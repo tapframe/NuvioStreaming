@@ -19,17 +19,65 @@
       "tintColor": "#04dcfc",
       "category": "entertainment",
       "screenshots": [
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/seasonandepisode-portrait.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.09.43-portrait.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/trailer-hero-section.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/video-player-interface.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/ratingscreen-portrait.png?raw=true",
-        "https://github.com/tapframe/NuvioStreaming/blob/main/screesnhots/search-portrait.png?raw=true"
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/seasonandepisode-portrait.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.09.43-portrait.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.10.14-portrait.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/trailer-hero-section.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/video-player-interface.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/ratingscreen-portrait.png?raw=true",
+        "https://github.com/tapframe/NuvioStreaming/blob/main/screenshots/search-portrait.png?raw=true"
       ],
       "versions": [
+        {
+          "version": "1.2.9",
+          "buildVersion": "24",
+          "date": "2025-11-16",
+          "localizedDescription": "# Nuvio Media Hub – v1.2.9  \n\n## Update Notes\n- **Trakt optimizations**\n- **Dependency updates** for better performance  \n- **API fixes** to improve data fetching and stability  \n- General **bug fixes** across the app  ",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.9/Stable_1-2-9.ipa",
+          "size": 25700000
+        },
+        {
+          "version": "1.2.8",
+          "buildVersion": "23",
+          "date": "2025-11-09",
+          "localizedDescription": "# Nuvio Media Hub – v1.2.8  \n\n## Update Notes\n- Dependency updates for stability and performance  \n- Minor animation tweaks  \n- Backend fixes and optimizations  ",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.8/Stable_1-2-8.ipa",
+          "size": 25700000
+        },
+        {
+          "version": "1.2.7",
+          "buildVersion": "22",
+          "date": "2025-10-26",
+          "localizedDescription": "# ⚠️ Important: Backup Before Updating to v1.2.7  \n\nBefore installing this update, **please back up your data** by going to **Settings → Backup** inside the app.  \nThis update replaces the internal storage system. **Old data will not be retrievable** without a backup.  \n\n---\n\n# Nuvio Media Hub – v1.2.7  \n\n## Major Changes\n- Replaced **Async Storage** with **React Native MMKV** for **much faster and more reliable local storage**  \n  > ⚠️ This change resets previous local data unless backed up and restored  \n- Added **Playback Speed Controls** to **KSPlayer** (iOS)  \n- Repositioned **Details Screen Action Buttons** for a cleaner layout  \n- Added **TMDB request caching** for faster performance when revisiting titles  \n- Fixed **Library Screen issue** with adding/removing movies and shows  \n\n---\n\n## Features Previously Released via OTA\n- **Playback controls for Android**  \n- **Library screen layout improvements**  \n- Various **backend bug fixes**  \n\n---\n\n## Recommended\nAll users are **strongly advised to perform a clean install** after updating  \nIf you've created a backup in the old version, restore it after installation using the **Restore** option in settings",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.7/Stable_1-2-7.ipa",
+          "size": 25700000
+        },
+        {
+          "version": "1.2.6",
+          "buildVersion": "21",
+          "date": "2025-10-19",
+          "localizedDescription": "# Version 1.2.6 – Update Notes\n\n### New Features\n- **AirPlay Support (iOS):**\n  - Introduced native AirPlay support for compatible playback.\n  - Note: **MKV format not supported** due to iOS restrictions.\n- **Last Streamed Link Caching:**\n  - The last streamed link is now cached for **1 hour** on the stream screen for faster playback.\n- **KSPlayer Internal Subtitle Support (iOS):**\n  - KSPlayer now supports internal subtitles for improved viewing experience.\n\n### PR Merge – Responsive Video Controls by @qarqun\n- **Responsive Sizing:**\n  - All controls now scale dynamically based on screen width for better phone and tablet compatibility.\n- **Play/Pause Animation:**\n  - Smooth crossfade transitions with scale effects for a polished user experience.\n- **Seek Animations:**\n  - Arc sweep animation on seek buttons.\n  - Number slide-out showing +10/-10 seconds.\n  - Touch feedback with semi-transparent circle flash.\n- **Technical Details:**\n  - Button sizes calculated as a percentage of screen width.\n  - All animations use `useNativeDriver` for optimal performance.\n  - Separate animation references to prevent animation conflicts.\n\n### Fixes\n- Fixed an issue where **Cinemeta Addon** reappeared even after removal from the addon screen.\n\n---\n\n## Changelog & Download\n[View on GitHub](https://github.com/tapframe/NuvioStreaming/releases/tag/1.2.6)\n\nSince the VLClib alone is 45 MB, Android APKs tend to be larger.\n\n🌐 [Official Website](https://tapframe.github.io/NuvioStreaming/)",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.6/Stable_1-2-6.ipa",
+          "size": 25700000
+        },
+        {
+          "version": "1.2.5",
+          "buildVersion": "20",
+          "date": "2025-10-15",
+          "localizedDescription": "# Version 1.2.5 – Update Notes\n\n### New Additions\n- Introduced **Liquid Glass Theme** for **iOS/iPadOS 16 and above**\n  - Devices running iOS/iPadOS 16+ will now use the new Liquid Glass theme across the app\n  - Older iOS versions will automatically fall back to the default theme\n\n### Improvements\n- Major **dependency updates** across the project\n- Improved **iOS player performance**\n- Optimized **metadata screen** rendering and responsiveness\n- Various **backend improvements** for smoother operations\n\n### General\n- Overall stability and performance improvements",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.5/Stable_1-2-5.ipa",
+          "size": 25700000
+        },
+        {
+          "version": "1.2.4",
+          "buildVersion": "19",
+          "date": "2025-10-12",
+          "localizedDescription": "# Version 1.2.4 – Update Notes\n\n### Improvements & Updates\n- Replaced **Expo Image** with **React Native Fast Image** for better performance and smoother image loading\n- Updated **VLCLib dependencies** to improve stability and compatibility\n\n### Bug Fixes\n- Fixed **rating screen episode number alignment**\n\n### General\n- Minor stability and performance improvements across the app",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.4/Stable_1-2-4.ipa",
+          "size": 25700000
+        },
         {
           "version": "1.2.3",
           "buildVersion": "18",

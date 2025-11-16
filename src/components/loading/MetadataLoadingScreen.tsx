@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -16,40 +16,77 @@ const { width, height } = Dimensions.get('window');
 
 interface MetadataLoadingScreenProps {
   type?: 'movie' | 'series';
+  onExitComplete?: () => void;
 }
 
-export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({ 
-  type = 'movie' 
-}) => {
+export interface MetadataLoadingScreenRef {
+  exit: () => void;
+}
+
+export const MetadataLoadingScreen = forwardRef<MetadataLoadingScreenRef, MetadataLoadingScreenProps>(({
+  type = 'movie',
+  onExitComplete
+}, ref) => {
   const { currentTheme } = useTheme();
   
-  // Animation values - removed fadeAnim since parent handles transitions
-  const pulseAnim = useRef(new Animated.Value(0.3)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  // Animation values - shimmer removed
   
   // Scene transition animation values (matching tab navigator)
   const sceneOpacity = useRef(new Animated.Value(0)).current;
   const sceneScale = useRef(new Animated.Value(0.95)).current;
   const sceneTranslateY = useRef(new Animated.Value(8)).current;
 
+  // Exit animation function
+  const exit = () => {
+    const exitAnimation = Animated.parallel([
+      Animated.timing(sceneOpacity, {
+        toValue: 0,
+        duration: 100,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sceneScale, {
+        toValue: 0.95,
+        duration: 100,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sceneTranslateY, {
+        toValue: 8,
+        duration: 100,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    exitAnimation.start(() => {
+      onExitComplete?.();
+    });
+  };
+
+  // Expose exit method through ref
+  useImperativeHandle(ref, () => ({
+    exit,
+  }));
+
   useEffect(() => {
     // Scene entrance animation (matching tab navigator)
     const sceneAnimation = Animated.parallel([
       Animated.timing(sceneOpacity, {
         toValue: 1,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
       Animated.timing(sceneScale, {
         toValue: 1,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
       Animated.timing(sceneTranslateY, {
         toValue: 0,
-        duration: 200,
+        duration: 100,
         easing: Easing.bezier(0.25, 0.1, 0.25, 1.0),
         useNativeDriver: true,
       }),
@@ -57,45 +94,14 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
 
     sceneAnimation.start();
 
-    // Continuous pulse animation for skeleton elements
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.3,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    // Shimmer effect for skeleton elements
-    const shimmerAnimation = Animated.loop(
-      Animated.timing(shimmerAnim, {
-        toValue: 1,
-        duration: 1500,
-        useNativeDriver: true,
-      })
-    );
-
-    pulseAnimation.start();
-    shimmerAnimation.start();
+    // Shimmer effect removed
 
     return () => {
       sceneAnimation.stop();
-      pulseAnimation.stop();
-      shimmerAnimation.stop();
     };
   }, []);
 
-  const shimmerTranslateX = shimmerAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-width, width],
-  });
+  // Shimmer translate removed
 
   const SkeletonElement = ({ 
     width: elementWidth, 
@@ -121,30 +127,8 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
       },
       style
     ]}>
-      <Animated.View style={[
-        StyleSheet.absoluteFill,
-        {
-          opacity: pulseAnim,
-          backgroundColor: currentTheme.colors.primary + '20',
-        }
-      ]} />
-      <Animated.View style={[
-        StyleSheet.absoluteFill,
-        {
-          transform: [{ translateX: shimmerTranslateX }],
-        }
-      ]}>
-        <LinearGradient
-          colors={[
-            'transparent',
-            currentTheme.colors.white + '20',
-            'transparent'
-          ]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        />
-      </Animated.View>
+      {/* Pulsating overlay removed */}
+      {/* Shimmer overlay removed */}
     </View>
   );
 
@@ -264,7 +248,7 @@ export const MetadataLoadingScreen: React.FC<MetadataLoadingScreenProps> = ({
       </Animated.View>
     </SafeAreaView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

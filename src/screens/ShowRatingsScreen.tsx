@@ -10,10 +10,25 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../contexts/ThemeContext';
-import { TMDBService, TMDBShow as Show, TMDBSeason, TMDBEpisode } from '../services/tmdbService';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for ShowRatingsScreen
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
+import { TMDBService, TMDBShow as Show, TMDBSeason, TMDBEpisode, IMDbRatings } from '../services/tmdbService';
 import { RouteProp } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import axios from 'axios';
@@ -63,17 +78,17 @@ const getRatingColor = (rating: number): string => {
 };
 
 // Memoized components
-const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeason, theme }: {
+const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, getIMDbRating, theme }: {
   episode: TMDBEpisode;
   ratingSource: RatingSource;
   getTVMazeRating: (seasonNumber: number, episodeNumber: number) => number | null;
-  isCurrentSeason: (episode: TMDBEpisode) => boolean;
+  getIMDbRating: (seasonNumber: number, episodeNumber: number) => number | null;
   theme: any;
 }) => {
   const getRatingForSource = useCallback((episode: TMDBEpisode): number | null => {
     switch (ratingSource) {
       case 'imdb':
-        return episode.imdb_rating || null;
+        return getIMDbRating(episode.season_number, episode.episode_number);
       case 'tmdb':
         return episode.vote_average || null;
       case 'tvmaze':
@@ -81,23 +96,9 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeas
       default:
         return null;
     }
-  }, [ratingSource, getTVMazeRating]);
-
-  const isRatingPotentiallyInaccurate = useCallback((episode: TMDBEpisode): boolean => {
-    const rating = getRatingForSource(episode);
-    if (!rating) return false;
-
-    if (ratingSource === 'tmdb' && episode.imdb_rating) {
-      const difference = Math.abs(rating - episode.imdb_rating);
-      return difference >= 2;
-    }
-
-    return false;
-  }, [getRatingForSource, ratingSource]);
+  }, [ratingSource, getTVMazeRating, getIMDbRating]);
 
   const rating = getRatingForSource(episode);
-  const isInaccurate = isRatingPotentiallyInaccurate(episode);
-  const isCurrent = isCurrentSeason(episode);
 
   if (!rating) {
     if (!episode.air_date || new Date(episode.air_date) > new Date()) {
@@ -120,19 +121,10 @@ const RatingCell = memo(({ episode, ratingSource, getTVMazeRating, isCurrentSeas
         styles.ratingCell, 
         { 
           backgroundColor: getRatingColor(rating),
-          opacity: isCurrent ? 0.7 : 1,
         }
       ]}>
         <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
       </Animated.View>
-      {(isInaccurate || isCurrent) && (
-        <MaterialIcons 
-          name={isCurrent ? "schedule" : "warning"}
-          size={12} 
-          color={isCurrent ? theme.colors.primary : theme.colors.warning}
-          style={styles.warningIcon}
-        />
-      )}
     </Animated.View>
   );
 });
@@ -145,7 +137,7 @@ const RatingSourceToggle = memo(({ ratingSource, setRatingSource, theme }: {
   <View style={styles.ratingSourceContainer}>
     <Text style={[styles.sectionTitle, { color: theme.colors.white }]}>Rating Source:</Text>
     <View style={styles.ratingSourceButtons}>
-      {['imdb', 'tmdb', 'tvmaze'].map((source) => {
+      {['tmdb', 'imdb', 'tvmaze'].map((source) => {
         const isActive = ratingSource === source;
         return (
           <TouchableOpacity
@@ -175,11 +167,10 @@ const RatingSourceToggle = memo(({ ratingSource, setRatingSource, theme }: {
 
 const ShowInfo = memo(({ show, theme }: { show: Show | null, theme: any }) => (
   <View style={styles.showInfo}>
-    <Image
+    <FastImage
       source={{ uri: `https://image.tmdb.org/t/p/w500${show?.poster_path}` }}
       style={styles.poster}
-      contentFit="cover"
-      transition={200}
+      resizeMode={FastImage.resizeMode.cover}
     />
     <View style={styles.showDetails}>
       <Text style={[styles.showTitle, { color: theme.colors.white }]}>{show?.name}</Text>
@@ -203,10 +194,11 @@ const ShowRatingsScreen = ({ route }: Props) => {
   const [show, setShow] = useState<Show | null>(null);
   const [seasons, setSeasons] = useState<TMDBSeason[]>([]);
   const [tvmazeEpisodes, setTvmazeEpisodes] = useState<TVMazeEpisode[]>([]);
+  const [imdbRatings, setImdbRatings] = useState<IMDbRatings>([]);
   const [loading, setLoading] = useState(true);
   const [loadingSeasons, setLoadingSeasons] = useState(false);
   const [loadedSeasons, setLoadedSeasons] = useState<number[]>([]);
-  const [ratingSource, setRatingSource] = useState<RatingSource>('tmdb');
+  const [ratingSource, setRatingSource] = useState<RatingSource>('imdb');
   const [visibleSeasonRange, setVisibleSeasonRange] = useState({ start: 0, end: 8 });
   const [loadingProgress, setLoadingProgress] = useState(0);
   const ratingsCache = useRef<{[key: string]: number | null}>({});
@@ -302,6 +294,12 @@ const ShowRatingsScreen = ({ route }: Props) => {
         if (showData) {
           setShow(showData);
           
+          // Fetch IMDb ratings for all seasons
+          const imdbRatingsData = await tmdb.getIMDbRatings(showId);
+          if (imdbRatingsData) {
+            setImdbRatings(imdbRatingsData);
+          }
+          
           // Get external IDs to fetch TVMaze data
           const externalIds = await tmdb.getShowExternalIds(showId);
           if (externalIds?.imdb_id) {
@@ -333,19 +331,22 @@ const ShowRatingsScreen = ({ route }: Props) => {
     return episode?.rating?.average || null;
   }, [tvmazeEpisodes]);
 
-  const isCurrentSeason = useCallback((episode: TMDBEpisode): boolean => {
-    if (!seasons.length || !episode.air_date) return false;
+  const getIMDbRating = useCallback((seasonNumber: number, episodeNumber: number): number | null => {
+    // Flatten all episodes from all seasons and find the matching one
+    for (const season of imdbRatings) {
+      if (!season.episodes) continue;
+      
+      const episode = season.episodes.find(
+        ep => ep.season_number === seasonNumber && ep.episode_number === episodeNumber
+      );
+      
+      if (episode) {
+        return episode.vote_average || null;
+      }
+    }
     
-    const latestSeasonNumber = Math.max(...seasons.map(s => s.season_number));
-    if (episode.season_number !== latestSeasonNumber) return false;
-    
-    const now = new Date();
-    const airDate = new Date(episode.air_date);
-    const monthsDiff = (now.getFullYear() - airDate.getFullYear()) * 12 + 
-                      (now.getMonth() - airDate.getMonth());
-    
-    return monthsDiff <= 6;
-  }, [seasons]);
+    return null;
+  }, [imdbRatings]);
 
   if (loading) {
     return (
@@ -368,11 +369,18 @@ const ShowRatingsScreen = ({ route }: Props) => {
   return (
     <View style={[styles.container, { backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.black }]}>
       {Platform.OS === 'ios' && (
-        <BlurView
-          style={StyleSheet.absoluteFill}
-          tint="dark"
-          intensity={60}
-        />
+        GlassViewComp && liquidGlassAvailable ? (
+          <GlassViewComp
+            style={StyleSheet.absoluteFill}
+            glassEffectStyle="regular"
+          />
+        ) : (
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            tint="dark"
+            intensity={60}
+          />
+        )
       )}
       <StatusBar
         translucent
@@ -433,16 +441,6 @@ const ShowRatingsScreen = ({ route }: Props) => {
                       </View>
                     ))}
                   </View>
-                  <View style={[styles.warningLegends, { borderTopColor: colors.black + '40' }]}>
-                    <View style={styles.warningLegend}>
-                      <MaterialIcons name="warning" size={14} color={colors.warning} />
-                      <Text style={[styles.warningText, { color: colors.lightGray }]}>Rating differs significantly from IMDb</Text>
-                    </View>
-                    <View style={styles.warningLegend}>
-                      <MaterialIcons name="schedule" size={14} color={colors.primary} />
-                      <Text style={[styles.warningText, { color: colors.lightGray }]}>Current season (ratings may change)</Text>
-                    </View>
-                  </View>
                 </View>
               </Animated.View>
 
@@ -474,7 +472,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                       onScroll={onScroll}
                       scrollEventThrottle={16}
                     >
-                      <View>
+                      <View style={styles.seasonsContainer}>
                         {/* Seasons Header */}
                         <View style={[styles.gridHeader, { borderBottomColor: colors.black + '40' }]}>
                           {seasons.map((season) => (
@@ -514,7 +512,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                                     episode={season.episodes[episodeIndex]}
                                     ratingSource={ratingSource}
                                     getTVMazeRating={getTVMazeRating}
-                                    isCurrentSeason={isCurrentSeason}
+                                    getIMDbRating={getIMDbRating}
                                     theme={currentTheme}
                                   />
                                 }
@@ -697,9 +695,15 @@ const styles = StyleSheet.create({
     width: 40,
     borderRightWidth: 1,
     paddingRight: 6,
+    justifyContent: 'flex-start',
+    paddingTop: 8,
   },
   seasonsScrollView: {
     flex: 1,
+  },
+  seasonsContainer: {
+    flexDirection: 'column',
+    paddingTop: 8,
   },
   gridHeader: {
     flexDirection: 'row',
@@ -707,26 +711,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingBottom: 6,
     paddingLeft: 6,
+    height: 32,
+    alignItems: 'center',
   },
   gridRow: {
     flexDirection: 'row',
     marginBottom: 6,
     paddingLeft: 6,
+    height: 32,
+    alignItems: 'center',
   },
   episodeCell: {
-    height: 26,
+    height: 32,
     justifyContent: 'center',
     paddingRight: 6,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   episodeColumn: {
-    height: 26,
+    height: 32,
     justifyContent: 'center',
     marginBottom: 8,
     paddingRight: 6,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent',
+    paddingBottom: 6,
   },
   ratingColumn: {
     width: 40,
     alignItems: 'center',
+    height: 32,
+    justifyContent: 'center',
   },
   headerText: {
     fontWeight: '700',
@@ -753,6 +769,8 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: 32,
     height: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   warningIcon: {
     position: 'absolute',
@@ -767,6 +785,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     opacity: 0.7,
+    height: 32,
   },
   loadingProgressContainer: {
     alignItems: 'center',

@@ -306,47 +306,75 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   Built-in Subtitles
                 </Text>
 
-                {/* Notice about built-in subtitle limitations - only when KSPlayer active on iOS */}
-                {isIos && isKsPlayerActive && (
+                {/* Built-in subtitles now enabled for KSPlayer */}
+                {isKsPlayerActive && (
                   <View style={{
-                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
                     borderRadius: 12,
                     padding: sectionPad,
                     marginBottom: 15,
                     borderWidth: 1,
-                    borderColor: 'rgba(255, 193, 7, 0.3)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)',
                   }}>
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                      <MaterialIcons name="info" size={18} color="#FFC107" />
+                      <MaterialIcons name="check-circle" size={18} color="#22C55E" />
                       <View style={{ flex: 1 }}>
                         <Text style={{
-                          color: '#FFC107',
+                          color: '#22C55E',
                           fontSize: isCompact ? 12 : 13,
                           fontWeight: '600',
                           marginBottom: 4,
                         }}>
-                          Built-in subtitles temporarily disabled
+                          Built-in subtitles enabled for KSPlayer
                         </Text>
                         <Text style={{
                           color: 'rgba(255, 255, 255, 0.8)',
                           fontSize: isCompact ? 11 : 12,
                           lineHeight: isCompact ? 16 : 18,
                         }}>
-                          Due to some React Native limitations with KSPlayer, built-in subtitle rendering is temporarily disabled. Please use external subtitles instead for the best experience.
+                          KSPlayer built-in subtitle rendering is now available. You can select from embedded subtitle tracks below.
                         </Text>
                       </View>
                     </View>
                   </View>
                 )}
-                
-                {(!isIos || (isIos && !isKsPlayerActive)) && (
+
+                {/* Disable Subtitles Button */}
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: selectedTextTrack === -1 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: 16,
+                    padding: sectionPad,
+                    borderWidth: 1,
+                    borderColor: selectedTextTrack === -1 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                    marginBottom: 8,
+                  }}
+                  onPress={() => {
+                    selectTextTrack(-1);
+                    setSelectedOnlineSubtitleId(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{
+                      color: selectedTextTrack === -1 ? '#EF4444' : '#FFFFFF',
+                      fontSize: isCompact ? 14 : 15,
+                      fontWeight: '500',
+                      flex: 1,
+                    }}>
+                      Disable All Subtitles
+                    </Text>
+                    {selectedTextTrack === -1 && (
+                      <MaterialIcons name="check" size={20} color="#EF4444" />
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                {/* Always show built-in subtitles */}
+                {ksTextTracks.length > 0 && (
                   <View style={{ gap: 8 }}>
                     {ksTextTracks.map((track) => {
                       const isSelected = selectedTextTrack === track.id && !useCustomSubtitles;
-                      // Debug logging for subtitle selection
-                      if (__DEV__ && ksTextTracks.length > 0) {
-                        console.log('[SubtitleModals] Track:', track.id, track.name, 'Selected:', selectedTextTrack, 'isSelected:', isSelected, 'useCustom:', useCustomSubtitles);
-                      }
                       return (
                         <TouchableOpacity
                           key={track.id}
@@ -599,11 +627,11 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFFFFF');
                         setSubtitleBgOpacity(0.7);
                         setSubtitleTextShadow(true);
-                        setSubtitleOutline(false);
+                        setSubtitleOutline(true);
                         setSubtitleOutlineColor('#000000');
-                        setSubtitleOutlineWidth(2);
+                        setSubtitleOutlineWidth(4);
                         setSubtitleAlign('center');
-                        setSubtitleBottomOffset(20);
+                        setSubtitleBottomOffset(10);
                         setSubtitleLetterSpacing(0);
                         setSubtitleLineHeightMultiplier(1.2);
                       }}
@@ -616,7 +644,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFD700');
                         setSubtitleOutline(true);
                         setSubtitleOutlineColor('#000000');
-                        setSubtitleOutlineWidth(2);
+                        setSubtitleOutlineWidth(4);
                         setSubtitleBgOpacity(0.3);
                         setSubtitleTextShadow(false);
                       }}
@@ -643,7 +671,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFFFFF');
                         setSubtitleBgOpacity(0.6);
                         setSubtitleTextShadow(true);
-                        setSubtitleOutline(false);
+                        setSubtitleOutline(true);
                         setSubtitleAlign('center');
                         setSubtitleLineHeightMultiplier(1.3);
                       }}
@@ -765,39 +793,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     </View>
                   </View>
 
-                  {/* Shadow & Outline */}
-                  <View style={{ flexDirection: isCompact ? 'column' : 'row', justifyContent: 'space-between', gap: 12 }}>
-                    {/* Shadow */}
-                    <View style={{ flex: 1, gap: 8 }}>
-                      <Text style={{ color: 'white', fontWeight: '600' }}>Text Shadow</Text>
-                      <TouchableOpacity onPress={() => setSubtitleTextShadow(!subtitleTextShadow)} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleTextShadow ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleTextShadow ? 'On' : 'Off'}</Text>
-                      </TouchableOpacity>
-                    </View>
-                    {/* Outline */}
-                    <View style={{ flex: 1, gap: 8 }}>
-                      <Text style={{ color: 'white', fontWeight: '600' }}>Outline</Text>
-                      <TouchableOpacity onPress={() => {
-                        const next = !subtitleOutline;
-                        setSubtitleOutline(next);
-                        if (next) {
-                          // Apply sensible defaults when enabling outline unless user already set larger values
-                          if (subtitleSize < 24) {
-                            // increase by calling increase handler enough times or provide a direct setter via size controls
-                            // We only have +/- handlers here, so set via stepping until >= 24
-                            const steps = Math.ceil((24 - subtitleSize) / 1); // size is integer steps
-                            for (let i = 0; i < steps; i++) {
-                              increaseSubtitleSize();
-                            }
-                          }
-                          if (subtitleBottomOffset < 40) {
-                            setSubtitleBottomOffset(40);
-                          }
-                        }
-                      }} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleOutline ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
-                        <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleOutline ? 'On' : 'Off'}</Text>
-                      </TouchableOpacity>
-                    </View>
+                  {/* Shadow */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ color: 'white', fontWeight: '600' }}>Text Shadow</Text>
+                    <TouchableOpacity onPress={() => setSubtitleTextShadow(!subtitleTextShadow)} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleTextShadow ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleTextShadow ? 'On' : 'Off'}</Text>
+                    </TouchableOpacity>
                   </View>
                   {/* Outline color & width */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -881,11 +882,11 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         setSubtitleTextColor('#FFFFFF');
                         setSubtitleBgOpacity(0.7);
                         setSubtitleTextShadow(true);
-                        setSubtitleOutline(false);
+                        setSubtitleOutline(true);
                         setSubtitleOutlineColor('#000000');
-                        setSubtitleOutlineWidth(2);
+                        setSubtitleOutlineWidth(4);
                         setSubtitleAlign('center');
-                        setSubtitleBottomOffset(20);
+                        setSubtitleBottomOffset(10);
                         setSubtitleLetterSpacing(0);
                         setSubtitleLineHeightMultiplier(1.2);
                         setSubtitleOffsetSec(0);

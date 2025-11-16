@@ -11,7 +11,7 @@ import {
   Dimensions,
   Linking
 } from 'react-native';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -20,7 +20,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import UpdateService from '../services/updateService';
 import CustomAlert from '../components/CustomAlert';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useGithubMajorUpdate } from '../hooks/useGithubMajorUpdate';
 import { getDisplayedAppVersion } from '../utils/version';
 import { isAnyUpgrade } from '../services/githubReleaseService';
@@ -70,6 +70,7 @@ const UpdateScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const github = useGithubMajorUpdate();
+  const { showInfo } = useToast();
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -145,14 +146,14 @@ const UpdateScreen: React.FC = () => {
     if (Platform.OS === 'android') {
       // ensure badge clears when entering this screen
       (async () => {
-        try { await AsyncStorage.removeItem('@update_badge_pending'); } catch {}
+        try { await mmkvStorage.removeItem('@update_badge_pending'); } catch {}
       })();
     }
     checkForUpdates();
     // Also refresh GitHub section on mount (works in dev and prod)
     try { github.refresh(); } catch {}
     if (Platform.OS === 'android') {
-      try { Toast.info('Checking for updates…'); } catch {}
+      showInfo('Checking for Updates', 'Checking for updates…');
     }
   }, []);
 

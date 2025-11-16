@@ -20,13 +20,13 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { catalogService, StreamingContent } from '../services/catalogService';
-import { Image } from 'expo-image';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
+import { catalogService, StreamingContent, GroupedSearchResults, AddonSearchResults } from '../services/catalogService';
+import FastImage from '@d11/react-native-fast-image';
 import debounce from 'lodash/debounce';
 import { DropUpMenu } from '../components/home/DropUpMenu';
 import { DeviceEventEmitter, Share } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import Animated, { 
   FadeIn, 
   FadeOut, 
@@ -45,14 +45,33 @@ import { useTheme } from '../contexts/ThemeContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const { width, height } = Dimensions.get('window');
-const isTablet = width >= 768;
+
+// Enhanced responsive breakpoints
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
+
+const getDeviceType = (deviceWidth: number) => {
+  if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+  if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+  if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+  return 'phone';
+};
+
+const deviceType = getDeviceType(width);
+const isTablet = deviceType === 'tablet';
+const isLargeTablet = deviceType === 'largeTablet';
+const isTV = deviceType === 'tv';
 const TAB_BAR_HEIGHT = 85;
 
-// Tablet-optimized poster sizes
-const HORIZONTAL_ITEM_WIDTH = isTablet ? width * 0.18 : width * 0.3;
+// Responsive poster sizes
+const HORIZONTAL_ITEM_WIDTH = isTV ? width * 0.14 : isLargeTablet ? width * 0.16 : isTablet ? width * 0.18 : width * 0.3;
 const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
-const POSTER_WIDTH = isTablet ? 70 : 90;
-const POSTER_HEIGHT = isTablet ? 105 : 135;
+const POSTER_WIDTH = isTV ? 90 : isLargeTablet ? 80 : isTablet ? 70 : 90;
+const POSTER_HEIGHT = POSTER_WIDTH * 1.5;
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 10;
 
@@ -201,7 +220,7 @@ const SearchScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = true;
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<StreamingContent[]>([]);
+  const [results, setResults] = useState<GroupedSearchResults>({ byAddon: [], allResults: [] });
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -209,6 +228,12 @@ const SearchScreen = () => {
   const inputRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
+  // Live search handle
+  const liveSearchHandle = useRef<{ cancel: () => void; done: Promise<void> } | null>(null);
+  // Addon installation order map for stable section ordering
+  const addonOrderRankRef = useRef<Record<string, number>>({});
+  // Track if this is the initial mount to prevent unnecessary operations
+  const isInitialMount = useRef(true);
   // DropUpMenu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StreamingContent | null>(null);
@@ -225,7 +250,7 @@ const SearchScreen = () => {
       const found = items.find((libItem: any) => libItem.id === selectedItem.id && libItem.type === selectedItem.type);
       setIsSaved(!!found);
       // Check watched status
-      const val = await AsyncStorage.getItem(`watched:${selectedItem.type}:${selectedItem.id}`);
+      const val = await mmkvStorage.getItem(`watched:${selectedItem.type}:${selectedItem.id}`);
       setIsWatched(val === 'true');
     })();
   }, [selectedItem]);
@@ -306,7 +331,7 @@ const SearchScreen = () => {
     Keyboard.dismiss();
     if (query) {
       setQuery('');
-      setResults([]);
+      setResults({ byAddon: [], allResults: [] });
       setSearched(false);
       setShowRecent(true);
       loadRecentSearches();
@@ -324,7 +349,7 @@ const SearchScreen = () => {
 
   const loadRecentSearches = async () => {
     try {
-      const savedSearches = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
+      const savedSearches = await mmkvStorage.getItem(RECENT_SEARCHES_KEY);
       if (savedSearches) {
         setRecentSearches(JSON.parse(savedSearches));
       }
@@ -342,7 +367,7 @@ const SearchScreen = () => {
       ].slice(0, MAX_RECENT_SEARCHES);
       
         // Save to AsyncStorage
-        AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+        mmkvStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
         
         return newRecentSearches;
       });
@@ -351,33 +376,88 @@ const SearchScreen = () => {
     }
   };
 
-  const debouncedSearch = useCallback(
-    debounce(async (searchQuery: string) => {
+  // Create a stable debounced search function using useMemo
+  const debouncedSearch = useMemo(() => {
+    return debounce(async (searchQuery: string) => {
       if (!searchQuery.trim()) {
-        setResults([]);
+        // Cancel any in-flight live search
+        liveSearchHandle.current?.cancel();
+        liveSearchHandle.current = null;
+        setResults({ byAddon: [], allResults: [] });
         setSearching(false);
         return;
       }
 
+      // Cancel prior live search
+      liveSearchHandle.current?.cancel();
+      setResults({ byAddon: [], allResults: [] });
+      setSearching(true);
+
+      logger.info('Starting live search for:', searchQuery);
+      // Preload addon order to keep sections sorted by installation order
       try {
-        logger.info('Performing search for:', searchQuery);
-        const searchResults = await catalogService.searchContentCinemeta(searchQuery);
-        setResults(searchResults);
-        if (searchResults.length > 0) {
+        const addons = await catalogService.getAllAddons();
+        const rank: Record<string, number> = {};
+        addons.forEach((a, idx) => { rank[a.id] = idx; });
+        addonOrderRankRef.current = rank;
+      } catch {}
+
+      const handle = catalogService.startLiveSearch(searchQuery, async (section: AddonSearchResults) => {
+        // Append/update this addon section immediately with minimal changes
+        setResults(prev => {
+          const rank = addonOrderRankRef.current;
+          const getRank = (id: string) => rank[id] ?? Number.MAX_SAFE_INTEGER;
+
+          const existingIndex = prev.byAddon.findIndex(s => s.addonId === section.addonId);
+
+          if (existingIndex >= 0) {
+            // Update existing section in-place (preserve order and other sections)
+            const copy = prev.byAddon.slice();
+            copy[existingIndex] = section;
+            return { byAddon: copy, allResults: prev.allResults };
+          }
+
+          // Insert new section at correct position based on rank
+          const insertRank = getRank(section.addonId);
+          let insertAt = prev.byAddon.length;
+          for (let i = 0; i < prev.byAddon.length; i++) {
+            if (getRank(prev.byAddon[i].addonId) > insertRank) {
+              insertAt = i;
+              break;
+            }
+          }
+
+          const nextByAddon = [
+            ...prev.byAddon.slice(0, insertAt),
+            section,
+            ...prev.byAddon.slice(insertAt)
+          ];
+
+          // Hide loading overlay once first section arrives
+          if (prev.byAddon.length === 0) {
+            setSearching(false);
+          }
+
+          return { byAddon: nextByAddon, allResults: prev.allResults };
+        });
+
+        // Save to recents after first result batch
+        try {
           await saveRecentSearch(searchQuery);
-        }
-        logger.info('Search completed, found', searchResults.length, 'results');
-      } catch (error) {
-        logger.error('Search failed:', error);
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 800),
-    []
-  );
+        } catch {}
+      });
+      liveSearchHandle.current = handle;
+    }, 800);
+  }, []); // Empty dependency array - create once and never recreate
 
   useEffect(() => {
+    // Skip initial mount to prevent unnecessary operations
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      loadRecentSearches();
+      return;
+    }
+
     if (query.trim() && query.trim().length >= 2) {
       setSearching(true);
       setSearched(true);
@@ -388,26 +468,30 @@ const SearchScreen = () => {
       setSearching(false);
       setSearched(false);
       setShowRecent(false);
-      setResults([]);
+      setResults({ byAddon: [], allResults: [] });
     } else {
       // Cancel any pending search when query is cleared
       debouncedSearch.cancel();
-      setResults([]);
+      liveSearchHandle.current?.cancel();
+      liveSearchHandle.current = null;
+      setResults({ byAddon: [], allResults: [] });
       setSearched(false);
       setSearching(false);
       setShowRecent(true);
       loadRecentSearches();
     }
-    
+
     // Cleanup function to cancel pending searches
     return () => {
       debouncedSearch.cancel();
     };
-  }, [query, debouncedSearch]);
+  }, [query]); // Removed debouncedSearch since it's now stable with useMemo
 
   const handleClearSearch = () => {
     setQuery('');
-    setResults([]);
+    liveSearchHandle.current?.cancel();
+    liveSearchHandle.current = null;
+    setResults({ byAddon: [], allResults: [] });
     setSearched(false);
     setShowRecent(true);
     loadRecentSearches();
@@ -449,7 +533,7 @@ const SearchScreen = () => {
                 const newRecentSearches = [...recentSearches];
                 newRecentSearches.splice(index, 1);
                 setRecentSearches(newRecentSearches);
-                AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
+                mmkvStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={styles.recentSearchDeleteButton}
@@ -462,27 +546,19 @@ const SearchScreen = () => {
     );
   };
 
-  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme, refreshFlag }: {
+  const SearchResultItem = ({ item, index, navigation, setSelectedItem, setMenuVisible, currentTheme }: {
     item: StreamingContent;
     index: number;
     navigation: any;
     setSelectedItem: (item: StreamingContent) => void;
     setMenuVisible: (visible: boolean) => void;
     currentTheme: any;
-    refreshFlag: boolean;
   }) => {
     const [inLibrary, setInLibrary] = React.useState(!!item.inLibrary);
     const [watched, setWatched] = React.useState(false);
-    // Re-check status when refreshFlag changes
-    React.useEffect(() => {
-      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
-      const items = catalogService.getLibraryItems();
-      const found = items.find((libItem: any) => libItem.id === item.id && libItem.type === item.type);
-      setInLibrary(!!found);
-    }, [refreshFlag, item.id, item.type]);
     React.useEffect(() => {
       const updateWatched = () => {
-        AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
+        mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
       };
       updateWatched();
       const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
@@ -514,16 +590,15 @@ const SearchScreen = () => {
           backgroundColor: currentTheme.colors.darkBackground,
           borderColor: 'rgba(255,255,255,0.05)'
         }]}> 
-          <Image
+          <FastImage
             source={{ uri: item.poster || PLACEHOLDER_POSTER }}
             style={styles.horizontalItemPoster}
-            contentFit="cover"
-            transition={300}
+            resizeMode={FastImage.resizeMode.cover}
           />
           {/* Bookmark and watched icons top right, bookmark to the left of watched */}
           {inLibrary && (
             <View style={[styles.libraryBadge, { position: 'absolute', top: 8, right: 36, backgroundColor: 'transparent', zIndex: 2 }] }>
-              <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
+              <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
             </View>
           )}
           {watched && (
@@ -541,13 +616,20 @@ const SearchScreen = () => {
           )}
         </View>
         <Text 
-          style={[styles.horizontalItemTitle, { color: currentTheme.colors.white }]}
+          style={[
+            styles.horizontalItemTitle, 
+            { 
+              color: currentTheme.colors.white,
+              fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 14,
+              lineHeight: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 18,
+            }
+          ]}
           numberOfLines={2}
         >
           {item.name}
         </Text>
         {item.year && (
-          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray }]}> 
+          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray, fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 12 }]}> 
             {item.year}
           </Text>
         )}
@@ -555,30 +637,174 @@ const SearchScreen = () => {
     );
   };
   
-  const movieResults = useMemo(() => {
-    return results.filter(item => item.type === 'movie');
-  }, [results]);
-
-  const seriesResults = useMemo(() => {
-    return results.filter(item => item.type === 'series');
-  }, [results]);
-
   const hasResultsToShow = useMemo(() => {
-     return movieResults.length > 0 || seriesResults.length > 0;
-  }, [movieResults, seriesResults]);
+    return results.byAddon.length > 0;
+  }, [results]);
+
+  // Memoized addon section to prevent re-rendering unchanged sections
+  const AddonSection = React.memo(({ 
+    addonGroup, 
+    addonIndex 
+  }: { 
+    addonGroup: AddonSearchResults; 
+    addonIndex: number;
+  }) => {
+    const movieResults = useMemo(() => 
+      addonGroup.results.filter(item => item.type === 'movie'), 
+      [addonGroup.results]
+    );
+    const seriesResults = useMemo(() => 
+      addonGroup.results.filter(item => item.type === 'series'), 
+      [addonGroup.results]
+    );
+    const otherResults = useMemo(() => 
+      addonGroup.results.filter(item => item.type !== 'movie' && item.type !== 'series'), 
+      [addonGroup.results]
+    );
+
+    return (
+      <Animated.View entering={FadeIn.duration(300).delay(addonIndex * 50)}>
+        {/* Addon Header */}
+        <View style={styles.addonHeaderContainer}>
+          <Text style={[styles.addonHeaderText, { color: currentTheme.colors.white }]}>
+            {addonGroup.addonName}
+          </Text>
+          <View style={[styles.addonHeaderBadge, { backgroundColor: currentTheme.colors.elevation2 }]}>
+            <Text style={[styles.addonHeaderBadgeText, { color: currentTheme.colors.lightGray }]}>
+              {addonGroup.results.length}
+            </Text>
+          </View>
+        </View>
+
+        {/* Movies */}
+        {movieResults.length > 0 && (
+          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <Text style={[
+            styles.carouselSubtitle,
+            { 
+              color: currentTheme.colors.lightGray,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+            }
+          ]}> 
+              Movies ({movieResults.length})
+            </Text>
+            <FlatList
+              data={movieResults}
+              renderItem={({ item, index }) => (
+                <SearchResultItem
+                  item={item}
+                  index={index}
+                  navigation={navigation}
+                  setSelectedItem={setSelectedItem}
+                  setMenuVisible={setMenuVisible}
+                  currentTheme={currentTheme}
+                />
+              )}
+              keyExtractor={item => `${addonGroup.addonId}-movie-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContent}
+            />
+          </Animated.View>
+        )}
+
+        {/* TV Shows */}
+        {seriesResults.length > 0 && (
+          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <Text style={[
+            styles.carouselSubtitle,
+            { 
+              color: currentTheme.colors.lightGray,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+            }
+          ]}> 
+              TV Shows ({seriesResults.length})
+            </Text>
+            <FlatList
+              data={seriesResults}
+              renderItem={({ item, index }) => (
+                <SearchResultItem
+                  item={item}
+                  index={index}
+                  navigation={navigation}
+                  setSelectedItem={setSelectedItem}
+                  setMenuVisible={setMenuVisible}
+                  currentTheme={currentTheme}
+                />
+              )}
+              keyExtractor={item => `${addonGroup.addonId}-series-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContent}
+            />
+          </Animated.View>
+        )}
+
+        {/* Other types */}
+        {otherResults.length > 0 && (
+          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <Text style={[
+            styles.carouselSubtitle,
+            { 
+              color: currentTheme.colors.lightGray,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+            }
+          ]}> 
+              {otherResults[0].type.charAt(0).toUpperCase() + otherResults[0].type.slice(1)} ({otherResults.length})
+            </Text>
+            <FlatList
+              data={otherResults}
+              renderItem={({ item, index }) => (
+                <SearchResultItem
+                  item={item}
+                  index={index}
+                  navigation={navigation}
+                  setSelectedItem={setSelectedItem}
+                  setMenuVisible={setMenuVisible}
+                  currentTheme={currentTheme}
+                />
+              )}
+              keyExtractor={item => `${addonGroup.addonId}-${item.type}-${item.id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContent}
+            />
+          </Animated.View>
+        )}
+      </Animated.View>
+    );
+  }, (prev, next) => {
+    // Only re-render if this section's reference changed
+    return prev.addonGroup === next.addonGroup && prev.addonIndex === next.addonIndex;
+  });
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  // Keep header below floating top navigator on tablets by adding extra offset
+  const tabletNavOffset = (isTV || isLargeTablet || isTablet) ? 64 : 0;
+  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
   const headerHeight = headerBaseHeight + topSpacing + 60;
 
+  // Set up listeners for watched status and library updates
+  // These will trigger re-renders in individual SearchResultItem components
   useEffect(() => {
-    const watchedSub = DeviceEventEmitter.addListener('watchedStatusChanged', () => setRefreshFlag(f => !f));
-    const librarySub = catalogService.subscribeToLibraryUpdates(() => setRefreshFlag(f => !f));
-    const focusSub = navigation.addListener('focus', () => setRefreshFlag(f => !f));
+    const watchedSub = DeviceEventEmitter.addListener('watchedStatusChanged', () => {
+      // Individual items will handle their own watched status updates
+      // No need to force a full re-render of all results
+    });
+    const librarySub = catalogService.subscribeToLibraryUpdates(() => {
+      // Individual items will handle their own library status updates
+      // No need to force a full re-render of all results
+    });
+
     return () => {
       watchedSub.remove();
       librarySub();
-      focusSub();
     };
   }, []);
 
@@ -707,64 +933,14 @@ const SearchScreen = () => {
               showsVerticalScrollIndicator={false}
             >
               {!query.trim() && renderRecentSearches()}
-              {movieResults.length > 0 && (
-                <Animated.View 
-                  style={styles.carouselContainer}
-                  entering={FadeIn.duration(300)}
-                >
-                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}> 
-                    Movies ({movieResults.length})
-                  </Text>
-                  <FlatList
-                    data={movieResults}
-                    renderItem={({ item, index }) => (
-                      <SearchResultItem
-                        item={item}
-                        index={index}
-                        navigation={navigation}
-                        setSelectedItem={setSelectedItem}
-                        setMenuVisible={setMenuVisible}
-                        currentTheme={currentTheme}
-                        refreshFlag={refreshFlag}
-                      />
-                    )}
-                    keyExtractor={item => `movie-${item.id}`}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalListContent}
-                    extraData={refreshFlag}
-                  />
-                </Animated.View>
-              )}
-              {seriesResults.length > 0 && (
-                <Animated.View 
-                  style={styles.carouselContainer}
-                  entering={FadeIn.duration(300).delay(50)}
-                >
-                  <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}> 
-                    TV Shows ({seriesResults.length})
-                  </Text>
-                  <FlatList
-                    data={seriesResults}
-                    renderItem={({ item, index }) => (
-                      <SearchResultItem
-                        item={item}
-                        index={index}
-                        navigation={navigation}
-                        setSelectedItem={setSelectedItem}
-                        setMenuVisible={setMenuVisible}
-                        currentTheme={currentTheme}
-                        refreshFlag={refreshFlag}
-                      />
-                    )}
-                    keyExtractor={item => `series-${item.id}`}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalListContent}
-                    extraData={refreshFlag}
-                  />
-                </Animated.View>
-              )}
+              {/* Render results grouped by addon using memoized component */}
+              {results.byAddon.map((addonGroup, addonIndex) => (
+                <AddonSection
+                  key={addonGroup.addonId}
+                  addonGroup={addonGroup}
+                  addonIndex={addonIndex}
+                />
+              ))}
             </Animated.ScrollView>
           )}
         </View>
@@ -801,7 +977,7 @@ const SearchScreen = () => {
                 case 'watched': {
                   const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                   const newWatched = !isWatched;
-                  await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
+                  await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
                   setIsWatched(newWatched);
                   break;
                 }
@@ -896,6 +1072,39 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: isTablet ? 16 : 12,
     paddingHorizontal: 16,
+  },
+  carouselSubtitle: {
+    fontSize: isTablet ? 16 : 14,
+    fontWeight: '600',
+    marginBottom: isTablet ? 12 : 8,
+    paddingHorizontal: 16,
+  },
+  addonHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: isTablet ? 16 : 12,
+    marginTop: isTablet ? 24 : 16,
+    marginBottom: isTablet ? 8 : 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  addonHeaderIcon: {
+    // removed icon
+  },
+  addonHeaderText: {
+    fontSize: isTablet ? 18 : 16,
+    fontWeight: '700',
+    flex: 1,
+  },
+  addonHeaderBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  addonHeaderBadgeText: {
+    fontSize: isTablet ? 12 : 11,
+    fontWeight: '600',
   },
   horizontalListContent: {
     paddingHorizontal: isTablet ? 16 : 12,

@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal, AppState } from 'react-native';
+import { View, TouchableOpacity, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import FastImage from '@d11/react-native-fast-image';
 import { RootStackParamList, RootStackNavigationProp } from '../../navigation/AppNavigator';
-import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, LongPressGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent, LongPressGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
@@ -17,26 +18,38 @@ import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
+import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
 
 import {
   DEFAULT_SUBTITLE_SIZE,
+  getDefaultSubtitleSize,
   AudioTrack,
   TextTrack,
   ResizeModeType,
   WyzieSubtitle,
   SubtitleCue,
+  SubtitleSegment,
   RESUME_PREF_KEY,
   RESUME_PREF,
   SUBTITLE_SIZE_KEY
 } from './utils/playerTypes';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
+
+// Speed settings storage key
+const SPEED_SETTINGS_KEY = '@nuvio_speed_settings';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
+import { SpeedModal } from './modals/SpeedModal';
 // Removed ResumeOverlay usage when alwaysResume is enabled
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import UpNextButton from './common/UpNextButton';
+import { EpisodesModal } from './modals/EpisodesModal';
+import LoadingOverlay from './modals/LoadingOverlay';
+import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
+import { Episode } from '../../types/metadata';
 import axios from 'axios';
 import { stremioService } from '../../services/stremioService';
 import * as Brightness from 'expo-brightness';
@@ -45,6 +58,7 @@ const KSPlayerCore: React.FC = () => {
   const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<RootStackParamList, 'PlayerIOS'>>();
   const { uri, headers, streamProvider } = route.params as any;
+
 
   const navigation = useNavigation<RootStackNavigationProp>();
 
@@ -64,7 +78,8 @@ const KSPlayerCore: React.FC = () => {
     episodeId,
     imdbId,
     availableStreams: passedAvailableStreams,
-    backdrop
+    backdrop,
+    groupedEpisodes
   } = route.params;
 
   // Initialize Trakt autosync
@@ -93,13 +108,20 @@ const KSPlayerCore: React.FC = () => {
   const screenData = Dimensions.get('screen');
   const [screenDimensions, setScreenDimensions] = useState(screenData);
 
-  // iPad-specific fullscreen handling
+  // iPad/macOS-specific fullscreen handling
   const isIPad = Platform.OS === 'ios' && (screenData.width > 1000 || screenData.height > 1000);
-  const shouldUseFullscreen = isIPad;
+  const isMacOS = Platform.OS === 'ios' && Platform.isPad === true;
+  const shouldUseFullscreen = isIPad || isMacOS;
 
   // Use window dimensions for iPad instead of screen dimensions
   const windowData = Dimensions.get('window');
   const effectiveDimensions = shouldUseFullscreen ? windowData : screenData;
+  
+  // Helper to get appropriate dimensions for gesture areas and overlays
+  const getDimensions = () => ({
+    width: shouldUseFullscreen ? windowData.width : screenDimensions.width,
+    height: shouldUseFullscreen ? windowData.height : screenDimensions.height,
+  });
 
   const [paused, setPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -109,12 +131,14 @@ const KSPlayerCore: React.FC = () => {
   const [selectedAudioTrack, setSelectedAudioTrack] = useState<number | null>(null);
   const [textTracks, setTextTracks] = useState<TextTrack[]>([]);
   const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
-  const [resizeMode, setResizeMode] = useState<ResizeModeType>('stretch');
+  const [resizeMode, setResizeMode] = useState<ResizeModeType>('contain');
+  const [playerBackend, setPlayerBackend] = useState<string>('');
   const [buffered, setBuffered] = useState(0);
   const [seekPosition, setSeekPosition] = useState<number | null>(null);
   const ksPlayerRef = useRef<KSPlayerRef>(null);
   const [showAudioModal, setShowAudioModal] = useState(false);
   const [showSubtitleModal, setShowSubtitleModal] = useState(false);
+  const [showSpeedModal, setShowSpeedModal] = useState(false);
   const [initialPosition, setInitialPosition] = useState<number | null>(null);
   const [progressSaveInterval, setProgressSaveInterval] = useState<NodeJS.Timeout | null>(null);
   const [isInitialSeekComplete, setIsInitialSeekComplete] = useState(false);
@@ -133,6 +157,7 @@ const KSPlayerCore: React.FC = () => {
   const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
   const [isBackdropLoaded, setIsBackdropLoaded] = useState(false);
   const backdropImageOpacityAnim = useRef(new Animated.Value(0)).current;
+
   const [isBuffering, setIsBuffering] = useState(false);
   const [ksAudioTracks, setKsAudioTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
   const [ksTextTracks, setKsTextTracks] = useState<Array<{ id: number, name: string, language?: string }>>([]);
@@ -157,17 +182,18 @@ const KSPlayerCore: React.FC = () => {
   const pinchRef = useRef<PinchGestureHandler>(null);
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+  const [currentFormattedSegments, setCurrentFormattedSegments] = useState<SubtitleSegment[][]>([]);
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
-  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
+  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(false);
   // External subtitle customization
   const [subtitleTextColor, setSubtitleTextColor] = useState<string>('#FFFFFF');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState<number>(0.7);
   const [subtitleTextShadow, setSubtitleTextShadow] = useState<boolean>(true);
-  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(false);
+  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(true);
   const [subtitleOutlineColor, setSubtitleOutlineColor] = useState<string>('#000000');
-  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(2);
+  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(4);
   const [subtitleAlign, setSubtitleAlign] = useState<'center' | 'left' | 'right'>('center');
-  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(20);
+  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(10);
   const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState<number>(0);
   const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState<number>(1.2);
   const [subtitleOffsetSec, setSubtitleOffsetSec] = useState<number>(0);
@@ -177,71 +203,29 @@ const KSPlayerCore: React.FC = () => {
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
+  const [showEpisodesModal, setShowEpisodesModal] = useState(false);
+  const [showEpisodeStreamsModal, setShowEpisodeStreamsModal] = useState(false);
+  const [selectedEpisodeForStreams, setSelectedEpisodeForStreams] = useState<Episode | null>(null);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   // Playback speed controls required by PlayerControls
-  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
+  const speedOptions = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5];
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+  // Hold-to-speed-up feature state
+  const [holdToSpeedEnabled, setHoldToSpeedEnabled] = useState(true);
+  const [holdToSpeedValue, setHoldToSpeedValue] = useState(2.0);
+  const [isSpeedBoosted, setIsSpeedBoosted] = useState(false);
+  const [originalSpeed, setOriginalSpeed] = useState<number>(1.0);
+  const [showSpeedActivatedOverlay, setShowSpeedActivatedOverlay] = useState(false);
+  const speedActivatedOverlayOpacity = useRef(new Animated.Value(0)).current;
   const cyclePlaybackSpeed = useCallback(() => {
     const idx = speedOptions.indexOf(playbackSpeed);
     const nextIdx = (idx + 1) % speedOptions.length;
     setPlaybackSpeed(speedOptions[nextIdx]);
   }, [playbackSpeed, speedOptions]);
-  // Smart URL processing for KSPlayer compatibility
-  const processUrlForKsPlayer = (url: string): string => {
-    try {
-      // Validate URL first
-      const urlObj = new URL(url);
-
-      // Only decode if the URL appears to be double-encoded
-      // Be more conservative - only check for clear double-encoding indicators
-
-      // Check 1: %25 indicates double-encoded % character
-      const hasDoubleEncodedPercent = url.includes('%25');
-
-      // Check 2: Only flag %2F + // if encoded slashes appear in the path/domain part
-      // (not just in query params where they might be legitimate base64/etc)
-      const hasProblematicEncodedSlashes = (() => {
-        const beforeQuery = url.split('?')[0]; // Get URL before query params
-        return beforeQuery.includes('%2F') && beforeQuery.includes('//');
-      })();
-
-      // Check 3: Only flag %3A + :// if colons are encoded in the scheme
-      const hasProblematicEncodedColons = (() => {
-        const schemeEnd = url.indexOf('://');
-        if (schemeEnd === -1) return false;
-        const schemePart = url.substring(0, schemeEnd);
-        return schemePart.includes('%3A');
-      })();
-
-      const hasDoubleEncoding = hasDoubleEncodedPercent ||
-                                hasProblematicEncodedSlashes ||
-                                hasProblematicEncodedColons;
-
-      if (hasDoubleEncoding) {
-        logger.log('[VideoPlayer] Detected double-encoded URL, decoding once');
-        return decodeURIComponent(url);
-      }
-      
-      // For URLs with special characters in query params, ensure proper encoding
-      if (urlObj.search) {
-        const searchParams = new URLSearchParams(urlObj.search);
-        urlObj.search = searchParams.toString();
-        return urlObj.toString();
-      }
-      
-      return url;
-    } catch (e) {
-      logger.warn('[VideoPlayer] URL processing failed, using original:', e);
-      return url;
-    }
-  };
-
-  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(processUrlForKsPlayer(uri));
-  const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
+  const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>('');
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [pendingSeek, setPendingSeek] = useState<{ position: number; shouldPlay: boolean } | null>(null);
   const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
@@ -250,6 +234,10 @@ const KSPlayerCore: React.FC = () => {
   const isMounted = useRef(true);
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
+
+  // AirPlay state
+  const [isAirPlayActive, setIsAirPlayActive] = useState<boolean>(false);
+  const [allowsAirPlay, setAllowsAirPlay] = useState<boolean>(true);
 
   // Silent startup-timeout retry state
   const startupRetryCountRef = useRef(0);
@@ -264,14 +252,11 @@ const KSPlayerCore: React.FC = () => {
   const metadataOpacity = useRef(new Animated.Value(1)).current;
   const metadataScale = useRef(new Animated.Value(1)).current;
 
-  // Next episode button state
-  const [showNextEpisodeButton, setShowNextEpisodeButton] = useState(false);
+  // Next episode loading state
   const [isLoadingNextEpisode, setIsLoadingNextEpisode] = useState(false);
   const [nextLoadingProvider, setNextLoadingProvider] = useState<string | null>(null);
   const [nextLoadingQuality, setNextLoadingQuality] = useState<string | null>(null);
   const [nextLoadingTitle, setNextLoadingTitle] = useState<string | null>(null);
-  const nextEpisodeButtonOpacity = useRef(new Animated.Value(0)).current;
-  const nextEpisodeButtonScale = useRef(new Animated.Value(0.8)).current;
 
   // Cast display state
   const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
@@ -282,15 +267,60 @@ const KSPlayerCore: React.FC = () => {
   // Volume and brightness controls
   const [volume, setVolume] = useState(100); // KSPlayer uses 0-100 range
   const [brightness, setBrightness] = useState(1.0);
-  const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
-  const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
   const [subtitleSettingsLoaded, setSubtitleSettingsLoaded] = useState(false);
-  const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
-  const brightnessOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
-  const lastVolumeChange = useRef<number>(0);
-  const lastBrightnessChange = useRef<number>(0);
+
+  // Use reusable gesture controls hook
+  const gestureControls = usePlayerGestureControls({
+    volume,
+    setVolume,
+    brightness,
+    setBrightness,
+    volumeRange: { min: 0, max: 100 }, // KSPlayer uses 0-100
+    volumeSensitivity: 0.006,
+    brightnessSensitivity: 0.004,
+    debugMode: DEBUG_MODE,
+  });
+
+  // Load speed settings from storage
+  const loadSpeedSettings = useCallback(async () => {
+    try {
+      const saved = await mmkvStorage.getItem(SPEED_SETTINGS_KEY);
+      if (saved) {
+        const settings = JSON.parse(saved);
+        if (typeof settings.holdToSpeedEnabled === 'boolean') {
+          setHoldToSpeedEnabled(settings.holdToSpeedEnabled);
+        }
+        if (typeof settings.holdToSpeedValue === 'number') {
+          setHoldToSpeedValue(settings.holdToSpeedValue);
+        }
+      }
+    } catch (error) {
+      logger.warn('[KSPlayerCore] Error loading speed settings:', error);
+    }
+  }, []);
+
+  // Save speed settings to storage
+  const saveSpeedSettings = useCallback(async () => {
+    try {
+      const settings = {
+        holdToSpeedEnabled,
+        holdToSpeedValue,
+      };
+      await mmkvStorage.setItem(SPEED_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      logger.warn('[KSPlayerCore] Error saving speed settings:', error);
+    }
+  }, [holdToSpeedEnabled, holdToSpeedValue]);
+
+  // Load speed settings on mount
+  useEffect(() => {
+    loadSpeedSettings();
+  }, [loadSpeedSettings]);
+
+  // Save speed settings when they change
+  useEffect(() => {
+    saveSpeedSettings();
+  }, [saveSpeedSettings]);
 
   // Get metadata to access logo (only if we have a valid id)
   const shouldLoadMetadata = Boolean(id && type);
@@ -298,7 +328,7 @@ const KSPlayerCore: React.FC = () => {
     id: id || 'placeholder',
     type: type || 'movie'
   });
-  const { metadata, loading: metadataLoading, groupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
+  const { metadata, loading: metadataLoading, groupedEpisodes: metadataGroupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
   const { settings } = useSettings();
 
   // Logo animation values
@@ -309,6 +339,7 @@ const KSPlayerCore: React.FC = () => {
   // Check if we have a logo to show
   const hasLogo = metadata && metadata.logo && !metadataLoading;
 
+  // Load custom backdrop on mount
   // Prefetch backdrop and title logo for faster loading screen appearance
   useEffect(() => {
     if (backdrop && typeof backdrop === 'string') {
@@ -317,22 +348,21 @@ const KSPlayerCore: React.FC = () => {
       backdropImageOpacityAnim.setValue(0);
 
       // Prefetch the image
-      Image.prefetch(backdrop)
-        .then(() => {
-          // Image loaded successfully, fade it in smoothly
-          setIsBackdropLoaded(true);
-          Animated.timing(backdropImageOpacityAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
-        })
-        .catch((error) => {
-          // If prefetch fails, still show the image but without animation
-          if (__DEV__) logger.warn('[VideoPlayer] Backdrop prefetch failed, showing anyway:', error);
-          setIsBackdropLoaded(true);
-          backdropImageOpacityAnim.setValue(1);
-        });
+      try {
+        FastImage.preload([{ uri: backdrop }]);
+        // Image prefetch initiated, fade it in smoothly
+        setIsBackdropLoaded(true);
+        Animated.timing(backdropImageOpacityAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+      } catch (error) {
+        // If prefetch fails, still show the image but without animation
+        if (__DEV__) logger.warn('[VideoPlayer] Backdrop prefetch failed, showing anyway:', error);
+        setIsBackdropLoaded(true);
+        backdropImageOpacityAnim.setValue(1);
+      }
     } else {
       // No backdrop provided, consider it "loaded"
       setIsBackdropLoaded(true);
@@ -343,9 +373,22 @@ const KSPlayerCore: React.FC = () => {
   useEffect(() => {
     const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
     if (logoUrl && typeof logoUrl === 'string') {
-      Image.prefetch(logoUrl).catch(() => {});
+      try {
+        FastImage.preload([{ uri: logoUrl }]);
+      } catch (error) {
+        // Silently ignore logo prefetch errors
+      }
     }
   }, [metadata]);
+  
+  // Log video source configuration with headers
+  useEffect(() => {
+    console.log('[KSPlayerCore] Video source configured with:', {
+      uri: currentStreamUrl,
+      hasHeaders: !!(headers && Object.keys(headers).length > 0),
+      headers: headers && Object.keys(headers).length > 0 ? headers : undefined
+    });
+  }, [currentStreamUrl, headers]);
   // Resolve current episode description for series
   const currentEpisodeDescription = (() => {
     try {
@@ -365,11 +408,14 @@ const KSPlayerCore: React.FC = () => {
     }
   })();
 
-  // Find next episode for series
+  // Find next episode for series (fallback to metadataGroupedEpisodes when needed)
   const nextEpisode = useMemo(() => {
     try {
       if (type !== 'series' || !season || !episode) return null;
-      const allEpisodes = Object.values(groupedEpisodes || {}).flat() as any[];
+      const sourceGroups = groupedEpisodes && Object.keys(groupedEpisodes || {}).length > 0
+        ? groupedEpisodes
+        : (metadataGroupedEpisodes || {});
+      const allEpisodes = Object.values(sourceGroups || {}).flat() as any[];
       if (!allEpisodes || allEpisodes.length === 0) return null;
       
       // First try next episode in same season
@@ -384,11 +430,23 @@ const KSPlayerCore: React.FC = () => {
         );
       }
       
+      if (DEBUG_MODE) {
+        logger.log('[KSPlayerCore] nextEpisode computation', {
+          fromRouteGroups: !!(groupedEpisodes && Object.keys(groupedEpisodes || {}).length),
+          fromMetadataGroups: !!(metadataGroupedEpisodes && Object.keys(metadataGroupedEpisodes || {}).length),
+          allEpisodesCount: allEpisodes?.length || 0,
+          currentSeason: season,
+          currentEpisode: episode,
+          found: !!nextEp,
+          foundId: nextEp?.stremioId || nextEp?.id,
+          foundName: nextEp?.name,
+        });
+      }
       return nextEp;
     } catch {
       return null;
     }
-  }, [type, season, episode, groupedEpisodes]);
+  }, [type, season, episode, groupedEpisodes, metadataGroupedEpisodes]);
 
   // Small offset (in seconds) used to avoid seeking to the *exact* end of the
   // file which triggers the `onEnd` callback and causes playback to restart.
@@ -443,103 +501,68 @@ const KSPlayerCore: React.FC = () => {
     }
   };
 
-  // Volume gesture handler (right side of screen)
-  const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.050; // Higher sensitivity for volume (more responsive than brightness)
-
-    if (state === State.ACTIVE) {
-      const deltaY = -translationY; // Invert for natural feel (up = increase)
-      const volumeChange = deltaY * sensitivity;
-      const newVolume = Math.max(0, Math.min(100, volume + volumeChange));
-
-      if (Math.abs(newVolume - volume) > 0.05) { // Even lower threshold for volume responsiveness
-        setVolume(newVolume);
-        lastVolumeChange.current = Date.now();
-
-        // Show overlay with smoother animation
-        if (!showVolumeOverlay) {
-          setShowVolumeOverlay(true);
-          Animated.spring(volumeOverlayOpacity, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-
-        // Clear existing timeout
-        if (volumeOverlayTimeout.current) {
-          clearTimeout(volumeOverlayTimeout.current);
-        }
-
-        // Hide overlay after 1.5 seconds
-        volumeOverlayTimeout.current = setTimeout(() => {
-          Animated.timing(volumeOverlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowVolumeOverlay(false);
-          });
-        }, 1500);
-      }
+  // Long press gesture handlers for speed boost
+  const onLongPressActivated = useCallback(() => {
+    if (!holdToSpeedEnabled) return;
+    
+    if (!isSpeedBoosted && playbackSpeed !== holdToSpeedValue) {
+      setOriginalSpeed(playbackSpeed);
+      setPlaybackSpeed(holdToSpeedValue);
+      setIsSpeedBoosted(true);
+      
+      // Show "Activated" overlay
+      setShowSpeedActivatedOverlay(true);
+      Animated.spring(speedActivatedOverlayOpacity, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+      
+      // Auto-hide after 2 seconds
+      setTimeout(() => {
+        Animated.timing(speedActivatedOverlayOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowSpeedActivatedOverlay(false);
+        });
+      }, 2000);
+      
+      logger.log(`[KSPlayerCore] Speed boost activated: ${holdToSpeedValue}x`);
     }
-  };
+  }, [isSpeedBoosted, playbackSpeed, holdToSpeedEnabled, holdToSpeedValue, speedActivatedOverlayOpacity]);
 
-  // Brightness gesture handler (left side of screen)
-  const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.001; // Lower sensitivity for finer brightness control
-
-    if (state === State.ACTIVE) {
-      const deltaY = -translationY; // Invert for natural feel (up = increase)
-      const brightnessChange = deltaY * sensitivity;
-      const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
-
-      if (Math.abs(newBrightness - brightness) > 0.001) { // Much lower threshold for more responsive updates
-        setBrightness(newBrightness);
-        lastBrightnessChange.current = Date.now();
-
-        // Set device brightness using Expo Brightness
-        try {
-          await Brightness.setBrightnessAsync(newBrightness);
-          if (DEBUG_MODE) {
-            logger.log(`[VideoPlayer] Device brightness set to: ${newBrightness}`);
-          }
-        } catch (error) {
-          logger.warn('[VideoPlayer] Error setting device brightness:', error);
-        }
-
-        // Show overlay with smoother animation
-        if (!showBrightnessOverlay) {
-          setShowBrightnessOverlay(true);
-          Animated.spring(brightnessOverlayOpacity, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-
-        // Clear existing timeout
-        if (brightnessOverlayTimeout.current) {
-          clearTimeout(brightnessOverlayTimeout.current);
-        }
-
-        // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-        brightnessOverlayTimeout.current = setTimeout(() => {
-          Animated.timing(brightnessOverlayOpacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => {
-            setShowBrightnessOverlay(false);
-          });
-        }, 1500);
-      }
+  const restoreSpeedSafely = useCallback(() => {
+    if (isSpeedBoosted) {
+      setPlaybackSpeed(originalSpeed);
+      setIsSpeedBoosted(false);
+      logger.log('[KSPlayerCore] Speed boost deactivated, restored to:', originalSpeed);
     }
-  };
+  }, [isSpeedBoosted, originalSpeed]);
+
+  const onLongPressEnd = useCallback(() => {
+    restoreSpeedSafely();
+  }, [restoreSpeedSafely]);
+
+  const onLongPressStateChange = useCallback((event: LongPressGestureHandlerGestureEvent) => {
+    // Ensure restoration on cancel/fail/end as well
+    // @ts-ignore - numeric State enum
+    const state = event?.nativeEvent?.state;
+    if (state === State.CANCELLED || state === State.FAILED || state === State.END) {
+      restoreSpeedSafely();
+    }
+  }, [restoreSpeedSafely]);
+
+  // Safety: restore speed on unmount if still boosted
+  useEffect(() => {
+    return () => {
+      if (isSpeedBoosted) {
+        try { setPlaybackSpeed(originalSpeed); } catch {}
+      }
+    };
+  }, [isSpeedBoosted, originalSpeed]);
 
   useEffect(() => {
     if (videoAspectRatio && effectiveDimensions.width > 0 && effectiveDimensions.height > 0) {
@@ -690,6 +713,9 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const completeOpeningAnimation = () => {
+    // Stop the pulse animation immediately
+    pulseAnim.stopAnimation();
+    
     Animated.parallel([
       Animated.timing(openingFadeAnim, {
         toValue: 1,
@@ -862,6 +888,9 @@ const KSPlayerCore: React.FC = () => {
         if (DEBUG_MODE) {
           logger.log(`[VideoPlayer] KSPlayer seek completed to ${timeInSeconds.toFixed(2)}s`);
         }
+
+        // IMMEDIATE SYNC: Update Trakt progress immediately after seeking
+        traktAutosync.handleProgressUpdate(timeInSeconds, duration, true); // force=true for immediate sync
       }
     }, 500);
   };
@@ -940,6 +969,18 @@ const KSPlayerCore: React.FC = () => {
       // KSPlayer returns bufferTime in seconds
       const bufferedTime = event.bufferTime || currentTimeInSeconds;
       safeSetState(() => setBuffered(bufferedTime));
+    }
+
+    // Update AirPlay state if available
+    if (event.airPlayState) {
+      const wasAirPlayActive = isAirPlayActive;
+      setIsAirPlayActive(event.airPlayState.isExternalPlaybackActive);
+      setAllowsAirPlay(event.airPlayState.allowsExternalPlayback);
+
+      // Log AirPlay state changes for debugging
+      if (wasAirPlayActive !== event.airPlayState.isExternalPlaybackActive) {
+        if (__DEV__) logger.log(`[VideoPlayer] AirPlay state changed: ${event.airPlayState.isExternalPlaybackActive ? 'ACTIVE' : 'INACTIVE'}`);
+      }
     }
 
     // Safety: if audio is advancing but onLoad didn't fire, dismiss opening overlay
@@ -1025,6 +1066,24 @@ const KSPlayerCore: React.FC = () => {
         logger.error('[VideoPlayer] onLoad called with null/undefined data');
         return;
       }
+      // Extract player backend information
+      if (data.playerBackend) {
+        const newPlayerBackend = data.playerBackend;
+        setPlayerBackend(newPlayerBackend);
+        if (DEBUG_MODE) {
+          logger.log(`[VideoPlayer] Player backend: ${newPlayerBackend}`);
+        }
+
+        // Reset AirPlay state if switching to KSMEPlayer (which doesn't support AirPlay)
+        if (newPlayerBackend === 'KSMEPlayer' && (isAirPlayActive || allowsAirPlay)) {
+          setIsAirPlayActive(false);
+          setAllowsAirPlay(false);
+          if (DEBUG_MODE) {
+            logger.log('[VideoPlayer] Reset AirPlay state for KSMEPlayer');
+          }
+        }
+      }
+
       // KSPlayer returns duration in seconds directly
       const videoDuration = data.duration;
       if (DEBUG_MODE) {
@@ -1235,6 +1294,11 @@ const KSPlayerCore: React.FC = () => {
       }
       
       controlsTimeout.current = setTimeout(hideControls, 5000);
+      
+      // Auto-fetch and load English external subtitles if available
+      if (imdbId) {
+        fetchAvailableSubtitles(undefined, true);
+      }
     } catch (error) {
       logger.error('[VideoPlayer] Error in onLoad:', error);
       // Set fallback values to prevent crashes
@@ -1261,6 +1325,12 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const cycleAspectRatio = () => {
+    // iOS KSPlayer: toggle native resize mode so subtitles remain independent
+    if (Platform.OS === 'ios') {
+      setResizeMode((prev) => (prev === 'cover' ? 'contain' : 'cover'));
+      return;
+    }
+    // Fallback (non‑iOS paths): keep legacy zoom behavior
     const newZoom = zoomScale === 1.1 ? 1 : 1.1;
     setZoomScale(newZoom);
     setZoomTranslateX(0);
@@ -1681,7 +1751,7 @@ const KSPlayerCore: React.FC = () => {
         return;
       }
       // One-time migrate legacy key if present
-      const legacy = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
+      const legacy = await mmkvStorage.getItem(SUBTITLE_SIZE_KEY);
       if (legacy) {
         const migrated = parseInt(legacy, 10);
         if (!Number.isNaN(migrated) && migrated > 0) {
@@ -1691,10 +1761,17 @@ const KSPlayerCore: React.FC = () => {
             await storageService.saveSubtitleSettings(merged);
           } catch {}
         }
-        try { await AsyncStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        try { await mmkvStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        return;
       }
+      // If no saved settings, use responsive default
+      const screenWidth = Dimensions.get('window').width;
+      setSubtitleSize(getDefaultSubtitleSize(screenWidth));
     } catch (error) {
       logger.error('[VideoPlayer] Error loading subtitle size:', error);
+      // Fallback to responsive default on error
+      const screenWidth = Dimensions.get('window').width;
+      setSubtitleSize(getDefaultSubtitleSize(screenWidth));
     }
   };
 
@@ -2073,65 +2150,7 @@ const KSPlayerCore: React.FC = () => {
     };
   }, [paused]);
 
-  // Handle next episode button visibility based on current time and next episode availability
-  useEffect(() => {
-    if (type !== 'series' || !nextEpisode || duration <= 0) {
-      if (showNextEpisodeButton) {
-        // Hide button with animation
-        Animated.parallel([
-          Animated.timing(nextEpisodeButtonOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(nextEpisodeButtonScale, {
-            toValue: 0.8,
-            duration: 200,
-            useNativeDriver: true,
-          })
-        ]).start(() => {
-          setShowNextEpisodeButton(false);
-        });
-      }
-      return;
-    }
-
-    // Show button when 1 minute (60 seconds) remains
-    const timeRemaining = duration - currentTime;
-    const shouldShowButton = timeRemaining <= 60 && timeRemaining > 10; // Hide in last 10 seconds
-
-    if (shouldShowButton && !showNextEpisodeButton) {
-      setShowNextEpisodeButton(true);
-      Animated.parallel([
-        Animated.timing(nextEpisodeButtonOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(nextEpisodeButtonScale, {
-          toValue: 1,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        })
-      ]).start();
-    } else if (!shouldShowButton && showNextEpisodeButton) {
-      Animated.parallel([
-        Animated.timing(nextEpisodeButtonOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(nextEpisodeButtonScale, {
-          toValue: 0.8,
-          duration: 200,
-          useNativeDriver: true,
-        })
-      ]).start(() => {
-        setShowNextEpisodeButton(false);
-      });
-    }
-  }, [type, nextEpisode, duration, currentTime, showNextEpisodeButton]);
+  // Up Next visibility handled inside reusable component
 
   useEffect(() => {
     isMounted.current = true;
@@ -2143,12 +2162,10 @@ const KSPlayerCore: React.FC = () => {
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
-      if (volumeOverlayTimeout.current) {
-        clearTimeout(volumeOverlayTimeout.current);
-      }
-      if (brightnessOverlayTimeout.current) {
-        clearTimeout(brightnessOverlayTimeout.current);
-      }
+      
+      // Cleanup gesture controls
+      gestureControls.cleanup();
+      
       if (startupRetryTimerRef.current) {
         clearTimeout(startupRetryTimerRef.current);
         startupRetryTimerRef.current = null;
@@ -2167,14 +2184,50 @@ const KSPlayerCore: React.FC = () => {
       if (currentSubtitle !== '') {
         setCurrentSubtitle('');
       }
+      if (currentFormattedSegments.length > 0) {
+        setCurrentFormattedSegments([]);
+      }
       return;
     }
-    const adjustedTime = currentTime + (subtitleOffsetSec || 0);
+    const adjustedTime = currentTime + (subtitleOffsetSec || 0) - 0.2;
     const currentCue = customSubtitles.find(cue =>
       adjustedTime >= cue.start && adjustedTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
     setCurrentSubtitle(newSubtitle);
+    
+    // Extract formatted segments from current cue
+    if (currentCue?.formattedSegments) {
+      // Split by newlines to get per-line segments
+      const lines = (currentCue.text || '').split(/\r?\n/);
+      const segmentsPerLine: SubtitleSegment[][] = [];
+      let segmentIndex = 0;
+      
+      for (const line of lines) {
+        const lineSegments: SubtitleSegment[] = [];
+        const words = line.split(/(\s+)/);
+        
+        for (const word of words) {
+          if (word.trim()) {
+            if (segmentIndex < currentCue.formattedSegments.length) {
+              lineSegments.push(currentCue.formattedSegments[segmentIndex]);
+              segmentIndex++;
+            } else {
+              // Fallback if segment count doesn't match
+              lineSegments.push({ text: word });
+            }
+          }
+        }
+        
+        if (lineSegments.length > 0) {
+          segmentsPerLine.push(lineSegments);
+        }
+      }
+      
+      setCurrentFormattedSegments(segmentsPerLine.length > 0 ? segmentsPerLine : []);
+    } else {
+      setCurrentFormattedSegments([]);
+    }
   }, [currentTime, customSubtitles, useCustomSubtitles, subtitleOffsetSec]);
 
   // Load global subtitle settings
@@ -2192,7 +2245,7 @@ const KSPlayerCore: React.FC = () => {
           if (typeof saved.subtitleOutlineColor === 'string') setSubtitleOutlineColor(saved.subtitleOutlineColor);
           if (typeof saved.subtitleOutlineWidth === 'number') setSubtitleOutlineWidth(saved.subtitleOutlineWidth);
           if (typeof saved.subtitleAlign === 'string') setSubtitleAlign(saved.subtitleAlign as 'center' | 'left' | 'right');
-          if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
+        if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
           if (typeof saved.subtitleLetterSpacing === 'number') setSubtitleLetterSpacing(saved.subtitleLetterSpacing);
           if (typeof saved.subtitleLineHeightMultiplier === 'number') setSubtitleLineHeightMultiplier(saved.subtitleLineHeightMultiplier);
           if (typeof saved.subtitleOffsetSec === 'number') setSubtitleOffsetSec(saved.subtitleOffsetSec);
@@ -2232,7 +2285,7 @@ const KSPlayerCore: React.FC = () => {
     subtitleOutlineColor,
     subtitleOutlineWidth,
     subtitleAlign,
-    subtitleBottomOffset,
+      subtitleBottomOffset,
     subtitleLetterSpacing,
     subtitleLineHeightMultiplier,
     subtitleOffsetSec,
@@ -2258,7 +2311,7 @@ const KSPlayerCore: React.FC = () => {
   }, [selectedAudioTrack, ksAudioTracks]);
 
   const increaseSubtitleSize = () => {
-    const newSize = Math.min(subtitleSize + 2, 32);
+    const newSize = Math.min(subtitleSize + 2, 80);
     saveSubtitleSize(newSize);
   };
 
@@ -2271,48 +2324,26 @@ const KSPlayerCore: React.FC = () => {
     setSubtitleBackground(prev => !prev);
   };
 
-  useEffect(() => {
-    if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
-      logger.log(`[VideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
-
-      if (pendingSeek.position > 0) {
-        const delayTime = Platform.OS === 'android' ? 1500 : 1000;
-
-        setTimeout(() => {
-          if (duration > 0 && pendingSeek) {
-            logger.log(`[VideoPlayer] Executing seek to ${pendingSeek.position}s`);
-
-            seekToTime(pendingSeek.position);
-
-            if (pendingSeek.shouldPlay) {
-              setTimeout(() => {
-                logger.log('[VideoPlayer] Resuming playback after source change seek');
-                setPaused(false);
-              }, 850); // Delay should be slightly more than seekToTime's internal timeout
-            }
-
-            setTimeout(() => {
-              setPendingSeek(null);
-              setIsChangingSource(false);
-            }, 900);
-          }
-        }, delayTime);
-      } else {
-        // No seeking needed, just resume playback if it was playing
-        if (pendingSeek.shouldPlay) {
-          setTimeout(() => {
-            logger.log('[VideoPlayer] No seek needed, just resuming playback');
-            setPaused(false);
-          }, 500);
-        }
-
-        setTimeout(() => {
-          setPendingSeek(null);
-          setIsChangingSource(false);
-        }, 600);
+  // AirPlay handler
+  const handleAirPlayPress = async () => {
+    if (!ksPlayerRef.current) return;
+    
+    try {
+      // First ensure AirPlay is enabled
+      if (!allowsAirPlay) {
+        ksPlayerRef.current.setAllowsExternalPlayback(true);
+        setAllowsAirPlay(true);
+        logger.log(`[VideoPlayer] AirPlay enabled before showing picker`);
       }
+      
+      // Show the AirPlay picker
+      ksPlayerRef.current.showAirPlayPicker();
+      
+      logger.log(`[VideoPlayer] AirPlay picker triggered - check console for native logs`);
+    } catch (error) {
+      logger.error('[VideoPlayer] Error showing AirPlay picker:', error);
     }
-  }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
+  };
 
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
@@ -2320,61 +2351,91 @@ const KSPlayerCore: React.FC = () => {
       return;
     }
 
-    // On iOS: All streams use KSPlayer, no need to switch players
-    // Stream switching is handled internally by KSPlayerCore
-
-    setIsChangingSource(true);
     setShowSourcesModal(false);
 
-    try {
-      // Save current state
-      const savedPosition = currentTime;
-      const wasPlaying = !paused;
-
-      logger.log(`[VideoPlayer] Changing source from ${currentStreamUrl} to ${newStream.url}`);
-      logger.log(`[VideoPlayer] Saved position: ${savedPosition}, was playing: ${wasPlaying}`);
-
-      // Extract quality and provider information from the new stream
-      let newQuality = newStream.quality;
-      if (!newQuality && newStream.title) {
-        // Try to extract quality from title (e.g., "1080p", "720p")
-        const qualityMatch = newStream.title.match(/(\d+)p/);
-        newQuality = qualityMatch ? qualityMatch[0] : undefined; // Use [0] to get full match like "1080p"
-      }
-
-      // For provider, try multiple fields
-      const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
-
-      // For stream name, prioritize the stream name over title
-      const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
-
-      logger.log(`[VideoPlayer] Stream object:`, newStream);
-      logger.log(`[VideoPlayer] Extracted - Quality: ${newQuality}, Provider: ${newProvider}, Stream Name: ${newStreamName}`);
-      logger.log(`[VideoPlayer] Available fields - quality: ${newStream.quality}, title: ${newStream.title}, addonName: ${newStream.addonName}, name: ${newStream.name}, addon: ${newStream.addon}`);
-
-      // Stop current playback
-      setPaused(true);
-
-      // Set pending seek state
-      setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
-
-      // Update the stream URL and details immediately (process URL for KSPlayer)
-      setCurrentStreamUrl(processUrlForKsPlayer(newStream.url));
-      setCurrentQuality(newQuality);
-      setCurrentStreamProvider(newProvider);
-      setCurrentStreamName(newStreamName);
-
-      // Reset player state for new source
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlayerReady(false);
-      setIsVideoLoaded(false);
-
-    } catch (error) {
-      logger.error('[VideoPlayer] Error changing source:', error);
-      setPendingSeek(null);
-      setIsChangingSource(false);
+    // Extract quality and provider information
+    let newQuality = newStream.quality;
+    if (!newQuality && newStream.title) {
+      const qualityMatch = newStream.title.match(/(\d+)p/);
+      newQuality = qualityMatch ? qualityMatch[0] : undefined;
     }
+
+    const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
+    const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
+
+    // Pause current playback
+    setPaused(true);
+
+    // Navigate with replace to reload player with new source
+    setTimeout(() => {
+      navigation.replace('PlayerIOS', {
+        uri: newStream.url,
+        title: title,
+        episodeTitle: episodeTitle,
+        season: season,
+        episode: episode,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: newStream.headers || undefined,
+        id,
+        type,
+        episodeId,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: availableStreams,
+      });
+    }, 100);
+  };
+
+  const handleEpisodeSelect = (episode: Episode) => {
+    logger.log('[KSPlayerCore] Episode selected:', episode.name);
+    setSelectedEpisodeForStreams(episode);
+    setShowEpisodesModal(false);
+    setShowEpisodeStreamsModal(true);
+  };
+
+  // Debug: Log when modal state changes
+  useEffect(() => {
+    if (showEpisodesModal) {
+      logger.log('[KSPlayerCore] Episodes modal opened, groupedEpisodes:', groupedEpisodes);
+      logger.log('[KSPlayerCore] type:', type, 'season:', season, 'episode:', episode);
+    }
+  }, [showEpisodesModal, groupedEpisodes, type]);
+
+  const handleEpisodeStreamSelect = async (stream: any) => {
+    if (!selectedEpisodeForStreams) return;
+    
+    setShowEpisodeStreamsModal(false);
+    
+    const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
+    const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';
+    const newStreamName = stream.name || stream.title || 'Unknown Stream';
+    
+    setPaused(true);
+    
+    setTimeout(() => {
+      navigation.replace('PlayerIOS', {
+        uri: stream.url,
+        title: title,
+        episodeTitle: selectedEpisodeForStreams.name,
+        season: selectedEpisodeForStreams.season_number,
+        episode: selectedEpisodeForStreams.episode_number,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: stream.headers || undefined,
+        id,
+        type: 'series',
+        episodeId: selectedEpisodeForStreams.stremioId || `${id}:${selectedEpisodeForStreams.season_number}:${selectedEpisodeForStreams.episode_number}`,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: {},
+        groupedEpisodes: groupedEpisodes,
+      });
+    }, 100);
   };
 
   useEffect(() => {
@@ -2407,7 +2468,7 @@ const KSPlayerCore: React.FC = () => {
     <View style={[
       styles.container,
       shouldUseFullscreen ? {
-        // iPad fullscreen: use flex layout instead of absolute positioning
+        // iPad/macOS fullscreen: use flex layout instead of absolute positioning
         flex: 1,
         width: '100%',
         height: '100%',
@@ -2420,100 +2481,17 @@ const KSPlayerCore: React.FC = () => {
         left: 0,
       }]}>
       {!DISABLE_OPENING_OVERLAY && (
-      <Animated.View
-        style={[
-          styles.openingOverlay,
-          {
-            opacity: backgroundFadeAnim,
-            zIndex: shouldHideOpeningOverlay ? -1 : 3000,
-            width: screenDimensions.width,
-            height: screenDimensions.height,
-          }
-        ]}
-        pointerEvents={shouldHideOpeningOverlay ? 'none' : 'auto'}
-      >
-        {backdrop && (
-          <Animated.Image
-            source={{ uri: backdrop }}
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                width: screenDimensions.width,
-                height: screenDimensions.height,
-                opacity: backdropImageOpacityAnim
-              }
-            ]}
-            resizeMode="cover"
-            blurRadius={0}
-          />
-        )}
-        <LinearGradient
-          colors={[
-            'rgba(0,0,0,0.3)',
-            'rgba(0,0,0,0.6)',
-            'rgba(0,0,0,0.8)',
-            'rgba(0,0,0,0.9)'
-          ]}
-          locations={[0, 0.3, 0.7, 1]}
-          style={StyleSheet.absoluteFill}
+        <LoadingOverlay
+          visible={!shouldHideOpeningOverlay}
+          backdrop={backdrop || null}
+          hasLogo={hasLogo}
+          logo={metadata?.logo}
+          backgroundFadeAnim={backgroundFadeAnim}
+          backdropImageOpacityAnim={backdropImageOpacityAnim}
+          onClose={handleClose}
+          width={shouldUseFullscreen ? effectiveDimensions.width : screenDimensions.width}
+          height={shouldUseFullscreen ? effectiveDimensions.height : screenDimensions.height}
         />
-
-        <TouchableOpacity
-          style={styles.loadingCloseButton}
-          onPress={handleClose}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="close" size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        <View style={styles.openingContent}>
-          {hasLogo ? (
-            <>
-            <Animated.View style={{
-              transform: [
-                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
-              ],
-              opacity: logoOpacityAnim,
-              alignItems: 'center',
-            }}>
-              <Image
-                source={{ uri: metadata.logo }}
-                style={{
-                  width: 300,
-                  height: 180,
-                  resizeMode: 'contain',
-                }}
-              />
-            </Animated.View>
-            </>
-          ) : (
-            <>
-              <ActivityIndicator size="large" color="#E50914" />
-            </>
-          )}
-        </View>
-      </Animated.View>
-      )}
-
-      {/* Source Change Loading Overlay */}
-      {isChangingSource && (
-        <Animated.View
-          style={[
-            styles.sourceChangeOverlay,
-            {
-              width: screenDimensions.width,
-              height: screenDimensions.height,
-              opacity: fadeAnim,
-            }
-          ]}
-          pointerEvents="auto"
-        >
-          <View style={styles.sourceChangeContent}>
-            <ActivityIndicator size="large" color="#E50914" />
-            <Text style={styles.sourceChangeText}>Changing source...</Text>
-            <Text style={styles.sourceChangeSubtext}>Please wait while we load the new stream</Text>
-          </View>
-        </Animated.View>
       )}
 
       <Animated.View
@@ -2521,61 +2499,79 @@ const KSPlayerCore: React.FC = () => {
           styles.videoPlayerContainer,
           {
             opacity: DISABLE_OPENING_OVERLAY ? 1 : openingFadeAnim,
-            transform: DISABLE_OPENING_OVERLAY ? [] : [{ scale: openingScaleAnim }],
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            transform: DISABLE_OPENING_OVERLAY ? [{ scale: 1 }] : [{ scale: openingScaleAnim }],
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }
         ]}
       >
-        {/* Combined gesture handler for left side - brightness + tap */}
-        <PanGestureHandler
-          onGestureEvent={onBrightnessGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+        {/* Combined gesture handler for left side - brightness + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={gestureControls.onBrightnessGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
-              left: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: getDimensions().height * 0.15, // Back to original margin
+                left: 0,
+                width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+                height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
-        {/* Combined gesture handler for right side - volume + tap */}
-        <PanGestureHandler
-          onGestureEvent={onVolumeGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+        {/* Combined gesture handler for right side - volume + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={gestureControls.onVolumeGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
-              right: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: getDimensions().height * 0.15, // Back to original margin
+                right: 0,
+                width: getDimensions().width * 0.4, // Back to larger area (40% of screen)
+                height: getDimensions().height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
         {/* Center area tap handler - handles both show and hide */}
         <TapGestureHandler
@@ -2600,18 +2596,18 @@ const KSPlayerCore: React.FC = () => {
         >
           <View style={{
             position: 'absolute',
-            top: screenDimensions.height * 0.15,
-            left: screenDimensions.width * 0.4, // Start after left gesture area
-            width: screenDimensions.width * 0.2, // Center area (20% of screen)
-            height: screenDimensions.height * 0.7,
+            top: getDimensions().height * 0.15,
+            left: getDimensions().width * 0.4, // Start after left gesture area
+            width: getDimensions().width * 0.2, // Center area (20% of screen)
+            height: getDimensions().height * 0.7,
             zIndex: 5, // Lower z-index, controls use box-none to allow touches through
           }} />
         </TapGestureHandler>
 
         <View
           style={[styles.videoContainer, {
-            width: screenDimensions.width,
-            height: screenDimensions.height,
+            width: shouldUseFullscreen ? '100%' : screenDimensions.width,
+            height: shouldUseFullscreen ? '100%' : screenDimensions.height,
           }]}
         >
 
@@ -2624,8 +2620,8 @@ const KSPlayerCore: React.FC = () => {
               position: 'absolute',
               top: 0,
               left: 0,
-              width: screenDimensions.width,
-              height: screenDimensions.height,
+              width: getDimensions().width,
+              height: getDimensions().height,
             }}>
               <TouchableOpacity
                 style={{ flex: 1 }}
@@ -2636,15 +2632,21 @@ const KSPlayerCore: React.FC = () => {
               >
                 <KSPlayerComponent
                   ref={ksPlayerRef}
-                  style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
+                  style={styles.video}
                   source={{
                     uri: currentStreamUrl,
                     headers: headers && Object.keys(headers).length > 0 ? headers : undefined
                   }}
                   paused={paused}
                   volume={volume / 100}
+                  rate={playbackSpeed}
                   audioTrack={selectedAudioTrack ?? undefined}
                   textTrack={useCustomSubtitles ? -1 : selectedTextTrack}
+                  allowsExternalPlayback={allowsAirPlay}
+                  usesExternalPlaybackWhileExternalScreenIsActive={true}
+                  subtitleBottomOffset={subtitleBottomOffset}
+                  subtitleFontSize={subtitleSize}
+                  resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
                   onProgress={handleProgress}
                   onLoad={onLoad}
                   onEnd={onEnd}
@@ -2677,17 +2679,24 @@ const KSPlayerCore: React.FC = () => {
             skip={skip}
             handleClose={handleClose}
             cycleAspectRatio={cycleAspectRatio}
+            currentResizeMode={resizeMode}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
+            setShowSpeedModal={setShowSpeedModal}
             isSubtitleModalOpen={showSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
+            setShowEpisodesModal={type === 'series' ? setShowEpisodesModal : undefined}
             onSliderValueChange={handleSliderValueChange}
             onSlidingStart={handleSlidingStart}
             onSlidingComplete={handleSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
+            playerBackend={playerBackend}
           cyclePlaybackSpeed={cyclePlaybackSpeed}
           currentPlaybackSpeed={playbackSpeed}
+          isAirPlayActive={isAirPlayActive}
+          allowsAirPlay={allowsAirPlay}
+          onAirPlayPress={handleAirPlayPress}
           />
 
           {showPauseOverlay && (
@@ -2714,7 +2723,7 @@ const KSPlayerCore: React.FC = () => {
                 }}
               >
                 {/* Strong horizontal fade from left side */}
-                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: screenDimensions.width * 0.7 }}>
+                <View style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: getDimensions().width * 0.7 }}>
                   <LinearGradient
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
@@ -2819,7 +2828,7 @@ const KSPlayerCore: React.FC = () => {
                               shadowRadius: 8,
                               elevation: 5,
                             }}>
-                              <Image
+                              <FastImage
                                 source={{ uri: `https://image.tmdb.org/t/p/w300${selectedCastMember.profile_path}` }}
                                 style={{
                                   width: Math.min(120, screenDimensions.width * 0.18),
@@ -2827,7 +2836,7 @@ const KSPlayerCore: React.FC = () => {
                                   borderRadius: 12,
                                   backgroundColor: 'rgba(255,255,255,0.1)'
                                 }}
-                                resizeMode="cover"
+                                resizeMode={FastImage.resizeMode.cover}
                               />
                             </View>
                           )}
@@ -2993,59 +3002,22 @@ const KSPlayerCore: React.FC = () => {
             </TouchableOpacity>
           )}
 
-          {/* Next Episode Button */}
-          {showNextEpisodeButton && nextEpisode && (
-            <Animated.View
-              style={{
-                position: 'absolute',
-                bottom: 80 + insets.bottom,
-                right: 8 + insets.right,
-                opacity: nextEpisodeButtonOpacity,
-                transform: [{ scale: nextEpisodeButtonScale }],
-                zIndex: 50,
-              }}
-            >
-              <TouchableOpacity
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.95)',
-                  borderRadius: 18,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 8,
-                }}
-                onPress={handlePlayNextEpisode}
-                activeOpacity={0.8}
-              >
-                {isLoadingNextEpisode ? (
-                  <ActivityIndicator size="small" color="#000000" style={{ marginRight: 8 }} />
-                ) : (
-                  <MaterialIcons name="skip-next" size={18} color="#000000" style={{ marginRight: 8 }} />
-                )}
-                <View>
-                  <Text style={{ color: '#000000', fontSize: 11, fontWeight: '700', opacity: 0.8 }}>
-                    {isLoadingNextEpisode ? 'Loading next episode…' : 'Up next'}
-                  </Text>
-                  <Text style={{ color: '#000000', fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
-                    S{nextEpisode.season_number}E{nextEpisode.episode_number}
-                    {nextEpisode.name ? `: ${nextEpisode.name}` : ''}
-                  </Text>
-                  {isLoadingNextEpisode && (
-                    <Text style={{ color: '#333333', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                      {nextLoadingProvider ? `${nextLoadingProvider}` : 'Finding source…'}
-                      {nextLoadingQuality ? ` • ${nextLoadingQuality}p` : ''}
-                      {nextLoadingTitle ? ` • ${nextLoadingTitle}` : ''}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
+          {/* Next Episode Button (reusable) */}
+          <UpNextButton
+            type={type as any}
+            nextEpisode={nextEpisode as any}
+            currentTime={currentTime}
+            duration={duration}
+            insets={{ top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left }}
+            isLoading={isLoadingNextEpisode}
+            nextLoadingProvider={nextLoadingProvider}
+            nextLoadingQuality={nextLoadingQuality}
+            nextLoadingTitle={nextLoadingTitle}
+            onPress={handlePlayNextEpisode}
+            metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
+            controlsVisible={showControls}
+            controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 126 : 106}
+          />
 
           <CustomSubtitles
             useCustomSubtitles={useCustomSubtitles}
@@ -3063,18 +3035,19 @@ const KSPlayerCore: React.FC = () => {
             bottomOffset={subtitleBottomOffset}
             letterSpacing={subtitleLetterSpacing}
             lineHeightMultiplier={subtitleLineHeightMultiplier}
+            formattedSegments={currentFormattedSegments}
             controlsVisible={showControls}
             controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 126 : 106}
           />
 
           {/* Volume Overlay */}
-          {showVolumeOverlay && (
+          {gestureControls.showVolumeOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
-                opacity: volumeOverlayOpacity,
+                left: getDimensions().width / 2 - 60,
+                top: getDimensions().height / 2 - 60,
+                opacity: gestureControls.volumeOverlayOpacity,
                 zIndex: 1000,
               }}
             >
@@ -3165,13 +3138,13 @@ const KSPlayerCore: React.FC = () => {
           )}
 
           {/* Brightness Overlay */}
-          {showBrightnessOverlay && (
+          {gestureControls.showBrightnessOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
-                opacity: brightnessOverlayOpacity,
+                left: getDimensions().width / 2 - 60,
+                top: getDimensions().height / 2 - 60,
+                opacity: gestureControls.brightnessOverlayOpacity,
                 zIndex: 1000,
               }}
             >
@@ -3261,6 +3234,41 @@ const KSPlayerCore: React.FC = () => {
             </Animated.View>
           )}
 
+          {/* Speed Activated Overlay */}
+          {showSpeedActivatedOverlay && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: getDimensions().height * 0.1,
+                left: getDimensions().width / 2 - 40,
+                opacity: speedActivatedOverlayOpacity,
+                zIndex: 1000,
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                elevation: 5,
+              }}>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  letterSpacing: 0.5,
+                }}>
+                  {holdToSpeedValue}x Speed Activated
+                </Text>
+              </View>
+            </Animated.View>
+          )}
 
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </View>
@@ -3272,6 +3280,16 @@ const KSPlayerCore: React.FC = () => {
         ksAudioTracks={ksAudioTracks}
         selectedAudioTrack={selectedAudioTrack}
         selectAudioTrack={selectAudioTrack}
+      />
+      <SpeedModal
+        showSpeedModal={showSpeedModal}
+        setShowSpeedModal={setShowSpeedModal}
+        currentSpeed={playbackSpeed}
+        setPlaybackSpeed={setPlaybackSpeed}
+        holdToSpeedEnabled={holdToSpeedEnabled}
+        setHoldToSpeedEnabled={setHoldToSpeedEnabled}
+        holdToSpeedValue={holdToSpeedValue}
+        setHoldToSpeedValue={setHoldToSpeedValue}
       />
       <SubtitleModals
         showSubtitleModal={showSubtitleModal}
@@ -3325,8 +3343,31 @@ const KSPlayerCore: React.FC = () => {
         availableStreams={availableStreams}
         currentStreamUrl={currentStreamUrl}
         onSelectStream={handleSelectStream}
-        isChangingSource={isChangingSource}
       />
+
+      {type === 'series' && (
+        <>
+          <EpisodesModal
+            showEpisodesModal={showEpisodesModal}
+            setShowEpisodesModal={setShowEpisodesModal}
+            groupedEpisodes={groupedEpisodes || metadataGroupedEpisodes || {}}
+            currentEpisode={season && episode ? { season, episode } : undefined}
+            metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
+            onSelectEpisode={handleEpisodeSelect}
+          />
+          
+          <EpisodeStreamsModal
+            visible={showEpisodeStreamsModal}
+            episode={selectedEpisodeForStreams}
+            onClose={() => {
+              setShowEpisodeStreamsModal(false);
+              setShowEpisodesModal(true);
+            }}
+            onSelectStream={handleEpisodeStreamSelect}
+            metadata={metadata ? { id: metadata.id, name: metadata.name } : undefined}
+          />
+        </>
+      )}
       
       {/* Error Modal */}
       <Modal

@@ -10,7 +10,22 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for CastDetailsModal
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import Animated, {
   FadeIn,
   FadeOut,
@@ -189,17 +204,30 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
         ]}
       >
         {Platform.OS === 'ios' ? (
-          <BlurView
-            intensity={100}
-            tint="dark"
-            style={{
-              width: '100%',
-              height: '100%',
-              backgroundColor: 'rgba(20, 20, 20, 0.8)',
-            }}
-          >
-            {renderContent()}
-          </BlurView>
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp
+              style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(20, 20, 20, 0.8)',
+              }}
+              glassEffectStyle="regular"
+            >
+              {renderContent()}
+            </GlassViewComp>
+          ) : (
+            <BlurView
+              intensity={100}
+              tint="dark"
+              style={{
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'rgba(20, 20, 20, 0.8)',
+              }}
+            >
+              {renderContent()}
+            </BlurView>
+          )
         ) : (
           renderContent()
         )}
@@ -228,12 +256,12 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
               backgroundColor: 'rgba(255, 255, 255, 0.08)',
             }}>
               {castMember?.profile_path ? (
-                <Image
+                <FastImage
                   source={{
                     uri: `https://image.tmdb.org/t/p/w185${castMember.profile_path}`,
                   }}
                   style={{ width: '100%', height: '100%' }}
-                  contentFit="cover"
+                  resizeMode={FastImage.resizeMode.cover}
                 />
               ) : (
                 <View style={{

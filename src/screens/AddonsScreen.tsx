@@ -21,15 +21,30 @@ import {
 } from 'react-native';
 import { stremioService, Manifest } from '../services/stremioService';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { logger } from '../utils/logger';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import CustomAlert from '../components/CustomAlert';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for AddonsScreen
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 // Removed community blur and expo-constants for Android overlay
 import axios from 'axios';
 import { useTheme } from '../contexts/ThemeContext';
@@ -656,7 +671,7 @@ const AddonsScreen = () => {
       });
       
       // Get catalog settings to determine enabled count
-      const catalogSettingsJson = await AsyncStorage.getItem('catalog_settings');
+      const catalogSettingsJson = await mmkvStorage.getItem('catalog_settings');
       if (catalogSettingsJson) {
         const catalogSettings = JSON.parse(catalogSettingsJson);
         const disabledCount = Object.entries(catalogSettings)
@@ -776,14 +791,6 @@ const AddonsScreen = () => {
   };
 
   const handleRemoveAddon = (addon: ExtendedManifest) => {
-    // Check if this is a pre-installed addon
-    if (stremioService.isPreInstalledAddon(addon.id)) {
-      setAlertTitle('Cannot Remove Addon');
-      setAlertMessage(`${addon.name} is a pre-installed addon and cannot be removed.`);
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
-      setAlertVisible(true);
-      return;
-    }
     setAlertTitle('Uninstall Addon');
     setAlertMessage(`Are you sure you want to uninstall ${addon.name}?`);
     setAlertActions([
@@ -980,10 +987,10 @@ const AddonsScreen = () => {
         
         <View style={styles.addonHeader}>
           {logo ? (
-            <ExpoImage 
+            <FastImage 
               source={{ uri: logo }} 
-              style={styles.addonIcon} 
-              contentFit="contain"
+              style={styles.addonIcon}
+              resizeMode={FastImage.resizeMode.contain}
             />
           ) : (
             <View style={styles.addonIconPlaceholder}>
@@ -1056,10 +1063,10 @@ const AddonsScreen = () => {
     return (
       <View style={styles.communityAddonItem}>
         {logo ? (
-          <ExpoImage
+          <FastImage
             source={{ uri: logo }}
             style={styles.communityAddonIcon}
-            contentFit="contain"
+            resizeMode={FastImage.resizeMode.contain}
           />
         ) : (
           <View style={styles.communityAddonIconPlaceholder}>
@@ -1248,10 +1255,10 @@ const AddonsScreen = () => {
                  <View style={styles.addonItem}>
                    <View style={styles.addonHeader}>
                      {promoAddon.logo ? (
-                       <ExpoImage 
+                       <FastImage 
                          source={{ uri: promoAddon.logo }} 
-                         style={styles.addonIcon} 
-                         contentFit="contain"
+                         style={styles.addonIcon}
+                         resizeMode={FastImage.resizeMode.contain}
                        />
                      ) : (
                        <View style={styles.addonIconPlaceholder}>
@@ -1326,10 +1333,10 @@ const AddonsScreen = () => {
                     <View style={styles.addonItem}>
                       <View style={styles.addonHeader}>
                         {item.manifest.logo ? (
-                          <ExpoImage 
+                          <FastImage 
                             source={{ uri: item.manifest.logo }} 
-                            style={styles.addonIcon} 
-                            contentFit="contain"
+                            style={styles.addonIcon}
+                            resizeMode={FastImage.resizeMode.contain}
                           />
                         ) : (
                           <View style={styles.addonIconPlaceholder}>
@@ -1399,7 +1406,11 @@ const AddonsScreen = () => {
       >
         <View style={styles.modalContainer}>
           {Platform.OS === 'ios' ? (
-            <ExpoBlurView intensity={80} style={styles.blurOverlay} tint="dark" />
+            GlassViewComp && liquidGlassAvailable ? (
+              <GlassViewComp style={styles.blurOverlay} glassEffectStyle="regular" />
+            ) : (
+              <ExpoBlurView intensity={80} style={styles.blurOverlay} tint="dark" />
+            )
           ) : (
             // Android: use solid themed background instead of semi-transparent overlay
             <View style={[styles.androidBlurContainer, { backgroundColor: colors.darkBackground }]} />
@@ -1427,10 +1438,10 @@ const AddonsScreen = () => {
                   <View style={styles.addonDetailHeader}>
                     {/* @ts-ignore */}
                     {addonDetails.logo ? (
-                      <ExpoImage
+                      <FastImage
                         source={{ uri: addonDetails.logo }}
                         style={styles.addonLogo}
-                        contentFit="contain"
+                        resizeMode={FastImage.resizeMode.contain}
                       />
                     ) : (
                       <View style={styles.addonLogoPlaceholder}>

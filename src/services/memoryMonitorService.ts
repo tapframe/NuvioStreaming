@@ -161,16 +161,16 @@ class MemoryMonitorService {
   private clearGlobalCaches(): void {
     try {
       // Clear any global caches your app might have
-      if (global && global.__APP_CACHE__) {
-        global.__APP_CACHE__ = {};
+      if (global && (global as any).__APP_CACHE__) {
+        (global as any).__APP_CACHE__ = {};
       }
       
-      if (global && global.__METADATA_CACHE__) {
-        global.__METADATA_CACHE__ = {};
+      if (global && (global as any).__METADATA_CACHE__) {
+        (global as any).__METADATA_CACHE__ = {};
       }
       
-      if (global && global.__EPISODE_CACHE__) {
-        global.__EPISODE_CACHE__ = {};
+      if (global && (global as any).__EPISODE_CACHE__) {
+        (global as any).__EPISODE_CACHE__ = {};
       }
     } catch (error) {
       logger.warn('[MemoryMonitor] Could not clear global caches:', error);
@@ -180,13 +180,13 @@ class MemoryMonitorService {
   private clearImageCaches(): void {
     try {
       // Clear React Native image caches if available
-      if (global && global.__IMAGE_CACHE__) {
-        global.__IMAGE_CACHE__ = {};
+      if (global && (global as any).__IMAGE_CACHE__) {
+        (global as any).__IMAGE_CACHE__ = {};
       }
       
       // Clear Expo Image cache if available
       // Note: Expo Image has its own cache management, but we can suggest cleanup
-      if (global && global.expo && global.expo.ImagePicker) {
+      if (global && (global as any).expo && (global as any).expo.ImagePicker) {
         // This is just an example - actual cache clearing would depend on the library
       }
     } catch (error) {

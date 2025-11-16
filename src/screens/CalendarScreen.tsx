@@ -16,7 +16,7 @@ import {
 import { InteractionManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
@@ -138,11 +138,10 @@ const CalendarScreen = () => {
             onPress={() => handleSeriesPress(item.seriesId, item)}
             activeOpacity={0.7}
           >
-            <Image
-              source={{ uri: imageUrl }}
+            <FastImage
+              source={{ uri: imageUrl || '' }}
               style={styles.poster}
-              contentFit="cover"
-              transition={300}
+              resizeMode={FastImage.resizeMode.cover}
             />
           </TouchableOpacity>
           
@@ -233,6 +232,20 @@ const CalendarScreen = () => {
   
   // Log when rendering with relevant state info
   logger.log(`[Calendar] Rendering: loading=${loading}, calendarData sections=${calendarData.length}, allEpisodes=${allEpisodes.length}`);
+
+  // Log section details
+  if (calendarData.length > 0) {
+    calendarData.forEach((section, index) => {
+      logger.log(`[Calendar] Section ${index}: "${section.title}" with ${section.data.length} episodes`);
+      if (section.data && section.data.length > 0) {
+        logger.log(`[Calendar] First episode in "${section.title}": ${section.data[0].seriesName} - ${section.data[0].title} (${section.data[0].releaseDate})`);
+      } else {
+        logger.log(`[Calendar] Section "${section.title}" has empty or undefined data array`);
+      }
+    });
+  } else {
+    logger.log(`[Calendar] No calendarData sections available`);
+  }
   
   // Handle date selection from calendar
   const handleDateSelect = useCallback((date: Date) => {

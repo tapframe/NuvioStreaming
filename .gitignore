@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 
+# Sentry
+ios/sentry.properties
+android/sentry.properties
+
 # typescript
 *.tsbuildinfo
 plan.md
@@ -64,3 +68,20 @@ toast.md
 ffmpegreadme.md
 sliderreadme.md
 bottomsheet.md
+fastimage.md
+
+# Backup directories
+backup_sdk54_upgrade/
+SDK54_UPGRADE_SUMMARY.md
+SDK54_UPGRADE_SUMMARY.md
+build-and-publish-app-releases.sh
+bottomnav.md
+/TrailerServices
+mmkv.md
+fix-android-scroll-lag-summary.md
+server/cache-server
+carousal.md
+node_modules
+expofs.md
+ios/sentry.properties
+android/sentry.properties

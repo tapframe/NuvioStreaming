@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -7,22 +7,25 @@ import {
   Dimensions,
   AppState,
   AppStateStatus,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { StreamingContent, catalogService } from '../../services/catalogService';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { useTheme } from '../../contexts/ThemeContext';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import * as Haptics from 'expo-haptics';
 import { TraktService } from '../../services/traktService';
 import { stremioService } from '../../services/stremioService';
+import { streamCacheService } from '../../services/streamCacheService';
+import { useSettings } from '../../hooks/useSettings';
 import CustomAlert from '../../components/CustomAlert';
 
 // Define interface for continue watching items
@@ -38,6 +41,14 @@ interface ContinueWatchingItem extends StreamingContent {
 interface ContinueWatchingRef {
   refresh: () => Promise<boolean>;
 }
+
+// Enhanced responsive breakpoints for Continue Watching section
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
 
 // Dynamic poster calculation based on screen width for Continue Watching section
 const calculatePosterLayout = (screenWidth: number) => {
@@ -89,12 +100,95 @@ const isEpisodeReleased = (video: any): boolean => {
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
   const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const appState = useRef(AppState.currentState);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Enhanced responsive sizing for tablets and TV screens
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  const deviceWidth = dimensions.width;
+  const deviceHeight = dimensions.height;
+  
+  // Listen for dimension changes (orientation changes)
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced responsive sizing for continue watching items
+  const computedItemWidth = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 400; // Larger items for TV
+      case 'largeTablet':
+        return 350; // Medium-large items for large tablets
+      case 'tablet':
+        return 320; // Medium items for tablets
+      default:
+        return 280; // Original phone size
+    }
+  }, [deviceType]);
+  
+  const computedItemHeight = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 160; // Taller items for TV
+      case 'largeTablet':
+        return 140; // Medium-tall items for large tablets
+      case 'tablet':
+        return 130; // Medium items for tablets
+      default:
+        return 120; // Original phone height
+    }
+  }, [deviceType]);
+  
+  // Enhanced spacing and padding
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
+  
+  const itemSpacing = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 20;
+      case 'largeTablet':
+        return 18;
+      case 'tablet':
+        return 16;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
 
   // Alert state for CustomAlert
   const [alertVisible, setAlertVisible] = useState(false);
@@ -108,6 +202,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Track recently removed items to prevent immediate re-addition
   const recentlyRemovedRef = useRef<Set<string>>(new Set());
   const REMOVAL_IGNORE_DURATION = 10000; // 10 seconds
+  
+  // Track last Trakt sync to prevent excessive API calls
+  const lastTraktSyncRef = useRef<number>(0);
+  const TRAKT_SYNC_COOLDOWN = 5 * 60 * 1000; // 5 minutes between Trakt syncs
 
   // Cache for metadata to avoid redundant API calls
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
@@ -124,7 +222,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
     
     try {
-      const shouldFetchMeta = stremioService.isValidContentId(type, id);
+      const shouldFetchMeta = await stremioService.isValidContentId(type, id);
       const [metadata, basicContent] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
         catalogService.getBasicContentDetails(type, id)
@@ -368,6 +466,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           const traktService = TraktService.getInstance();
           const isAuthed = await traktService.isAuthenticated();
           if (!isAuthed) return;
+          
+          // Check Trakt sync cooldown to prevent excessive API calls
+          const now = Date.now();
+          if (now - lastTraktSyncRef.current < TRAKT_SYNC_COOLDOWN) {
+            logger.log(`[TraktSync] Skipping Trakt sync - cooldown active (${Math.round((TRAKT_SYNC_COOLDOWN - (now - lastTraktSyncRef.current)) / 1000)}s remaining)`);
+            return;
+          }
+          
+          lastTraktSyncRef.current = now;
           const historyItems = await traktService.getWatchedEpisodesHistory(1, 200);
           const latestWatchedByShow: Record<string, { season: number; episode: number; watchedAt: number }> = {};
           for (const item of historyItems) {
@@ -384,18 +491,21 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             }
           }
 
-          const perShowPromises = Object.entries(latestWatchedByShow).map(async ([showId, info]) => {
+          // Collect all valid Trakt items first, then merge as a batch
+          const traktBatch: ContinueWatchingItem[] = [];
+
+          for (const [showId, info] of Object.entries(latestWatchedByShow)) {
             try {
               // Check if this show was recently removed by the user
               const showKey = `series:${showId}`;
               if (recentlyRemovedRef.current.has(showKey)) {
                 logger.log(`🚫 [TraktSync] Skipping recently removed show: ${showKey}`);
-                return;
+                continue;
               }
-              
+
               const nextEpisode = info.episode + 1;
               const cachedData = await getCachedMetadata('series', showId);
-              if (!cachedData?.basicContent) return;
+              if (!cachedData?.basicContent) continue;
               const { metadata, basicContent } = cachedData;
               let nextEpisodeVideo = null;
               if (metadata?.videos && Array.isArray(metadata.videos)) {
@@ -405,18 +515,16 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               }
               if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
                 logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${info.season}E${nextEpisode}`);
-                await mergeBatchIntoState([
-                  {
-                    ...basicContent,
-                    id: showId,
-                    type: 'series',
-                    progress: 0,
-                    lastUpdated: info.watchedAt,
-                    season: info.season,
-                    episode: nextEpisode,
-                    episodeTitle: `Episode ${nextEpisode}`,
-                  } as ContinueWatchingItem,
-                ]);
+                traktBatch.push({
+                  ...basicContent,
+                  id: showId,
+                  type: 'series',
+                  progress: 0,
+                  lastUpdated: info.watchedAt,
+                  season: info.season,
+                  episode: nextEpisode,
+                  episodeTitle: `Episode ${nextEpisode}`,
+                } as ContinueWatchingItem);
               }
 
               // Persist "watched" progress for the episode that Trakt reported (only if not recently removed)
@@ -445,8 +553,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             } catch (err) {
               // Continue with other shows even if one fails
             }
-          });
-          await Promise.allSettled(perShowPromises);
+          }
+
+          // Merge all Trakt items as a single batch to ensure proper sorting
+          if (traktBatch.length > 0) {
+            await mergeBatchIntoState(traktBatch);
+          }
         } catch (err) {
           // Continue even if Trakt history merge fails
         }
@@ -475,7 +587,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       appState.current.match(/inactive|background/) &&
       nextAppState === 'active'
     ) {
-      // App has come to the foreground - trigger a background refresh
+      // App has come to the foreground - force Trakt sync by resetting cooldown
+      lastTraktSyncRef.current = 0; // Reset cooldown to allow immediate Trakt sync
       loadContinueWatching(true);
     }
     appState.current = nextAppState;
@@ -493,9 +606,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         clearTimeout(refreshTimerRef.current);
       }
       refreshTimerRef.current = setTimeout(() => {
-        // Trigger a background refresh
+        // Only trigger background refresh for local progress updates, not Trakt sync
+        // This prevents the feedback loop where Trakt sync triggers more progress updates
         loadContinueWatching(true);
-      }, 800); // Shorter debounce for snappier UI without battery impact
+      }, 2000); // Increased debounce to reduce frequency
     };
 
     // Try to set up a custom event listener or use a timer as fallback
@@ -543,15 +657,131 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Expose the refresh function via the ref
   React.useImperativeHandle(ref, () => ({
     refresh: async () => {
-      // Allow manual refresh to show loading indicator
+      // Manual refresh bypasses Trakt cooldown to get fresh data
+      lastTraktSyncRef.current = 0; // Reset cooldown for manual refresh
       await loadContinueWatching(false);
       return true;
     }
   }));
 
-  const handleContentPress = useCallback((id: string, type: string) => {
-    navigation.navigate('Metadata', { id, type });
-  }, [navigation]);
+  const handleContentPress = useCallback(async (item: ContinueWatchingItem) => {
+    try {
+      logger.log(`🎬 [ContinueWatching] User clicked on: ${item.name} (${item.type}:${item.id})`);
+      
+      // Check if cached streams are enabled in settings
+      if (!settings.useCachedStreams) {
+        logger.log(`📺 [ContinueWatching] Cached streams disabled, navigating to ${settings.openMetadataScreenWhenCacheDisabled ? 'MetadataScreen' : 'StreamsScreen'} for ${item.name}`);
+        
+        // Navigate based on the second setting
+        if (settings.openMetadataScreenWhenCacheDisabled) {
+          // Navigate to MetadataScreen
+          if (item.type === 'series' && item.season && item.episode) {
+            const episodeId = `${item.id}:${item.season}:${item.episode}`;
+            navigation.navigate('Metadata', { 
+              id: item.id, 
+              type: item.type, 
+              episodeId: episodeId 
+            });
+          } else {
+            navigation.navigate('Metadata', { 
+              id: item.id, 
+              type: item.type 
+            });
+          }
+        } else {
+          // Navigate to StreamsScreen
+          if (item.type === 'series' && item.season && item.episode) {
+            const episodeId = `${item.id}:${item.season}:${item.episode}`;
+            navigation.navigate('Streams', { 
+              id: item.id, 
+              type: item.type, 
+              episodeId: episodeId 
+            });
+          } else {
+            navigation.navigate('Streams', { 
+              id: item.id, 
+              type: item.type 
+            });
+          }
+        }
+        return;
+      }
+      
+      // Check if we have a cached stream for this content
+      const episodeId = item.type === 'series' && item.season && item.episode 
+        ? `${item.id}:${item.season}:${item.episode}` 
+        : undefined;
+      
+      logger.log(`🔍 [ContinueWatching] Looking for cached stream with episodeId: ${episodeId || 'none'}`);
+      
+      const cachedStream = await streamCacheService.getCachedStream(item.id, item.type, episodeId);
+      
+      if (cachedStream) {
+        // We have a valid cached stream, navigate directly to player
+        logger.log(`🚀 [ContinueWatching] Using cached stream for ${item.name}`);
+        
+        // Determine the player route based on platform
+        const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
+        
+        // Navigate directly to player with cached stream data
+        navigation.navigate(playerRoute as any, {
+          uri: cachedStream.stream.url,
+          title: cachedStream.metadata?.name || item.name,
+          episodeTitle: cachedStream.episodeTitle || (item.type === 'series' ? `Episode ${item.episode}` : undefined),
+          season: cachedStream.season || item.season,
+          episode: cachedStream.episode || item.episode,
+          quality: (cachedStream.stream.title?.match(/(\d+)p/) || [])[1] || undefined,
+          year: cachedStream.metadata?.year || item.year,
+          streamProvider: cachedStream.stream.addonId || cachedStream.stream.addonName || cachedStream.stream.name,
+          streamName: cachedStream.stream.name || cachedStream.stream.title || 'Unnamed Stream',
+          headers: cachedStream.stream.headers || undefined,
+          forceVlc: false,
+          id: item.id,
+          type: item.type,
+          episodeId: episodeId,
+          imdbId: cachedStream.imdbId || cachedStream.metadata?.imdbId || item.imdb_id,
+          backdrop: cachedStream.metadata?.backdrop || item.banner,
+          videoType: undefined, // Let player auto-detect
+        } as any);
+        
+        return;
+      }
+      
+      // No cached stream or cache failed, navigate to StreamsScreen
+      logger.log(`📺 [ContinueWatching] No cached stream, navigating to StreamsScreen for ${item.name}`);
+      
+      if (item.type === 'series' && item.season && item.episode) {
+        // For series, navigate to the specific episode
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type, 
+          episodeId: episodeId 
+        });
+      } else {
+        // For movies or series without specific episode, navigate to main content
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type 
+        });
+      }
+    } catch (error) {
+      logger.warn('[ContinueWatching] Error handling content press:', error);
+      // Fallback to StreamsScreen on any error
+      if (item.type === 'series' && item.season && item.episode) {
+        const episodeId = `${item.id}:${item.season}:${item.episode}`;
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type, 
+          episodeId: episodeId 
+        });
+      } else {
+        navigation.navigate('Streams', { 
+          id: item.id, 
+          type: item.type 
+        });
+      }
+    }
+  }, [navigation, settings.useCachedStreams, settings.openMetadataScreenWhenCacheDisabled]);
 
   // Handle long press to delete (moved before renderContinueWatchingItem)
   const handleLongPress = useCallback((item: ContinueWatchingItem) => {
@@ -611,27 +841,36 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Memoized render function for continue watching items
   const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
     <TouchableOpacity
-      style={[styles.wideContentItem, {
-        backgroundColor: currentTheme.colors.elevation1,
-        borderColor: currentTheme.colors.border,
-        shadowColor: currentTheme.colors.black
-      }]}
+      style={[
+        styles.wideContentItem, 
+        {
+          backgroundColor: currentTheme.colors.elevation1,
+          borderColor: currentTheme.colors.border,
+          shadowColor: currentTheme.colors.black,
+          width: computedItemWidth,
+          height: computedItemHeight
+        }
+      ]}
       activeOpacity={0.8}
-      onPress={() => handleContentPress(item.id, item.type)}
+      onPress={() => handleContentPress(item)}
       onLongPress={() => handleLongPress(item)}
       delayLongPress={800}
     >
       {/* Poster Image */}
-      <View style={styles.posterContainer}>
-        <ExpoImage
-          source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+      <View style={[
+        styles.posterContainer,
+        {
+          width: isTV ? 100 : isLargeTablet ? 90 : isTablet ? 85 : 80
+        }
+      ]}>
+        <FastImage
+          source={{ 
+            uri: item.poster || 'https://via.placeholder.com/300x450',
+            priority: FastImage.priority.high,
+            cache: FastImage.cacheControl.immutable
+          }}
           style={styles.continueWatchingPoster}
-          contentFit="cover"
-          cachePolicy="memory"
-          transition={0}
-          placeholder={{ uri: 'https://via.placeholder.com/300x450' }}
-          placeholderContentFit="cover"
-          recyclingKey={item.id}
+          resizeMode={FastImage.resizeMode.cover}
         />
         
         {/* Delete Indicator Overlay */}
@@ -643,21 +882,42 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       </View>
 
       {/* Content Details */}
-      <View style={styles.contentDetails}>
+      <View style={[
+        styles.contentDetails,
+        {
+          padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+        }
+      ]}>
         <View style={styles.titleRow}>
           {(() => {
             const isUpNext = item.type === 'series' && item.progress === 0;
             return (
               <View style={styles.titleRow}>
                 <Text 
-                  style={[styles.contentTitle, { color: currentTheme.colors.highEmphasis }]}
+                  style={[
+                    styles.contentTitle, 
+                    { 
+                      color: currentTheme.colors.highEmphasis,
+                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
+                    }
+                  ]}
                   numberOfLines={1}
                 >
                   {item.name}
                 </Text>
                 {isUpNext && (
-                <View style={[styles.progressBadge, { backgroundColor: currentTheme.colors.primary }]}>
-                    <Text style={styles.progressText}>Up Next</Text>
+                <View style={[
+                  styles.progressBadge, 
+                  { 
+                    backgroundColor: currentTheme.colors.primary,
+                    paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                    paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
+                  }
+                ]}>
+                    <Text style={[
+                      styles.progressText,
+                      { fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12 }
+                    ]}>Up Next</Text>
                 </View>
                 )}
               </View>
@@ -670,12 +930,24 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           if (item.type === 'series' && item.season && item.episode) {
             return (
               <View style={styles.episodeRow}>
-                <Text style={[styles.episodeText, { color: currentTheme.colors.mediumEmphasis }]}>
+                <Text style={[
+                  styles.episodeText, 
+                  { 
+                    color: currentTheme.colors.mediumEmphasis,
+                    fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
+                  }
+                ]}>
                   Season {item.season}
                 </Text>
                 {item.episodeTitle && (
                   <Text 
-                    style={[styles.episodeTitle, { color: currentTheme.colors.mediumEmphasis }]}
+                    style={[
+                      styles.episodeTitle, 
+                      { 
+                        color: currentTheme.colors.mediumEmphasis,
+                        fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
+                      }
+                    ]}
                     numberOfLines={1}
                   >
                     {item.episodeTitle}
@@ -685,7 +957,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             );
           } else {
             return (
-              <Text style={[styles.yearText, { color: currentTheme.colors.mediumEmphasis }]}>
+              <Text style={[
+                styles.yearText, 
+                { 
+                  color: currentTheme.colors.mediumEmphasis,
+                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
+                }
+              ]}>
                 {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
               </Text>
             );
@@ -695,7 +973,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         {/* Progress Bar */}
         {item.progress > 0 && (
           <View style={styles.wideProgressContainer}>
-            <View style={styles.wideProgressTrack}>
+            <View style={[
+              styles.wideProgressTrack,
+              {
+                height: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
+              }
+            ]}>
               <View 
                 style={[
                   styles.wideProgressBar, 
@@ -706,20 +989,26 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 ]} 
               />
             </View>
-            <Text style={[styles.progressLabel, { color: currentTheme.colors.textMuted }]}>
+            <Text style={[
+              styles.progressLabel, 
+              { 
+                color: currentTheme.colors.textMuted,
+                fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 11
+              }
+            ]}>
               {Math.round(item.progress)}% watched
             </Text>
           </View>
         )}
       </View>
     </TouchableOpacity>
-  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId]);
+  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedItemWidth, computedItemHeight, isTV, isLargeTablet, isTablet]);
 
   // Memoized key extractor
   const keyExtractor = useCallback((item: ContinueWatchingItem) => `continue-${item.id}-${item.type}`, []);
 
   // Memoized item separator
-  const ItemSeparator = useCallback(() => <View style={{ width: 16 }} />, []);
+  const ItemSeparator = useCallback(() => <View style={{ width: itemSpacing }} />, [itemSpacing]);
 
   // If no continue watching items, don't render anything
   if (continueWatchingItems.length === 0) {
@@ -727,11 +1016,27 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
-      <View style={styles.header}>
+    <Animated.View
+      style={styles.container}
+      entering={FadeIn.duration(350)}
+    >
+      <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: currentTheme.colors.text }]}>Continue Watching</Text>
-          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
+          <Text style={[
+            styles.title, 
+            { 
+              color: currentTheme.colors.text,
+              fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
+            }
+          ]}>Continue Watching</Text>
+          <View style={[
+            styles.titleUnderline, 
+            { 
+              backgroundColor: currentTheme.colors.primary,
+              width: isTV ? 50 : isLargeTablet ? 45 : isTablet ? 40 : 40,
+              height: isTV ? 4 : isLargeTablet ? 3.5 : isTablet ? 3 : 3
+            }
+          ]} />
         </View>
       </View>
       
@@ -741,7 +1046,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.wideList}
+        contentContainerStyle={[
+          styles.wideList,
+          { 
+            paddingLeft: horizontalPadding, 
+            paddingRight: horizontalPadding 
+          }
+        ]}
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
         onEndReached={() => {}}
@@ -769,7 +1080,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
     marginBottom: 16,
   },
   titleContainer: {
@@ -791,7 +1101,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   wideList: {
-    paddingHorizontal: 16,
     paddingBottom: 8,
     paddingTop: 4,
   },

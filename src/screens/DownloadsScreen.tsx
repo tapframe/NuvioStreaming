@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Alert,
   Platform,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -25,15 +26,39 @@ import Animated, {
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
+import FastImage from '@d11/react-native-fast-image';
 import { useDownloads } from '../contexts/DownloadsContext';
 import type { DownloadItem } from '../contexts/DownloadsContext';
+import { useToast } from '../contexts/ToastContext';
+import CustomAlert from '../components/CustomAlert';
 
 const { height, width } = Dimensions.get('window');
+const isTablet = width >= 768;
+
+// Tablet-optimized poster sizes
+const HORIZONTAL_ITEM_WIDTH = isTablet ? width * 0.18 : width * 0.3;
+const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
+const POSTER_WIDTH = isTablet ? 70 : 90;
+const POSTER_HEIGHT = isTablet ? 105 : 135;
+
+// Helper function to optimize poster URLs
+const optimizePosterUrl = (poster: string | undefined | null): string => {
+  if (!poster || poster.includes('placeholder')) {
+    return 'https://via.placeholder.com/80x120/333333/666666?text=No+Image';
+  }
+
+  // For TMDB images, use larger sizes for bigger posters
+  if (poster.includes('image.tmdb.org')) {
+    return poster.replace(/\/w\d+\//, '/w300/');
+  }
+
+  return poster;
+};
 
 // Download items come from DownloadsContext
 
 // Empty state component
-const EmptyDownloadsState: React.FC = () => {
+const EmptyDownloadsState: React.FC<{ navigation: NavigationProp<RootStackParamList> }> = ({ navigation }) => {
   const { currentTheme } = useTheme();
   
   return (
@@ -54,7 +79,7 @@ const EmptyDownloadsState: React.FC = () => {
       <TouchableOpacity 
         style={[styles.exploreButton, { backgroundColor: currentTheme.colors.primary }]}
         onPress={() => {
-          // Navigate to search or home to find content
+          navigation.navigate('Search');
         }}
       >
         <Text style={[styles.exploreButtonText, { color: currentTheme.colors.background }]}>
@@ -70,8 +95,38 @@ const DownloadItemComponent: React.FC<{
   item: DownloadItem;
   onPress: (item: DownloadItem) => void;
   onAction: (item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => void;
-}> = React.memo(({ item, onPress, onAction }) => {
+  onRequestRemove: (item: DownloadItem) => void;
+}> = React.memo(({ item, onPress, onAction, onRequestRemove }) => {
   const { currentTheme } = useTheme();
+  const { showSuccess, showInfo } = useToast();
+  const [posterUrl, setPosterUrl] = useState<string | null>(item.posterUrl || null);
+
+  // Try to fetch poster if not available
+  useEffect(() => {
+    if (!posterUrl && (item.imdbId || item.tmdbId)) {
+      // This could be enhanced to fetch poster from TMDB API if needed
+      // For now, we'll use the existing posterUrl or fallback to placeholder
+      setPosterUrl(item.posterUrl || null);
+    }
+  }, [item.imdbId, item.tmdbId, item.posterUrl, posterUrl]);
+
+  const handleLongPress = useCallback(() => {
+    if (item.status === 'completed' && item.fileUri) {
+      Clipboard.setString(item.fileUri);
+      if (Platform.OS === 'android') {
+        showSuccess('Path Copied', 'Local file path copied to clipboard');
+      } else {
+        Alert.alert('Copied', 'Local file path copied to clipboard');
+      }
+    } else if (item.status !== 'completed') {
+      if (Platform.OS === 'android') {
+        showInfo('Download Incomplete', 'Download is not complete yet');
+      } else {
+        Alert.alert('Not Available', 'The local file path is available only after the download is complete.');
+      }
+    }
+  }, [item.status, item.fileUri, showSuccess, showInfo]);
+
   const formatBytes = (bytes?: number) => {
     if (!bytes || bytes <= 0) return '0 B';
     const sizes = ['B','KB','MB','GB','TB'];
@@ -85,11 +140,11 @@ const DownloadItemComponent: React.FC<{
       case 'downloading':
         return currentTheme.colors.primary;
       case 'completed':
-        return currentTheme.colors.success;
+        return currentTheme.colors.success || '#4CAF50';
       case 'paused':
-        return currentTheme.colors.warning;
+        return currentTheme.colors.warning || '#FF9500';
       case 'error':
-        return currentTheme.colors.error;
+        return currentTheme.colors.error || '#FF3B30';
       case 'queued':
         return currentTheme.colors.mediumEmphasis;
       default:
@@ -118,15 +173,12 @@ const DownloadItemComponent: React.FC<{
   const getActionIcon = () => {
     switch (item.status) {
       case 'downloading':
-        // return 'pause'; // Resume support commented out
-        return null;
+        return 'pause';
       case 'paused':
       case 'error':
-        // return 'play'; // Resume support commented out
-        return null;
+        return 'play';
       case 'queued':
-        // return 'play'; // Resume support commented out
-        return null;
+        return 'play';
       default:
         return null;
     }
@@ -137,22 +189,46 @@ const DownloadItemComponent: React.FC<{
 
     switch (item.status) {
       case 'downloading':
-        // onAction(item, 'pause'); // Resume support commented out
+        onAction(item, 'pause');
         break;
       case 'paused':
       case 'error':
       case 'queued':
-        // onAction(item, 'resume'); // Resume support commented out
+        onAction(item, 'resume');
         break;
     }
   };
 
   return (
     <TouchableOpacity
-      style={[styles.downloadItem, { backgroundColor: currentTheme.colors.card }]}
+      style={[styles.downloadItem, { backgroundColor: currentTheme.colors.elevation2 }]}
       onPress={() => onPress(item)}
+      onLongPress={handleLongPress}
       activeOpacity={0.8}
     >
+      {/* Poster */}
+      <View style={styles.posterContainer}>
+        <FastImage
+          source={{ uri: optimizePosterUrl(posterUrl) }}
+          style={styles.poster}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+        {/* Status indicator overlay */}
+        <View style={[styles.statusOverlay, { backgroundColor: getStatusColor() }]}>
+          <MaterialCommunityIcons
+            name={
+              item.status === 'completed' ? 'check' :
+              item.status === 'downloading' ? 'download' :
+              item.status === 'paused' ? 'pause' :
+              item.status === 'error' ? 'alert-circle' :
+              'clock'
+            }
+            size={12}
+            color="white"
+          />
+        </View>
+      </View>
+
       {/* Content info */}
       <View style={styles.downloadContent}>
         <View style={styles.downloadHeader}>
@@ -174,7 +250,7 @@ const DownloadItemComponent: React.FC<{
           {/* Provider + quality row */}
           <View style={styles.providerRow}>
             <Text style={[styles.providerText, { color: currentTheme.colors.mediumEmphasis }]}>
-              {(item.providerName || 'Provider') + (item.quality ? `  ${item.quality}` : '')}
+              {item.providerName || 'Provider'}
             </Text>
           </View>
           {/* Status row */}
@@ -190,7 +266,21 @@ const DownloadItemComponent: React.FC<{
               {formatBytes(item.downloadedBytes)} / {item.totalBytes ? formatBytes(item.totalBytes) : '—'}
             </Text>
           </View>
-          
+
+          {/* Warning for small files */}
+          {item.totalBytes && item.totalBytes < 1048576 && ( // Less than 1MB
+            <View style={styles.warningRow}>
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={14}
+                color={currentTheme.colors.warning || '#FF9500'}
+              />
+              <Text style={[styles.warningText, { color: currentTheme.colors.warning || '#FF9500' }]}>
+                May not play - streaming playlist
+              </Text>
+            </View>
+          )}
+
           {/* Progress bar */}
           <View style={[styles.progressContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
             <Animated.View
@@ -235,16 +325,7 @@ const DownloadItemComponent: React.FC<{
         
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-          onPress={() => {
-            Alert.alert(
-              'Remove Download',
-              'Are you sure you want to remove this download?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Remove', style: 'destructive', onPress: () => onAction(item, 'cancel') },
-              ]
-            );
-          }}
+          onPress={() => onRequestRemove(item)}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons
@@ -262,10 +343,14 @@ const DownloadsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
-  const { downloads, /*pauseDownload, resumeDownload,*/ cancelDownload } = useDownloads();
+  const { downloads, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
+  const { showSuccess, showInfo } = useToast();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed'>('all');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'downloading' | 'completed' | 'paused'>('all');
+  const [showHelpAlert, setShowHelpAlert] = useState(false);
+  const [showRemoveAlert, setShowRemoveAlert] = useState(false);
+  const [pendingRemoveItem, setPendingRemoveItem] = useState<DownloadItem | null>(null);
 
   // Animation values
   const headerOpacity = useSharedValue(1);
@@ -279,8 +364,8 @@ const DownloadsScreen: React.FC = () => {
           return item.status === 'downloading' || item.status === 'queued';
         case 'completed':
           return item.status === 'completed';
-        // case 'paused':
-        //   return item.status === 'paused' || item.status === 'error'; // Resume support commented out
+        case 'paused':
+          return item.status === 'paused' || item.status === 'error';
         default:
           return true;
       }
@@ -294,11 +379,11 @@ const DownloadsScreen: React.FC = () => {
       item.status === 'downloading' || item.status === 'queued'
     ).length;
     const completed = downloads.filter(item => item.status === 'completed').length;
-    // const paused = downloads.filter(item =>
-    //   item.status === 'paused' || item.status === 'error'
-    // ).length; // Resume support commented out
+    const paused = downloads.filter(item =>
+      item.status === 'paused' || item.status === 'error'
+    ).length;
 
-    return { total, downloading, completed /*, paused*/ };
+    return { total, downloading, completed, paused };
   }, [downloads]);
 
   // Handlers
@@ -326,6 +411,11 @@ const DownloadsScreen: React.FC = () => {
     const isMp4 = /\.mp4(\?|$)/i.test(lower);
     const videoType = isM3u8 ? 'm3u8' : isMpd ? 'mpd' : isMp4 ? 'mp4' : undefined;
 
+    // Build episodeId for series progress tracking (format: contentId:season:episode)
+    const episodeId = item.type === 'series' && item.season && item.episode
+      ? `${item.contentId}:${item.season}:${item.episode}`
+      : undefined;
+
     const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
     navigation.navigate(playerRoute as any, {
       uri,
@@ -339,10 +429,10 @@ const DownloadsScreen: React.FC = () => {
       streamName: item.providerName || 'Offline',
       headers: undefined,
       forceVlc: Platform.OS === 'android' ? isMkv : false,
-      id: item.id,
+      id: item.contentId, // Use contentId (base ID) instead of compound id for progress tracking
       type: item.type,
-      episodeId: undefined,
-      imdbId: undefined,
+      episodeId: episodeId, // Pass episodeId for series progress tracking
+      imdbId: (item as any).imdbId || item.contentId, // Use imdbId if available, fallback to contentId
       availableStreams: {},
       backdrop: undefined,
       videoType,
@@ -350,14 +440,24 @@ const DownloadsScreen: React.FC = () => {
   }, [navigation]);
 
   const handleDownloadAction = useCallback((item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => {
-    // if (action === 'pause') pauseDownload(item.id);
-    // if (action === 'resume') resumeDownload(item.id);
+    if (action === 'pause') pauseDownload(item.id);
+    if (action === 'resume') resumeDownload(item.id);
     if (action === 'cancel') cancelDownload(item.id);
-  }, [/*pauseDownload, resumeDownload,*/ cancelDownload]);
+  }, [pauseDownload, resumeDownload, cancelDownload]);
 
-  const handleFilterPress = useCallback((filter: 'all' | 'downloading' | 'completed') => {
+  const handleRequestRemove = useCallback((item: DownloadItem) => {
+    setPendingRemoveItem(item);
+    setShowRemoveAlert(true);
+  }, []);
+
+  const handleFilterPress = useCallback((filter: 'all' | 'downloading' | 'completed' | 'paused') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedFilter(filter);
+  }, []);
+
+  const showDownloadHelp = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowHelpAlert(true);
   }, []);
 
   // Focus effect
@@ -391,7 +491,7 @@ const DownloadsScreen: React.FC = () => {
         styles.filterButtonText,
         {
           color: selectedFilter === filter 
-            ? currentTheme.colors.background 
+            ? currentTheme.colors.white 
             : currentTheme.colors.text,
         }
       ]}>
@@ -402,7 +502,7 @@ const DownloadsScreen: React.FC = () => {
           styles.filterBadge,
           {
             backgroundColor: selectedFilter === filter 
-              ? currentTheme.colors.background 
+              ? currentTheme.colors.white 
               : currentTheme.colors.primary,
           }
         ]}>
@@ -411,7 +511,7 @@ const DownloadsScreen: React.FC = () => {
             {
               color: selectedFilter === filter 
                 ? currentTheme.colors.primary 
-                : currentTheme.colors.background,
+                : currentTheme.colors.white,
             }
           ]}>
             {count}
@@ -422,7 +522,7 @@ const DownloadsScreen: React.FC = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar
         translucent
         barStyle="light-content"
@@ -433,28 +533,44 @@ const DownloadsScreen: React.FC = () => {
       <Animated.View style={[
         styles.header,
         {
-          backgroundColor: currentTheme.colors.background,
-          paddingTop: safeAreaTop + 16,
+          backgroundColor: currentTheme.colors.darkBackground,
+          paddingTop: (Platform.OS === 'android' 
+            ? (StatusBar.currentHeight || 0) + 26 
+            : safeAreaTop + 15) + (isTablet ? 64 : 0),
+          borderBottomColor: currentTheme.colors.border,
         },
         headerStyle,
       ]}>
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-          Downloads
-        </Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
+            Downloads
+          </Text>
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={showDownloadHelp}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="help-circle-outline"
+              size={24}
+              color={currentTheme.colors.mediumEmphasis}
+            />
+          </TouchableOpacity>
+        </View>
         
         {downloads.length > 0 && (
           <View style={styles.filterContainer}>
             {renderFilterButton('all', 'All', stats.total)}
             {renderFilterButton('downloading', 'Active', stats.downloading)}
             {renderFilterButton('completed', 'Done', stats.completed)}
-            {/* {renderFilterButton('paused', 'Paused', stats.paused)} */} {/* Resume support commented out */}
+            {renderFilterButton('paused', 'Paused', stats.paused)}
           </View>
         )}
       </Animated.View>
 
       {/* Content */}
       {downloads.length === 0 ? (
-        <EmptyDownloadsState />
+        <EmptyDownloadsState navigation={navigation} />
       ) : (
         <FlatList
           data={filteredDownloads}
@@ -464,8 +580,10 @@ const DownloadsScreen: React.FC = () => {
               item={item}
               onPress={handleDownloadPress}
               onAction={handleDownloadAction}
+              onRequestRemove={handleRequestRemove}
             />
           )}
+          style={{ backgroundColor: currentTheme.colors.darkBackground }}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -493,6 +611,26 @@ const DownloadsScreen: React.FC = () => {
           )}
         />
       )}
+
+      {/* Help Alert */}
+      <CustomAlert
+        visible={showHelpAlert}
+        title="Download Limitations"
+        message="• Files smaller than 1MB are typically M3U8 streaming playlists and cannot be downloaded for offline viewing. These only work with online streaming and contain links to video segments, not the actual video content."
+        onClose={() => setShowHelpAlert(false)}
+      />
+
+      {/* Remove Download Confirmation */}
+      <CustomAlert
+        visible={showRemoveAlert}
+        title="Remove Download"
+        message={pendingRemoveItem ? `Remove \"${pendingRemoveItem.title}\"${pendingRemoveItem.type === 'series' && pendingRemoveItem.season && pendingRemoveItem.episode ? ` S${String(pendingRemoveItem.season).padStart(2,'0')}E${String(pendingRemoveItem.episode).padStart(2,'0')}` : ''}?` : 'Remove this download?'}
+        actions={[
+          { label: 'Cancel', onPress: () => setShowRemoveAlert(false) },
+          { label: 'Remove', onPress: () => { if (pendingRemoveItem) { cancelDownload(pendingRemoveItem.id); } setShowRemoveAlert(false); setPendingRemoveItem(null); }, style: { } },
+        ]}
+        onClose={() => { setShowRemoveAlert(false); setPendingRemoveItem(null); }}
+      />
     </View>
   );
 };
@@ -502,30 +640,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: isTablet ? 24 : Math.max(1, width * 0.05),
+    paddingBottom: isTablet ? 20 : 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginBottom: isTablet ? 20 : 16,
+    paddingBottom: 8,
   },
   headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 16,
+    fontSize: isTablet ? 36 : Math.min(32, width * 0.08),
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  helpButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   filterContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: isTablet ? 16 : 12,
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: isTablet ? 20 : 16,
+    paddingVertical: isTablet ? 10 : 8,
     borderRadius: 20,
     gap: 8,
   },
   filterButtonText: {
-    fontSize: 14,
+    fontSize: isTablet ? 16 : 14,
     fontWeight: '600',
   },
   filterBadge: {
@@ -541,24 +689,59 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContainer: {
-    padding: 20,
+    paddingHorizontal: 0,
     paddingTop: 8,
+    paddingBottom: isTablet ? 120 : 100, // Extra padding for tablet bottom nav
   },
   downloadItem: {
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    padding: isTablet ? 20 : 16,
+    marginBottom: isTablet ? 16 : 12,
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: isTablet ? 165 : 152, // Accommodate tablet poster + padding
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    marginHorizontal: 0,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  posterContainer: {
+    width: POSTER_WIDTH,
+    height: POSTER_HEIGHT,
+    borderRadius: 8,
+    marginRight: isTablet ? 20 : 16,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#333',
+  },
+  poster: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  statusOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   downloadContent: {
     flex: 1,
-    marginRight: 12,
   },
   downloadHeader: {
     marginBottom: 12,
@@ -602,6 +785,16 @@ const styles = StyleSheet.create({
   },
   sizeRow: {
     marginBottom: 6,
+  },
+  warningRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  warningText: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   progressInfo: {
     flexDirection: 'row',
@@ -655,7 +848,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: isTablet ? 64 : 40,
+    paddingBottom: isTablet ? 120 : 100,
   },
   emptyIconContainer: {
     width: 96,
@@ -666,16 +860,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: isTablet ? 28 : 24,
     fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
+    fontSize: isTablet ? 18 : 16,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
+    lineHeight: isTablet ? 28 : 24,
+    marginBottom: isTablet ? 40 : 32,
   },
   exploreButton: {
     paddingHorizontal: 24,
@@ -689,7 +883,7 @@ const styles = StyleSheet.create({
   emptyFilterContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
+    paddingVertical: isTablet ? 80 : 60,
   },
   emptyFilterTitle: {
     fontSize: 18,

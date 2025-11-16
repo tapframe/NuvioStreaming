@@ -6,16 +6,32 @@ import {
   TouchableOpacity,
   Platform,
   Dimensions,
+  Image,
 } from 'react-native';
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for FloatingHeader
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import Animated, {
   useAnimatedStyle,
   interpolate,
   Extrapolate,
   useAnimatedReaction,
   runOnJS,
+  SharedValue,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 import { logger } from '../../utils/logger';
@@ -28,11 +44,12 @@ interface FloatingHeaderProps {
   handleBack: () => void;
   handleToggleLibrary: () => void;
   inLibrary: boolean;
-  headerOpacity: Animated.SharedValue<number>;
-  headerElementsY: Animated.SharedValue<number>;
-  headerElementsOpacity: Animated.SharedValue<number>;
+  headerOpacity: SharedValue<number>;
+  headerElementsY: SharedValue<number>;
+  headerElementsOpacity: SharedValue<number>;
   safeAreaTop: number;
   setLogoLoadError: (error: boolean) => void;
+  stableLogoUri?: string | null;
 }
 
 const FloatingHeader: React.FC<FloatingHeaderProps> = ({
@@ -46,6 +63,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
   headerElementsOpacity,
   safeAreaTop,
   setLogoLoadError,
+  stableLogoUri,
 }) => {
   const { currentTheme } = useTheme();
   const [isHeaderInteractive, setIsHeaderInteractive] = React.useState(false);
@@ -82,27 +100,26 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
           style={[styles.blurContainer, { paddingTop: Math.max(safeAreaTop * 0.8, safeAreaTop - 6) }]}
         >
           <Animated.View style={[styles.floatingHeaderContent, headerElementsStyle]}>
-            <TouchableOpacity 
-              style={styles.backButton} 
+            <TouchableOpacity
+              style={styles.backButton}
               onPress={handleBack}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons 
-                name="arrow-back" 
-                size={24} 
+              <MaterialIcons
+                name="arrow-back"
+                size={24}
                 color={currentTheme.colors.highEmphasis}
               />
             </TouchableOpacity>
-            
+
             <View style={styles.headerTitleContainer}>
-              {metadata.logo && !logoLoadError ? (
+              {(stableLogoUri || metadata.logo) && !logoLoadError ? (
                 <Image
-                  source={{ uri: metadata.logo }}
+                  source={{ uri: stableLogoUri || metadata.logo }}
                   style={styles.floatingHeaderLogo}
-                  contentFit="contain"
-                  transition={150}
+                  resizeMode="contain"
                   onError={() => {
-                    logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
+                    logger.warn(`[FloatingHeader] Logo failed to load: ${stableLogoUri || metadata.logo}`);
                     setLogoLoadError(true);
                   }}
                 />
@@ -110,17 +127,13 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                 <Text style={[styles.floatingHeaderTitle, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>{metadata.name}</Text>
               )}
             </View>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.headerActionButton}
               onPress={handleToggleLibrary}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons 
-                name={inLibrary ? 'bookmark' : 'bookmark-border'} 
-                size={22} 
-                color={currentTheme.colors.highEmphasis}
-              />
+              <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
             </TouchableOpacity>
           </Animated.View>
         </ExpoBlurView>
@@ -149,8 +162,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                 <Image
                   source={{ uri: metadata.logo }}
                   style={styles.floatingHeaderLogo}
-                  contentFit="contain"
-                  transition={150}
+                  resizeMode="contain"
                   onError={() => {
                     logger.warn(`[FloatingHeader] Logo failed to load: ${metadata.logo}`);
                     setLogoLoadError(true);
@@ -166,11 +178,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
               onPress={handleToggleLibrary}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <MaterialIcons 
-                name={inLibrary ? 'bookmark' : 'bookmark-border'} 
-                size={22} 
-                color={currentTheme.colors.highEmphasis}
-              />
+              <MaterialIcons name={inLibrary ? "bookmark" : "bookmark-outline"} size={22} color={currentTheme.colors.highEmphasis} />
             </TouchableOpacity>
           </Animated.View>
         </View>

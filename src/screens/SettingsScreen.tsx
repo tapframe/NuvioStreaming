@@ -10,15 +10,15 @@ import {
   StatusBar,
   Platform,
   Dimensions,
-  Image,
   Button,
   Linking,
   Clipboard
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import FastImage from '@d11/react-native-fast-image';
+import { Feather } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -26,15 +26,17 @@ import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { useAccount } from '../contexts/AccountContext';
 import { catalogService } from '../services/catalogService';
+import { fetchTotalDownloads } from '../services/githubReleaseService';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { getDisplayedAppVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
-import ProfileIcon from '../components/icons/ProfileIcon';
 import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
+import TMDBIcon from '../components/icons/TMDBIcon';
+import MDBListIcon from '../components/icons/MDBListIcon';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -43,17 +45,17 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Settings categories for tablet sidebar
 const SETTINGS_CATEGORIES = [
-  { id: 'account', title: 'Account', icon: 'account-circle' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'content', title: 'Content & Discovery', icon: 'explore' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'appearance', title: 'Appearance', icon: 'palette' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'integrations', title: 'Integrations', icon: 'extension' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'ai', title: 'AI Assistant', icon: 'smart-toy' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'playback', title: 'Playback', icon: 'play-circle-outline' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'backup', title: 'Backup & Restore', icon: 'save' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'updates', title: 'Updates', icon: 'system-update' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'about', title: 'About', icon: 'info-outline' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'developer', title: 'Developer', icon: 'code' as keyof typeof MaterialIcons.glyphMap },
-  { id: 'cache', title: 'Cache', icon: 'cached' as keyof typeof MaterialIcons.glyphMap },
+  { id: 'account', title: 'Account', icon: 'user' as string },
+  { id: 'content', title: 'Content & Discovery', icon: 'compass' as string },
+  { id: 'appearance', title: 'Appearance', icon: 'sliders' as string },
+  { id: 'integrations', title: 'Integrations', icon: 'layers' as string },
+  { id: 'ai', title: 'AI Assistant', icon: 'cpu' as string },
+  { id: 'playback', title: 'Playback', icon: 'play-circle' as string },
+  { id: 'backup', title: 'Backup & Restore', icon: 'archive' as string },
+  { id: 'updates', title: 'Updates', icon: 'refresh-ccw' as string },
+  { id: 'about', title: 'About', icon: 'info' as string },
+  { id: 'developer', title: 'Developer', icon: 'code' as string },
+  { id: 'cache', title: 'Cache', icon: 'database' as string },
 ];
 
 // Card component with minimalistic style
@@ -96,7 +98,7 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet =
 interface SettingItemProps {
   title: string;
   description?: string;
-  icon?: keyof typeof MaterialIcons.glyphMap;
+  icon?: string;
   customIcon?: React.ReactNode;
   renderControl?: () => React.ReactNode;
   isLast?: boolean;
@@ -141,8 +143,8 @@ const SettingItem: React.FC<SettingItemProps> = ({
         {customIcon ? (
           customIcon
         ) : (
-          <MaterialIcons 
-            name={icon!} 
+          <Feather 
+            name={icon! as any} 
             size={isTablet ? 24 : 20} 
             color={currentTheme.colors.primary} 
           />
@@ -188,12 +190,18 @@ interface SidebarProps {
   onCategorySelect: (category: string) => void;
   currentTheme: any;
   categories: typeof SETTINGS_CATEGORIES;
+  extraTopPadding?: number;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories }) => {
+const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories, extraTopPadding = 0 }) => {
   return (
     <View style={[styles.sidebar, { backgroundColor: currentTheme.colors.elevation1 }]}>
-      <View style={styles.sidebarHeader}>
+      <View style={[
+        styles.sidebarHeader,
+        {
+          paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48) + extraTopPadding,
+        }
+      ]}>
         <Text style={[styles.sidebarTitle, { color: currentTheme.colors.highEmphasis }]}>
           Settings
         </Text>
@@ -212,8 +220,8 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
             ]}
             onPress={() => onCategorySelect(category.id)}
           >
-            <MaterialIcons
-              name={category.icon}
+            <Feather
+              name={category.icon as any}
               size={22}
               color={
                 selectedCategory === category.id 
@@ -264,7 +272,7 @@ const SettingsScreen: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        const flag = await AsyncStorage.getItem('@update_badge_pending');
+        const flag = await mmkvStorage.getItem('@update_badge_pending');
         if (mounted) setHasUpdateBadge(flag === 'true');
       } catch {}
     })();
@@ -275,12 +283,9 @@ const SettingsScreen: React.FC = () => {
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, signOut, loading: accountLoading, refreshCurrentUser } = useAccount();
   
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
-  const [downloadsDevUnlocked, setDownloadsDevUnlocked] = useState(false);
-  const [versionTapCount, setVersionTapCount] = useState(0);
 
   // States for dynamic content
   const [addonCount, setAddonCount] = useState<number>(0);
@@ -288,8 +293,11 @@ const SettingsScreen: React.FC = () => {
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
   const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
+  const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
+  const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
+  const [isCountingUp, setIsCountingUp] = useState<boolean>(false);
 
-  // Add a useEffect to check authentication status on focus
+  // Add a useEffect to check Trakt authentication status on focus
   useEffect(() => {
     // This will reload the Trakt auth status whenever the settings screen is focused
     const unsubscribe = navigation.addListener('focus', () => {
@@ -301,15 +309,10 @@ const SettingsScreen: React.FC = () => {
         if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
       }
       refreshAuthStatus();
-      // Don't refresh account user on every focus - the context handles auth state changes
-      // Only refresh if we have no user at all and aren't loading (rare edge case)
-      if (!user && !accountLoading && !initialLoadComplete) {
-        refreshCurrentUser();
-      }
     });
     
     return unsubscribe;
-  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshCurrentUser, user, accountLoading, initialLoadComplete]);
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
 
   const loadData = useCallback(async () => {
     try {
@@ -327,7 +330,7 @@ const SettingsScreen: React.FC = () => {
       });
       
       // Load saved catalog settings
-      const catalogSettingsJson = await AsyncStorage.getItem('catalog_settings');
+      const catalogSettingsJson = await mmkvStorage.getItem('catalog_settings');
       if (catalogSettingsJson) {
         const catalogSettings = JSON.parse(catalogSettingsJson);
         // Filter out _lastUpdate key and count only explicitly disabled catalogs
@@ -342,12 +345,19 @@ const SettingsScreen: React.FC = () => {
       }
 
       // Check MDBList API key status
-      const mdblistKey = await AsyncStorage.getItem('mdblist_api_key');
+      const mdblistKey = await mmkvStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
 
       // Check OpenRouter API key status
-      const openRouterKey = await AsyncStorage.getItem('openrouter_api_key');
+      const openRouterKey = await mmkvStorage.getItem('openrouter_api_key');
       setOpenRouterKeySet(!!openRouterKey);
+
+      // Load GitHub total downloads (initial load only, polling happens in useEffect)
+      const downloads = await fetchTotalDownloads();
+      if (downloads !== null) {
+        setTotalDownloads(downloads);
+        setDisplayDownloads(downloads);
+      }
       
     } catch (error) {
       if (__DEV__) console.error('Error loading settings data:', error);
@@ -367,6 +377,60 @@ const SettingsScreen: React.FC = () => {
 
     return unsubscribe;
   }, [navigation, loadData]);
+
+  // Poll GitHub downloads every 10 seconds when on the About section
+  useEffect(() => {
+    // Only poll when viewing the About section (where downloads counter is shown)
+    const shouldPoll = isTablet ? selectedCategory === 'about' : true;
+    
+    if (!shouldPoll) return;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const downloads = await fetchTotalDownloads();
+        if (downloads !== null && downloads !== totalDownloads) {
+          setTotalDownloads(downloads);
+        }
+      } catch (error) {
+        if (__DEV__) console.error('Error polling downloads:', error);
+      }
+    }, 3600000); // 3600000 milliseconds (1 hour)
+
+    return () => clearInterval(pollInterval);
+  }, [selectedCategory, isTablet, totalDownloads]);
+
+  // Animate counting up when totalDownloads changes
+  useEffect(() => {
+    if (totalDownloads === null || displayDownloads === null) return;
+    if (totalDownloads === displayDownloads) return;
+
+    setIsCountingUp(true);
+    const start = displayDownloads;
+    const end = totalDownloads;
+    const duration = 2000; // 2 seconds animation
+    const startTime = Date.now();
+
+    const animate = () => {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out quad for smooth deceleration
+      const easeProgress = 1 - Math.pow(1 - progress, 2);
+      const current = Math.floor(start + (end - start) * easeProgress);
+      
+      setDisplayDownloads(current);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setDisplayDownloads(end);
+        setIsCountingUp(false);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [totalDownloads]);
 
   const handleResetSettings = useCallback(() => {
     openAlert(
@@ -396,7 +460,7 @@ const SettingsScreen: React.FC = () => {
           label: 'Clear',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('mdblist_cache');
+              await mmkvStorage.removeItem('mdblist_cache');
               openAlert('Success', 'MDBList cache has been cleared.');
             } catch (error) {
               openAlert('Error', 'Could not clear MDBList cache.');
@@ -419,7 +483,7 @@ const SettingsScreen: React.FC = () => {
   );
 
   const ChevronRight = () => (
-    <MaterialIcons 
+    <Feather 
       name="chevron-right" 
       size={isTablet ? 24 : 20} 
       color={currentTheme.colors.mediumEmphasis}
@@ -440,32 +504,6 @@ const SettingsScreen: React.FC = () => {
       case 'account':
         return (
           <SettingsCard title="ACCOUNT" isTablet={isTablet}>
-            {!accountLoading && user ? (
-              <>
-                <SettingItem
-                  title={user.displayName || user.email || user.id}
-                  description="Manage account"
-                  customIcon={<ProfileIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-                  onPress={() => navigation.navigate('AccountManage')}
-                  isTablet={isTablet}
-                />
-              </>
-            ) : !accountLoading && !user ? (
-              <SettingItem
-                title="Sign in / Create account"
-                description="Sync across devices"
-                icon="login"
-                onPress={() => navigation.navigate('Account')}
-                isTablet={isTablet}
-              />
-            ) : (
-              <SettingItem
-                title="Loading account..."
-                description="Please wait"
-                icon="hourglass-empty"
-                isTablet={isTablet}
-              />
-            )}
             <SettingItem
               title="Trakt"
               description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
@@ -484,7 +522,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Addons"
               description={`${addonCount} installed`}
-              icon="extension"
+              icon="layers"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('Addons')}
               isTablet={isTablet}
@@ -500,7 +538,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Catalogs"
               description={`${catalogCount} active`}
-              icon="view-list"
+              icon="list"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('CatalogSettings')}
               isTablet={isTablet}
@@ -511,6 +549,14 @@ const SettingsScreen: React.FC = () => {
               icon="home"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('HomeScreenSettings')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Continue Watching"
+              description="Cache and playback behavior"
+              icon="play-circle"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('ContinueWatchingSettings')}
               isLast={true}
               isTablet={isTablet}
             />
@@ -523,7 +569,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Theme"
               description={currentTheme.name}
-              icon="palette"
+              icon="sliders"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('ThemeSettings')}
               isTablet={isTablet}
@@ -531,16 +577,31 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Episode Layout"
               description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
-              icon="view-module"
+              icon="grid"
               renderControl={() => (
                 <CustomSwitch
                   value={settings?.episodeLayoutStyle === 'horizontal'}
                   onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
                 />
               )}
-              isLast={true}
+              isLast={isTablet}
               isTablet={isTablet}
             />
+            {!isTablet && (
+              <SettingItem
+                title="Streams Backdrop"
+                description="Show blurred backdrop on mobile streams"
+                icon="image"
+                renderControl={() => (
+                  <CustomSwitch
+                    value={settings?.enableStreamsBackdrop ?? true}
+                    onValueChange={(value) => updateSetting('enableStreamsBackdrop', value)}
+                  />
+                )}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
           </SettingsCard>
         );
 
@@ -550,25 +611,17 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="MDBList"
               description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
-              icon="star"
+              customIcon={<MDBListIcon size={isTablet ? 24 : 20} colorPrimary={currentTheme.colors.primary} colorSecondary={currentTheme.colors.white} />}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('MDBListSettings')}
               isTablet={isTablet}
             />
             <SettingItem
               title="TMDB"
-              description="Metadata provider"
-              icon="movie"
+              description="Metadata & logo source provider"
+              customIcon={<TMDBIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('TMDBSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Media Sources"
-              description="Logo & image preferences"
-              icon="image"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('LogoSourceSettings')}
               isLast={true}
               isTablet={isTablet}
             />
@@ -581,7 +634,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="OpenRouter API"
               description={openRouterKeySet ? "Connected" : "Add your API key to enable AI chat"}
-              icon="smart-toy"
+              icon="cpu"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('AISettings')}
               isLast={true}
@@ -599,7 +652,7 @@ const SettingsScreen: React.FC = () => {
                 ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
                 : (settings?.useExternalPlayer ? 'External' : 'Built-in')
               }
-              icon="play-circle-outline"
+              icon="play-circle"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('PlayerSettings')}
               isTablet={isTablet}
@@ -607,7 +660,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Show Trailers"
               description="Display trailers in hero section"
-              icon="movie"
+              icon="film"
               renderControl={() => (
                 <Switch
                   value={settings?.showTrailers ?? true}
@@ -618,26 +671,24 @@ const SettingsScreen: React.FC = () => {
               )}
               isTablet={isTablet}
             />
-            {downloadsDevUnlocked && (
-              <SettingItem
-                title="Enable Downloads"
-                description="Show Downloads tab and enable saving streams"
-                icon="download"
-                renderControl={() => (
-                  <Switch
-                    value={settings?.enableDownloads ?? true}
-                    onValueChange={(value) => updateSetting('enableDownloads', value)}
-                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
-                    thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
-                  />
-                )}
-                isTablet={isTablet}
-              />
-            )}
+            <SettingItem
+              title="Enable Downloads (Beta)"
+              description="Show Downloads tab and enable saving streams"
+              icon="download"
+              renderControl={() => (
+                <Switch
+                  value={settings?.enableDownloads ?? false}
+                  onValueChange={(value) => updateSetting('enableDownloads', value)}
+                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                  thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
+                />
+              )}
+              isTablet={isTablet}
+            />
             <SettingItem
               title="Notifications"
               description="Episode reminders"
-              icon="notifications-none"
+              icon="bell"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('NotificationSettings')}
               isLast={true}
@@ -658,7 +709,7 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="Report Issue"
-              icon="bug-report"
+              icon="alert-triangle"
               onPress={() => Sentry.showFeedbackWidget()}
               renderControl={ChevronRight}
               isTablet={isTablet}
@@ -666,17 +717,15 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Version"
               description={getDisplayedAppVersion()}
-              icon="info-outline"
-              onPress={() => {
-                if (downloadsDevUnlocked) return;
-                const next = versionTapCount + 1;
-                setVersionTapCount(next);
-                if (next >= 5) {
-                  setDownloadsDevUnlocked(true);
-                  setVersionTapCount(0);
-                  openAlert('Developer option unlocked', 'Downloads toggle is now visible in Playback settings.');
-                }
-              }}
+              icon="info"
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Contributors"
+              description="View all contributors"
+              icon="users"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('Contributors')}
               isLast={true}
               isTablet={isTablet}
             />
@@ -688,17 +737,17 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title="DEVELOPER" isTablet={isTablet}>
             <SettingItem
               title="Test Onboarding"
-              icon="play-circle-outline"
+              icon="play-circle"
               onPress={() => navigation.navigate('Onboarding')}
               renderControl={ChevronRight}
               isTablet={isTablet}
             />
             <SettingItem
               title="Reset Onboarding"
-              icon="refresh"
+              icon="refresh-ccw"
               onPress={async () => {
                 try {
-                  await AsyncStorage.removeItem('hasCompletedOnboarding');
+                  await mmkvStorage.removeItem('hasCompletedOnboarding');
                   openAlert('Success', 'Onboarding has been reset. Restart the app to see the onboarding flow.');
                 } catch (error) {
                   openAlert('Error', 'Failed to reset onboarding.');
@@ -709,7 +758,7 @@ const SettingsScreen: React.FC = () => {
             />
             <SettingItem
               title="Clear All Data"
-              icon="delete-forever"
+              icon="trash-2"
               onPress={() => {
                 openAlert(
                   'Clear All Data',
@@ -720,7 +769,7 @@ const SettingsScreen: React.FC = () => {
                       label: 'Clear',
                       onPress: async () => {
                         try {
-                          await AsyncStorage.clear();
+                          await mmkvStorage.clear();
                           openAlert('Success', 'All data cleared. Please restart the app.');
                         } catch (error) {
                           openAlert('Error', 'Failed to clear data.');
@@ -741,7 +790,7 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title="CACHE MANAGEMENT" isTablet={isTablet}>
             <SettingItem
               title="Clear MDBList Cache"
-              icon="cached"
+              icon="database"
               onPress={handleClearMDBListCache}
               isLast={true}
               isTablet={isTablet}
@@ -755,7 +804,7 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="Backup & Restore"
               description="Create and restore app backups"
-              icon="backup"
+              icon="archive"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('Backup')}
               isLast={true}
@@ -770,12 +819,12 @@ const SettingsScreen: React.FC = () => {
             <SettingItem
               title="App Updates"
               description="Check for updates and manage app version"
-              icon="system-update"
+              icon="refresh-ccw"
               renderControl={ChevronRight}
               badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
               onPress={async () => {
                 if (Platform.OS === 'android') {
-                  try { await AsyncStorage.removeItem('@update_badge_pending'); } catch {}
+                  try { await mmkvStorage.removeItem('@update_badge_pending'); } catch {}
                   setHasUpdateBadge(false);
                 }
                 navigation.navigate('Update');
@@ -792,7 +841,9 @@ const SettingsScreen: React.FC = () => {
   };
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  // Keep headers below floating top navigator on tablets by adding extra offset
+  const tabletNavOffset = isTablet ? 64 : 0;
+  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
   const headerHeight = headerBaseHeight + topSpacing;
 
   if (isTablet) {
@@ -808,9 +859,15 @@ const SettingsScreen: React.FC = () => {
             onCategorySelect={setSelectedCategory}
             currentTheme={currentTheme}
             categories={visibleCategories}
+            extraTopPadding={tabletNavOffset}
           />
           
-          <View style={styles.tabletContent}>
+          <View style={[
+            styles.tabletContent,
+            {
+              paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48) + tabletNavOffset,
+            }
+          ]}>
             <ScrollView 
               style={styles.tabletScrollView}
               showsVerticalScrollIndicator={false}
@@ -820,6 +877,17 @@ const SettingsScreen: React.FC = () => {
               
               {selectedCategory === 'about' && (
                 <>
+                  {displayDownloads !== null && (
+                    <View style={styles.downloadsContainer}>
+                      <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
+                        {displayDownloads.toLocaleString()}
+                      </Text>
+                      <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                        downloads and counting
+                      </Text>
+                    </View>
+                  )}
+                  
                   <View style={styles.footer}>
                     <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}> 
                       Made with ❤️ by Tapframe and Friends
@@ -833,10 +901,10 @@ const SettingsScreen: React.FC = () => {
                         activeOpacity={0.7}
                       >
                         <View style={styles.discordButtonContent}>
-                          <Image
+                          <FastImage
                             source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
                             style={styles.discordLogo}
-                            resizeMode="contain"
+                            resizeMode={FastImage.resizeMode.contain}
                           />
                           <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
                             Join Discord
@@ -846,13 +914,15 @@ const SettingsScreen: React.FC = () => {
 
                       <TouchableOpacity
                         style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
-                        onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
+                        onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
+                          presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
+                        })}
                         activeOpacity={0.7}
                       >
-                        <Image
+                        <FastImage
                           source={require('../../assets/support_me_on_kofi_red.png')}
                           style={styles.kofiImage}
-                          resizeMode="contain"
+                          resizeMode={FastImage.resizeMode.contain}
                         />
                       </TouchableOpacity>
                     </View>
@@ -905,6 +975,17 @@ const SettingsScreen: React.FC = () => {
             {renderCategoryContent('developer')}
             {renderCategoryContent('cache')}
 
+            {displayDownloads !== null && (
+              <View style={styles.downloadsContainer}>
+                <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
+                  {displayDownloads.toLocaleString()}
+                </Text>
+                <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                  downloads and counting
+                </Text>
+              </View>
+            )}
+
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
                 Made with ❤️ by Tapframe and friends
@@ -920,10 +1001,10 @@ const SettingsScreen: React.FC = () => {
                   activeOpacity={0.7}
                 >
                   <View style={styles.discordButtonContent}>
-                    <Image
+                    <FastImage
                       source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
                       style={styles.discordLogo}
-                      resizeMode="contain"
+                      resizeMode={FastImage.resizeMode.contain}
                     />
                     <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
                       Join Discord
@@ -933,13 +1014,15 @@ const SettingsScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
-                  onPress={() => Linking.openURL('https://ko-fi.com/tapframe')}
+                  onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
+                    presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
+                  })}
                   activeOpacity={0.7}
                 >
-                  <Image
+                  <FastImage
                     source={require('../../assets/support_me_on_kofi_red.png')}
                     style={styles.kofiImage}
-                    resizeMode="contain"
+                    resizeMode={FastImage.resizeMode.contain}
                   />
                 </TouchableOpacity>
               </View>
@@ -1225,6 +1308,24 @@ const styles = StyleSheet.create({
   kofiImage: {
     height: 32,
     width: 150,
+  },
+  downloadsContainer: {
+    marginTop: 20,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  downloadsNumber: {
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  downloadsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    opacity: 0.6,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   loadingSpinner: {
     width: 16,

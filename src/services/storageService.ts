@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 
 interface WatchProgress {
@@ -24,6 +24,11 @@ class StorageService {
   private readonly NOTIFICATION_DEBOUNCE_MS = 1000; // 1 second debounce
   private readonly MIN_NOTIFICATION_INTERVAL = 500; // Minimum 500ms between notifications
 
+  // Cache for getAllWatchProgress
+  private watchProgressCache: Record<string, WatchProgress> | null = null;
+  private watchProgressCacheTimestamp = 0;
+  private readonly WATCH_PROGRESS_CACHE_TTL = 5000; // 5 seconds
+
   private constructor() {}
 
   public static getInstance(): StorageService {
@@ -35,7 +40,7 @@ class StorageService {
 
   private async getUserScope(): Promise<string> {
     try {
-      const scope = await AsyncStorage.getItem('@user:current');
+      const scope = await mmkvStorage.getItem('@user:current');
       return scope || 'local';
     } catch {
       return 'local';
@@ -79,10 +84,10 @@ class StorageService {
   ): Promise<void> {
     try {
       const key = await this.getTombstonesKeyScoped();
-      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const json = (await mmkvStorage.getItem(key)) || '{}';
       const map = JSON.parse(json) as Record<string, number>;
       map[this.buildWpKeyString(id, type, episodeId)] = deletedAtMs || Date.now();
-      await AsyncStorage.setItem(key, JSON.stringify(map));
+      await mmkvStorage.setItem(key, JSON.stringify(map));
     } catch {}
   }
 
@@ -93,12 +98,12 @@ class StorageService {
   ): Promise<void> {
     try {
       const key = await this.getTombstonesKeyScoped();
-      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const json = (await mmkvStorage.getItem(key)) || '{}';
       const map = JSON.parse(json) as Record<string, number>;
       const k = this.buildWpKeyString(id, type, episodeId);
       if (map[k] != null) {
         delete map[k];
-        await AsyncStorage.setItem(key, JSON.stringify(map));
+        await mmkvStorage.setItem(key, JSON.stringify(map));
       }
     } catch {}
   }
@@ -106,7 +111,7 @@ class StorageService {
   public async getWatchProgressTombstones(): Promise<Record<string, number>> {
     try {
       const key = await this.getTombstonesKeyScoped();
-      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const json = (await mmkvStorage.getItem(key)) || '{}';
       return JSON.parse(json) as Record<string, number>;
     } catch {
       return {};
@@ -120,10 +125,10 @@ class StorageService {
   ): Promise<void> {
     try {
       const key = await this.getContinueWatchingRemovedKeyScoped();
-      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const json = (await mmkvStorage.getItem(key)) || '{}';
       const map = JSON.parse(json) as Record<string, number>;
       map[this.buildWpKeyString(id, type)] = removedAtMs || Date.now();
-      await AsyncStorage.setItem(key, JSON.stringify(map));
+      await mmkvStorage.setItem(key, JSON.stringify(map));
     } catch (error) {
       logger.error('Error adding continue watching removed item:', error);
     }
@@ -135,12 +140,12 @@ class StorageService {
   ): Promise<void> {
     try {
       const key = await this.getContinueWatchingRemovedKeyScoped();
-      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const json = (await mmkvStorage.getItem(key)) || '{}';
       const map = JSON.parse(json) as Record<string, number>;
       const k = this.buildWpKeyString(id, type);
       if (map[k] != null) {
         delete map[k];
-        await AsyncStorage.setItem(key, JSON.stringify(map));
+        await mmkvStorage.setItem(key, JSON.stringify(map));
       }
     } catch (error) {
       logger.error('Error removing continue watching removed item:', error);
@@ -150,7 +155,7 @@ class StorageService {
   public async getContinueWatchingRemoved(): Promise<Record<string, number>> {
     try {
       const key = await this.getContinueWatchingRemovedKeyScoped();
-      const json = (await AsyncStorage.getItem(key)) || '{}';
+      const json = (await mmkvStorage.getItem(key)) || '{}';
       return JSON.parse(json) as Record<string, number>;
     } catch (error) {
       logger.error('Error getting continue watching removed items:', error);
@@ -176,7 +181,7 @@ class StorageService {
   ): Promise<void> {
     try {
       const key = await this.getContentDurationKeyScoped(id, type, episodeId);
-      await AsyncStorage.setItem(key, duration.toString());
+      await mmkvStorage.setItem(key, duration.toString());
     } catch (error) {
       logger.error('Error setting content duration:', error);
     }
@@ -189,7 +194,7 @@ class StorageService {
   ): Promise<number | null> {
     try {
       const key = await this.getContentDurationKeyScoped(id, type, episodeId);
-      const data = await AsyncStorage.getItem(key);
+      const data = await mmkvStorage.getItem(key);
       return data ? parseFloat(data) : null;
     } catch (error) {
       logger.error('Error getting content duration:', error);
@@ -262,7 +267,10 @@ class StorageService {
         ? progress.lastUpdated
         : Date.now();
       const updated = { ...progress, lastUpdated: timestamp };
-      await AsyncStorage.setItem(key, JSON.stringify(updated));
+      await mmkvStorage.setItem(key, JSON.stringify(updated));
+      
+      // Invalidate cache
+      this.invalidateWatchProgressCache();
 
       // Notify subscribers; allow forcing immediate notification
       if (options?.forceNotify) {
@@ -332,7 +340,7 @@ class StorageService {
   ): Promise<WatchProgress | null> {
     try {
       const key = await this.getWatchProgressKeyScoped(id, type, episodeId);
-      const data = await AsyncStorage.getItem(key);
+      const data = await mmkvStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
       logger.error('Error getting watch progress:', error);
@@ -347,8 +355,12 @@ class StorageService {
   ): Promise<void> {
     try {
       const key = await this.getWatchProgressKeyScoped(id, type, episodeId);
-      await AsyncStorage.removeItem(key);
+      await mmkvStorage.removeItem(key);
       await this.addWatchProgressTombstone(id, type, episodeId);
+      
+      // Invalidate cache
+      this.invalidateWatchProgressCache();
+      
       // Notify subscribers
       this.notifyWatchProgressSubscribers();
       // Emit explicit remove event for sync layer
@@ -360,21 +372,39 @@ class StorageService {
 
   public async getAllWatchProgress(): Promise<Record<string, WatchProgress>> {
     try {
+      // Use cache if available and fresh
+      const now = Date.now();
+      if (this.watchProgressCache && (now - this.watchProgressCacheTimestamp) < this.WATCH_PROGRESS_CACHE_TTL) {
+        return this.watchProgressCache;
+      }
+
       const scope = await this.getUserScope();
       const prefix = `@user:${scope}:${this.WATCH_PROGRESS_KEY}`;
-      const keys = await AsyncStorage.getAllKeys();
+      const keys = await mmkvStorage.getAllKeys();
       const watchProgressKeys = keys.filter(key => key.startsWith(prefix));
-      const pairs = await AsyncStorage.multiGet(watchProgressKeys);
-      return pairs.reduce((acc, [key, value]) => {
+      const pairs = await mmkvStorage.multiGet(watchProgressKeys);
+      
+      const result = pairs.reduce((acc, [key, value]) => {
         if (value) {
           acc[key.replace(prefix, '')] = JSON.parse(value);
         }
         return acc;
       }, {} as Record<string, WatchProgress>);
+      
+      // Update cache
+      this.watchProgressCache = result;
+      this.watchProgressCacheTimestamp = now;
+      
+      return result;
     } catch (error) {
       logger.error('Error getting all watch progress:', error);
       return {};
     }
+  }
+  
+  private invalidateWatchProgressCache(): void {
+    this.watchProgressCache = null;
+    this.watchProgressCacheTimestamp = 0;
   }
 
   /**
@@ -644,7 +674,7 @@ class StorageService {
   public async saveSubtitleSettings(settings: Record<string, any>): Promise<void> {
     try {
       const key = await this.getSubtitleSettingsKeyScoped();
-      await AsyncStorage.setItem(key, JSON.stringify(settings));
+      await mmkvStorage.setItem(key, JSON.stringify(settings));
     } catch (error) {
       logger.error('Error saving subtitle settings:', error);
     }
@@ -653,7 +683,7 @@ class StorageService {
   public async getSubtitleSettings(): Promise<Record<string, any> | null> {
     try {
       const key = await this.getSubtitleSettingsKeyScoped();
-      const data = await AsyncStorage.getItem(key);
+      const data = await mmkvStorage.getItem(key);
       return data ? JSON.parse(data) : null;
     } catch (error) {
       logger.error('Error loading subtitle settings:', error);

@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import RNImmersiveMode from 'react-native-immersive-mode';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { colors } from '../styles/colors';
@@ -15,8 +16,22 @@ import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import ToastManager from 'toastify-react-native';
 import { PostHogProvider } from 'posthog-react-native';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 
 // Import screens with their proper types
 import HomeScreen from '../screens/HomeScreen';
@@ -40,7 +55,6 @@ import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
-import LogoSourceSettings from '../screens/LogoSourceSettings';
 import ThemeScreen from '../screens/ThemeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import AuthScreen from '../screens/AuthScreen';
@@ -52,7 +66,10 @@ import CastMoviesScreen from '../screens/CastMoviesScreen';
 import UpdateScreen from '../screens/UpdateScreen';
 import AISettingsScreen from '../screens/AISettingsScreen';
 import AIChatScreen from '../screens/AIChatScreen';
+import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
 import BackupScreen from '../screens/BackupScreen';
+import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
+import ContributorsScreen from '../screens/ContributorsScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -97,6 +114,7 @@ export type RootStackParamList = {
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
     backdrop?: string;
     videoType?: string;
+    groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
   PlayerAndroid: { 
     uri: string; 
@@ -117,6 +135,7 @@ export type RootStackParamList = {
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
     backdrop?: string;
     videoType?: string;
+    groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
   Credits: { mediaId: string; mediaType: string };
@@ -135,7 +154,6 @@ export type RootStackParamList = {
   HeroCatalogs: undefined;
   TraktSettings: undefined;
   PlayerSettings: undefined;
-  LogoSourceSettings: undefined;
   ThemeSettings: undefined;
   ScraperSettings: undefined;
   CastMovies: {
@@ -155,6 +173,13 @@ export type RootStackParamList = {
     episodeNumber?: number;
     title: string;
   };
+  BackdropGallery: {
+    tmdbId: number;
+    type: 'movie' | 'tv';
+    title: string;
+  };
+  ContinueWatchingSettings: undefined;
+  Contributors: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -348,17 +373,14 @@ export const CustomNavigationDarkTheme: Theme = {
   fonts,
 };
 
-type IconNameType = 'home' | 'home-outline' | 'compass' | 'compass-outline' | 
-                   'play-box-multiple' | 'play-box-multiple-outline' | 
-                   'puzzle' | 'puzzle-outline' | 
-                   'cog' | 'cog-outline' | 'feature-search' | 'feature-search-outline' |
-                   'magnify' | 'heart' | 'heart-outline' | 'download' | 'download-outline';
+type IconNameType = string;
 
 // Add TabIcon component
-const TabIcon = React.memo(({ focused, color, iconName }: { 
+const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material' }: { 
   focused: boolean; 
   color: string; 
   iconName: IconNameType;
+  iconLibrary?: 'material' | 'feather' | 'ionicons';
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -371,8 +393,11 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
     }).start();
   }, [focused]);
 
-  // Use outline variant when available, but keep single-form icons (like 'magnify') the same
+  // Use outline variant when available for Material icons; Feather has single-form icons
   const finalIconName = (() => {
+    if (iconLibrary === 'feather') {
+      return iconName;
+    }
     if (iconName === 'magnify') return 'magnify';
     return focused ? iconName : `${iconName}-outline` as IconNameType;
   })();
@@ -383,22 +408,46 @@ const TabIcon = React.memo(({ focused, color, iconName }: {
       justifyContent: 'center',
       transform: [{ scale: scaleAnim }]
     }}>
-      <MaterialCommunityIcons 
-        name={finalIconName}
-        size={24} 
-        color={color} 
-      />
+      {iconLibrary === 'feather' ? (
+        <Feather 
+          name={finalIconName as any}
+          size={24} 
+          color={color} 
+        />
+      ) : iconLibrary === 'ionicons' ? (
+        <Ionicons 
+          name={finalIconName as any}
+          size={24}
+          color={color}
+        />
+      ) : (
+        <MaterialCommunityIcons 
+          name={finalIconName as any}
+          size={24} 
+          color={color} 
+        />
+      )}
     </Animated.View>
   );
 });
 
 // Update the TabScreenWrapper component with fixed layout dimensions
 const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
+  
   const isTablet = useMemo(() => {
-    const { width, height } = Dimensions.get('window');
+    const { width, height } = dimensions;
     const smallestDimension = Math.min(width, height);
     return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
-  }, []);
+  }, [dimensions]);
   const insets = useSafeAreaInsets();
   // Force consistent status bar settings
   useEffect(() => {
@@ -464,12 +513,21 @@ const MainTabs = () => {
   const { useSettings: useSettingsHook } = require('../hooks/useSettings');
   const { settings: appSettings } = useSettingsHook();
   const [hasUpdateBadge, setHasUpdateBadge] = React.useState(false);
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions(window);
+    });
+    
+    return () => subscription?.remove();
+  }, []);
   React.useEffect(() => {
     if (Platform.OS !== 'android') return;
     let mounted = true;
     const load = async () => {
       try {
-        const flag = await AsyncStorage.getItem('@update_badge_pending');
+        const flag = await mmkvStorage.getItem('@update_badge_pending');
         if (mounted) setHasUpdateBadge(flag === 'true');
       } catch {}
     };
@@ -497,10 +555,10 @@ const MainTabs = () => {
   }, []);
   const { isHomeLoading } = useLoading();
   const isTablet = useMemo(() => {
-    const { width, height } = Dimensions.get('window');
+    const { width, height } = dimensions;
     const smallestDimension = Math.min(width, height);
     return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
-  }, []);
+  }, [dimensions]);
   const insets = useSafeAreaInsets();
   const isIosTablet = Platform.OS === 'ios' && isTablet;
   const [hidden, setHidden] = React.useState(HeaderVisibility.isHidden());
@@ -554,18 +612,32 @@ const MainTabs = () => {
             backgroundColor: isIosTablet ? 'transparent' : 'rgba(0,0,0,0.7)'
           }}>
             {isIosTablet && (
-              <BlurView
-                tint="dark"
-                intensity={75}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  borderRadius: 28,
-                }}
-              />
+              GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    borderRadius: 28,
+                  }}
+                  glassEffectStyle="clear"
+                />
+              ) : (
+                <BlurView
+                  tint="dark"
+                  intensity={75}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    borderRadius: 28,
+                  }}
+                />
+              )
             )}
             {props.state.routes.map((route, index) => {
               const { options } = props.descriptors[route.key];
@@ -625,26 +697,37 @@ const MainTabs = () => {
         bottom: 0, 
         left: 0, 
         right: 0,
-        height: 85,
+        height: Platform.OS === 'android' ? 70 + insets.bottom : 85 + insets.bottom,
         backgroundColor: 'transparent',
         overflow: 'hidden',
       }}>
         {Platform.OS === 'ios' ? (
-          <BlurView
-            tint="dark"
-            intensity={75}
-            style={{
-              position: 'absolute',
-              height: '100%',
-              width: '100%',
-              borderTopColor: currentTheme.colors.border,
-              borderTopWidth: 0.5,
-              shadowColor: currentTheme.colors.black,
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 3,
-            }}
-          />
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp
+              style={{
+                position: 'absolute',
+                height: '100%',
+                width: '100%',
+              }}
+              glassEffectStyle="clear"
+            />
+          ) : (
+            <BlurView
+              tint="dark"
+              intensity={75}
+              style={{
+                position: 'absolute',
+                height: '100%',
+                width: '100%',
+                borderTopColor: currentTheme.colors.border,
+                borderTopWidth: 0.5,
+                shadowColor: currentTheme.colors.black,
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 3,
+              }}
+            />
+          )
         ) : (
           <LinearGradient
             colors={[
@@ -664,8 +747,8 @@ const MainTabs = () => {
         <View
           style={{
             height: '100%',
-            paddingBottom: 20,
-            paddingTop: 12,
+            paddingBottom: Platform.OS === 'android' ? 15 + insets.bottom : 20 + insets.bottom,
+            paddingTop: Platform.OS === 'android' ? 8 : 12,
             backgroundColor: 'transparent',
           }}
         >
@@ -694,21 +777,27 @@ const MainTabs = () => {
               };
 
               let iconName: IconNameType = 'home';
+              let iconLibrary: 'material' | 'feather' | 'ionicons' = 'material';
               switch (route.name) {
                 case 'Home':
                   iconName = 'home';
+                  iconLibrary = 'feather';
                   break;
                 case 'Library':
-                  iconName = 'heart';
+                  iconName = 'library';
+                  iconLibrary = 'ionicons';
                   break;
                 case 'Search':
-                  iconName = 'magnify';
+                  iconName = 'search';
+                  iconLibrary = 'feather';
                   break;
                 case 'Downloads':
                   iconName = 'download';
+                  iconLibrary = 'feather';
                   break;
                 case 'Settings':
-                  iconName = 'cog';
+                  iconName = 'settings';
+                  iconLibrary = 'feather';
                   break;
               }
 
@@ -728,6 +817,7 @@ const MainTabs = () => {
                     focused={isFocused} 
                     color={isFocused ? currentTheme.colors.primary : currentTheme.colors.white} 
                     iconName={iconName}
+                    iconLibrary={iconLibrary}
                   />
                   <Text
                     style={{
@@ -749,6 +839,82 @@ const MainTabs = () => {
     );
   };
   
+  // iOS: Use native bottom tabs (@bottom-tabs/react-navigation)
+  if (Platform.OS === 'ios') {
+    // Dynamically require to avoid impacting Android bundle
+    const { createNativeBottomTabNavigator } = require('@bottom-tabs/react-navigation');
+    const IOSTab = createNativeBottomTabNavigator();
+    const downloadsEnabled = appSettings?.enableDownloads !== false;
+
+    return (
+      <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
+        <StatusBar
+          translucent
+          barStyle="light-content"
+          backgroundColor="transparent"
+        />
+        <IOSTab.Navigator
+          key={`ios-tabs-${downloadsEnabled ? 'with-dl' : 'no-dl'}`}
+          initialRouteName="Home"
+          // Native tab bar handles its own visuals; keep options minimal
+          screenOptions={{
+            headerShown: false,
+            tabBarActiveTintColor: currentTheme.colors.primary,
+            tabBarInactiveTintColor: currentTheme.colors.white,
+            translucent: true,
+            // Prefer native lazy/freeze when available; still pass for parity
+            lazy: true,
+            freezeOnBlur: true,
+          }}
+        >
+          <IOSTab.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{
+              title: 'Home',
+              tabBarIcon: () => ({ sfSymbol: 'house' }),
+              freezeOnBlur: true,
+            }}
+          />
+          <IOSTab.Screen
+            name="Library"
+            component={LibraryScreen}
+            options={{
+              title: 'Library',
+              tabBarIcon: () => ({ sfSymbol: 'heart' }),
+            }}
+          />
+          <IOSTab.Screen
+            name="Search"
+            component={SearchScreen}
+            options={{
+              title: 'Search',
+              tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
+            }}
+          />
+          {downloadsEnabled && (
+            <IOSTab.Screen
+              name="Downloads"
+              component={DownloadsScreen}
+              options={{
+                title: 'Downloads',
+                tabBarIcon: () => ({ sfSymbol: 'arrow.down.circle' }),
+              }}
+            />
+          )}
+          <IOSTab.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{
+              title: 'Settings',
+              tabBarIcon: () => ({ sfSymbol: 'gear' }),
+            }}
+          />
+        </IOSTab.Navigator>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
       {/* Common StatusBar for all tabs */}
@@ -812,6 +978,7 @@ const MainTabs = () => {
             tabBarIcon: ({ color, size, focused }) => (
               <MaterialCommunityIcons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
             ),
+            freezeOnBlur: true,
           }}
         />
         <Tab.Screen
@@ -896,6 +1063,14 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
   // Handle Android-specific optimizations
   useEffect(() => {
     if (Platform.OS === 'android') {
+      // Hide system navigation bar
+      try {
+        RNImmersiveMode.setBarMode('Bottom');
+        RNImmersiveMode.fullLayout(true);
+      } catch (error) {
+        console.log('Immersive mode error:', error);
+      }
+      
       // Ensure consistent background color for Android
       StatusBar.setBackgroundColor('transparent', true);
       StatusBar.setTranslucent(true);
@@ -922,6 +1097,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             initialRouteName={initialRouteName || 'MainTabs'}
             screenOptions={{
               headerShown: false,
+              // Freeze non-focused stack screens to prevent background re-renders (e.g., SeriesContent behind player)
+              freezeOnBlur: true,
               // Use slide_from_right for consistency and smooth transitions
               animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
               animationDuration: Platform.OS === 'android' ? 250 : 300,
@@ -1128,6 +1305,36 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               }}
             />
             <Stack.Screen 
+              name="ContinueWatchingSettings" 
+              component={ContinueWatchingSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="Contributors" 
+              component={ContributorsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen 
               name="HeroCatalogs" 
               component={HeroCatalogsScreen}
               options={{
@@ -1240,21 +1447,6 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               }}
             />
             <Stack.Screen 
-              name="LogoSourceSettings" 
-              component={LogoSourceSettings}
-              options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
-                animationDuration: Platform.OS === 'android' ? 250 : 200,
-                presentation: 'card',
-                gestureEnabled: true,
-                gestureDirection: 'horizontal',
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: currentTheme.colors.darkBackground,
-                },
-              }}
-            />
-            <Stack.Screen 
               name="ThemeSettings" 
               component={ThemeScreen}
               options={{
@@ -1345,8 +1537,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="AIChat" 
+            <Stack.Screen
+              name="AIChat"
               component={AIChatScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
@@ -1360,88 +1552,20 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
+            <Stack.Screen
+              name="BackdropGallery"
+              component={BackdropGalleryScreen}
+              options={{
+                animation: 'slide_from_right',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: '#000',
+                },
+              }}
+            />
           </Stack.Navigator>
         </View>
       </PaperProvider>
-      {/* Global toast customization using ThemeContext */}
-      <ToastManager
-        position="top"
-        useModal={false}
-        theme={'dark'}
-        // Dimensions
-        width={'90%'}
-        minHeight={61}
-        // Icon defaults
-        iconFamily="MaterialIcons"
-        iconSize={22}
-        icons={{
-          success: 'check-circle',
-          error: 'error',
-          info: 'info',
-          warn: 'warning',
-          default: 'notifications',
-        }}
-        // Close icon defaults
-        showCloseIcon={true}
-        closeIcon={'close'}
-        closeIconFamily={'MaterialIcons'}
-        closeIconSize={18}
-        // Spacing (ensure below safe area)
-        topOffset={Math.max(8, insets.top + 8)}
-        bottomOffset={40}
-        // Styles bound to ThemeContext
-        style={{
-          backgroundColor: currentTheme.colors.darkBackground,
-          borderRadius: 12,
-          paddingVertical: 12,
-          paddingHorizontal: 14,
-        }}
-        textStyle={{
-          color: currentTheme.colors.highEmphasis,
-          fontWeight: '600',
-        }}
-        config={{
-          default: (props: any) => (
-            <View style={{
-              backgroundColor: currentTheme.colors.elevation2,
-              borderRadius: 12,
-              padding: 12,
-              width: '100%'
-            }}>
-              <Text style={{ color: currentTheme.colors.highEmphasis, fontWeight: '700' }}>{props.text1}</Text>
-              {props.text2 ? (
-                <Text style={{ color: currentTheme.colors.mediumEmphasis, marginTop: 4 }}>{props.text2}</Text>
-              ) : null}
-            </View>
-          ),
-          success: (props: any) => (
-            <View style={{
-              backgroundColor: currentTheme.colors.elevation2,
-              borderRadius: 12,
-              padding: 12,
-              width: '100%'
-            }}>
-              <Text style={{ color: currentTheme.colors.success || '#4CAF50', fontWeight: '800' }}>{props.text1}</Text>
-              {props.text2 ? (
-                <Text style={{ color: currentTheme.colors.mediumEmphasis, marginTop: 4 }}>{props.text2}</Text>
-              ) : null}
-            </View>
-          ),
-          error: (props: any) => (
-            <View style={{
-              backgroundColor: currentTheme.colors.elevation2,
-              borderRadius: 12,
-              padding: 12,
-              width: '100%'
-            }}>
-              <Text style={{ color: currentTheme.colors.error || '#ff4444', fontWeight: '800' }}>{props.text1}</Text>
-              {props.text2 ? (
-                <Text style={{ color: currentTheme.colors.mediumEmphasis, marginTop: 4 }}>{props.text2}</Text>
-              ) : null}
-            </View>
-          ),
-        }}
-      />
     </SafeAreaProvider>
   );
 };

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nuvio",
     "slug": "nuvio",
-    "version": "1.2.3",
+    "version": "1.2.9",
     "orientation": "default",
     "backgroundColor": "#020404",
     "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
@@ -10,22 +10,25 @@
     "scheme": "nuvio",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./src/assets/splash-icon-new.png",
       "resizeMode": "contain",
       "backgroundColor": "#020404"
     },
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": true,
       "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
-      "buildNumber": "18",
+      "buildNumber": "24",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
         "NSBonjourServices": [
-          "_http._tcp"
+          "_http._tcp",
+          "_googlecast._tcp",
+          "_CC1AD845._googlecast._tcp"
         ],
-        "NSLocalNetworkUsageDescription": "App uses the local network to discover and connect to devices.",
+        "NSLocalNetworkUsageDescription": "Nuvio uses the local network to discover Cast-enabled devices on your WiFi network and to connect to local media servers.",
         "NSMicrophoneUsageDescription": "This app does not require microphone access.",
         "UIBackgroundModes": [
           "audio"
@@ -45,10 +48,11 @@
       "icon": "./assets/android/mipmap-xxxhdpi/ic_launcher.png",
       "permissions": [
         "INTERNET",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "WRITE_SETTINGS"
       ],
       "package": "com.nuvio.app",
-      "versionCode": 18,
+      "versionCode": 24,
       "architectures": [
         "arm64-v8a",
         "armeabi-v7a",
@@ -57,7 +61,6 @@
       ],
       "jsEngine": "hermes"
     },
-
     "extra": {
       "eas": {
         "projectId": "909107b8-fe61-45ce-b02f-b02510d306a6"
@@ -86,6 +89,14 @@
           "localNetworkPermission": "Allow $(PRODUCT_NAME) to access your local network",
           "supportsBackgroundPlayback": true
         }
+      ],
+      "react-native-bottom-tabs",
+      [
+        "react-native-google-cast",
+        {
+          "receiverAppId": "CC1AD845",
+          "iosStartDiscoveryAfterFirstTapOnCastButton": true
+        }
       ]
     ],
     "updates": {
@@ -94,6 +105,6 @@
       "fallbackToCacheTimeout": 30000,
       "url": "https://grim-reyna-tapframe-69970143.koyeb.app/api/manifest"
     },
-    "runtimeVersion": "1.2.3"
+    "runtimeVersion": "1.2.9"
   }
 }

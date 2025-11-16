@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import Svg, { Text as SvgText, TSpan } from 'react-native-svg';
 import { styles } from '../utils/playerStyles';
+import { SubtitleSegment } from '../utils/playerTypes';
+import { detectRTL } from '../utils/playerUtils';
 
 interface CustomSubtitlesProps {
   useCustomSubtitles: boolean;
@@ -25,6 +27,8 @@ interface CustomSubtitlesProps {
   controlsFixedOffset?: number; // fixed px when controls visible (ignores user offset)
   letterSpacing?: number;
   lineHeightMultiplier?: number; // multiplies subtitleSize
+  // New: support for formatted subtitle segments
+  formattedSegments?: SubtitleSegment[][]; // Segments per line
 }
 
 export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
@@ -47,6 +51,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   controlsFixedOffset,
   letterSpacing = 0,
   lineHeightMultiplier = 1.2,
+  formattedSegments,
 }) => {
   if (!useCustomSubtitles || !currentSubtitle) return null;
   
@@ -73,9 +78,53 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
 
   // Prepare content lines
   const lines = String(currentSubtitle).split(/\r?\n/);
+  
+  // Detect RTL for each line
+  const lineRTLStatus = lines.map(line => detectRTL(line));
+  
   const displayFontSize = subtitleSize * inverseScale;
   const displayLineHeight = subtitleSize * lineHeightMultiplier * inverseScale;
   const svgHeight = lines.length * displayLineHeight;
+
+  // Helper to render formatted segments
+  const renderFormattedText = (segments: SubtitleSegment[], lineIndex: number, keyPrefix: string, isRTL?: boolean, customLetterSpacing?: number) => {
+    if (!segments || segments.length === 0) return null;
+    
+    // For RTL, use a very small negative letter spacing to stretch words slightly
+    // This helps with proper diacritic spacing while maintaining ligatures
+    const effectiveLetterSpacing = isRTL ? (displayFontSize * -0.02) : (customLetterSpacing ?? letterSpacing);
+
+    // For RTL, adjust text alignment
+    const effectiveAlign = isRTL && align === 'left' ? 'right' : (isRTL && align === 'right' ? 'left' : align);
+    
+    return (
+      <Text key={`${keyPrefix}-line-${lineIndex}`} style={{
+        color: textColor,
+        fontFamily,
+        textAlign: effectiveAlign,
+        letterSpacing: effectiveLetterSpacing,
+        fontSize: displayFontSize,
+        lineHeight: displayLineHeight,
+      }}>
+        {segments.map((segment, segIdx) => {
+          const segmentStyle: any = {};
+          if (segment.italic) segmentStyle.fontStyle = 'italic';
+          if (segment.bold) segmentStyle.fontWeight = 'bold';
+          if (segment.underline) segmentStyle.textDecorationLine = 'underline';
+          if (segment.color) segmentStyle.color = segment.color;
+
+          // Apply outline/shadow to individual segments if needed
+          const mergedShadowStyle = (textShadow && !useCrispSvgOutline) ? shadowStyle : {};
+
+          return (
+            <Text key={`${keyPrefix}-seg-${segIdx}`} style={[segmentStyle, mergedShadowStyle]}>
+              {segment.text}
+            </Text>
+          );
+        })}
+      </Text>
+    );
+  };
 
   return (
     <View
@@ -102,16 +151,34 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
             preserveAspectRatio="xMidYMax meet"
           >
             {(() => {
-              const anchor = align === 'center' ? 'middle' : align === 'left' ? 'start' : 'end';
-              const x = align === 'center' ? 500 : (align === 'left' ? 0 : 1000);
+              // Determine alignment and anchor for RTL or LTR
+              // Only apply RTL styling if ALL lines are RTL, not just some
+              const isRTL = lineRTLStatus.every(status => status);
+              let anchor: 'start' | 'middle' | 'end';
+              let x: number;
+              
+              if (isRTL) {
+                // For RTL, always use 'end' anchor to position from right edge
+                anchor = 'end';
+                x = 1000;
+              } else {
+                anchor = align === 'center' ? 'middle' : align === 'left' ? 'start' : 'end';
+                x = align === 'center' ? 500 : (align === 'left' ? 0 : 1000);
+              }
+              
               const baseFontSize = displayFontSize;
               const lineHeightPx = displayLineHeight;
               const strokeWidth = Math.max(0.5, outlineWidth);
+              // For RTL, use a very small negative letter spacing to stretch words slightly
+              // This helps with proper diacritic spacing while maintaining ligatures
+              const effectiveLetterSpacing = isRTL ? (baseFontSize * -0.02) : letterSpacing;
+              
               // Position text from bottom up - last line should be at svgHeight - small margin
               // Add descender buffer so letters like y/g/p/q/j aren't clipped
               const descenderBuffer = baseFontSize * 0.35 + (strokeWidth * 0.5);
               const lastLineBaselineY = svgHeight - descenderBuffer;
               const startY = lastLineBaselineY - (lines.length - 1) * lineHeightPx;
+              
               return (
                 <>
                   {/* Stroke layer */}
@@ -127,7 +194,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
                     strokeMiterlimit={2}
                     fontFamily={fontFamily}
                     fontSize={baseFontSize}
-                    letterSpacing={letterSpacing}
+                    letterSpacing={effectiveLetterSpacing}
                   >
                     {lines.map((line, idx) => (
                       <TSpan key={idx} x={x} dy={idx === 0 ? 0 : lineHeightPx}>
@@ -143,7 +210,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
                     fill={textColor}
                     fontFamily={fontFamily}
                     fontSize={baseFontSize}
-                    letterSpacing={letterSpacing}
+                    letterSpacing={effectiveLetterSpacing}
                   >
                     {lines.map((line, idx) => (
                       <TSpan key={idx} x={x} dy={idx === 0 ? 0 : lineHeightPx}>
@@ -157,21 +224,41 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
           </Svg>
         ) : (
           // No outline: use RN Text with (optional) shadow
-          <Text style={[
-            styles.customSubtitleText,
-            {
-              color: textColor,
-              fontFamily,
-              textAlign: align,
-              letterSpacing,
-              fontSize: subtitleSize * inverseScale,
-              lineHeight: subtitleSize * lineHeightMultiplier * inverseScale,
-              transform: [{ scale: inverseScale }],
-            },
-            shadowStyle,
-          ]}>
-            {currentSubtitle}
-          </Text>
+          formattedSegments && formattedSegments.length > 0 ? (
+            // Render formatted segments if available
+            formattedSegments.map((lineSegments, lineIdx) => {
+              const isLineRTL = lineRTLStatus[lineIdx];
+              return renderFormattedText(lineSegments, lineIdx, 'formatted', isLineRTL, letterSpacing);
+            })
+          ) : (
+            (() => {
+              // Only apply RTL styling if ALL lines are RTL, not just some
+              const isRTL = lineRTLStatus.every(status => status);
+              // For RTL, use a very small negative letter spacing to stretch words slightly
+              // This helps with proper diacritic spacing while maintaining ligatures
+              const effectiveLetterSpacing = isRTL ? (subtitleSize * inverseScale * -0.02) : letterSpacing;
+              // For RTL, adjust text alignment
+              const effectiveAlign = isRTL && align === 'left' ? 'right' : (isRTL && align === 'right' ? 'left' : align);
+              
+              return (
+                <Text style={[
+                  styles.customSubtitleText,
+                  {
+                    color: textColor,
+                    fontFamily,
+                    textAlign: effectiveAlign,
+                    letterSpacing: effectiveLetterSpacing,
+                    fontSize: subtitleSize * inverseScale,
+                    lineHeight: subtitleSize * lineHeightMultiplier * inverseScale,
+                    transform: [{ scale: inverseScale }],
+                  },
+                  shadowStyle,
+                ]}>
+                  {currentSubtitle}
+                </Text>
+              );
+            })()
+          )
         )}
       </View>
     </View>

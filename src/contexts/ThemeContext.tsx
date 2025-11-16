@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { settingsEmitter } from '../hooks/useSettings';
 import { colors as defaultColors } from '../styles/colors';
 
@@ -168,11 +168,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadThemes = async () => {
       try {
-        const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-        const appSettingsJson = await AsyncStorage.getItem(`@user:${scope}:app_settings`);
+        const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
+        const appSettingsJson = await mmkvStorage.getItem(`@user:${scope}:app_settings`);
         const appSettings = appSettingsJson ? JSON.parse(appSettingsJson) : {};
-        const savedThemeId = appSettings.themeId || (await AsyncStorage.getItem(CURRENT_THEME_KEY));
-        const customThemesJson = appSettings.customThemes ? JSON.stringify(appSettings.customThemes) : await AsyncStorage.getItem(CUSTOM_THEMES_KEY);
+        const savedThemeId = appSettings.themeId || (await mmkvStorage.getItem(CURRENT_THEME_KEY));
+        const customThemesJson = appSettings.customThemes ? JSON.stringify(appSettings.customThemes) : await mmkvStorage.getItem(CUSTOM_THEMES_KEY);
         const customThemes = customThemesJson ? JSON.parse(customThemesJson) : [];
         const allThemes = [...DEFAULT_THEMES, ...customThemes];
         setAvailableThemes(allThemes);
@@ -195,13 +195,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (theme) {
       setCurrentThemeState(theme);
       // Persist into scoped app_settings and legacy key for backward compat
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const key = `@user:${scope}:app_settings`;
       let settings = {} as any;
-      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      try { settings = JSON.parse((await mmkvStorage.getItem(key)) || '{}'); } catch {}
       settings.themeId = themeId;
-      await AsyncStorage.setItem(key, JSON.stringify(settings));
-      await AsyncStorage.setItem(CURRENT_THEME_KEY, themeId);
+      await mmkvStorage.setItem(key, JSON.stringify(settings));
+      await mmkvStorage.setItem(CURRENT_THEME_KEY, themeId);
       // Do not emit global settings sync for themes (sync on app restart only)
     }
   };
@@ -225,20 +225,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const updatedAllThemes = [...DEFAULT_THEMES, ...updatedCustomThemes];
       
       // Save to storage (scoped app_settings + legacy key)
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const key = `@user:${scope}:app_settings`;
       let settings = {} as any;
-      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      try { settings = JSON.parse((await mmkvStorage.getItem(key)) || '{}'); } catch {}
       settings.customThemes = updatedCustomThemes;
-      await AsyncStorage.setItem(key, JSON.stringify(settings));
-      await AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
+      await mmkvStorage.setItem(key, JSON.stringify(settings));
+      await mmkvStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
       
       // Update state
       setAvailableThemes(updatedAllThemes);
       
       // Set as current theme
       setCurrentThemeState(newTheme);
-      await AsyncStorage.setItem(CURRENT_THEME_KEY, id);
+      await mmkvStorage.setItem(CURRENT_THEME_KEY, id);
       // Do not emit global settings sync for themes
     } catch (error) {
       if (__DEV__) console.error('Failed to add custom theme:', error);
@@ -262,13 +262,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const updatedAllThemes = [...DEFAULT_THEMES, ...updatedCustomThemes];
       
       // Save to storage (scoped app_settings + legacy key)
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const key = `@user:${scope}:app_settings`;
       let settings = {} as any;
-      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      try { settings = JSON.parse((await mmkvStorage.getItem(key)) || '{}'); } catch {}
       settings.customThemes = updatedCustomThemes;
-      await AsyncStorage.setItem(key, JSON.stringify(settings));
-      await AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
+      await mmkvStorage.setItem(key, JSON.stringify(settings));
+      await mmkvStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updatedCustomThemes));
       
       // Update state
       setAvailableThemes(updatedAllThemes);
@@ -298,13 +298,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const updatedAllThemes = [...DEFAULT_THEMES, ...customThemes];
       
       // Save to storage (scoped app_settings + legacy key)
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const key = `@user:${scope}:app_settings`;
       let settings = {} as any;
-      try { settings = JSON.parse((await AsyncStorage.getItem(key)) || '{}'); } catch {}
+      try { settings = JSON.parse((await mmkvStorage.getItem(key)) || '{}'); } catch {}
       settings.customThemes = customThemes;
-      await AsyncStorage.setItem(key, JSON.stringify(settings));
-      await AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(customThemes));
+      await mmkvStorage.setItem(key, JSON.stringify(settings));
+      await mmkvStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(customThemes));
       
       // Update state
       setAvailableThemes(updatedAllThemes);
@@ -312,7 +312,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // Reset to default theme if current theme was deleted
       if (currentTheme.id === themeId) {
         setCurrentThemeState(DEFAULT_THEMES[0]);
-        await AsyncStorage.setItem(CURRENT_THEME_KEY, DEFAULT_THEMES[0].id);
+        await mmkvStorage.setItem(CURRENT_THEME_KEY, DEFAULT_THEMES[0].id);
       }
       // Do not emit global settings sync for themes
     } catch (error) {

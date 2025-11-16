@@ -9,6 +9,7 @@ import {
   StatusBar,
   useColorScheme,
   Dimensions,
+  useWindowDimensions,
   ImageBackground,
   ScrollView,
   Platform,
@@ -16,7 +17,8 @@ import {
   Modal,
   Pressable,
   Alert,
-  InteractionManager
+  InteractionManager,
+  AppState
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -27,8 +29,8 @@ import { stremioService } from '../services/stremioService';
 import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ExpoImage } from 'expo-image';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import FastImage from '@d11/react-native-fast-image';
+import Animated, { FadeIn, Layout, useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
   Gesture,
@@ -48,6 +50,7 @@ import { useFeaturedContent } from '../hooks/useFeaturedContent';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
 import FeaturedContent from '../components/home/FeaturedContent';
 import HeroCarousel from '../components/home/HeroCarousel';
+import AppleTVHero from '../components/home/AppleTVHero';
 import CatalogSection from '../components/home/CatalogSection';
 import { SkeletonFeatured } from '../components/home/SkeletonLoaders';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -56,15 +59,20 @@ import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../contexts/ThemeContext';
 import { useLoading } from '../contexts/LoadingContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../contexts/ToastContext';
 import FirstTimeWelcome from '../components/FirstTimeWelcome';
-import { imageCacheService } from '../services/imageCacheService';
 import { HeaderVisibility } from '../contexts/HeaderVisibility';
+import { useTrailer } from '../contexts/TrailerContext';
 
 // Constants
 const CATALOG_SETTINGS_KEY = 'catalog_settings';
+
+// In-memory cache for catalog settings to avoid repeated MMKV reads
+let cachedCatalogSettings: Record<string, boolean> | null = null;
+let catalogSettingsCacheTimestamp = 0;
+const CATALOG_SETTINGS_CACHE_TTL = 30000; // 30 seconds
 
 // Define interfaces for our data
 interface Category {
@@ -111,10 +119,15 @@ const HomeScreen = () => {
   const continueWatchingRef = useRef<ContinueWatchingRef>(null);
   const { settings } = useSettings();
   const { lastUpdate } = useCatalogContext(); // Add catalog context to listen for addon changes
+  const { showInfo } = useToast();
+  const { setTrailerPlaying } = useTrailer();
   const [showHeroSection, setShowHeroSection] = useState(settings.showHeroSection);
   const [featuredContentSource, setFeaturedContentSource] = useState(settings.featuredContentSource);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasContinueWatching, setHasContinueWatching] = useState(false);
+
+  // Shared value for scroll position (for parallax effects)
+  const scrollY = useSharedValue(0);
 
   const [catalogs, setCatalogs] = useState<(CatalogContent | null)[]>([]);
   const [catalogsLoading, setCatalogsLoading] = useState(true);
@@ -124,14 +137,25 @@ const HomeScreen = () => {
   const totalCatalogsRef = useRef(0);
       const [visibleCatalogCount, setVisibleCatalogCount] = useState(5); // Reduced for memory
   const insets = useSafeAreaInsets();
+
+  // Stabilize insets to prevent iOS layout shifts
+  const [stableInsetsTop, setStableInsetsTop] = useState(insets.top);
+  useEffect(() => {
+    // Only update insets after initial mount to prevent shifting
+    const timer = setTimeout(() => {
+      setStableInsetsTop(insets.top);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [insets.top]);
   
-  const { 
-    featuredContent, 
+  const {
+    featuredContent,
     allFeaturedContent,
-    loading: featuredLoading, 
-    isSaved, 
-    handleSaveToLibrary, 
-    refreshFeatured 
+    loading: featuredLoading,
+    isSaved,
+    handleSaveToLibrary,
+    isItemSaved,
+    refreshFeatured
   } = useFeaturedContent();
 
   // Progressive catalog loading function with performance optimizations
@@ -141,9 +165,24 @@ const HomeScreen = () => {
     setLoadedCatalogCount(0);
     
     try {
-      const [addons, catalogSettingsJson, addonManifests] = await Promise.all([
+      // Check cache first
+      let catalogSettings: Record<string, boolean> = {};
+      const now = Date.now();
+      
+      if (cachedCatalogSettings && (now - catalogSettingsCacheTimestamp) < CATALOG_SETTINGS_CACHE_TTL) {
+        catalogSettings = cachedCatalogSettings;
+      } else {
+        // Load from storage
+        const catalogSettingsJson = await mmkvStorage.getItem(CATALOG_SETTINGS_KEY);
+        catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
+        
+        // Update cache
+        cachedCatalogSettings = catalogSettings;
+        catalogSettingsCacheTimestamp = now;
+      }
+      
+      const [addons, addonManifests] = await Promise.all([
         catalogService.getAllAddons(),
-        AsyncStorage.getItem(CATALOG_SETTINGS_KEY),
         stremioService.getInstalledAddonsAsync()
       ]);
       
@@ -152,27 +191,16 @@ const HomeScreen = () => {
         setHasAddons(addons.length > 0);
       });
       
-      const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
-      
       // Create placeholder array with proper order and track indices
       let catalogIndex = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
       
-      // Limit concurrent catalog loading to prevent overwhelming the system
-      const MAX_CONCURRENT_CATALOGS = 1; // Single catalog at a time to minimize heating/memory
-      let activeCatalogLoads = 0;
-      
-      const processCatalogQueue = async () => {
-        while (catalogQueue.length > 0 && activeCatalogLoads < MAX_CONCURRENT_CATALOGS) {
+      // Launch all catalog loaders in parallel
+      const launchAllCatalogs = () => {
+        while (catalogQueue.length > 0) {
           const catalogLoader = catalogQueue.shift();
           if (catalogLoader) {
-            activeCatalogLoads++;
-            catalogLoader().finally(async () => {
-              activeCatalogLoads--;
-              // Yield to event loop to avoid JS thread starvation and reduce heating
-              await new Promise(resolve => setTimeout(resolve, 100));
-              processCatalogQueue(); // Process next in queue
-            });
+            catalogLoader();
           }
         }
       };
@@ -288,8 +316,8 @@ const HomeScreen = () => {
         setCatalogs(new Array(catalogIndex).fill(null));
       });
       
-      // Start processing the catalog queue
-      processCatalogQueue();
+      // Start all catalog requests in parallel
+      launchAllCatalogs();
     } catch (error) {
       if (__DEV__) console.error('[HomeScreen] Error in progressive catalog loading:', error);
       InteractionManager.runAfterInteractions(() => {
@@ -335,13 +363,13 @@ const HomeScreen = () => {
     let hideTimer: any;
     (async () => {
       try {
-        const flag = await AsyncStorage.getItem('showLoginHintToastOnce');
+        const flag = await mmkvStorage.getItem('showLoginHintToastOnce');
         if (flag === 'true') {
           setHintVisible(true);
-          await AsyncStorage.removeItem('showLoginHintToastOnce');
+          await mmkvStorage.removeItem('showLoginHintToastOnce');
           hideTimer = setTimeout(() => setHintVisible(false), 2000);
           // Also show a global toast for consistency across screens
-          try { Toast.info('You can sign in anytime from Settings → Account', 'bottom'); } catch {}
+          // showInfo('Sign In Available', 'You can sign in anytime from Settings → Account');
         }
       } catch {}
     })();
@@ -375,16 +403,6 @@ const HomeScreen = () => {
         StatusBar.setBarStyle("light-content");
         StatusBar.setTranslucent(true);
         StatusBar.setBackgroundColor('transparent');
-        
-        // Allow free rotation on tablets; lock portrait on phones
-        try {
-          const isTabletDevice = Platform.OS === 'ios' ? (Platform as any).isPad === true : isTablet;
-          if (isTabletDevice) {
-            ScreenOrientation.unlockAsync();
-          } else {
-            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-          }
-        } catch {}
 
         // For iOS specifically
         if (Platform.OS === 'ios') {
@@ -394,11 +412,36 @@ const HomeScreen = () => {
       
       statusBarConfig();
       
+      // Unlock orientation to allow free rotation
+      ScreenOrientation.unlockAsync().catch(() => {});
+      
       return () => {
-        // Keep translucent when unfocusing to prevent layout shifts
+        // Stop trailer when screen loses focus (navigating to other screens)
+        setTrailerPlaying(false);
+        logger.info('[HomeScreen] Screen blur - stopping trailer');
       };
-    }, [])
+    }, [setTrailerPlaying])
   );
+
+  // Handle app state changes for smart cache management
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'background') {
+        // Only clear memory cache when app goes to background
+        // This frees memory while keeping disk cache intact for fast restoration
+        try {
+          FastImage.clearMemoryCache();
+          if (__DEV__) console.log('[HomeScreen] Cleared memory cache on background');
+        } catch (error) {
+          if (__DEV__) console.warn('[HomeScreen] Failed to clear memory cache:', error);
+        }
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
 
   useEffect(() => {
     // Only run cleanup when component unmounts completely
@@ -413,58 +456,40 @@ const HomeScreen = () => {
         clearTimeout(refreshTimeoutRef.current);
       }
       
-      // Clear image cache when component unmounts to free memory
-       try {
-         ExpoImage.clearMemoryCache();
-       } catch (error) {
-         if (__DEV__) console.warn('Failed to clear image cache:', error);
-       }
+      // Don't clear FastImage cache on unmount - it causes broken images on remount
+      // FastImage's native libraries (SDWebImage/Glide) handle memory automatically
+      // Cache clearing only happens on app background (see AppState handler above)
     };
   }, [currentTheme.colors.darkBackground]);
 
   // Removed periodic forced cache clearing to avoid churn under load
   // useEffect(() => {}, [catalogs]);
 
-  // Balanced preload images function
+  // Balanced preload images function using FastImage
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
     if (!content.length) return;
     
     try {
       // Moderate prefetching for better performance balance
-      const MAX_IMAGES = 6; // Preload 6 most important images
+      const MAX_IMAGES = 10; // Preload 10 most important images
       
       // Only preload poster images (skip banner and logo entirely)
       const posterImages = content.slice(0, MAX_IMAGES)
         .map(item => item.poster)
         .filter(Boolean) as string[];
 
-      // Process in batches of 2 with moderate delays
-      for (let i = 0; i < posterImages.length; i += 2) {
-        const batch = posterImages.slice(i, i + 2);
-        
-        await Promise.all(batch.map(async (imageUrl) => {
-          try {
-            // Use our cache service with timeout
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 2000)
-            );
-            
-            await Promise.race([
-              imageCacheService.getCachedImageUrl(imageUrl),
-              timeoutPromise
-            ]);
-          } catch (error) {
-            // Skip failed images and continue
-          }
-        }));
-        
-        // Moderate delay between batches
-        if (i + 2 < posterImages.length) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-      }
+      // FastImage preload with proper source format
+      const sources = posterImages.map(uri => ({
+        uri,
+        priority: FastImage.priority.normal,
+        cache: FastImage.cacheControl.immutable
+      }));
+
+      // Preload all images at once - FastImage handles batching internally
+      FastImage.preload(sources);
     } catch (error) {
       // Silently handle preload errors
+      if (__DEV__) console.warn('Image preload error:', error);
     }
   }, []);
 
@@ -476,14 +501,8 @@ const HomeScreen = () => {
     if (!featuredContent) return;
     
     try {
-      // Clear image cache to reduce memory pressure before orientation change
-      if (typeof (global as any)?.ExpoImage?.clearMemoryCache === 'function') {
-        try {
-          (global as any).ExpoImage.clearMemoryCache();
-        } catch (e) {
-          // Ignore cache clear errors
-        }
-      }
+      // Don't clear cache before player - causes broken images on return
+      // FastImage's native libraries handle memory efficiently
       
       // Lock orientation to landscape before navigation to prevent glitches
       try {
@@ -609,31 +628,58 @@ const HomeScreen = () => {
   // Stable keyExtractor for FlashList
   const keyExtractor = useCallback((item: HomeScreenListItem) => item.key, []);
 
-  // Memoize device check to avoid repeated Dimensions.get calls
+  // Use reactive window dimensions that update on orientation changes
+  const { width: windowWidth } = useWindowDimensions();
   const isTablet = useMemo(() => {
-    const deviceWidth = Dimensions.get('window').width;
-    return deviceWidth >= 768;
-  }, []);
+    return windowWidth >= 768;
+  }, [windowWidth]);
 
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => {
-    const heroStyleToUse = isTablet ? 'legacy' : settings.heroStyle;
-    return heroStyleToUse === 'carousel' ? (
-      <HeroCarousel
-        key={`carousel-${featuredContentSource}`}
-        items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
-        loading={featuredLoading}
-      />
-    ) : (
-      <FeaturedContent
-        key={`featured-${showHeroSection}-${featuredContentSource}`}
-        featuredContent={featuredContent}
-        isSaved={isSaved}
-        handleSaveToLibrary={handleSaveToLibrary}
-        loading={featuredLoading}
-      />
-    );
-  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, featuredContent, allFeaturedContent, isSaved, handleSaveToLibrary, featuredLoading]);
+    const heroStyleToUse = settings.heroStyle;
+    
+    // AppleTVHero is only available on mobile devices (not tablets)
+    if (heroStyleToUse === 'appletv' && !isTablet) {
+      return (
+        <AppleTVHero
+          featuredContent={featuredContent || null}
+          allFeaturedContent={allFeaturedContent || []}
+          loading={featuredLoading}
+          scrollY={scrollY}
+        />
+      );
+    } else if (heroStyleToUse === 'carousel') {
+      return (
+        <HeroCarousel
+          items={allFeaturedContent || (featuredContent ? [featuredContent] : [])}
+          loading={featuredLoading}
+        />
+      );
+    } else {
+      return (
+        <>
+          <FeaturedContent
+            featuredContent={featuredContent || null}
+            isSaved={isSaved}
+            handleSaveToLibrary={handleSaveToLibrary}
+            loading={featuredLoading}
+          />
+          <LinearGradient
+            colors={["transparent", currentTheme.colors.darkBackground]}
+            locations={[0, 1]}
+            style={{
+              height: isTablet ? 40 : 30,
+              width: '100%',
+              marginTop: -(isTablet ? 40 : 30),
+              position: 'relative',
+              zIndex: -1,
+            }}
+            pointerEvents="none"
+          />
+        </>
+      );
+    }
+  }, [isTablet, settings.heroStyle, showHeroSection, featuredContentSource, allFeaturedContent, featuredContent, isSaved, handleSaveToLibrary, featuredLoading]);
 
   const memoizedThisWeekSection = useMemo(() => <ThisWeekSection />, []);
   const memoizedContinueWatchingSection = useMemo(() => <ContinueWatchingSection ref={continueWatchingRef} />, []);
@@ -646,6 +692,9 @@ const HomeScreen = () => {
   // Track scroll direction manually for reliable behavior across platforms
   const lastScrollYRef = useRef(0);
   const lastToggleRef = useRef(0);
+  const scrollAnimationFrameRef = useRef<number | null>(null);
+  const isScrollingRef = useRef(false);
+  
   const toggleHeader = useCallback((hide: boolean) => {
     const now = Date.now();
     if (now - lastToggleRef.current < 120) return; // debounce
@@ -657,15 +706,11 @@ const HomeScreen = () => {
   const renderListItem = useCallback(({ item }: { item: HomeScreenListItem; index: number }) => {
     switch (item.type) {
       case 'thisWeek':
-        return <Animated.View>{memoizedThisWeekSection}</Animated.View>;
+        return memoizedThisWeekSection;
       case 'continueWatching':
         return null; // Moved to ListHeaderComponent to avoid remounts on scroll
       case 'catalog':
-        return (
-          <Animated.View>
-            <CatalogSection catalog={item.catalog} />
-          </Animated.View>
-        );
+        return <CatalogSection catalog={item.catalog} />;
       case 'placeholder':
         return (
           <Animated.View>
@@ -705,7 +750,7 @@ const HomeScreen = () => {
           </Animated.View>
         );
       case 'welcome':
-        return <Animated.View><FirstTimeWelcome /></Animated.View>;
+        return <FirstTimeWelcome />;
       default:
         return null;
     }
@@ -734,28 +779,56 @@ const HomeScreen = () => {
     </>
   ), [catalogsLoading, catalogs, loadedCatalogCount, totalCatalogsRef.current, navigation, currentTheme.colors]);
 
-  // Memoize scroll handler to prevent recreating on every render
+  // Memoize scroll handler with requestAnimationFrame throttling for better performance
   const handleScroll = useCallback((event: any) => {
-    const y = event.nativeEvent.contentOffset.y;
-    const dy = y - lastScrollYRef.current;
-    lastScrollYRef.current = y;
-    if (y <= 10) {
-      toggleHeader(false);
-      return;
+    // Persist the event before using requestAnimationFrame to prevent event pooling issues
+    event.persist();
+    
+    // Cancel any pending animation frame
+    if (scrollAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(scrollAnimationFrameRef.current);
     }
-    // Threshold to avoid jitter
-    if (dy > 6) {
-      toggleHeader(true); // scrolling down
-    } else if (dy < -6) {
-      toggleHeader(false); // scrolling up
-    }
+    
+    // Capture scroll values immediately before async operation
+    const scrollYValue = event.nativeEvent.contentOffset.y;
+    
+    // Update shared value for parallax (on UI thread)
+    scrollY.value = scrollYValue;
+    
+    // Use requestAnimationFrame to throttle scroll handling
+    scrollAnimationFrameRef.current = requestAnimationFrame(() => {
+      const y = scrollYValue;
+      const dy = y - lastScrollYRef.current;
+      lastScrollYRef.current = y;
+      
+      isScrollingRef.current = Math.abs(dy) > 0;
+      
+      if (y <= 10) {
+        toggleHeader(false);
+        return;
+      }
+      // Threshold to avoid jitter
+      if (dy > 6) {
+        toggleHeader(true); // scrolling down
+      } else if (dy < -6) {
+        toggleHeader(false); // scrolling up
+      }
+      
+      scrollAnimationFrameRef.current = null;
+    });
   }, [toggleHeader]);
 
-  // Memoize content container style
-  const contentContainerStyle = useMemo(() => 
-    StyleSheet.flatten([styles.scrollContent, { paddingTop: insets.top }]),
-    [insets.top]
-  );
+  // Memoize content container style - use stable insets to prevent iOS shifting
+  // Don't add paddingTop when using AppleTVHero as it handles its own top spacing
+  const contentContainerStyle = useMemo(() => {
+    const heroStyleToUse = settings.heroStyle;
+    const isUsingAppleTVHero = heroStyleToUse === 'appletv' && !isTablet && showHeroSection;
+    
+    return StyleSheet.flatten([
+      styles.scrollContent, 
+      { paddingTop: isUsingAppleTVHero ? 0 : stableInsetsTop }
+    ]);
+  }, [stableInsetsTop, settings.heroStyle, isTablet, showHeroSection]);
 
   // Memoize the main content section
   const renderMainContent = useMemo(() => {
@@ -774,12 +847,12 @@ const HomeScreen = () => {
           keyExtractor={keyExtractor}
           contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          nestedScrollEnabled={true}
           ListHeaderComponent={memoizedHeader}
           ListFooterComponent={ListFooterComponent}
           onEndReached={handleLoadMoreCatalogs}
           onEndReachedThreshold={0.6}
-          removeClippedSubviews={true}
-          scrollEventThrottle={64}
           onScroll={handleScroll}
         />
         {/* Toasts are rendered globally at root */}
@@ -1346,3 +1419,4 @@ const HomeScreenWithFocusSync = (props: any) => {
 };
 
 export default React.memo(HomeScreenWithFocusSync);
+

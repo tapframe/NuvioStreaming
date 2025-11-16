@@ -7,6 +7,21 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { useTheme } from '../contexts/ThemeContext';
 
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for NuvioHeader
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
+
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const NuvioHeader = () => {
@@ -26,7 +41,11 @@ export const NuvioHeader = () => {
         Platform.OS === 'android' && { backgroundColor: currentTheme.colors.darkBackground }
       ]}>
         {Platform.OS === 'ios' ? (
-          <ExpoBlurView intensity={60} style={styles.blurOverlay} tint="dark" />
+          GlassViewComp && liquidGlassAvailable ? (
+            <GlassViewComp style={styles.blurOverlay} glassEffectStyle="regular" />
+          ) : (
+            <ExpoBlurView intensity={60} style={styles.blurOverlay} tint="dark" />
+          )
         ) : (
           // Android: solid themed background instead of blur/transparent overlay
           <View style={[styles.androidBlurContainer, { backgroundColor: currentTheme.colors.darkBackground }]} />

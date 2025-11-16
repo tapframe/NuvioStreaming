@@ -15,8 +15,8 @@ import {
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ExpoImage } from 'expo-image';
-import { MaterialIcons } from '@expo/vector-icons';
+import FastImage from '@d11/react-native-fast-image';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -27,12 +27,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { StreamingContent } from '../../services/catalogService';
 import { SkeletonFeatured } from './SkeletonLoaders';
-import { isValidMetahubLogo, hasValidLogoFormat, isMetahubUrl, isTmdbUrl } from '../../utils/logoUtils';
-import { useSettings } from '../../hooks/useSettings';
-import { TMDBService } from '../../services/tmdbService';
+import { hasValidLogoFormat, isTmdbUrl } from '../../utils/logoUtils';
 import { logger } from '../../utils/logger';
 import { useTheme } from '../../contexts/ThemeContext';
-import { imageCacheService } from '../../services/imageCacheService';
 
 interface FeaturedContentProps {
   featuredContent: StreamingContent | null;
@@ -151,15 +148,11 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
   const [showSkeleton, setShowSkeleton] = useState(true);
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
-  const { settings } = useSettings();
   const logoOpacity = useSharedValue(0);
   const bannerOpacity = useSharedValue(0);
   const posterOpacity = useSharedValue(0);
   const prevContentIdRef = useRef<string | null>(null);
-  // Add state for tracking logo load errors
   const [logoLoadError, setLogoLoadError] = useState(false);
-  // Add a ref to track logo fetch in progress
-  const logoFetchInProgress = useRef<boolean>(false);
   const firstRenderTsRef = useRef<number>(nowMs());
   const lastContentChangeTsRef = useRef<number>(0);
 
@@ -233,10 +226,9 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         }, 1500);
       });
 
-      await Promise.race([
-        imageCacheService.getCachedImageUrl(url),
-        timeout,
-      ]);
+      // FastImage.preload doesn't return a promise, so we just call it and use timeout
+      FastImage.preload([{ uri: url }]);
+      await timeout;
       imageCache[url] = true;
       logger.debug('[FeaturedContent] preloadImage:success', { url, duration: since(t0) });
       return true;
@@ -253,154 +245,29 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
     setLogoLoadError(false);
   }, [featuredContent?.id]);
 
-  // Fetch logo based on preference
+  // Use logo from featuredContent data (already processed by useFeaturedContent hook)
   useEffect(() => {
-    if (!featuredContent || logoFetchInProgress.current) return;
+    if (!featuredContent) {
+      setLogoUrl(null);
+      setLogoLoadError(false);
+      return;
+    }
 
-    const fetchLogo = async () => {
-      logoFetchInProgress.current = true;
-      const t0 = nowMs();
-      logger.info('[FeaturedContent] fetchLogo:start', { id: featuredContent?.id, type: featuredContent?.type });
+    // Simply use the logo that's already been processed by the useFeaturedContent hook
+    const logo = featuredContent.logo;
+    logger.info('[FeaturedContent] using logo from data', {
+      id: featuredContent.id,
+      name: featuredContent.name,
+      hasLogo: Boolean(logo),
+      logo: logo,
+      logoSource: logo ? (isTmdbUrl(logo) ? 'tmdb' : 'addon') : 'none',
+      type: featuredContent.type
+    });
 
-      try {
-        const contentId = featuredContent.id;
-        const contentData = featuredContent; // Use a clearer variable name
-        const currentLogo = contentData.logo;
-
-        // Get preferences
-        const logoPreference = settings.logoSourcePreference || 'metahub';
-        const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-
-        // Reset state for new fetch only if switching to a different item
-        if (prevContentIdRef.current !== contentId) {
-          setLogoUrl(null);
-        }
-        setLogoLoadError(false);
-
-        // Extract IDs
-        let imdbId: string | null = null;
-        if (contentData.id.startsWith('tt')) {
-          imdbId = contentData.id;
-        } else if ((contentData as any).imdbId) {
-          imdbId = (contentData as any).imdbId;
-        } else if ((contentData as any).externalIds?.imdb_id) {
-          imdbId = (contentData as any).externalIds.imdb_id;
-        }
-
-        let tmdbId: string | null = null;
-        if (contentData.id.startsWith('tmdb:')) {
-          tmdbId = contentData.id.split(':')[1];
-        } else if ((contentData as any).tmdb_id) {
-          tmdbId = String((contentData as any).tmdb_id);
-        }
-
-        // If we only have IMDB ID, try to find TMDB ID proactively
-        if (imdbId && !tmdbId) {
-          try {
-            const tmdbService = TMDBService.getInstance();
-            const foundData = await tmdbService.findTMDBIdByIMDB(imdbId);
-            if (foundData) {
-              tmdbId = String(foundData);
-            }
-          } catch (findError) {
-            // logger.warn(`[FeaturedContent] Failed to find TMDB ID for ${imdbId}:`, findError);
-          }
-        }
-
-        const tmdbType = contentData.type === 'series' ? 'tv' : 'movie';
-        let finalLogoUrl: string | null = null;
-        let primaryAttempted = false;
-        let fallbackAttempted = false;
-
-        // --- Logo Fetching Logic ---
-        logger.debug('[FeaturedContent] fetchLogo:ids', { imdbId, tmdbId, preference: logoPreference, lang: preferredLanguage });
-
-        if (logoPreference === 'metahub') {
-          // Primary: Metahub (needs imdbId)
-          if (imdbId) {
-            primaryAttempted = true;
-            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-            try {
-              const tHead = nowMs();
-              const response = await fetch(metahubUrl, { method: 'HEAD' });
-              if (response.ok) {
-                finalLogoUrl = metahubUrl;
-                logger.debug('[FeaturedContent] fetchLogo:metahub:ok', { url: metahubUrl, duration: since(tHead) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
-
-          // Fallback: TMDB (needs tmdbId)
-          if (!finalLogoUrl && tmdbId) {
-            fallbackAttempted = true;
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const tTmdb = nowMs();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-              if (logoUrl) {
-                finalLogoUrl = logoUrl;
-                logger.debug('[FeaturedContent] fetchLogo:tmdb:fallback:ok', { url: logoUrl, duration: since(tTmdb) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
-
-        } else { // logoPreference === 'tmdb'
-          // Primary: TMDB (needs tmdbId)
-          if (tmdbId) {
-            primaryAttempted = true;
-            try {
-              const tmdbService = TMDBService.getInstance();
-              const tTmdb = nowMs();
-              const logoUrl = await tmdbService.getContentLogo(tmdbType, tmdbId, preferredLanguage);
-              if (logoUrl) {
-                finalLogoUrl = logoUrl;
-                logger.debug('[FeaturedContent] fetchLogo:tmdb:ok', { url: logoUrl, duration: since(tTmdb) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
-
-          // Fallback: Metahub (needs imdbId)
-          if (!finalLogoUrl && imdbId) {
-            fallbackAttempted = true;
-            const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-            try {
-              const tHead = nowMs();
-              const response = await fetch(metahubUrl, { method: 'HEAD' });
-              if (response.ok) {
-                finalLogoUrl = metahubUrl;
-                logger.debug('[FeaturedContent] fetchLogo:metahub:fallback:ok', { url: metahubUrl, duration: since(tHead) });
-              }
-            } catch (error) { /* Log if needed */ }
-          }
-        }
-
-        // --- Set Final Logo ---
-        if (finalLogoUrl) {
-          setLogoUrl(finalLogoUrl);
-          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'ok', duration: since(t0) });
-        } else if (currentLogo) {
-          // Use existing logo only if primary and fallback failed or weren't applicable
-          setLogoUrl(currentLogo);
-          logger.info('[FeaturedContent] fetchLogo:done', { id: contentId, result: 'existing', duration: since(t0) });
-        } else {
-          // No logo found from any source
-          setLogoLoadError(true);
-          logger.warn('[FeaturedContent] fetchLogo:none', { id: contentId, primaryAttempted, fallbackAttempted, duration: since(t0) });
-          // logger.warn(`[FeaturedContent] No logo found for ${contentData.name} (${contentId}) with preference ${logoPreference}. Primary attempted: ${primaryAttempted}, Fallback attempted: ${fallbackAttempted}`);
-        }
-
-      } catch (error) {
-        // logger.error('[FeaturedContent] Error in fetchLogo:', error);
-        setLogoLoadError(true);
-        logger.error('[FeaturedContent] fetchLogo:error', { error: String(error), duration: since(t0) });
-      } finally {
-        logoFetchInProgress.current = false;
-      }
-    };
-
-    // Trigger fetch when content changes
-    fetchLogo();
-  }, [featuredContent, settings.logoSourcePreference, settings.tmdbLanguagePreference]);
+    setLogoUrl(logo || null);
+    setLogoLoadError(!logo);
+    setLogoError(false); // Reset any previous errors
+  }, [featuredContent]);
 
   // Load poster and logo
   useEffect(() => {
@@ -501,17 +368,20 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
       // Load logo if available with enhanced timing
       if (logoUrl) {
         const tLogo = nowMs();
+        // Try to preload but don't fail if it times out - still show the logo
         const logoSuccess = await preloadImage(logoUrl);
         if (logoSuccess) {
-          logoOpacity.value = withDelay(500, withTiming(1, {
-            duration: 600,
-            easing: Easing.out(Easing.cubic)
-          }));
-          logger.debug('[FeaturedContent] logo:ready', { id: contentId, duration: since(tLogo) });
+          logger.debug('[FeaturedContent] logo:preload:success', { id: contentId, duration: since(tLogo) });
         } else {
-          setLogoLoadError(true);
-          logger.warn('[FeaturedContent] logo:failed', { id: contentId, duration: since(tLogo) });
+          logger.debug('[FeaturedContent] logo:preload:failed', { id: contentId, duration: since(tLogo) });
         }
+
+        // Always animate in the logo since we have the URL
+        logoOpacity.value = withDelay(500, withTiming(1, {
+          duration: 600,
+          easing: Easing.out(Easing.cubic)
+        }));
+        logger.debug('[FeaturedContent] logo:animated', { id: contentId });
       }
       logger.info('[FeaturedContent] images:load:done', { id: contentId, total: since(t0) });
     };
@@ -521,7 +391,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
 
   const onLogoLoadError = () => {
     setLogoLoaded(true); // Treat error as "loaded" to stop spinner
-    setLogoError(true);
+    setLogoLoadError(true);
     logger.warn('[FeaturedContent] logo:onError', { id: featuredContent?.id, url: logoUrl });
   };
 
@@ -588,13 +458,14 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
         <Animated.View style={[styles.tabletOverlayContent as ViewStyle, contentAnimatedStyle]}>
           {logoUrl && !logoLoadError ? (
             <Animated.View style={logoAnimatedStyle}>
-              <ExpoImage
-                source={{ uri: logoUrl }}
-                style={styles.tabletLogo as ImageStyle}
-                contentFit="contain"
-                cachePolicy="memory"
-                transition={300}
-                recyclingKey={`logo-${featuredContent.id}`}
+              <FastImage
+                source={{ 
+                  uri: logoUrl,
+                  priority: FastImage.priority.high,
+                  cache: FastImage.cacheControl.immutable
+                }}
+                style={styles.tabletLogo as any}
+                resizeMode={FastImage.resizeMode.contain}
                 onError={onLogoLoadError}
               />
             </Animated.View>
@@ -647,11 +518,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
               onPress={handleSaveToLibrary}
               activeOpacity={0.7}
             >
-              <MaterialIcons
-                name={isSaved ? "bookmark" : "bookmark-border"}
-                size={20}
-                color={currentTheme.colors.white}
-              />
+              <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={currentTheme.colors.white} />
               <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
                 {isSaved ? "Saved" : "My List"}
               </Text>
@@ -721,13 +588,14 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                 >
                   {logoUrl && !logoLoadError ? (
                     <Animated.View style={logoAnimatedStyle}>
-                      <ExpoImage
-                        source={{ uri: logoUrl }}
-                        style={styles.featuredLogo as ImageStyle}
-                        contentFit="contain"
-                        cachePolicy="memory"
-                        transition={300}
-                        recyclingKey={`logo-${featuredContent.id}`}
+                      <FastImage
+                        source={{ 
+                          uri: logoUrl,
+                          priority: FastImage.priority.high,
+                          cache: FastImage.cacheControl.immutable
+                        }}
+                        style={styles.featuredLogo as any}
+                        resizeMode={FastImage.resizeMode.contain}
                         onError={onLogoLoadError}
                       />
                     </Animated.View>
@@ -756,11 +624,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                     onPress={handleSaveToLibrary}
                     activeOpacity={0.7}
                   >
-                    <MaterialIcons
-                      name={isSaved ? "bookmark" : "bookmark-border"}
-                      size={24}
-                      color={currentTheme.colors.white}
-                    />
+                    <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={currentTheme.colors.white} />
                     <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
                       {isSaved ? "Saved" : "Save"}
                     </Text>

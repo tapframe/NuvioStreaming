@@ -10,8 +10,14 @@ interface KSPlayerViewProps {
   source?: KSPlayerSource;
   paused?: boolean;
   volume?: number;
+  rate?: number;
   audioTrack?: number;
   textTrack?: number;
+  allowsExternalPlayback?: boolean;
+  usesExternalPlaybackWhileExternalScreenIsActive?: boolean;
+  subtitleBottomOffset?: number;
+  subtitleFontSize?: number;
+  resizeMode?: 'contain' | 'cover' | 'stretch';
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
   onBuffering?: (data: any) => void;
@@ -29,17 +35,28 @@ export interface KSPlayerRef {
   setSource: (source: KSPlayerSource) => void;
   setPaused: (paused: boolean) => void;
   setVolume: (volume: number) => void;
+  setPlaybackRate: (rate: number) => void;
   setAudioTrack: (trackId: number) => void;
   setTextTrack: (trackId: number) => void;
   getTracks: () => Promise<{ audioTracks: any[]; textTracks: any[] }>;
+  setAllowsExternalPlayback: (allows: boolean) => void;
+  setUsesExternalPlaybackWhileExternalScreenIsActive: (uses: boolean) => void;
+  getAirPlayState: () => Promise<{ allowsExternalPlayback: boolean; usesExternalPlaybackWhileExternalScreenIsActive: boolean; isExternalPlaybackActive: boolean }>;
+  showAirPlayPicker: () => void;
 }
 
 export interface KSPlayerProps {
   source?: KSPlayerSource;
   paused?: boolean;
   volume?: number;
+  rate?: number;
   audioTrack?: number;
   textTrack?: number;
+  allowsExternalPlayback?: boolean;
+  usesExternalPlaybackWhileExternalScreenIsActive?: boolean;
+  subtitleBottomOffset?: number;
+  subtitleFontSize?: number;
+  resizeMode?: 'contain' | 'cover' | 'stretch';
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
   onBuffering?: (data: any) => void;
@@ -86,6 +103,14 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
         UIManager.dispatchViewManagerCommand(node, commandId, [volume]);
       }
     },
+    setPlaybackRate: (rate: number) => {
+      if (nativeRef.current) {
+        const node = findNodeHandle(nativeRef.current);
+        // @ts-ignore legacy UIManager commands path for Paper
+        const commandId = UIManager.getViewManagerConfig('KSPlayerView').Commands.setPlaybackRate;
+        UIManager.dispatchViewManagerCommand(node, commandId, [rate]);
+      }
+    },
     setAudioTrack: (trackId: number) => {
       if (nativeRef.current) {
         const node = findNodeHandle(nativeRef.current);
@@ -109,6 +134,38 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       }
       return { audioTracks: [], textTracks: [] };
     },
+    setAllowsExternalPlayback: (allows: boolean) => {
+      if (nativeRef.current) {
+        const node = findNodeHandle(nativeRef.current);
+        // @ts-ignore legacy UIManager commands path for Paper
+        const commandId = UIManager.getViewManagerConfig('KSPlayerView').Commands.setAllowsExternalPlayback;
+        UIManager.dispatchViewManagerCommand(node, commandId, [allows]);
+      }
+    },
+    setUsesExternalPlaybackWhileExternalScreenIsActive: (uses: boolean) => {
+      if (nativeRef.current) {
+        const node = findNodeHandle(nativeRef.current);
+        // @ts-ignore legacy UIManager commands path for Paper
+        const commandId = UIManager.getViewManagerConfig('KSPlayerView').Commands.setUsesExternalPlaybackWhileExternalScreenIsActive;
+        UIManager.dispatchViewManagerCommand(node, commandId, [uses]);
+      }
+    },
+    getAirPlayState: async () => {
+      if (nativeRef.current) {
+        const node = findNodeHandle(nativeRef.current);
+        return await KSPlayerModule.getAirPlayState(node);
+      }
+      return { allowsExternalPlayback: false, usesExternalPlaybackWhileExternalScreenIsActive: false, isExternalPlaybackActive: false };
+    },
+    showAirPlayPicker: () => {
+      if (nativeRef.current) {
+        const node = findNodeHandle(nativeRef.current);
+        console.log('[KSPlayerComponent] Calling showAirPlayPicker with node:', node);
+        KSPlayerModule.showAirPlayPicker(node);
+      } else {
+        console.log('[KSPlayerComponent] nativeRef.current is null');
+      }
+    },
   }));
 
   // No need for event listeners - events are handled through props
@@ -127,8 +184,14 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       source={props.source}
       paused={props.paused}
       volume={props.volume}
+      rate={props.rate}
       audioTrack={props.audioTrack}
       textTrack={props.textTrack}
+      allowsExternalPlayback={props.allowsExternalPlayback}
+      usesExternalPlaybackWhileExternalScreenIsActive={props.usesExternalPlaybackWhileExternalScreenIsActive}
+      subtitleBottomOffset={props.subtitleBottomOffset}
+      subtitleFontSize={props.subtitleFontSize}
+      resizeMode={props.resizeMode}
       onLoad={(e: any) => props.onLoad?.(e?.nativeEvent ?? e)}
       onProgress={(e: any) => props.onProgress?.(e?.nativeEvent ?? e)}
       onBuffering={(e: any) => props.onBuffering?.(e?.nativeEvent ?? e)}

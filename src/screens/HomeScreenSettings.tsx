@@ -115,6 +115,7 @@ const HomeScreenSettings: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const isTabletDevice = Platform.OS !== 'web' && (Dimensions.get('window').width >= 768);
 
   // Prevent iOS entrance flicker by restoring a non-translucent StatusBar
   useFocusEffect(
@@ -161,6 +162,15 @@ const HomeScreenSettings: React.FC = () => {
     updateSetting(key, value);
     setShowSavedIndicator(true);
   }, [updateSetting]);
+
+  // Ensure carousel is the default hero layout on tablets for all users
+  useEffect(() => {
+    try {
+      if (isTabletDevice && settings.heroStyle !== 'carousel') {
+        updateSetting('heroStyle', 'carousel' as any);
+      }
+    } catch {}
+  }, [isTabletDevice, settings.heroStyle, updateSetting]);
 
   const CustomSwitch = ({ value, onValueChange }: { value: boolean, onValueChange: (value: boolean) => void }) => (
     <Switch
@@ -313,16 +323,7 @@ const HomeScreenSettings: React.FC = () => {
               />
             )}
           />
-          <SettingItem
-            title="Featured Content Source"
-            description={settings.featuredContentSource === 'tmdb' ? 'TMDB Trending' : 'From Catalogs'}
-            icon="settings-input-component"
-            isDarkMode={isDarkMode}
-            colors={colors}
-            renderControl={() => <View />}
-            isLast={!settings.showHeroSection || settings.featuredContentSource !== 'catalogs'}
-          />
-          {settings.showHeroSection && settings.featuredContentSource === 'catalogs' && (
+          {settings.showHeroSection && (
             <SettingItem
               title="Select Catalogs"
               description={getSelectedCatalogsText()}
@@ -336,35 +337,33 @@ const HomeScreenSettings: React.FC = () => {
           )}
         </SettingsCard>
 
-        {settings.showHeroSection && !(Dimensions.get('window').width >= 768) && (
+        {settings.showHeroSection && (
           <>
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>
               <SegmentedControl
-                options={[{ label: 'Legacy', value: 'legacy' }, { label: 'Carousel', value: 'carousel' }]}
+                options={[
+                  { label: 'Legacy', value: 'legacy' }, 
+                  { label: 'Carousel', value: 'carousel' },
+                  { label: 'Apple TV', value: 'appletv' }
+                ]}
                 value={settings.heroStyle}
                 onChange={(val) => handleUpdateSetting('heroStyle', val as any)}
               />
-              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner or swipeable cards</Text>
+              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner, swipeable cards, or Apple TV style</Text>
             </View>
 
             <View style={styles.segmentCard}>
               <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
-              <SegmentedControl
-                options={[{ label: 'TMDB', value: 'tmdb' }, { label: 'Catalogs', value: 'catalogs' }]}
-                value={settings.featuredContentSource}
-                onChange={(val) => handleUpdateSetting('featuredContentSource', val as any)}
-              />
-              {settings.featuredContentSource === 'catalogs' && (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('HeroCatalogs')}
-                  style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
-                  activeOpacity={0.8}
-                >
-                  <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
-                  <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
-                </TouchableOpacity>
-              )}
+              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Using Catalogs</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('HeroCatalogs')}
+                style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
+                <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
+              </TouchableOpacity>
             </View>
 
             {settings.heroStyle === 'carousel' && (

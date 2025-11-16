@@ -1,8 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
-import { InteractionManager } from 'react-native';
 import accountService, { AuthUser } from '../services/AccountService';
-import supabase from '../services/supabaseClient';
-import syncService from '../services/SyncService';
 
 type AccountContextValue = {
   user: AuthUser | null;
@@ -22,73 +19,19 @@ export const AccountProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Initial session (load full profile)
-    // Defer heavy work until after initial interactions to reduce launch CPU spike
-    const task = InteractionManager.runAfterInteractions(() => {
-      (async () => {
+    // Initial user load
+    const loadUser = async () => {
+      try {
         const u = await accountService.getCurrentUser();
         setUser(u);
+      } catch (error) {
+        console.warn('[AccountContext] Failed to load user:', error);
+      } finally {
         setLoading(false);
-        // Stage sync operations to avoid blocking the JS thread
-        syncService.init();
-        if (u) {
-          try {
-            await syncService.migrateLocalScopeToUser();
-            // Longer yield to event loop to reduce CPU pressure
-            await new Promise(resolve => setTimeout(resolve, 100));
-            await syncService.subscribeRealtime();
-            await new Promise(resolve => setTimeout(resolve, 100));
-            // Pull first to hydrate local state, then push to avoid wiping server with empty local
-            await syncService.fullPull();
-            await new Promise(resolve => setTimeout(resolve, 100));
-            await syncService.fullPush();
-          } catch {}
-        }
-      })();
-    });
-
-    // Auth state listener
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only set loading for actual auth changes, not initial session
-      if (event !== 'INITIAL_SESSION') {
-        setLoading(true);
-      }
-      try {
-        const fullUser = session?.user ? await accountService.getCurrentUser() : null;
-        setUser(fullUser);
-        // Immediately clear loading so UI can transition to MainTabs/Auth
-        setLoading(false);
-        if (fullUser) {
-          // Run sync in background without blocking UI
-          setTimeout(async () => {
-            try {
-              await syncService.migrateLocalScopeToUser();
-              await new Promise(r => setTimeout(r, 0));
-              await syncService.subscribeRealtime();
-              await new Promise(r => setTimeout(r, 0));
-              await syncService.fullPull();
-              await new Promise(r => setTimeout(r, 0));
-              await syncService.fullPush();
-            } catch (error) {
-              console.warn('[AccountContext] Background sync failed:', error);
-            }
-          }, 0);
-        } else {
-          syncService.unsubscribeRealtime();
-        }
-      } catch (e) {
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      subscription.subscription.unsubscribe();
-      task.cancel();
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = null;
       }
     };
+
+    loadUser();
   }, []);
 
   const value = useMemo<AccountContextValue>(() => ({

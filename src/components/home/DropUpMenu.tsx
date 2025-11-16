@@ -11,7 +11,8 @@ import {
   Platform
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Image as ExpoImage } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
+import { useTraktContext } from '../../contexts/TraktContext';
 import { colors } from '../../styles/colors';
 import Animated, {
   useAnimatedStyle,
@@ -42,6 +43,9 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
   const opacity = useSharedValue(0);
   const isDarkMode = useColorScheme() === 'dark';
   const SNAP_THRESHOLD = 100;
+
+  // Trakt integration
+  const { isAuthenticated, isInWatchlist, isInCollection } = useTraktContext();
 
   useEffect(() => {
     if (visible) {
@@ -92,6 +96,9 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
   // Robustly determine if the item is in the library (saved)
   const isSaved = typeof isSavedProp === 'boolean' ? isSavedProp : !!item.inLibrary;
   const isWatched = !!isWatchedProp;
+  const inTraktWatchlist = isAuthenticated && isInWatchlist(item.id, item.type as 'movie' | 'show');
+  const inTraktCollection = isAuthenticated && isInCollection(item.id, item.type as 'movie' | 'show');
+  
   let menuOptions = [
     {
       icon: 'bookmark',
@@ -117,6 +124,22 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
     }
   ];
 
+  // Add Trakt options if authenticated
+  if (isAuthenticated) {
+    menuOptions.push(
+      {
+        icon: 'playlist-add-check',
+        label: inTraktWatchlist ? 'Remove from Trakt Watchlist' : 'Add to Trakt Watchlist',
+        action: 'trakt-watchlist'
+      },
+      {
+        icon: 'video-library',
+        label: inTraktCollection ? 'Remove from Trakt Collection' : 'Add to Trakt Collection',
+        action: 'trakt-collection'
+      }
+    );
+  }
+
   // If used in LibraryScreen, only show 'Remove from Library' if item is in library
   if (isSavedProp === true) {
     menuOptions = menuOptions.filter(opt => opt.action !== 'library' || isSaved);
@@ -138,10 +161,14 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
             <Animated.View style={[styles.menuContainer, menuStyle, { backgroundColor }]}>
               <View style={styles.dragHandle} />
               <View style={styles.menuHeader}>
-                <ExpoImage
-                  source={{ uri: item.poster }}
+                <FastImage
+                  source={{ 
+                    uri: item.poster,
+                    priority: FastImage.priority.high,
+                    cache: FastImage.cacheControl.immutable
+                  }}
                   style={styles.menuPoster}
-                  contentFit="cover"
+                  resizeMode={FastImage.resizeMode.cover}
                 />
                 <View style={styles.menuTitleContainer}>
                   <Text style={[styles.menuTitle, { color: isDarkMode ? '#FFFFFF' : '#000000' }]}>

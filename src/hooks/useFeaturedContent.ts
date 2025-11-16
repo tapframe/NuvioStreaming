@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { StreamingContent, catalogService } from '../services/catalogService';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import * as Haptics from 'expo-haptics';
 import { useGenres } from '../contexts/GenreContext';
 import { useSettings, settingsEmitter } from './useSettings';
+import { isTmdbUrl } from '../utils/logoUtils';
 
 // Create a persistent store outside of the hook to maintain state between navigation
 const persistentStore = {
@@ -19,7 +20,7 @@ const persistentStore = {
     showHeroSection: true,
     featuredContentSource: 'tmdb' as 'tmdb' | 'catalogs',
     selectedHeroCatalogs: [] as string[],
-    logoSourcePreference: 'metahub' as 'metahub' | 'tmdb',
+    logoSourcePreference: 'tmdb' as 'metahub' | 'tmdb',
     tmdbLanguagePreference: 'en'
   }
 };
@@ -37,16 +38,17 @@ export function useFeaturedContent() {
   const currentIndexRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { settings } = useSettings();
-  const [contentSource, setContentSource] = useState<'tmdb' | 'catalogs'>(settings.featuredContentSource);
+  const [contentSource, setContentSource] = useState<'tmdb' | 'catalogs'>('catalogs');
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>(settings.selectedHeroCatalogs || []);
 
   const { genreMap, loadingGenres } = useGenres();
 
   // Simple update for state variables
   useEffect(() => {
-    setContentSource(settings.featuredContentSource);
+    // Always use catalogs as the featured source
+    setContentSource('catalogs');
     setSelectedCatalogs(settings.selectedHeroCatalogs || []);
-  }, [settings]);
+  }, [settings.selectedHeroCatalogs]);
 
   const cleanup = useCallback(() => {
     if (abortControllerRef.current) {
@@ -57,32 +59,16 @@ export function useFeaturedContent() {
 
   const loadFeaturedContent = useCallback(async (forceRefresh = false) => {
     const t0 = Date.now();
-    logger.info('[useFeaturedContent] load:start', { forceRefresh, contentSource, selectedCatalogsCount: (selectedCatalogs || []).length });
-    // First, ensure contentSource matches current settings (could be outdated due to async updates)
-    if (contentSource !== settings.featuredContentSource) {
-      logger.debug('[useFeaturedContent] load:source-mismatch', { from: contentSource, to: settings.featuredContentSource });
-      setContentSource(settings.featuredContentSource);
-      // We return here and let the effect triggered by contentSource change handle the loading
-      return;
-    }
     
     // Check if we should use cached data (disabled if DISABLE_CACHE)
     const now = Date.now();
     const cacheAge = now - persistentStore.lastFetchTime;
-    logger.debug('[useFeaturedContent] cache:status', {
-      disabled: DISABLE_CACHE,
-      hasFeatured: Boolean(persistentStore.featuredContent),
-      allCount: persistentStore.allFeaturedContent?.length || 0,
-      cacheAgeMs: cacheAge,
-      timeoutMs: CACHE_TIMEOUT,
-    });
     if (!DISABLE_CACHE) {
       if (!forceRefresh && 
           persistentStore.featuredContent && 
           persistentStore.allFeaturedContent.length > 0 && 
           cacheAge < CACHE_TIMEOUT) {
         // Use cached data
-        logger.info('[useFeaturedContent] cache:use', { duration: `${Date.now() - t0}ms` });
         setFeaturedContent(persistentStore.featuredContent);
         setAllFeaturedContent(persistentStore.allFeaturedContent);
         setLoading(false);
@@ -91,7 +77,6 @@ export function useFeaturedContent() {
       }
     }
 
-    logger.info('[useFeaturedContent] fetch:start', { source: contentSource });
     setLoading(true);
     cleanup();
     abortControllerRef.current = new AbortController();
@@ -100,123 +85,10 @@ export function useFeaturedContent() {
     try {
       let formattedContent: StreamingContent[] = [];
 
-      if (contentSource === 'tmdb') {
-        // Load from TMDB trending
-        const tTmdb = Date.now();
-        const trendingResults = await tmdbService.getTrending('movie', 'day');
-        logger.info('[useFeaturedContent] tmdb:trending', { count: trendingResults?.length || 0, duration: `${Date.now() - tTmdb}ms` });
-        
-        if (signal.aborted) return;
-
-        if (trendingResults.length > 0) {
-          // First convert items to StreamingContent objects
-          const preFormattedContent = trendingResults
-            .filter(item => item.title || item.name) 
-            .map(item => {
-              const yearString = (item.release_date || item.first_air_date)?.substring(0, 4);
-              return {
-                id: `tmdb:${item.id}`,
-                type: 'movie',
-                name: item.title || item.name || 'Unknown Title',
-                poster: tmdbService.getImageUrl(item.poster_path) || '',
-                banner: tmdbService.getImageUrl(item.backdrop_path) || '',
-                logo: undefined, // Will be populated below
-                description: item.overview || '',
-                year: yearString ? parseInt(yearString, 10) : undefined,
-                genres: item.genre_ids.map(id => 
-                  loadingGenres ? '...' : (genreMap[id] || `ID:${id}`)
-                ),
-                inLibrary: false,
-              };
-            });
-            
-          // Then fetch logos for each item based on preference
-          const tLogos = Date.now();
-          const preference = settings.logoSourcePreference || 'metahub';
-          const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-
-          const fetchLogoForItem = async (item: StreamingContent): Promise<StreamingContent> => {
-            try {
-              // Support both TMDB-prefixed and IMDb-prefixed IDs
-              const isTmdb = item.id.startsWith('tmdb:');
-              const isImdb = item.id.startsWith('tt');
-              let tmdbId: string | null = null;
-              let imdbId: string | null = null;
-
-              if (isTmdb) {
-                tmdbId = item.id.split(':')[1];
-              } else if (isImdb) {
-                imdbId = item.id.split(':')[0];
-              } else {
-                return item;
-              }
-
-              if (preference === 'tmdb') {
-                logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
-                // Resolve TMDB id if we only have IMDb
-                if (!tmdbId && imdbId) {
-                  const found = await tmdbService.findTMDBIdByIMDB(imdbId);
-                  tmdbId = found ? String(found) : null;
-                }
-                if (!tmdbId) return item;
-                const logoUrl = tmdbId ? await tmdbService.getContentLogo('movie', tmdbId as string, preferredLanguage) : null;
-                if (logoUrl) {
-                  logger.debug('[useFeaturedContent] logo:tmdb:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
-                  return { ...item, logo: logoUrl };
-                }
-                // Fallback to Metahub via IMDb ID
-                if (!imdbId && tmdbId) {
-                  const movieDetails: any = await tmdbService.getMovieDetails(tmdbId);
-                  imdbId = movieDetails?.imdb_id;
-                }
-                if (imdbId) {
-                  const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-                  logger.debug('[useFeaturedContent] logo:fallback:metahub', { name: item.name, id: item.id, url: metahubUrl });
-                  return { ...item, logo: metahubUrl };
-                }
-                logger.debug('[useFeaturedContent] logo:none', { name: item.name, id: item.id });
-                return item;
-              } else {
-                // preference === 'metahub'
-                // If have IMDb, use directly
-                if (!imdbId && tmdbId) {
-                  const movieDetails: any = await tmdbService.getMovieDetails(tmdbId);
-                  imdbId = movieDetails?.imdb_id;
-                }
-                if (imdbId) {
-                  const metahubUrl = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-                  logger.debug('[useFeaturedContent] logo:metahub:ok', { name: item.name, id: item.id, url: metahubUrl });
-                  return { ...item, logo: metahubUrl };
-                }
-                // Fallback to TMDB logo
-                logger.debug('[useFeaturedContent] logo:metahub:miss → fallback:tmdb', { name: item.name, id: item.id, lang: preferredLanguage });
-                if (!tmdbId && imdbId) {
-                  const found = await tmdbService.findTMDBIdByIMDB(imdbId);
-                  tmdbId = found ? String(found) : null;
-                }
-                if (!tmdbId) return item;
-                const logoUrl = tmdbId ? await tmdbService.getContentLogo('movie', tmdbId as string, preferredLanguage) : null;
-                if (logoUrl) {
-                  logger.debug('[useFeaturedContent] logo:tmdb:fallback:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
-                  return { ...item, logo: logoUrl };
-                }
-                logger.debug('[useFeaturedContent] logo:none', { name: item.name, id: item.id });
-                return item;
-              }
-            } catch (error) {
-              logger.error('[useFeaturedContent] logo:error', { name: item.name, id: item.id, error: String(error) });
-              return item;
-            }
-          };
-
-          formattedContent = await Promise.all(preFormattedContent.map(fetchLogoForItem));
-          logger.info('[useFeaturedContent] logos:resolved', { count: formattedContent.length, duration: `${Date.now() - tLogos}ms`, preference });
-        }
-      } else {
+      {
         // Load from installed catalogs
         const tCats = Date.now();
         const catalogs = await catalogService.getHomeCatalogs();
-        logger.info('[useFeaturedContent] catalogs:list', { count: catalogs?.length || 0, duration: `${Date.now() - tCats}ms` });
         
         if (signal.aborted) return;
 
@@ -231,7 +103,6 @@ export function useFeaturedContent() {
                 return selectedCatalogs.includes(catalogId);
               })
             : catalogs; // Use all catalogs if none specifically selected
-          logger.debug('[useFeaturedContent] catalogs:filtered', { filteredCount: filteredCatalogs.length, selectedCount: selectedCatalogs?.length || 0 });
 
           // Flatten all catalog items into a single array, filter out items without posters
           const tFlat = Date.now();
@@ -241,13 +112,11 @@ export function useFeaturedContent() {
               // Remove duplicates based on ID
               index === self.findIndex(t => t.id === item.id)
             );
-          logger.info('[useFeaturedContent] catalogs:items', { total: allItems.length, duration: `${Date.now() - tFlat}ms` });
 
           // Sort by popular, newest, etc. (possibly enhanced later) and take first 10
           const topItems = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
 
-          // Optionally enrich with logos based on preference for tmdb-sourced IDs
-          const preference = settings.logoSourcePreference || 'metahub';
+          // Optionally enrich with logos (TMDB only) for tmdb/imdb sourced IDs
           const preferredLanguage = settings.tmdbLanguagePreference || 'en';
 
           const enrichLogo = async (item: any): Promise<StreamingContent> => {
@@ -263,7 +132,14 @@ export function useFeaturedContent() {
               genres: (item as any).genres,
               inLibrary: Boolean((item as any).inLibrary),
             };
+            
             try {
+              if (!settings.enrichMetadataWithTMDB) {
+                // When enrichment is OFF, keep addon logo or undefined
+                return { ...base, logo: base.logo || undefined };
+              }
+
+              // When enrichment is ON, fetch from TMDB with language preference
               const rawId = String(item.id);
               const isTmdb = rawId.startsWith('tmdb:');
               const isImdb = rawId.startsWith('tt');
@@ -276,53 +152,87 @@ export function useFeaturedContent() {
                 const found = await tmdbService.findTMDBIdByIMDB(imdbId);
                 tmdbId = found ? String(found) : null;
               }
-              if (!tmdbId && !imdbId) return base;
-              if (preference === 'tmdb') {
-                logger.debug('[useFeaturedContent] logo:try:tmdb', { name: item.name, id: item.id, tmdbId, lang: preferredLanguage });
-                if (!tmdbId) return base;
+              
+              if (tmdbId) {
                 const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
-                if (logoUrl) {
-                  logger.debug('[useFeaturedContent] logo:tmdb:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
-                  return { ...base, logo: logoUrl };
-                }
-                // fallback metahub
-                if (!imdbId && tmdbId) {
-                  const details: any = item.type === 'series' ? await tmdbService.getShowExternalIds(parseInt(tmdbId)) : await tmdbService.getMovieDetails(tmdbId);
-                  imdbId = details?.imdb_id;
-                }
-                if (imdbId) {
-                  const url = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-                  logger.debug('[useFeaturedContent] logo:fallback:metahub', { name: item.name, id: item.id, url });
-                  return { ...base, logo: url };
-                }
-                return base;
-              } else {
-                // metahub first
-                if (!imdbId && tmdbId) {
-                  const details: any = item.type === 'series' ? await tmdbService.getShowExternalIds(parseInt(tmdbId)) : await tmdbService.getMovieDetails(tmdbId);
-                  imdbId = details?.imdb_id;
-                }
-                if (imdbId) {
-                  const url = `https://images.metahub.space/logo/medium/${imdbId}/img`;
-                  logger.debug('[useFeaturedContent] logo:metahub:ok', { name: item.name, id: item.id, url });
-                  return { ...base, logo: url };
-                }
-                logger.debug('[useFeaturedContent] logo:metahub:miss → fallback:tmdb', { name: item.name, id: item.id, lang: preferredLanguage });
-                if (!tmdbId) return base;
-                const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
-                if (logoUrl) {
-                  logger.debug('[useFeaturedContent] logo:tmdb:fallback:ok', { name: item.name, id: item.id, url: logoUrl, lang: preferredLanguage });
-                  return { ...base, logo: logoUrl };
-                }
-                return base;
+                return { ...base, logo: logoUrl || undefined }; // TMDB logo or undefined (no addon fallback)
               }
+              
+              return { ...base, logo: undefined }; // No TMDB ID means no logo
             } catch (error) {
-              logger.error('[useFeaturedContent] logo:error', { name: item.name, id: item.id, error: String(error) });
-              return base;
+              return { ...base, logo: undefined }; // Error means no logo
             }
           };
 
-          formattedContent = await Promise.all(topItems.map(enrichLogo));
+          // Only enrich with logos if enrichment is enabled
+          if (settings.enrichMetadataWithTMDB) {
+            formattedContent = await Promise.all(topItems.map(enrichLogo));
+            try {
+              const details = formattedContent.slice(0, 20).map((c) => ({
+                id: c.id,
+                name: c.name,
+                hasLogo: Boolean(c.logo),
+                logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
+                logo: c.logo || undefined,
+              }));
+            } catch {}
+          } else {
+            // When enrichment is disabled, prefer addon-provided logos; if missing, fetch basic meta to pull logo (like HeroSection)
+            const baseItems = topItems.map((item: any) => {
+              const base: StreamingContent = {
+                id: item.id,
+                type: item.type,
+                name: item.name,
+                poster: item.poster,
+                banner: (item as any).banner,
+                logo: (item as any).logo || undefined,
+                description: (item as any).description,
+                year: (item as any).year,
+                genres: (item as any).genres,
+                inLibrary: Boolean((item as any).inLibrary),
+              };
+              return base;
+            });
+
+            // Attempt to fill missing logos from addon meta details for a limited subset
+            const candidates = baseItems.filter(i => !i.logo).slice(0, 10);
+
+            try {
+              const filled = await Promise.allSettled(candidates.map(async (item) => {
+                try {
+                  const meta = await catalogService.getBasicContentDetails(item.type, item.id);
+                  if (meta?.logo) {
+                    return { id: item.id, logo: meta.logo } as { id: string; logo: string };
+                  }
+                } catch (e) {
+                }
+                return { id: item.id, logo: undefined as any };
+              }));
+
+              const idToLogo = new Map<string, string>();
+              filled.forEach(res => {
+                if (res.status === 'fulfilled' && res.value && res.value.logo) {
+                  idToLogo.set(res.value.id, res.value.logo);
+                }
+              });
+
+              formattedContent = baseItems.map(i => (
+                idToLogo.has(i.id) ? { ...i, logo: idToLogo.get(i.id)! } : i
+              ));
+            } catch {
+              formattedContent = baseItems;
+            }
+
+            try {
+              const details = formattedContent.slice(0, 20).map((c) => ({
+                id: c.id,
+                name: c.name,
+                hasLogo: Boolean(c.logo),
+                logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
+                logo: c.logo || undefined,
+              }));
+            } catch {}
+          }
         }
       }
 
@@ -330,9 +240,8 @@ export function useFeaturedContent() {
 
       // Safety guard: if nothing came back within a reasonable time, stop loading
       if (!formattedContent || formattedContent.length === 0) {
-        logger.warn('[useFeaturedContent] results:empty');
         // Fall back to any cached featured item so UI can render something
-        const cachedJson = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+        const cachedJson = await mmkvStorage.getItem(STORAGE_KEY).catch(() => null);
         if (cachedJson) {
           try {
             const parsed = JSON.parse(cachedJson);
@@ -340,7 +249,6 @@ export function useFeaturedContent() {
               formattedContent = Array.isArray(parsed.allFeaturedContent) && parsed.allFeaturedContent.length > 0
                 ? parsed.allFeaturedContent
                 : [parsed.featuredContent];
-              logger.info('[useFeaturedContent] fallback:storage', { count: formattedContent.length });
             }
           } catch {}
         }
@@ -357,12 +265,12 @@ export function useFeaturedContent() {
       
       if (formattedContent.length > 0) {
         persistentStore.featuredContent = formattedContent[0];
-        setFeaturedContent(formattedContent[0]); 
+        setFeaturedContent(formattedContent[0]);
         currentIndexRef.current = 0;
         // Persist cache for fast startup (skipped when cache disabled)
         if (!DISABLE_CACHE) {
           try {
-            await AsyncStorage.setItem(
+            await mmkvStorage.setItem(
               STORAGE_KEY,
               JSON.stringify({
                 ts: now,
@@ -370,7 +278,6 @@ export function useFeaturedContent() {
                 allFeaturedContent: formattedContent,
               })
             );
-            logger.debug('[useFeaturedContent] cache:written', { firstId: formattedContent[0]?.id });
           } catch {}
         }
       } else {
@@ -378,36 +285,32 @@ export function useFeaturedContent() {
         setFeaturedContent(null);
         // Clear persisted cache on empty (skipped when cache disabled)
         if (!DISABLE_CACHE) {
-          try { await AsyncStorage.removeItem(STORAGE_KEY); } catch {}
+          try { await mmkvStorage.removeItem(STORAGE_KEY); } catch {}
         }
       }
     } catch (error) {
       if (signal.aborted) {
-        logger.info('[useFeaturedContent] fetch:aborted');
       } else {
-        logger.error('[useFeaturedContent] fetch:error', { error: String(error) });
       }
       setFeaturedContent(null);
       setAllFeaturedContent([]);
     } finally {
       if (!signal.aborted) {
         setLoading(false);
-        logger.info('[useFeaturedContent] load:done', { duration: `${Date.now() - t0}ms` });
       }
     }
-  }, [cleanup, genreMap, loadingGenres, contentSource, selectedCatalogs]);
+  }, [cleanup, genreMap, loadingGenres, selectedCatalogs]);
 
   // Hydrate from persisted cache immediately for instant render
   useEffect(() => {
     if (DISABLE_CACHE) {
       // Skip hydration entirely
-      logger.debug('[useFeaturedContent] hydrate:skipped');
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const json = await AsyncStorage.getItem(STORAGE_KEY);
+        const json = await mmkvStorage.getItem(STORAGE_KEY);
         if (!json) return;
         const parsed = JSON.parse(json);
         if (cancelled) return;
@@ -421,7 +324,6 @@ export function useFeaturedContent() {
             setFeaturedContent(parsed.featuredContent);
             setAllFeaturedContent(persistentStore.allFeaturedContent);
             setLoading(false);
-            logger.info('[useFeaturedContent] hydrate:storage', { allCount: persistentStore.allFeaturedContent.length });
           }
         }
       } catch {}
@@ -434,7 +336,6 @@ export function useFeaturedContent() {
     // Check if settings changed while app was closed
     const settingsChanged = 
       persistentStore.lastSettings.showHeroSection !== settings.showHeroSection ||
-      persistentStore.lastSettings.featuredContentSource !== settings.featuredContentSource ||
       JSON.stringify(persistentStore.lastSettings.selectedHeroCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs) ||
       persistentStore.lastSettings.logoSourcePreference !== settings.logoSourcePreference ||
       persistentStore.lastSettings.tmdbLanguagePreference !== settings.tmdbLanguagePreference;
@@ -442,7 +343,7 @@ export function useFeaturedContent() {
     // Update our tracking of last used settings
     persistentStore.lastSettings = {
       showHeroSection: settings.showHeroSection,
-      featuredContentSource: settings.featuredContentSource,
+      featuredContentSource: 'catalogs',
       selectedHeroCatalogs: [...settings.selectedHeroCatalogs],
       logoSourcePreference: settings.logoSourcePreference,
       tmdbLanguagePreference: settings.tmdbLanguagePreference
@@ -450,7 +351,6 @@ export function useFeaturedContent() {
     
     // Force refresh if settings changed during app restart, but only if we have content
     if (settingsChanged && persistentStore.featuredContent) {
-      logger.info('[useFeaturedContent] settings:changed', { source: settings.featuredContentSource, selectedCount: settings.selectedHeroCatalogs?.length || 0 });
       loadFeaturedContent(true);
     }
   }, [settings, loadFeaturedContent]);
@@ -459,34 +359,24 @@ export function useFeaturedContent() {
   useEffect(() => {
     const handleSettingsChange = () => {
       // Always reflect settings immediately in this hook
-      const nextSource = settings.featuredContentSource;
       const nextSelected = settings.selectedHeroCatalogs || [];
       const nextLogoPref = settings.logoSourcePreference;
       const nextTmdbLang = settings.tmdbLanguagePreference;
 
-      const sourceChanged = contentSource !== nextSource;
       const catalogsChanged = JSON.stringify(selectedCatalogs) !== JSON.stringify(nextSelected);
       const logoPrefChanged = persistentStore.lastSettings.logoSourcePreference !== nextLogoPref;
       const tmdbLangChanged = persistentStore.lastSettings.tmdbLanguagePreference !== nextTmdbLang;
 
-      if (sourceChanged || (nextSource === 'catalogs' && catalogsChanged) || logoPrefChanged || tmdbLangChanged) {
-        logger.info('[useFeaturedContent] event:settings-changed:immediate-refresh', {
-          fromSource: contentSource,
-          toSource: nextSource,
-          catalogsChanged,
-          logoPrefChanged,
-          tmdbLangChanged
-        });
+      if (catalogsChanged || logoPrefChanged || tmdbLangChanged) {
 
         // Update internal state immediately so dependent effects are in sync
-        setContentSource(nextSource);
         setSelectedCatalogs(nextSelected);
         // Update tracked last settings for subsequent comparisons
         persistentStore.lastSettings.logoSourcePreference = nextLogoPref;
         persistentStore.lastSettings.tmdbLanguagePreference = nextTmdbLang;
 
         // Only clear current data if it's a significant change (source or catalogs)
-        if (sourceChanged || (nextSource === 'catalogs' && catalogsChanged)) {
+        if (catalogsChanged) {
           setAllFeaturedContent([]);
           setFeaturedContent(null);
           persistentStore.allFeaturedContent = [];
@@ -504,28 +394,15 @@ export function useFeaturedContent() {
     return unsubscribe;
   }, [loadFeaturedContent, settings, contentSource, selectedCatalogs]);
 
-  // Load featured content initially and when content source changes
+  // Load featured content initially and when catalogs selection changes
   useEffect(() => {
-    // Force refresh when switching to catalogs or when catalog selection changes
-    if (contentSource === 'catalogs') {
-      // Clear cache when switching to catalogs mode
-      setAllFeaturedContent([]);
-      setFeaturedContent(null);
-      persistentStore.allFeaturedContent = [];
-      persistentStore.featuredContent = null;
-      loadFeaturedContent(true);
-    } else if (contentSource === 'tmdb' && contentSource !== persistentStore.featuredContent?.type) {
-      // Clear cache when switching to TMDB mode from catalogs
-      setAllFeaturedContent([]);
-      setFeaturedContent(null);
-      persistentStore.allFeaturedContent = [];
-      persistentStore.featuredContent = null;
-      loadFeaturedContent(true);
-    } else {
-      // Normal load (might use cache if available)
-      loadFeaturedContent(false);
-    }
-  }, [loadFeaturedContent, contentSource, selectedCatalogs]);
+    // Always use catalogs
+    setAllFeaturedContent([]);
+    setFeaturedContent(null);
+    persistentStore.allFeaturedContent = [];
+    persistentStore.featuredContent = null;
+    loadFeaturedContent(true);
+  }, [loadFeaturedContent, selectedCatalogs]);
 
   useEffect(() => {
     if (featuredContent) {
@@ -598,35 +475,64 @@ export function useFeaturedContent() {
     return () => cleanup();
   }, [cleanup]);
 
-  const handleSaveToLibrary = useCallback(async () => {
-    if (!featuredContent) return;
-    
-    try {
-      const currentSavedStatus = isSaved;
-      setIsSaved(!currentSavedStatus);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const handleSaveToLibrary = useCallback(async (item?: StreamingContent) => {
+    const contentToUse = item || featuredContent;
+    if (!contentToUse) return;
 
-      if (currentSavedStatus) {
-        await catalogService.removeFromLibrary(featuredContent.type, featuredContent.id);
+    try {
+      // For the legacy single item behavior
+      if (!item) {
+        const currentSavedStatus = isSaved;
+        setIsSaved(!currentSavedStatus);
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        if (currentSavedStatus) {
+          await catalogService.removeFromLibrary(contentToUse.type, contentToUse.id);
+        } else {
+          const itemToAdd = { ...contentToUse, inLibrary: true };
+          await catalogService.addToLibrary(itemToAdd);
+        }
       } else {
-        const itemToAdd = { ...featuredContent, inLibrary: true }; 
-        await catalogService.addToLibrary(itemToAdd);
+        // For carousel items - check if saved and toggle
+        const libraryItems = await catalogService.getLibraryItems();
+        const isItemSaved = libraryItems.some(libItem => libItem.id === contentToUse.id && libItem.type === contentToUse.type);
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        if (isItemSaved) {
+          await catalogService.removeFromLibrary(contentToUse.type, contentToUse.id);
+        } else {
+          const itemToAdd = { ...contentToUse, inLibrary: true };
+          await catalogService.addToLibrary(itemToAdd);
+        }
       }
     } catch (error) {
       logger.error('Error updating library:', error);
-      setIsSaved(prev => !prev); 
+      if (!item) {
+        setIsSaved(prev => !prev);
+      }
     }
   }, [featuredContent, isSaved]);
+
+  const isItemSaved = useCallback(async (item: StreamingContent) => {
+    try {
+      const items = await catalogService.getLibraryItems();
+      return items.some(libItem => libItem.id === item.id && libItem.type === item.type);
+    } catch (error) {
+      logger.error('Error checking if item is saved:', error);
+      return false;
+    }
+  }, []);
 
   // Function to force a refresh if needed
   const refreshFeatured = useCallback(() => loadFeaturedContent(true), [loadFeaturedContent]);
 
-  return { 
-    featuredContent, 
+  return {
+    featuredContent,
     allFeaturedContent,
-    loading, 
-    isSaved, 
-    handleSaveToLibrary, 
+    loading,
+    isSaved,
+    handleSaveToLibrary,
+    isItemSaved,
     refreshFeatured
   };
 } 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { Share } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Toast } from 'toastify-react-native';
+import { mmkvStorage } from '../services/mmkvStorage';
+import { useToast } from '../contexts/ToastContext';
 import DropUpMenu from '../components/home/DropUpMenu';
 import {
   View,
@@ -22,8 +22,8 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
+import FastImage from '@d11/react-native-fast-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { catalogService } from '../services/catalogService';
@@ -66,22 +66,20 @@ interface TraktFolder {
   id: string;
   name: string;
   icon: keyof typeof MaterialIcons.glyphMap;
-  description: string;
   itemCount: number;
-  gradient: [string, string];
 }
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Compute responsive grid layout (more columns on tablets)
 function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: number } {
-  const horizontalPadding = 24; // matches listContainer padding (approx)
-  const gutter = 16; // space between items (via space-between + marginBottom)
-  let numColumns = 2;
+  const horizontalPadding = 16; // matches listContainer padding (approx)
+  const gutter = 12; // space between items (via space-between + marginBottom)
+  let numColumns = 3;
   if (screenWidth >= 1200) numColumns = 5;
   else if (screenWidth >= 1000) numColumns = 4;
   else if (screenWidth >= 700) numColumns = 3;
-  else numColumns = 2;
+  else numColumns = 3;
   const available = screenWidth - horizontalPadding - (numColumns - 1) * gutter;
   const itemWidth = Math.floor(available / numColumns);
   return { numColumns, itemWidth };
@@ -94,7 +92,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
     let isMounted = true;
     const fetchPoster = async () => {
       if (item.images) {
-        const url = await TraktService.getTraktPosterUrlCached(item.images);
+        const url = TraktService.getTraktPosterUrl(item.images);
         if (isMounted && url) {
           setPosterUrl(url);
         }
@@ -119,13 +117,10 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
       <View>
         <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
           {posterUrl ? (
-            <Image
+            <FastImage
               source={{ uri: posterUrl }}
               style={styles.poster}
-              contentFit="cover"
-              cachePolicy="disk"
-              transition={0}
-              allowDownscaling
+              resizeMode={FastImage.resizeMode.cover}
             />
           ) : (
             <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center' }]}>
@@ -133,7 +128,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
           {item.name}
         </Text>
       </View>
@@ -143,7 +138,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
 
 const SkeletonLoader = () => {
   const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { numColumns, itemWidth } = getGridLayout(width);
   const { currentTheme } = useTheme();
 
@@ -204,13 +199,14 @@ const SkeletonLoader = () => {
 const LibraryScreen = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { numColumns, itemWidth } = useMemo(() => getGridLayout(width), [width]);
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
   const [filter, setFilter] = useState<'trakt' | 'movies' | 'series'>('movies');
   const [showTraktContent, setShowTraktContent] = useState(false);
   const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
+  const { showInfo, showError } = useToast();
   // DropUpMenu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
@@ -276,8 +272,16 @@ const LibraryScreen = () => {
       setLoading(true);
       try {
         const items = await catalogService.getLibraryItems();
+        
+        // Sort by date added (most recent first)
+        const sortedItems = items.sort((a, b) => {
+          const timeA = (a as any).addedToLibraryAt || 0;
+          const timeB = (b as any).addedToLibraryAt || 0;
+          return timeB - timeA; // Descending order (newest first)
+        });
+        
         // Load watched status for each item from AsyncStorage
-        const updatedItems = await Promise.all(items.map(async (item) => {
+        const updatedItems = await Promise.all(sortedItems.map(async (item) => {
           // Map StreamingContent to LibraryItem shape
           const libraryItem: LibraryItem = {
             ...item,
@@ -285,7 +289,7 @@ const LibraryScreen = () => {
             traktId: typeof (item as any).traktId === 'number' ? (item as any).traktId : 0,
           };
           const key = `watched:${item.type}:${item.id}`;
-          const watched = await AsyncStorage.getItem(key);
+          const watched = await mmkvStorage.getItem(key);
           return {
             ...libraryItem,
             watched: watched === 'true'
@@ -303,8 +307,15 @@ const LibraryScreen = () => {
 
     // Subscribe to library updates
     const unsubscribe = catalogService.subscribeToLibraryUpdates(async (items) => {
+      // Sort by date added (most recent first)
+      const sortedItems = items.sort((a, b) => {
+        const timeA = (a as any).addedToLibraryAt || 0;
+        const timeB = (b as any).addedToLibraryAt || 0;
+        return timeB - timeA; // Descending order (newest first)
+      });
+      
       // Sync watched status on update
-      const updatedItems = await Promise.all(items.map(async (item) => {
+      const updatedItems = await Promise.all(sortedItems.map(async (item) => {
         // Map StreamingContent to LibraryItem shape
         const libraryItem: LibraryItem = {
           ...item,
@@ -312,7 +323,7 @@ const LibraryScreen = () => {
           traktId: typeof (item as any).traktId === 'number' ? (item as any).traktId : 0,
         };
         const key = `watched:${item.type}:${item.id}`;
-        const watched = await AsyncStorage.getItem(key);
+        const watched = await mmkvStorage.getItem(key);
         return {
           ...libraryItem,
           watched: watched === 'true'
@@ -349,41 +360,31 @@ const LibraryScreen = () => {
         id: 'watched',
         name: 'Watched',
         icon: 'visibility',
-        description: 'Your watched content',
         itemCount: (watchedMovies?.length || 0) + (watchedShows?.length || 0),
-        gradient: ['#2C3E50', '#34495E']
       },
       {
         id: 'continue-watching',
-        name: 'Continue Watching',
+        name: 'Continue',
         icon: 'play-circle-outline',
-        description: 'Resume your progress',
         itemCount: continueWatching?.length || 0,
-        gradient: ['#2980B9', '#3498DB']
       },
       {
         id: 'watchlist',
         name: 'Watchlist',
         icon: 'bookmark',
-        description: 'Want to watch',
         itemCount: (watchlistMovies?.length || 0) + (watchlistShows?.length || 0),
-        gradient: ['#6C3483', '#9B59B6']
       },
       {
         id: 'collection',
         name: 'Collection',
         icon: 'library-add',
-        description: 'Your collection',
         itemCount: (collectionMovies?.length || 0) + (collectionShows?.length || 0),
-        gradient: ['#1B2631', '#283747']
       },
       {
         id: 'ratings',
         name: 'Rated',
         icon: 'star',
-        description: 'Your ratings',
         itemCount: ratedContent?.length || 0,
-        gradient: ['#5D6D7E', '#85929E']
       }
     ];
 
@@ -403,11 +404,10 @@ const LibraryScreen = () => {
     >
       <View>
         <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}> 
-          <Image
+              <FastImage
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
-            contentFit="cover"
-            transition={300}
+            resizeMode={FastImage.resizeMode.cover}
           />
           {item.watched && (
             <View style={styles.watchedIndicator}>
@@ -425,7 +425,7 @@ const LibraryScreen = () => {
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}> 
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}> 
           {item.name}
         </Text>
       </View>
@@ -442,16 +442,13 @@ const LibraryScreen = () => {
       }}
       activeOpacity={0.7}
     >
-      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black }]}>
-        <LinearGradient
-          colors={folder.gradient}
-          style={styles.folderGradient}
-        >
+      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
+        <View style={styles.folderGradient}>
           <MaterialIcons 
             name={folder.icon} 
-            size={60} 
+            size={48} 
             color={currentTheme.colors.white} 
-            style={{ marginBottom: 12 }} 
+            style={{ marginBottom: 8 }} 
           />
           <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
             {folder.name}
@@ -459,10 +456,7 @@ const LibraryScreen = () => {
           <Text style={styles.folderCount}>
             {folder.itemCount} items
           </Text>
-          <Text style={styles.folderSubtitle}>
-            {folder.description}
-          </Text>
-        </LinearGradient>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -482,12 +476,9 @@ const LibraryScreen = () => {
       activeOpacity={0.7}
     >
       <View>
-        <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black }]}>
-          <LinearGradient
-            colors={['#666666', '#444444']}
-            style={styles.folderGradient}
-          >
-            <TraktIcon width={60} height={60} style={{ marginBottom: 12 }} />
+        <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
+          <View style={styles.folderGradient}>
+            <TraktIcon width={48} height={48} style={{ marginBottom: 8 }} />
             <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
               Trakt
             </Text>
@@ -496,14 +487,9 @@ const LibraryScreen = () => {
                 {traktFolders.length} items
               </Text>
             )}
-            {!traktAuthenticated && (
-              <Text style={styles.folderSubtitle}>
-                Tap to connect
-              </Text>
-            )}
-          </LinearGradient>
+          </View>
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.white }]}>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
           Trakt collections
         </Text>
       </View>
@@ -912,7 +898,14 @@ const LibraryScreen = () => {
   };
 
   const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  const topSpacing = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top;
+  // Tablet detection aligned with navigation tablet logic
+  const isTablet = useMemo(() => {
+    const smallestDimension = Math.min(width, height);
+    return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
+  }, [width, height]);
+  // Keep header below floating top navigator on tablets
+  const tabletNavOffset = isTablet ? 64 : 0;
+  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
   const headerHeight = headerBaseHeight + topSpacing;
 
   return (
@@ -958,8 +951,8 @@ const LibraryScreen = () => {
                   onPress={() => navigation.navigate('Calendar')}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons 
-                    name="event" 
+                  <Feather 
+                    name="calendar" 
                     size={24} 
                     color={currentTheme.colors.white} 
                   />
@@ -1002,11 +995,11 @@ const LibraryScreen = () => {
               case 'library': {
               try {
                 await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
-                Toast.info('Removed from Library');
+                showInfo('Removed from Library', 'Item removed from your library');
                 setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
                 setMenuVisible(false);
               } catch (error) {
-                Toast.error('Failed to update Library');
+                showError('Failed to update Library', 'Unable to remove item from library');
               }
               break;
               }
@@ -1015,8 +1008,8 @@ const LibraryScreen = () => {
                 // Use AsyncStorage to store watched status by key
                 const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                 const newWatched = !selectedItem.watched;
-                await AsyncStorage.setItem(key, newWatched ? 'true' : 'false');
-                Toast.info(newWatched ? 'Marked as Watched' : 'Marked as Unwatched');
+                await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
+                showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
                 // Instantly update local state
                 setLibraryItems(prev => prev.map(item =>
                 item.id === selectedItem.id && item.type === selectedItem.type
@@ -1024,7 +1017,7 @@ const LibraryScreen = () => {
                   : item
                 ));
               } catch (error) {
-                Toast.error('Failed to update watched status');
+                showError('Failed to update watched status', 'Unable to update watched status');
               }
               break;
               }
@@ -1084,7 +1077,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   filtersContainer: {
     flexDirection: 'row',
@@ -1116,7 +1109,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 16,
     paddingBottom: 90,
   },
@@ -1132,7 +1125,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   itemContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   posterContainer: {
     borderRadius: 12,
@@ -1143,6 +1136,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   poster: {
     width: '100%',
@@ -1194,8 +1189,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   cardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 4,
@@ -1276,27 +1272,29 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   folderTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   folderCount: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    color: 'rgba(255,255,255,0.8)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    marginBottom: 2,
   },
   folderSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    marginTop: 2,
   },
   backButton: {
     padding: 8,

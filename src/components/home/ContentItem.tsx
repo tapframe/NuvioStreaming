@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Toast } from 'toastify-react-native';
+import { useToast } from '../../contexts/ToastContext';
 import { DeviceEventEmitter } from 'react-native';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Animated, Share } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
-import { MaterialIcons } from '@expo/vector-icons';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share } from 'react-native';
+import FastImage from '@d11/react-native-fast-image';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { catalogService, StreamingContent } from '../../services/catalogService';
 import { DropUpMenu } from './DropUpMenu';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 import { storageService } from '../../services/storageService';
 import { TraktService } from '../../services/traktService';
+import { useTraktContext } from '../../contexts/TraktContext';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface ContentItemProps {
   item: StreamingContent;
@@ -21,21 +23,39 @@ interface ContentItemProps {
 
 const { width } = Dimensions.get('window');
 
+// Enhanced responsive breakpoints
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
+
+const getDeviceType = (screenWidth: number) => {
+  if (screenWidth >= BREAKPOINTS.tv) return 'tv';
+  if (screenWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+  if (screenWidth >= BREAKPOINTS.tablet) return 'tablet';
+  return 'phone';
+};
+
 // Dynamic poster calculation based on screen width - show 1/4 of next poster
 const calculatePosterLayout = (screenWidth: number) => {
-  // Detect if device is a tablet (width >= 768px is common tablet breakpoint)
-  const isTablet = screenWidth >= 768;
-
-  const MIN_POSTER_WIDTH = isTablet ? 140 : 100; // Bigger minimum for tablets
-  const MAX_POSTER_WIDTH = isTablet ? 180 : 130; // Bigger maximum for tablets
-  const LEFT_PADDING = 16; // Left padding
-  const SPACING = 8; // Space between posters
+  const deviceType = getDeviceType(screenWidth);
+  
+  // Responsive sizing based on device type
+  const MIN_POSTER_WIDTH = deviceType === 'tv' ? 180 : deviceType === 'largeTablet' ? 160 : deviceType === 'tablet' ? 140 : 100;
+  const MAX_POSTER_WIDTH = deviceType === 'tv' ? 220 : deviceType === 'largeTablet' ? 200 : deviceType === 'tablet' ? 180 : 130;
+  const LEFT_PADDING = deviceType === 'tv' ? 32 : deviceType === 'largeTablet' ? 28 : deviceType === 'tablet' ? 24 : 16;
+  const SPACING = deviceType === 'tv' ? 12 : deviceType === 'largeTablet' ? 10 : deviceType === 'tablet' ? 8 : 8;
 
   // Calculate available width for posters (reserve space for left padding)
   const availableWidth = screenWidth - LEFT_PADDING;
 
   // Try different numbers of full posters to find the best fit
-  let bestLayout = { numFullPosters: 3, posterWidth: isTablet ? 160 : 120 };
+  let bestLayout = { 
+    numFullPosters: 3, 
+    posterWidth: deviceType === 'tv' ? 200 : deviceType === 'largeTablet' ? 180 : deviceType === 'tablet' ? 160 : 120 
+  };
 
   for (let n = 3; n <= 6; n++) {
     // Calculate poster width needed for N full posters + 0.25 partial poster
@@ -61,8 +81,6 @@ const calculatePosterLayout = (screenWidth: number) => {
 const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
-const PLACEHOLDER_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';
-
 const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
@@ -79,7 +97,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     // Load watched state from AsyncStorage when item changes
   useEffect(() => {
     const updateWatched = () => {
-      AsyncStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setIsWatched(val === 'true'));
+      mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then((val: string | null) => setIsWatched(val === 'true'));
     };
     updateWatched();
     const sub = DeviceEventEmitter.addListener('watchedStatusChanged', updateWatched);
@@ -88,24 +106,36 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
+
+  // Trakt integration
+  const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
+
+  useEffect(() => {
+    // Reset image error state when item changes, allowing for retry on re-render
+    setImageError(false);
+  }, [item.id, item.poster]);
+
   const { currentTheme } = useTheme();
   const { settings, isLoaded } = useSettings();
+  const { showSuccess, showInfo } = useToast();
   const posterRadius = typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12;
-  const fadeInOpacity = React.useRef(new Animated.Value(0)).current;
   // Memoize poster width calculation to avoid recalculating on every render
   const posterWidth = React.useMemo(() => {
+    const deviceType = getDeviceType(width);
+    const sizeMultiplier = deviceType === 'tv' ? 1.2 : deviceType === 'largeTablet' ? 1.1 : deviceType === 'tablet' ? 1.0 : 0.9;
+    
     switch (settings.posterSize) {
       case 'small':
-        return Math.max(100, Math.min(POSTER_WIDTH - 10, POSTER_WIDTH));
+        return Math.max(90, POSTER_WIDTH - 15) * sizeMultiplier;
+      case 'medium':
+        return Math.max(110, POSTER_WIDTH + 10) * sizeMultiplier;
       case 'large':
-        return Math.min(POSTER_WIDTH + 20, POSTER_WIDTH + 30);
+        return Math.max(130, POSTER_WIDTH + 25) * sizeMultiplier;
       default:
-        return POSTER_WIDTH;
+        return POSTER_WIDTH * sizeMultiplier;
     }
-  }, [settings.posterSize]);
+  }, [settings.posterSize, width]);
 
   // Intersection observer simulation for lazy loading
   const itemRef = useRef<View>(null);
@@ -115,7 +145,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   }, []);
 
   const handlePress = useCallback(() => {
-    onPress(item.id, item.type);
+    // Validate ID before pressing to prevent errors with NaN/undefined IDs
+    if (item.id && item.id !== 'NaN' && item.id !== 'undefined') {
+      onPress(item.id, item.type);
+    }
   }, [item.id, item.type, onPress]);
 
   const handleOptionSelect = useCallback(async (option: string) => {
@@ -123,19 +156,19 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
-          Toast.info('Removed from Library');
+          showInfo('Removed from Library', 'Removed from your local library');
         } else {
           catalogService.addToLibrary(item);
-          Toast.success('Added to Library');
+          showSuccess('Added to Library', 'Added to your local library');
         }
         break;
       case 'watched': {
         const targetWatched = !isWatched;
         setIsWatched(targetWatched);
         try {
-          await AsyncStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
+          await mmkvStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
         } catch {}
-        Toast.info(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched');
+        showInfo(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched', targetWatched ? 'Item marked as watched' : 'Item marked as unwatched');
         setTimeout(() => {
           DeviceEventEmitter.emit('watchedStatusChanged');
         }, 100);
@@ -178,8 +211,30 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         Share.share({ message, url, title: item.name });
         break;
       }
+      case 'trakt-watchlist': {
+        if (isInWatchlist(item.id, item.type as 'movie' | 'show')) {
+          await removeFromWatchlist(item.id, item.type as 'movie' | 'show');
+          showInfo('Removed from Watchlist', 'Removed from your Trakt watchlist');
+        } else {
+          await addToWatchlist(item.id, item.type as 'movie' | 'show');
+          showSuccess('Added to Watchlist', 'Added to your Trakt watchlist');
+        }
+        setMenuVisible(false);
+        break;
+      }
+      case 'trakt-collection': {
+        if (isInCollection(item.id, item.type as 'movie' | 'show')) {
+          await removeFromCollection(item.id, item.type as 'movie' | 'show');
+          showInfo('Removed from Collection', 'Removed from your Trakt collection');
+        } else {
+          await addToCollection(item.id, item.type as 'movie' | 'show');
+          showSuccess('Added to Collection', 'Added to your Trakt collection');
+        }
+        setMenuVisible(false);
+        break;
+      }
     }
-  }, [item, inLibrary, isWatched]);
+  }, [item, inLibrary, isWatched, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, showSuccess, showInfo]);
 
   const handleMenuClose = useCallback(() => {
     setMenuVisible(false);
@@ -192,11 +247,6 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
     }
 
-    // If we've had an error, try metahub fallback
-    if (retryCount > 0 && !item.poster.includes('metahub.space')) {
-      return `https://images.metahub.space/poster/small/${item.id}/img`;
-    }
-
     // For TMDB images, use smaller sizes
     if (item.poster.includes('image.tmdb.org')) {
       // Replace any size with w154 (fits 100-130px tiles perfectly)
@@ -204,20 +254,13 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     }
 
     // For metahub images, use smaller sizes
-    if (item.poster.includes('images.metahub.space')) {
+    if (item.poster.includes('placeholder')) {
       return item.poster.replace('/medium/', '/small/');
     }
 
     // Return original URL for other sources to avoid breaking them
     return item.poster;
-  }, [item.poster, retryCount, item.id]);
-
-  // Avoid strong fade animations that can appear as flicker on mount/scroll
-  useEffect(() => {
-    if (isLoaded) {
-      fadeInOpacity.setValue(1);
-    }
-  }, [isLoaded, fadeInOpacity]);
+  }, [item.poster, item.id]);
 
   // While settings load, render a placeholder with reserved space (poster aspect + title)
   if (!isLoaded) {
@@ -242,7 +285,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   return (
     <>
-      <Animated.View style={[styles.itemContainer, { width: posterWidth, opacity: fadeInOpacity }]}> 
+      <Animated.View style={[styles.itemContainer, { width: posterWidth }]} entering={FadeIn.duration(300)}> 
         <TouchableOpacity
           style={[styles.contentItem, { width: posterWidth, borderRadius: posterRadius }]}
           activeOpacity={0.7}
@@ -251,33 +294,23 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
           delayLongPress={300}
         >
           <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
-            {/* Image with lightweight placeholder to reduce flicker */}
+            {/* Image with FastImage for aggressive caching */}
             {item.poster ? (
-              <ExpoImage
-                source={{ uri: optimizedPosterUrl }}
+              <FastImage
+                source={{ 
+                  uri: optimizedPosterUrl,
+                  priority: FastImage.priority.normal,
+                  cache: FastImage.cacheControl.immutable
+                }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
-                contentFit="cover"
-                cachePolicy={Platform.OS === 'android' ? 'disk' : 'memory-disk'}
-                transition={0}
-                allowDownscaling
-                priority="normal" // Normal priority for horizontal scrolling
+                resizeMode={FastImage.resizeMode.cover}
                 onLoad={() => {
-                  setImageLoaded(true);
                   setImageError(false);
                 }}
-                onError={(error) => {
-                  if (__DEV__) console.warn('Image load error for:', item.poster, error);
-                  // Try fallback URL on first error
-                  if (retryCount === 0 && item.poster && !item.poster.includes('metahub.space')) {
-                    setRetryCount(1);
-                    // Don't set error state yet, let it try the fallback
-                    return;
-                  }
+                onError={() => {
+                  if (__DEV__) console.warn('Image load error for:', item.poster);
                   setImageError(true);
-                  setImageLoaded(false);
                 }}
-                recyclingKey={item.id} // Add recycling key for better performance
-                placeholder={PLACEHOLDER_BLURHASH}
               />
             ) : (
               // Show placeholder for items without posters
@@ -299,13 +332,32 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
             )}
             {inLibrary && (
               <View style={styles.libraryBadge}>
-                <MaterialIcons name="bookmark" size={16} color={currentTheme.colors.white} />
+                <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
+              </View>
+            )}
+            {isAuthenticated && isInWatchlist(item.id, item.type as 'movie' | 'show') && (
+              <View style={styles.traktWatchlistIcon}>
+                <MaterialIcons name="playlist-add-check" size={16} color="#E74C3C" />
+              </View>
+            )}
+            {isAuthenticated && isInCollection(item.id, item.type as 'movie' | 'show') && (
+              <View style={styles.traktCollectionIcon}>
+                <MaterialIcons name="video-library" size={16} color="#3498DB" />
               </View>
             )}
           </View>
         </TouchableOpacity>
         {settings.showPosterTitles && (
-          <Text style={[styles.title, { color: currentTheme.colors.text }]} numberOfLines={2}>
+          <Text 
+            style={[
+              styles.title, 
+              { 
+                color: currentTheme.colors.mediumEmphasis,
+                fontSize: getDeviceType(width) === 'tv' ? 16 : getDeviceType(width) === 'largeTablet' ? 15 : getDeviceType(width) === 'tablet' ? 14 : 13
+              }
+            ]} 
+            numberOfLines={2}
+          >
             {item.name}
           </Text>
         )}
@@ -339,8 +391,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 1,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
     marginBottom: 8,
   },
   contentItemContainer: {
@@ -379,8 +431,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 4,
   },
+  traktWatchlistIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 2,
+  },
+  traktCollectionIcon: {
+    position: 'absolute',
+    top: 8,
+    right: 32, // Positioned to the left of watchlist icon
+    padding: 2,
+  },
   title: {
-    fontSize: 13,
+    fontSize: 13, // Will be overridden responsively
     fontWeight: '500',
     marginTop: 4,
     textAlign: 'center',
@@ -388,7 +452,7 @@ const styles = StyleSheet.create({
 });
 
 export default React.memo(ContentItem, (prev, next) => {
-  // Re-render when identity changes or poster changes
+  // Re-render when identity or poster changes. Caching is handled by FastImage.
   if (prev.item.id !== next.item.id) return false;
   if (prev.item.poster !== next.item.poster) return false;
   return true;

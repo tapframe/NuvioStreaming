@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import * as Updates from 'expo-updates';
 import { getDisplayedAppVersion } from '../utils/version';
 import { fetchLatestGithubRelease, isAnyUpgrade } from '../services/githubReleaseService';
@@ -29,7 +29,7 @@ export function useGithubMajorUpdate(): MajorUpdateData {
       const info = await fetchLatestGithubRelease();
       if (!info?.tag_name) return;
 
-      const dismissed = await AsyncStorage.getItem(DISMISSED_KEY);
+      const dismissed = await mmkvStorage.getItem(DISMISSED_KEY);
       if (dismissed === info.tag_name) return;
 
       // "Later" is session-only now, no persisted snooze
@@ -51,7 +51,7 @@ export function useGithubMajorUpdate(): MajorUpdateData {
   }, [check]);
 
   const onDismiss = useCallback(async () => {
-    if (latestTag) await AsyncStorage.setItem(DISMISSED_KEY, latestTag);
+    if (latestTag) await mmkvStorage.setItem(DISMISSED_KEY, latestTag);
     setVisible(false);
   }, [latestTag]);
 

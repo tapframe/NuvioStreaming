@@ -7,7 +7,17 @@ export const RESUME_PREF = {
 };
 
 export const SUBTITLE_SIZE_KEY = '@subtitle_size_preference';
-export const DEFAULT_SUBTITLE_SIZE = 16;
+
+// Helper function to get responsive subtitle size based on screen width
+export const getDefaultSubtitleSize = (screenWidth: number): number => {
+  if (screenWidth >= 1440) return 65; // TV
+  if (screenWidth >= 1024) return 55; // Large tablet
+  if (screenWidth >= 768) return 45;  // Tablet
+  return 30; // Phone
+};
+
+// Keep the constant for backward compatibility, using phone size as base
+export const DEFAULT_SUBTITLE_SIZE = 30;
 
 // Define the TrackPreferenceType for audio/text tracks
 export type TrackPreferenceType = 'system' | 'disabled' | 'title' | 'language' | 'index';
@@ -52,8 +62,8 @@ export interface TextTrack {
 }
 
 // Define the possible resize modes - force to stretch for absolute full screen
-export type ResizeModeType = 'contain' | 'cover' | 'fill' | 'none' | 'stretch';
-export const resizeModes: ResizeModeType[] = ['stretch']; // Force stretch mode for absolute full screen
+export type ResizeModeType = 'contain' | 'cover' | 'none';
+export const resizeModes: ResizeModeType[] = ['cover']; // Force cover mode for absolute full screen
 
 // Add VLC specific interface for their event structure
 export interface VlcMediaEvent {
@@ -67,10 +77,23 @@ export interface VlcMediaEvent {
   selectedTextTrack?: number;
 }
 
+export interface SubtitleSegment {
+  text: string;
+  italic?: boolean;
+  bold?: boolean;
+  underline?: boolean;
+  color?: string;
+  fontName?: string;
+}
+
 export interface SubtitleCue {
   start: number;
   end: number;
   text: string;
+  // New fields for advanced features
+  formattedSegments?: SubtitleSegment[]; // Rich text with formatting
+  position?: { x?: number; y?: number; align?: string }; // Position tags
+  rawText?: string; // Original text before processing
 }
 
 // Add interface for Wyzie subtitle API response

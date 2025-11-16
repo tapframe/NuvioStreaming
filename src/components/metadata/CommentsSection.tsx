@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useRef } from 'react';
+import React, { useCallback, useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,13 @@ import { useTraktComments } from '../../hooks/useTraktComments';
 import { useSettings } from '../../hooks/useSettings';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
-const { width } = Dimensions.get('window');
+// Enhanced responsive breakpoints for Comments Section
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
 
 interface CommentsSectionProps {
   imdbId: string;
@@ -191,6 +197,64 @@ const CompactCommentCard: React.FC<{
     }).start();
   }, [fadeInOpacity]);
 
+  // Enhanced responsive sizing for tablets and TV screens
+  const deviceWidth = Dimensions.get('window').width;
+  const deviceHeight = Dimensions.get('window').height;
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced comment card sizing
+  const commentCardWidth = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 360;
+      case 'largeTablet':
+        return 320;
+      case 'tablet':
+        return 300;
+      default:
+        return 280; // phone
+    }
+  }, [deviceType]);
+  
+  const commentCardHeight = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 200;
+      case 'largeTablet':
+        return 185;
+      case 'tablet':
+        return 175;
+      default:
+        return 170; // phone
+    }
+  }, [deviceType]);
+  
+  const commentCardSpacing = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 16;
+      case 'largeTablet':
+        return 14;
+      case 'tablet':
+        return 12;
+      default:
+        return 12; // phone
+    }
+  }, [deviceType]);
+
   // Safety check - ensure comment data exists
   if (!comment || !comment.comment) {
     return null;
@@ -272,6 +336,11 @@ const CompactCommentCard: React.FC<{
           borderColor: theme.colors.border,
           opacity: fadeInOpacity,
           transform: isPressed ? [{ scale: 0.98 }] : [{ scale: 1 }],
+          width: commentCardWidth,
+          height: commentCardHeight,
+          marginRight: commentCardSpacing,
+          padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+          borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
         },
       ]}
     >
@@ -287,18 +356,41 @@ const CompactCommentCard: React.FC<{
       >
       {/* Trakt Icon - Top Right Corner */}
       <View style={styles.traktIconContainer}>
-        <TraktIcon width={16} height={16} />
+        <TraktIcon width={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} height={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} />
       </View>
 
       {/* Header Section - Fixed at top */}
-      <View style={styles.compactHeader}>
+      <View style={[
+        styles.compactHeader,
+        {
+          marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
+        }
+      ]}>
         <View style={styles.usernameContainer}>
-          <Text style={[styles.compactUsername, { color: theme.colors.highEmphasis }]}>
+          <Text style={[
+            styles.compactUsername, 
+            { 
+              color: theme.colors.highEmphasis,
+              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 16
+            }
+          ]}>
             {username}
           </Text>
           {user.vip && (
-            <View style={styles.miniVipBadge}>
-              <Text style={styles.miniVipText}>VIP</Text>
+            <View style={[
+              styles.miniVipBadge,
+              {
+                paddingHorizontal: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4,
+                paddingVertical: isTV ? 2 : isLargeTablet ? 2 : isTablet ? 1 : 1,
+                borderRadius: isTV ? 8 : isLargeTablet ? 7 : isTablet ? 6 : 6
+              }
+            ]}>
+              <Text style={[
+                styles.miniVipText,
+                {
+                  fontSize: isTV ? 11 : isLargeTablet ? 10 : isTablet ? 9 : 9
+                }
+              ]}>VIP</Text>
             </View>
           )}
         </View>
@@ -306,48 +398,107 @@ const CompactCommentCard: React.FC<{
 
       {/* Rating - Show stars */}
       {comment.user_stats?.rating && (
-        <View style={styles.compactRating}>
+        <View style={[
+          styles.compactRating,
+          {
+            marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
+          }
+        ]}>
           {renderCompactStars(comment.user_stats.rating)}
-          <Text style={[styles.compactRatingText, { color: theme.colors.mediumEmphasis }]}>
+          <Text style={[
+            styles.compactRatingText, 
+            { 
+              color: theme.colors.mediumEmphasis,
+              fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
+            }
+          ]}>
             {comment.user_stats.rating}/10
           </Text>
         </View>
       )}
 
       {/* Comment Preview - Flexible area that fills space */}
-      <View style={[styles.commentContainer, shouldBlurContent ? styles.blurredContent : undefined]}>
+      <View style={[
+        styles.commentContainer, 
+        shouldBlurContent ? styles.blurredContent : undefined,
+        {
+          marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
+        }
+      ]}>
         {shouldBlurContent ? (
-          <Text style={[styles.compactComment, { color: theme.colors.highEmphasis }]}>⚠️ This comment contains spoilers. Tap to reveal.</Text>
+          <Text style={[
+            styles.compactComment, 
+            { 
+              color: theme.colors.highEmphasis,
+              fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+              lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18
+            }
+          ]}>⚠️ This comment contains spoilers. Tap to reveal.</Text>
         ) : (
           <MarkdownText
             text={comment.comment}
             theme={theme}
-            numberOfLines={3}
+            numberOfLines={isLargeScreen ? 4 : 3}
             revealedInlineSpoilers={isSpoilerRevealed}
             onSpoilerPress={onSpoilerPress}
-            textStyle={styles.compactComment}
+            textStyle={[
+              styles.compactComment,
+              {
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18
+              }
+            ]}
           />
         )}
       </View>
 
       {/* Meta Info - Fixed at bottom */}
-      <View style={styles.compactMeta}>
+      <View style={[
+        styles.compactMeta,
+        {
+          paddingTop: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 6 : 6
+        }
+      ]}>
         <View style={styles.compactBadges}>
           {comment.spoiler && (
-            <Text style={[styles.spoilerMiniText, { color: theme.colors.error }]}>Spoiler</Text>
+            <Text style={[
+              styles.spoilerMiniText, 
+              { 
+                color: theme.colors.error,
+                fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11
+              }
+            ]}>Spoiler</Text>
           )}
         </View>
         <View style={styles.compactStats}>
-          <Text style={[styles.compactTime, { color: theme.colors.mediumEmphasis }]}>
+          <Text style={[
+            styles.compactTime, 
+            { 
+              color: theme.colors.mediumEmphasis,
+              fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11
+            }
+          ]}>
             {formatRelativeTime(comment.created_at)}
           </Text>
           {comment.likes > 0 && (
-            <Text style={[styles.compactStat, { color: theme.colors.mediumEmphasis }]}>
+            <Text style={[
+              styles.compactStat, 
+              { 
+                color: theme.colors.mediumEmphasis,
+                fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 12 : 12
+              }
+            ]}>
               👍 {comment.likes}
             </Text>
           )}
           {comment.replies > 0 && (
-            <Text style={[styles.compactStat, { color: theme.colors.mediumEmphasis }]}>
+            <Text style={[
+              styles.compactStat, 
+              { 
+                color: theme.colors.mediumEmphasis,
+                fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 12 : 12
+              }
+            ]}>
               💬 {comment.replies}
             </Text>
           )}
@@ -578,6 +729,38 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   const { settings } = useSettings();
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
 
+  // Enhanced responsive sizing for tablets and TV screens
+  const deviceWidth = Dimensions.get('window').width;
+  const deviceHeight = Dimensions.get('window').height;
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced spacing and padding
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
+
   const {
     comments,
     loading,
@@ -640,7 +823,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       <View style={styles.emptyContainer}>
         <MaterialIcons name="chat-bubble-outline" size={48} color={currentTheme.colors.mediumEmphasis} />
         <Text style={[styles.emptyText, { color: currentTheme.colors.mediumEmphasis }]}>
-          {error ? 'Comments unavailable' : 'No comments yet'}
+          {error ? 'Comments unavailable' : 'No comments on Trakt yet'}
         </Text>
         <Text style={[styles.emptySubtext, { color: currentTheme.colors.disabled }]}>
           {error
@@ -654,41 +837,66 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
 
   const renderSkeletons = useCallback(() => {
     const placeholders = [0, 1, 2];
+    // Responsive skeleton sizes to match CompactCommentCard
+    const skWidth = isTV ? 360 : isLargeTablet ? 320 : isTablet ? 300 : 280;
+    const skHeight = isTV ? 200 : isLargeTablet ? 185 : isTablet ? 175 : 170;
+    const skPad = isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12;
+    const gap = isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12;
+    const headLineWidth = isTV ? 160 : isLargeTablet ? 140 : isTablet ? 130 : 120;
+    const ratingWidth = isTV ? 100 : isLargeTablet ? 90 : isTablet ? 85 : 80;
+    const statWidth = isTV ? 44 : isLargeTablet ? 40 : isTablet ? 38 : 36;
+    const badgeW = isTV ? 60 : isLargeTablet ? 56 : isTablet ? 52 : 50;
+    const badgeH = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+
     return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalList}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.horizontalList, { paddingRight: gap }]}>
         {placeholders.map((i) => (
-          <View key={`skeleton-${i}`} style={[styles.compactCard, { backgroundColor: currentTheme.colors.card, borderColor: currentTheme.colors.border }]}>
+          <View
+            key={`skeleton-${i}`}
+            style={[
+              styles.compactCard,
+              {
+                backgroundColor: currentTheme.colors.card,
+                borderColor: currentTheme.colors.border,
+                width: skWidth,
+                height: skHeight,
+                marginRight: gap,
+                padding: skPad,
+                borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+              },
+            ]}
+          >
             <View style={styles.skeletonTraktContainer}>
-              <View style={[styles.skeletonDot]} />
+              <View style={[styles.skeletonDot, { width: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16, height: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16, borderRadius: isTV ? 10 : isLargeTablet ? 9 : 8 }]} />
             </View>
 
-            <View style={styles.compactHeader}>
-              <View style={[styles.skeletonLine, { width: 120 }]} />
-              <View style={[styles.miniVipBadge, styles.skeletonBadge]} />
+            <View style={[styles.compactHeader, { marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8 }]}>
+              <View style={[styles.skeletonLine, { width: headLineWidth, height: isTV ? 14 : 12 }]} />
+              <View style={[styles.miniVipBadge, styles.skeletonBadge, { width: isTV ? 36 : isLargeTablet ? 32 : isTablet ? 28 : 24, height: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12, borderRadius: isTV ? 10 : isLargeTablet ? 9 : 8 }]} />
             </View>
 
-            <View style={styles.compactRating}>
-              <View style={[styles.skeletonLine, { width: 80, height: 10 }]} />
+            <View style={[styles.compactRating, { marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8 }]}>
+              <View style={[styles.skeletonLine, { width: ratingWidth, height: isTV ? 12 : 10 }]} />
             </View>
 
-            <View style={styles.commentContainer}>
-              <View style={[styles.skeletonLine, { width: '95%' }]} />
-              <View style={[styles.skeletonLine, { width: '90%', marginTop: 6 }]} />
-              <View style={[styles.skeletonLine, { width: '70%', marginTop: 6 }]} />
+            <View style={[styles.commentContainer, { marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8 }]}>
+              <View style={[styles.skeletonLine, { width: '95%', height: isTV ? 14 : 12 }]} />
+              <View style={[styles.skeletonLine, { width: '90%', height: isTV ? 14 : 12, marginTop: 6 }]} />
+              <View style={[styles.skeletonLine, { width: '70%', height: isTV ? 14 : 12, marginTop: 6 }]} />
             </View>
 
-            <View style={styles.compactMeta}>
-              <View style={[styles.skeletonBadge, { width: 50, height: 12, borderRadius: 6 }]} />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={[styles.skeletonLine, { width: 36, height: 10 }]} />
-                <View style={[styles.skeletonLine, { width: 36, height: 10 }]} />
+            <View style={[styles.compactMeta, { paddingTop: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 6 : 6 }]}>
+              <View style={[styles.skeletonBadge, { width: badgeW, height: badgeH, borderRadius: Math.min(6, badgeH / 2) }]} />
+              <View style={{ flexDirection: 'row', gap }}>
+                <View style={[styles.skeletonLine, { width: statWidth, height: isTV ? 12 : 10 }]} />
+                <View style={[styles.skeletonLine, { width: statWidth, height: isTV ? 12 : 10 }]} />
               </View>
             </View>
           </View>
         ))}
       </ScrollView>
     );
-  }, [currentTheme]);
+  }, [currentTheme, isTV, isLargeTablet, isTablet]);
 
   // Don't show section if not authenticated, if comments are disabled in settings, or if still checking authentication
   // Only show when authentication is definitively true and settings allow it
@@ -705,9 +913,23 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]}>
+    <View style={[
+      styles.container,
+      { paddingHorizontal: horizontalPadding }
+    ]}>
+      <View style={[
+        styles.header,
+        {
+          marginBottom: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
+        }
+      ]}>
+        <Text style={[
+          styles.title, 
+          { 
+            color: currentTheme.colors.highEmphasis,
+            fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 20
+          }
+        ]}>
           Trakt Comments
         </Text>
       </View>
@@ -729,13 +951,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         </View>
       )}
 
-      {loading && comments.length === 0 && renderSkeletons()}
+      {loading && Array.isArray(comments) && comments.length === 0 && renderSkeletons()}
 
-      {(!loading && comments.length === 0 && hasLoadedOnce && !error) && (
+      {(!loading && Array.isArray(comments) && comments.length === 0 && hasLoadedOnce && !error) && (
         renderEmpty()
       )}
 
-      {comments.length > 0 && (
+      {Array.isArray(comments) && comments.length > 0 && (
         <Animated.FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -744,11 +966,14 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
           renderItem={renderComment}
           contentContainerStyle={styles.horizontalList}
           removeClippedSubviews={false}
-          getItemLayout={(data, index) => ({
-            length: 292, // width + marginRight
-            offset: 292 * index,
-            index,
-          })}
+          getItemLayout={(data, index) => {
+            const itemWidth = isTV ? 376 : isLargeTablet ? 334 : isTablet ? 312 : 292; // width + marginRight
+            return {
+              length: itemWidth,
+              offset: itemWidth * index,
+              index,
+            };
+          }}
           onEndReached={() => {
             if (hasMore && !loading) {
               loadMore();
@@ -991,7 +1216,6 @@ export const CommentBottomSheet: React.FC<{
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
     marginBottom: 24,
   },
   header: {
@@ -1008,11 +1232,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   compactCard: {
-    width: 280,
-    height: 170,
-    padding: 12,
     paddingBottom: 16,
-    marginRight: 12,
     borderRadius: 12,
     borderWidth: 1,
     shadowColor: '#000',

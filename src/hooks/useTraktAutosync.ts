@@ -35,6 +35,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
   const hasStartedWatching = useRef(false);
   const hasStopped = useRef(false); // New: Track if we've already stopped for this session
   const isSessionComplete = useRef(false); // New: Track if session is completely finished (scrobbled)
+  const isUnmounted = useRef(false); // New: Track if component has unmounted
   const lastSyncTime = useRef(0);
   const lastSyncProgress = useRef(0);
   const sessionKey = useRef<string | null>(null);
@@ -43,21 +44,23 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
   
   // Generate a unique session key for this content instance
   useEffect(() => {
-    const contentKey = options.type === 'movie' 
+    const contentKey = options.type === 'movie'
       ? `movie:${options.imdbId}`
-      : `episode:${options.imdbId}:${options.season}:${options.episode}`;
+      : `episode:${options.showImdbId || options.imdbId}:${options.season}:${options.episode}`;
     sessionKey.current = `${contentKey}:${Date.now()}`;
     
     // Reset all session state for new content
     hasStartedWatching.current = false;
     hasStopped.current = false;
     isSessionComplete.current = false;
+    isUnmounted.current = false; // Reset unmount flag for new mount
     lastStopCall.current = 0;
     
     logger.log(`[TraktAutosync] Session started for: ${sessionKey.current}`);
     
     return () => {
       unmountCount.current++;
+      isUnmounted.current = true; // Mark as unmounted to prevent post-unmount operations
       logger.log(`[TraktAutosync] Component unmount #${unmountCount.current} for: ${sessionKey.current}`);
     };
   }, [options.imdbId, options.season, options.episode, options.type]);
@@ -104,8 +107,10 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
   // Start watching (scrobble start)
   const handlePlaybackStart = useCallback(async (currentTime: number, duration: number) => {
+    if (isUnmounted.current) return; // Prevent execution after component unmount
+
     logger.log(`[TraktAutosync] handlePlaybackStart called: time=${currentTime}, duration=${duration}, authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, alreadyStarted=${hasStartedWatching.current}, alreadyStopped=${hasStopped.current}, sessionComplete=${isSessionComplete.current}, session=${sessionKey.current}`);
-    
+
     if (!isAuthenticated || !autosyncSettings.enabled) {
       logger.log(`[TraktAutosync] Skipping handlePlaybackStart: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
       return;
@@ -134,7 +139,9 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
 
     try {
-      const progressPercent = (currentTime / duration) * 100;
+      // Clamp progress between 0 and 100
+      const rawProgress = (currentTime / duration) * 100;
+      const progressPercent = Math.min(100, Math.max(0, rawProgress));
       const contentData = buildContentData();
       
       const success = await startWatching(contentData, progressPercent);
@@ -154,6 +161,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     duration: number,
     force: boolean = false
   ) => {
+    if (isUnmounted.current) return; // Prevent execution after component unmount
+
     if (!isAuthenticated || !autosyncSettings.enabled || duration <= 0) {
       return;
     }
@@ -164,7 +173,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
 
     try {
-      const progressPercent = (currentTime / duration) * 100;
+      const rawProgress = (currentTime / duration) * 100;
+      const progressPercent = Math.min(100, Math.max(0, rawProgress));
       const now = Date.now();
 
       // IMMEDIATE SYNC: Use immediate method for user-triggered actions (force=true)
@@ -196,8 +206,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         // BACKGROUND: Periodic sync - use queued method
         const progressDiff = Math.abs(progressPercent - lastSyncProgress.current);
 
-        // Only skip if not forced and progress difference is minimal (< 1%)
-        if (progressDiff < 1) {
+        // Only skip if not forced and progress difference is minimal (< 0.5%)
+        if (progressDiff < 0.5) {
           return;
         }
 
@@ -228,6 +238,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
   // Handle playback end/pause
   const handlePlaybackEnd = useCallback(async (currentTime: number, duration: number, reason: 'ended' | 'unmount' | 'user_close' = 'ended') => {
+    if (isUnmounted.current) return; // Prevent execution after component unmount
+
     const now = Date.now();
 
     // Removed excessive logging for handlePlaybackEnd calls
@@ -265,8 +277,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     let useImmediate = reason === 'user_close';
 
     // IMMEDIATE SYNC: Remove debouncing for instant sync when closing
-    // Only prevent truly duplicate calls (within 1 second for regular, 200ms for immediate)
-    const debounceThreshold = useImmediate ? 200 : 1000;
+    // Only prevent truly duplicate calls (within 500ms for regular, 100ms for immediate)
+    const debounceThreshold = useImmediate ? 100 : 500;
     if (!isSignificantUpdate && now - lastStopCall.current < debounceThreshold) {
       logger.log(`[TraktAutosync] Ignoring duplicate stop call within ${debounceThreshold}ms (reason: ${reason})`);
       return;
@@ -280,6 +292,8 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
     try {
       let progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+      // Clamp progress between 0 and 100
+      progressPercent = Math.min(100, Math.max(0, progressPercent));
       // Initial progress calculation logging removed
 
       // For unmount calls, always use the highest available progress
@@ -301,7 +315,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           );
 
           if (savedProgress && savedProgress.duration > 0) {
-            const savedProgressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
+            const savedProgressPercent = Math.min(100, Math.max(0, (savedProgress.currentTime / savedProgress.duration) * 100));
             if (savedProgressPercent > maxProgress) {
               maxProgress = savedProgressPercent;
             }
@@ -334,11 +348,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         return;
       }
 
-      // For natural end events, always set progress to at least 90%
-      if (reason === 'ended' && progressPercent < 90) {
-        logger.log(`[TraktAutosync] Natural end detected but progress is low (${progressPercent.toFixed(1)}%), boosting to 90%`);
-        progressPercent = 90;
-      }
+      // Note: No longer boosting progress since Trakt API handles 80% threshold correctly
 
       // Mark stop attempt and update timestamp
       lastStopCall.current = now;
@@ -362,10 +372,29 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           currentTime
         );
 
-        // Mark session as complete if high progress (scrobbled)
-        if (progressPercent >= 80) {
+        // Mark session as complete if >= user completion threshold
+        if (progressPercent >= autosyncSettings.completionThreshold) {
           isSessionComplete.current = true;
           logger.log(`[TraktAutosync] Session marked as complete (scrobbled) at ${progressPercent.toFixed(1)}%`);
+
+          // Ensure local watch progress reflects completion so UI shows as watched
+          try {
+            if (duration > 0) {
+              await storageService.setWatchProgress(
+                options.id,
+                options.type,
+                {
+                  currentTime: duration,
+                  duration,
+                  lastUpdated: Date.now(),
+                  traktSynced: true,
+                  traktProgress: Math.max(progressPercent, 100),
+                } as any,
+                options.episodeId,
+                { forceNotify: true }
+              );
+            }
+          } catch {}
         }
 
         logger.log(`[TraktAutosync] ${useImmediate ? 'IMMEDIATE: ' : ''}Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
@@ -395,6 +424,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     hasStartedWatching.current = false;
     hasStopped.current = false;
     isSessionComplete.current = false;
+    isUnmounted.current = false;
     lastSyncTime.current = 0;
     lastSyncProgress.current = 0;
     unmountCount.current = 0;

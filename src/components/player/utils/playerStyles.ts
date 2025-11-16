@@ -1,4 +1,38 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
+
+const deviceWidth = Dimensions.get('window').width;
+const BREAKPOINTS = { phone: 0, tablet: 768, largeTablet: 1024, tv: 1440 } as const;
+const getDeviceType = (w: number) => {
+  if (w >= BREAKPOINTS.tv) return 'tv';
+  if (w >= BREAKPOINTS.largeTablet) return 'largeTablet';
+  if (w >= BREAKPOINTS.tablet) return 'tablet';
+  return 'phone';
+};
+const deviceType = getDeviceType(deviceWidth);
+const isTablet = deviceType === 'tablet';
+const isLargeTablet = deviceType === 'largeTablet';
+const isTV = deviceType === 'tv';
+
+// Scales for larger displays
+const padH = isTV ? 28 : isLargeTablet ? 24 : isTablet ? 20 : 20;
+const padV = isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16;
+const titleFont = isTV ? 28 : isLargeTablet ? 24 : isTablet ? 22 : 18;
+const episodeInfoFont = isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14;
+const metadataFont = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+const qualityPadH = isTV ? 10 : isLargeTablet ? 9 : isTablet ? 8 : 8;
+const qualityPadV = isTV ? 4 : isLargeTablet ? 3 : isTablet ? 3 : 2;
+const qualityRadius = isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4;
+const qualityTextFont = isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11;
+const controlsGap = isTV ? 56 : isLargeTablet ? 48 : isTablet ? 44 : 40;
+const controlsTranslateY = isTV ? -48 : isLargeTablet ? -42 : isTablet ? -36 : -30;
+const skipTextFont = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+const sliderBottom = isTV ? 60 : isLargeTablet ? 50 : isTablet ? 45 : 35;
+const progressTouchHeight = isTV ? 48 : isLargeTablet ? 44 : isTablet ? 40 : 40;
+const progressBarHeight = isTV ? 6 : isLargeTablet ? 5 : isTablet ? 5 : 4;
+const progressThumbSize = isTV ? 24 : isLargeTablet ? 20 : isTablet ? 18 : 16;
+const progressThumbTop = isTV ? -10 : isLargeTablet ? -8 : isTablet ? -7 : -6;
+const durationFont = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
+const bottomButtonTextFont = isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12;
 
 export const styles = StyleSheet.create({
   container: {
@@ -37,14 +71,15 @@ export const styles = StyleSheet.create({
     padding: 0,
   },
   topGradient: {
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingTop: padV,
+    paddingHorizontal: padH,
+    paddingBottom: Math.max(10, Math.round(padV * 0.6)),
   },
   bottomGradient: {
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingBottom: padV,
+    paddingHorizontal: padH,
+    paddingTop: padV,
+    zIndex: 1001,
   },
   header: {
     flexDirection: 'row',
@@ -57,12 +92,12 @@ export const styles = StyleSheet.create({
   },
   title: {
     color: 'white',
-    fontSize: 18,
+    fontSize: titleFont,
     fontWeight: 'bold',
   },
   episodeInfo: {
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 14,
+    fontSize: episodeInfoFont,
     marginTop: 3,
   },
   metadataRow: {
@@ -73,20 +108,20 @@ export const styles = StyleSheet.create({
   },
   metadataText: {
     color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
+    fontSize: metadataFont,
     marginRight: 8,
   },
   qualityBadge: {
     backgroundColor: 'rgba(229, 9, 20, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: qualityPadH,
+    paddingVertical: qualityPadV,
+    borderRadius: qualityRadius,
     marginRight: 8,
     marginBottom: 4,
   },
   qualityText: {
     color: '#E50914',
-    fontSize: 11,
+    fontSize: qualityTextFont,
     fontWeight: 'bold',
   },
   providerText: {
@@ -97,50 +132,129 @@ export const styles = StyleSheet.create({
   closeButton: {
     padding: 8,
   },
+  topRightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topButton: {
+    padding: 8,
+  },
+  
+  
+  /* CloudStream Style - Center Controls */
   controls: {
     position: 'absolute',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 40,
     left: 0,
     right: 0,
     top: '50%',
-    transform: [{ translateY: -30 }],
+    transform: [{ translateY: controlsTranslateY }],
+    paddingHorizontal: 20,
+    gap: controlsGap,
     zIndex: 1000,
   },
+  
+  /* CloudStream Style - Seek Buttons */
+  seekButtonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  buttonCircle: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seekNumberContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 50,
+    height: 50,
+  },
+  seekNumber: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '500',
+    opacity: 1,
+    textAlign: 'center',
+    marginLeft: -7,
+  },
+  
+  /* CloudStream Style - Play Button */
   playButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 10,
-  },
-  skipButton: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  skipText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 2,
+  playButtonCircle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
+  playIcon: {
+    color: '#FFFFFF',
+    opacity: 1,
+  },
+  
+  /* CloudStream Style - Arc Animations */
+  arcContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  arcLeft: {
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderTopColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: 'transparent',
+    position: 'absolute',
+  },
+  arcRight: {
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderTopColor: 'transparent',
+    borderLeftColor: 'transparent',
+    borderBottomColor: 'transparent',
+    position: 'absolute',
+  },
+  playPressCircle: {
+    position: 'absolute',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+
+
+
+
   bottomControls: {
     gap: 12,
   },
   sliderContainer: {
     position: 'absolute',
-    bottom: 55,
+    bottom: sliderBottom,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    zIndex: 1000,
+    paddingHorizontal: padH,
+    zIndex: 21,
   },
   progressTouchArea: {
-    height: 40, // Increased from 30 to give more space for the thumb
+    height: progressTouchHeight, // Increased touch area for larger displays
     justifyContent: 'center',
     width: '100%',
   },
   progressBarContainer: {
-    height: 4,
+    height: progressBarHeight,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 2,
     overflow: 'hidden',
@@ -164,12 +278,12 @@ export const styles = StyleSheet.create({
   },
   progressThumb: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: progressThumbSize,
+    height: progressThumbSize,
+    borderRadius: progressThumbSize / 2,
     backgroundColor: '#E50914',
-    top: -6, // Position to center on the progress bar
-    marginLeft: -8, // Center the thumb horizontally
+    top: progressThumbTop, // Position to center on the progress bar
+    marginLeft: -(progressThumbSize / 2), // Center the thumb horizontally
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -187,8 +301,16 @@ export const styles = StyleSheet.create({
   },
   duration: {
     color: 'white',
-    fontSize: 12,
+    fontSize: durationFont,
     fontWeight: '500',
+  },
+  timeContainer: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   bottomButtons: {
     flexDirection: 'row',
@@ -202,7 +324,36 @@ export const styles = StyleSheet.create({
   },
   bottomButtonText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: bottomButtonTextFont,
+  },
+  bottomIconRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    paddingVertical: 8,
+  },
+  iconButton: {
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 44,
+    minHeight: 44,
+  },
+  centerControlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    marginTop: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'center',
+    zIndex: 1002,
   },
   modalOverlay: {
     flex: 1,
@@ -555,6 +706,8 @@ export const styles = StyleSheet.create({
   customSubtitleWrapper: {
     padding: 10,
     borderRadius: 5,
+    alignSelf: 'center',
+    maxWidth: '90%',
   },
   customSubtitleText: {
     color: 'white',
@@ -997,5 +1150,16 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: 'center',
+  },
+  // Additional missing styles
+  skipButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  skipText: {
+    color: 'white',
+    fontSize: skipTextFont,
+    marginTop: 2,
   },
 }); 

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 
 // Define the structure of cached data
@@ -16,7 +16,7 @@ interface TraktCollections {
 }
 
 const THIS_WEEK_CACHE_KEY = 'this_week_episodes_cache';
-const CALENDAR_CACHE_KEY = 'calendar_data_cache';
+const CALENDAR_CACHE_KEY = 'calendar_data_cache_v2';
 const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes (increased to reduce API calls)
 const ERROR_CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes for error recovery
 
@@ -32,7 +32,7 @@ class RobustCalendarCache {
 
   private async getCachedData<T>(key: string, libraryItems: any[], traktCollections: TraktCollections): Promise<T | null> {
     try {
-      const storedCache = await AsyncStorage.getItem(key);
+      const storedCache = await mmkvStorage.getItem(key);
       if (!storedCache) return null;
 
       const cache: CachedData<T> = JSON.parse(storedCache);
@@ -49,7 +49,6 @@ class RobustCalendarCache {
         return null;
       }
       
-      logger.log(`[Cache] Valid cache found for key ${key}`);
       return cache.data;
     } catch (error) {
       logger.error(`[Cache] Error getting cached data for key ${key}:`, error);
@@ -74,7 +73,7 @@ class RobustCalendarCache {
         logger.log(`[Cache] Saving successful data to cache for key ${key}`);
       }
       
-      await AsyncStorage.setItem(key, JSON.stringify(cache));
+      await mmkvStorage.setItem(key, JSON.stringify(cache));
     } catch (error) {
       logger.error(`[Cache] Error setting cached data for key ${key}:`, error);
     }

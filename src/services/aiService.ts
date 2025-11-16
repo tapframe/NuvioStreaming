@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 
 export interface ChatMessage {
   id: string;
@@ -112,7 +112,7 @@ class AIService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.apiKey = await AsyncStorage.getItem('openrouter_api_key');
+      this.apiKey = await mmkvStorage.getItem('openrouter_api_key');
       return !!this.apiKey;
     } catch (error) {
       if (__DEV__) console.error('Failed to initialize AI service:', error);
@@ -304,7 +304,7 @@ Answer questions about this movie using only the verified database information a
           'X-Title': 'Nuvio - AI Chat',
         },
         body: JSON.stringify({
-          model: 'x-ai/grok-4-fast:free',
+          model: 'openai/gpt-oss-20b:free',
           messages,
           max_tokens: 1000,
           temperature: 0.7,

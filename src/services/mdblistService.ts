@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 import { 
   MDBLIST_API_KEY_STORAGE_KEY,
@@ -38,7 +38,7 @@ export class MDBListService {
   async initialize(): Promise<void> {
     try {
       // First check if MDBList is enabled
-      const enabledSetting = await AsyncStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
+      const enabledSetting = await mmkvStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
       const wasEnabled = this.enabled;
       this.enabled = enabledSetting === null || enabledSetting === 'true';
       logger.log('[MDBListService] MDBList enabled:', this.enabled);
@@ -55,7 +55,7 @@ export class MDBListService {
         return;
       }
 
-      const newApiKey = await AsyncStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
+      const newApiKey = await mmkvStorage.getItem(MDBLIST_API_KEY_STORAGE_KEY);
       // Reset error counter when API key changes
       if (newApiKey !== this.apiKey) {
         this.apiKeyErrorCount = 0;
@@ -91,7 +91,7 @@ export class MDBListService {
     if (!this.enabled) {
       // Try to refresh enabled status in case it was changed
       try {
-        const enabledSetting = await AsyncStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
+        const enabledSetting = await mmkvStorage.getItem(MDBLIST_ENABLED_STORAGE_KEY);
         this.enabled = enabledSetting === null || enabledSetting === 'true';
       } catch (error) {
         // Ignore error and keep current state

@@ -17,6 +17,7 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTraktContext } from '../contexts/TraktContext';
 import { useMetadata } from '../hooks/useMetadata';
 import { useDominantColor, preloadDominantColor } from '../hooks/useDominantColor';
 import { CastSection } from '../components/metadata/CastSection';
@@ -26,6 +27,8 @@ import { MovieContent } from '../components/metadata/MovieContent';
 import { MoreLikeThisSection } from '../components/metadata/MoreLikeThisSection';
 import { RatingsSection } from '../components/metadata/RatingsSection';
 import { CommentsSection, CommentBottomSheet } from '../components/metadata/CommentsSection';
+import TrailersSection from '../components/metadata/TrailersSection';
+import CollectionSection from '../components/metadata/CollectionSection';
 import { RouteParams, Episode } from '../types/metadata';
 import Animated, {
   useAnimatedStyle,
@@ -43,8 +46,9 @@ import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
-import { MetadataLoadingScreen } from '../components/loading/MetadataLoadingScreen';
+import { MetadataLoadingScreen, MetadataLoadingScreenRef } from '../components/loading/MetadataLoadingScreen';
 import { useTrailer } from '../contexts/TrailerContext';
+import FastImage from '@d11/react-native-fast-image';
 
 // Import our optimized components and hooks
 import HeroSection from '../components/metadata/HeroSection';
@@ -64,6 +68,14 @@ const MemoizedCastSection = memo(CastSection);
 const MemoizedSeriesContent = memo(SeriesContent);
 const MemoizedMovieContent = memo(MovieContent);
 const MemoizedMoreLikeThisSection = memo(MoreLikeThisSection);
+// Enhanced responsive breakpoints for Metadata Screen
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
+
 const MemoizedRatingsSection = memo(RatingsSection);
 const MemoizedCommentsSection = memo(CommentsSection);
 const MemoizedCastDetailsModal = memo(CastDetailsModal);
@@ -73,11 +85,51 @@ const MetadataScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { id, type, episodeId, addonId } = route.params;
   
+  // Log route parameters for debugging
+  React.useEffect(() => {
+    console.log('🔍 [MetadataScreen] Route params:', { id, type, episodeId, addonId });
+  }, [id, type, episodeId, addonId]);
+  
   // Consolidated hooks for better performance
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
   const { top: safeAreaTop } = useSafeAreaInsets();
   const { pauseTrailer } = useTrailer();
+
+  // Trakt integration
+  const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
+
+  // Enhanced responsive sizing for tablets and TV screens
+  const deviceWidth = Dimensions.get('window').width;
+  const deviceHeight = Dimensions.get('window').height;
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced spacing and padding for production sections
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
 
   // Optimized state management - reduced state variables
   const [isContentReady, setIsContentReady] = useState(false);
@@ -89,10 +141,19 @@ const MetadataScreen: React.FC = () => {
   const transitionOpacity = useSharedValue(1);
   const interactionComplete = useRef(false);
 
+  // Animation values for network/production sections
+  const networkSectionOpacity = useSharedValue(0);
+  const productionSectionOpacity = useSharedValue(0);
+
   // Comment bottom sheet state
   const [commentBottomSheetVisible, setCommentBottomSheetVisible] = useState(false);
   const [selectedComment, setSelectedComment] = useState<any>(null);
   const [revealedSpoilers, setRevealedSpoilers] = useState<Set<string>>(new Set());
+  const loadingScreenRef = useRef<MetadataLoadingScreenRef>(null);
+  const [loadingScreenExited, setLoadingScreenExited] = useState(false);
+  // Delay flag to show sections 800ms after cast is rendered (if present)
+  const [postCastDelayDone, setPostCastDelayDone] = useState(false);
+
 
   // Debug state changes
   React.useEffect(() => {
@@ -122,12 +183,84 @@ const MetadataScreen: React.FC = () => {
     setMetadata,
     imdbId,
     tmdbId,
+    collectionMovies,
+    loadingCollection,
   } = useMetadata({ id, type, addonId });
+
+
+  // Log useMetadata hook state changes for debugging
+  React.useEffect(() => {
+    console.log('🔍 [MetadataScreen] useMetadata state:', {
+      loading,
+      hasMetadata: !!metadata,
+      metadataId: metadata?.id,
+      metadataName: metadata?.name,
+      error: metadataError,
+      hasCast: cast.length > 0,
+      hasEpisodes: episodes.length > 0,
+      seasonsCount: Object.keys(groupedEpisodes).length,
+      imdbId,
+      tmdbId,
+      hasNetworks: !!(metadata as any)?.networks,
+      networksCount: metadata?.networks ? metadata.networks.length : 0
+    });
+  }, [loading, metadata, metadataError, cast.length, episodes.length, Object.keys(groupedEpisodes).length, imdbId, tmdbId]);
+
+  // Animate network section when data becomes available (for series)
+  useEffect(() => {
+    const hasNetworks = metadata?.networks && metadata.networks.length > 0;
+    const hasDescription = !!metadata?.description;
+    const isSeries = Object.keys(groupedEpisodes).length > 0;
+    // Defer showing until cast (if any) has finished fetching and 800ms delay elapsed
+    const shouldShow = shouldLoadSecondaryData && postCastDelayDone && hasNetworks && hasDescription && isSeries;
+
+    if (shouldShow && networkSectionOpacity.value === 0) {
+      networkSectionOpacity.value = withTiming(1, { duration: 400 });
+    }
+  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, postCastDelayDone, networkSectionOpacity]);
+
+  // Animate production section when data becomes available (for movies)
+  useEffect(() => {
+    const hasNetworks = metadata?.networks && metadata.networks.length > 0;
+    const hasDescription = !!metadata?.description;
+    const isMovie = Object.keys(groupedEpisodes).length === 0;
+    // Defer showing until cast (if any) has finished fetching and 800ms delay elapsed
+    const shouldShow = shouldLoadSecondaryData && postCastDelayDone && hasNetworks && hasDescription && isMovie;
+
+    if (shouldShow && productionSectionOpacity.value === 0) {
+      productionSectionOpacity.value = withTiming(1, { duration: 400 });
+    }
+  }, [metadata?.networks, metadata?.description, Object.keys(groupedEpisodes).length, shouldLoadSecondaryData, postCastDelayDone, productionSectionOpacity]);
+
+  // Manage 800ms delay after cast finishes loading (only if cast is present)
+  useEffect(() => {
+    if (!shouldLoadSecondaryData) {
+      setPostCastDelayDone(false);
+      return;
+    }
+
+    if (!loadingCast) {
+      if (cast && cast.length > 0) {
+        setPostCastDelayDone(false);
+        const t = setTimeout(() => setPostCastDelayDone(true), 800);
+        return () => clearTimeout(t);
+      } else {
+        // If no cast present, no need to delay
+        setPostCastDelayDone(true);
+      }
+    } else {
+      // Reset while cast is loading
+      setPostCastDelayDone(false);
+    }
+  }, [loadingCast, cast.length, shouldLoadSecondaryData]);
 
   // Optimized hooks with memoization and conditional loading
   const watchProgressData = useWatchProgress(id, Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series', episodeId, episodes);
   const assetData = useMetadataAssets(metadata, id, type, imdbId, settings, setMetadata);
   const animations = useMetadataAnimations(safeAreaTop, watchProgressData.watchProgress);
+
+  // Stable logo URI from HeroSection
+  const [stableLogoUri, setStableLogoUri] = React.useState<string | null>(null);
   
   // Extract dominant color from hero image for dynamic background
   const heroImageUri = useMemo(() => {
@@ -200,7 +333,16 @@ const MetadataScreen: React.FC = () => {
     );
     return { backgroundColor: color as any };
   });
-  
+
+  // Animated styles for network and production sections
+  const networkSectionAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: networkSectionOpacity.value,
+  }));
+
+  const productionSectionAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: productionSectionOpacity.value,
+  }));
+
   // For compatibility with existing code, maintain the static value as well
   const dynamicBackgroundColor = useMemo(() => {
     if (settings.useDominantBackgroundColor && dominantColor && dominantColor !== '#1a1a1a' && dominantColor !== null && dominantColor !== currentTheme.colors.darkBackground) {
@@ -391,6 +533,17 @@ const MetadataScreen: React.FC = () => {
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
   
+  // Log readiness state for debugging
+  React.useEffect(() => {
+    console.log('🔍 [MetadataScreen] Readiness state:', {
+      isReady,
+      loading,
+      hasMetadata: !!metadata,
+      hasError: !!metadataError,
+      errorMessage: metadataError
+    });
+  }, [isReady, loading, metadata, metadataError]);
+  
   // Optimized content ready state management
   useEffect(() => {
     if (isReady && isScreenFocused) {
@@ -399,8 +552,16 @@ const MetadataScreen: React.FC = () => {
     } else if (!isReady && isContentReady) {
       setIsContentReady(false);
       transitionOpacity.value = 0;
+      setLoadingScreenExited(false); // Reset for next load
     }
   }, [isReady, isContentReady, isScreenFocused]);
+
+  // Trigger loading screen exit animation when content is ready
+  useEffect(() => {
+    if (isReady && isContentReady && !loadingScreenExited && loadingScreenRef.current) {
+      loadingScreenRef.current.exit();
+    }
+  }, [isReady, isContentReady, loadingScreenExited]);
 
   // Optimized callback functions with reduced dependencies and haptics throttling
   const handleToggleLibrary = useCallback(() => {
@@ -595,21 +756,111 @@ const MetadataScreen: React.FC = () => {
     opacity: transitionOpacity.value,
   }), []);
 
-  // Memoized error component for performance
+  // Improved error component with user-friendly messages and error codes
   const ErrorComponent = useMemo(() => {
     if (!metadataError) return null;
-    
+
+    // Parse error to extract code and user-friendly message
+    const parseError = (error: string) => {
+      console.log('🔍 Parsing error in MetadataScreen:', error);
+
+      // Check for HTTP status codes - handle multiple formats
+      // Match patterns like: "status code 500", "status": 500, "Request failed with status code 500"
+      const statusCodeMatch = error.match(/status code (\d+)/) ||
+                             error.match(/"status":\s*(\d+)/) ||
+                             error.match(/Request failed with status code (\d+)/) ||
+                             error.match(/\b(\d{3})\b/); // Match any 3-digit number (last resort)
+
+      if (statusCodeMatch) {
+        const code = parseInt(statusCodeMatch[1]);
+        console.log('✅ Found status code:', code);
+        switch (code) {
+          case 404:
+            return { code: '404', message: 'Content not found', userMessage: 'This content doesn\'t exist or may have been removed.' };
+          case 500:
+            return { code: '500', message: 'Server error', userMessage: 'The server is temporarily unavailable. Please try again later.' };
+          case 502:
+            return { code: '502', message: 'Bad gateway', userMessage: 'The server is experiencing issues. Please try again later.' };
+          case 503:
+            return { code: '503', message: 'Service unavailable', userMessage: 'The service is currently down for maintenance. Please try again later.' };
+          case 429:
+            return { code: '429', message: 'Too many requests', userMessage: 'You\'re making too many requests. Please wait a moment and try again.' };
+          case 408:
+            return { code: '408', message: 'Request timeout', userMessage: 'The request took too long. Please try again.' };
+          default:
+            return { code: code.toString(), message: `Error ${code}`, userMessage: 'Something went wrong. Please try again.' };
+        }
+      }
+
+      // Check for network/Axios errors
+      if (error.includes('Network Error') ||
+          error.includes('ERR_BAD_RESPONSE') ||
+          error.includes('Request failed') ||
+          error.includes('ERR_NETWORK')) {
+        return { code: 'NETWORK', message: 'Network error', userMessage: 'Please check your internet connection and try again.' };
+      }
+
+      // Check for timeout errors
+      if (error.includes('timeout') ||
+          error.includes('timed out') ||
+          error.includes('ECONNABORTED') ||
+          error.includes('ETIMEDOUT')) {
+        return { code: 'TIMEOUT', message: 'Request timeout', userMessage: 'The request took too long. Please try again.' };
+      }
+
+      // Check for authentication errors
+      if (error.includes('401') || error.includes('Unauthorized') || error.includes('authentication')) {
+        return { code: '401', message: 'Authentication error', userMessage: 'Please check your account settings and try again.' };
+      }
+
+      // Check for permission errors
+      if (error.includes('403') || error.includes('Forbidden') || error.includes('permission')) {
+        return { code: '403', message: 'Access denied', userMessage: 'You don\'t have permission to access this content.' };
+      }
+
+      // Check for "not found" errors - but only if no status code was found
+      if (!statusCodeMatch && (error.includes('Content not found') || error.includes('not found'))) {
+        return { code: '404', message: 'Content not found', userMessage: 'This content doesn\'t exist or may have been removed.' };
+      }
+
+      // Check for retry/attempt errors
+      if (error.includes('attempts') || error.includes('Please check your connection')) {
+        return { code: 'CONNECTION', message: 'Connection error', userMessage: 'Please check your internet connection and try again.' };
+      }
+
+      // Check for streams-related errors
+      if (error.includes('streams') || error.includes('Failed to load streams')) {
+        return { code: 'STREAMS', message: 'Streams unavailable', userMessage: 'Streaming sources are currently unavailable. Please try again later.' };
+      }
+
+      // Default case
+      return { code: 'UNKNOWN', message: 'Unknown error', userMessage: 'An unexpected error occurred. Please try again.' };
+    };
+
+    const errorInfo = parseError(metadataError);
+
     return (
-      <SafeAreaView 
+      <SafeAreaView
         style={[styles.container, { backgroundColor: dynamicBackgroundColor }]}
-        edges={['bottom']}
+        edges={[]}
       >
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={styles.errorContainer}>
-          <MaterialIcons name="error-outline" size={64} color={currentTheme.colors.textMuted} />
-          <Text style={[styles.errorText, { color: currentTheme.colors.highEmphasis }]}>
-            {metadataError || 'Content not found'}
+          <MaterialIcons name="error-outline" size={64} color={currentTheme.colors.error || '#FF6B6B'} />
+          <Text style={[styles.errorTitle, { color: currentTheme.colors.highEmphasis }]}>
+            Unable to Load Content
           </Text>
+          <Text style={[styles.errorCode, { color: currentTheme.colors.textMuted }]}>
+            Error Code: {errorInfo.code}
+          </Text>
+          <Text style={[styles.errorMessage, { color: currentTheme.colors.highEmphasis }]}>
+            {errorInfo.userMessage}
+          </Text>
+          {__DEV__ && (
+            <Text style={[styles.errorDetails, { color: currentTheme.colors.textMuted }]}>
+              {metadataError}
+            </Text>
+          )}
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
             onPress={loadMetadata}
@@ -630,26 +881,46 @@ const MetadataScreen: React.FC = () => {
 
   // Show error if exists
   if (metadataError || (!loading && !metadata)) {
+    console.log('🔍 [MetadataScreen] Showing error component:', {
+      hasError: !!metadataError,
+      errorMessage: metadataError,
+      isLoading: loading,
+      hasMetadata: !!metadata,
+      loadingState: loading
+    });
     return ErrorComponent;
   }
 
-  // Show loading screen if metadata is not yet available
-  if (loading || !isContentReady) {
-    return <MetadataLoadingScreen type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'} />;
+  // Show loading screen if metadata is not yet available or exit animation hasn't completed
+  if (loading || !isContentReady || !loadingScreenExited) {
+    console.log('🔍 [MetadataScreen] Showing loading screen:', {
+      isLoading: loading,
+      isContentReady,
+      loadingScreenExited,
+      hasMetadata: !!metadata,
+      errorMessage: metadataError
+    });
+    return (
+      <MetadataLoadingScreen
+        ref={loadingScreenRef}
+        type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
+        onExitComplete={() => setLoadingScreenExited(true)}
+      />
+    );
   }
 
   return (
     <Animated.View style={[animatedBackgroundStyle, { flex: 1 }]}>
     <SafeAreaView 
       style={[containerStyle, styles.container]}
-      edges={['bottom']}
+      edges={[]}
     >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
       
       {metadata && (
         <>
           {/* Floating Header - Optimized */}
-          <FloatingHeader 
+          <FloatingHeader
             metadata={metadata}
             logoLoadError={assetData.logoLoadError}
             handleBack={handleBack}
@@ -660,6 +931,7 @@ const MetadataScreen: React.FC = () => {
             headerElementsOpacity={animations.headerElementsOpacity}
             safeAreaTop={safeAreaTop}
             setLogoLoadError={assetData.setLogoLoadError}
+            stableLogoUri={stableLogoUri}
           />
 
           <Animated.ScrollView
@@ -674,11 +946,10 @@ const MetadataScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Hero Section - Optimized */}
-            <HeroSection 
+            <HeroSection
               metadata={metadata}
               bannerImage={assetData.bannerImage}
               loadingBanner={assetData.loadingBanner}
-              logoLoadError={assetData.logoLoadError}
               scrollY={animations.scrollY}
               heroHeight={animations.heroHeight}
               heroOpacity={animations.heroOpacity}
@@ -688,6 +959,7 @@ const MetadataScreen: React.FC = () => {
               watchProgressOpacity={animations.watchProgressOpacity}
               watchProgressWidth={animations.watchProgressWidth}
               watchProgress={watchProgressData.watchProgress}
+              onStableLogoUriChange={setStableLogoUri}
               type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
               getEpisodeDetails={watchProgressData.getEpisodeDetails}
               handleShowStreams={handleShowStreams}
@@ -697,8 +969,25 @@ const MetadataScreen: React.FC = () => {
               navigation={navigation}
               getPlayButtonText={watchProgressData.getPlayButtonText}
               setBannerImage={assetData.setBannerImage}
-              setLogoLoadError={assetData.setLogoLoadError}
               groupedEpisodes={groupedEpisodes}
+              // Trakt integration props
+              isAuthenticated={isAuthenticated}
+              isInWatchlist={isInWatchlist(id, type as 'movie' | 'show')}
+              isInCollection={isInCollection(id, type as 'movie' | 'show')}
+              onToggleWatchlist={async () => {
+                if (isInWatchlist(id, type as 'movie' | 'show')) {
+                  await removeFromWatchlist(id, type as 'movie' | 'show');
+                } else {
+                  await addToWatchlist(id, type as 'movie' | 'show');
+                }
+              }}
+              onToggleCollection={async () => {
+                if (isInCollection(id, type as 'movie' | 'show')) {
+                  await removeFromCollection(id, type as 'movie' | 'show');
+                } else {
+                  await addToCollection(id, type as 'movie' | 'show');
+                }
+              }}
               dynamicBackgroundColor={dynamicBackgroundColor}
               handleBack={handleBack}
               tmdbId={tmdbId}
@@ -717,12 +1006,133 @@ const MetadataScreen: React.FC = () => {
                 ) : null}
               />
 
+              {/* Production info row — shown below description and above cast for series */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.networks && metadata.networks.length > 0 && metadata?.description && (
+                <Animated.View style={[
+                  styles.productionContainer, 
+                  networkSectionAnimatedStyle,
+                  { paddingHorizontal: horizontalPadding }
+                ]}>
+                  <Text style={[
+                    styles.productionHeader,
+                    {
+                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                    }
+                  ]}>Network</Text>
+                  <View style={[
+                    styles.productionRow,
+                    {
+                      gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+                    }
+                  ]}>
+                    {metadata.networks.slice(0, 6).map((net) => (
+                      <View key={String(net.id || net.name)} style={[
+                        styles.productionChip,
+                        {
+                          paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                          paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+                          minHeight: isTV ? 48 : isLargeTablet ? 44 : isTablet ? 40 : 36,
+                          borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                        }
+                      ]}>
+                        {net.logo ? (
+                          <FastImage
+                            source={{ uri: net.logo }}
+                            style={[
+                              styles.productionLogo,
+                              {
+                                width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 64,
+                                height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
+                              }
+                            ]}
+                            resizeMode={FastImage.resizeMode.contain}
+                          />
+                        ) : (
+                          <Text style={[
+                            styles.productionText,
+                            {
+                              fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12
+                            }
+                          ]}>{net.name}</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </Animated.View>
+              )}
+
               {/* Cast Section with skeleton when loading - Lazy loaded */}
               {shouldLoadSecondaryData && (
                 <MemoizedCastSection
                   cast={cast}
                   loadingCast={loadingCast}
                   onSelectCastMember={handleSelectCastMember}
+                  isTmdbEnrichmentEnabled={settings.enrichMetadataWithTMDB}
+                />
+              )}
+
+              {/* Production info row — only render companies with logos */}
+              {shouldLoadSecondaryData &&
+                Object.keys(groupedEpisodes).length === 0 &&
+                metadata?.networks && Array.isArray(metadata.networks) &&
+                metadata.networks.some((n: any) => !!n?.logo) &&
+                metadata?.description && (
+                <Animated.View style={[
+                  styles.productionContainer, 
+                  productionSectionAnimatedStyle,
+                  { paddingHorizontal: horizontalPadding }
+                ]}>
+                  <Text style={[
+                    styles.productionHeader,
+                    {
+                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                    }
+                  ]}>Production</Text>
+                  <View style={[
+                    styles.productionRow,
+                    {
+                      gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+                    }
+                  ]}>
+                    {metadata.networks
+                      .filter((net: any) => !!net?.logo)
+                      .slice(0, 6)
+                      .map((net: any) => (
+                        <View key={String(net.id || net.name)} style={[
+                          styles.productionChip,
+                          {
+                            paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                            paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+                            minHeight: isTV ? 48 : isLargeTablet ? 44 : isTablet ? 40 : 36,
+                            borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                          }
+                        ]}>
+                          <FastImage
+                            source={{ uri: net.logo }}
+                            style={[
+                              styles.productionLogo,
+                              {
+                                width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 64,
+                                height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
+                              }
+                            ]}
+                            resizeMode={FastImage.resizeMode.contain}
+                          />
+                        </View>
+                      ))}
+                  </View>
+                </Animated.View>
+              )}
+
+              {/* Trailers Section - Lazy loaded */}
+              {shouldLoadSecondaryData && tmdbId && settings.enrichMetadataWithTMDB && (
+                <TrailersSection
+                  tmdbId={tmdbId}
+                  type={Object.keys(groupedEpisodes).length > 0 ? 'tv' : 'movie'}
+                  contentId={id}
+                  contentTitle={metadata?.name || (metadata as any)?.title || 'Unknown'}
                 />
               )}
 
@@ -735,11 +1145,118 @@ const MetadataScreen: React.FC = () => {
                 />
               )}
 
-              {/* Recommendations Section with skeleton when loading - Lazy loaded */}
-              {type === 'movie' && shouldLoadSecondaryData && (
-                <MemoizedMoreLikeThisSection
-                  recommendations={recommendations}
-                  loadingRecommendations={loadingRecommendations}
+              {/* Movie Details section - shown above recommendations for movies when TMDB enrichment is ON */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.movieDetails && (
+                <View style={[
+                  styles.tvDetailsContainer,
+                  { paddingHorizontal: horizontalPadding }
+                ]}>
+                  <Text style={[
+                    styles.tvDetailsHeader,
+                    {
+                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                    }
+                  ]}>Movie Details</Text>
+
+                  {metadata.movieDetails.tagline && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Tagline</Text>
+                      <Text style={[styles.tvDetailValue, { fontStyle: 'italic', fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        "{metadata.movieDetails.tagline}"
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.status && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.status}</Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.releaseDate && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Release Date</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        {new Date(metadata.movieDetails.releaseDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.runtime && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Runtime</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        {Math.floor(metadata.movieDetails.runtime / 60)}h {metadata.movieDetails.runtime % 60}m
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.budget && metadata.movieDetails.budget > 0 && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Budget</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        ${metadata.movieDetails.budget.toLocaleString()}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.revenue && metadata.movieDetails.revenue > 0 && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Revenue</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        ${metadata.movieDetails.revenue.toLocaleString()}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.originCountry && metadata.movieDetails.originCountry.length > 0 && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originCountry.join(', ')}</Text>
+                    </View>
+                  )}
+
+                  {metadata.movieDetails.originalLanguage && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originalLanguage.toUpperCase()}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Backdrop Gallery section - shown after movie details for movies when TMDB ID is available and enrichment is enabled */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
+                <View style={styles.backdropGalleryContainer}>
+                  <TouchableOpacity
+                    style={styles.backdropGalleryButton}
+                    onPress={() => navigation.navigate('BackdropGallery' as any, {
+                      tmdbId: metadata.tmdbId,
+                      type: 'movie',
+                      title: metadata.name || 'Gallery'
+                    })}
+                  >
+                    <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                    <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Collection Section - Lazy loaded */}
+              {shouldLoadSecondaryData && 
+                Object.keys(groupedEpisodes).length === 0 && 
+                metadata?.collection && 
+                settings.enrichMetadataWithTMDB && (
+                <CollectionSection
+                  collectionName={metadata.collection.name}
+                  collectionMovies={collectionMovies}
+                  loadingCollection={loadingCollection}
                 />
               )}
 
@@ -756,6 +1273,126 @@ const MetadataScreen: React.FC = () => {
                 />
               ) : (
                 metadata && <MemoizedMovieContent metadata={metadata} />
+              )}
+
+              {/* TV Details section - shown after episodes for series when TMDB enrichment is ON */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tvDetails && (
+                <View style={[
+                  styles.tvDetailsContainer,
+                  { paddingHorizontal: horizontalPadding }
+                ]}>
+                  <Text style={[
+                    styles.tvDetailsHeader,
+                    {
+                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                    }
+                  ]}>Show Details</Text>
+
+                  {metadata.tvDetails.status && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.status}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.firstAirDate && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>First Air Date</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        {new Date(metadata.tvDetails.firstAirDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.lastAirDate && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Last Air Date</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        {new Date(metadata.tvDetails.lastAirDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.numberOfSeasons && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Seasons</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfSeasons}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.numberOfEpisodes && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Total Episodes</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfEpisodes}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.episodeRunTime && metadata.tvDetails.episodeRunTime.length > 0 && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Episode Runtime</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        {metadata.tvDetails.episodeRunTime.join(' - ')} min
+                      </Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.originCountry && metadata.tvDetails.originCountry.length > 0 && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originCountry.join(', ')}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.originalLanguage && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originalLanguage.toUpperCase()}</Text>
+                    </View>
+                  )}
+
+                  {metadata.tvDetails.createdBy && metadata.tvDetails.createdBy.length > 0 && (
+                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Created By</Text>
+                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                        {metadata.tvDetails.createdBy.map(creator => creator.name).join(', ')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Backdrop Gallery section - shown after show details for TV shows when TMDB ID is available and enrichment is enabled */}
+              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
+                <View style={styles.backdropGalleryContainer}>
+                  <TouchableOpacity
+                    style={styles.backdropGalleryButton}
+                    onPress={() => navigation.navigate('BackdropGallery' as any, {
+                      tmdbId: metadata.tmdbId,
+                      type: 'tv',
+                      title: metadata.name || 'Gallery'
+                    })}
+                  >
+                    <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                    <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Recommendations Section with skeleton when loading - Shown at bottom for shows */}
+              {shouldLoadSecondaryData && (
+                <MemoizedMoreLikeThisSection
+                  recommendations={recommendations}
+                  loadingRecommendations={loadingRecommendations}
+                />
               )}
             </Animated.View>
           </Animated.ScrollView>
@@ -801,6 +1438,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 32,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorCode: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 8,
+    fontFamily: 'monospace',
+  },
+  errorMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 22,
+  },
+  errorDetails: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 16,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    fontFamily: 'monospace',
   },
   errorText: {
     fontSize: 18,
@@ -869,6 +1534,103 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 8,
     marginBottom: 8,
+  },
+  productionContainer: {
+    marginTop: 0,
+    marginBottom: 20,
+  },
+  productionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  productionChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(245,245,245,0.9)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+  },
+  productionLogo: {
+    width: 64,
+    height: 22,
+  },
+  productionText: {
+    color: '#333',
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+  productionHeader: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    opacity: 0.9,
+  },
+  tvDetailsContainer: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  tvDetailsHeader: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    opacity: 0.9,
+  },
+  tvDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  tvDetailLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    opacity: 0.8,
+  },
+  tvDetailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#fff',
+    opacity: 0.9,
+    textAlign: 'right',
+    flex: 1,
+  },
+  backdropGalleryContainer: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  backdropGalleryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  backdropGalleryText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    opacity: 0.9,
   },
 });
 

@@ -15,7 +15,7 @@ interface SourcesModalProps {
   availableStreams: { [providerId: string]: { streams: Stream[]; addonName: string } };
   currentStreamUrl: string;
   onSelectStream: (stream: Stream) => void;
-  isChangingSource: boolean;
+  isChangingSource?: boolean;
 }
 
 const { width } = Dimensions.get('window');
@@ -70,7 +70,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   availableStreams,
   currentStreamUrl,
   onSelectStream,
-  isChangingSource,
+  isChangingSource = false,
 }) => {
   const handleClose = () => {
     setShowSourcesModal(false);
@@ -228,11 +228,11 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                           padding: 16,
                           borderWidth: 1,
                           borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                          opacity: isChangingSource && !isSelected ? 0.6 : 1,
+                          opacity: (isChangingSource && !isSelected) ? 0.6 : 1,
                         }}
                         onPress={() => handleStreamSelect(stream)}
                         activeOpacity={0.7}
-                        disabled={isChangingSource}
+                        disabled={isChangingSource === true}
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View style={{ flex: 1 }}>

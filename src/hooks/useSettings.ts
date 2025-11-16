@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { syncService } from '../services/SyncService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 
 // Simple event emitter for settings changes
 class SettingsEventEmitter {
@@ -36,10 +35,10 @@ export interface AppSettings {
   enableBackgroundPlayback: boolean;
   cacheLimit: number;
   useExternalPlayer: boolean;
-  preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'external';
+  preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'infuse_livecontainer' | 'external';
   showHeroSection: boolean;
   featuredContentSource: 'tmdb' | 'catalogs';
-  heroStyle: 'legacy' | 'carousel';
+  heroStyle: 'legacy' | 'carousel' | 'appletv';
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
   logoSourcePreference: 'metahub' | 'tmdb'; // Preferred source for title logos
   tmdbLanguagePreference: string; // Preferred language for TMDB logos (ISO 639-1 code)
@@ -55,6 +54,8 @@ export interface AppSettings {
   showScraperLogos: boolean; // Show scraper logos next to streaming links
   // Quality filtering settings
   excludedQualities: string[]; // Array of quality strings to exclude (e.g., ['2160p', '4K', '1080p', '720p'])
+  // Language filtering settings
+  excludedLanguages: string[]; // Array of language strings to exclude (e.g., ['Spanish', 'German', 'French'])
   // Playback behavior
   alwaysResume: boolean; // If true, resume automatically without prompt when progress < 85%
   // Downloads
@@ -81,6 +82,11 @@ export interface AppSettings {
   useTmdbLocalizedMetadata: boolean; // Use TMDB localized metadata (titles, overviews) per tmdbLanguagePreference
   // Trakt integration
   showTraktComments: boolean; // Show Trakt comments in metadata screens
+  // Continue Watching behavior
+  useCachedStreams: boolean; // Enable/disable direct player navigation from Continue Watching cache
+  openMetadataScreenWhenCacheDisabled: boolean; // When cache disabled, open MetadataScreen instead of StreamsScreen
+  streamCacheTTL: number; // Stream cache duration in milliseconds (default: 1 hour)
+  enableStreamsBackdrop: boolean; // Enable blurred backdrop background on StreamsScreen mobile
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -94,9 +100,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferredPlayer: 'internal',
   showHeroSection: true,
   featuredContentSource: 'catalogs',
-  heroStyle: 'carousel',
+  heroStyle: 'appletv',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
-  logoSourcePreference: 'metahub', // Default to Metahub as first source
+  logoSourcePreference: 'tmdb', // Default to TMDB as first source
   tmdbLanguagePreference: 'en', // Default to English
   episodeLayoutStyle: 'vertical', // Default to vertical layout for new installs
   autoplayBestStream: false, // Disabled by default for user choice
@@ -110,6 +116,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showScraperLogos: true, // Show scraper logos by default
   // Quality filtering defaults
   excludedQualities: [], // No qualities excluded by default
+  // Language filtering defaults
+  excludedLanguages: [], // No languages excluded by default
   // Playback behavior defaults
   alwaysResume: true,
   // Downloads
@@ -134,9 +142,19 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useTmdbLocalizedMetadata: false,
   // Trakt integration
   showTraktComments: true, // Show Trakt comments by default when authenticated
+  // Continue Watching behavior
+  useCachedStreams: false, // Enable by default
+  openMetadataScreenWhenCacheDisabled: true, // Default to StreamsScreen when cache disabled
+  streamCacheTTL: 60 * 60 * 1000, // Default: 1 hour in milliseconds
+  enableStreamsBackdrop: true, // Enable by default (new behavior)
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
+
+// Singleton settings cache
+let cachedSettings: AppSettings | null = null;
+let settingsCacheTimestamp = 0;
+const SETTINGS_CACHE_TTL = 60000; // 1 minute
 
 export const useSettings = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -155,41 +173,46 @@ export const useSettings = () => {
 
   const loadSettings = async () => {
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      // Use cached settings if available and fresh
+      const now = Date.now();
+      if (cachedSettings && (now - settingsCacheTimestamp) < SETTINGS_CACHE_TTL) {
+        setSettings(cachedSettings);
+        setIsLoaded(true);
+        return;
+      }
+
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
+      
+      // Use synchronous MMKV reads for better performance
       const [scopedJson, legacyJson] = await Promise.all([
-        AsyncStorage.getItem(scopedKey),
-        AsyncStorage.getItem(SETTINGS_STORAGE_KEY),
+        mmkvStorage.getItem(scopedKey),
+        mmkvStorage.getItem(SETTINGS_STORAGE_KEY),
       ]);
+      
       const parsedScoped = scopedJson ? JSON.parse(scopedJson) : null;
       const parsedLegacy = legacyJson ? JSON.parse(legacyJson) : null;
 
       let merged = parsedScoped || parsedLegacy;
 
-      // Fallback: scan any existing user-scoped settings if current scope not set yet
+      // Simplified fallback - only use getAllKeys if absolutely necessary
       if (!merged) {
-        try {
-          const allKeys = await AsyncStorage.getAllKeys();
-          const candidateKeys = (allKeys || []).filter(k => k.endsWith(`:${SETTINGS_STORAGE_KEY}`));
-          if (candidateKeys.length > 0) {
-            const pairs = await AsyncStorage.multiGet(candidateKeys);
-            for (const [, value] of pairs) {
-              if (value) {
-                try {
-                  const candidate = JSON.parse(value);
-                  if (candidate && typeof candidate === 'object') {
-                    merged = candidate;
-                    break;
-                  }
-                } catch {}
-              }
-            }
-          }
-        } catch {}
+        // Use string search on MMKV storage instead of getAllKeys for performance
+        const scoped = mmkvStorage.getString(scopedKey);
+        if (scoped) {
+          try {
+            merged = JSON.parse(scoped);
+          } catch {}
+        }
       }
 
-      if (merged) setSettings({ ...DEFAULT_SETTINGS, ...merged });
-      else setSettings(DEFAULT_SETTINGS);
+      const finalSettings = merged ? { ...DEFAULT_SETTINGS, ...merged } : DEFAULT_SETTINGS;
+      
+      // Update cache
+      cachedSettings = finalSettings;
+      settingsCacheTimestamp = now;
+      
+      setSettings(finalSettings);
     } catch (error) {
       if (__DEV__) console.error('Failed to load settings:', error);
       // Fallback to default settings on error
@@ -208,15 +231,20 @@ export const useSettings = () => {
   ) => {
     const newSettings = { ...settings, [key]: value };
     try {
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
-      const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
-      // Write to both scoped key (multi-user aware) and legacy key for backward compatibility
-      await Promise.all([
-        AsyncStorage.setItem(scopedKey, JSON.stringify(newSettings)),
-        AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings)),
-      ]);
-      // Ensure a current scope exists to avoid future loads missing the chosen scope
-      await AsyncStorage.setItem('@user:current', scope);
+    const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
+    const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
+    // Write to both scoped key (multi-user aware) and legacy key for backward compatibility
+    await Promise.all([
+      mmkvStorage.setItem(scopedKey, JSON.stringify(newSettings)),
+      mmkvStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings)),
+    ]);
+    // Ensure a current scope exists to avoid future loads missing the chosen scope
+    await mmkvStorage.setItem('@user:current', scope);
+      
+      // Update cache
+      cachedSettings = newSettings;
+      settingsCacheTimestamp = Date.now();
+      
       setSettings(newSettings);
       if (__DEV__) console.log(`Setting updated: ${key}`, value);
       
@@ -226,8 +254,6 @@ export const useSettings = () => {
         settingsEmitter.emit();
       }
 
-      // If authenticated, push settings to server to prevent overwrite on next pull
-      try { syncService.pushSettings(); } catch {}
     } catch (error) {
       if (__DEV__) console.error('Failed to save settings:', error);
     }

@@ -10,13 +10,14 @@ import {
   View,
   StyleSheet,
   I18nManager,
-  Platform
+  Platform,
+  LogBox
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { enableScreens } from 'react-native-screens';
+import { enableScreens, enableFreeze } from 'react-native-screens';
 import AppNavigator, { 
   CustomNavigationDarkTheme,
   CustomDarkTheme
@@ -33,12 +34,13 @@ import UpdatePopup from './src/components/UpdatePopup';
 import MajorUpdateOverlay from './src/components/MajorUpdateOverlay';
 import { useGithubMajorUpdate } from './src/hooks/useGithubMajorUpdate';
 import { useUpdatePopup } from './src/hooks/useUpdatePopup';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sentry from '@sentry/react-native';
 import UpdateService from './src/services/updateService';
 import { memoryMonitorService } from './src/services/memoryMonitorService';
 import { aiService } from './src/services/aiService';
 import { AccountProvider, useAccount } from './src/contexts/AccountContext';
+import { ToastProvider } from './src/contexts/ToastContext';
+import { mmkvStorage } from './src/services/mmkvStorage';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -61,8 +63,16 @@ Sentry.init({
 I18nManager.allowRTL(false);
 I18nManager.forceRTL(false);
 
+// Suppress duplicate key warnings app-wide
+LogBox.ignoreLogs([
+  'Warning: Encountered two children with the same key',
+  'Keys should be unique so that components maintain their identity across updates'
+]);
+
 // This fixes many navigation layout issues by using native screen containers
 enableScreens(true);
+// Freeze non-focused screens to stop background re-renders
+enableFreeze(true);
 
 // Inner app component that uses the theme context
 const ThemedApp = () => {
@@ -96,13 +106,11 @@ const ThemedApp = () => {
     const initializeApp = async () => {
       try {
         // Check onboarding status
-        const onboardingCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
+        const onboardingCompleted = await mmkvStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingCompleted === 'true');
         
-        // Initialize update service (skip on Android to prevent update checks)
-        if (Platform.OS !== 'android') {
-          await UpdateService.initialize();
-        }
+        // Initialize update service
+        await UpdateService.initialize();
         
         // Initialize memory monitoring service to prevent OutOfMemoryError
         memoryMonitorService; // Just accessing it starts the monitoring
@@ -162,16 +170,14 @@ const ThemedApp = () => {
               <StatusBar style="light" />
               {!isAppReady && <SplashScreen onFinish={handleSplashComplete} />}
               {shouldShowApp && <AppNavigator initialRouteName={initialRouteName} />}
-              {Platform.OS === 'ios' && (
-                <UpdatePopup
-                  visible={showUpdatePopup}
-                  updateInfo={updateInfo}
-                  onUpdateNow={handleUpdateNow}
-                  onUpdateLater={handleUpdateLater}
-                  onDismiss={handleDismiss}
-                  isInstalling={isInstalling}
-                />
-              )}
+              <UpdatePopup
+                visible={showUpdatePopup}
+                updateInfo={updateInfo}
+                onUpdateNow={handleUpdateNow}
+                onUpdateLater={handleUpdateLater}
+                onDismiss={handleDismiss}
+                isInstalling={isInstalling}
+              />
               <MajorUpdateOverlay
                 visible={githubUpdate.visible}
                 latestTag={githubUpdate.latestTag}
@@ -196,7 +202,9 @@ function App(): React.JSX.Element {
           <TraktProvider>
             <ThemeProvider>
               <TrailerProvider>
-                <ThemedApp />
+                <ToastProvider>
+                  <ThemedApp />
+                </ToastProvider>
               </TrailerProvider>
             </ThemeProvider>
           </TraktProvider>

@@ -1,43 +1,56 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, Image, StyleSheet, Modal, AppState } from 'react-native';
+import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType, ViewType } from 'react-native-video';
+import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
-import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent } from 'react-native-gesture-handler';
+import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, LongPressGestureHandler, State, PinchGestureHandlerGestureEvent, PanGestureHandlerGestureEvent, TapGestureHandlerGestureEvent, LongPressGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../../services/mmkvStorage';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useTraktAutosyncSettings } from '../../hooks/useTraktAutosyncSettings';
 import { useMetadata } from '../../hooks/useMetadata';
 import { useSettings } from '../../hooks/useSettings';
+import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
 
 import { 
-  DEFAULT_SUBTITLE_SIZE, 
+  DEFAULT_SUBTITLE_SIZE,
+  getDefaultSubtitleSize,
   AudioTrack,
   TextTrack,
   ResizeModeType, 
   WyzieSubtitle, 
   SubtitleCue,
+  SubtitleSegment,
   RESUME_PREF_KEY,
   RESUME_PREF,
   SUBTITLE_SIZE_KEY
 } from './utils/playerTypes';
+
+// Speed settings storage key
+const SPEED_SETTINGS_KEY = '@nuvio_speed_settings';
 import { safeDebugLog, parseSRT, DEBUG_MODE, formatTime } from './utils/playerUtils';
 import { styles } from './utils/playerStyles';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { AudioTrackModal } from './modals/AudioTrackModal';
+import LoadingOverlay from './modals/LoadingOverlay';
+import SpeedModal from './modals/SpeedModal';
 // Removed ResumeOverlay usage when alwaysResume is enabled
 import PlayerControls from './controls/PlayerControls';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SourcesModal } from './modals/SourcesModal';
+import { EpisodesModal } from './modals/EpisodesModal';
+import UpNextButton from './common/UpNextButton';
+import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import VlcVideoPlayer, { VlcPlayerRef } from './VlcVideoPlayer';
 import { stremioService } from '../../services/stremioService';
+import { Episode } from '../../types/metadata';
 import { shouldUseKSPlayer } from '../../utils/playerSelection';
 import axios from 'axios';
 import * as Brightness from 'expo-brightness';
@@ -48,7 +61,6 @@ const getVideoResizeMode = (resizeMode: ResizeModeType) => {
   switch (resizeMode) {
     case 'contain': return 'contain';
     case 'cover': return 'cover';
-    case 'stretch': return 'stretch';
     case 'none': return 'contain';
     default: return 'contain';
   }
@@ -75,7 +87,8 @@ const AndroidVideoPlayer: React.FC = () => {
     episodeId,
     imdbId,
     availableStreams: passedAvailableStreams,
-    backdrop
+    backdrop,
+    groupedEpisodes
   } = route.params;
 
   // Opt-in flag to use VLC backend
@@ -206,6 +219,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const isSourceSeekableRef = useRef<boolean | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const [isOpeningAnimationComplete, setIsOpeningAnimationComplete] = useState(false);
+  const [shouldHideOpeningOverlay, setShouldHideOpeningOverlay] = useState(false);
   const openingFadeAnim = useRef(new Animated.Value(0)).current;
   const openingScaleAnim = useRef(new Animated.Value(0.8)).current;
   const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
@@ -215,14 +229,64 @@ const AndroidVideoPlayer: React.FC = () => {
   const [rnVideoAudioTracks, setRnVideoAudioTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
   const [rnVideoTextTracks, setRnVideoTextTracks] = useState<Array<{id: number, name: string, language?: string}>>([]);
 
+  // Speed boost state for hold-to-speed-up feature
+  const [isSpeedBoosted, setIsSpeedBoosted] = useState(false);
+  const [originalSpeed, setOriginalSpeed] = useState<number>(1.0);
+  const [showSpeedActivatedOverlay, setShowSpeedActivatedOverlay] = useState(false);
+  const speedActivatedOverlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // Speed modal state
+  const [showSpeedModal, setShowSpeedModal] = useState(false);
+  const [holdToSpeedEnabled, setHoldToSpeedEnabled] = useState(true);
+  const [holdToSpeedValue, setHoldToSpeedValue] = useState(2.0);
+
+  // Load speed settings from storage
+  const loadSpeedSettings = useCallback(async () => {
+    try {
+      const saved = await mmkvStorage.getItem(SPEED_SETTINGS_KEY);
+      if (saved) {
+        const settings = JSON.parse(saved);
+        if (typeof settings.holdToSpeedEnabled === 'boolean') {
+          setHoldToSpeedEnabled(settings.holdToSpeedEnabled);
+        }
+        if (typeof settings.holdToSpeedValue === 'number') {
+          setHoldToSpeedValue(settings.holdToSpeedValue);
+        }
+      }
+    } catch (error) {
+      logger.warn('[AndroidVideoPlayer] Error loading speed settings:', error);
+    }
+  }, []);
+
+  // Save speed settings to storage
+  const saveSpeedSettings = useCallback(async () => {
+    try {
+      const settings = {
+        holdToSpeedEnabled,
+        holdToSpeedValue,
+      };
+      await mmkvStorage.setItem(SPEED_SETTINGS_KEY, JSON.stringify(settings));
+    } catch (error) {
+      logger.warn('[AndroidVideoPlayer] Error saving speed settings:', error);
+    }
+  }, [holdToSpeedEnabled, holdToSpeedValue]);
+
+  // Load speed settings on mount
+  useEffect(() => {
+    loadSpeedSettings();
+  }, [loadSpeedSettings]);
+
+  // Save speed settings when they change
+  useEffect(() => {
+    saveSpeedSettings();
+  }, [saveSpeedSettings]);
+
   // Debounce track updates to prevent excessive processing
   const trackUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Debounce resize operations to prevent rapid successive clicks
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounce gesture operations to prevent rapid-fire events
-  const gestureDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
 
 
@@ -319,10 +383,6 @@ const AndroidVideoPlayer: React.FC = () => {
         clearTimeout(resizeTimeoutRef.current);
         resizeTimeoutRef.current = null;
       }
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-        gestureDebounceRef.current = null;
-      }
     };
   }, []);
 
@@ -380,13 +440,8 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Memoize zoom factor calculations to prevent expensive recalculations
   const zoomFactor = useMemo(() => {
-    if (resizeMode === 'cover' && videoAspectRatio && screenDimensions.width > 0 && screenDimensions.height > 0) {
-      const screenAspect = screenDimensions.width / screenDimensions.height;
-      return Math.max(screenAspect / videoAspectRatio, videoAspectRatio / screenAspect);
-    } else if (resizeMode === 'none') {
-      return 1;
-    }
-    return 1; // Default for other modes
+    // Zoom disabled
+    return 1;
   }, [resizeMode, videoAspectRatio, screenDimensions.width, screenDimensions.height]);
   const [customVideoStyles, setCustomVideoStyles] = useState<any>({});
   const [zoomScale, setZoomScale] = useState(1);
@@ -398,9 +453,10 @@ const AndroidVideoPlayer: React.FC = () => {
   const pinchRef = useRef<PinchGestureHandler>(null);
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+  const [currentFormattedSegments, setCurrentFormattedSegments] = useState<SubtitleSegment[][]>([]);
   const [customSubtitleVersion, setCustomSubtitleVersion] = useState<number>(0);
   const [subtitleSize, setSubtitleSize] = useState<number>(DEFAULT_SUBTITLE_SIZE);
-  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(true);
+  const [subtitleBackground, setSubtitleBackground] = useState<boolean>(false);
   // iOS seeking helpers
   const iosWasPausedDuringSeekRef = useRef<boolean | null>(null);
   const wasPlayingBeforeDragRef = useRef<boolean>(false);
@@ -408,11 +464,11 @@ const AndroidVideoPlayer: React.FC = () => {
   const [subtitleTextColor, setSubtitleTextColor] = useState<string>('#FFFFFF');
   const [subtitleBgOpacity, setSubtitleBgOpacity] = useState<number>(0.7);
   const [subtitleTextShadow, setSubtitleTextShadow] = useState<boolean>(true);
-  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(false);
+  const [subtitleOutline, setSubtitleOutline] = useState<boolean>(true);
   const [subtitleOutlineColor, setSubtitleOutlineColor] = useState<string>('#000000');
-  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(2);
+  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState<number>(4);
   const [subtitleAlign, setSubtitleAlign] = useState<'center' | 'left' | 'right'>('center');
-  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(20);
+  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState<number>(10);
   const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState<number>(0);
   const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState<number>(1.2);
   const [subtitleOffsetSec, setSubtitleOffsetSec] = useState<number>(0);
@@ -422,6 +478,9 @@ const AndroidVideoPlayer: React.FC = () => {
   const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState<boolean>(false);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState<boolean>(false);
   const [showSourcesModal, setShowSourcesModal] = useState<boolean>(false);
+  const [showEpisodesModal, setShowEpisodesModal] = useState(false);
+  const [showEpisodeStreamsModal, setShowEpisodeStreamsModal] = useState(false);
+  const [selectedEpisodeForStreams, setSelectedEpisodeForStreams] = useState<Episode | null>(null);
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: any[]; addonName: string } }>(passedAvailableStreams || {});
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>(videoType);
@@ -432,12 +491,11 @@ const AndroidVideoPlayer: React.FC = () => {
   }, [currentStreamUrl, useVLC, processUrlForVLC]);
   // Track a single silent retry per source to avoid loops
   const retryAttemptRef = useRef<number>(0);
-  const [isChangingSource, setIsChangingSource] = useState<boolean>(false);
-  const [pendingSeek, setPendingSeek] = useState<{ position: number; shouldPlay: boolean } | null>(null);
   const [currentQuality, setCurrentQuality] = useState<string | undefined>(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState<string | undefined>(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState<string | undefined>(streamName);
   const isMounted = useRef(true);
+  const isAppBackgrounded = useRef(false); // Track if app is backgrounded to prevent prop updates on detached views
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isSyncingBeforeClose, setIsSyncingBeforeClose] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -524,15 +582,21 @@ const AndroidVideoPlayer: React.FC = () => {
   // Store Android system brightness state to restore on exit/unmount
   const originalSystemBrightnessRef = useRef<number | null>(null);
   const originalSystemBrightnessModeRef = useRef<number | null>(null);
-  const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
-  const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
   const [subtitleSettingsLoaded, setSubtitleSettingsLoaded] = useState(false);
-  const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
-  const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
-  const brightnessOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastVolumeChange = useRef<number>(0);
   const lastBrightnessChange = useRef<number>(0);
+
+  // Use reusable gesture controls hook
+  const gestureControls = usePlayerGestureControls({
+    volume,
+    setVolume,
+    brightness,
+    setBrightness,
+    volumeRange: { min: 0, max: 1 },
+    volumeSensitivity: 0.006,
+    brightnessSensitivity: 0.004,
+    debugMode: DEBUG_MODE,
+  });
 
   // iOS startup timing diagnostics
   const loadStartAtRef = useRef<number | null>(null);
@@ -549,14 +613,11 @@ const AndroidVideoPlayer: React.FC = () => {
   const metadataOpacity = useRef(new Animated.Value(1)).current;
   const metadataScale = useRef(new Animated.Value(1)).current;
 
-  // Next episode button state
-  const [showNextEpisodeButton, setShowNextEpisodeButton] = useState(false);
+  // Next episode loading state
   const [isLoadingNextEpisode, setIsLoadingNextEpisode] = useState(false);
   const [nextLoadingProvider, setNextLoadingProvider] = useState<string | null>(null);
   const [nextLoadingQuality, setNextLoadingQuality] = useState<string | null>(null);
   const [nextLoadingTitle, setNextLoadingTitle] = useState<string | null>(null);
-  const nextEpisodeButtonOpacity = useRef(new Animated.Value(0)).current;
-  const nextEpisodeButtonScale = useRef(new Animated.Value(0.8)).current;
 
   // Cast display state
   const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
@@ -568,7 +629,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const shouldLoadMetadata = Boolean(id && type);
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
   const { settings: appSettings } = useSettings();
-  const { metadata, loading: metadataLoading, groupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
+  const { metadata, loading: metadataLoading, groupedEpisodes: metadataGroupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
   
   // Logo animation values
   const logoScaleAnim = useRef(new Animated.Value(0.8)).current;
@@ -586,22 +647,21 @@ const AndroidVideoPlayer: React.FC = () => {
       backdropImageOpacityAnim.setValue(0);
 
       // Prefetch the image
-      Image.prefetch(backdrop)
-        .then(() => {
-          // Image loaded successfully, fade it in smoothly
-          setIsBackdropLoaded(true);
-          Animated.timing(backdropImageOpacityAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
-        })
-        .catch((error) => {
-          // If prefetch fails, still show the image but without animation
-          if (__DEV__) logger.warn('[AndroidVideoPlayer] Backdrop prefetch failed, showing anyway:', error);
-          setIsBackdropLoaded(true);
-          backdropImageOpacityAnim.setValue(1);
-        });
+      try {
+        FastImage.preload([{ uri: backdrop }]);
+        // Image prefetch initiated, fade it in smoothly
+        setIsBackdropLoaded(true);
+        Animated.timing(backdropImageOpacityAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+      } catch (error) {
+        // If prefetch fails, still show the image but without animation
+        if (__DEV__) logger.warn('[AndroidVideoPlayer] Backdrop prefetch failed, showing anyway:', error);
+        setIsBackdropLoaded(true);
+        backdropImageOpacityAnim.setValue(1);
+      }
     } else {
       // No backdrop provided, consider it "loaded"
       setIsBackdropLoaded(true);
@@ -612,7 +672,11 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
     if (logoUrl && typeof logoUrl === 'string') {
-      Image.prefetch(logoUrl).catch(() => {});
+      try {
+        FastImage.preload([{ uri: logoUrl }]);
+      } catch (error) {
+        // Silently ignore logo prefetch errors
+      }
     }
   }, [metadata]);
 
@@ -635,30 +699,43 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [type, groupedEpisodes, episodeId, season, episode]);
 
-  // Find next episode for series
+  // Find next episode for series (use groupedEpisodes or fallback to metadataGroupedEpisodes)
   const nextEpisode = useMemo(() => {
     try {
       if ((type as any) !== 'series' || !season || !episode) return null;
-      const allEpisodes = Object.values(groupedEpisodes || {}).flat() as any[];
+      // Prefer groupedEpisodes from route, else metadataGroupedEpisodes
+      const sourceGroups = groupedEpisodes && Object.keys(groupedEpisodes || {}).length > 0
+        ? groupedEpisodes
+        : (metadataGroupedEpisodes || {});
+      const allEpisodes = Object.values(sourceGroups || {}).flat() as any[];
       if (!allEpisodes || allEpisodes.length === 0) return null;
-      
       // First try next episode in same season
       let nextEp = allEpisodes.find((ep: any) => 
         ep.season_number === season && ep.episode_number === episode + 1
       );
-      
       // If not found, try first episode of next season
       if (!nextEp) {
         nextEp = allEpisodes.find((ep: any) => 
           ep.season_number === season + 1 && ep.episode_number === 1
         );
       }
-      
+      if (DEBUG_MODE) {
+        logger.log('[AndroidVideoPlayer] nextEpisode computation', {
+          fromRouteGroups: !!(groupedEpisodes && Object.keys(groupedEpisodes || {}).length),
+          fromMetadataGroups: !!(metadataGroupedEpisodes && Object.keys(metadataGroupedEpisodes || {}).length),
+          allEpisodesCount: allEpisodes?.length || 0,
+          currentSeason: season,
+          currentEpisode: episode,
+          found: !!nextEp,
+          foundId: nextEp?.stremioId || nextEp?.id,
+          foundName: nextEp?.name,
+        });
+      }
       return nextEp;
     } catch {
       return null;
     }
-  }, [type, season, episode, groupedEpisodes]);
+  }, [type, season, episode, groupedEpisodes, metadataGroupedEpisodes]);
   
   // Small offset (in seconds) used to avoid seeking to the *exact* end of the
   // file which triggers the `onEnd` callback and causes playback to restart.
@@ -678,140 +755,78 @@ const AndroidVideoPlayer: React.FC = () => {
 
 
   const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
-    const { scale } = event.nativeEvent;
-    const newScale = Math.max(1, Math.min(lastZoomScale * scale, 1.1));
-    setZoomScale(newScale);
-    if (DEBUG_MODE) {
-      if (__DEV__) logger.log(`[AndroidVideoPlayer] Center Zoom: ${newScale.toFixed(2)}x`);
-    }
+    // Zoom disabled
+    return;
   };
 
   const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      setLastZoomScale(zoomScale);
-      if (DEBUG_MODE) {
-        if (__DEV__) logger.log(`[AndroidVideoPlayer] Pinch ended - saved scale: ${zoomScale.toFixed(2)}x`);
-      }
-    }
+    // Zoom disabled
+    return;
   };
 
-  // Volume gesture handler (right side of screen) - optimized with debouncing
-  const onVolumeGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.002; // Lower sensitivity for gradual volume control on Android
-
-    if (state === State.ACTIVE) {
-      // Debounce rapid gesture events
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-      }
+  // Long press gesture handlers for speed boost
+  const onLongPressActivated = useCallback(() => {
+    if (!holdToSpeedEnabled) return;
+    
+    if (!isSpeedBoosted && playbackSpeed !== holdToSpeedValue) {
+      setOriginalSpeed(playbackSpeed);
+      setPlaybackSpeed(holdToSpeedValue);
+      setIsSpeedBoosted(true);
       
-      gestureDebounceRef.current = setTimeout(() => {
-        const deltaY = -translationY; // Invert for natural feel (up = increase)
-        const volumeChange = deltaY * sensitivity;
-        const newVolume = Math.max(0, Math.min(1, volume + volumeChange));
-
-        if (Math.abs(newVolume - volume) > 0.01) { // Lower threshold for smoother Android volume control
-          setVolume(newVolume);
-          lastVolumeChange.current = Date.now();
-          
-          if (DEBUG_MODE) {
-            logger.log(`[AndroidVideoPlayer] Volume set to: ${newVolume}`);
-          }
-          
-          // Show overlay with smoother animation
-          if (!showVolumeOverlay) {
-            setShowVolumeOverlay(true);
-            Animated.spring(volumeOverlayOpacity, {
-              toValue: 1,
-              tension: 100,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-          
-          // Clear existing timeout
-          if (volumeOverlayTimeout.current) {
-            clearTimeout(volumeOverlayTimeout.current);
-          }
-          
-          // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-          volumeOverlayTimeout.current = setTimeout(() => {
-            Animated.timing(volumeOverlayOpacity, {
-              toValue: 0,
-              duration: 250,
-              useNativeDriver: true,
-            }).start(() => {
-              setShowVolumeOverlay(false);
-            });
-          }, 1500);
-        }
-      }, 16); // ~60fps debouncing
-    }
-  };
-
-  // Brightness gesture handler (left side of screen) - optimized with debouncing
-  const onBrightnessGestureEvent = async (event: PanGestureHandlerGestureEvent) => {
-    const { translationY, state } = event.nativeEvent;
-    const sensitivity = 0.001; // Lower sensitivity for finer brightness control
-
-    if (state === State.ACTIVE) {
-      // Debounce rapid gesture events
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-      }
+      // Show "Activated" overlay
+      setShowSpeedActivatedOverlay(true);
+      Animated.spring(speedActivatedOverlayOpacity, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
       
-      gestureDebounceRef.current = setTimeout(() => {
-        const deltaY = -translationY; // Invert for natural feel (up = increase)
-        const brightnessChange = deltaY * sensitivity;
-        const newBrightness = Math.max(0, Math.min(1, brightness + brightnessChange));
-
-        if (Math.abs(newBrightness - brightness) > 0.001) { // Much lower threshold for more responsive updates
-          setBrightness(newBrightness);
-          lastBrightnessChange.current = Date.now();
-          
-          // Set device brightness using Expo Brightness
-          try {
-            Brightness.setBrightnessAsync(newBrightness).catch((error) => {
-              logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
-            });
-            if (DEBUG_MODE) {
-              logger.log(`[AndroidVideoPlayer] Device brightness set to: ${newBrightness}`);
-            }
-          } catch (error) {
-            logger.warn('[AndroidVideoPlayer] Error setting device brightness:', error);
-          }
-          
-          // Show overlay with smoother animation
-          if (!showBrightnessOverlay) {
-            setShowBrightnessOverlay(true);
-            Animated.spring(brightnessOverlayOpacity, {
-              toValue: 1,
-              tension: 100,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-          
-          // Clear existing timeout
-          if (brightnessOverlayTimeout.current) {
-            clearTimeout(brightnessOverlayTimeout.current);
-          }
-          
-          // Hide overlay after 1.5 seconds (reduced from 2 seconds)
-          brightnessOverlayTimeout.current = setTimeout(() => {
-            Animated.timing(brightnessOverlayOpacity, {
-              toValue: 0,
-              duration: 250,
-              useNativeDriver: true,
-            }).start(() => {
-              setShowBrightnessOverlay(false);
-            });
-          }, 1500);
-        }
-      }, 16); // ~60fps debouncing
+      // Auto-hide after 2 seconds
+      setTimeout(() => {
+        Animated.timing(speedActivatedOverlayOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowSpeedActivatedOverlay(false);
+        });
+      }, 2000);
+      
+      logger.log(`[AndroidVideoPlayer] Speed boost activated: ${holdToSpeedValue}x`);
     }
-  };
+  }, [isSpeedBoosted, playbackSpeed, holdToSpeedEnabled, holdToSpeedValue, speedActivatedOverlayOpacity]);
+
+  const restoreSpeedSafely = useCallback(() => {
+    if (isSpeedBoosted) {
+      setPlaybackSpeed(originalSpeed);
+      setIsSpeedBoosted(false);
+      logger.log('[AndroidVideoPlayer] Speed boost deactivated, restored to:', originalSpeed);
+    }
+  }, [isSpeedBoosted, originalSpeed]);
+
+  const onLongPressEnd = useCallback(() => {
+    restoreSpeedSafely();
+  }, [restoreSpeedSafely]);
+
+  const onLongPressStateChange = useCallback((event: LongPressGestureHandlerGestureEvent) => {
+    // Fallback: ensure we restore on cancel/fail transitions as well
+    // @ts-ignore - event.nativeEvent.state uses numeric State enum
+    const state = event?.nativeEvent?.state;
+    if (state === State.CANCELLED || state === State.FAILED || state === State.END) {
+      restoreSpeedSafely();
+    }
+  }, [restoreSpeedSafely]);
+
+  // Safety: if component unmounts while boosted, restore speed
+  useEffect(() => {
+    return () => {
+      if (isSpeedBoosted) {
+        // best-effort restoration on unmount
+        try { setPlaybackSpeed(originalSpeed); } catch {}
+      }
+    };
+  }, [isSpeedBoosted, originalSpeed]);
 
   const resetZoom = () => {
     const targetZoom = is16by9Content ? 1.1 : 1;
@@ -911,6 +926,7 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     const onAppStateChange = (state: string) => {
       if (state === 'active') {
+        isAppBackgrounded.current = false;
         enableImmersiveMode();
         if (useVLC) {
           // Force complete remount VLC view when app returns to foreground
@@ -937,6 +953,8 @@ const AndroidVideoPlayer: React.FC = () => {
           }, 300); // Slightly longer delay for iOS
         }
       } else if (state === 'background' || state === 'inactive') {
+        // Mark app as backgrounded to prevent prop updates on detached native views
+        isAppBackgrounded.current = true;
         // On iOS, when app goes inactive (like status bar pull), track if we were playing
         if (Platform.OS === 'ios') {
           wasPlayingBeforeIOSInterruptionRef.current = !paused;
@@ -999,6 +1017,9 @@ const AndroidVideoPlayer: React.FC = () => {
   };
 
   const completeOpeningAnimation = () => {
+    // Stop the pulse animation immediately
+    pulseAnim.stopAnimation();
+    
     Animated.parallel([
       Animated.timing(openingFadeAnim, {
         toValue: 1,
@@ -1016,11 +1037,12 @@ const AndroidVideoPlayer: React.FC = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      openingScaleAnim.setValue(1);
-      openingFadeAnim.setValue(1);
       setIsOpeningAnimationComplete(true);
-      // Removed the 100ms delay
-      backgroundFadeAnim.setValue(0);
+      
+      // Delay hiding the overlay to allow background fade animation to complete
+      setTimeout(() => {
+        setShouldHideOpeningOverlay(true);
+      }, 450); // Slightly longer than the background fade duration
     });
     
     // Fallback: ensure animation completes even if something goes wrong
@@ -1028,9 +1050,6 @@ const AndroidVideoPlayer: React.FC = () => {
       if (!isOpeningAnimationComplete) {
         if (__DEV__) logger.warn('[AndroidVideoPlayer] Opening animation fallback triggered');
         setIsOpeningAnimationComplete(true);
-        openingScaleAnim.setValue(1);
-        openingFadeAnim.setValue(1);
-        backgroundFadeAnim.setValue(0);
       }
     }, 1000); // 1 second fallback
   };
@@ -1219,6 +1238,12 @@ const AndroidVideoPlayer: React.FC = () => {
     if (isMounted.current) {
       setSeekTime(null);
       isSeeking.current = false;
+
+      // IMMEDIATE SYNC: Update Trakt progress immediately after seeking
+      if (duration > 0 && data?.currentTime !== undefined) {
+        traktAutosync.handleProgressUpdate(data.currentTime, duration, true); // force=true for immediate sync
+      }
+
       // Resume playback on iOS if we paused for seeking
       if (Platform.OS === 'ios') {
         const shouldResume = wasPlayingBeforeDragRef.current || iosWasPausedDuringSeekRef.current === false || isDragging;
@@ -1297,7 +1322,9 @@ const AndroidVideoPlayer: React.FC = () => {
   // Removed processProgressTouch - no longer needed with React Native Community Slider
 
   const handleProgress = (data: any) => {
-    if (isDragging || isSeeking.current) return;
+    // Prevent processing progress updates when component is unmounted or app is backgrounded
+    // This prevents Fabric from attempting to update props on detached native views
+    if (isDragging || isSeeking.current || !isMounted.current || isAppBackgrounded.current) return;
     
     const currentTimeInSeconds = data.currentTime;
     
@@ -1614,6 +1641,11 @@ const AndroidVideoPlayer: React.FC = () => {
       }
       
       controlsTimeout.current = setTimeout(hideControls, 5000);
+      
+      // Auto-fetch and load English external subtitles if available
+      if (imdbId) {
+        fetchAvailableSubtitles(undefined, true);
+      }
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error in onLoad:', error);
       // Set fallback values to prevent crashes
@@ -1643,10 +1675,10 @@ const AndroidVideoPlayer: React.FC = () => {
     // Android: exclude 'contain' for both VLC and RN Video (not well supported)
     let resizeModes: ResizeModeType[];
     if (Platform.OS === 'ios') {
-      resizeModes = ['cover', 'fill'];
+      resizeModes = ['contain', 'cover'];
     } else {
-      // Android: both VLC and RN Video skip 'contain' mode
-      resizeModes = ['cover', 'fill', 'none'];
+      // On Android with VLC backend, only 'none' (original) and 'cover' (client-side crop)
+      resizeModes = useVLC ? ['none', 'cover'] : ['cover', 'none'];
     }
 
     const currentIndex = resizeModes.indexOf(resizeMode);
@@ -2290,6 +2322,14 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [useVLC, selectVlcSubtitleTrack]);
 
+  // Automatically disable VLC internal subtitles when external subtitles are enabled
+  useEffect(() => {
+    if (useVLC && useCustomSubtitles) {
+      logger.log('[AndroidVideoPlayer][VLC] External subtitles enabled, disabling internal subtitles');
+      selectVlcSubtitleTrack(null);
+    }
+  }, [useVLC, useCustomSubtitles, selectVlcSubtitleTrack]);
+
   const disableCustomSubtitles = useCallback(() => {
     setUseCustomSubtitles(false);
     setCustomSubtitles([]);
@@ -2309,7 +2349,7 @@ const AndroidVideoPlayer: React.FC = () => {
         return;
       }
       // One-time migrate legacy key if present
-      const legacy = await AsyncStorage.getItem(SUBTITLE_SIZE_KEY);
+      const legacy = await mmkvStorage.getItem(SUBTITLE_SIZE_KEY);
       if (legacy) {
         const migrated = parseInt(legacy, 10);
         if (!Number.isNaN(migrated) && migrated > 0) {
@@ -2319,10 +2359,17 @@ const AndroidVideoPlayer: React.FC = () => {
             await storageService.saveSubtitleSettings(merged);
           } catch {}
         }
-        try { await AsyncStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        try { await mmkvStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        return;
       }
+      // If no saved settings, use responsive default
+      const screenWidth = Dimensions.get('window').width;
+      setSubtitleSize(getDefaultSubtitleSize(screenWidth));
     } catch (error) {
       logger.error('[AndroidVideoPlayer] Error loading subtitle size:', error);
+      // Fallback to responsive default on error
+      const screenWidth = Dimensions.get('window').width;
+      setSubtitleSize(getDefaultSubtitleSize(screenWidth));
     }
   };
 
@@ -2736,70 +2783,14 @@ const AndroidVideoPlayer: React.FC = () => {
     };
   }, [paused]);
 
-  // Handle next episode button visibility based on current time and next episode availability
-  useEffect(() => {
-    if ((type as any) !== 'series' || !nextEpisode || duration <= 0) {
-      if (showNextEpisodeButton) {
-        // Hide button with animation
-        Animated.parallel([
-          Animated.timing(nextEpisodeButtonOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(nextEpisodeButtonScale, {
-            toValue: 0.8,
-            duration: 200,
-            useNativeDriver: true,
-          })
-        ]).start(() => {
-          setShowNextEpisodeButton(false);
-        });
-      }
-      return;
-    }
-
-    // Show button when 1 minute (60 seconds) remains
-    const timeRemaining = duration - currentTime;
-    const shouldShowButton = timeRemaining <= 60 && timeRemaining > 10; // Hide in last 10 seconds
-
-    if (shouldShowButton && !showNextEpisodeButton) {
-      setShowNextEpisodeButton(true);
-      Animated.parallel([
-        Animated.timing(nextEpisodeButtonOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.spring(nextEpisodeButtonScale, {
-          toValue: 1,
-          tension: 100,
-          friction: 8,
-          useNativeDriver: true,
-        })
-      ]).start();
-    } else if (!shouldShowButton && showNextEpisodeButton) {
-      Animated.parallel([
-        Animated.timing(nextEpisodeButtonOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(nextEpisodeButtonScale, {
-          toValue: 0.8,
-          duration: 200,
-          useNativeDriver: true,
-        })
-      ]).start(() => {
-        setShowNextEpisodeButton(false);
-      });
-    }
-  }, [type, nextEpisode, duration, currentTime, showNextEpisodeButton]);
+  // Up Next visibility handled inside reusable component
 
   useEffect(() => {
     isMounted.current = true;
+    isAppBackgrounded.current = false;
     return () => {
       isMounted.current = false;
+      isAppBackgrounded.current = false;
       // Clear all timers and intervals
       if (seekDebounceTimer.current) {
         clearTimeout(seekDebounceTimer.current);
@@ -2809,14 +2800,6 @@ const AndroidVideoPlayer: React.FC = () => {
         clearTimeout(errorTimeoutRef.current);
         errorTimeoutRef.current = null;
       }
-      if (volumeOverlayTimeout.current) {
-        clearTimeout(volumeOverlayTimeout.current);
-        volumeOverlayTimeout.current = null;
-      }
-      if (brightnessOverlayTimeout.current) {
-        clearTimeout(brightnessOverlayTimeout.current);
-        brightnessOverlayTimeout.current = null;
-      }
       if (controlsTimeout.current) {
         clearTimeout(controlsTimeout.current);
         controlsTimeout.current = null;
@@ -2825,14 +2808,13 @@ const AndroidVideoPlayer: React.FC = () => {
         clearTimeout(pauseOverlayTimerRef.current);
         pauseOverlayTimerRef.current = null;
       }
-      if (gestureDebounceRef.current) {
-        clearTimeout(gestureDebounceRef.current);
-        gestureDebounceRef.current = null;
-      }
       if (progressSaveInterval) {
         clearInterval(progressSaveInterval);
         setProgressSaveInterval(null);
       }
+      
+      // Cleanup gesture controls
+      gestureControls.cleanup();
       // Best-effort restore of Android system brightness state on unmount
       if (Platform.OS === 'android') {
         try {
@@ -2861,14 +2843,50 @@ const AndroidVideoPlayer: React.FC = () => {
       if (currentSubtitle !== '') {
         setCurrentSubtitle('');
       }
+      if (currentFormattedSegments.length > 0) {
+        setCurrentFormattedSegments([]);
+      }
       return;
     }
-    const adjustedTime = currentTime + (subtitleOffsetSec || 0);
+    const adjustedTime = currentTime + (subtitleOffsetSec || 0) - 0.2;
     const currentCue = customSubtitles.find(cue => 
       adjustedTime >= cue.start && adjustedTime <= cue.end
     );
     const newSubtitle = currentCue ? currentCue.text : '';
     setCurrentSubtitle(newSubtitle);
+    
+    // Extract formatted segments from current cue
+    if (currentCue?.formattedSegments) {
+      // Split by newlines to get per-line segments
+      const lines = (currentCue.text || '').split(/\r?\n/);
+      const segmentsPerLine: SubtitleSegment[][] = [];
+      let segmentIndex = 0;
+      
+      for (const line of lines) {
+        const lineSegments: SubtitleSegment[] = [];
+        const words = line.split(/(\s+)/);
+        
+        for (const word of words) {
+          if (word.trim()) {
+            if (segmentIndex < currentCue.formattedSegments.length) {
+              lineSegments.push(currentCue.formattedSegments[segmentIndex]);
+              segmentIndex++;
+            } else {
+              // Fallback if segment count doesn't match
+              lineSegments.push({ text: word });
+            }
+          }
+        }
+        
+        if (lineSegments.length > 0) {
+          segmentsPerLine.push(lineSegments);
+        }
+      }
+      
+      setCurrentFormattedSegments(segmentsPerLine.length > 0 ? segmentsPerLine : []);
+    } else {
+      setCurrentFormattedSegments([]);
+    }
   }, [currentTime, customSubtitles, useCustomSubtitles, subtitleOffsetSec]);
 
   useEffect(() => {
@@ -2961,7 +2979,7 @@ const AndroidVideoPlayer: React.FC = () => {
   ]);
 
   const increaseSubtitleSize = () => {
-    const newSize = Math.min(subtitleSize + 2, 32);
+    const newSize = Math.min(subtitleSize + 2, 80);
     saveSubtitleSize(newSize);
   };
 
@@ -2974,110 +2992,99 @@ const AndroidVideoPlayer: React.FC = () => {
     setSubtitleBackground(!subtitleBackground);
   };
 
-  useEffect(() => {
-    if (pendingSeek && isPlayerReady && isVideoLoaded && duration > 0) {
-      logger.log(`[AndroidVideoPlayer] Player ready after source change, seeking to position: ${pendingSeek.position}s out of ${duration}s total`);
-      
-      if (pendingSeek.position > 0 && videoRef.current) {
-        const delayTime = 800; // Shorter delay for react-native-video
-        
-        setTimeout(() => {
-          if (videoRef.current && duration > 0 && pendingSeek) {
-            logger.log(`[AndroidVideoPlayer] Executing seek to ${pendingSeek.position}s`);
-            
-            seekToTime(pendingSeek.position);
-            
-            if (pendingSeek.shouldPlay) {
-              setTimeout(() => {
-                logger.log('[AndroidVideoPlayer] Resuming playback after source change seek');
-                setPaused(false);
-              }, 300);
-            }
-            
-            setTimeout(() => {
-              setPendingSeek(null);
-              setIsChangingSource(false);
-            }, 400);
-          }
-        }, delayTime);
-      } else {
-        // No seeking needed, just resume playback if it was playing
-        if (pendingSeek.shouldPlay) {
-          setTimeout(() => {
-            logger.log('[AndroidVideoPlayer] No seek needed, just resuming playback');
-            setPaused(false);
-          }, 300);
-        }
-        
-        setTimeout(() => {
-          setPendingSeek(null);
-          setIsChangingSource(false);
-        }, 400);
-      }
-    }
-  }, [pendingSeek, isPlayerReady, isVideoLoaded, duration]);
-
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
       setShowSourcesModal(false);
       return;
     }
 
-    // Note: iOS now always uses KSPlayer, so this AndroidVideoPlayer should never be used on iOS
-    // This logic is kept for safety in case routing changes
-
-    setIsChangingSource(true);
     setShowSourcesModal(false);
     
-    try {
-      // Save current state
-      const savedPosition = currentTime;
-      const wasPlaying = !paused;
-      
-      logger.log(`[AndroidVideoPlayer] Changing source from ${currentStreamUrl} to ${newStream.url}`);
-      logger.log(`[AndroidVideoPlayer] Saved position: ${savedPosition}, was playing: ${wasPlaying}`);
-      
-      // Extract quality and provider information from the new stream
-      let newQuality = newStream.quality;
-      if (!newQuality && newStream.title) {
-        // Try to extract quality from title (e.g., "1080p", "720p")
-        const qualityMatch = newStream.title.match(/(\d+)p/);
-        newQuality = qualityMatch ? qualityMatch[0] : undefined;
-      }
-      
-      // For provider, try multiple fields
-      const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
-      
-      // For stream name, prioritize the stream name over title
-      const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
-      
-      logger.log(`[AndroidVideoPlayer] Stream object:`, newStream);
-      logger.log(`[AndroidVideoPlayer] Extracted - Quality: ${newQuality}, Provider: ${newProvider}, Stream Name: ${newStreamName}`);
-      
-      // Stop current playback
-      setPaused(true);
-      
-      // Set pending seek state
-      setPendingSeek({ position: savedPosition, shouldPlay: wasPlaying });
-      
-      // Update the stream URL and details immediately
-      setCurrentStreamUrl(newStream.url);
-      setCurrentQuality(newQuality);
-      setCurrentStreamProvider(newProvider);
-      setCurrentStreamName(newStreamName);
-      
-      // Reset player state for new source
-      setCurrentTime(0);
-      setDuration(0);
-      setIsPlayerReady(false);
-      setIsVideoLoaded(false);
-      vlcLoadedRef.current = false;
-      
-    } catch (error) {
-      logger.error('[AndroidVideoPlayer] Error changing source:', error);
-      setPendingSeek(null);
-      setIsChangingSource(false);
+    // Extract quality and provider information
+    let newQuality = newStream.quality;
+    if (!newQuality && newStream.title) {
+      const qualityMatch = newStream.title.match(/(\d+)p/);
+      newQuality = qualityMatch ? qualityMatch[0] : undefined;
     }
+    
+    const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
+    const newStreamName = newStream.name || newStream.title || 'Unknown Stream';
+    
+    // Pause current playback
+    setPaused(true);
+    
+    // Navigate with replace to reload player with new source
+    setTimeout(() => {
+      (navigation as any).replace('PlayerAndroid', {
+        uri: newStream.url,
+        title: title,
+        episodeTitle: episodeTitle,
+        season: season,
+        episode: episode,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: newStream.headers || undefined,
+        forceVlc: false,
+        id,
+        type,
+        episodeId,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: availableStreams,
+      });
+    }, 100);
+  };
+
+  const handleEpisodeSelect = (episode: Episode) => {
+    logger.log('[AndroidVideoPlayer] Episode selected:', episode.name);
+    setSelectedEpisodeForStreams(episode);
+    setShowEpisodesModal(false);
+    setShowEpisodeStreamsModal(true);
+  };
+
+  // Debug: Log when modal state changes
+  useEffect(() => {
+    if (showEpisodesModal) {
+      logger.log('[AndroidVideoPlayer] Episodes modal opened, groupedEpisodes:', groupedEpisodes);
+      logger.log('[AndroidVideoPlayer] type:', type, 'season:', season, 'episode:', episode);
+    }
+  }, [showEpisodesModal, groupedEpisodes, type]);
+
+  const handleEpisodeStreamSelect = async (stream: any) => {
+    if (!selectedEpisodeForStreams) return;
+    
+    setShowEpisodeStreamsModal(false);
+    
+    const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
+    const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';
+    const newStreamName = stream.name || stream.title || 'Unknown Stream';
+    
+    setPaused(true);
+    
+    setTimeout(() => {
+      (navigation as any).replace('PlayerAndroid', {
+        uri: stream.url,
+        title: title,
+        episodeTitle: selectedEpisodeForStreams.name,
+        season: selectedEpisodeForStreams.season_number,
+        episode: selectedEpisodeForStreams.episode_number,
+        quality: newQuality,
+        year: year,
+        streamProvider: newProvider,
+        streamName: newStreamName,
+        headers: stream.headers || undefined,
+        forceVlc: false,
+        id,
+        type: 'series',
+        episodeId: selectedEpisodeForStreams.stremioId || `${id}:${selectedEpisodeForStreams.season_number}:${selectedEpisodeForStreams.episode_number}`,
+        imdbId: imdbId ?? undefined,
+        backdrop: backdrop || undefined,
+        availableStreams: {},
+        groupedEpisodes: groupedEpisodes,
+      });
+    }, 100);
   };
 
   useEffect(() => {
@@ -3114,161 +3121,96 @@ const AndroidVideoPlayer: React.FC = () => {
       top: 0,
       left: 0,
     }]}> 
-      <Animated.View 
-        style={[
-          styles.openingOverlay,
-          {
-            opacity: backgroundFadeAnim,
-            zIndex: isOpeningAnimationComplete ? -1 : 3000,
-            width: screenDimensions.width,
-            height: screenDimensions.height,
-          }
-        ]}
-        pointerEvents={isOpeningAnimationComplete ? 'none' : 'auto'}
-      >
-        {backdrop && (
-          <Animated.Image
-            source={{ uri: backdrop }}
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                width: screenDimensions.width,
-                height: screenDimensions.height,
-                opacity: backdropImageOpacityAnim
-              }
-            ]}
-            resizeMode="cover"
-            blurRadius={0}
-          />
-        )}
-        <LinearGradient
-          colors={[
-            'rgba(0,0,0,0.3)',
-            'rgba(0,0,0,0.6)',
-            'rgba(0,0,0,0.8)',
-            'rgba(0,0,0,0.9)'
-          ]}
-          locations={[0, 0.3, 0.7, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        
-        <TouchableOpacity 
-          style={styles.loadingCloseButton}
-          onPress={handleClose}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="close" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        
-        <View style={styles.openingContent}>
-          {hasLogo ? (
-            <>
-            <Animated.View style={{
-              transform: [
-                { scale: Animated.multiply(logoScaleAnim, pulseAnim) }
-              ],
-              opacity: logoOpacityAnim,
-              alignItems: 'center',
-            }}>
-              <Image
-                source={{ uri: metadata.logo }}
-                style={{
-                  width: 300,
-                  height: 180,
-                  resizeMode: 'contain',
-                }}
-              />
-            </Animated.View>
-            </>
-          ) : (
-            <>
-          <ActivityIndicator size="large" color="#E50914" />
-            </>
-          )}
-        </View>
-      </Animated.View>
-
-      {/* Source Change Loading Overlay */}
-      {isChangingSource && (
-        <Animated.View 
-          style={[
-            styles.sourceChangeOverlay,
-            {
-              width: screenDimensions.width,
-              height: screenDimensions.height,
-              opacity: fadeAnim,
-            }
-          ]}
-          pointerEvents="auto"
-        >
-          <View style={styles.sourceChangeContent}>
-            <ActivityIndicator size="large" color="#E50914" />
-            <Text style={styles.sourceChangeText}>Changing source...</Text>
-            <Text style={styles.sourceChangeSubtext}>Please wait while we load the new stream</Text>
-          </View>
-        </Animated.View>
-      )}
+      <LoadingOverlay
+        visible={!shouldHideOpeningOverlay}
+        backdrop={backdrop || null}
+        hasLogo={hasLogo}
+        logo={metadata?.logo}
+        backgroundFadeAnim={backgroundFadeAnim}
+        backdropImageOpacityAnim={backdropImageOpacityAnim}
+        onClose={handleClose}
+        width={screenDimensions.width}
+        height={screenDimensions.height}
+      />
 
       <Animated.View 
         style={[
           styles.videoPlayerContainer,
           {
             opacity: openingFadeAnim,
-            transform: isOpeningAnimationComplete ? [] : [{ scale: openingScaleAnim }],
+            transform: [{ scale: openingScaleAnim }],
             width: screenDimensions.width,
             height: screenDimensions.height,
           }
         ]}
       >
-        {/* Combined gesture handler for left side - brightness + tap */}
-        <PanGestureHandler
-          onGestureEvent={onBrightnessGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+        {/* Combined gesture handler for left side - brightness + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={gestureControls.onBrightnessGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
-              left: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.15, // Back to original margin
+                left: 0,
+                width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
+                height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
-        {/* Combined gesture handler for right side - volume + tap */}
-        <PanGestureHandler
-          onGestureEvent={onVolumeGestureEvent}
-          activeOffsetY={[-5, 5]}
-          failOffsetX={[-20, 20]}
+        {/* Combined gesture handler for right side - volume + tap + long press */}
+        <LongPressGestureHandler
+          onActivated={onLongPressActivated}
+          onEnded={onLongPressEnd}
+          onHandlerStateChange={onLongPressStateChange}
+          minDurationMs={500}
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
-          maxPointers={1}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={gestureControls.onVolumeGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15, // Back to original margin
-              right: 0,
-              width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-              height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
-              zIndex: 10, // Higher z-index to capture gestures
-            }} />
-          </TapGestureHandler>
-        </PanGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.15, // Back to original margin
+                right: 0,
+                width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
+                height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
+                zIndex: 10, // Higher z-index to capture gestures
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
 
         {/* Center area tap handler - handles both show and hide */}
         <TapGestureHandler
@@ -3324,14 +3266,13 @@ const AndroidVideoPlayer: React.FC = () => {
                 style={{ flex: 1 }}
                 activeOpacity={1}
                 onPress={toggleControls}
-                onLongPress={resetZoom}
-                delayLongPress={300}
               >
                 {useVLC && !forceVlcRemount ? (
                   <VlcVideoPlayer
                     ref={vlcPlayerRef}
                     source={processedStreamUrl}
                     volume={volume}
+                    playbackSpeed={playbackSpeed}
                     zoomScale={zoomScale}
                     resizeMode={resizeMode}
                     onLoad={(data) => {
@@ -3366,7 +3307,7 @@ const AndroidVideoPlayer: React.FC = () => {
                 ) : (
                   <Video
                       ref={videoRef}
-                  style={[styles.video, customVideoStyles, { transform: [{ scale: zoomScale }] }]}
+                  style={[styles.video, customVideoStyles]}
                   source={{ 
                     uri: currentStreamUrl, 
                     headers: headers || getStreamHeaders(), 
@@ -3432,8 +3373,8 @@ const AndroidVideoPlayer: React.FC = () => {
                   allowsExternalPlayback={false as any}
                   preventsDisplaySleepDuringVideoPlayback={true as any}
                   // ExoPlayer HLS optimization - let the player use optimal defaults
-                  // Use textureView on Android: allows 3D mapping but DRM not supported
-                  viewType={Platform.OS === 'android' ? ViewType.TEXTURE : undefined}
+                  // Use surfaceView on Android for improved compatibility
+                  viewType={Platform.OS === 'android' ? ViewType.SURFACE : undefined}
                 />
                 )}
               </TouchableOpacity>
@@ -3475,8 +3416,10 @@ const AndroidVideoPlayer: React.FC = () => {
             currentPlaybackSpeed={playbackSpeed}
             setShowAudioModal={setShowAudioModal}
             setShowSubtitleModal={setShowSubtitleModal}
+            setShowSpeedModal={setShowSpeedModal}
             isSubtitleModalOpen={showSubtitleModal}
             setShowSourcesModal={setShowSourcesModal}
+            setShowEpisodesModal={type === 'series' ? setShowEpisodesModal : undefined}
             onSliderValueChange={handleSliderValueChange}
             onSlidingStart={handleSlidingStart}
             onSlidingComplete={handleSlidingComplete}
@@ -3614,7 +3557,7 @@ const AndroidVideoPlayer: React.FC = () => {
                               shadowRadius: 8,
                               elevation: 5,
                             }}>
-                              <Image
+                              <FastImage
                                 source={{ uri: `https://image.tmdb.org/t/p/w300${selectedCastMember.profile_path}` }}
                                 style={{
                                   width: Math.min(120, screenDimensions.width * 0.18),
@@ -3622,7 +3565,7 @@ const AndroidVideoPlayer: React.FC = () => {
                                   borderRadius: 12,
                                   backgroundColor: 'rgba(255,255,255,0.1)'
                                 }}
-                                resizeMode="cover"
+                                resizeMode={FastImage.resizeMode.cover}
                               />
                             </View>
                           )}
@@ -3788,59 +3731,22 @@ const AndroidVideoPlayer: React.FC = () => {
             </TouchableOpacity>
           )}
 
-          {/* Next Episode Button */}
-          {showNextEpisodeButton && nextEpisode && (
-            <Animated.View
-              style={{
-                position: 'absolute',
-                bottom: 80 + insets.bottom,
-                right: 8 + insets.right,
-                opacity: nextEpisodeButtonOpacity,
-                transform: [{ scale: nextEpisodeButtonScale }],
-                zIndex: 50,
-              }}
-            >
-              <TouchableOpacity
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.95)',
-                  borderRadius: 18,
-                  paddingHorizontal: 14,
-                  paddingVertical: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 8,
-                }}
-                onPress={handlePlayNextEpisode}
-                activeOpacity={0.8}
-              >
-                {isLoadingNextEpisode ? (
-                  <ActivityIndicator size="small" color="#000000" style={{ marginRight: 8 }} />
-                ) : (
-                  <MaterialIcons name="skip-next" size={18} color="#000000" style={{ marginRight: 8 }} />
-                )}
-                <View>
-                  <Text style={{ color: '#000000', fontSize: 11, fontWeight: '700', opacity: 0.8 }}>
-                    {isLoadingNextEpisode ? 'Loading next episode…' : 'Up next'}
-                  </Text>
-                  <Text style={{ color: '#000000', fontSize: 13, fontWeight: '700' }} numberOfLines={1}>
-                    S{nextEpisode.season_number}E{nextEpisode.episode_number}
-                    {nextEpisode.name ? `: ${nextEpisode.name}` : ''}
-                  </Text>
-                  {isLoadingNextEpisode && (
-                    <Text style={{ color: '#333333', fontSize: 11, marginTop: 2 }} numberOfLines={1}>
-                      {nextLoadingProvider ? `${nextLoadingProvider}` : 'Finding source…'}
-                      {nextLoadingQuality ? ` • ${nextLoadingQuality}p` : ''}
-                      {nextLoadingTitle ? ` • ${nextLoadingTitle}` : ''}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
+          {/* Next Episode Button (reusable) */}
+          <UpNextButton
+            type={type as any}
+            nextEpisode={nextEpisode as any}
+            currentTime={currentTime}
+            duration={duration}
+            insets={{ top: insets.top, right: insets.right, bottom: insets.bottom, left: insets.left }}
+            isLoading={isLoadingNextEpisode}
+            nextLoadingProvider={nextLoadingProvider}
+            nextLoadingQuality={nextLoadingQuality}
+            nextLoadingTitle={nextLoadingTitle}
+            onPress={handlePlayNextEpisode}
+            metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
+            controlsVisible={showControls}
+            controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
+          />
           
           <CustomSubtitles
             key={customSubtitleVersion}
@@ -3859,18 +3765,19 @@ const AndroidVideoPlayer: React.FC = () => {
             bottomOffset={subtitleBottomOffset}
             letterSpacing={subtitleLetterSpacing}
             lineHeightMultiplier={subtitleLineHeightMultiplier}
+            formattedSegments={currentFormattedSegments}
             controlsVisible={showControls}
             controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
           />
 
           {/* Volume Overlay */}
-          {showVolumeOverlay && (
+          {gestureControls.showVolumeOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
                 left: screenDimensions.width / 2 - 60,
                 top: screenDimensions.height / 2 - 60,
-                opacity: volumeOverlayOpacity,
+                opacity: gestureControls.volumeOverlayOpacity,
                 zIndex: 1000,
               }}
             >
@@ -3961,13 +3868,13 @@ const AndroidVideoPlayer: React.FC = () => {
           )}
 
           {/* Brightness Overlay */}
-          {showBrightnessOverlay && (
+          {gestureControls.showBrightnessOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
                 left: screenDimensions.width / 2 - 60,
                 top: screenDimensions.height / 2 - 60,
-                opacity: brightnessOverlayOpacity,
+                opacity: gestureControls.brightnessOverlayOpacity,
                 zIndex: 1000,
               }}
             >
@@ -4057,6 +3964,42 @@ const AndroidVideoPlayer: React.FC = () => {
             </Animated.View>
           )}
 
+          {/* Speed Activated Overlay */}
+          {showSpeedActivatedOverlay && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.1,
+                left: screenDimensions.width / 2 - 40,
+                opacity: speedActivatedOverlayOpacity,
+                zIndex: 1000,
+              }}
+            >
+              <View style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3,
+                shadowRadius: 4,
+                elevation: 5,
+              }}>
+                <Text style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '600',
+                  letterSpacing: 0.5,
+                }}>
+                  {holdToSpeedValue}x Speed Activated
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+
           {/* Resume overlay removed when AlwaysResume is enabled; overlay component omitted */}
         </View> 
       </Animated.View>
@@ -4116,14 +4059,48 @@ const AndroidVideoPlayer: React.FC = () => {
         setSubtitleOffsetSec={setSubtitleOffsetSec}
       />
       
+      <SpeedModal
+        showSpeedModal={showSpeedModal}
+        setShowSpeedModal={setShowSpeedModal}
+        currentSpeed={playbackSpeed}
+        setPlaybackSpeed={setPlaybackSpeed}
+        holdToSpeedEnabled={holdToSpeedEnabled}
+        setHoldToSpeedEnabled={setHoldToSpeedEnabled}
+        holdToSpeedValue={holdToSpeedValue}
+        setHoldToSpeedValue={setHoldToSpeedValue}
+      />
+      
       <SourcesModal
         showSourcesModal={showSourcesModal}
         setShowSourcesModal={setShowSourcesModal}
         availableStreams={availableStreams}
         currentStreamUrl={currentStreamUrl}
         onSelectStream={handleSelectStream}
-        isChangingSource={isChangingSource}
       />
+
+      {type === 'series' && (
+        <>
+          <EpisodesModal
+            showEpisodesModal={showEpisodesModal}
+            setShowEpisodesModal={setShowEpisodesModal}
+            groupedEpisodes={groupedEpisodes || metadataGroupedEpisodes || {}}
+            currentEpisode={season && episode ? { season, episode } : undefined}
+            metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
+            onSelectEpisode={handleEpisodeSelect}
+          />
+          
+          <EpisodeStreamsModal
+            visible={showEpisodeStreamsModal}
+            episode={selectedEpisodeForStreams}
+            onClose={() => {
+              setShowEpisodeStreamsModal(false);
+              setShowEpisodesModal(true);
+            }}
+            onSelectStream={handleEpisodeStreamSelect}
+            metadata={metadata ? { id: metadata.id, name: metadata.name } : undefined}
+          />
+        </>
+      )}
       
       {/* Error Modal */}
       {isMounted.current && (

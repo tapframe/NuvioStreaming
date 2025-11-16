@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
-import { imageCacheService } from '../../services/imageCacheService';
+import FastImage from '@d11/react-native-fast-image';
 import { logger } from '../../utils/logger';
 
 interface OptimizedImageProps {
@@ -59,16 +58,14 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   onLoad,
   onError,
   contentFit = 'cover',
-  transition = 200,
-  cachePolicy = 'memory-disk'
+  transition = 0,
+  cachePolicy = 'memory'
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isVisible, setIsVisible] = useState(!lazy);
-  const [recyclingKey] = useState(() => `${Math.random().toString(36).slice(2)}-${Date.now()}`);
   const [optimizedUrl, setOptimizedUrl] = useState<string>('');
   const mountedRef = useRef(true);
-  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Extract URL from source
   const sourceUrl = typeof source === 'string' ? source : source?.uri || '';
@@ -80,9 +77,6 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   useEffect(() => {
     return () => {
       mountedRef.current = false;
-      if (loadTimeoutRef.current) {
-        clearTimeout(loadTimeoutRef.current);
-      }
     };
   }, []);
 
@@ -97,7 +91,6 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   // Lazy loading intersection observer simulation
   useEffect(() => {
     if (lazy && !isVisible) {
-      // Simple lazy loading - load after a short delay to simulate intersection
       const timer = setTimeout(() => {
         if (mountedRef.current) {
           setIsVisible(true);
@@ -108,41 +101,22 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     }
   }, [lazy, isVisible, priority]);
 
-  // Preload image with caching
+  // Preload image via FastImage
   const preloadImage = useCallback(async () => {
     if (!optimizedUrl || !isVisible) return;
 
     try {
-      // Use our cache service to manage the image
-      const cachedUrl = await imageCacheService.getCachedImageUrl(optimizedUrl);
-      
-      // Set a timeout for loading
-      loadTimeoutRef.current = setTimeout(() => {
-        if (mountedRef.current && !isLoaded) {
-          logger.warn(`[OptimizedImage] Load timeout for: ${optimizedUrl.substring(0, 50)}...`);
-          setHasError(true);
-        }
-      }, 10000); // 10 second timeout
-
-      // Skip prefetch to reduce memory pressure and heating
-      // await ExpoImage.prefetch(cachedUrl);
-      
-      if (mountedRef.current) {
-        setIsLoaded(true);
-        if (loadTimeoutRef.current) {
-          clearTimeout(loadTimeoutRef.current);
-          loadTimeoutRef.current = null;
-        }
-        onLoad?.();
-      }
+      FastImage.preload([{ uri: optimizedUrl }]);
+      if (!mountedRef.current) return;
+      setIsLoaded(true);
+      onLoad?.();
     } catch (error) {
-      if (mountedRef.current) {
-        logger.error(`[OptimizedImage] Failed to load: ${optimizedUrl.substring(0, 50)}...`, error);
-        setHasError(true);
-        onError?.(error);
-      }
+      if (!mountedRef.current) return;
+      logger.error(`[OptimizedImage] Failed to preload: ${optimizedUrl.substring(0, 50)}...`, error);
+      setHasError(true);
+      onError?.(error);
     }
-  }, [optimizedUrl, isVisible, isLoaded, onLoad, onError]);
+  }, [optimizedUrl, isVisible, onLoad, onError]);
 
   useEffect(() => {
     if (isVisible && optimizedUrl && !isLoaded && !hasError) {
@@ -158,26 +132,23 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   // Show placeholder while loading or on error
   if (!isLoaded || hasError) {
     return (
-      <ExpoImage
+      <FastImage
         source={{ uri: placeholder }}
         style={style}
-        contentFit={contentFit}
-        transition={0}
-        cachePolicy="memory"
+        resizeMode={FastImage.resizeMode.cover}
       />
     );
   }
 
   return (
-      <ExpoImage
-      source={{ uri: optimizedUrl }}
+    <FastImage
+      source={{ 
+        uri: optimizedUrl,
+        priority: priority === 'high' ? FastImage.priority.high : priority === 'low' ? FastImage.priority.low : FastImage.priority.normal,
+        cache: FastImage.cacheControl.immutable
+      }}
       style={style}
-      contentFit={contentFit}
-      transition={transition}
-      cachePolicy={cachePolicy}
-        // Use a stable recycling key per component instance to keep textures alive between reuses
-        // This mitigates flicker on fast horizontal scrolls
-        recyclingKey={recyclingKey}
+      resizeMode={contentFit === 'contain' ? FastImage.resizeMode.contain : contentFit === 'cover' ? FastImage.resizeMode.cover : FastImage.resizeMode.cover}
       onLoad={() => {
         setIsLoaded(true);
         onLoad?.();

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -18,7 +18,7 @@ import { useTraktContext } from '../../contexts/TraktContext';
 import { useLibrary } from '../../hooks/useLibrary';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { parseISO, isThisWeek, format, isAfter, isBefore } from 'date-fns';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { useCalendarData } from '../../hooks/useCalendarData';
 import { memoryManager } from '../../utils/memoryManager';
 import { tmdbService } from '../../services/tmdbService';
@@ -27,6 +27,14 @@ import { tmdbService } from '../../services/tmdbService';
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.75; // phone default
 const ITEM_HEIGHT = 180; // phone default
+
+// Enhanced responsive breakpoints
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
 
 interface ThisWeekEpisode {
   id: string;
@@ -49,11 +57,77 @@ export const ThisWeekSection = React.memo(() => {
   const { currentTheme } = useTheme();
   const { calendarData, loading } = useCalendarData();
 
-  // Responsive sizing for tablets
+  // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
-  const isTablet = deviceWidth >= 768;
-  const computedItemWidth = useMemo(() => (isTablet ? Math.min(deviceWidth * 0.46, 560) : ITEM_WIDTH), [isTablet, deviceWidth]);
-  const computedItemHeight = useMemo(() => (isTablet ? 220 : ITEM_HEIGHT), [isTablet]);
+  const deviceHeight = Dimensions.get('window').height;
+  
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+  
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+  
+  // Enhanced responsive sizing
+  const computedItemWidth = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return Math.min(deviceWidth * 0.25, 400); // 4 items per row on TV
+      case 'largeTablet':
+        return Math.min(deviceWidth * 0.35, 350); // 3 items per row on large tablet
+      case 'tablet':
+        return Math.min(deviceWidth * 0.46, 300); // 2 items per row on tablet
+      default:
+        return ITEM_WIDTH; // phone
+    }
+  }, [deviceType, deviceWidth]);
+  
+  const computedItemHeight = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 280;
+      case 'largeTablet':
+        return 250;
+      case 'tablet':
+        return 220;
+      default:
+        return ITEM_HEIGHT; // phone
+    }
+  }, [deviceType]);
+  
+  // Enhanced spacing and padding
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
+  
+  const itemSpacing = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 20;
+      case 'largeTablet':
+        return 18;
+      case 'tablet':
+        return 16;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
 
   // Use the already memory-optimized calendar data instead of fetching separately
   const thisWeekEpisodes = useMemo(() => {
@@ -125,11 +199,14 @@ export const ThisWeekSection = React.memo(() => {
           activeOpacity={0.8}
         >
           <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: imageUrl }}
+          <FastImage
+            source={{ 
+              uri: imageUrl || undefined,
+              priority: FastImage.priority.normal,
+              cache: FastImage.cacheControl.immutable
+            }}
             style={styles.poster}
-            contentFit="cover"
-            transition={0}
+            resizeMode={FastImage.resizeMode.cover}
           />
           
                         {/* Enhanced gradient overlay */}
@@ -141,35 +218,70 @@ export const ThisWeekSection = React.memo(() => {
                 'rgba(0,0,0,0.8)',
                 'rgba(0,0,0,0.95)'
               ]}
-            style={styles.gradient}
+            style={[
+              styles.gradient,
+              {
+                padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+              }
+            ]}
               locations={[0, 0.4, 0.6, 0.8, 1]}
             >
               {/* Content area */}
               <View style={styles.contentArea}>
-                <Text style={[styles.seriesName, { color: currentTheme.colors.white, fontSize: isTablet ? 18 : undefined }]} numberOfLines={1}>
+                <Text style={[
+                  styles.seriesName, 
+                  { 
+                    color: currentTheme.colors.white,
+                    fontSize: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16
+                  }
+                ]} numberOfLines={1}>
                   {item.seriesName}
                 </Text>
                 
-                <Text style={[styles.episodeTitle, { color: 'rgba(255,255,255,0.9)', fontSize: isTablet ? 16 : undefined }]} numberOfLines={2}>
+                <Text style={[
+                  styles.episodeTitle, 
+                  { 
+                    color: 'rgba(255,255,255,0.9)',
+                    fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14
+                  }
+                ]} numberOfLines={2}>
                   {item.title}
                 </Text>
               
                 {item.overview && (
-                  <Text style={[styles.overview, { color: 'rgba(255,255,255,0.8)', fontSize: isTablet ? 13 : undefined }]} numberOfLines={isTablet ? 3 : 2}>
+                  <Text style={[
+                    styles.overview, 
+                    { 
+                      color: 'rgba(255,255,255,0.8)',
+                      fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
+                    }
+                  ]} numberOfLines={isLargeScreen ? 3 : 2}>
                     {item.overview}
                   </Text>
                 )}
                 
                 <View style={styles.dateContainer}>
-                  <Text style={[styles.episodeInfo, { color: 'rgba(255,255,255,0.7)', fontSize: isTablet ? 13 : undefined }]}>
+                  <Text style={[
+                    styles.episodeInfo, 
+                    { 
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
+                    }
+                  ]}>
                     S{item.season}:E{item.episode} • 
                   </Text>
                   <MaterialIcons
                     name="event" 
-                    size={isTablet ? 16 : 14} 
+                    size={isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14} 
                     color={currentTheme.colors.primary}
                   />
-                  <Text style={[styles.releaseDate, { color: currentTheme.colors.primary, fontSize: isTablet ? 14 : undefined }]}>
+                  <Text style={[
+                    styles.releaseDate, 
+                    { 
+                      color: currentTheme.colors.primary,
+                      fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
+                    }
+                  ]}>
                     {formattedDate}
                   </Text>
                 </View>
@@ -182,15 +294,47 @@ export const ThisWeekSection = React.memo(() => {
   };
   
   return (
-    <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
-      <View style={styles.header}>
+    <Animated.View
+      style={styles.container}
+      entering={FadeIn.duration(350)}
+    >
+      <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.titleContainer}>
-        <Text style={[styles.title, { color: currentTheme.colors.text }]}>This Week</Text>
-          <View style={[styles.titleUnderline, { backgroundColor: currentTheme.colors.primary }]} />
+        <Text style={[
+          styles.title, 
+          { 
+            color: currentTheme.colors.text,
+            fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
+          }
+        ]}>This Week</Text>
+          <View style={[
+            styles.titleUnderline, 
+            { 
+              backgroundColor: currentTheme.colors.primary,
+              width: isTV ? 50 : isLargeTablet ? 45 : isTablet ? 40 : 40,
+              height: isTV ? 4 : isLargeTablet ? 3.5 : isTablet ? 3 : 3
+            }
+          ]} />
         </View>
-        <TouchableOpacity onPress={handleViewAll} style={styles.viewAllButton}>
-          <Text style={[styles.viewAllText, { color: currentTheme.colors.textMuted }]}>View All</Text>
-          <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.textMuted} />
+        <TouchableOpacity onPress={handleViewAll} style={[
+          styles.viewAllButton,
+          {
+            paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+            paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 10
+          }
+        ]}>
+          <Text style={[
+            styles.viewAllText, 
+            { 
+              color: currentTheme.colors.textMuted,
+              fontSize: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 15 : 14
+            }
+          ]}>View All</Text>
+          <MaterialIcons 
+            name="chevron-right" 
+            size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20} 
+            color={currentTheme.colors.textMuted} 
+          />
         </TouchableOpacity>
       </View>
       
@@ -200,20 +344,26 @@ export const ThisWeekSection = React.memo(() => {
         renderItem={renderEpisodeItem}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, { paddingLeft: isTablet ? 24 : 16, paddingRight: isTablet ? 24 : 16 }]}
-        snapToInterval={computedItemWidth + 16}
+        contentContainerStyle={[
+          styles.listContent, 
+          { 
+            paddingLeft: horizontalPadding, 
+            paddingRight: horizontalPadding 
+          }
+        ]}
+        snapToInterval={computedItemWidth + itemSpacing}
         decelerationRate="fast"
         snapToAlignment="start"
-        initialNumToRender={isTablet ? 4 : 3}
-        windowSize={3}
-        maxToRenderPerBatch={3}
+        initialNumToRender={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
+        windowSize={isTV ? 4 : isLargeTablet ? 4 : 3}
+        maxToRenderPerBatch={isTV ? 4 : isLargeTablet ? 4 : 3}
         removeClippedSubviews
         getItemLayout={(data, index) => {
-          const length = computedItemWidth + 16;
+          const length = computedItemWidth + itemSpacing;
           const offset = length * index;
           return { length, offset, index };
         }}
-        ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+        ItemSeparatorComponent={() => <View style={{ width: itemSpacing }} />}
       />
     </Animated.View>
   );
@@ -227,7 +377,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
     marginBottom: 16,
   },
   titleContainer: {
@@ -263,8 +412,6 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   listContent: {
-    paddingLeft: 16,
-    paddingRight: 16,
     paddingBottom: 8,
   },
   loadingContainer: {
@@ -310,7 +457,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 16,
   },
-    contentArea: {
+  contentArea: {
     width: '100%',
   },
   seriesName: {

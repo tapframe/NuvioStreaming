@@ -18,7 +18,7 @@ import CustomAlert from '../components/CustomAlert';
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 // Lazy-safe community blur import (avoid bundling issues on web)
 let AndroidBlurView: any = null;
@@ -28,6 +28,21 @@ if (Platform.OS === 'android') {
     AndroidBlurView = require('@react-native-community/blur').BlurView;
   } catch (_) {
     AndroidBlurView = null;
+  }
+}
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for AIChatScreen
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
   }
 }
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
@@ -124,6 +139,8 @@ const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) =
           <View style={styles.assistantBlurBackdrop} pointerEvents="none">
             {Platform.OS === 'android' && AndroidBlurView
               ? <AndroidBlurView blurAmount={16} blurRadius={8} style={StyleSheet.absoluteFill} />
+              : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
+              ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
               : <ExpoBlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />}
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.50)' }]} />
           </View>
@@ -642,14 +659,15 @@ const AIChatScreen: React.FC = () => {
     <SafeAreaView edges={['top','bottom']} style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       {backdropUrl && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
+          <FastImage
             source={{ uri: backdropUrl }}
             style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            recyclingKey={backdropUrl || undefined}
+            resizeMode={FastImage.resizeMode.cover}
           />
           {Platform.OS === 'android' && AndroidBlurView
             ? <AndroidBlurView blurAmount={12} blurRadius={6} style={StyleSheet.absoluteFill} />
+            : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
+            ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
             : <ExpoBlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />}
           <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.45)' }]} />
         </View>
@@ -781,6 +799,8 @@ const AIChatScreen: React.FC = () => {
             <View style={styles.inputBlurBackdrop} pointerEvents="none">
               {Platform.OS === 'android' && AndroidBlurView
                 ? <AndroidBlurView blurAmount={10} blurRadius={4} style={StyleSheet.absoluteFill} />
+                : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
+                ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
                 : <ExpoBlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />}
               <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.25)' }]} />
             </View>

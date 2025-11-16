@@ -18,12 +18,27 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService } from '../services/stremioService';
 import { useTheme } from '../contexts/ThemeContext';
-import { Image } from 'expo-image';
+import FastImage from '@d11/react-native-fast-image';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
+
+// Optional iOS Glass effect (expo-glass-effect) with safe fallback for CatalogScreen
+let GlassViewComp: any = null;
+let liquidGlassAvailable = false;
+if (Platform.OS === 'ios') {
+  try {
+    // Dynamically require so app still runs if the package isn't installed yet
+    const glass = require('expo-glass-effect');
+    GlassViewComp = glass.GlassView;
+    liquidGlassAvailable = typeof glass.isLiquidGlassAvailable === 'function' ? glass.isLiquidGlassAvailable() : false;
+  } catch {
+    GlassViewComp = null;
+    liquidGlassAvailable = false;
+  }
+}
 import { logger } from '../utils/logger';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { catalogService, DataSource, StreamingContent } from '../services/catalogService';
 import { tmdbService } from '../services/tmdbService';
 
@@ -43,12 +58,13 @@ const SPACING = {
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Dynamic column calculation based on screen width
+// Dynamic column and spacing calculation based on screen width
 const calculateCatalogLayout = (screenWidth: number) => {
   const MIN_ITEM_WIDTH = 120;
   const MAX_ITEM_WIDTH = 180; // Increased for tablets
-  const HORIZONTAL_PADDING = SPACING.lg * 2;
-  const ITEM_SPACING = SPACING.sm;
+  // Increase padding and spacing on larger screens for proper breathing room
+  const HORIZONTAL_PADDING = screenWidth >= 1600 ? SPACING.xl * 4 : screenWidth >= 1200 ? SPACING.xl * 3 : screenWidth >= 1000 ? SPACING.xl * 2 : SPACING.lg * 2;
+  const ITEM_SPACING = screenWidth >= 1600 ? SPACING.xl : screenWidth >= 1200 ? SPACING.lg : screenWidth >= 1000 ? SPACING.md : SPACING.sm;
   
   // Calculate how many columns can fit
   const availableWidth = screenWidth - HORIZONTAL_PADDING;
@@ -65,9 +81,12 @@ const calculateCatalogLayout = (screenWidth: number) => {
   } else if (screenWidth < 1200) {
     // Large tablet: 4-6 columns
     numColumns = Math.min(Math.max(maxColumns, 4), 6);
-  } else {
-    // Very large screens: 5-8 columns
+  } else if (screenWidth < 1600) {
+    // Desktop-ish: 5-8 columns
     numColumns = Math.min(Math.max(maxColumns, 5), 8);
+  } else {
+    // Ultra-wide: 6-10 columns
+    numColumns = Math.min(Math.max(maxColumns, 6), 10);
   }
   
   // Calculate actual item width with proper spacing
@@ -75,11 +94,13 @@ const calculateCatalogLayout = (screenWidth: number) => {
   const itemWidth = (availableWidth - totalSpacing) / numColumns;
   
   // Ensure item width doesn't exceed maximum
-  const finalItemWidth = Math.min(itemWidth, MAX_ITEM_WIDTH);
+  const finalItemWidth = Math.floor(Math.min(itemWidth, MAX_ITEM_WIDTH));
   
   return {
     numColumns,
-    itemWidth: finalItemWidth
+    itemWidth: finalItemWidth,
+    itemSpacing: ITEM_SPACING,
+    containerPadding: HORIZONTAL_PADDING / 2, // use half per side for contentContainerStyle padding
   };
 };
 
@@ -94,9 +115,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? ANDROID_STATUSBAR_HEIGHT + 8 : 8,
-    // Center header on very wide screens
-    alignSelf: 'center',
-    maxWidth: 1400,
     width: '100%',
   },
   backButton: {
@@ -116,17 +134,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
     paddingTop: 8,
-    // Center title on very wide screens
-    alignSelf: 'center',
-    maxWidth: 1400,
     width: '100%',
   },
   list: {
     padding: SPACING.lg,
     paddingTop: SPACING.sm,
-    // Center content on very wide screens
-    alignSelf: 'center',
-    maxWidth: 1400, // Prevent content from being too wide on large screens
     width: '100%',
   },
   item: {
@@ -228,6 +240,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [dataSource, setDataSource] = useState<DataSource>(DataSource.STREMIO_ADDONS);
   const [actualCatalogName, setActualCatalogName] = useState<string | null>(null);
   const [screenData, setScreenData] = useState(() => {
@@ -248,7 +262,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   useEffect(() => {
     (async () => {
       try {
-        const pref = await AsyncStorage.getItem('catalog_mobile_columns');
+        const pref = await mmkvStorage.getItem('catalog_mobile_columns');
         if (pref === '2') setMobileColumnsPref(2);
         else if (pref === '3') setMobileColumnsPref(3);
         else setMobileColumnsPref('auto');
@@ -350,10 +364,20 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     loadNowPlayingMovies();
   }, [type]);
 
-  const loadItems = useCallback(async (shouldRefresh: boolean = false) => {
+  const loadItems = useCallback(async (shouldRefresh: boolean = false, pageParam: number = 1) => {
+    logger.log('[CatalogScreen] loadItems called', {
+      shouldRefresh,
+      pageParam,
+      addonId,
+      type,
+      id,
+      dataSource,
+      genreFilter
+    });
     try {
       if (shouldRefresh) {
         setRefreshing(true);
+        setPage(1);
       } else {
         setLoading(true);
       }
@@ -410,6 +434,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
               setHasMore(false); // TMDB already returns a full set
               setLoading(false);
               setRefreshing(false);
+              setIsFetchingMore(false);
+              logger.log('[CatalogScreen] TMDB set items', {
+                count: uniqueItems.length,
+                hasMore: false
+              });
             });
             return;
           } else {
@@ -418,6 +447,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
               setItems([]);
               setLoading(false);
               setRefreshing(false);
+              setIsFetchingMore(false);
+              logger.log('[CatalogScreen] TMDB returned no items');
             });
             return;
           }
@@ -428,6 +459,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             setItems([]);
             setLoading(false);
             setRefreshing(false);
+            setIsFetchingMore(false);
+            logger.log('[CatalogScreen] TMDB error, cleared items');
           });
           return;
         }
@@ -452,12 +485,42 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         const filters = effectiveGenreFilter ? [{ title: 'genre', value: effectiveGenreFilter }] : [];
 
         // Load items from the catalog
-        const catalogItems = await stremioService.getCatalog(addon, type, id, 1, filters);
+        const catalogItems = await stremioService.getCatalog(addon, type, id, pageParam, filters);
+        logger.log('[CatalogScreen] Fetched addon catalog page', {
+          addon: addon.id,
+          page: pageParam,
+          fetched: catalogItems.length
+        });
 
         if (catalogItems.length > 0) {
           foundItems = true;
           InteractionManager.runAfterInteractions(() => {
-            setItems(catalogItems);
+            if (shouldRefresh || pageParam === 1) {
+              setItems(catalogItems);
+            } else {
+              setItems(prev => {
+                const map = new Map<string, Meta>();
+                for (const it of prev) map.set(`${it.id}-${it.type}`, it);
+                for (const it of catalogItems) map.set(`${it.id}-${it.type}`, it);
+                return Array.from(map.values());
+              });
+            }
+            // Prefer service-provided hasMore for addons that support it; fallback to page-size heuristic
+            let nextHasMore = false;
+            try {
+              const svcHasMore = addonId ? stremioService.getCatalogHasMore(addonId, type, id) : undefined;
+              // If service explicitly provides hasMore, use it; otherwise assume there's more if we got any items
+              // This handles addons with different page sizes (not just 50 items per page)
+              nextHasMore = typeof svcHasMore === 'boolean' ? svcHasMore : (catalogItems.length > 0);
+            } catch {
+              nextHasMore = catalogItems.length > 0;
+            }
+            setHasMore(nextHasMore);
+            logger.log('[CatalogScreen] Updated items and hasMore', {
+              total: (shouldRefresh || pageParam === 1) ? catalogItems.length : undefined,
+              appended: !(shouldRefresh || pageParam === 1) ? catalogItems.length : undefined,
+              hasMore: nextHasMore
+            });
           });
         }
       } else if (effectiveGenreFilter) {
@@ -539,6 +602,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           foundItems = true;
           InteractionManager.runAfterInteractions(() => {
             setItems(uniqueItems);
+            setHasMore(false);
+            logger.log('[CatalogScreen] Genre aggregated uniqueItems', { count: uniqueItems.length });
           });
         }
       }
@@ -546,6 +611,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       if (!foundItems) {
         InteractionManager.runAfterInteractions(() => {
           setError("No content found for the selected filters");
+          logger.log('[CatalogScreen] No items found after loading');
         });
       }
     } catch (err) {
@@ -557,12 +623,17 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       InteractionManager.runAfterInteractions(() => {
         setLoading(false);
         setRefreshing(false);
+        setIsFetchingMore(false);
+        logger.log('[CatalogScreen] loadItems finished', {
+          shouldRefresh,
+          pageParam
+        });
       });
     }
   }, [addonId, type, id, genreFilter, dataSource]);
 
   useEffect(() => {
-    loadItems(true);
+    loadItems(true, 1);
   }, [loadItems]);
 
   const handleRefresh = useCallback(() => {
@@ -581,11 +652,12 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const effectiveItemWidth = React.useMemo(() => {
     if (effectiveNumColumns === screenData.numColumns) return screenData.itemWidth;
     // recompute width for custom columns on mobile to maintain spacing roughly similar
-    const HORIZONTAL_PADDING = 16 * 2; // SPACING.lg * 2
-    const ITEM_SPACING = 8; // SPACING.sm
+    const HORIZONTAL_PADDING = (screenData as any).containerPadding ? (screenData as any).containerPadding * 2 : 16 * 2;
+    const ITEM_SPACING = (screenData as any).itemSpacing ?? 8;
     const availableWidth = screenData.width - HORIZONTAL_PADDING;
     const totalSpacing = ITEM_SPACING * (effectiveNumColumns - 1);
-    return (availableWidth - totalSpacing) / effectiveNumColumns;
+    const width = (availableWidth - totalSpacing) / effectiveNumColumns;
+    return Math.floor(width);
   }, [effectiveNumColumns, screenData.width, screenData.itemWidth]);
 
   // Helper function to optimize poster URLs
@@ -606,7 +678,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     // Calculate if this is the last item in a row
     const isLastInRow = (index + 1) % effectiveNumColumns === 0;
     // For proper spacing
-    const rightMargin = isLastInRow ? 0 : SPACING.sm;
+    const rightMargin = isLastInRow ? 0 : ((screenData as any).itemSpacing ?? SPACING.sm);
     
     return (
       <TouchableOpacity
@@ -620,31 +692,40 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type, addonId })}
         activeOpacity={0.7}
       >
-        <Image
+        <FastImage
           source={{ uri: optimizePosterUrl(item.poster) }}
           style={styles.poster}
-          contentFit="cover"
-          cachePolicy={Platform.OS === 'android' ? 'memory-disk' : 'memory-disk'}
-          transition={100}
-          allowDownscaling
-          priority="normal"
-          recyclingKey={`${item.id}-${item.type}`}
+          resizeMode={FastImage.resizeMode.cover}
         />
 
         {type === 'movie' && nowPlayingMovies.has(item.id) && (
           Platform.OS === 'ios' ? (
             <View style={styles.badgeBlur}>
-              <BlurView intensity={40} tint={isDarkMode ? 'dark' : 'light'} style={{ borderRadius: 10 }}>
-                <View style={styles.badgeContent}>
-                  <MaterialIcons
-                    name="theaters"
-                    size={12}
-                    color={colors.white}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.badgeText}>In Theaters</Text>
-                </View>
-              </BlurView>
+              {GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp style={{ borderRadius: 10 }} glassEffectStyle="regular">
+                  <View style={styles.badgeContent}>
+                    <MaterialIcons
+                      name="theaters"
+                      size={12}
+                      color={colors.white}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={styles.badgeText}>In Theaters</Text>
+                  </View>
+                </GlassViewComp>
+              ) : (
+                <BlurView intensity={40} tint={isDarkMode ? 'dark' : 'light'} style={{ borderRadius: 10 }}>
+                  <View style={styles.badgeContent}>
+                    <MaterialIcons
+                      name="theaters"
+                      size={12}
+                      color={colors.white}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={styles.badgeText}>In Theaters</Text>
+                  </View>
+                </BlurView>
+              )}
             </View>
           ) : (
             <View style={styles.badgeContainer}>
@@ -760,6 +841,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           keyExtractor={(item) => `${item.id}-${item.type}`}
           numColumns={effectiveNumColumns}
           key={effectiveNumColumns}
+          ItemSeparatorComponent={() => <View style={{ height: ((screenData as any).itemSpacing ?? SPACING.sm) }} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -768,13 +850,46 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
               tintColor={colors.primary}
             />
           }
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingHorizontal: (screenData as any).containerPadding ?? SPACING.lg, paddingTop: SPACING.sm, paddingBottom: SPACING.lg }]}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={effectiveNumColumns * 3}
-          windowSize={10}
-          initialNumToRender={effectiveNumColumns * 4}
           getItemType={() => 'item'}
+          onEndReachedThreshold={0.6}
+          onEndReached={() => {
+            logger.log('[CatalogScreen] onEndReached fired', {
+              hasMore,
+              loading,
+              refreshing,
+              isFetchingMore,
+              page
+            });
+            if (!hasMore) {
+              logger.log('[CatalogScreen] onEndReached guard: hasMore is false');
+              return;
+            }
+            if (loading) {
+              logger.log('[CatalogScreen] onEndReached guard: initial loading is true');
+              return;
+            }
+            if (refreshing) {
+              logger.log('[CatalogScreen] onEndReached guard: refreshing is true');
+              return;
+            }
+            if (isFetchingMore) {
+              logger.log('[CatalogScreen] onEndReached guard: already fetching more');
+              return;
+            }
+            setIsFetchingMore(true);
+            const next = page + 1;
+            setPage(next);
+            logger.log('[CatalogScreen] onEndReached loading next page', { next });
+            loadItems(false, next);
+          }}
+          ListFooterComponent={isFetchingMore ? (
+            <View style={{ paddingVertical: 16 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null}
         />
       ) : renderEmptyState()}
     </SafeAreaView>

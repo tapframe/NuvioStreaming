@@ -1,6 +1,7 @@
 import { logger } from '../../../utils/logger';
 import { useEffect } from 'react';
 import { SubtitleCue } from './playerTypes';
+import { parseSRT as parseSRTEnhanced, parseSubtitle } from './subtitleParser';
 
 // Debug flag - set back to false to disable verbose logging
 // WARNING: Setting this to true currently causes infinite render loops
@@ -166,104 +167,37 @@ export const formatTime = (seconds: number) => {
   }
 };
 
-// Enhanced SRT parser function - more robust
+// Enhanced SRT parser function - delegates to new parser with formatting support
 export const parseSRT = (srtContent: string): SubtitleCue[] => {
-  const cues: SubtitleCue[] = [];
+  // Use the new enhanced parser from subtitleParser.ts
+  return parseSRTEnhanced(srtContent);
+};
+
+/**
+ * Detect if text contains primarily RTL (right-to-left) characters
+ * Checks for Arabic, Hebrew, Persian, Urdu, and other RTL scripts
+ * Returns true if the majority of non-whitespace characters are RTL
+ */
+export const detectRTL = (text: string): boolean => {
+  if (!text || text.length === 0) return false;
+
+  // RTL character ranges
+  // Arabic: U+0600–U+06FF
+  // Arabic Supplement: U+0750–U+077F
+  // Arabic Extended-A: U+08A0–U+08FF
+  // Arabic Presentation Forms-A: U+FB50–U+FDFF
+  // Arabic Presentation Forms-B: U+FE70–U+FEFF
+  // Hebrew: U+0590–U+05FF
+  // Persian/Urdu use Arabic script (no separate range)
+  const rtlRegex = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
   
-  if (!srtContent || srtContent.trim().length === 0) {
-    if (DEBUG_MODE) {
-      logger.log(`[VideoPlayer] SRT Parser: Empty content provided`);
-    }
-    return cues;
-  }
+  // Remove whitespace and count characters
+  const nonWhitespace = text.replace(/\s/g, '');
+  if (nonWhitespace.length === 0) return false;
 
-  // Normalize line endings and clean up the content
-  const normalizedContent = srtContent
-    .replace(/\r\n/g, '\n')  // Convert Windows line endings
-    .replace(/\r/g, '\n')    // Convert Mac line endings
-    .trim();
-
-  // Split by double newlines, but also handle cases with multiple empty lines
-  const blocks = normalizedContent.split(/\n\s*\n/).filter(block => block.trim().length > 0);
-
-  if (DEBUG_MODE) {
-    logger.log(`[VideoPlayer] SRT Parser: Found ${blocks.length} blocks after normalization`);
-    logger.log(`[VideoPlayer] SRT Parser: First few characters: "${normalizedContent.substring(0, 300)}"`);
-  }
-
-  for (let i = 0; i < blocks.length; i++) {
-    const block = blocks[i].trim();
-    const lines = block.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    
-    if (lines.length >= 3) {
-      // Find the timestamp line (could be line 1 or 2, depending on numbering)
-      let timeLineIndex = -1;
-      let timeMatch = null;
-      
-      for (let j = 0; j < Math.min(3, lines.length); j++) {
-        // More flexible time pattern matching
-        timeMatch = lines[j].match(/(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{1,2}):(\d{2}):(\d{2})[,.](\d{3})/);
-        if (timeMatch) {
-          timeLineIndex = j;
-          break;
-        }
-      }
-      
-      if (timeMatch && timeLineIndex !== -1) {
-        try {
-          const startTime = 
-            parseInt(timeMatch[1]) * 3600 + 
-            parseInt(timeMatch[2]) * 60 + 
-            parseInt(timeMatch[3]) + 
-            parseInt(timeMatch[4]) / 1000;
-          
-          const endTime = 
-            parseInt(timeMatch[5]) * 3600 + 
-            parseInt(timeMatch[6]) * 60 + 
-            parseInt(timeMatch[7]) + 
-            parseInt(timeMatch[8]) / 1000;
-
-          // Get text lines (everything after the timestamp line)
-          const textLines = lines.slice(timeLineIndex + 1);
-          if (textLines.length > 0) {
-            const text = textLines
-              .join('\n')
-              .replace(/<[^>]*>/g, '') // Remove HTML tags
-              .replace(/\{[^}]*\}/g, '') // Remove subtitle formatting tags like {italic}
-              .replace(/\\N/g, '\n') // Handle \N newlines
-              .trim();
-
-            if (text.length > 0) {
-              cues.push({
-                start: startTime,
-                end: endTime,
-                text: text
-              });
-              
-              if (DEBUG_MODE && (i < 5 || cues.length <= 10)) {
-                logger.log(`[VideoPlayer] SRT Parser: Cue ${cues.length}: ${startTime.toFixed(3)}s-${endTime.toFixed(3)}s: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
-              }
-            }
-          }
-        } catch (error) {
-          if (DEBUG_MODE) {
-            logger.log(`[VideoPlayer] SRT Parser: Error parsing times for block ${i + 1}: ${error}`);
-          }
-        }
-      } else if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] SRT Parser: No valid timestamp found in block ${i + 1}. Lines: ${JSON.stringify(lines.slice(0, 3))}`);
-      }
-    } else if (DEBUG_MODE && block.length > 0) {
-      logger.log(`[VideoPlayer] SRT Parser: Block ${i + 1} has insufficient lines (${lines.length}): "${block.substring(0, 100)}"`);
-    }
-  }
-
-  if (DEBUG_MODE) {
-    logger.log(`[VideoPlayer] SRT Parser: Successfully parsed ${cues.length} subtitle cues`);
-    if (cues.length > 0) {
-      logger.log(`[VideoPlayer] SRT Parser: Time range: ${cues[0].start.toFixed(1)}s to ${cues[cues.length-1].end.toFixed(1)}s`);
-    }
-  }
-
-  return cues;
+  const rtlCount = (nonWhitespace.match(rtlRegex) || []).length;
+  
+  // Consider RTL if at least 30% of non-whitespace characters are RTL
+  // This handles mixed-language subtitles (e.g., Arabic with English numbers)
+  return rtlCount / nonWhitespace.length >= 0.3;
 }; 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mmkvStorage } from '../services/mmkvStorage';
 import { StreamingContent } from '../services/catalogService';
 import { catalogService } from '../services/catalogService';
 
@@ -13,14 +13,14 @@ export const useLibrary = () => {
   const loadLibraryItems = useCallback(async () => {
     try {
       setLoading(true);
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:stremio-library`;
-      let storedItems = await AsyncStorage.getItem(scopedKey);
+      let storedItems = await mmkvStorage.getItem(scopedKey);
       if (!storedItems) {
         // migrate legacy into scoped
-        const legacy = await AsyncStorage.getItem(LEGACY_LIBRARY_STORAGE_KEY);
+        const legacy = await mmkvStorage.getItem(LEGACY_LIBRARY_STORAGE_KEY);
         if (legacy) {
-          await AsyncStorage.setItem(scopedKey, legacy);
+          await mmkvStorage.setItem(scopedKey, legacy);
           storedItems = legacy;
         }
       }
@@ -50,11 +50,11 @@ export const useLibrary = () => {
         acc[`${item.type}:${item.id}`] = item;
         return acc;
       }, {} as Record<string, StreamingContent>);
-      const scope = (await AsyncStorage.getItem('@user:current')) || 'local';
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:stremio-library`;
-      await AsyncStorage.setItem(scopedKey, JSON.stringify(itemsObject));
+      await mmkvStorage.setItem(scopedKey, JSON.stringify(itemsObject));
       // keep legacy for backward-compat
-      await AsyncStorage.setItem(LEGACY_LIBRARY_STORAGE_KEY, JSON.stringify(itemsObject));
+      await mmkvStorage.setItem(LEGACY_LIBRARY_STORAGE_KEY, JSON.stringify(itemsObject));
     } catch (error) {
       if (__DEV__) console.error('Error saving library items:', error);
     }
@@ -115,7 +115,6 @@ export const useLibrary = () => {
   // Subscribe to catalogService library updates
   useEffect(() => {
     const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
-      if (__DEV__) console.log('[useLibrary] Received library update from catalogService:', items.length, 'items');
       setLibraryItems(items);
       setLoading(false);
     });
