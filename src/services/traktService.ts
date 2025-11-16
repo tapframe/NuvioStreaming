@@ -9,13 +9,10 @@ export const TRAKT_TOKEN_EXPIRY_KEY = 'trakt_token_expiry';
 
 // Trakt API configuration
 const TRAKT_API_URL = 'https://api.trakt.tv';
-const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID as string;
-const TRAKT_CLIENT_SECRET = process.env.EXPO_PUBLIC_TRAKT_CLIENT_SECRET as string;
+// Use placeholder values if environment variables are missing (for builds without .env)
+const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID || 'placeholder-trakt-client-id';
+const TRAKT_CLIENT_SECRET = process.env.EXPO_PUBLIC_TRAKT_CLIENT_SECRET || 'placeholder-trakt-client-secret';
 const TRAKT_REDIRECT_URI = process.env.EXPO_PUBLIC_TRAKT_REDIRECT_URI || 'nuvio://auth/trakt'; // Must match registered callback URL
-
-if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
-  throw new Error('Missing Trakt env vars. Set EXPO_PUBLIC_TRAKT_CLIENT_ID and EXPO_PUBLIC_TRAKT_CLIENT_SECRET');
-}
 
 // Types
 export interface TraktUser {
