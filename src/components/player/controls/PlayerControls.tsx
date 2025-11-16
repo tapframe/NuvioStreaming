@@ -285,8 +285,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           tapToSeek={Platform.OS === 'ios'}
         />
         <View style={[styles.timeDisplay, { paddingHorizontal: 14 }]}>
-          <Text style={styles.duration}>{formatTime(currentTime)}</Text>
-          <Text style={styles.duration}>{formatTime(duration)}</Text>
+          <View style={styles.timeContainer}>
+            <Text style={styles.duration}>{formatTime(currentTime)}</Text>
+          </View>
+          <View style={styles.timeContainer}>
+            <Text style={styles.duration}>{formatTime(duration)}</Text>
+          </View>
         </View>
       </View>
 
@@ -368,7 +372,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 styles.buttonCircle,
                 { 
                   opacity: backwardPressAnim,
-                  width: seekButtonSize * 0.6, // 60% of seek button
+                  width: seekButtonSize * 0.6,
                   height: seekButtonSize * 0.6,
                   borderRadius: (seekButtonSize * 0.6) / 2,
                 }
@@ -381,7 +385,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   styles.seekNumber,
                   { 
                     fontSize: seekNumberSize,
-                    marginLeft: 7, // Opposite offset for flipped icon
+                    marginLeft: 7,
                     transform: [{ translateX: backwardSlideAnim }] 
                   }
                 ]}>
@@ -426,9 +430,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 styles.playPressCircle,
                 { 
                   opacity: playPressAnim,
-                  width: playButtonSize * 0.85, // ← 85% of button size
+                  width: playButtonSize * 0.85,
                   height: playButtonSize * 0.85,
-                  borderRadius: (playButtonSize * 0.85) / 2, // ← Half of width/height for circle
+                  borderRadius: (playButtonSize * 0.85) / 2,
                 }
               ]} />
               <Animated.View style={{ 
@@ -466,7 +470,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 styles.buttonCircle,
                 { 
                   opacity: forwardPressAnim,
-                  width: seekButtonSize * 0.6, // 60% of seek button
+                  width: seekButtonSize * 0.6,
                   height: seekButtonSize * 0.6,
                   borderRadius: (seekButtonSize * 0.6) / 2,
                 }
@@ -525,81 +529,56 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           style={styles.bottomGradient}
         >
           <View style={styles.bottomControls}>
-            {/* Bottom Buttons Row */}
-            <View style={styles.bottomButtons}>
-              {/* Aspect Ratio Button - uses official resize modes */}
-              <TouchableOpacity style={styles.bottomButton} onPress={cycleAspectRatio}>
-                <Ionicons name="resize" size={20} color="white" />
-                <Text style={[styles.bottomButtonText, { fontSize: 14, textAlign: 'center' }]}>
-                  {currentResizeMode
-                    ? (currentResizeMode === 'none'
-                        ? 'Original'
-                        : currentResizeMode.charAt(0).toUpperCase() + currentResizeMode.slice(1))
-                    : 'Contain'}
-                </Text>
+            {/* Center Buttons Container with rounded background - wraps all buttons */}
+            <View style={styles.centerControlsContainer}>
+              {/* Left Side: Aspect Ratio Button */}
+              <TouchableOpacity style={styles.iconButton} onPress={cycleAspectRatio}>
+                <Ionicons name="expand-outline" size={24} color="white" />
               </TouchableOpacity>
 
-              {/* Playback Speed Button */}
-              <TouchableOpacity style={styles.bottomButton} onPress={() => setShowSpeedModal(true)}>
-                <Ionicons name="speedometer" size={20} color="white" />
-                <Text style={styles.bottomButtonText}>
-                  Speed {currentPlaybackSpeed}x
-                </Text>
-              </TouchableOpacity>
-
-              {/* Audio Button - Updated to use ksAudioTracks */}
+              {/* Subtitle Button */}
               <TouchableOpacity
-                style={styles.bottomButton}
-                onPress={() => setShowAudioModal(true)}
-                disabled={ksAudioTracks.length <= 1}
-              >
-                <Ionicons name="volume-high" size={20} color={ksAudioTracks.length <= 1 ? 'grey' : 'white'} />
-                <Text style={[styles.bottomButtonText, ksAudioTracks.length <= 1 && {color: 'grey'}]} numberOfLines={1}>
-                  {(() => {
-                    const trackName = getTrackDisplayName(
-                      ksAudioTracks.find(t => t.id === selectedAudioTrack) || { id: -1, name: 'Default' }
-                    );
-                    // Truncate long audio track names to prevent UI cramping
-                    const maxLength = 12; // Limit to 12 characters
-                    return trackName.length > maxLength ? `${trackName.substring(0, maxLength)}...` : trackName;
-                  })()}
-                </Text>
-              </TouchableOpacity>
-              
-              {/* Subtitle Button - Always available for external subtitle search */}
-              <TouchableOpacity
-                style={styles.bottomButton}
+                style={styles.iconButton}
                 onPress={() => setShowSubtitleModal(!isSubtitleModalOpen)}
               >
-                <Ionicons name="text" size={20} color="white" />
-                <Text style={styles.bottomButtonText}>
-                  Subtitles
-                </Text>
+                <Ionicons name="text" size={24} color="white" />
               </TouchableOpacity>
 
               {/* Change Source Button */}
               {setShowSourcesModal && (
                 <TouchableOpacity
-                  style={styles.bottomButton}
+                  style={styles.iconButton}
                   onPress={() => setShowSourcesModal(true)}
                 >
-                  <Ionicons name="swap-horizontal" size={20} color="white" />
-                  <Text style={styles.bottomButtonText}>
-                    Change Source
-                  </Text>
+                  <Ionicons name="cloud-outline" size={24} color="white" />
                 </TouchableOpacity>
               )}
 
-              {/* Episodes Button */}
+              {/* Playback Speed Button */}
+              <TouchableOpacity style={styles.iconButton} onPress={() => setShowSpeedModal(true)}>
+                <Ionicons name="speedometer-outline" size={24} color="white" />
+              </TouchableOpacity>
+
+              {/* Audio Button */}
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => setShowAudioModal(true)}
+                disabled={ksAudioTracks.length <= 1}
+              >
+                <Ionicons 
+                  name="musical-notes-outline" 
+                  size={24} 
+                  color={ksAudioTracks.length <= 1 ? 'grey' : 'white'} 
+                />
+              </TouchableOpacity>
+
+              {/* Right Side: Episodes Button */}
               {setShowEpisodesModal && (
                 <TouchableOpacity
-                  style={styles.bottomButton}
+                  style={styles.iconButton}
                   onPress={() => setShowEpisodesModal(true)}
                 >
-                  <Ionicons name="list" size={20} color="white" />
-                  <Text style={styles.bottomButtonText}>
-                    Episodes
-                  </Text>
+                  <Ionicons name="list" size={24} color="white" />
                 </TouchableOpacity>
               )}
             </View>

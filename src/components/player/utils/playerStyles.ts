@@ -26,7 +26,7 @@ const qualityTextFont = isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11;
 const controlsGap = isTV ? 56 : isLargeTablet ? 48 : isTablet ? 44 : 40;
 const controlsTranslateY = isTV ? -48 : isLargeTablet ? -42 : isTablet ? -36 : -30;
 const skipTextFont = isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12;
-const sliderBottom = isTV ? 80 : isLargeTablet ? 70 : isTablet ? 65 : 55;
+const sliderBottom = isTV ? 60 : isLargeTablet ? 50 : isTablet ? 45 : 35;
 const progressTouchHeight = isTV ? 48 : isLargeTablet ? 44 : isTablet ? 40 : 40;
 const progressBarHeight = isTV ? 6 : isLargeTablet ? 5 : isTablet ? 5 : 4;
 const progressThumbSize = isTV ? 24 : isLargeTablet ? 20 : isTablet ? 18 : 16;
@@ -184,7 +184,7 @@ export const styles = StyleSheet.create({
     fontWeight: '500',
     opacity: 1,
     textAlign: 'center',
-    marginLeft: -7, // Adjusted for better centering with icon
+    marginLeft: -7,
   },
   
   /* CloudStream Style - Play Button */
@@ -303,6 +303,14 @@ export const styles = StyleSheet.create({
     fontSize: durationFont,
     fontWeight: '500',
   },
+  timeContainer: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
   bottomButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -316,6 +324,32 @@ export const styles = StyleSheet.create({
   bottomButtonText: {
     color: 'white',
     fontSize: bottomButtonTextFont,
+  },
+  bottomIconRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
+    paddingVertical: 8,
+  },
+  iconButton: {
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerControlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignSelf: 'center',
   },
   modalOverlay: {
     flex: 1,
