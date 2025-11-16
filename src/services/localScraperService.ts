@@ -1056,11 +1056,9 @@ class LocalScraperService {
       }
       
       // MovieBox constants - read from Expo public envs so they bundle in builds
-      const MOVIEBOX_PRIMARY_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY;
+      // Use placeholder values if environment variables are missing (for builds without .env)
+      const MOVIEBOX_PRIMARY_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY || 'placeholder-moviebox-key';
       const MOVIEBOX_TMDB_API_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_TMDB_API_KEY || '439c478a771f35c05022f9feabcca01c';
-      if (!MOVIEBOX_PRIMARY_KEY) {
-        throw new Error('Missing EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY');
-      }
       
       const sandbox = {
         console: {

@@ -29,11 +29,8 @@ import CustomAlert from '../components/CustomAlert';
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Trakt configuration
-const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID as string;
-
-if (!TRAKT_CLIENT_ID) {
-  throw new Error('Missing EXPO_PUBLIC_TRAKT_CLIENT_ID environment variable');
-}
+// Use placeholder value if environment variable is missing (for builds without .env)
+const TRAKT_CLIENT_ID = process.env.EXPO_PUBLIC_TRAKT_CLIENT_ID || 'placeholder-trakt-client-id';
 const discovery = {
   authorizationEndpoint: 'https://trakt.tv/oauth/authorize',
   tokenEndpoint: 'https://api.trakt.tv/oauth/token',
