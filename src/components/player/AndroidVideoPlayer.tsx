@@ -1035,6 +1035,27 @@ const AndroidVideoPlayer: React.FC = () => {
     }, 1000); // 1 second fallback
   };
 
+  // Force landscape orientation after opening animation completes
+  useEffect(() => {
+    const lockOrientation = async () => {
+      try {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+        if (__DEV__) logger.log('[AndroidVideoPlayer] Locked to landscape orientation');
+      } catch (error) {
+        logger.warn('[AndroidVideoPlayer] Failed to lock orientation:', error);
+      }
+    };
+
+    // Lock orientation after opening animation completes to prevent glitches
+    if (isOpeningAnimationComplete) {
+      lockOrientation();
+    }
+
+    return () => {
+      // Do not unlock orientation here; we unlock explicitly on close to avoid mid-transition flips
+    };
+  }, [isOpeningAnimationComplete]);
+
   useEffect(() => {
     const loadWatchProgress = async () => {
       if (id && type) {
