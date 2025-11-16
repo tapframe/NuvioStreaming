@@ -25,6 +25,27 @@ jobs:
       - name: Build app
         run: |
           npm run build
+        env:
+          # Trakt API placeholders
+          EXPO_PUBLIC_TRAKT_CLIENT_ID: 'placeholder_trakt_client_id'
+          EXPO_PUBLIC_TRAKT_CLIENT_SECRET: 'placeholder_trakt_client_secret'
+          EXPO_PUBLIC_TRAKT_REDIRECT_URI: 'nuvio://auth/trakt'
+          
+          # MovieBox placeholders
+          EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY: 'placeholder_moviebox_primary_key'
+          EXPO_PUBLIC_MOVIEBOX_TMDB_API_KEY: '439c478a771f35c05022f9feabcca01c'
+          
+          # Trailer service placeholders
+          EXPO_PUBLIC_TRAILER_LOCAL_BASE: 'http://46.62.173.157:3001'
+          EXPO_PUBLIC_TRAILER_LOCAL_TRAILER_PATH: '/trailer'
+          EXPO_PUBLIC_TRAILER_LOCAL_SEARCH_PATH: '/search-trailer'
+          EXPO_PUBLIC_XPRIME_URL: 'https://db.xprime.tv/trailers'
+          
+          # TMDB/Cache service placeholders
+          EXPO_PUBLIC_CACHE_SERVER_URL: ''
+          EXPO_PUBLIC_USE_REMOTE_CACHE: 'false'
+          EXPO_PUBLIC_DISABLE_LOCAL_CACHE: 'false'
+          EXPO_PUBLIC_IMDB_RATINGS_API_BASE_URL: ''
           
       - name: Create Release
         uses: softprops/action-gh-release@v1
