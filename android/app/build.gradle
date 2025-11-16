@@ -101,33 +101,10 @@ android {
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
 
-    // Split APKs by architecture only for smaller downloads
     splits {
         abi {
-            enable true
             reset()
-            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
-            universalApk true
-        }
-        density {
-            enable false
-        }
-    }
-
-    // Generate unique version codes for each split APK
-    def abiVersionCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86': 3, 'x86_64': 4]
-    applicationVariants.all { variant ->
-        variant.outputs.each { output ->
-            def baseVersionCode = 24 // Current versionCode 24 from defaultConfig
-            def abiName = output.getFilter(com.android.build.OutputFile.ABI)
-
-            def versionCode = baseVersionCode * 100 // Base multiplier
-
-            if (abiName != null) {
-                versionCode += abiVersionCodes.get(abiName)
-            }
-
-            output.versionCodeOverride = versionCode
+            enable false  // Disable splits - build single APK for specified architecture
         }
     }
     signingConfigs {
