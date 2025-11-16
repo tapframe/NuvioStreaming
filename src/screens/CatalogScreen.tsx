@@ -509,9 +509,11 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             let nextHasMore = false;
             try {
               const svcHasMore = addonId ? stremioService.getCatalogHasMore(addonId, type, id) : undefined;
-              nextHasMore = typeof svcHasMore === 'boolean' ? svcHasMore : (catalogItems.length >= 50);
+              // If service explicitly provides hasMore, use it; otherwise assume there's more if we got any items
+              // This handles addons with different page sizes (not just 50 items per page)
+              nextHasMore = typeof svcHasMore === 'boolean' ? svcHasMore : (catalogItems.length > 0);
             } catch {
-              nextHasMore = catalogItems.length >= 50;
+              nextHasMore = catalogItems.length > 0;
             }
             setHasMore(nextHasMore);
             logger.log('[CatalogScreen] Updated items and hasMore', {
