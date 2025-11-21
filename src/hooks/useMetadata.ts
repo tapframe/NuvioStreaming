@@ -2168,7 +2168,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   useEffect(() => {
     const unsubscribe = catalogService.subscribeToLibraryUpdates((libraryItems) => {
       const isInLib = libraryItems.some(item => item.id === id);
-      setInLibrary(isInLib);
+      // Only update state if the value actually changed to prevent unnecessary re-renders
+      setInLibrary(prev => prev !== isInLib ? isInLib : prev);
     });
 
     return () => unsubscribe();
