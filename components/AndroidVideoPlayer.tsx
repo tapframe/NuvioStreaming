@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Platform, Animated, TouchableWithoutFeedback, View } from 'react-native';
 import Video, { VideoRef, SelectedTrack, BufferingStrategyType, ResizeMode } from 'react-native-video';
+import RNImmersiveMode from 'react-native-immersive-mode';
 
 interface VideoPlayerProps {
   src: string;
@@ -39,6 +40,28 @@ export const AndroidVideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSeeking, setIsSeeking] = useState(false);
   const [lastSeekTime, setLastSeekTime] = useState<number>(0);
+
+  // Enable immersive mode when video player mounts, disable when it unmounts
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      try {
+        RNImmersiveMode.setBarMode('Bottom');
+        RNImmersiveMode.fullLayout(true);
+      } catch (error) {
+        console.log('Immersive mode error:', error);
+      }
+
+      return () => {
+        // Restore navigation bar when video player unmounts
+        try {
+          RNImmersiveMode.setBarMode('Normal');
+          RNImmersiveMode.fullLayout(false);
+        } catch (error) {
+          console.log('Immersive mode cleanup error:', error);
+        }
+      };
+    }
+  }, []);
 
   // Only render on Android
   if (Platform.OS !== 'android') {
