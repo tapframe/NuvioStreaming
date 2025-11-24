@@ -457,9 +457,24 @@ class KSPlayerView: UIView {
             return
         }
         
-        playerView.seek(time: time) { success in
+        // Capture the current paused state before seeking
+        let wasPaused = isPaused
+        print("KSPlayerView: Seeking to \(time), paused state before seek: \(wasPaused)")
+        
+        playerView.seek(time: time) { [weak self] success in
+            guard let self = self else { return }
+            
             if success {
                 print("KSPlayerView: Seek successful to \(time)")
+                
+                // Restore the paused state after seeking
+                // KSPlayer's seek may resume playback, so we need to re-apply the paused state
+                if wasPaused {
+                    DispatchQueue.main.async {
+                        self.playerView.pause()
+                        print("KSPlayerView: Restored paused state after seek")
+                    }
+                }
             } else {
                 print("KSPlayerView: Seek failed to \(time)")
             }

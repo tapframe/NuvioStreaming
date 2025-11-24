@@ -849,6 +849,8 @@ const KSPlayerCore: React.FC = () => {
   const onPaused = () => {
     if (isMounted.current) {
       setPaused(true);
+      // Reset the wasPlayingBeforeDrag ref so that seeking while paused doesn't resume playback
+      wasPlayingBeforeDragRef.current = false;
 
       // IMMEDIATE: Send immediate pause update to Trakt when user pauses
       if (duration > 0) {
@@ -919,8 +921,9 @@ const KSPlayerCore: React.FC = () => {
     if (duration > 0) {
       const seekTime = Math.min(value, duration - END_EPSILON);
       seekToTime(seekTime);
-      // If the video was playing before the drag, ensure we remain in playing state after the seek
-      if (wasPlayingBeforeDragRef.current) {
+      // Only resume playback if the video was playing before the drag AND is not currently paused
+      // This ensures that if the user paused during or before the drag, it stays paused
+      if (wasPlayingBeforeDragRef.current && !paused) {
         setTimeout(() => {
           if (isMounted.current) {
             setPaused(false);
@@ -986,14 +989,6 @@ const KSPlayerCore: React.FC = () => {
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
       completeOpeningAnimation();
-    }
-
-    // If time is advancing right after seek and we previously intended to play,
-    // ensure paused state is false to keep UI in sync
-    if (wasPlayingBeforeDragRef.current && paused && !isDragging) {
-      setPaused(false);
-      // Reset the intent once corrected
-      wasPlayingBeforeDragRef.current = false;
     }
 
     // Periodic check for disabled audio track (every 3 seconds, max 3 attempts)
