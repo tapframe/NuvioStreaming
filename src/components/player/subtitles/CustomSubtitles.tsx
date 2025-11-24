@@ -54,7 +54,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   formattedSegments,
 }) => {
   if (!useCustomSubtitles || !currentSubtitle) return null;
-  
+
   const inverseScale = 1 / zoomScale;
   const bgColor = subtitleBackground ? `rgba(0, 0, 0, ${Math.min(Math.max(backgroundOpacity, 0), 1)})` : 'transparent';
   let effectiveBottom = bottomOffset;
@@ -65,23 +65,26 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   }
   effectiveBottom = Math.max(0, effectiveBottom);
 
+  // Prepare content lines
+  const lines = String(currentSubtitle).split(/\r?\n/);
+
+  // Detect RTL for each line
+  const lineRTLStatus = lines.map(line => detectRTL(line));
+  const hasRTL = lineRTLStatus.some(status => status);
+
   // When using crisp outline, prefer SVG text with real stroke instead of blur shadow
-  const useCrispSvgOutline = outline === true;
+  // However, SVG text does not support complex text shaping (required for Arabic/RTL),
+  // so we must fallback to standard Text component for RTL languages.
+  const useCrispSvgOutline = outline === true && !hasRTL;
 
   const shadowStyle = (textShadow && !useCrispSvgOutline)
     ? {
-        textShadowColor: 'rgba(0, 0, 0, 0.9)',
-        textShadowOffset: { width: 2, height: 2 },
-        textShadowRadius: 4,
-      }
+      textShadowColor: 'rgba(0, 0, 0, 0.9)',
+      textShadowOffset: { width: 2, height: 2 },
+      textShadowRadius: 4,
+    }
     : {};
 
-  // Prepare content lines
-  const lines = String(currentSubtitle).split(/\r?\n/);
-  
-  // Detect RTL for each line
-  const lineRTLStatus = lines.map(line => detectRTL(line));
-  
   const displayFontSize = subtitleSize * inverseScale;
   const displayLineHeight = subtitleSize * lineHeightMultiplier * inverseScale;
   const svgHeight = lines.length * displayLineHeight;
@@ -89,14 +92,14 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
   // Helper to render formatted segments
   const renderFormattedText = (segments: SubtitleSegment[], lineIndex: number, keyPrefix: string, isRTL?: boolean, customLetterSpacing?: number) => {
     if (!segments || segments.length === 0) return null;
-    
+
     // For RTL, use a very small negative letter spacing to stretch words slightly
     // This helps with proper diacritic spacing while maintaining ligatures
     const effectiveLetterSpacing = isRTL ? (displayFontSize * -0.02) : (customLetterSpacing ?? letterSpacing);
 
     // For RTL, adjust text alignment
     const effectiveAlign = isRTL && align === 'left' ? 'right' : (isRTL && align === 'right' ? 'left' : align);
-    
+
     return (
       <Text key={`${keyPrefix}-line-${lineIndex}`} style={{
         color: textColor,
@@ -156,7 +159,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
               const isRTL = lineRTLStatus.every(status => status);
               let anchor: 'start' | 'middle' | 'end';
               let x: number;
-              
+
               if (isRTL) {
                 // For RTL, always use 'end' anchor to position from right edge
                 anchor = 'end';
@@ -165,20 +168,20 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
                 anchor = align === 'center' ? 'middle' : align === 'left' ? 'start' : 'end';
                 x = align === 'center' ? 500 : (align === 'left' ? 0 : 1000);
               }
-              
+
               const baseFontSize = displayFontSize;
               const lineHeightPx = displayLineHeight;
               const strokeWidth = Math.max(0.5, outlineWidth);
               // For RTL, use a very small negative letter spacing to stretch words slightly
               // This helps with proper diacritic spacing while maintaining ligatures
               const effectiveLetterSpacing = isRTL ? (baseFontSize * -0.02) : letterSpacing;
-              
+
               // Position text from bottom up - last line should be at svgHeight - small margin
               // Add descender buffer so letters like y/g/p/q/j aren't clipped
               const descenderBuffer = baseFontSize * 0.35 + (strokeWidth * 0.5);
               const lastLineBaselineY = svgHeight - descenderBuffer;
               const startY = lastLineBaselineY - (lines.length - 1) * lineHeightPx;
-              
+
               return (
                 <>
                   {/* Stroke layer */}
@@ -239,7 +242,7 @@ export const CustomSubtitles: React.FC<CustomSubtitlesProps> = ({
               const effectiveLetterSpacing = isRTL ? (subtitleSize * inverseScale * -0.02) : letterSpacing;
               // For RTL, adjust text alignment
               const effectiveAlign = isRTL && align === 'left' ? 'right' : (isRTL && align === 'right' ? 'left' : align);
-              
+
               return (
                 <Text style={[
                   styles.customSubtitleText,

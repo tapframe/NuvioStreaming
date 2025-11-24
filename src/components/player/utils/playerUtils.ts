@@ -25,7 +25,7 @@ export const safeDebugLog = (message: string, data?: any) => {
 };
 
 // Add language code to name mapping
-export const languageMap: {[key: string]: string} = {
+export const languageMap: { [key: string]: string } = {
   'en': 'English',
   'eng': 'English',
   'es': 'Spanish',
@@ -81,10 +81,10 @@ export const formatLanguage = (code?: string): string => {
   if (!code) return 'Unknown';
   const normalized = code.toLowerCase();
   const languageName = languageMap[normalized] || code.toUpperCase();
-  
+
   // If the result is still the uppercased code, it means we couldn't find it in our map.
   if (languageName === code.toUpperCase()) {
-      return `Unknown (${code})`;
+    return `Unknown (${code})`;
   }
 
   return languageName;
@@ -103,8 +103,8 @@ export const getTrackDisplayName = (track: { name?: string, id: number, language
   }
 
   // If the track name contains detailed information (like codec, bitrate, etc.), use it as-is
-  if (track.name && (track.name.includes('DDP') || track.name.includes('DTS') || track.name.includes('AAC') || 
-                     track.name.includes('Kbps') || track.name.includes('Atmos') || track.name.includes('~'))) {
+  if (track.name && (track.name.includes('DDP') || track.name.includes('DTS') || track.name.includes('AAC') ||
+    track.name.includes('Kbps') || track.name.includes('Atmos') || track.name.includes('~'))) {
     return track.name;
   }
 
@@ -159,7 +159,7 @@ export const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   } else {
@@ -189,14 +189,14 @@ export const detectRTL = (text: string): boolean => {
   // Arabic Presentation Forms-B: U+FE70–U+FEFF
   // Hebrew: U+0590–U+05FF
   // Persian/Urdu use Arabic script (no separate range)
-  const rtlRegex = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-  
+  const rtlRegex = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+
   // Remove whitespace and count characters
   const nonWhitespace = text.replace(/\s/g, '');
   if (nonWhitespace.length === 0) return false;
 
   const rtlCount = (nonWhitespace.match(rtlRegex) || []).length;
-  
+
   // Consider RTL if at least 30% of non-whitespace characters are RTL
   // This handles mixed-language subtitles (e.g., Arabic with English numbers)
   return rtlCount / nonWhitespace.length >= 0.3;
