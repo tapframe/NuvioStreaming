@@ -50,6 +50,10 @@ interface ThisWeekEpisode {
   vote_average: number;
   still_path: string | null;
   season_poster_path: string | null;
+  // Grouping fields
+  isGroup?: boolean;
+  episodeCount?: number;
+  episodeRange?: string;
 }
 
 export const ThisWeekSection = React.memo(() => {
@@ -134,16 +138,72 @@ export const ThisWeekSection = React.memo(() => {
     const thisWeekSection = calendarData.find(section => section.title === 'This Week');
     if (!thisWeekSection) return [];
 
-    // Limit episodes to prevent memory issues and add release status
-    const episodes = memoryManager.limitArraySize(thisWeekSection.data, 20); // Limit to 20 for home screen
+    // Get raw episodes (limit to 60 to be safe for performance but allow grouping)
+    const rawEpisodes = memoryManager.limitArraySize(thisWeekSection.data, 60);
 
-    return episodes.map(episode => ({
-      ...episode,
-      isReleased: episode.releaseDate ? isBefore(parseISO(episode.releaseDate), new Date()) : false,
-    }));
+    // Group by series and date
+    const groups: Record<string, typeof rawEpisodes> = {};
+
+    rawEpisodes.forEach(ep => {
+      // Create a unique key for series + date
+      const dateKey = ep.releaseDate || 'unknown';
+      const key = `${ep.seriesId}_${dateKey}`;
+
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(ep);
+    });
+
+    const processedItems: ThisWeekEpisode[] = [];
+
+    Object.values(groups).forEach(group => {
+      // Sort episodes in the group by episode number
+      group.sort((a, b) => a.episode - b.episode);
+
+      const firstEp = group[0];
+      const isReleased = firstEp.releaseDate ? isBefore(parseISO(firstEp.releaseDate), new Date()) : false;
+
+      if (group.length === 1) {
+        processedItems.push({
+          ...firstEp,
+          isReleased
+        });
+      } else {
+        // Create group item
+        const lastEp = group[group.length - 1];
+        processedItems.push({
+          ...firstEp,
+          id: `group_${firstEp.seriesId}_${firstEp.releaseDate}`, // Unique ID for the group
+          title: `${group.length} New Episodes`,
+          isReleased,
+          isGroup: true,
+          episodeCount: group.length,
+          episodeRange: `E${firstEp.episode}-${lastEp.episode}`
+        });
+      }
+    });
+
+    // Sort by release date
+    processedItems.sort((a, b) => {
+      if (!a.releaseDate) return 1;
+      if (!b.releaseDate) return -1;
+      return a.releaseDate.localeCompare(b.releaseDate);
+    });
+
+    return memoryManager.limitArraySize(processedItems, 20);
   }, [calendarData]);
 
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
+    // For grouped episodes, always go to series details
+    if (episode.isGroup) {
+      navigation.navigate('Metadata', {
+        id: episode.seriesId,
+        type: 'series'
+      });
+      return;
+    }
+
     // For upcoming episodes, go to the metadata screen
     if (!episode.isReleased) {
       const episodeId = `${episode.seriesId}:${episode.season}:${episode.episode}`;
@@ -187,6 +247,15 @@ export const ThisWeekSection = React.memo(() => {
 
     return (
       <View style={[styles.episodeItemContainer, { width: computedItemWidth, height: computedItemHeight }]}>
+        {item.isGroup && (
+          <View style={[
+            styles.cardStackEffect,
+            {
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              borderColor: 'rgba(255,255,255,0.05)',
+            }
+          ]} />
+        )}
         <TouchableOpacity
           style={[
             styles.episodeItem,
@@ -226,7 +295,7 @@ export const ThisWeekSection = React.memo(() => {
                   { backgroundColor: isReleased ? currentTheme.colors.primary : 'rgba(0,0,0,0.6)' }
                 ]}>
                   <Text style={styles.statusText}>
-                    {isReleased ? 'New' : formattedDate}
+                    {isReleased ? (item.isGroup ? 'Released' : 'New') : formattedDate}
                   </Text>
                 </View>
               </View>
@@ -250,7 +319,7 @@ export const ThisWeekSection = React.memo(() => {
                       fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 12
                     }
                   ]}>
-                    S{item.season} E{item.episode}
+                    S{item.season} {item.isGroup ? item.episodeRange : `E${item.episode}`}
                   </Text>
                   <Text style={styles.dotSeparator}>•</Text>
                   <Text style={[
@@ -482,5 +551,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     flex: 1,
+  },
+  cardStackEffect: {
+    position: 'absolute',
+    top: -6,
+    width: '92%',
+    height: '100%',
+    left: '4%',
+    borderRadius: 16,
+    borderWidth: 1,
+    zIndex: -1,
   },
 }); 
