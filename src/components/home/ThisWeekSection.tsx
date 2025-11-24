@@ -60,7 +60,7 @@ export const ThisWeekSection = React.memo(() => {
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -68,13 +68,13 @@ export const ThisWeekSection = React.memo(() => {
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced responsive sizing
   const computedItemWidth = useMemo(() => {
     switch (deviceType) {
@@ -88,7 +88,7 @@ export const ThisWeekSection = React.memo(() => {
         return ITEM_WIDTH; // phone
     }
   }, [deviceType, deviceWidth]);
-  
+
   const computedItemHeight = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -101,7 +101,7 @@ export const ThisWeekSection = React.memo(() => {
         return ITEM_HEIGHT; // phone
     }
   }, [deviceType]);
-  
+
   // Enhanced spacing and padding
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -115,7 +115,7 @@ export const ThisWeekSection = React.memo(() => {
         return 16; // phone
     }
   }, [deviceType]);
-  
+
   const itemSpacing = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -136,13 +136,13 @@ export const ThisWeekSection = React.memo(() => {
 
     // Limit episodes to prevent memory issues and add release status
     const episodes = memoryManager.limitArraySize(thisWeekSection.data, 20); // Limit to 20 for home screen
-    
+
     return episodes.map(episode => ({
       ...episode,
       isReleased: episode.releaseDate ? isBefore(parseISO(episode.releaseDate), new Date()) : false,
     }));
   }, [calendarData]);
-  
+
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
     // For upcoming episodes, go to the metadata screen
     if (!episode.isReleased) {
@@ -154,7 +154,7 @@ export const ThisWeekSection = React.memo(() => {
       });
       return;
     }
-    
+
     // For released episodes, go to the streams screen
     const episodeId = `${episode.seriesId}:${episode.season}:${episode.episode}`;
     navigation.navigate('Streams', {
@@ -163,136 +163,114 @@ export const ThisWeekSection = React.memo(() => {
       episodeId
     });
   };
-  
+
   const handleViewAll = () => {
     navigation.navigate('Calendar' as any);
   };
-  
+
   if (thisWeekEpisodes.length === 0) {
     return null;
   }
-  
+
   const renderEpisodeItem = ({ item, index }: { item: ThisWeekEpisode, index: number }) => {
     // Handle episodes without release dates gracefully
     const releaseDate = item.releaseDate ? parseISO(item.releaseDate) : null;
-    const formattedDate = releaseDate ? format(releaseDate, 'E, MMM d') : 'TBA';
+    const formattedDate = releaseDate ? format(releaseDate, 'MMM d') : 'TBA';
     const isReleased = item.isReleased;
-    
+
     // Use episode still image if available, fallback to series poster
-    const imageUrl = item.still_path ? 
-      tmdbService.getImageUrl(item.still_path) : 
-      (item.season_poster_path ? 
-        tmdbService.getImageUrl(item.season_poster_path) : 
+    const imageUrl = item.still_path ?
+      tmdbService.getImageUrl(item.still_path) :
+      (item.season_poster_path ?
+        tmdbService.getImageUrl(item.season_poster_path) :
         item.poster);
-    
+
     return (
       <View style={[styles.episodeItemContainer, { width: computedItemWidth, height: computedItemHeight }]}>
         <TouchableOpacity
           style={[
             styles.episodeItem,
-            { 
-              shadowColor: currentTheme.colors.black,
+            {
               backgroundColor: currentTheme.colors.background,
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
             }
           ]}
           onPress={() => handleEpisodePress(item)}
-          activeOpacity={0.8}
+          activeOpacity={0.7}
         >
           <View style={styles.imageContainer}>
-          <FastImage
-            source={{ 
-              uri: imageUrl || undefined,
-              priority: FastImage.priority.normal,
-              cache: FastImage.cacheControl.immutable
-            }}
-            style={styles.poster}
-            resizeMode={FastImage.resizeMode.cover}
-          />
-          
-                        {/* Enhanced gradient overlay */}
-          <LinearGradient
+            <FastImage
+              source={{
+                uri: imageUrl || undefined,
+                priority: FastImage.priority.normal,
+                cache: FastImage.cacheControl.immutable
+              }}
+              style={styles.poster}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+
+            <LinearGradient
               colors={[
-                'transparent', 
                 'transparent',
-                'rgba(0,0,0,0.4)', 
-                'rgba(0,0,0,0.8)',
-                'rgba(0,0,0,0.95)'
+                'rgba(0,0,0,0.0)',
+                'rgba(0,0,0,0.5)',
+                'rgba(0,0,0,0.9)'
               ]}
-            style={[
-              styles.gradient,
-              {
-                padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-              }
-            ]}
-              locations={[0, 0.4, 0.6, 0.8, 1]}
+              style={styles.gradient}
+              locations={[0, 0.4, 0.7, 1]}
             >
-              {/* Content area */}
+              <View style={styles.cardHeader}>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: isReleased ? currentTheme.colors.primary : 'rgba(0,0,0,0.6)' }
+                ]}>
+                  <Text style={styles.statusText}>
+                    {isReleased ? 'New' : formattedDate}
+                  </Text>
+                </View>
+              </View>
+
               <View style={styles.contentArea}>
                 <Text style={[
-                  styles.seriesName, 
-                  { 
+                  styles.seriesName,
+                  {
                     color: currentTheme.colors.white,
-                    fontSize: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16
+                    fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
                   }
                 ]} numberOfLines={1}>
                   {item.seriesName}
                 </Text>
-                
-                <Text style={[
-                  styles.episodeTitle, 
-                  { 
-                    color: 'rgba(255,255,255,0.9)',
-                    fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14
-                  }
-                ]} numberOfLines={2}>
-                  {item.title}
-                </Text>
-              
-                {item.overview && (
+
+                <View style={styles.metaContainer}>
                   <Text style={[
-                    styles.overview, 
-                    { 
-                      color: 'rgba(255,255,255,0.8)',
-                      fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
-                    }
-                  ]} numberOfLines={isLargeScreen ? 3 : 2}>
-                    {item.overview}
-                  </Text>
-                )}
-                
-                <View style={styles.dateContainer}>
-                  <Text style={[
-                    styles.episodeInfo, 
-                    { 
-                      color: 'rgba(255,255,255,0.7)',
-                      fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
-                    }
-                  ]}>
-                    S{item.season}:E{item.episode} • 
-                  </Text>
-                  <MaterialIcons
-                    name="event" 
-                    size={isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14} 
-                    color={currentTheme.colors.primary}
-                  />
-                  <Text style={[
-                    styles.releaseDate, 
-                    { 
+                    styles.seasonBadge,
+                    {
                       color: currentTheme.colors.primary,
-                      fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
+                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 12
                     }
                   ]}>
-                    {formattedDate}
+                    S{item.season} E{item.episode}
+                  </Text>
+                  <Text style={styles.dotSeparator}>•</Text>
+                  <Text style={[
+                    styles.episodeTitle,
+                    {
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 12
+                    }
+                  ]} numberOfLines={1}>
+                    {item.title}
                   </Text>
                 </View>
-            </View>
-          </LinearGradient>
+              </View>
+            </LinearGradient>
           </View>
         </TouchableOpacity>
       </View>
     );
   };
-  
+
   return (
     <Animated.View
       style={styles.container}
@@ -300,16 +278,16 @@ export const ThisWeekSection = React.memo(() => {
     >
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.titleContainer}>
-        <Text style={[
-          styles.title, 
-          { 
-            color: currentTheme.colors.text,
-            fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
-          }
-        ]}>This Week</Text>
+          <Text style={[
+            styles.title,
+            {
+              color: currentTheme.colors.text,
+              fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
+            }
+          ]}>This Week</Text>
           <View style={[
-            styles.titleUnderline, 
-            { 
+            styles.titleUnderline,
+            {
               backgroundColor: currentTheme.colors.primary,
               width: isTV ? 50 : isLargeTablet ? 45 : isTablet ? 40 : 40,
               height: isTV ? 4 : isLargeTablet ? 3.5 : isTablet ? 3 : 3
@@ -324,20 +302,20 @@ export const ThisWeekSection = React.memo(() => {
           }
         ]}>
           <Text style={[
-            styles.viewAllText, 
-            { 
+            styles.viewAllText,
+            {
               color: currentTheme.colors.textMuted,
               fontSize: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 15 : 14
             }
           ]}>View All</Text>
-          <MaterialIcons 
-            name="chevron-right" 
-            size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20} 
-            color={currentTheme.colors.textMuted} 
+          <MaterialIcons
+            name="chevron-right"
+            size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}
+            color={currentTheme.colors.textMuted}
           />
         </TouchableOpacity>
       </View>
-      
+
       <FlatList
         data={thisWeekEpisodes}
         keyExtractor={(item) => item.id}
@@ -345,10 +323,10 @@ export const ThisWeekSection = React.memo(() => {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[
-          styles.listContent, 
-          { 
-            paddingLeft: horizontalPadding, 
-            paddingRight: horizontalPadding 
+          styles.listContent,
+          {
+            paddingLeft: horizontalPadding,
+            paddingRight: horizontalPadding
           }
         ]}
         snapToInterval={computedItemWidth + itemSpacing}
@@ -371,7 +349,7 @@ export const ThisWeekSection = React.memo(() => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 20,
+    marginVertical: 24,
   },
   header: {
     flexDirection: 'row',
@@ -400,14 +378,15 @@ const styles = StyleSheet.create({
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginRight: -10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   viewAllText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     marginRight: 4,
   },
@@ -432,10 +411,11 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowRadius: 8,
+    elevation: 8,
   },
   imageContainer: {
     width: '100%',
@@ -453,44 +433,54 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     padding: 12,
     borderRadius: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    width: '100%',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   contentArea: {
     width: '100%',
   },
   seriesName: {
     fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  episodeTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '800',
     marginBottom: 4,
-    lineHeight: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  overview: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 6,
-    opacity: 0.9,
-  },
-  dateContainer: {
+  metaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
   },
-  episodeInfo: {
+  seasonBadge: {
     fontSize: 12,
-    fontWeight: '600',
-    marginRight: 4,
+    fontWeight: '700',
   },
-  releaseDate: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 6,
-    letterSpacing: 0.3,
+  dotSeparator: {
+    marginHorizontal: 6,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  episodeTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
   },
 }); 
