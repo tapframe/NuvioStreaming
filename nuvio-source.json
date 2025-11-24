@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.10",
+          "buildVersion": "25",
+          "date": "2025-11-25",
+          "localizedDescription": "# Nuvio Media Hub – v1.2.10  \n\n## Update Notes\n- **Dependency updates** for stability and performance  \n- **Trakt optimizations** for smoother syncing  \n- **Subtitle RTL detection** improvements for better language handling  \n- **KSPlayer** pause behavior improvements  \n- Fixed incorrect **HDR detection logic** in KSPlayer  \n- Simplified **This Week’s section** card UI for a cleaner look  \n\n## 📦 Changelog & Download\n[View on GitHub](https://github.com/tapframe/NuvioStreaming/releases/tag/1.2.10)\n\n🌐 **Official Website:** [tapframe.github.io/NuvioStreaming](https://tapframe.github.io/NuvioStreaming)\n\nIf you like **Nuvio Media Hub**, please consider **⭐ starring it on GitHub**. It really helps the project grow  \n[⭐ Star on GitHub](https://github.com/tapframe/NuvioStreaming)",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.10/Stable_1-2-10.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.9",
           "buildVersion": "24",
           "date": "2025-11-16",
