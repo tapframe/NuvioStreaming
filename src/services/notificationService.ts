@@ -56,7 +56,9 @@ class NotificationService {
   private appStateSubscription: any = null;
   private lastSyncTime: number = 0;
   private readonly MIN_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes minimum between syncs
-  
+  // Download notification tracking - stores progress value (50) when notified
+  private lastDownloadNotificationTime: Map<string, number> = new Map();
+
   private constructor() {
     // Initialize notifications
     this.configureNotifications();
@@ -88,7 +90,7 @@ class NotificationService {
 
     // Request permissions if needed
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    
+
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -102,7 +104,7 @@ class NotificationService {
   private async loadSettings(): Promise<void> {
     try {
       const storedSettings = await mmkvStorage.getItem(NOTIFICATION_SETTINGS_KEY);
-      
+
       if (storedSettings) {
         this.settings = { ...DEFAULT_NOTIFICATION_SETTINGS, ...JSON.parse(storedSettings) };
       }
@@ -122,7 +124,7 @@ class NotificationService {
   private async loadScheduledNotifications(): Promise<void> {
     try {
       const storedNotifications = await mmkvStorage.getItem(NOTIFICATION_STORAGE_KEY);
-      
+
       if (storedNotifications) {
         this.scheduledNotifications = JSON.parse(storedNotifications);
       }
@@ -156,9 +158,9 @@ class NotificationService {
 
     // Check if notification already exists for this episode
     const existingNotification = this.scheduledNotifications.find(
-      notification => notification.seriesId === item.seriesId && 
-                     notification.season === item.season && 
-                     notification.episode === item.episode
+      notification => notification.seriesId === item.seriesId &&
+        notification.season === item.season &&
+        notification.episode === item.episode
     );
     if (existingNotification) {
       return null; // Don't schedule duplicate notifications
@@ -166,22 +168,22 @@ class NotificationService {
 
     const releaseDate = parseISO(item.releaseDate);
     const now = new Date();
-    
+
     // If release date has already passed, don't schedule
     if (releaseDate < now) {
       return null;
     }
-    
+
     try {
       // Calculate notification time (default to 24h before air time)
       const notificationTime = new Date(releaseDate);
       notificationTime.setHours(notificationTime.getHours() - this.settings.timeBeforeAiring);
-      
+
       // If notification time has already passed, don't schedule the notification
       if (notificationTime < now) {
         return null;
       }
-      
+
       // Schedule the notification
       const notificationId = await Notifications.scheduleNotificationAsync({
         content: {
@@ -197,16 +199,16 @@ class NotificationService {
           type: SchedulableTriggerInputTypes.DATE,
         },
       });
-      
+
       // Add to scheduled notifications
       this.scheduledNotifications.push({
         ...item,
         notified: false,
       });
-      
+
       // Save to storage
       await this.saveScheduledNotifications();
-      
+
       return notificationId;
     } catch (error) {
       logger.error('Error scheduling notification:', error);
@@ -218,16 +220,16 @@ class NotificationService {
     if (!this.settings.enabled) {
       return 0;
     }
-    
+
     let scheduledCount = 0;
-    
+
     for (const item of items) {
       const notificationId = await this.scheduleEpisodeNotification(item);
       if (notificationId) {
         scheduledCount++;
       }
     }
-    
+
     return scheduledCount;
   }
 
@@ -235,12 +237,12 @@ class NotificationService {
     try {
       // Cancel with Expo
       await Notifications.cancelScheduledNotificationAsync(id);
-      
+
       // Remove from our tracked notifications
       this.scheduledNotifications = this.scheduledNotifications.filter(
         notification => notification.id !== id
       );
-      
+
       // Save updated list
       await this.saveScheduledNotifications();
     } catch (error) {
@@ -268,10 +270,10 @@ class NotificationService {
       // Subscribe to library updates from catalog service
       this.librarySubscription = catalogService.subscribeToLibraryUpdates(async (libraryItems) => {
         if (!this.settings.enabled) return;
-        
+
         const now = Date.now();
         const timeSinceLastSync = now - this.lastSyncTime;
-        
+
         // Only sync if enough time has passed since last sync
         if (timeSinceLastSync >= this.MIN_SYNC_INTERVAL) {
           // Reduced logging verbosity
@@ -309,7 +311,7 @@ class NotificationService {
     if (nextAppState === 'active' && this.settings.enabled) {
       const now = Date.now();
       const timeSinceLastSync = now - this.lastSyncTime;
-      
+
       // Only sync if enough time has passed since last sync
       if (timeSinceLastSync >= this.MIN_SYNC_INTERVAL) {
         // App came to foreground, sync notifications
@@ -327,6 +329,21 @@ class NotificationService {
     try {
       if (!this.settings.enabled) return;
       if (AppState.currentState === 'active') return;
+
+      // Only notify at 50% progress
+      if (progress < 50) {
+        return; // Skip notifications before 50%
+      }
+
+      // Check if we've already notified at 50% for this download
+      const lastNotifiedProgress = this.lastDownloadNotificationTime.get(title) || 0;
+      if (lastNotifiedProgress >= 50) {
+        return; // Already notified at 50%, don't notify again
+      }
+
+      // Mark that we've notified at 50%
+      this.lastDownloadNotificationTime.set(title, 50);
+
       const downloadedMb = Math.floor((downloadedBytes || 0) / (1024 * 1024));
       const totalMb = totalBytes ? Math.floor(totalBytes / (1024 * 1024)) : undefined;
       const body = `${progress}%` + (totalMb !== undefined ? ` • ${downloadedMb}MB / ${totalMb}MB` : '');
@@ -348,6 +365,7 @@ class NotificationService {
     try {
       if (!this.settings.enabled) return;
       if (AppState.currentState === 'active') return;
+
       await Notifications.scheduleNotificationAsync({
         content: {
           title: 'Download complete',
@@ -356,6 +374,9 @@ class NotificationService {
         },
         trigger: null,
       });
+
+      // Clean up tracking entry after completion to prevent memory leaks
+      this.lastDownloadNotificationTime.delete(title);
     } catch (error) {
       logger.error('[NotificationService] notifyDownloadComplete error:', error);
     }
@@ -365,14 +386,14 @@ class NotificationService {
   private async syncNotificationsForLibrary(libraryItems: any[]): Promise<void> {
     try {
       const seriesItems = libraryItems.filter(item => item.type === 'series');
-      
+
       // Limit series to prevent memory overflow during notifications sync
       const limitedSeries = memoryManager.limitArraySize(seriesItems, 50);
-      
+
       if (limitedSeries.length < seriesItems.length) {
         logger.warn(`[NotificationService] Limited series sync from ${seriesItems.length} to ${limitedSeries.length} to prevent memory issues`);
       }
-      
+
       // Process in small batches with memory management
       await memoryManager.processArrayInBatches(
         limitedSeries,
@@ -386,10 +407,10 @@ class NotificationService {
         3, // Very small batch size to prevent memory spikes
         800 // Longer delay to prevent API overwhelming and reduce heating
       );
-      
+
       // Force cleanup after processing
       memoryManager.forceGarbageCollection();
-      
+
       // Reduced logging verbosity
       // logger.log(`[NotificationService] Synced notifications for ${limitedSeries.length} series from library`);
     } catch (error) {
@@ -402,20 +423,20 @@ class NotificationService {
     try {
       // Update last sync time at the start
       this.lastSyncTime = Date.now();
-      
+
       // Reduced logging verbosity
       // logger.log('[NotificationService] Starting comprehensive background sync');
-      
+
       // Get library items
       const libraryItems = await catalogService.getLibraryItems();
       await this.syncNotificationsForLibrary(libraryItems);
-      
+
       // Sync Trakt items if authenticated
       await this.syncTraktNotifications();
-      
+
       // Clean up old notifications
       await this.cleanupOldNotifications();
-      
+
       // Reduced logging verbosity
       // logger.log('[NotificationService] Background sync completed');
     } catch (error) {
@@ -435,7 +456,7 @@ class NotificationService {
 
       // Reduced logging verbosity
       // logger.log('[NotificationService] Syncing comprehensive Trakt notifications');
-      
+
       // Get all Trakt data sources (same as calendar screen uses)
       const [watchlistShows, continueWatching, watchedShows, collectionShows] = await Promise.all([
         traktService.getWatchlistShows(),
@@ -446,7 +467,7 @@ class NotificationService {
 
       // Combine and deduplicate shows using the same logic as calendar screen
       const allTraktShows = new Map();
-      
+
       // Add watchlist shows
       if (watchlistShows) {
         watchlistShows.forEach((item: any) => {
@@ -523,11 +544,11 @@ class NotificationService {
       // Sync notifications for each Trakt show using memory-efficient batching
       const traktShows = Array.from(allTraktShows.values());
       const limitedTraktShows = memoryManager.limitArraySize(traktShows, 30); // Limit Trakt shows
-      
+
       if (limitedTraktShows.length < traktShows.length) {
         logger.warn(`[NotificationService] Limited Trakt shows sync from ${traktShows.length} to ${limitedTraktShows.length} to prevent memory issues`);
       }
-      
+
       let syncedCount = 0;
       await memoryManager.processArrayInBatches(
         limitedTraktShows,
@@ -542,7 +563,7 @@ class NotificationService {
         2, // Even smaller batch size for Trakt shows
         1000 // Longer delay to prevent API rate limiting
       );
-      
+
       // Clear Trakt shows array to free memory
       memoryManager.clearObjects(traktShows, limitedTraktShows);
 
@@ -558,23 +579,23 @@ class NotificationService {
     try {
       // Check memory pressure before processing
       memoryManager.checkMemoryPressure();
-      
+
       // Use the new memory-efficient method to fetch only upcoming episodes
       const episodeData = await stremioService.getUpcomingEpisodes('series', seriesId, {
         daysBack: 7,   // 1 week back for notifications
         daysAhead: 28, // 4 weeks ahead for notifications
         maxEpisodes: 10, // Limit to 10 episodes per series for notifications
       });
-      
+
       let upcomingEpisodes: any[] = [];
       let metadata: any = null;
-      
+
       if (episodeData && episodeData.episodes.length > 0) {
         metadata = {
           name: episodeData.seriesName,
           poster: episodeData.poster,
         };
-        
+
         upcomingEpisodes = episodeData.episodes
           .filter(video => {
             if (!video.released) return false;
@@ -612,7 +633,7 @@ class NotificationService {
             // Get upcoming episodes from TMDB
             const now = new Date();
             const fourWeeksLater = addDays(now, 28);
-            
+
             // Check current and next seasons for upcoming episodes
             for (let seasonNum = tmdbDetails.number_of_seasons; seasonNum >= Math.max(1, tmdbDetails.number_of_seasons - 2); seasonNum--) {
               try {
@@ -641,11 +662,11 @@ class NotificationService {
           logger.warn(`[NotificationService] TMDB fallback failed for ${seriesId}:`, tmdbError);
         }
       }
-      
+
       if (!metadata) {
         return;
       }
-      
+
       // Cancel existing notifications for this series
       const existingNotifications = await Notifications.getAllScheduledNotificationsAsync();
       for (const notification of existingNotifications) {
@@ -653,17 +674,17 @@ class NotificationService {
           await Notifications.cancelScheduledNotificationAsync(notification.identifier);
         }
       }
-      
+
       // Remove from our tracked notifications
       this.scheduledNotifications = this.scheduledNotifications.filter(
         notification => notification.seriesId !== seriesId
       );
-      
+
       // Schedule new notifications for upcoming episodes with memory limits
       if (upcomingEpisodes.length > 0 && metadata) {
         // Limit notifications per series to prevent memory overflow
         const limitedEpisodes = memoryManager.limitArraySize(upcomingEpisodes, 5);
-        
+
         const notificationItems: NotificationItem[] = limitedEpisodes.map(episode => ({
           id: episode.id,
           seriesId,
@@ -675,23 +696,23 @@ class NotificationService {
           notified: false,
           poster: metadata.poster,
         }));
-        
+
         const scheduledCount = await this.scheduleMultipleEpisodeNotifications(notificationItems);
-        
+
         // Clear notification items array to free memory
         memoryManager.clearObjects(notificationItems, upcomingEpisodes);
-        
+
         // Reduced logging verbosity
         // logger.log(`[NotificationService] Scheduled ${scheduledCount} notifications for ${metadata.name}`);
       } else {
         // logger.log(`[NotificationService] No upcoming episodes found for ${metadata?.name || seriesId}`);
       }
-      
+
       // Clear episode data to free memory
       if (episodeData) {
         memoryManager.clearObjects(episodeData.episodes);
       }
-      
+
     } catch (error) {
       logger.error(`[NotificationService] Error updating notifications for series ${seriesId}:`, error);
     } finally {
@@ -705,18 +726,18 @@ class NotificationService {
     try {
       const now = new Date();
       const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      
+
       // Remove notifications for episodes that have already aired
       const validNotifications = this.scheduledNotifications.filter(notification => {
         const releaseDate = parseISO(notification.releaseDate);
         return releaseDate > oneDayAgo;
       });
-      
+
       if (validNotifications.length !== this.scheduledNotifications.length) {
         this.scheduledNotifications = validNotifications;
         await this.saveScheduledNotifications();
         // Reduced logging verbosity
-         // logger.log(`[NotificationService] Cleaned up ${this.scheduledNotifications.length - validNotifications.length} old notifications`);
+        // logger.log(`[NotificationService] Cleaned up ${this.scheduledNotifications.length - validNotifications.length} old notifications`);
       }
     } catch (error) {
       logger.error('[NotificationService] Error cleaning up notifications:', error);
@@ -734,17 +755,17 @@ class NotificationService {
   public getNotificationStats(): { total: number; upcoming: number; thisWeek: number } {
     const now = new Date();
     const oneWeekLater = addDays(now, 7);
-    
+
     const upcoming = this.scheduledNotifications.filter(notification => {
       const releaseDate = parseISO(notification.releaseDate);
       return releaseDate > now;
     });
-    
+
     const thisWeek = upcoming.filter(notification => {
       const releaseDate = parseISO(notification.releaseDate);
       return releaseDate < oneWeekLater;
     });
-    
+
     return {
       total: this.scheduledNotifications.length,
       upcoming: upcoming.length,
@@ -758,12 +779,12 @@ class NotificationService {
       clearInterval(this.backgroundSyncInterval);
       this.backgroundSyncInterval = null;
     }
-    
+
     if (this.librarySubscription) {
       this.librarySubscription();
       this.librarySubscription = null;
     }
-    
+
     if (this.appStateSubscription) {
       this.appStateSubscription.remove();
       this.appStateSubscription = null;
