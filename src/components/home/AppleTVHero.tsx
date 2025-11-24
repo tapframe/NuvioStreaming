@@ -57,8 +57,8 @@ const STATUS_BAR_HEIGHT = StatusBar.currentHeight || 0;
 const HERO_HEIGHT = height * 0.85;
 
 // Animated Pagination Dot Component
-const PaginationDot: React.FC<{ 
-  isActive: boolean; 
+const PaginationDot: React.FC<{
+  isActive: boolean;
   isNext: boolean;
   dragProgress: SharedValue<number>;
   onPress: () => void;
@@ -70,11 +70,11 @@ const PaginationDot: React.FC<{
       const inactiveWidth = 8;
       const activeOpacity = 0.9;
       const inactiveOpacity = 0.3;
-      
+
       // Calculate target width and opacity based on state
       let targetWidth = isActive ? activeWidth : inactiveWidth;
       let targetOpacity = isActive ? activeOpacity : inactiveOpacity;
-      
+
       // If this is the next dot during drag, interpolate between inactive and active
       if (isNext && dragProgress.value > 0) {
         targetWidth = interpolate(
@@ -90,7 +90,7 @@ const PaginationDot: React.FC<{
           Extrapolation.CLAMP
         );
       }
-      
+
       // If this is the current active dot during drag, interpolate from active to inactive
       if (isActive && dragProgress.value > 0) {
         targetWidth = interpolate(
@@ -106,7 +106,7 @@ const PaginationDot: React.FC<{
           Extrapolation.CLAMP
         );
       }
-      
+
       return {
         width: withTiming(targetWidth, {
           duration: 300,
@@ -144,11 +144,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
   const { isTrailerPlaying: globalTrailerPlaying, setTrailerPlaying } = useTrailer();
-  
+
   // Create internal scrollY if not provided externally
   const internalScrollY = useSharedValue(0);
   const scrollY = externalScrollY || internalScrollY;
-  
+
   // Determine items to display
   const items = useMemo(() => {
     if (allFeaturedContent && allFeaturedContent.length > 0) {
@@ -174,10 +174,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const [trailerPreloaded, setTrailerPreloaded] = useState(false);
   const [trailerShouldBePaused, setTrailerShouldBePaused] = useState(false);
   const trailerVideoRef = useRef<any>(null);
-  
+
   // Use ref to avoid re-fetching trailer when trailerMuted changes
   const showTrailersEnabled = useRef(settings?.showTrailers ?? false);
-  
+
   // Update ref when showTrailers setting changes
   useEffect(() => {
     showTrailersEnabled.current = settings?.showTrailers ?? false;
@@ -188,6 +188,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   // Animation values
   const dragProgress = useSharedValue(0);
   const dragDirection = useSharedValue(0); // -1 for left, 1 for right
+  const isDragging = useSharedValue(0); // 1 when dragging, 0 when not
   const logoOpacity = useSharedValue(1);
   const [nextIndex, setNextIndex] = useState(currentIndex);
   const thumbnailOpacity = useSharedValue(1);
@@ -197,14 +198,14 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
   // Animated style for trailer container - 60% height with zoom
   const trailerContainerStyle = useAnimatedStyle(() => {
-    // Fade out trailer during drag with smooth curve (inverse of next image fade)
+    // Faster fade out during drag - complete fade by 0.3 progress instead of 1.0
     const dragFade = interpolate(
       dragProgress.value,
-      [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1],
-      [1, 0.95, 0.88, 0.78, 0.65, 0.5, 0.35, 0.22, 0.08, 0],
+      [0, 0.05, 0.1, 0.15, 0.2, 0.3],
+      [1, 0.85, 0.65, 0.4, 0.15, 0],
       Extrapolation.CLAMP
     );
-    
+
     return {
       position: 'absolute',
       top: 0,
@@ -225,26 +226,36 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     };
   });
 
-  // Parallax style for background images
+  // Parallax style for background images - disabled during drag
   const backgroundParallaxStyle = useAnimatedStyle(() => {
     'worklet';
     const scrollYValue = scrollY.value;
-    
+
+    // Disable parallax during drag to avoid transform conflicts
+    if (isDragging.value > 0) {
+      return {
+        transform: [
+          { scale: 1.0 },
+          { translateY: 0 }
+        ],
+      };
+    }
+
     // Pre-calculated constants - start at 1.0 for normal size
     const DEFAULT_ZOOM = 1.0;
     const SCROLL_UP_MULTIPLIER = 0.002;
     const SCROLL_DOWN_MULTIPLIER = 0.0001;
     const MAX_SCALE = 1.3;
     const PARALLAX_FACTOR = 0.3;
-    
+
     // Optimized scale calculation with minimal branching
     const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
     const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
     const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
-    
+
     // Single parallax calculation
     const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
-    
+
     return {
       transform: [
         { scale },
@@ -253,26 +264,36 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     };
   });
 
-  // Parallax style for trailer
+  // Parallax style for trailer - disabled during drag
   const trailerParallaxStyle = useAnimatedStyle(() => {
     'worklet';
     const scrollYValue = scrollY.value;
-    
+
+    // Disable parallax during drag to avoid transform conflicts
+    if (isDragging.value > 0) {
+      return {
+        transform: [
+          { scale: 1.0 },
+          { translateY: 0 }
+        ],
+      };
+    }
+
     // Pre-calculated constants - start at 1.0 for normal size
     const DEFAULT_ZOOM = 1.0;
     const SCROLL_UP_MULTIPLIER = 0.0015;
     const SCROLL_DOWN_MULTIPLIER = 0.0001;
     const MAX_SCALE = 1.2;
     const PARALLAX_FACTOR = 0.2; // Slower than background for depth
-    
+
     // Optimized scale calculation with minimal branching
     const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
     const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
     const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
-    
+
     // Single parallax calculation
     const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
-    
+
     return {
       transform: [
         { scale },
@@ -316,16 +337,16 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       // Pause this screen's trailer
       setTrailerShouldBePaused(true);
       setTrailerPlaying(false);
-      
+
       // Fade out trailer
       trailerOpacity.value = withTiming(0, { duration: 300 });
       thumbnailOpacity.value = withTiming(1, { duration: 300 });
-      
+
       logger.info('[AppleTVHero] Screen lost focus - pausing trailer');
     } else {
       // Screen gained focus - allow trailer to resume if it was ready
       setTrailerShouldBePaused(false);
-      
+
       // If trailer was ready and loaded, restore the video opacity
       if (trailerReady && trailerUrl) {
         logger.info('[AppleTVHero] Screen gained focus - restoring trailer');
@@ -370,20 +391,20 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       setTrailerReady(false);
       setTrailerPreloaded(false);
       setTrailerPlaying(false);
-      
+
       // Fade out any existing trailer
       trailerOpacity.value = withTiming(0, { duration: 300 });
       thumbnailOpacity.value = withTiming(1, { duration: 300 });
 
       try {
         // Extract year from metadata
-        const year = currentItem.releaseInfo 
-          ? parseInt(currentItem.releaseInfo.split('-')[0], 10) 
+        const year = currentItem.releaseInfo
+          ? parseInt(currentItem.releaseInfo.split('-')[0], 10)
           : new Date().getFullYear();
 
         // Extract TMDB ID if available
-        const tmdbId = currentItem.id?.startsWith('tmdb:') 
-          ? currentItem.id.replace('tmdb:', '') 
+        const tmdbId = currentItem.id?.startsWith('tmdb:')
+          ? currentItem.id.replace('tmdb:', '')
           : undefined;
 
         const contentType = currentItem.type === 'series' ? 'tv' : 'movie';
@@ -391,9 +412,9 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         logger.info('[AppleTVHero] Fetching trailer for:', currentItem.name, year, tmdbId);
 
         const url = await TrailerService.getTrailerUrl(
-          currentItem.name, 
-          year, 
-          tmdbId, 
+          currentItem.name,
+          year,
+          tmdbId,
           contentType
         );
 
@@ -435,13 +456,13 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   // Handle trailer ready to play
   const handleTrailerReady = useCallback(() => {
     setTrailerReady(true);
-    
+
     // Smooth crossfade: thumbnail out, trailer in
     thumbnailOpacity.value = withTiming(0, { duration: 800 });
     trailerOpacity.value = withTiming(1, { duration: 800 });
-    
+
     logger.info('[AppleTVHero] Trailer ready - starting playback');
-    
+
     // Auto-start trailer
     setTrailerPlaying(true);
   }, [thumbnailOpacity, trailerOpacity, setTrailerPlaying]);
@@ -451,11 +472,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setTrailerError(true);
     setTrailerReady(false);
     setTrailerPlaying(false);
-    
+
     // Fade back to thumbnail
     trailerOpacity.value = withTiming(0, { duration: 300 });
     thumbnailOpacity.value = withTiming(1, { duration: 300 });
-    
+
     logger.error('[AppleTVHero] Trailer playback error');
   }, [trailerOpacity, thumbnailOpacity, setTrailerPlaying]);
 
@@ -463,11 +484,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const handleTrailerEnd = useCallback(() => {
     logger.info('[AppleTVHero] Trailer ended');
     setTrailerPlaying(false);
-    
+
     // Reset trailer state
     setTrailerReady(false);
     setTrailerPreloaded(false);
-    
+
     // Smooth fade back to thumbnail
     trailerOpacity.value = withTiming(0, { duration: 500 });
     thumbnailOpacity.value = withTiming(1, { duration: 500 });
@@ -531,12 +552,12 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     // Instant reset - no extra fade animation
     dragProgress.value = 0;
     setNextIndex(currentIndex);
-    
+
     // Immediately hide trailer and show thumbnail when index changes
     trailerOpacity.value = 0;
     thumbnailOpacity.value = 1;
     setTrailerPlaying(false);
-    
+
     // Faster logo fade
     logoOpacity.value = 0;
     logoOpacity.value = withDelay(
@@ -580,6 +601,9 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         .activeOffsetX([-5, 5]) // Smaller activation area - more sensitive
         .failOffsetY([-15, 15]) // Fail if vertical movement is detected
         .onStart(() => {
+          // Mark as dragging to disable parallax
+          isDragging.value = 1;
+
           // Determine which direction and set preview
           runOnJS(updateInteractionTime)();
           // Immediately stop trailer playback when drag starts
@@ -589,10 +613,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
           const translationX = event.translationX;
           // Use larger width multiplier for smoother visual feedback on small swipes
           const progress = Math.abs(translationX) / (width * 1.2);
-          
+
           // Update drag progress (0 to 1) with eased curve
           dragProgress.value = Math.min(progress, 1);
-          
+
           // Track drag direction: positive = right (previous), negative = left (next)
           if (translationX > 0) {
             dragDirection.value = 1; // Swiping right - show previous
@@ -626,6 +650,9 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
               },
               (finished) => {
                 if (finished) {
+                  // Re-enable parallax after navigation completes
+                  isDragging.value = withTiming(0, { duration: 200 });
+
                   if (translationX > 0) {
                     runOnJS(goToPrevious)();
                   } else {
@@ -640,6 +667,9 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
               duration: 450,
               easing: Easing.bezier(0.25, 0.1, 0.25, 1), // Custom ease-out for buttery smooth return
             });
+
+            // Re-enable parallax immediately on cancel
+            isDragging.value = withTiming(0, { duration: 200 });
           }
         }),
     [goToPrevious, goToNext, updateInteractionTime, setPreviewIndex, hideTrailerOnDrag, currentIndex, items.length]
@@ -654,15 +684,15 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       [0, 0.05, 0.12, 0.22, 0.35, 0.5, 0.65, 0.78, 0.92, 1],
       Extrapolation.CLAMP
     );
-    
+
     // Ultra-subtle slide effect with smooth ease-out curve
     const slideDistance = 6; // Even more subtle 6px movement
     const slideProgress = interpolate(
       dragProgress.value,
       [0, 0.2, 0.4, 0.6, 0.8, 1], // 6-point for ultra-smooth acceleration
       [
-        -slideDistance * dragDirection.value, 
-        -slideDistance * 0.8 * dragDirection.value, 
+        -slideDistance * dragDirection.value,
+        -slideDistance * 0.8 * dragDirection.value,
         -slideDistance * 0.6 * dragDirection.value,
         -slideDistance * 0.35 * dragDirection.value,
         -slideDistance * 0.12 * dragDirection.value,
@@ -670,7 +700,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       ],
       Extrapolation.CLAMP
     );
-    
+
     return {
       opacity,
       transform: [{ translateX: slideProgress }],
@@ -685,7 +715,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       [1, 0.5, 0],
       Extrapolation.CLAMP
     );
-    
+
     return {
       opacity: dragFade * logoOpacity.value,
     };
@@ -915,10 +945,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             style={logoAnimatedStyle}
           >
             {currentItem.logo && !logoError[currentIndex] ? (
-              <View 
+              <View
                 style={[
                   styles.logoContainer,
-                  logoHeights[currentIndex] && logoHeights[currentIndex] < 80 
+                  logoHeights[currentIndex] && logoHeights[currentIndex] < 80
                     ? { marginBottom: 4 } // Minimal spacing for small logos
                     : { marginBottom: 8 } // Small spacing for normal logos
                 ]}
