@@ -70,6 +70,7 @@ import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
 import BackupScreen from '../screens/BackupScreen';
 import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
 import ContributorsScreen from '../screens/ContributorsScreen';
+import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
 
 // Stack navigator types
 export type RootStackParamList = {
@@ -82,27 +83,27 @@ export type RootStackParamList = {
   Update: undefined;
   Search: undefined;
   Calendar: undefined;
-  Metadata: { 
-    id: string; 
+  Metadata: {
+    id: string;
     type: string;
     episodeId?: string;
     addonId?: string;
   };
-  Streams: { 
-    id: string; 
+  Streams: {
+    id: string;
     type: string;
     episodeId?: string;
     episodeThumbnail?: string;
     fromPlayer?: boolean;
   };
-  PlayerIOS: { 
-    uri: string; 
-    title?: string; 
-    season?: number; 
-    episode?: number; 
-    episodeTitle?: string; 
-    quality?: string; 
-    year?: number; 
+  PlayerIOS: {
+    uri: string;
+    title?: string;
+    season?: number;
+    episode?: number;
+    episodeTitle?: string;
+    quality?: string;
+    year?: number;
     streamProvider?: string;
     streamName?: string;
     headers?: { [key: string]: string };
@@ -116,14 +117,14 @@ export type RootStackParamList = {
     videoType?: string;
     groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
-  PlayerAndroid: { 
-    uri: string; 
-    title?: string; 
-    season?: number; 
-    episode?: number; 
-    episodeTitle?: string; 
-    quality?: string; 
-    year?: number; 
+  PlayerAndroid: {
+    uri: string;
+    title?: string;
+    season?: number;
+    episode?: number;
+    episodeTitle?: string;
+    quality?: string;
+    year?: number;
     streamProvider?: string;
     streamName?: string;
     headers?: { [key: string]: string };
@@ -180,6 +181,7 @@ export type RootStackParamList = {
   };
   ContinueWatchingSettings: undefined;
   Contributors: undefined;
+  DebridIntegration: undefined;
 };
 
 export type RootStackNavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -376,9 +378,9 @@ export const CustomNavigationDarkTheme: Theme = {
 type IconNameType = string;
 
 // Add TabIcon component
-const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material' }: { 
-  focused: boolean; 
-  color: string; 
+const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material' }: {
+  focused: boolean;
+  color: string;
   iconName: IconNameType;
   iconLibrary?: 'material' | 'feather' | 'ionicons';
 }) => {
@@ -403,28 +405,28 @@ const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material'
   })();
 
   return (
-    <Animated.View style={{ 
-      alignItems: 'center', 
+    <Animated.View style={{
+      alignItems: 'center',
       justifyContent: 'center',
       transform: [{ scale: scaleAnim }]
     }}>
       {iconLibrary === 'feather' ? (
-        <Feather 
+        <Feather
           name={finalIconName as any}
-          size={24} 
-          color={color} 
+          size={24}
+          color={color}
         />
       ) : iconLibrary === 'ionicons' ? (
-        <Ionicons 
+        <Ionicons
           name={finalIconName as any}
           size={24}
           color={color}
         />
       ) : (
-        <MaterialCommunityIcons 
+        <MaterialCommunityIcons
           name={finalIconName as any}
-          size={24} 
-          color={color} 
+          size={24}
+          color={color}
         />
       )}
     </Animated.View>
@@ -432,17 +434,17 @@ const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material'
 });
 
 // Update the TabScreenWrapper component with fixed layout dimensions
-const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) => {
+const TabScreenWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
-  
+
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setDimensions(window);
     });
-    
+
     return () => subscription?.remove();
   }, []);
-  
+
   const isTablet = useMemo(() => {
     const { width, height } = dimensions;
     const smallestDimension = Math.min(width, height);
@@ -456,35 +458,35 @@ const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) =
       StatusBar.setTranslucent(true);
       StatusBar.setBackgroundColor('transparent');
     };
-    
+
     applyStatusBarConfig();
-    
+
     // Apply status bar config on every focus
-    const subscription = Platform.OS === 'android' 
+    const subscription = Platform.OS === 'android'
       ? AppState.addEventListener('change', (state) => {
-          if (state === 'active') {
-            applyStatusBarConfig();
-          }
-        })
-      : { remove: () => {} };
-      
+        if (state === 'active') {
+          applyStatusBarConfig();
+        }
+      })
+      : { remove: () => { } };
+
     return () => {
       subscription.remove();
     };
   }, []);
 
   return (
-    <View style={{ 
-      flex: 1, 
+    <View style={{
+      flex: 1,
       backgroundColor: colors.darkBackground,
       // Lock the layout to prevent shifts
       position: 'relative',
       overflow: 'hidden'
     }}>
       {/* Reserve consistent space for the header area on all screens */}
-      <View style={{ 
-        height: isTablet ? (insets.top + 64) : (Platform.OS === 'android' ? 80 : 60), 
-        width: '100%', 
+      <View style={{
+        height: isTablet ? (insets.top + 64) : (Platform.OS === 'android' ? 80 : 60),
+        width: '100%',
         backgroundColor: colors.darkBackground,
         position: 'absolute',
         top: 0,
@@ -498,7 +500,7 @@ const TabScreenWrapper: React.FC<{children: React.ReactNode}> = ({ children }) =
 };
 
 // Add this component to wrap each screen in the tab navigator
-const WrappedScreen: React.FC<{Screen: React.ComponentType<any>}> = ({ Screen }) => {
+const WrappedScreen: React.FC<{ Screen: React.ComponentType<any> }> = ({ Screen }) => {
   return (
     <TabScreenWrapper>
       <Screen />
@@ -514,12 +516,12 @@ const MainTabs = () => {
   const { settings: appSettings } = useSettingsHook();
   const [hasUpdateBadge, setHasUpdateBadge] = React.useState(false);
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
-  
+
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setDimensions(window);
     });
-    
+
     return () => subscription?.remove();
   }, []);
   React.useEffect(() => {
@@ -529,7 +531,7 @@ const MainTabs = () => {
       try {
         const flag = await mmkvStorage.getItem('@update_badge_pending');
         if (mounted) setHasUpdateBadge(flag === 'true');
-      } catch {}
+      } catch { }
     };
     load();
     // Fast poll initially for quick badge appearance, then slow down
@@ -575,7 +577,7 @@ const MainTabs = () => {
   }, [hidden, headerAnim]);
   const translateY = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -70] });
   const fade = headerAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  
+
   const renderTabBar = (props: BottomTabBarProps) => {
     // Hide tab bar when home is loading
     if (isHomeLoading) {
@@ -590,18 +592,18 @@ const MainTabs = () => {
       // Top floating, text-only pill nav for tablets
       return (
         <Animated.View
-        style={[{
-          position: 'absolute',
-          top: insets.top + 12,
-          left: 0,
-          right: 0,
-          alignItems: 'center',
-          backgroundColor: 'transparent',
-          zIndex: 100,
-        }, shouldKeepFixed ? {} : {
-          transform: [{ translateY }],
-          opacity: fade,
-        }]}>
+          style={[{
+            position: 'absolute',
+            top: insets.top + 12,
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+            backgroundColor: 'transparent',
+            zIndex: 100,
+          }, shouldKeepFixed ? {} : {
+            transform: [{ translateY }],
+            opacity: fade,
+          }]}>
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -645,8 +647,8 @@ const MainTabs = () => {
                 options.tabBarLabel !== undefined
                   ? options.tabBarLabel
                   : options.title !== undefined
-                  ? options.title
-                  : route.name;
+                    ? options.title
+                    : route.name;
 
               const isFocused = props.state.index === index;
 
@@ -692,10 +694,10 @@ const MainTabs = () => {
 
     // Default bottom tab for phones
     return (
-      <View style={{ 
-        position: 'absolute', 
-        bottom: 0, 
-        left: 0, 
+      <View style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
         right: 0,
         height: Platform.OS === 'android' ? 70 + insets.bottom : 85 + insets.bottom,
         backgroundColor: 'transparent',
@@ -759,8 +761,8 @@ const MainTabs = () => {
                 options.tabBarLabel !== undefined
                   ? options.tabBarLabel
                   : options.title !== undefined
-                  ? options.title
-                  : route.name;
+                    ? options.title
+                    : route.name;
 
               const isFocused = props.state.index === index;
 
@@ -813,9 +815,9 @@ const MainTabs = () => {
                     backgroundColor: 'transparent',
                   }}
                 >
-                  <TabIcon 
-                    focused={isFocused} 
-                    color={isFocused ? currentTheme.colors.primary : currentTheme.colors.white} 
+                  <TabIcon
+                    focused={isFocused}
+                    color={isFocused ? currentTheme.colors.primary : currentTheme.colors.white}
                     iconName={iconName}
                     iconLibrary={iconLibrary}
                   />
@@ -838,7 +840,7 @@ const MainTabs = () => {
       </View>
     );
   };
-  
+
   // iOS: Use native bottom tabs (@bottom-tabs/react-navigation)
   if (Platform.OS === 'ios') {
     // Dynamically require to avoid impacting Android bundle
@@ -923,7 +925,7 @@ const MainTabs = () => {
         barStyle="light-content"
         backgroundColor="transparent"
       />
-      
+
       <Tab.Navigator
         tabBar={renderTabBar}
         screenOptions={({ route, navigation, theme }) => ({
@@ -1059,7 +1061,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
   const { currentTheme } = useTheme();
   const { user, loading } = useAccount();
   const insets = useSafeAreaInsets();
-  
+
   // Handle Android-specific optimizations
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -1070,13 +1072,13 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
       } catch (error) {
         console.log('Immersive mode error:', error);
       }
-      
+
       // Ensure consistent background color for Android
       StatusBar.setBackgroundColor('transparent', true);
       StatusBar.setTranslucent(true);
     }
   }, []);
-  
+
   return (
     <SafeAreaProvider>
       <StatusBar
@@ -1085,8 +1087,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
         barStyle="light-content"
       />
       <PaperProvider theme={CustomDarkTheme}>
-        <View style={{ 
-          flex: 1, 
+        <View style={{
+          flex: 1,
           backgroundColor: currentTheme.colors.darkBackground,
           ...(Platform.OS === 'android' && {
             // Prevent white flashes on Android
@@ -1135,8 +1137,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 contentStyle: { backgroundColor: currentTheme.colors.darkBackground },
               }}
             />
-            <Stack.Screen 
-              name="Onboarding" 
+            <Stack.Screen
+              name="Onboarding"
               component={OnboardingScreen}
               options={{
                 headerShown: false,
@@ -1147,9 +1149,9 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="MainTabs" 
-              component={MainTabs as any} 
+            <Stack.Screen
+              name="MainTabs"
+              component={MainTabs as any}
               options={{
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
@@ -1168,11 +1170,11 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="Metadata" 
+            <Stack.Screen
+              name="Metadata"
               component={MetadataScreen}
-              options={{ 
-                headerShown: false, 
+              options={{
+                headerShown: false,
                 animation: Platform.OS === 'android' ? 'none' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 0 : 300,
                 ...(Platform.OS === 'ios' && {
@@ -1186,9 +1188,9 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="Streams" 
-              component={StreamsScreen as any} 
+            <Stack.Screen
+              name="Streams"
+              component={StreamsScreen as any}
               options={{
                 headerShown: false,
                 animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'none',
@@ -1203,10 +1205,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 freezeOnBlur: true,
               }}
             />
-            <Stack.Screen 
-              name="PlayerIOS" 
-              component={KSPlayerCore as any} 
-              options={{ 
+            <Stack.Screen
+              name="PlayerIOS"
+              component={KSPlayerCore as any}
+              options={{
                 animation: 'default',
                 animationDuration: 0,
                 // Force fullscreen presentation on iPad
@@ -1225,10 +1227,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 freezeOnBlur: true,
               }}
             />
-            <Stack.Screen 
-              name="PlayerAndroid" 
-              component={AndroidVideoPlayer as any} 
-              options={{ 
+            <Stack.Screen
+              name="PlayerAndroid"
+              component={AndroidVideoPlayer as any}
+              options={{
                 animation: 'none',
                 animationDuration: 0,
                 presentation: 'card',
@@ -1243,10 +1245,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 freezeOnBlur: true,
               }}
             />
-            <Stack.Screen 
-              name="Catalog" 
-              component={CatalogScreen as any} 
-              options={{ 
+            <Stack.Screen
+              name="Catalog"
+              component={CatalogScreen as any}
+              options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 contentStyle: {
@@ -1254,10 +1256,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="Addons" 
-              component={AddonsScreen as any} 
-              options={{ 
+            <Stack.Screen
+              name="Addons"
+              component={AddonsScreen as any}
+              options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 contentStyle: {
@@ -1265,10 +1267,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="Search" 
-              component={SearchScreen as any} 
-              options={{ 
+            <Stack.Screen
+              name="Search"
+              component={SearchScreen as any}
+              options={{
                 animation: Platform.OS === 'android' ? 'none' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 0 : 350,
                 gestureEnabled: true,
@@ -1278,10 +1280,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="CatalogSettings" 
-              component={CatalogSettingsScreen as any} 
-              options={{ 
+            <Stack.Screen
+              name="CatalogSettings"
+              component={CatalogSettingsScreen as any}
+              options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 contentStyle: {
@@ -1289,8 +1291,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="HomeScreenSettings" 
+            <Stack.Screen
+              name="HomeScreenSettings"
               component={HomeScreenSettings}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
@@ -1304,8 +1306,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="ContinueWatchingSettings" 
+            <Stack.Screen
+              name="ContinueWatchingSettings"
               component={ContinueWatchingSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
@@ -1319,8 +1321,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="Contributors" 
+            <Stack.Screen
+              name="Contributors"
               component={ContributorsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
@@ -1334,8 +1336,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="HeroCatalogs" 
+            <Stack.Screen
+              name="HeroCatalogs"
               component={HeroCatalogsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
@@ -1349,8 +1351,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="ShowRatings" 
+            <Stack.Screen
+              name="ShowRatings"
               component={ShowRatingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'fade',
@@ -1364,10 +1366,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="Calendar" 
-              component={CalendarScreen as any} 
-              options={{ 
+            <Stack.Screen
+              name="Calendar"
+              component={CalendarScreen as any}
+              options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 contentStyle: {
@@ -1375,10 +1377,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="NotificationSettings" 
-              component={NotificationSettingsScreen as any} 
-              options={{ 
+            <Stack.Screen
+              name="NotificationSettings"
+              component={NotificationSettingsScreen as any}
+              options={{
                 animation: 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 contentStyle: {
@@ -1386,8 +1388,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="MDBListSettings" 
+            <Stack.Screen
+              name="MDBListSettings"
               component={MDBListSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1401,8 +1403,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="TMDBSettings" 
+            <Stack.Screen
+              name="TMDBSettings"
               component={TMDBSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1416,8 +1418,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="TraktSettings" 
+            <Stack.Screen
+              name="TraktSettings"
               component={TraktSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1431,8 +1433,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="PlayerSettings" 
+            <Stack.Screen
+              name="PlayerSettings"
               component={PlayerSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1446,8 +1448,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="ThemeSettings" 
+            <Stack.Screen
+              name="ThemeSettings"
               component={ThemeScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1461,8 +1463,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="ScraperSettings" 
+            <Stack.Screen
+              name="ScraperSettings"
               component={PluginsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1476,8 +1478,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="CastMovies" 
+            <Stack.Screen
+              name="CastMovies"
               component={CastMoviesScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
@@ -1491,8 +1493,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen 
-              name="Update" 
+            <Stack.Screen
+              name="Update"
               component={UpdateScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
@@ -1563,6 +1565,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
+            <Stack.Screen
+              name="DebridIntegration"
+              component={DebridIntegrationScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
           </Stack.Navigator>
         </View>
       </PaperProvider>
@@ -1571,8 +1588,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
 };
 
 const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => (
-  <PostHogProvider 
-    apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C" 
+  <PostHogProvider
+    apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
     options={{
       host: "https://us.i.posthog.com",
     }}
