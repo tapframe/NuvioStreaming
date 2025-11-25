@@ -765,6 +765,21 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
+              title="Test Announcement"
+              icon="bell"
+              description="Show what's new overlay"
+              onPress={async () => {
+                try {
+                  await mmkvStorage.removeItem('announcement_v1.0.0_shown');
+                  openAlert('Success', 'Announcement reset. Restart the app to see the announcement overlay.');
+                } catch (error) {
+                  openAlert('Error', 'Failed to reset announcement.');
+                }
+              }}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+            />
+            <SettingItem
               title="Clear All Data"
               icon="trash-2"
               onPress={() => {

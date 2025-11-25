@@ -18,7 +18,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { enableScreens, enableFreeze } from 'react-native-screens';
-import AppNavigator, { 
+import AppNavigator, {
   CustomNavigationDarkTheme,
   CustomDarkTheme
 } from './src/navigation/AppNavigator';
@@ -41,6 +41,7 @@ import { aiService } from './src/services/aiService';
 import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { mmkvStorage } from './src/services/mmkvStorage';
+import AnnouncementOverlay from './src/components/AnnouncementOverlay';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -82,12 +83,13 @@ const ThemedApp = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const engine = (global as any).HermesInternal ? 'Hermes' : 'JSC';
       console.log('JS Engine:', engine);
-    } catch {}
+    } catch { }
   }, []);
   const { currentTheme } = useTheme();
   const [isAppReady, setIsAppReady] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
-  
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+
   // Update popup functionality
   const {
     showUpdatePopup,
@@ -100,7 +102,17 @@ const ThemedApp = () => {
 
   // GitHub major/minor release overlay
   const githubUpdate = useGithubMajorUpdate();
-  
+
+  // Announcement data
+  const announcements = [
+    {
+      icon: 'zap',
+      title: 'Debrid Integration',
+      description: 'Unlock 4K high-quality streams with lightning-fast speeds. Connect your TorBox account to access cached premium content with zero buffering.',
+      tag: 'NEW',
+    },
+  ];
+
   // Check onboarding status and initialize services
   useEffect(() => {
     const initializeApp = async () => {
@@ -108,28 +120,37 @@ const ThemedApp = () => {
         // Check onboarding status
         const onboardingCompleted = await mmkvStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingCompleted === 'true');
-        
+
         // Initialize update service
         await UpdateService.initialize();
-        
+
         // Initialize memory monitoring service to prevent OutOfMemoryError
         memoryMonitorService; // Just accessing it starts the monitoring
         console.log('Memory monitoring service initialized');
-        
+
         // Initialize AI service
         await aiService.initialize();
         console.log('AI service initialized');
-        
+
+        // Check if announcement should be shown (version 1.0.0)
+        const announcementShown = await mmkvStorage.getItem('announcement_v1.0.0_shown');
+        if (!announcementShown && onboardingCompleted === 'true') {
+          // Show announcement only after app is ready
+          setTimeout(() => {
+            setShowAnnouncement(true);
+          }, 1000);
+        }
+
       } catch (error) {
         console.error('Error initializing app:', error);
         // Default to showing onboarding if we can't check
         setHasCompletedOnboarding(false);
       }
     };
-    
+
     initializeApp();
   }, []);
-  
+
   // Create custom themes based on current theme
   const customDarkTheme = {
     ...CustomDarkTheme,
@@ -138,7 +159,7 @@ const ThemedApp = () => {
       primary: currentTheme.colors.primary,
     }
   };
-  
+
   const customNavigationTheme = {
     ...CustomNavigationDarkTheme,
     colors: {
@@ -153,15 +174,33 @@ const ThemedApp = () => {
   const handleSplashComplete = () => {
     setIsAppReady(true);
   };
-  
+
+  // Navigation reference
+  const navigationRef = React.useRef<any>(null);
+
+  // Handler for navigating to debrid integration
+  const handleNavigateToDebrid = () => {
+    if (navigationRef.current) {
+      navigationRef.current.navigate('DebridIntegration');
+    }
+  };
+
+  // Handler for announcement close
+  const handleAnnouncementClose = async () => {
+    setShowAnnouncement(false);
+    // Mark announcement as shown
+    await mmkvStorage.setItem('announcement_v1.0.0_shown', 'true');
+  };
+
   // Don't render anything until we know the onboarding status
   const shouldShowApp = isAppReady && hasCompletedOnboarding !== null;
   const initialRouteName = hasCompletedOnboarding ? 'MainTabs' : 'Onboarding';
-  
+
   return (
     <AccountProvider>
       <PaperProvider theme={customDarkTheme}>
-        <NavigationContainer 
+        <NavigationContainer
+          ref={navigationRef}
           theme={customNavigationTheme}
           linking={undefined}
         >
@@ -185,6 +224,13 @@ const ThemedApp = () => {
                 releaseUrl={githubUpdate.releaseUrl}
                 onDismiss={githubUpdate.onDismiss}
                 onLater={githubUpdate.onLater}
+              />
+              <AnnouncementOverlay
+                visible={showAnnouncement}
+                announcements={announcements}
+                onClose={handleAnnouncementClose}
+                onActionPress={handleNavigateToDebrid}
+                actionButtonText="Connect Now"
               />
             </View>
           </DownloadsProvider>
