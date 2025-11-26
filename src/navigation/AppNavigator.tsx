@@ -1065,10 +1065,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
   // Handle Android-specific optimizations
   useEffect(() => {
     if (Platform.OS === 'android') {
-      // Hide system navigation bar
+      // Ensure system navigation bar is shown by default
       try {
-        RNImmersiveMode.setBarMode('Bottom');
-        RNImmersiveMode.fullLayout(true);
+        RNImmersiveMode.setBarMode('Normal');
+        RNImmersiveMode.fullLayout(false);
       } catch (error) {
         console.log('Immersive mode error:', error);
       }
