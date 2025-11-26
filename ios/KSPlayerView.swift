@@ -385,9 +385,11 @@ class KSPlayerView: UIView {
         options.asynchronousDecompression = true
         #endif
         
-        // PERFORMANCE OPTIMIZATION: Native HDR processing
-        // Set destination dynamic range based on device capabilities to eliminate unnecessary color conversions
-        options.destinationDynamicRange = getOptimalDynamicRange()
+        // HDR handling: Let KSPlayer automatically detect content's native dynamic range
+        // Setting destinationDynamicRange to nil allows KSPlayer to use the content's actual HDR/SDR mode
+        // This prevents forcing HDR tone mapping on SDR content (which causes oversaturation)
+        // KSPlayer will automatically detect HDR10/Dolby Vision/HLG from the video format description
+        options.destinationDynamicRange = nil
         
         // Configure audio for proper dialogue mixing using FFmpeg's pan filter
         // This approach uses standard audio engineering practices for multi-channel downmixing
@@ -455,9 +457,24 @@ class KSPlayerView: UIView {
             return
         }
         
-        playerView.seek(time: time) { success in
+        // Capture the current paused state before seeking
+        let wasPaused = isPaused
+        print("KSPlayerView: Seeking to \(time), paused state before seek: \(wasPaused)")
+        
+        playerView.seek(time: time) { [weak self] success in
+            guard let self = self else { return }
+            
             if success {
                 print("KSPlayerView: Seek successful to \(time)")
+                
+                // Restore the paused state after seeking
+                // KSPlayer's seek may resume playback, so we need to re-apply the paused state
+                if wasPaused {
+                    DispatchQueue.main.async {
+                        self.playerView.pause()
+                        print("KSPlayerView: Restored paused state after seek")
+                    }
+                }
             } else {
                 print("KSPlayerView: Seek failed to \(time)")
             }
@@ -804,40 +821,6 @@ class KSPlayerView: UIView {
     }
     
     // MARK: - Performance Optimization Helpers
-    
-    /// Detects device HDR capabilities and returns optimal dynamic range setting
-    /// This prevents unnecessary color space conversion overhead
-    private func getOptimalDynamicRange() -> DynamicRange? {
-        #if canImport(UIKit)
-        let availableHDRModes = AVPlayer.availableHDRModes
-        
-        // If no HDR modes available, use SDR (nil will use content's native range)
-        if availableHDRModes == AVPlayer.HDRMode(rawValue: 0) {
-            return .sdr
-        }
-        
-        // Prefer HDR10 if supported (most common HDR format)
-        if availableHDRModes.contains(.hdr10) {
-            return .hdr10
-        }
-        
-        // Fallback to Dolby Vision if available
-        if availableHDRModes.contains(.dolbyVision) {
-            return .dolbyVision
-        }
-        
-        // Fallback to HLG if available
-        if availableHDRModes.contains(.hlg) {
-            return .hlg
-        }
-        
-        // Default to SDR if no HDR support
-        return .sdr
-        #else
-        // macOS: Check screen capabilities
-        return .sdr
-        #endif
-    }
 }
 
 // MARK: - High Performance KSOptions Subclass

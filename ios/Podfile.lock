@@ -3178,13 +3178,13 @@ EXTERNAL SOURCES:
 
 CHECKOUT OPTIONS:
   DisplayCriteria:
-    :commit: 83ba8419ca365e9397c0b45c4147755da522324e
+    :commit: cbc74996afb55e096bf1ff240f07d1d206ac86df
     :git: https://github.com/kingslay/KSPlayer.git
   FFmpegKit:
     :commit: d7048037a2eb94a3b08113fbf43aa92bdcb332d9
     :git: https://github.com/kingslay/FFmpegKit.git
   KSPlayer:
-    :commit: 83ba8419ca365e9397c0b45c4147755da522324e
+    :commit: cbc74996afb55e096bf1ff240f07d1d206ac86df
     :git: https://github.com/kingslay/KSPlayer.git
   Libass:
     :commit: d7048037a2eb94a3b08113fbf43aa92bdcb332d9

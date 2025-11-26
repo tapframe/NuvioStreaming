@@ -116,7 +116,7 @@ const KSPlayerCore: React.FC = () => {
   // Use window dimensions for iPad instead of screen dimensions
   const windowData = Dimensions.get('window');
   const effectiveDimensions = shouldUseFullscreen ? windowData : screenData;
-  
+
   // Helper to get appropriate dimensions for gesture areas and overlays
   const getDimensions = () => ({
     width: shouldUseFullscreen ? windowData.width : screenDimensions.width,
@@ -328,7 +328,7 @@ const KSPlayerCore: React.FC = () => {
     id: id || 'placeholder',
     type: type || 'movie'
   });
-  const { metadata, loading: metadataLoading, groupedEpisodes: metadataGroupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => {} };
+  const { metadata, loading: metadataLoading, groupedEpisodes: metadataGroupedEpisodes, cast, loadCast } = shouldLoadMetadata ? (metadataResult as any) : { metadata: null, loading: false, groupedEpisodes: {}, cast: [], loadCast: () => { } };
   const { settings } = useSettings();
 
   // Logo animation values
@@ -380,7 +380,7 @@ const KSPlayerCore: React.FC = () => {
       }
     }
   }, [metadata]);
-  
+
   // Log video source configuration with headers
   useEffect(() => {
     console.log('[KSPlayerCore] Video source configured with:', {
@@ -417,19 +417,19 @@ const KSPlayerCore: React.FC = () => {
         : (metadataGroupedEpisodes || {});
       const allEpisodes = Object.values(sourceGroups || {}).flat() as any[];
       if (!allEpisodes || allEpisodes.length === 0) return null;
-      
+
       // First try next episode in same season
-      let nextEp = allEpisodes.find((ep: any) => 
+      let nextEp = allEpisodes.find((ep: any) =>
         ep.season_number === season && ep.episode_number === episode + 1
       );
-      
+
       // If not found, try first episode of next season
       if (!nextEp) {
-        nextEp = allEpisodes.find((ep: any) => 
+        nextEp = allEpisodes.find((ep: any) =>
           ep.season_number === season + 1 && ep.episode_number === 1
         );
       }
-      
+
       if (DEBUG_MODE) {
         logger.log('[KSPlayerCore] nextEpisode computation', {
           fromRouteGroups: !!(groupedEpisodes && Object.keys(groupedEpisodes || {}).length),
@@ -504,12 +504,12 @@ const KSPlayerCore: React.FC = () => {
   // Long press gesture handlers for speed boost
   const onLongPressActivated = useCallback(() => {
     if (!holdToSpeedEnabled) return;
-    
+
     if (!isSpeedBoosted && playbackSpeed !== holdToSpeedValue) {
       setOriginalSpeed(playbackSpeed);
       setPlaybackSpeed(holdToSpeedValue);
       setIsSpeedBoosted(true);
-      
+
       // Show "Activated" overlay
       setShowSpeedActivatedOverlay(true);
       Animated.spring(speedActivatedOverlayOpacity, {
@@ -518,7 +518,7 @@ const KSPlayerCore: React.FC = () => {
         friction: 8,
         useNativeDriver: true,
       }).start();
-      
+
       // Auto-hide after 2 seconds
       setTimeout(() => {
         Animated.timing(speedActivatedOverlayOpacity, {
@@ -529,7 +529,7 @@ const KSPlayerCore: React.FC = () => {
           setShowSpeedActivatedOverlay(false);
         });
       }, 2000);
-      
+
       logger.log(`[KSPlayerCore] Speed boost activated: ${holdToSpeedValue}x`);
     }
   }, [isSpeedBoosted, playbackSpeed, holdToSpeedEnabled, holdToSpeedValue, speedActivatedOverlayOpacity]);
@@ -559,7 +559,7 @@ const KSPlayerCore: React.FC = () => {
   useEffect(() => {
     return () => {
       if (isSpeedBoosted) {
-        try { setPlaybackSpeed(originalSpeed); } catch {}
+        try { setPlaybackSpeed(originalSpeed); } catch { }
       }
     };
   }, [isSpeedBoosted, originalSpeed]);
@@ -648,7 +648,7 @@ const KSPlayerCore: React.FC = () => {
       if (isOpeningAnimationComplete) {
         enableImmersiveMode();
       }
-      return () => {};
+      return () => { };
     }, [isOpeningAnimationComplete])
   );
 
@@ -713,7 +713,7 @@ const KSPlayerCore: React.FC = () => {
   const completeOpeningAnimation = () => {
     // Stop the pulse animation immediately
     pulseAnim.stopAnimation();
-    
+
     Animated.parallel([
       Animated.timing(openingFadeAnim, {
         toValue: 1,
@@ -849,6 +849,8 @@ const KSPlayerCore: React.FC = () => {
   const onPaused = () => {
     if (isMounted.current) {
       setPaused(true);
+      // Reset the wasPlayingBeforeDrag ref so that seeking while paused doesn't resume playback
+      wasPlayingBeforeDragRef.current = false;
 
       // IMMEDIATE: Send immediate pause update to Trakt when user pauses
       if (duration > 0) {
@@ -870,7 +872,7 @@ const KSPlayerCore: React.FC = () => {
     const timeInSeconds = duration > 0
       ? Math.max(0, Math.min(rawSeconds, duration - END_EPSILON))
       : Math.max(0, rawSeconds);
-    
+
     if (DEBUG_MODE) {
       if (__DEV__) logger.log(`[VideoPlayer] Seeking to ${timeInSeconds.toFixed(2)}s out of ${duration.toFixed(2)}s`);
     }
@@ -919,8 +921,9 @@ const KSPlayerCore: React.FC = () => {
     if (duration > 0) {
       const seekTime = Math.min(value, duration - END_EPSILON);
       seekToTime(seekTime);
-      // If the video was playing before the drag, ensure we remain in playing state after the seek
-      if (wasPlayingBeforeDragRef.current) {
+      // Only resume playback if the video was playing before the drag AND is not currently paused
+      // This ensures that if the user paused during or before the drag, it stays paused
+      if (wasPlayingBeforeDragRef.current && !paused) {
         setTimeout(() => {
           if (isMounted.current) {
             setPaused(false);
@@ -987,48 +990,40 @@ const KSPlayerCore: React.FC = () => {
       setIsPlayerReady(true);
       completeOpeningAnimation();
     }
-    
-    // If time is advancing right after seek and we previously intended to play,
-    // ensure paused state is false to keep UI in sync
-    if (wasPlayingBeforeDragRef.current && paused && !isDragging) {
-      setPaused(false);
-      // Reset the intent once corrected
-      wasPlayingBeforeDragRef.current = false;
-    }
-    
+
     // Periodic check for disabled audio track (every 3 seconds, max 3 attempts)
     const now = Date.now();
     if (now - lastAudioTrackCheck > 3000 && !paused && duration > 0 && audioTrackFallbackAttempts < 3) {
       setLastAudioTrackCheck(now);
-      
+
       // Check if audio track is disabled (-1) and we have available tracks
       if (selectedAudioTrack === -1 && ksAudioTracks.length > 1) {
         logger.warn('[VideoPlayer] Detected disabled audio track, attempting fallback');
-        
+
         // Find a fallback audio track (prefer stereo/standard formats)
         const fallbackTrack = ksAudioTracks.find((track, index) => {
           const trackName = (track.name || '').toLowerCase();
           const trackLang = (track.language || '').toLowerCase();
           // Prefer stereo, AAC, or standard audio formats, avoid heavy codecs
-          return !trackName.includes('truehd') && 
-                 !trackName.includes('dts') && 
-                 !trackName.includes('dolby') &&
-                 !trackName.includes('atmos') &&
-                 !trackName.includes('7.1') &&
-                 !trackName.includes('5.1') &&
-                 index !== selectedAudioTrack; // Don't select the same track
+          return !trackName.includes('truehd') &&
+            !trackName.includes('dts') &&
+            !trackName.includes('dolby') &&
+            !trackName.includes('atmos') &&
+            !trackName.includes('7.1') &&
+            !trackName.includes('5.1') &&
+            index !== selectedAudioTrack; // Don't select the same track
         });
-        
+
         if (fallbackTrack) {
           const fallbackIndex = ksAudioTracks.indexOf(fallbackTrack);
           logger.warn(`[VideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (index: ${fallbackIndex})`);
-          
+
           // Increment fallback attempts counter
           setAudioTrackFallbackAttempts(prev => prev + 1);
-          
+
           // Switch to fallback audio track
           setSelectedAudioTrack(fallbackIndex);
-          
+
           // Brief pause to allow track switching
           setPaused(true);
           setTimeout(() => {
@@ -1129,33 +1124,33 @@ const KSPlayerCore: React.FC = () => {
             });
           });
         }
-        
+
         const formattedAudioTracks = data.audioTracks.map((track: any, index: number) => {
           const trackIndex = track.id !== undefined ? track.id : index;
-          
+
           // Build comprehensive track name from available fields
           let trackName = '';
           const parts = [];
-          
+
           // Add language if available
           let language = track.language || track.languageCode;
-          
+
           if (language && language !== 'Unknown' && language !== 'und' && language !== '') {
             parts.push(language.toUpperCase());
           }
-          
+
           // Add bitrate if available
           const bitrate = track.bitRate;
           if (bitrate && bitrate > 0) {
             parts.push(`${Math.round(bitrate / 1000)}kbps`);
           }
-          
+
           // Add bit depth if available
           const bitDepth = track.bitDepth;
           if (bitDepth && bitDepth > 0) {
             parts.push(`${bitDepth}bit`);
           }
-          
+
           // Add track name if available and not generic
           let title = track.name;
           if (title && !title.match(/^(Audio|Track)\s*\d*$/i) && title !== 'Unknown') {
@@ -1165,7 +1160,7 @@ const KSPlayerCore: React.FC = () => {
               parts.push(title);
             }
           }
-          
+
           // Combine parts or fallback to generic name
           if (parts.length > 0) {
             trackName = parts.join(' • ');
@@ -1178,9 +1173,9 @@ const KSPlayerCore: React.FC = () => {
               trackName = `Audio ${index + 1}`;
             }
           }
-          
+
           const trackLanguage = language || 'Unknown';
-          
+
           if (DEBUG_MODE) {
             logger.log(`[VideoPlayer] Processed KSPlayer track ${index}:`, {
               id: trackIndex,
@@ -1191,7 +1186,7 @@ const KSPlayerCore: React.FC = () => {
               bitDepth: bitDepth
             });
           }
-          
+
           return {
             id: trackIndex, // Use the actual track ID from KSPlayer
             name: trackName,
@@ -1199,19 +1194,19 @@ const KSPlayerCore: React.FC = () => {
           };
         });
         setKsAudioTracks(formattedAudioTracks);
-        
+
         // Auto-select English audio track if available, otherwise first track
         if (selectedAudioTrack === null && formattedAudioTracks.length > 0) {
           // Look for English track first
-          const englishTrack = formattedAudioTracks.find((track: {id: number, name: string, language?: string}) => {
+          const englishTrack = formattedAudioTracks.find((track: { id: number, name: string, language?: string }) => {
             const lang = (track.language || '').toLowerCase();
-            return lang === 'english' || lang === 'en' || lang === 'eng' || 
-                   (track.name && track.name.toLowerCase().includes('english'));
+            return lang === 'english' || lang === 'en' || lang === 'eng' ||
+              (track.name && track.name.toLowerCase().includes('english'));
           });
-          
+
           const selectedTrack = englishTrack || formattedAudioTracks[0];
           setSelectedAudioTrack(selectedTrack.id);
-          
+
           if (DEBUG_MODE) {
             if (englishTrack) {
               logger.log(`[VideoPlayer] Auto-selected English audio track: ${selectedTrack.name} (ID: ${selectedTrack.id})`);
@@ -1220,7 +1215,7 @@ const KSPlayerCore: React.FC = () => {
             }
           }
         }
-        
+
         if (DEBUG_MODE) {
           logger.log(`[VideoPlayer] Formatted audio tracks:`, formattedAudioTracks);
         }
@@ -1234,7 +1229,7 @@ const KSPlayerCore: React.FC = () => {
           isEnabled: track.isEnabled || false,
           isImageSubtitle: track.isImageSubtitle || false
         }));
-        
+
         setKsTextTracks(formattedTextTracks);
 
         // Auto-select English subtitle track if available
@@ -1248,7 +1243,7 @@ const KSPlayerCore: React.FC = () => {
             const lang = (track.language || '').toLowerCase();
             const name = (track.name || '').toLowerCase();
             return lang === 'english' || lang === 'en' || lang === 'eng' ||
-                   name.includes('english') || name.includes('en');
+              name.includes('english') || name.includes('en');
           });
 
           if (englishTrack) {
@@ -1264,7 +1259,7 @@ const KSPlayerCore: React.FC = () => {
 
       setIsVideoLoaded(true);
       setIsPlayerReady(true);
-      
+
       // Reset audio track fallback attempts when new video loads
       setAudioTrackFallbackAttempts(0);
       setLastAudioTrackCheck(0);
@@ -1276,7 +1271,7 @@ const KSPlayerCore: React.FC = () => {
 
       // Complete opening animation immediately before seeking
       completeOpeningAnimation();
-      
+
       if (initialPosition && !isInitialSeekComplete) {
         logger.log(`[VideoPlayer] Seeking to initial position: ${initialPosition}s (duration: ${videoDuration}s)`);
         // Reduced timeout from 1000ms to 500ms
@@ -1290,9 +1285,9 @@ const KSPlayerCore: React.FC = () => {
           }
         }, 500);
       }
-      
+
       controlsTimeout.current = setTimeout(hideControls, 5000);
-      
+
       // Auto-fetch and load English external subtitles if available
       if (imdbId) {
         fetchAvailableSubtitles(undefined, true);
@@ -1393,9 +1388,9 @@ const KSPlayerCore: React.FC = () => {
         const isTablet = (Platform as any).isPad === true || Math.min(dw, dh) >= 768;
         setTimeout(() => {
           if (isTablet) {
-            ScreenOrientation.unlockAsync().catch(() => {});
+            ScreenOrientation.unlockAsync().catch(() => { });
           } else {
-            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
           }
         }, 50);
       }
@@ -1479,7 +1474,7 @@ const KSPlayerCore: React.FC = () => {
   const handleError = (error: any) => {
     try {
       logger.error('[VideoPlayer] Playback Error:', error);
-      
+
       // Detect KSPlayer startup timeout and silently retry without UI
       const errText = typeof error === 'string'
         ? error
@@ -1523,43 +1518,43 @@ const KSPlayerCore: React.FC = () => {
       }
 
       // Check for audio codec errors (TrueHD, DTS, Dolby, etc.)
-      const isAudioCodecError = 
+      const isAudioCodecError =
         (error?.message && /(trhd|truehd|true\s?hd|dts|dolby|atmos|e-ac3|ac3)/i.test(error.message)) ||
         (error?.error?.message && /(trhd|truehd|true\s?hd|dts|dolby|atmos|e-ac3|ac3)/i.test(error.error.message)) ||
         (error?.title && /codec not supported/i.test(error.title));
-      
+
       // Handle audio codec errors with automatic fallback
       if (isAudioCodecError && ksAudioTracks.length > 1) {
         logger.warn('[VideoPlayer] Audio codec error detected, attempting audio track fallback');
-        
+
         // Find a fallback audio track (prefer stereo/standard formats)
         const fallbackTrack = ksAudioTracks.find((track, index) => {
           const trackName = (track.name || '').toLowerCase();
           const trackLang = (track.language || '').toLowerCase();
           // Prefer stereo, AAC, or standard audio formats, avoid heavy codecs
-          return !trackName.includes('truehd') && 
-                 !trackName.includes('dts') && 
-                 !trackName.includes('dolby') &&
-                 !trackName.includes('atmos') &&
-                 !trackName.includes('7.1') &&
-                 !trackName.includes('5.1') &&
-                 index !== selectedAudioTrack; // Don't select the same track
+          return !trackName.includes('truehd') &&
+            !trackName.includes('dts') &&
+            !trackName.includes('dolby') &&
+            !trackName.includes('atmos') &&
+            !trackName.includes('7.1') &&
+            !trackName.includes('5.1') &&
+            index !== selectedAudioTrack; // Don't select the same track
         });
-        
+
         if (fallbackTrack) {
           const fallbackIndex = ksAudioTracks.indexOf(fallbackTrack);
           logger.warn(`[VideoPlayer] Switching to fallback audio track: ${fallbackTrack.name || 'Unknown'} (index: ${fallbackIndex})`);
-          
+
           // Clear any existing error state
           if (errorTimeoutRef.current) {
             clearTimeout(errorTimeoutRef.current);
             errorTimeoutRef.current = null;
           }
           setShowErrorModal(false);
-          
+
           // Switch to fallback audio track
           setSelectedAudioTrack(fallbackIndex);
-          
+
           // Brief pause to allow track switching
           setPaused(true);
           setTimeout(() => {
@@ -1567,11 +1562,11 @@ const KSPlayerCore: React.FC = () => {
               setPaused(false);
             }
           }, 500);
-          
+
           return; // Don't show error UI, attempt recovery
         }
       }
-      
+
       // Format error details for user display
       let errorMessage = 'An unknown error occurred';
       if (error) {
@@ -1589,15 +1584,15 @@ const KSPlayerCore: React.FC = () => {
           errorMessage = JSON.stringify(error, null, 2);
         }
       }
-      
+
       setErrorDetails(errorMessage);
       setShowErrorModal(true);
-      
+
       // Clear any existing timeout
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
-      
+
       // Auto-exit after 5 seconds if user doesn't dismiss
       errorTimeoutRef.current = setTimeout(() => {
         handleErrorExit();
@@ -1618,7 +1613,7 @@ const KSPlayerCore: React.FC = () => {
       }
     }
   };
-  
+
   const handleErrorExit = () => {
     if (errorTimeoutRef.current) {
       clearTimeout(errorTimeoutRef.current);
@@ -1657,44 +1652,44 @@ const KSPlayerCore: React.FC = () => {
       logger.log(`[VideoPlayer] Selecting audio track: ${trackId}`);
       logger.log(`[VideoPlayer] Available tracks:`, ksAudioTracks);
     }
-    
+
     // Validate that the track exists
     const trackExists = ksAudioTracks.some(track => track.id === trackId);
     if (!trackExists) {
       logger.error(`[VideoPlayer] Audio track ${trackId} not found in available tracks`);
       return;
     }
-    
+
     // Get the selected track info for logging
     const selectedTrack = ksAudioTracks.find(track => track.id === trackId);
     if (selectedTrack && DEBUG_MODE) {
       logger.log(`[VideoPlayer] Switching to track: ${selectedTrack.name} (${selectedTrack.language})`);
-      
+
       // Check if this is a multi-channel track that might need downmixing
       const trackName = selectedTrack.name.toLowerCase();
-      const isMultiChannel = trackName.includes('5.1') || trackName.includes('7.1') || 
-                            trackName.includes('truehd') || trackName.includes('dts') ||
-                            trackName.includes('dolby') || trackName.includes('atmos');
-      
+      const isMultiChannel = trackName.includes('5.1') || trackName.includes('7.1') ||
+        trackName.includes('truehd') || trackName.includes('dts') ||
+        trackName.includes('dolby') || trackName.includes('atmos');
+
       if (isMultiChannel) {
         logger.log(`[VideoPlayer] Multi-channel audio track detected: ${selectedTrack.name}`);
         logger.log(`[VideoPlayer] KSPlayer will apply downmixing to ensure dialogue is audible`);
       }
     }
-    
+
     // If changing tracks, briefly pause to allow smooth transition
     const wasPlaying = !paused;
     if (wasPlaying) {
       setPaused(true);
     }
-    
+
     // Set the new audio track
     setSelectedAudioTrack(trackId);
-    
+
     if (DEBUG_MODE) {
       logger.log(`[VideoPlayer] Audio track changed to: ${trackId}`);
     }
-    
+
     // Resume playback after a brief delay if it was playing
     if (wasPlaying) {
       setTimeout(() => {
@@ -1757,9 +1752,9 @@ const KSPlayerCore: React.FC = () => {
           try {
             const merged = { ...(saved || {}), subtitleSize: migrated };
             await storageService.saveSubtitleSettings(merged);
-          } catch {}
+          } catch { }
         }
-        try { await mmkvStorage.removeItem(SUBTITLE_SIZE_KEY); } catch {}
+        try { await mmkvStorage.removeItem(SUBTITLE_SIZE_KEY); } catch { }
         return;
       }
       // If no saved settings, use responsive default
@@ -1930,39 +1925,39 @@ const KSPlayerCore: React.FC = () => {
     if (!nextEpisode || !id || isLoadingNextEpisode) return;
 
     setIsLoadingNextEpisode(true);
-    
+
     try {
       logger.log('[VideoPlayer] Loading next episode:', nextEpisode);
-      
+
       // Create episode ID for next episode using stremioId if available, otherwise construct it
       const nextEpisodeId = nextEpisode.stremioId || `${id}:${nextEpisode.season_number}:${nextEpisode.episode_number}`;
-      
+
       logger.log('[VideoPlayer] Fetching streams for next episode:', nextEpisodeId);
-      
+
       // Import stremio service 
       const stremioService = require('../../services/stremioService').default;
-      
+
       let bestStream: any = null;
       let streamFound = false;
       let completedProviders = 0;
       const expectedProviders = new Set<string>();
-      
+
       // Get installed addons to know how many providers to expect
       const installedAddons = stremioService.getInstalledAddons();
-      const streamAddons = installedAddons.filter((addon: any) => 
+      const streamAddons = installedAddons.filter((addon: any) =>
         addon.resources && addon.resources.includes('stream')
       );
-      
+
       streamAddons.forEach((addon: any) => expectedProviders.add(addon.id));
-      
+
       // Collect all streams from all providers for the sources modal
       const allStreams: { [providerId: string]: { streams: any[]; addonName: string } } = {};
       let hasNavigated = false;
-      
+
       // Fetch streams for next episode
       await stremioService.getStreams('series', nextEpisodeId, (streams: any, addonId: any, addonName: any, error: any) => {
         completedProviders++;
-        
+
         // Always collect streams from this provider for sources modal (even after navigation)
         if (streams && streams.length > 0) {
           allStreams[addonId] = {
@@ -1970,7 +1965,7 @@ const KSPlayerCore: React.FC = () => {
             addonName: addonName || addonId
           };
         }
-        
+
         // Navigate with first good stream found, but continue collecting streams in background
         if (!hasNavigated && !streamFound && streams && streams.length > 0) {
           // Sort streams by quality and cache status (prefer cached/debrid streams)
@@ -1979,7 +1974,7 @@ const KSPlayerCore: React.FC = () => {
             const bQuality = parseInt(b.title?.match(/(\d+)p/)?.[1] || '0', 10);
             const aCached = a.behaviorHints?.cached || false;
             const bCached = b.behaviorHints?.cached || false;
-            
+
             // Prioritize cached streams first
             if (aCached !== bCached) {
               return aCached ? -1 : 1;
@@ -1987,7 +1982,7 @@ const KSPlayerCore: React.FC = () => {
             // Then sort by quality (higher quality first)
             return bQuality - aQuality;
           });
-          
+
           bestStream = sortedStreams[0];
           streamFound = true;
           hasNavigated = true;
@@ -1997,9 +1992,9 @@ const KSPlayerCore: React.FC = () => {
           setNextLoadingProvider(addonName || addonId || null);
           setNextLoadingQuality(qualityText);
           setNextLoadingTitle(bestStream.name || bestStream.title || null);
-          
+
           logger.log('[VideoPlayer] Found stream for next episode:', bestStream);
-          
+
           // Pause current playback to ensure no background player remains active
           setPaused(true);
 
@@ -2026,14 +2021,14 @@ const KSPlayerCore: React.FC = () => {
             setIsLoadingNextEpisode(false);
           }, 100); // Small delay to ensure smooth transition
         }
-        
+
         // If we've checked all providers and no stream found
         if (completedProviders >= expectedProviders.size && !streamFound) {
           logger.warn('[VideoPlayer] No streams found for next episode after checking all providers');
           setIsLoadingNextEpisode(false);
         }
       });
-      
+
       // Fallback timeout in case providers don't respond
       setTimeout(() => {
         if (!streamFound) {
@@ -2041,7 +2036,7 @@ const KSPlayerCore: React.FC = () => {
           setIsLoadingNextEpisode(false);
         }
       }, 8000);
-      
+
     } catch (error) {
       logger.error('[VideoPlayer] Error loading next episode:', error);
       setIsLoadingNextEpisode(false);
@@ -2078,7 +2073,7 @@ const KSPlayerCore: React.FC = () => {
         metadataOpacity.setValue(1);
         metadataScale.setValue(1);
       }
-      
+
       Animated.parallel([
         Animated.timing(pauseOverlayOpacity, {
           toValue: 0,
@@ -2091,7 +2086,7 @@ const KSPlayerCore: React.FC = () => {
           useNativeDriver: true,
         })
       ]).start(() => setShowPauseOverlay(false));
-      
+
       // Show controls when overlay is touched
       if (!showControls) {
         setShowControls(true);
@@ -2100,7 +2095,7 @@ const KSPlayerCore: React.FC = () => {
           duration: 300,
           useNativeDriver: true,
         }).start();
-        
+
         // Auto-hide controls after 5 seconds
         if (controlsTimeout.current) {
           clearTimeout(controlsTimeout.current);
@@ -2160,10 +2155,10 @@ const KSPlayerCore: React.FC = () => {
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
       }
-      
+
       // Cleanup gesture controls
       gestureControls.cleanup();
-      
+
       if (startupRetryTimerRef.current) {
         clearTimeout(startupRetryTimerRef.current);
         startupRetryTimerRef.current = null;
@@ -2193,36 +2188,31 @@ const KSPlayerCore: React.FC = () => {
     );
     const newSubtitle = currentCue ? currentCue.text : '';
     setCurrentSubtitle(newSubtitle);
-    
+
     // Extract formatted segments from current cue
     if (currentCue?.formattedSegments) {
-      // Split by newlines to get per-line segments
-      const lines = (currentCue.text || '').split(/\r?\n/);
       const segmentsPerLine: SubtitleSegment[][] = [];
-      let segmentIndex = 0;
-      
-      for (const line of lines) {
-        const lineSegments: SubtitleSegment[] = [];
-        const words = line.split(/(\s+)/);
-        
-        for (const word of words) {
-          if (word.trim()) {
-            if (segmentIndex < currentCue.formattedSegments.length) {
-              lineSegments.push(currentCue.formattedSegments[segmentIndex]);
-              segmentIndex++;
-            } else {
-              // Fallback if segment count doesn't match
-              lineSegments.push({ text: word });
-            }
+      let currentLine: SubtitleSegment[] = [];
+
+      currentCue.formattedSegments.forEach(seg => {
+        const parts = seg.text.split(/\r?\n/);
+        parts.forEach((part, index) => {
+          if (index > 0) {
+            // New line found
+            segmentsPerLine.push(currentLine);
+            currentLine = [];
           }
-        }
-        
-        if (lineSegments.length > 0) {
-          segmentsPerLine.push(lineSegments);
-        }
+          if (part.length > 0) {
+            currentLine.push({ ...seg, text: part });
+          }
+        });
+      });
+
+      if (currentLine.length > 0) {
+        segmentsPerLine.push(currentLine);
       }
-      
-      setCurrentFormattedSegments(segmentsPerLine.length > 0 ? segmentsPerLine : []);
+
+      setCurrentFormattedSegments(segmentsPerLine);
     } else {
       setCurrentFormattedSegments([]);
     }
@@ -2243,14 +2233,14 @@ const KSPlayerCore: React.FC = () => {
           if (typeof saved.subtitleOutlineColor === 'string') setSubtitleOutlineColor(saved.subtitleOutlineColor);
           if (typeof saved.subtitleOutlineWidth === 'number') setSubtitleOutlineWidth(saved.subtitleOutlineWidth);
           if (typeof saved.subtitleAlign === 'string') setSubtitleAlign(saved.subtitleAlign as 'center' | 'left' | 'right');
-        if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
+          if (typeof saved.subtitleBottomOffset === 'number') setSubtitleBottomOffset(saved.subtitleBottomOffset);
           if (typeof saved.subtitleLetterSpacing === 'number') setSubtitleLetterSpacing(saved.subtitleLetterSpacing);
           if (typeof saved.subtitleLineHeightMultiplier === 'number') setSubtitleLineHeightMultiplier(saved.subtitleLineHeightMultiplier);
           if (typeof saved.subtitleOffsetSec === 'number') setSubtitleOffsetSec(saved.subtitleOffsetSec);
         }
-      } catch {} finally {
+      } catch { } finally {
         // Mark subtitle settings as loaded so we can safely persist subsequent changes
-        try { setSubtitleSettingsLoaded(true); } catch {}
+        try { setSubtitleSettingsLoaded(true); } catch { }
       }
     })();
   }, []);
@@ -2283,7 +2273,7 @@ const KSPlayerCore: React.FC = () => {
     subtitleOutlineColor,
     subtitleOutlineWidth,
     subtitleAlign,
-      subtitleBottomOffset,
+    subtitleBottomOffset,
     subtitleLetterSpacing,
     subtitleLineHeightMultiplier,
     subtitleOffsetSec,
@@ -2325,7 +2315,7 @@ const KSPlayerCore: React.FC = () => {
   // AirPlay handler
   const handleAirPlayPress = async () => {
     if (!ksPlayerRef.current) return;
-    
+
     try {
       // First ensure AirPlay is enabled
       if (!allowsAirPlay) {
@@ -2333,10 +2323,10 @@ const KSPlayerCore: React.FC = () => {
         setAllowsAirPlay(true);
         logger.log(`[VideoPlayer] AirPlay enabled before showing picker`);
       }
-      
+
       // Show the AirPlay picker
       ksPlayerRef.current.showAirPlayPicker();
-      
+
       logger.log(`[VideoPlayer] AirPlay picker triggered - check console for native logs`);
     } catch (error) {
       logger.error('[VideoPlayer] Error showing AirPlay picker:', error);
@@ -2404,15 +2394,15 @@ const KSPlayerCore: React.FC = () => {
 
   const handleEpisodeStreamSelect = async (stream: any) => {
     if (!selectedEpisodeForStreams) return;
-    
+
     setShowEpisodeStreamsModal(false);
-    
+
     const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
     const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';
     const newStreamName = stream.name || stream.title || 'Unknown Stream';
-    
+
     setPaused(true);
-    
+
     setTimeout(() => {
       navigation.replace('PlayerIOS', {
         uri: stream.url,
@@ -2690,11 +2680,11 @@ const KSPlayerCore: React.FC = () => {
             buffered={buffered}
             formatTime={formatTime}
             playerBackend={playerBackend}
-          cyclePlaybackSpeed={cyclePlaybackSpeed}
-          currentPlaybackSpeed={playbackSpeed}
-          isAirPlayActive={isAirPlayActive}
-          allowsAirPlay={allowsAirPlay}
-          onAirPlayPress={handleAirPlayPress}
+            cyclePlaybackSpeed={cyclePlaybackSpeed}
+            currentPlaybackSpeed={playbackSpeed}
+            isAirPlayActive={isAirPlayActive}
+            allowsAirPlay={allowsAirPlay}
+            onAirPlayPress={handleAirPlayPress}
           />
 
           {showPauseOverlay && (
@@ -2725,7 +2715,7 @@ const KSPlayerCore: React.FC = () => {
                   <LinearGradient
                     start={{ x: 0, y: 0.5 }}
                     end={{ x: 1, y: 0.5 }}
-                    colors={[ 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.0)' ]}
+                    colors={['rgba(0,0,0,0.85)', 'rgba(0,0,0,0.0)']}
                     locations={[0, 1]}
                     style={StyleSheet.absoluteFill}
                   />
@@ -2750,24 +2740,24 @@ const KSPlayerCore: React.FC = () => {
                 }}>
                   {showCastDetails && selectedCastMember ? (
                     // Cast Detail View with fade transition
-                    <Animated.View 
-                      style={{ 
-                        flex: 1, 
+                    <Animated.View
+                      style={{
+                        flex: 1,
                         justifyContent: 'center',
                         opacity: castDetailsOpacity,
-                        transform: [{ 
+                        transform: [{
                           scale: castDetailsScale
                         }]
                       }}
                     >
-                      <View style={{ 
+                      <View style={{
                         alignItems: 'flex-start',
-                        paddingBottom: screenDimensions.height * 0.1 
+                        paddingBottom: screenDimensions.height * 0.1
                       }}>
-                        <TouchableOpacity 
-                          style={{ 
-                            flexDirection: 'row', 
-                            alignItems: 'center', 
+                        <TouchableOpacity
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
                             marginBottom: 24,
                             paddingVertical: 8,
                             paddingHorizontal: 4
@@ -2806,14 +2796,14 @@ const KSPlayerCore: React.FC = () => {
                           }}
                         >
                           <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                          <Text style={{ 
-                            color: '#B8B8B8', 
-                            fontSize: Math.min(14, screenDimensions.width * 0.02) 
+                          <Text style={{
+                            color: '#B8B8B8',
+                            fontSize: Math.min(14, screenDimensions.width * 0.02)
                           }}>Back to details</Text>
                         </TouchableOpacity>
-                        
-                        <View style={{ 
-                          flexDirection: 'row', 
+
+                        <View style={{
+                          flexDirection: 'row',
                           alignItems: 'flex-start',
                           width: '100%'
                         }}>
@@ -2838,23 +2828,23 @@ const KSPlayerCore: React.FC = () => {
                               />
                             </View>
                           )}
-                          <View style={{ 
+                          <View style={{
                             flex: 1,
                             paddingTop: 8
                           }}>
-                            <Text style={{ 
-                              color: '#FFFFFF', 
-                              fontSize: Math.min(32, screenDimensions.width * 0.045), 
-                              fontWeight: '800', 
+                            <Text style={{
+                              color: '#FFFFFF',
+                              fontSize: Math.min(32, screenDimensions.width * 0.045),
+                              fontWeight: '800',
                               marginBottom: 8,
                               lineHeight: Math.min(38, screenDimensions.width * 0.05)
                             }} numberOfLines={2}>
                               {selectedCastMember.name}
                             </Text>
                             {selectedCastMember.character && (
-                              <Text style={{ 
-                                color: '#CCCCCC', 
-                                fontSize: Math.min(16, screenDimensions.width * 0.022), 
+                              <Text style={{
+                                color: '#CCCCCC',
+                                fontSize: Math.min(16, screenDimensions.width * 0.022),
                                 marginBottom: 8,
                                 fontWeight: '500',
                                 fontStyle: 'italic'
@@ -2862,12 +2852,12 @@ const KSPlayerCore: React.FC = () => {
                                 as {selectedCastMember.character}
                               </Text>
                             )}
-                            
+
                             {/* Biography if available */}
                             {selectedCastMember.biography && (
-                              <Text style={{ 
-                                color: '#D6D6D6', 
-                                fontSize: Math.min(14, screenDimensions.width * 0.019), 
+                              <Text style={{
+                                color: '#D6D6D6',
+                                fontSize: Math.min(14, screenDimensions.width * 0.019),
                                 lineHeight: Math.min(20, screenDimensions.width * 0.026),
                                 marginTop: 16,
                                 opacity: 0.9
@@ -2881,60 +2871,60 @@ const KSPlayerCore: React.FC = () => {
                     </Animated.View>
                   ) : (
                     // Default Metadata View
-                    <Animated.View style={{ 
-                      flex: 1, 
+                    <Animated.View style={{
+                      flex: 1,
                       justifyContent: 'space-between',
                       opacity: metadataOpacity,
                       transform: [{ scale: metadataScale }]
                     }}>
                       <View>
-                        <Text style={{ 
-                          color: '#B8B8B8', 
-                          fontSize: Math.min(18, screenDimensions.width * 0.025), 
-                          marginBottom: 8 
+                        <Text style={{
+                          color: '#B8B8B8',
+                          fontSize: Math.min(18, screenDimensions.width * 0.025),
+                          marginBottom: 8
                         }}>You're watching</Text>
-                        <Text style={{ 
-                          color: '#FFFFFF', 
-                          fontSize: Math.min(48, screenDimensions.width * 0.06), 
-                          fontWeight: '800', 
-                          marginBottom: 10 
+                        <Text style={{
+                          color: '#FFFFFF',
+                          fontSize: Math.min(48, screenDimensions.width * 0.06),
+                          fontWeight: '800',
+                          marginBottom: 10
                         }} numberOfLines={2}>
                           {title}
                         </Text>
                         {!!year && (
-                          <Text style={{ 
-                            color: '#CCCCCC', 
-                            fontSize: Math.min(18, screenDimensions.width * 0.025), 
-                            marginBottom: 8 
+                          <Text style={{
+                            color: '#CCCCCC',
+                            fontSize: Math.min(18, screenDimensions.width * 0.025),
+                            marginBottom: 8
                           }} numberOfLines={1}>
                             {`${year}${type === 'series' && season && episode ? ` • S${season}E${episode}` : ''}`}
                           </Text>
                         )}
                         {!!episodeTitle && (
-                          <Text style={{ 
-                            color: '#FFFFFF', 
-                            fontSize: Math.min(20, screenDimensions.width * 0.03), 
-                            fontWeight: '600', 
-                            marginBottom: 8 
+                          <Text style={{
+                            color: '#FFFFFF',
+                            fontSize: Math.min(20, screenDimensions.width * 0.03),
+                            fontWeight: '600',
+                            marginBottom: 8
                           }} numberOfLines={2}>
                             {episodeTitle}
                           </Text>
                         )}
                         {(currentEpisodeDescription || metadata?.description) && (
-                          <Text style={{ 
-                            color: '#D6D6D6', 
-                            fontSize: Math.min(18, screenDimensions.width * 0.025), 
-                            lineHeight: Math.min(24, screenDimensions.width * 0.03) 
+                          <Text style={{
+                            color: '#D6D6D6',
+                            fontSize: Math.min(18, screenDimensions.width * 0.025),
+                            lineHeight: Math.min(24, screenDimensions.width * 0.03)
                           }} numberOfLines={3}>
                             {type === 'series' ? (currentEpisodeDescription || metadata?.description || '') : (metadata?.description || '')}
                           </Text>
                         )}
                         {cast && cast.length > 0 && (
                           <View style={{ marginTop: 16 }}>
-                            <Text style={{ 
-                              color: '#B8B8B8', 
-                              fontSize: Math.min(16, screenDimensions.width * 0.022), 
-                              marginBottom: 8 
+                            <Text style={{
+                              color: '#B8B8B8',
+                              fontSize: Math.min(16, screenDimensions.width * 0.022),
+                              marginBottom: 8
                             }}>Cast</Text>
                             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
                               {cast.slice(0, 6).map((castMember: any, index: number) => (
@@ -2948,42 +2938,42 @@ const KSPlayerCore: React.FC = () => {
                                     marginRight: 8,
                                     marginBottom: 8,
                                   }}
-                                                                  onPress={() => {
-                                  setSelectedCastMember(castMember);
-                                  // Animate metadata out, then cast details in
-                                  Animated.parallel([
-                                    Animated.timing(metadataOpacity, {
-                                      toValue: 0,
-                                      duration: 250,
-                                      useNativeDriver: true,
-                                    }),
-                                    Animated.timing(metadataScale, {
-                                      toValue: 0.95,
-                                      duration: 250,
-                                      useNativeDriver: true,
-                                    })
-                                  ]).start(() => {
-                                    setShowCastDetails(true);
-                                    // Animate cast details in
+                                  onPress={() => {
+                                    setSelectedCastMember(castMember);
+                                    // Animate metadata out, then cast details in
                                     Animated.parallel([
-                                      Animated.timing(castDetailsOpacity, {
-                                        toValue: 1,
-                                        duration: 400,
+                                      Animated.timing(metadataOpacity, {
+                                        toValue: 0,
+                                        duration: 250,
                                         useNativeDriver: true,
                                       }),
-                                      Animated.spring(castDetailsScale, {
-                                        toValue: 1,
-                                        tension: 80,
-                                        friction: 8,
+                                      Animated.timing(metadataScale, {
+                                        toValue: 0.95,
+                                        duration: 250,
                                         useNativeDriver: true,
                                       })
-                                    ]).start();
-                                  });
-                                }}
+                                    ]).start(() => {
+                                      setShowCastDetails(true);
+                                      // Animate cast details in
+                                      Animated.parallel([
+                                        Animated.timing(castDetailsOpacity, {
+                                          toValue: 1,
+                                          duration: 400,
+                                          useNativeDriver: true,
+                                        }),
+                                        Animated.spring(castDetailsScale, {
+                                          toValue: 1,
+                                          tension: 80,
+                                          friction: 8,
+                                          useNativeDriver: true,
+                                        })
+                                      ]).start();
+                                    });
+                                  }}
                                 >
-                                  <Text style={{ 
-                                    color: '#FFFFFF', 
-                                    fontSize: Math.min(14, screenDimensions.width * 0.018) 
+                                  <Text style={{
+                                    color: '#FFFFFF',
+                                    fontSize: Math.min(14, screenDimensions.width * 0.018)
                                   }}>
                                     {castMember.name}
                                   </Text>
@@ -3065,13 +3055,13 @@ const KSPlayerCore: React.FC = () => {
                 borderWidth: 1,
                 borderColor: 'rgba(255, 255, 255, 0.1)',
               }}>
-                <MaterialIcons 
-                  name={volume === 0 ? "volume-off" : volume < 30 ? "volume-mute" : volume < 70 ? "volume-down" : "volume-up"} 
-                  size={24} 
-                  color={volume === 0 ? "#FF6B6B" : "#FFFFFF"} 
+                <MaterialIcons
+                  name={volume === 0 ? "volume-off" : volume < 30 ? "volume-mute" : volume < 70 ? "volume-down" : "volume-up"}
+                  size={24}
+                  color={volume === 0 ? "#FF6B6B" : "#FFFFFF"}
                   style={{ marginBottom: 8 }}
                 />
-                
+
                 {/* Horizontal Dotted Progress Bar */}
                 <View style={{
                   width: 80,
@@ -3106,7 +3096,7 @@ const KSPlayerCore: React.FC = () => {
                       />
                     ))}
                   </View>
-                  
+
                   {/* Progress fill */}
                   <View style={{
                     position: 'absolute',
@@ -3122,7 +3112,7 @@ const KSPlayerCore: React.FC = () => {
                     shadowRadius: 2,
                   }} />
                 </View>
-                
+
                 <Text style={{
                   color: '#FFFFFF',
                   fontSize: 12,
@@ -3162,13 +3152,13 @@ const KSPlayerCore: React.FC = () => {
                 borderWidth: 1,
                 borderColor: 'rgba(255, 255, 255, 0.1)',
               }}>
-                <MaterialIcons 
-                  name={brightness < 0.2 ? "brightness-low" : brightness < 0.5 ? "brightness-medium" : brightness < 0.8 ? "brightness-high" : "brightness-auto"} 
-                  size={24} 
-                  color={brightness < 0.2 ? "#FFD700" : "#FFFFFF"} 
+                <MaterialIcons
+                  name={brightness < 0.2 ? "brightness-low" : brightness < 0.5 ? "brightness-medium" : brightness < 0.8 ? "brightness-high" : "brightness-auto"}
+                  size={24}
+                  color={brightness < 0.2 ? "#FFD700" : "#FFFFFF"}
                   style={{ marginBottom: 8 }}
                 />
-                
+
                 {/* Horizontal Dotted Progress Bar */}
                 <View style={{
                   width: 80,
@@ -3203,7 +3193,7 @@ const KSPlayerCore: React.FC = () => {
                       />
                     ))}
                   </View>
-                  
+
                   {/* Progress fill */}
                   <View style={{
                     position: 'absolute',
@@ -3219,7 +3209,7 @@ const KSPlayerCore: React.FC = () => {
                     shadowRadius: 2,
                   }} />
                 </View>
-                
+
                 <Text style={{
                   color: '#FFFFFF',
                   fontSize: 12,
@@ -3353,7 +3343,7 @@ const KSPlayerCore: React.FC = () => {
             metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
             onSelectEpisode={handleEpisodeSelect}
           />
-          
+
           <EpisodeStreamsModal
             visible={showEpisodeStreamsModal}
             episode={selectedEpisodeForStreams}
@@ -3366,7 +3356,7 @@ const KSPlayerCore: React.FC = () => {
           />
         </>
       )}
-      
+
       {/* Error Modal */}
       <Modal
         visible={showErrorModal}
@@ -3409,14 +3399,14 @@ const KSPlayerCore: React.FC = () => {
                 <MaterialIcons name="close" size={24} color="#ffffff" />
               </TouchableOpacity>
             </View>
-            
+
             <Text style={{
               fontSize: 14,
               color: '#cccccc',
               marginBottom: 16,
               lineHeight: 20
             }}>The video player encountered an error and cannot continue playback:</Text>
-            
+
             <View style={{
               backgroundColor: '#2a2a2a',
               borderRadius: 8,
@@ -3430,7 +3420,7 @@ const KSPlayerCore: React.FC = () => {
                 fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
               }}>{errorDetails}</Text>
             </View>
-            
+
             <View style={{
               flexDirection: 'row',
               justifyContent: 'flex-end'
@@ -3451,7 +3441,7 @@ const KSPlayerCore: React.FC = () => {
                 }}>Exit Player</Text>
               </TouchableOpacity>
             </View>
-            
+
             <Text style={{
               fontSize: 12,
               color: '#888888',

@@ -12,7 +12,7 @@
     "@adrianso/react-native-device-brightness": "^1.2.7",
     "@backpackapp-io/react-native-toast": "^0.15.1",
     "@bottom-tabs/react-navigation": "^1.0.2",
-    "@d11/react-native-fast-image": "^8.8.0",
+    "@d11/react-native-fast-image": "^8.13.0",
     "@expo/env": "^2.0.7",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",

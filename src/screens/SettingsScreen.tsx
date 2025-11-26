@@ -67,9 +67,9 @@ interface SettingsCardProps {
 
 const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet = false }) => {
   const { currentTheme } = useTheme();
-  
+
   return (
-    <View 
+    <View
       style={[
         styles.cardContainer,
         isTablet && styles.tabletCardContainer
@@ -119,13 +119,13 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isTablet = false
 }) => {
   const { currentTheme } = useTheme();
-  
+
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       activeOpacity={0.6}
       onPress={onPress}
       style={[
-        styles.settingItem, 
+        styles.settingItem,
         !isLast && styles.settingItemBorder,
         { borderBottomColor: currentTheme.colors.elevation2 },
         isTablet && styles.tabletSettingItem
@@ -133,7 +133,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
     >
       <View style={[
         styles.settingIconContainer,
-        { 
+        {
           backgroundColor: currentTheme.colors.darkGray,
           borderWidth: 1,
           borderColor: currentTheme.colors.primary + '20'
@@ -143,17 +143,17 @@ const SettingItem: React.FC<SettingItemProps> = ({
         {customIcon ? (
           customIcon
         ) : (
-          <Feather 
-            name={icon! as any} 
-            size={isTablet ? 24 : 20} 
-            color={currentTheme.colors.primary} 
+          <Feather
+            name={icon! as any}
+            size={isTablet ? 24 : 20}
+            color={currentTheme.colors.primary}
           />
         )}
       </View>
       <View style={styles.settingContent}>
         <View style={styles.settingTextContainer}>
           <Text style={[
-            styles.settingTitle, 
+            styles.settingTitle,
             { color: currentTheme.colors.highEmphasis },
             isTablet && styles.tabletSettingTitle
           ]}>
@@ -161,7 +161,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
           </Text>
           {description && (
             <Text style={[
-              styles.settingDescription, 
+              styles.settingDescription,
               { color: currentTheme.colors.mediumEmphasis },
               isTablet && styles.tabletSettingDescription
             ]} numberOfLines={1}>
@@ -224,16 +224,16 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
               name={category.icon as any}
               size={22}
               color={
-                selectedCategory === category.id 
-                  ? currentTheme.colors.primary 
+                selectedCategory === category.id
+                  ? currentTheme.colors.primary
                   : currentTheme.colors.mediumEmphasis
               }
             />
             <Text style={[
               styles.sidebarItemText,
               {
-                color: selectedCategory === category.id 
-                  ? currentTheme.colors.primary 
+                color: selectedCategory === category.id
+                  ? currentTheme.colors.primary
                   : currentTheme.colors.mediumEmphasis
               }
             ]}>
@@ -263,7 +263,7 @@ const SettingsScreen: React.FC = () => {
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
-    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => { } }]);
     setAlertVisible(true);
   };
 
@@ -274,7 +274,7 @@ const SettingsScreen: React.FC = () => {
       try {
         const flag = await mmkvStorage.getItem('@update_badge_pending');
         if (mounted) setHasUpdateBadge(flag === 'true');
-      } catch {}
+      } catch { }
     })();
     return () => { mounted = false; };
   }, []);
@@ -283,7 +283,7 @@ const SettingsScreen: React.FC = () => {
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
 
@@ -310,7 +310,7 @@ const SettingsScreen: React.FC = () => {
       }
       refreshAuthStatus();
     });
-    
+
     return unsubscribe;
   }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
 
@@ -320,7 +320,7 @@ const SettingsScreen: React.FC = () => {
       const addons = await stremioService.getInstalledAddonsAsync();
       setAddonCount(addons.length);
       setInitialLoadComplete(true);
-      
+
       // Count total available catalogs
       let totalCatalogs = 0;
       addons.forEach(addon => {
@@ -328,7 +328,7 @@ const SettingsScreen: React.FC = () => {
           totalCatalogs += addon.catalogs.length;
         }
       });
-      
+
       // Load saved catalog settings
       const catalogSettingsJson = await mmkvStorage.getItem('catalog_settings');
       if (catalogSettingsJson) {
@@ -358,7 +358,7 @@ const SettingsScreen: React.FC = () => {
         setTotalDownloads(downloads);
         setDisplayDownloads(downloads);
       }
-      
+
     } catch (error) {
       if (__DEV__) console.error('Error loading settings data:', error);
     }
@@ -382,7 +382,7 @@ const SettingsScreen: React.FC = () => {
   useEffect(() => {
     // Only poll when viewing the About section (where downloads counter is shown)
     const shouldPoll = isTablet ? selectedCategory === 'about' : true;
-    
+
     if (!shouldPoll) return;
 
     const pollInterval = setInterval(async () => {
@@ -414,11 +414,11 @@ const SettingsScreen: React.FC = () => {
       const now = Date.now();
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      
+
       // Ease out quad for smooth deceleration
       const easeProgress = 1 - Math.pow(1 - progress, 2);
       const current = Math.floor(start + (end - start) * easeProgress);
-      
+
       setDisplayDownloads(current);
 
       if (progress < 1) {
@@ -437,7 +437,7 @@ const SettingsScreen: React.FC = () => {
       'Reset Settings',
       'Are you sure you want to reset all settings to default values?',
       [
-        { label: 'Cancel', onPress: () => {} },
+        { label: 'Cancel', onPress: () => { } },
         {
           label: 'Reset',
           onPress: () => {
@@ -455,7 +455,7 @@ const SettingsScreen: React.FC = () => {
       'Clear MDBList Cache',
       'Are you sure you want to clear all cached MDBList data? This cannot be undone.',
       [
-        { label: 'Cancel', onPress: () => {} },
+        { label: 'Cancel', onPress: () => { } },
         {
           label: 'Clear',
           onPress: async () => {
@@ -483,9 +483,9 @@ const SettingsScreen: React.FC = () => {
   );
 
   const ChevronRight = () => (
-    <Feather 
-      name="chevron-right" 
-      size={isTablet ? 24 : 20} 
+    <Feather
+      name="chevron-right"
+      size={isTablet ? 24 : 20}
       color={currentTheme.colors.mediumEmphasis}
     />
   );
@@ -525,6 +525,14 @@ const SettingsScreen: React.FC = () => {
               icon="layers"
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('Addons')}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Debrid Integration"
+              description="Connect Torbox for premium streams"
+              icon="link"
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('DebridIntegration')}
               isTablet={isTablet}
             />
             <SettingItem
@@ -648,7 +656,7 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title="PLAYBACK" isTablet={isTablet}>
             <SettingItem
               title="Video Player"
-              description={Platform.OS === 'ios' 
+              description={Platform.OS === 'ios'
                 ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
                 : (settings?.useExternalPlayer ? 'External' : 'Built-in')
               }
@@ -757,6 +765,21 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
+              title="Test Announcement"
+              icon="bell"
+              description="Show what's new overlay"
+              onPress={async () => {
+                try {
+                  await mmkvStorage.removeItem('announcement_v1.0.0_shown');
+                  openAlert('Success', 'Announcement reset. Restart the app to see the announcement overlay.');
+                } catch (error) {
+                  openAlert('Error', 'Failed to reset announcement.');
+                }
+              }}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+            />
+            <SettingItem
               title="Clear All Data"
               icon="trash-2"
               onPress={() => {
@@ -764,7 +787,7 @@ const SettingsScreen: React.FC = () => {
                   'Clear All Data',
                   'This will reset all settings and clear all cached data. Are you sure?',
                   [
-                    { label: 'Cancel', onPress: () => {} },
+                    { label: 'Cancel', onPress: () => { } },
                     {
                       label: 'Clear',
                       onPress: async () => {
@@ -824,7 +847,7 @@ const SettingsScreen: React.FC = () => {
               badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
               onPress={async () => {
                 if (Platform.OS === 'android') {
-                  try { await mmkvStorage.removeItem('@update_badge_pending'); } catch {}
+                  try { await mmkvStorage.removeItem('@update_badge_pending'); } catch { }
                   setHasUpdateBadge(false);
                 }
                 navigation.navigate('Update');
@@ -861,20 +884,20 @@ const SettingsScreen: React.FC = () => {
             categories={visibleCategories}
             extraTopPadding={tabletNavOffset}
           />
-          
+
           <View style={[
             styles.tabletContent,
             {
               paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48) + tabletNavOffset,
             }
           ]}>
-            <ScrollView 
+            <ScrollView
               style={styles.tabletScrollView}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.tabletScrollContent}
             >
               {renderCategoryContent(selectedCategory)}
-              
+
               {selectedCategory === 'about' && (
                 <>
                   {displayDownloads !== null && (
@@ -887,9 +910,9 @@ const SettingsScreen: React.FC = () => {
                       </Text>
                     </View>
                   )}
-                  
+
                   <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}> 
+                    <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
                       Made with ❤️ by Tapframe and Friends
                     </Text>
                   </View>
@@ -906,7 +929,7 @@ const SettingsScreen: React.FC = () => {
                             style={styles.discordLogo}
                             resizeMode={FastImage.resizeMode.contain}
                           />
-                          <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
+                          <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
                             Join Discord
                           </Text>
                         </View>
@@ -958,7 +981,7 @@ const SettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.contentContainer}>
-          <ScrollView 
+          <ScrollView
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
@@ -1006,7 +1029,7 @@ const SettingsScreen: React.FC = () => {
                       style={styles.discordLogo}
                       resizeMode={FastImage.resizeMode.contain}
                     />
-                    <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}> 
+                    <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
                       Join Discord
                     </Text>
                   </View>
@@ -1074,7 +1097,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingBottom: 90,
   },
-  
+
   // Tablet-specific styles
   tabletContainer: {
     flex: 1,
@@ -1128,7 +1151,7 @@ const styles = StyleSheet.create({
   tabletScrollContent: {
     paddingBottom: 32,
   },
-  
+
   // Common card styles
   cardContainer: {
     width: '100%',

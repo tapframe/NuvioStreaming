@@ -89,7 +89,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     // Subscribe to library updates and update local state if this item's status changes
     const unsubscribe = catalogService.subscribeToLibraryUpdates((items) => {
       const found = items.find((libItem) => libItem.id === item.id && libItem.type === item.type);
-      setInLibrary(!!found);
+      const newInLibrary = !!found;
+      // Only update state if the value actually changed to prevent unnecessary re-renders
+      setInLibrary(prev => prev !== newInLibrary ? newInLibrary : prev);
     });
     return () => unsubscribe();
   }, [item.id, item.type]);

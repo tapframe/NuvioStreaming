@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   Dimensions,
   AppState,
   AppStateStatus,
@@ -55,17 +55,17 @@ const calculatePosterLayout = (screenWidth: number) => {
   const MIN_POSTER_WIDTH = 120; // Slightly larger for continue watching items
   const MAX_POSTER_WIDTH = 160; // Maximum poster width for this section
   const HORIZONTAL_PADDING = 40; // Total horizontal padding/margins
-  
+
   // Calculate how many posters can fit (fewer items for continue watching)
   const availableWidth = screenWidth - HORIZONTAL_PADDING;
   const maxColumns = Math.floor(availableWidth / MIN_POSTER_WIDTH);
-  
+
   // Limit to reasonable number of columns (2-5 for continue watching)
   const numColumns = Math.min(Math.max(maxColumns, 2), 5);
-  
+
   // Calculate actual poster width
   const posterWidth = Math.min(availableWidth / numColumns, MAX_POSTER_WIDTH);
-  
+
   return {
     numColumns,
     posterWidth,
@@ -85,7 +85,7 @@ const isSupportedId = (id: string): boolean => {
 // Function to check if an episode has been released
 const isEpisodeReleased = (video: any): boolean => {
   if (!video.released) return false;
-  
+
   try {
     const releaseDate = new Date(video.released);
     const now = new Date();
@@ -112,16 +112,16 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   const deviceWidth = dimensions.width;
   const deviceHeight = dimensions.height;
-  
+
   // Listen for dimension changes (orientation changes)
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       setDimensions(window);
     });
-    
+
     return () => subscription?.remove();
   }, []);
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -129,13 +129,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced responsive sizing for continue watching items
   const computedItemWidth = useMemo(() => {
     switch (deviceType) {
@@ -149,7 +149,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         return 280; // Original phone size
     }
   }, [deviceType]);
-  
+
   const computedItemHeight = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -162,7 +162,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         return 120; // Original phone height
     }
   }, [deviceType]);
-  
+
   // Enhanced spacing and padding
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -176,7 +176,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         return 16; // phone
     }
   }, [deviceType]);
-  
+
   const itemSpacing = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -198,11 +198,11 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
   // Use a ref to track if a background refresh is in progress to avoid state updates
   const isRefreshingRef = useRef(false);
-  
+
   // Track recently removed items to prevent immediate re-addition
   const recentlyRemovedRef = useRef<Set<string>>(new Set());
   const REMOVAL_IGNORE_DURATION = 10000; // 10 seconds
-  
+
   // Track last Trakt sync to prevent excessive API calls
   const lastTraktSyncRef = useRef<number>(0);
   const TRAKT_SYNC_COOLDOWN = 5 * 60 * 1000; // 5 minutes between Trakt syncs
@@ -216,18 +216,18 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     const cacheKey = `${type}:${id}`;
     const cached = metadataCache.current[cacheKey];
     const now = Date.now();
-    
+
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
       return cached;
     }
-    
+
     try {
       const shouldFetchMeta = await stremioService.isValidContentId(type, id);
       const [metadata, basicContent] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
         catalogService.getBasicContentDetails(type, id)
       ]);
-      
+
       if (basicContent) {
         const result = { metadata, basicContent, timestamp: now };
         metadataCache.current[cacheKey] = result;
@@ -334,13 +334,67 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           if (!isAuthed) return new Set<string>();
           if (typeof (traktService as any).getWatchedMovies === 'function') {
             const watched = await (traktService as any).getWatchedMovies();
+            const watchedSet = new Set<string>();
+
             if (Array.isArray(watched)) {
-              const ids = watched
-                .map((w: any) => w?.movie?.ids?.imdb)
-                .filter(Boolean)
-                .map((imdb: string) => (imdb.startsWith('tt') ? imdb : `tt${imdb}`));
-              return new Set<string>(ids);
+              watched.forEach((w: any) => {
+                const ids = w?.movie?.ids;
+                if (!ids) return;
+
+                if (ids.imdb) {
+                  const imdb = ids.imdb;
+                  watchedSet.add(imdb.startsWith('tt') ? imdb : `tt${imdb}`);
+                }
+                if (ids.tmdb) {
+                  watchedSet.add(ids.tmdb.toString());
+                }
+              });
             }
+            return watchedSet;
+          }
+          return new Set<string>();
+        } catch {
+          return new Set<string>();
+        }
+      })();
+
+      // Fetch Trakt watched shows once and reuse
+      const traktShowsSetPromise = (async () => {
+        try {
+          const traktService = TraktService.getInstance();
+          const isAuthed = await traktService.isAuthenticated();
+          if (!isAuthed) return new Set<string>();
+
+          if (typeof (traktService as any).getWatchedShows === 'function') {
+            const watched = await (traktService as any).getWatchedShows();
+            const watchedSet = new Set<string>();
+
+            if (Array.isArray(watched)) {
+              watched.forEach((show: any) => {
+                const ids = show?.show?.ids;
+                if (!ids) return;
+
+                const imdbId = ids.imdb;
+                const tmdbId = ids.tmdb;
+
+                if (show.seasons && Array.isArray(show.seasons)) {
+                  show.seasons.forEach((season: any) => {
+                    if (season.episodes && Array.isArray(season.episodes)) {
+                      season.episodes.forEach((episode: any) => {
+                        if (imdbId) {
+                          const cleanImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+                          watchedSet.add(`${cleanImdbId}:${season.number}:${episode.number}`);
+                        }
+                        if (tmdbId) {
+                          watchedSet.add(`${tmdbId}:${season.number}:${episode.number}`);
+                        }
+                      });
+                    }
+                  });
+                }
+              });
+            }
+            return watchedSet;
           }
           return new Set<string>();
         } catch {
@@ -365,7 +419,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   traktSynced: true,
                   traktProgress: 100,
                 } as any);
-              } catch (_e) {}
+              } catch (_e) { }
               return;
             }
           }
@@ -422,6 +476,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             let season: number | undefined;
             let episodeNumber: number | undefined;
             let episodeTitle: string | undefined;
+            let isWatchedOnTrakt = false;
+
             if (episodeId && group.type === 'series') {
               let match = episodeId.match(/s(\d+)e(\d+)/i);
               if (match) {
@@ -442,6 +498,61 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   }
                 }
               }
+
+              // Check if this specific episode is watched on Trakt
+              if (season !== undefined && episodeNumber !== undefined) {
+                const watchedEpisodesSet = await traktShowsSetPromise;
+                // Try with both raw ID and tt-prefixed ID, and TMDB ID (which is just the ID string)
+                const rawId = group.id.replace(/^tt/, '');
+                const ttId = `tt${rawId}`;
+
+                if (watchedEpisodesSet.has(`${ttId}:${season}:${episodeNumber}`) ||
+                  watchedEpisodesSet.has(`${rawId}:${season}:${episodeNumber}`) ||
+                  watchedEpisodesSet.has(`${group.id}:${season}:${episodeNumber}`)) {
+                  isWatchedOnTrakt = true;
+
+                  // Update local storage to reflect watched status
+                  try {
+                    await storageService.setWatchProgress(
+                      group.id,
+                      'series',
+                      {
+                        currentTime: 1,
+                        duration: 1,
+                        lastUpdated: Date.now(),
+                        traktSynced: true,
+                        traktProgress: 100,
+                      } as any,
+                      episodeId
+                    );
+                  } catch (_e) { }
+                }
+              }
+            }
+
+            // If watched on Trakt, treat it as completed (try to find next episode)
+            if (isWatchedOnTrakt) {
+              let nextSeason = season;
+              let nextEpisode = (episodeNumber || 0) + 1;
+
+              if (nextSeason !== undefined && nextEpisode !== undefined && metadata?.videos && Array.isArray(metadata.videos)) {
+                const nextEpisodeVideo = metadata.videos.find((video: any) =>
+                  video.season === nextSeason && video.episode === nextEpisode
+                );
+                if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
+                  batch.push({
+                    ...basicContent,
+                    id: group.id,
+                    type: group.type,
+                    progress: 0,
+                    lastUpdated: progress.lastUpdated,
+                    season: nextSeason,
+                    episode: nextEpisode,
+                    episodeTitle: `Episode ${nextEpisode}`,
+                  } as ContinueWatchingItem);
+                }
+              }
+              continue;
             }
 
             batch.push({
@@ -466,14 +577,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           const traktService = TraktService.getInstance();
           const isAuthed = await traktService.isAuthenticated();
           if (!isAuthed) return;
-          
+
           // Check Trakt sync cooldown to prevent excessive API calls
           const now = Date.now();
           if (now - lastTraktSyncRef.current < TRAKT_SYNC_COOLDOWN) {
             logger.log(`[TraktSync] Skipping Trakt sync - cooldown active (${Math.round((TRAKT_SYNC_COOLDOWN - (now - lastTraktSyncRef.current)) / 1000)}s remaining)`);
             return;
           }
-          
+
           lastTraktSyncRef.current = now;
           const historyItems = await traktService.getWatchedEpisodesHistory(1, 200);
           const latestWatchedByShow: Record<string, { season: number; episode: number; watchedAt: number }> = {};
@@ -650,7 +761,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   useFocusEffect(
     useCallback(() => {
       loadContinueWatching(true);
-      return () => {};
+      return () => { };
     }, [loadContinueWatching])
   );
 
@@ -667,62 +778,62 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const handleContentPress = useCallback(async (item: ContinueWatchingItem) => {
     try {
       logger.log(`🎬 [ContinueWatching] User clicked on: ${item.name} (${item.type}:${item.id})`);
-      
+
       // Check if cached streams are enabled in settings
       if (!settings.useCachedStreams) {
         logger.log(`📺 [ContinueWatching] Cached streams disabled, navigating to ${settings.openMetadataScreenWhenCacheDisabled ? 'MetadataScreen' : 'StreamsScreen'} for ${item.name}`);
-        
+
         // Navigate based on the second setting
         if (settings.openMetadataScreenWhenCacheDisabled) {
           // Navigate to MetadataScreen
           if (item.type === 'series' && item.season && item.episode) {
             const episodeId = `${item.id}:${item.season}:${item.episode}`;
-            navigation.navigate('Metadata', { 
-              id: item.id, 
-              type: item.type, 
-              episodeId: episodeId 
+            navigation.navigate('Metadata', {
+              id: item.id,
+              type: item.type,
+              episodeId: episodeId
             });
           } else {
-            navigation.navigate('Metadata', { 
-              id: item.id, 
-              type: item.type 
+            navigation.navigate('Metadata', {
+              id: item.id,
+              type: item.type
             });
           }
         } else {
           // Navigate to StreamsScreen
           if (item.type === 'series' && item.season && item.episode) {
             const episodeId = `${item.id}:${item.season}:${item.episode}`;
-            navigation.navigate('Streams', { 
-              id: item.id, 
-              type: item.type, 
-              episodeId: episodeId 
+            navigation.navigate('Streams', {
+              id: item.id,
+              type: item.type,
+              episodeId: episodeId
             });
           } else {
-            navigation.navigate('Streams', { 
-              id: item.id, 
-              type: item.type 
+            navigation.navigate('Streams', {
+              id: item.id,
+              type: item.type
             });
           }
         }
         return;
       }
-      
+
       // Check if we have a cached stream for this content
-      const episodeId = item.type === 'series' && item.season && item.episode 
-        ? `${item.id}:${item.season}:${item.episode}` 
+      const episodeId = item.type === 'series' && item.season && item.episode
+        ? `${item.id}:${item.season}:${item.episode}`
         : undefined;
-      
+
       logger.log(`🔍 [ContinueWatching] Looking for cached stream with episodeId: ${episodeId || 'none'}`);
-      
+
       const cachedStream = await streamCacheService.getCachedStream(item.id, item.type, episodeId);
-      
+
       if (cachedStream) {
         // We have a valid cached stream, navigate directly to player
         logger.log(`🚀 [ContinueWatching] Using cached stream for ${item.name}`);
-        
+
         // Determine the player route based on platform
         const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
-        
+
         // Navigate directly to player with cached stream data
         navigation.navigate(playerRoute as any, {
           uri: cachedStream.stream.url,
@@ -743,25 +854,25 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           backdrop: cachedStream.metadata?.backdrop || item.banner,
           videoType: undefined, // Let player auto-detect
         } as any);
-        
+
         return;
       }
-      
+
       // No cached stream or cache failed, navigate to StreamsScreen
       logger.log(`📺 [ContinueWatching] No cached stream, navigating to StreamsScreen for ${item.name}`);
-      
+
       if (item.type === 'series' && item.season && item.episode) {
         // For series, navigate to the specific episode
-        navigation.navigate('Streams', { 
-          id: item.id, 
-          type: item.type, 
-          episodeId: episodeId 
+        navigation.navigate('Streams', {
+          id: item.id,
+          type: item.type,
+          episodeId: episodeId
         });
       } else {
         // For movies or series without specific episode, navigate to main content
-        navigation.navigate('Streams', { 
-          id: item.id, 
-          type: item.type 
+        navigation.navigate('Streams', {
+          id: item.id,
+          type: item.type
         });
       }
     } catch (error) {
@@ -769,15 +880,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Fallback to StreamsScreen on any error
       if (item.type === 'series' && item.season && item.episode) {
         const episodeId = `${item.id}:${item.season}:${item.episode}`;
-        navigation.navigate('Streams', { 
-          id: item.id, 
-          type: item.type, 
-          episodeId: episodeId 
+        navigation.navigate('Streams', {
+          id: item.id,
+          type: item.type,
+          episodeId: episodeId
         });
       } else {
-        navigation.navigate('Streams', { 
-          id: item.id, 
-          type: item.type 
+        navigation.navigate('Streams', {
+          id: item.id,
+          type: item.type
         });
       }
     }
@@ -798,7 +909,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       {
         label: 'Cancel',
         style: { color: '#888' },
-        onPress: () => {},
+        onPress: () => { },
       },
       {
         label: 'Remove',
@@ -842,7 +953,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
     <TouchableOpacity
       style={[
-        styles.wideContentItem, 
+        styles.wideContentItem,
         {
           backgroundColor: currentTheme.colors.elevation1,
           borderColor: currentTheme.colors.border,
@@ -864,7 +975,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }
       ]}>
         <FastImage
-          source={{ 
+          source={{
             uri: item.poster || 'https://via.placeholder.com/300x450',
             priority: FastImage.priority.high,
             cache: FastImage.cacheControl.immutable
@@ -872,7 +983,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           style={styles.continueWatchingPoster}
           resizeMode={FastImage.resizeMode.cover}
         />
-        
+
         {/* Delete Indicator Overlay */}
         {deletingItemId === item.id && (
           <View style={styles.deletingOverlay}>
@@ -893,10 +1004,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             const isUpNext = item.type === 'series' && item.progress === 0;
             return (
               <View style={styles.titleRow}>
-                <Text 
+                <Text
                   style={[
-                    styles.contentTitle, 
-                    { 
+                    styles.contentTitle,
+                    {
                       color: currentTheme.colors.highEmphasis,
                       fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
                     }
@@ -906,19 +1017,19 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   {item.name}
                 </Text>
                 {isUpNext && (
-                <View style={[
-                  styles.progressBadge, 
-                  { 
-                    backgroundColor: currentTheme.colors.primary,
-                    paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                    paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
-                  }
-                ]}>
+                  <View style={[
+                    styles.progressBadge,
+                    {
+                      backgroundColor: currentTheme.colors.primary,
+                      paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                      paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
+                    }
+                  ]}>
                     <Text style={[
                       styles.progressText,
                       { fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12 }
                     ]}>Up Next</Text>
-                </View>
+                  </View>
                 )}
               </View>
             );
@@ -931,8 +1042,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             return (
               <View style={styles.episodeRow}>
                 <Text style={[
-                  styles.episodeText, 
-                  { 
+                  styles.episodeText,
+                  {
                     color: currentTheme.colors.mediumEmphasis,
                     fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
                   }
@@ -940,10 +1051,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   Season {item.season}
                 </Text>
                 {item.episodeTitle && (
-                  <Text 
+                  <Text
                     style={[
-                      styles.episodeTitle, 
-                      { 
+                      styles.episodeTitle,
+                      {
                         color: currentTheme.colors.mediumEmphasis,
                         fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 13 : 12
                       }
@@ -958,8 +1069,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           } else {
             return (
               <Text style={[
-                styles.yearText, 
-                { 
+                styles.yearText,
+                {
                   color: currentTheme.colors.mediumEmphasis,
                   fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
                 }
@@ -979,19 +1090,19 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 height: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4
               }
             ]}>
-              <View 
+              <View
                 style={[
-                  styles.wideProgressBar, 
-                  { 
-                    width: `${item.progress}%`, 
-                    backgroundColor: currentTheme.colors.primary 
+                  styles.wideProgressBar,
+                  {
+                    width: `${item.progress}%`,
+                    backgroundColor: currentTheme.colors.primary
                   }
-                ]} 
+                ]}
               />
             </View>
             <Text style={[
-              styles.progressLabel, 
-              { 
+              styles.progressLabel,
+              {
                 color: currentTheme.colors.textMuted,
                 fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 11
               }
@@ -1023,15 +1134,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.titleContainer}>
           <Text style={[
-            styles.title, 
-            { 
+            styles.title,
+            {
               color: currentTheme.colors.text,
               fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
             }
           ]}>Continue Watching</Text>
           <View style={[
-            styles.titleUnderline, 
-            { 
+            styles.titleUnderline,
+            {
               backgroundColor: currentTheme.colors.primary,
               width: isTV ? 50 : isLargeTablet ? 45 : isTablet ? 40 : 40,
               height: isTV ? 4 : isLargeTablet ? 3.5 : isTablet ? 3 : 3
@@ -1039,7 +1150,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           ]} />
         </View>
       </View>
-      
+
       <FlashList
         data={continueWatchingItems}
         renderItem={renderContinueWatchingItem}
@@ -1048,14 +1159,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[
           styles.wideList,
-          { 
-            paddingLeft: horizontalPadding, 
-            paddingRight: horizontalPadding 
+          {
+            paddingLeft: horizontalPadding,
+            paddingRight: horizontalPadding
           }
         ]}
         ItemSeparatorComponent={ItemSeparator}
         onEndReachedThreshold={0.7}
-        onEndReached={() => {}}
+        onEndReached={() => { }}
         removeClippedSubviews={true}
       />
 
@@ -1209,7 +1320,7 @@ const styles = StyleSheet.create({
   },
   contentItem: {
     width: POSTER_WIDTH,
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     margin: 0,
     borderRadius: 8,
     overflow: 'hidden',

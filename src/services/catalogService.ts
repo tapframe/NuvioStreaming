@@ -928,8 +928,16 @@ class CatalogService {
 
   public subscribeToLibraryUpdates(callback: (items: StreamingContent[]) => void): () => void {
     this.librarySubscribers.push(callback);
-    // Initial callback with current items
-    this.getLibraryItems().then(items => callback(items));
+    // Defer initial callback to next tick to avoid synchronous state updates during render
+    // This prevents infinite loops when the callback triggers setState in useEffect
+    Promise.resolve().then(() => {
+      this.getLibraryItems().then(items => {
+        // Only call if still subscribed (callback might have been unsubscribed)
+        if (this.librarySubscribers.includes(callback)) {
+          callback(items);
+        }
+      });
+    });
     
     // Return unsubscribe function
     return () => {

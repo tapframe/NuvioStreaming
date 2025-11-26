@@ -1041,45 +1041,49 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Grace delay before showing text fallback to avoid flashing when logo arrives late
   const [shouldShowTextFallback, setShouldShowTextFallback] = useState<boolean>(!metadata?.logo);
   const logoWaitTimerRef = useRef<any>(null);
+  // Ref to track the last synced logo to break circular dependency with error handling
+  const lastSyncedLogoRef = useRef<string | undefined>(metadata?.logo);
 
   // Update stable logo URI when metadata logo changes
   useEffect(() => {
-    // Reset text fallback and timers on logo updates
-    if (logoWaitTimerRef.current) {
-      try { clearTimeout(logoWaitTimerRef.current); } catch (_e) {}
-      logoWaitTimerRef.current = null;
-    }
+    // Check if metadata logo has actually changed from what we last processed
+    const currentMetadataLogo = metadata?.logo;
+    
+    if (currentMetadataLogo !== lastSyncedLogoRef.current) {
+      lastSyncedLogoRef.current = currentMetadataLogo;
 
-    if (metadata?.logo && metadata.logo !== stableLogoUri) {
-      setStableLogoUri(metadata.logo);
-      onStableLogoUriChange?.(metadata.logo);
-      setLogoHasLoadedSuccessfully(false); // Reset for new logo
-      logoLoadOpacity.value = 0; // reset fade for new logo
-      setShouldShowTextFallback(false);
-    } else if (!metadata?.logo && stableLogoUri) {
-      // Clear logo if metadata no longer has one
-      setStableLogoUri(null);
-      onStableLogoUriChange?.(null);
-      setLogoHasLoadedSuccessfully(false);
-      // Start a short grace period before showing text fallback
-      setShouldShowTextFallback(false);
-      logoWaitTimerRef.current = setTimeout(() => {
-        setShouldShowTextFallback(true);
-      }, 600);
-    } else if (!metadata?.logo && !stableLogoUri) {
-      // No logo currently; wait briefly before showing text to avoid flash
-      setShouldShowTextFallback(false);
-      logoWaitTimerRef.current = setTimeout(() => {
-        setShouldShowTextFallback(true);
-      }, 600);
+      // Reset text fallback and timers on logo updates
+      if (logoWaitTimerRef.current) {
+        try { clearTimeout(logoWaitTimerRef.current); } catch (_e) {}
+        logoWaitTimerRef.current = null;
+      }
+
+      if (currentMetadataLogo) {
+        setStableLogoUri(currentMetadataLogo);
+        onStableLogoUriChange?.(currentMetadataLogo);
+        setLogoHasLoadedSuccessfully(false); // Reset for new logo
+        logoLoadOpacity.value = 0; // reset fade for new logo
+        setShouldShowTextFallback(false);
+      } else {
+        // Clear logo if metadata no longer has one
+        setStableLogoUri(null);
+        onStableLogoUriChange?.(null);
+        setLogoHasLoadedSuccessfully(false);
+        // Start a short grace period before showing text fallback
+        setShouldShowTextFallback(false);
+        logoWaitTimerRef.current = setTimeout(() => {
+          setShouldShowTextFallback(true);
+        }, 600);
+      }
     }
+    
     return () => {
       if (logoWaitTimerRef.current) {
         try { clearTimeout(logoWaitTimerRef.current); } catch (_e) {}
         logoWaitTimerRef.current = null;
       }
     };
-  }, [metadata?.logo, stableLogoUri]);
+  }, [metadata?.logo]); // Removed stableLogoUri from dependencies to prevent circular updates on error
 
   // Handle logo load success - once loaded successfully, keep it stable
   const handleLogoLoad = useCallback(() => {
