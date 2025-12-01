@@ -165,27 +165,53 @@ const RatingSourceToggle = memo(({ ratingSource, setRatingSource, theme }: {
   </View>
 ));
 
-const ShowInfo = memo(({ show, theme }: { show: Show | null, theme: any }) => (
-  <View style={styles.showInfo}>
-    <FastImage
-      source={{ uri: `https://image.tmdb.org/t/p/w500${show?.poster_path}` }}
-      style={styles.poster}
-      resizeMode={FastImage.resizeMode.cover}
-    />
-    <View style={styles.showDetails}>
-      <Text style={[styles.showTitle, { color: theme.colors.white }]}>{show?.name}</Text>
-      <Text style={[styles.showYear, { color: theme.colors.lightGray }]}>
-        {show?.first_air_date ? `${new Date(show.first_air_date).getFullYear()} - ${show.last_air_date ? new Date(show.last_air_date).getFullYear() : 'Present'}` : ''}
-      </Text>
-      <View style={styles.episodeCountContainer}>
-        <MaterialIcons name="tv" size={16} color={theme.colors.primary} />
-        <Text style={[styles.episodeCount, { color: theme.colors.lightGray }]}>
-          {show?.number_of_seasons} Seasons • {show?.number_of_episodes} Episodes
+const ShowInfo = memo(({ show, theme }: { show: Show | null, theme: any }) => {
+  // singular / plural logic
+  const seasonLabel =
+    show?.number_of_seasons === 1
+      ? "Season"
+      : "Seasons";
+
+  const episodeLabel =
+    show?.number_of_episodes === 1
+      ? "Episode"
+      : "Episodes";
+
+  return (
+    <View style={styles.showInfo}>
+      <FastImage
+        source={{ uri: `https://image.tmdb.org/t/p/w500${show?.poster_path}` }}
+        style={styles.poster}
+        resizeMode={FastImage.resizeMode.cover}
+      />
+
+      <View style={styles.showDetails}>
+        <Text style={[styles.showTitle, { color: theme.colors.white }]}>
+          {show?.name}
         </Text>
+
+        <Text style={[styles.showYear, { color: theme.colors.lightGray }]}>
+          {show?.first_air_date
+            ? `${new Date(show.first_air_date).getFullYear()} - ${
+                show.last_air_date
+                  ? new Date(show.last_air_date).getFullYear()
+                  : "Present"
+              }`
+            : ""}
+        </Text>
+
+        <View style={styles.episodeCountContainer}>
+          <MaterialIcons name="tv" size={16} color={theme.colors.primary} />
+
+          <Text style={[styles.episodeCount, { color: theme.colors.lightGray }]}>
+            {show?.number_of_seasons} {seasonLabel} •{" "}
+            {show?.number_of_episodes} {episodeLabel}
+          </Text>
+        </View>
       </View>
     </View>
-  </View>
-));
+  );
+});
 
 const ShowRatingsScreen = ({ route }: Props) => {
   const { currentTheme } = useTheme();
@@ -455,7 +481,7 @@ const ShowRatingsScreen = ({ route }: Props) => {
                     {/* Fixed Episode Column */}
                     <View style={[styles.fixedColumn, { borderRightColor: colors.black + '40' }]}>
                       <View style={styles.episodeColumn}>
-                        <Text style={[styles.headerText, { color: colors.white }]}>Episode</Text>
+                        <Text style={[styles.headerText, { color: colors.white }]}>EPs</Text>
                       </View>
                       {Array.from({ length: Math.max(...seasons.map(s => s.episodes.length)) }).map((_, episodeIndex) => (
                         <View key={`e${episodeIndex + 1}`} style={styles.episodeCell}>
