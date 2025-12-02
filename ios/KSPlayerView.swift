@@ -356,9 +356,10 @@ class KSPlayerView: UIView {
         options.registerRemoteControll = false
         
         // PERFORMANCE OPTIMIZATION: Optimal buffer durations for high bitrate
-        // Increased buffer prevents stuttering during network hiccups with high bitrate streams
-        options.preferredForwardBufferDuration = 3.0  // Increased from 0.5 for high bitrate stability
-        options.maxBufferDuration = 20.0  // Increased from 10.0 to allow more aggressive buffering
+        // preferredForwardBufferDuration = 1.0s: Kept low to ensure instant start.
+        options.preferredForwardBufferDuration = 1.0
+        // maxBufferDuration = 60.0s: Increased to allow the player to cache more content ahead of time
+        options.maxBufferDuration = 60.0
         
         // Enable "second open" to relax startup/seek buffering thresholds (already enabled)
         options.isSecondOpen = true
