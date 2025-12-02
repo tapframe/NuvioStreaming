@@ -352,20 +352,7 @@ const HomeScreenSettings: React.FC = () => {
               />
               <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner, swipeable cards, or Apple TV style</Text>
             </View>
-
-            <View style={styles.segmentCard}>
-              <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
-              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Using Catalogs</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('HeroCatalogs')}
-                style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
-                activeOpacity={0.8}
-              >
-                <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
-                <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
-              </TouchableOpacity>
-            </View>
-
+    
             {settings.heroStyle === 'carousel' && (
               <SettingsCard isDarkMode={isDarkMode} colors={colors}>
                 <SettingItem
