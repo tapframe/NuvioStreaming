@@ -1297,7 +1297,7 @@ const styles = StyleSheet.create({
   libraryBadge: {
     position: 'absolute',
     top: 8,
-    right: 36,
+    left: 8,
     borderRadius: 8,
     padding: 4,
     zIndex: 2,
