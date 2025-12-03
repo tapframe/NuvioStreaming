@@ -964,22 +964,20 @@ const LibraryScreen = () => {
 
         {/* Content Container */}
         <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
-          {!showTraktContent && (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filtersContainer}
-              style={styles.filtersScrollView}
-            >
-              {renderFilter('trakt', 'Trakt', 'pan-tool')}
-              {renderFilter('movies', 'Movies', 'movie')}
-              {renderFilter('series', 'TV Shows', 'live-tv')}
-            </ScrollView>
-          )}
+            {!showTraktContent && (
+              // Replaced ScrollView with View and used the modified style
+              <View
+                style={styles.filtersContainer}
+              >
+                {renderFilter('trakt', 'Trakt', 'pan-tool')}
+                {renderFilter('movies', 'Movies', 'movie')}
+                {renderFilter('series', 'TV Shows', 'live-tv')}
+              </View>
+            )}
 
-          {showTraktContent ? renderTraktContent() : renderContent()}
+            {showTraktContent ? renderTraktContent() : renderContent()}
+          </View>
         </View>
-      </View>
 
       {/* DropUpMenu integration */}
       {selectedItem && (
@@ -1081,6 +1079,7 @@ const styles = StyleSheet.create({
   },
   filtersContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingBottom: 16,
     paddingTop: 8,
