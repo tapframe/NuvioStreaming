@@ -1,6 +1,4 @@
-// ... existing imports ...
 import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
-// ADD THIS LINE:
 import { useTorrentStream } from '../../hooks/useTorrentStream';
 
 import {
@@ -12,9 +10,6 @@ import {
   WyzieSubtitle,
   SubtitleCue,
   SubtitleSegment,
-  RESUME_PREF_KEY,
-  RESUME_PREF,
-  SUBTITLE_SIZE_KEY
 } from './utils/playerTypes';
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -29,15 +24,13 @@ import {
   StatusBar,
   Text,
   Modal,
-  AppState,
-  Image
+  AppState
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, {
   VideoRef,
   SelectedTrack,
   SelectedTrackType,
-  BufferingStrategyType,
   ViewType
 } from 'react-native-video';
 import FastImage from '@d11/react-native-fast-image';
@@ -119,26 +112,28 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>(videoType);
 
-    // --- START TORRENT INTEGRATION ---
+  // --- START TORRENT INTEGRATION (FIXED) ---
   const {
     videoSource,
     isBuffering: isTorrentBuffering = false,
     stats: torrentStats = { seeds: 0, peers: 0, downloadSpeed: 0 },
     error: torrentError = null,
-    // REMOVED: start and stop (the hook handles this automatically)
-  } = useTorrentStream({ uri }); // Pass the object format expected by the hook
+    // Note: The hook handles start/stop automatically. We do not destructure them here.
+  } = useTorrentStream({
+    uri,
+    headers: headers || {},
+    preferStreaming: true
+  });
 
-  // Keep this part! It swaps the URL when the file is ready.
+  // Sync the local file URL to the player when ready
   useEffect(() => {
     if (videoSource?.uri && videoSource.uri !== currentStreamUrl) {
       console.log('[AndroidVideoPlayer] 🧲 Swapping magnet link for local file:', videoSource.uri);
       setCurrentStreamUrl(videoSource.uri);
     }
   }, [videoSource, currentStreamUrl]);
-
-  // DELETE THE ENTIRE SECOND useEffect HERE (The one checking for magnet: and calling startTorrent)
-  // The hook internal logic handles the detection and startup.
   // --- END TORRENT INTEGRATION ---
+
   // Memo for processed playback URL
   const processedStreamUrl = useMemo(() => {
     if (!currentStreamUrl) return '';
@@ -331,6 +326,10 @@ const AndroidVideoPlayer: React.FC = () => {
   }, [videoAspectRatio, screenDimensions]);
 
   const zoomFactor = 1;
+  const [customVideoStyles, setCustomVideoStyles] = useState<any>({});
+  const [zoomScale, setZoomScale] = useState(1);
+  const pinchRef = useRef<PinchGestureHandler>(null);
+
   // Player backend selection
   const TEMP_FORCE_RNV = false;
   const TEMP_FORCE_VLC = false;
@@ -621,7 +620,7 @@ const AndroidVideoPlayer: React.FC = () => {
           playerBackend={useVLC ? 'VLC' : 'ExoPlayer'}
         />
 
-        {/* --- ADD THIS BLOCK: TORRENT OVERLAY --- */}
+        {/* --- TORRENT OVERLAY --- */}
         {isTorrentBuffering && (
           <View style={{
             position: 'absolute',
@@ -655,7 +654,7 @@ const AndroidVideoPlayer: React.FC = () => {
             )}
           </View>
         )}
-        {/* --------------------------------------- */}
+        {/* ----------------------- */}
 
         {/* Custom Subtitles */}
         <CustomSubtitles
@@ -713,7 +712,6 @@ const AndroidVideoPlayer: React.FC = () => {
 
       <SourcesModal
         visible={false}
-        // you can wire sources modal props here if needed
         onRequestClose={() => {}}
       />
 
