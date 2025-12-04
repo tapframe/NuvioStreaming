@@ -21,45 +21,6 @@ react {
     cliFile = new File(["node", "--print", "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"].execute(null, rootDir).text.trim())
     bundleCommand = "export:embed"
 
-    /* Folders */
-     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
-    // root = file("../../")
-    //   The folder where the react-native NPM package is. Default is ../../node_modules/react-native
-    // reactNativeDir = file("../../node_modules/react-native")
-    //   The folder where the react-native Codegen package is. Default is ../../node_modules/@react-native/codegen
-    // codegenDir = file("../../node_modules/@react-native/codegen")
-
-    /* Variants */
-    //   The list of variants to that are debuggable. For those we're going to
-    //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
-    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "prodDebug"]
-
-    /* Bundling */
-    //   A list containing the node command and its flags. Default is just 'node'.
-    // nodeExecutableAndArgs = ["node"]
-
-    //
-    //   The path to the CLI configuration file. Default is empty.
-    // bundleConfig = file(../rn-cli.config.js)
-    //
-    //   The name of the generated asset file containing your JS bundle
-    // bundleAssetName = "MyApplication.android.bundle"
-    //
-    //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
-    // entryFile = file("../js/MyApplication.android.js")
-    //
-    //   A list of extra flags to pass to the 'bundle' commands.
-    //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
-    // extraPackagerArgs = []
-
-    /* Hermes Commands */
-    //   The hermes compiler command to run. By default it is 'hermesc'
-    // hermesCommand = "$rootDir/my-custom-hermesc/bin/hermesc"
-    //
-    //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
-    // hermesFlags = ["-O", "-output-source-map"]
-
     /* Autolinking */
     autolinkLibrariesWithApp()
 }
@@ -71,14 +32,6 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
- *
- * For example, to use the international variant, you can use:
- * `def jscFlavor = 'org.webkit:android-jsc-intl:+'`
- *
- * The international variant includes ICU i18n library and necessary data
- * allowing to use e.g. `Date.toLocaleString` and `String.localeCompare` that
- * give correct results when using with locales other than en-US. Note that
- * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
@@ -143,8 +96,6 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
@@ -165,20 +116,14 @@ android {
     }
 }
 
-// Apply static values from `gradle.properties` to the `android.packagingOptions`
-// Accepts values in comma delimited lists, example:
-// android.packagingOptions.pickFirsts=/LICENSE,**/picasa.ini
+// Apply static values from `gradle.properties`
 ["pickFirsts", "excludes", "merges", "doNotStrip"].each { prop ->
-    // Split option: 'foo,bar' -> ['foo', 'bar']
     def options = (findProperty("android.packagingOptions.$prop") ?: "").split(",");
-    // Trim all elements in place.
     for (i in 0..<options.size()) options[i] = options[i].trim();
-    // `[] - ""` is essentially `[""].filter(Boolean)` removing all empty strings.
     options -= ""
 
     if (options.length > 0) {
         println "android.packagingOptions.$prop += $options ($options.length)"
-        // Ex: android.packagingOptions.pickFirsts += '**/SCCS/**'
         options.each {
             android.packagingOptions[prop] += it
         }
@@ -186,24 +131,8 @@ android {
 }
 
 sentry {
-    // Enables or disables the automatic configuration of Native Symbols
-    // for Sentry. This executes sentry-cli automatically so
-    // you don't need to do it manually.
-    // Default is disabled.
     uploadNativeSymbols = true
-
-    // Enables or disables the automatic upload of the app's native source code to Sentry.
-    // This executes sentry-cli with the --include-sources param automatically so
-    // you don't need to do it manually.
-    // This option has an effect only when [uploadNativeSymbols] is enabled.
-    // Default is disabled.
     includeNativeSources = true
-
-    // `@sentry/react-native` ships with compatible `sentry-android`
-    // This option would install the latest version that ships with the SDK or SAGP (Sentry Android Gradle Plugin)
-    // which might be incompatible with the React Native SDK
-    // Enable auto-installation of Sentry components (sentry-android SDK and okhttp, timber and fragment integrations).
-    // Default is enabled.
     autoInstallation {
       enabled = false
     }
@@ -214,10 +143,10 @@ configurations.all {
 }
 
 dependencies {
-// @generated begin react-native-google-cast-dependencies - expo prebuild (DO NOT MODIFY) sync-3822a3c86222e7aca74039b551612aab7e75365d
+    // @generated begin react-native-google-cast-dependencies
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
-// @generated end react-native-google-cast-dependencies
-    // The version of react-native is set by the React Native Gradle Plugin
+    // @generated end react-native-google-cast-dependencies
+    
     implementation("com.facebook.react:react-android")
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
@@ -225,15 +154,12 @@ dependencies {
     def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
 
     if (isGifEnabled) {
-        // For animated gif support
         implementation("com.facebook.fresco:animated-gif:${expoLibs.versions.fresco.get()}")
     }
 
     if (isWebpEnabled) {
-        // For webp support
         implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
         if (isWebpAnimatedEnabled) {
-            // Animated webp support
             implementation("com.facebook.fresco:animated-webp:${expoLibs.versions.fresco.get()}")
         }
     }
@@ -244,11 +170,12 @@ dependencies {
         implementation jscFlavor
     }
 
-    // Include only FFmpeg decoder AAR to avoid duplicates with Maven Media3
     implementation files("libs/lib-decoder-ffmpeg-release.aar")
-
-    // Google Cast Framework
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
+
+    // --- ADDED: TORRENT ENGINE DEPENDENCIES ---
+    implementation 'com.github.se_bastiaan:TorrentStream:2.5.0'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
 }
 
 def safeExtGet(prop, fallback) {

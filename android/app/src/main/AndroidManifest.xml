@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- EXISTING PERMISSIONS -->
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
@@ -6,6 +7,11 @@
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
   <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+
+  <!-- ADDED FOR TORRENT ENGINE -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -13,6 +19,7 @@
       <data android:scheme="https"/>
     </intent>
   </queries>
+  
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
     <meta-data android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME" android:value="com.reactnative.googlecast.GoogleCastOptionsProvider"/>
     <meta-data android:name="com.reactnative.googlecast.RECEIVER_APPLICATION_ID" android:value="CC1AD845"/>
@@ -25,6 +32,8 @@
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
         <category android:name="android.intent.category.LAUNCHER"/>
+        <!-- Added for Android TV Launcher support -->
+        <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
       </intent-filter>
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>

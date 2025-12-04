@@ -16,6 +16,8 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
+// NO IMPORT NEEDED since TorrentStreamPackage is in the same 'com.nuvio.app' package
+
 class MainApplication : Application(), ReactApplication {
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
@@ -23,8 +25,8 @@ class MainApplication : Application(), ReactApplication {
       object : DefaultReactNativeHost(this) {
         override fun getPackages(): List<ReactPackage> =
             PackageList(this).packages.apply {
-              // Packages that cannot be autolinked yet can be added manually here, for example:
-              // add(MyReactNativePackage())
+              // Packages that cannot be autolinked yet can be added manually here:
+              add(TorrentStreamPackage()) // <--- ADDED THIS LINE
             }
 
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
