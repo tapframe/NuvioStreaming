@@ -254,3 +254,33 @@ dependencies {
 def safeExtGet(prop, fallback) {
     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
+// ... (Your existing plugins at the top)
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+apply plugin: "io.sentry.android.gradle"
+
+// ... (Keep all your existing configuration same until dependencies)
+
+dependencies {
+    // ... (Your existing dependencies)
+
+    // @generated begin react-native-google-cast-dependencies
+    implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
+    // @generated end react-native-google-cast-dependencies
+    
+    implementation("com.facebook.react:react-android")
+
+    // ... (Keep existing fresco/hermes dependencies)
+
+    // Google Cast Framework
+    implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"
+
+    // --- ADD THESE LINES FOR TORRENT SUPPORT ---
+    implementation 'com.github.se_bastiaan:TorrentStream:2.5.0'
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+}
+
+def safeExtGet(prop, fallback) {
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
