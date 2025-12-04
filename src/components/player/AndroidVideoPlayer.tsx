@@ -1,64 +1,11 @@
-import { useTorrentStream } from '../../hooks/useTorrentStream';
-import { View, Text, ActivityIndicator } from 'react-native'; // Ensure these are imported
+// ... existing imports ...
+import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
+// ADD THIS LINE:
+import { useTorrentStream } from '../../hooks/useTorrentStream'; 
 
-**Change B: Use the Hook inside your component**
-Find your component function (e.g., `export default function AndroidVideoPlayer(props) ...`) and modify it like this:
-
-```typescript
-// ... inside your component ...
-
-// 1. REPLACE your existing source/props with our Hook
-// Assuming props.source is what comes from the parent
-const { videoSource, isBuffering, stats } = useTorrentStream(props.source);
-
-// 2. RENDER (This goes where your return (...) is)
-return (
-  <View style={props.style || { flex: 1, backgroundColor: 'black' }}>
-    
-    {/* THE VIDEO PLAYER */}
-    {/* Notice we use videoSource (from hook) instead of props.source */}
-    <Video
-      {...props}       // Keep all your existing props (resizeMode, onLoad, etc)
-      source={videoSource} 
-    />
-
-    {/* 3. ADD THIS OVERLAY: Shows "Downloading..." when buffering */}
-    {isBuffering && (
-      <View style={{
-        position: 'absolute', inset: 0, 
-        justifyContent: 'center', alignItems: 'center', 
-        backgroundColor: 'rgba(0,0,0,0.7)'
-      }}>
-        <ActivityIndicator size="large" color="#a855f7" />
-        <Text style={{ color: 'white', marginTop: 10, fontWeight: 'bold' }}>
-          Finding Peers...
-        </Text>
-        <Text style={{ color: '#ccc', fontSize: 12 }}>
-          {stats.seeds} Seeds found
-        </Text>
-      </View>
-    )}
-
-    {/* OPTIONAL: Show Speed while playing (like Stremio) */}
-    {stats.downloadSpeed > 0 && !isBuffering && (
-      <View style={{
-        position: 'absolute', top: 20, right: 20,
-        backgroundColor: 'rgba(0,0,0,0.5)', padding: 8, borderRadius: 8
-      }}>
-        <Text style={{ color: '#4ade80', fontSize: 10, fontFamily: 'monospace' }}>
-          ⬇ {(stats.downloadSpeed / 1024 / 1024).toFixed(1)} MB/s
-        </Text>
-      </View>
-    )}
-    
-  </View>
-);
-
-### **Summary of what this does:**
-1.  **Intercepts:** When Nuvio tries to play a `magnet:` link, the hook stops it from going to the player immediately.
-2.  **Downloads:** It starts the background C++ engine.
-3.  **Swaps:** Once the first video chunk is on disk, it swaps the `magnet:` URL for a `file://` URL.
-4.  **Plays:** Your Video Player thinks it's just playing a local file, so it works smoothly with zero changes to your UI controls or seek bar.
+import {
+  DEFAULT_SUBTITLE_SIZE,
+// ... rest of imports
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
