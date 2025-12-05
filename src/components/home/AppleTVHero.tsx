@@ -494,6 +494,45 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     thumbnailOpacity.value = withTiming(1, { duration: 500 });
   }, [trailerOpacity, thumbnailOpacity, setTrailerPlaying]);
 
+  //NEW BUTTON HANDLERS:
+
+
+
+  // Add Handle play button press code here ******
+
+
+
+
+  //optimize following save button code not work I not able to recall required code ******
+
+  // Enhanced save handler that combines local library + Trakt watchlist
+    const handleSaveAction = useCallback(async () => {
+    const wasInLibrary = inLibrary;
+
+    // Always toggle local library first
+    toggleLibrary();
+
+    // If authenticated, also toggle Trakt watchlist
+    if (isAuthenticated && onToggleWatchlist) {
+      await onToggleWatchlist();
+    }
+
+    // Show appropriate toast
+    if (isAuthenticated) {
+      if (wasInLibrary) {
+        showTraktRemoved();
+      } else {
+        showTraktSaved();
+      }
+    } else {
+      if (wasInLibrary) {
+        showRemoved();
+      } else {
+        showSaved();
+      }
+    }
+  }, [toggleLibrary, isAuthenticated, onToggleWatchlist, inLibrary, showSaved, showTraktSaved, showRemoved, showTraktRemoved]);
+
   // Handle fullscreen toggle
   const handleFullscreenToggle = useCallback(async () => {
     try {
@@ -993,21 +1032,62 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             </View>
           </View>
 
-          {/* Action Buttons - Always Visible */}
+          {/* Action Buttons - Play and Save buttons */}
           <View style={styles.buttonsContainer}>
-            {/* Info Button */}
+            {/* Play Button */}
             <TouchableOpacity
-              style={styles.playButton}
-              onPress={() => {
-                navigation.navigate('Metadata', {
-                  id: currentItem.id,
-                  type: currentItem.type,
-                });
-              }}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="info-outline" size={28} color="#000" />
-              <Text style={styles.playButtonText}>Info</Text>
+                style={[
+                  playButtonStyle,
+                  isTablet && styles.tabletPlayButton,
+                  additionalButtonCount === 0 ? styles.singleRowPlayButtonFullWidth : styles.primaryActionButton
+                ]}
+                onPress={handleShowStreams}
+                activeOpacity={0.85}
+              >
+                <MaterialIcons
+                  name={(() => {
+                    if (isWatched) {
+                      return type === 'movie' ? 'replay' : 'play-arrow';
+                    }
+                    return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
+                  })()}
+                  size={isTablet ? 28 : 24}
+                  color={isWatched && type === 'movie' ? "#fff" : "#000"}
+                />
+                <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
+            </TouchableOpacity>
+
+            {/* Save Button */}
+            <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.infoButton,
+                  isTablet && styles.tabletInfoButton,
+                  additionalButtonCount === 0 ? styles.singleRowSaveButtonFullWidth : styles.primaryActionButton
+                ]}
+                onPress={handleSaveAction}
+                activeOpacity={0.85}
+              >
+                {Platform.OS === 'ios' ? (
+                  GlassViewComp && liquidGlassAvailable ? (
+                    <GlassViewComp
+                      style={styles.blurBackground}
+                      glassEffectStyle="regular"
+                    />
+                  ) : (
+                    <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+                  )
+                ) : (
+                  <View style={styles.androidFallbackBlur} />
+                )}
+                <MaterialIcons
+                  name={inLibrary ? "bookmark" : "bookmark-outline"}
+                  size={isTablet ? 28 : 24}
+                  color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
+                />
+                <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
+                  {inLibrary ? 'Saved' : 'Save'}
+                </Text>
             </TouchableOpacity>
           </View>
 
@@ -1144,9 +1224,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
-    paddingVertical: 14,
+    paddingVertical: 11,
     paddingHorizontal: 32,
-    borderRadius: 24,
+    borderRadius: 40,
     gap: 8,
     minWidth: 140,
   },
@@ -1154,6 +1234,16 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 18,
     fontWeight: '700',
+  },
+  saveButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   secondaryButton: {
     width: 48,
