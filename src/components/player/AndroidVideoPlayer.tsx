@@ -4081,7 +4081,7 @@ const AndroidVideoPlayer: React.FC = () => {
           transparent
           animationType="fade"
           onRequestClose={handleErrorExit}
-          supportedOrientations={['landscape', 'portrait']}
+          supportedOrientations={['landscape', 'portrait', 'landscape-left', 'landscape-right']}
           statusBarTranslucent={true}
         >
           <View style={{

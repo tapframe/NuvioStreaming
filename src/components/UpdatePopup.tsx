@@ -87,6 +87,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
       animationType="fade"
       statusBarTranslucent={true}
       presentationStyle="overFullScreen"
+      supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
     >
       <View style={styles.overlay}>
         <View style={[
@@ -104,10 +105,10 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
               styles.iconContainer,
               { backgroundColor: `${currentTheme.colors.primary}20` }
             ]}>
-              <MaterialIcons 
-                name="system-update" 
-                size={32} 
-                color={currentTheme.colors.primary} 
+              <MaterialIcons
+                name="system-update"
+                size={32}
+                color={currentTheme.colors.primary}
               />
             </View>
             <Text style={[
@@ -127,10 +128,10 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
           {/* Update Info */}
           <View style={styles.updateInfo}>
             <View style={styles.infoRow}>
-              <MaterialIcons 
-                name="info-outline" 
-                size={16} 
-                color={currentTheme.colors.primary} 
+              <MaterialIcons
+                name="info-outline"
+                size={16}
+                color={currentTheme.colors.primary}
               />
               <Text style={[
                 styles.infoLabel,
@@ -150,7 +151,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                 {updateInfo.manifest?.id || 'Latest'}
               </Text>
             </View>
-            
+
             {!!getReleaseNotes() && (
               <View style={styles.descriptionContainer}>
                 <Text style={[
@@ -194,7 +195,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                 style={[
                   styles.button,
                   styles.secondaryButton,
-                  { 
+                  {
                     backgroundColor: currentTheme.colors.darkBackground || '#2a2a2a',
                     borderColor: currentTheme.colors.elevation3 || '#444444',
                   }
@@ -215,7 +216,7 @@ const UpdatePopup: React.FC<UpdatePopupProps> = ({
                 style={[
                   styles.button,
                   styles.secondaryButton,
-                  { 
+                  {
                     backgroundColor: currentTheme.colors.darkBackground || '#2a2a2a',
                     borderColor: currentTheme.colors.elevation3 || '#444444',
                   }

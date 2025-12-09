@@ -18,9 +18,9 @@ const MajorUpdateOverlay: React.FC<Props> = ({ visible, latestTag, releaseNotes,
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen">
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen" supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}>
       <View style={styles.backdrop}>
-        <View style={[styles.card, { backgroundColor: currentTheme.colors.darkBackground, borderColor: currentTheme.colors.elevation3 }]}>          
+        <View style={[styles.card, { backgroundColor: currentTheme.colors.darkBackground, borderColor: currentTheme.colors.elevation3 }]}>
           <View style={styles.header}>
             <View style={[styles.iconCircle, { backgroundColor: `${currentTheme.colors.primary}22` }]}>
               <MaterialIcons name="new-releases" size={28} color={currentTheme.colors.primary} />

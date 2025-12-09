@@ -86,10 +86,11 @@ export const CustomAlert = ({
         onRequestClose={onClose}
         statusBarTranslucent={true}
         hardwareAccelerated={true}
+        supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
       >
-        <Animated.View 
+        <Animated.View
           style={[
-            styles.overlay, 
+            styles.overlay,
             { backgroundColor: 'rgba(0,0,0,0.6)' },
             overlayStyle
           ]}
