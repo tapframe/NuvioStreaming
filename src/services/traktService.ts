@@ -1213,54 +1213,59 @@ export class TraktService {
    */
   public async getTraktIdFromImdbId(imdbId: string, type: 'movie' | 'show'): Promise<number | null> {
     try {
-      // Clean IMDb ID - remove 'tt' prefix if present
-      const cleanImdbId = imdbId.startsWith('tt') ? imdbId.substring(2) : imdbId;
+      // Ensure IMDb ID has the 'tt' prefix - Trakt API requires it for exact matches
+      const fullImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
 
-      logger.log(`[TraktService] Searching Trakt for ${type} with IMDb ID: ${cleanImdbId}`);
+      logger.log(`[TraktService] Searching Trakt for ${type} with IMDb ID: ${fullImdbId}`);
 
-      // Try multiple search approaches
-      const searchUrls = [
-        `${TRAKT_API_URL}/search/${type === 'show' ? 'show' : type}?id_type=imdb&id=${cleanImdbId}`,
-        `${TRAKT_API_URL}/search/${type === 'show' ? 'show' : type}?query=${encodeURIComponent(cleanImdbId)}&id_type=imdb`,
-        // Also try with the full tt-prefixed ID in case the API accepts it
-        `${TRAKT_API_URL}/search/${type === 'show' ? 'show' : type}?id_type=imdb&id=tt${cleanImdbId}`
-      ];
+      // Use the correct Trakt API endpoint for exact IMDb ID lookup: /search/imdb/{id}
+      // This returns exact matches instead of a general search
+      const searchUrl = `${TRAKT_API_URL}/search/imdb/${fullImdbId}?type=${type}`;
 
-      for (const searchUrl of searchUrls) {
-        try {
-          logger.log(`[TraktService] Trying search URL: ${searchUrl}`);
+      try {
+        logger.log(`[TraktService] Trying search URL: ${searchUrl}`);
 
-          const response = await fetch(searchUrl, {
-            headers: {
-              'Content-Type': 'application/json',
-              'trakt-api-version': '2',
-              'trakt-api-key': TRAKT_CLIENT_ID
-            }
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            logger.warn(`[TraktService] Search attempt failed (${response.status}): ${errorText}`);
-            continue; // Try next URL
+        const response = await fetch(searchUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'trakt-api-version': '2',
+            'trakt-api-key': TRAKT_CLIENT_ID
           }
+        });
 
-          const data = await response.json();
-          logger.log(`[TraktService] Search response data:`, data);
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.warn(`[TraktService] Search attempt failed (${response.status}): ${errorText}`);
+          return null;
+        }
 
-          if (data && data.length > 0) {
-            const traktId = data[0][type === 'show' ? 'show' : type]?.ids?.trakt;
+        const data = await response.json();
+        logger.log(`[TraktService] Search response data:`, data);
+
+        if (data && data.length > 0) {
+          // Find the result that matches our requested type
+          const matchingResult = data.find((item: any) => item.type === type);
+
+          if (matchingResult) {
+            const traktId = matchingResult[type]?.ids?.trakt;
             if (traktId) {
-              logger.log(`[TraktService] Found Trakt ID: ${traktId} for IMDb ID: ${cleanImdbId}`);
+              logger.log(`[TraktService] Found Trakt ID: ${traktId} for IMDb ID: ${fullImdbId}`);
               return traktId;
             }
           }
-        } catch (urlError) {
-          logger.warn(`[TraktService] URL attempt failed:`, urlError);
-          continue;
+
+          // Fallback: try the first result if type filtering didn't work
+          const traktId = data[0][type]?.ids?.trakt;
+          if (traktId) {
+            logger.log(`[TraktService] Found Trakt ID (fallback): ${traktId} for IMDb ID: ${fullImdbId}`);
+            return traktId;
+          }
         }
+      } catch (urlError) {
+        logger.warn(`[TraktService] URL attempt failed:`, urlError);
       }
 
-      logger.warn(`[TraktService] No results found for IMDb ID: ${cleanImdbId} after trying all search methods`);
+      logger.warn(`[TraktService] No results found for IMDb ID: ${fullImdbId}`);
       return null;
     } catch (error) {
       logger.error('[TraktService] Failed to get Trakt ID from IMDb ID:', error);
