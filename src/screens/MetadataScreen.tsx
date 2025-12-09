@@ -84,12 +84,12 @@ const MetadataScreen: React.FC = () => {
   const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string; addonId?: string }>, string>>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { id, type, episodeId, addonId } = route.params;
-  
+
   // Log route parameters for debugging
   React.useEffect(() => {
     console.log('🔍 [MetadataScreen] Route params:', { id, type, episodeId, addonId });
   }, [id, type, episodeId, addonId]);
-  
+
   // Consolidated hooks for better performance
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
@@ -102,7 +102,7 @@ const MetadataScreen: React.FC = () => {
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -110,13 +110,13 @@ const MetadataScreen: React.FC = () => {
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced spacing and padding for production sections
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -242,7 +242,7 @@ const MetadataScreen: React.FC = () => {
     if (!loadingCast) {
       if (cast && cast.length > 0) {
         setPostCastDelayDone(false);
-        const t = setTimeout(() => setPostCastDelayDone(true), 800);
+        const t = setTimeout(() => setPostCastDelayDone(true), 200);
         return () => clearTimeout(t);
       } else {
         // If no cast present, no need to delay
@@ -261,14 +261,14 @@ const MetadataScreen: React.FC = () => {
 
   // Stable logo URI from HeroSection
   const [stableLogoUri, setStableLogoUri] = React.useState<string | null>(null);
-  
+
   // Extract dominant color from hero image for dynamic background
   const heroImageUri = useMemo(() => {
     if (!settings.useDominantBackgroundColor) return null;
     if (!metadata) return null;
     return assetData.bannerImage || metadata.banner || metadata.poster || null;
   }, [settings.useDominantBackgroundColor, metadata, assetData.bannerImage]);
-  
+
   // Preload color extraction as soon as we have the URI
   useEffect(() => {
     if (heroImageUri) {
@@ -277,14 +277,14 @@ const MetadataScreen: React.FC = () => {
       });
     }
   }, [heroImageUri]);
-  
+
   const { dominantColor, loading: colorLoading } = useDominantColor(heroImageUri);
-  
+
   // Create shared values for smooth color interpolation
   const bgFromColor = useSharedValue(currentTheme.colors.darkBackground);
   const bgToColor = useSharedValue(currentTheme.colors.darkBackground);
   const bgProgress = useSharedValue(1);
-  
+
   // Update the shared value when dominant color changes
   const hasAnimatedInitialColorRef = useRef(false);
   useEffect(() => {
@@ -323,7 +323,7 @@ const MetadataScreen: React.FC = () => {
       });
     })();
   }, [dominantColor, currentTheme.colors.darkBackground, settings.useDominantBackgroundColor]);
-  
+
   // Create an animated style for the background color
   const animatedBackgroundStyle = useAnimatedStyle(() => {
     const color = interpolateColor(
@@ -376,7 +376,7 @@ const MetadataScreen: React.FC = () => {
             interactionComplete.current = true;
           });
         }
-      }, 100);
+      }, 50);
 
       return () => {
         setIsScreenFocused(false);
@@ -405,7 +405,7 @@ const MetadataScreen: React.FC = () => {
     if (metadata && isScreenFocused && !shouldLoadSecondaryData) {
       const timer = setTimeout(() => {
         setShouldLoadSecondaryData(true);
-      }, 300);
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [metadata, isScreenFocused, shouldLoadSecondaryData]);
@@ -413,11 +413,11 @@ const MetadataScreen: React.FC = () => {
   // Optimized Trakt progress fetching - only when secondary data should load
   const fetchTraktProgress = useCallback(async () => {
     if (!shouldLoadSecondaryData || !metadata || !id) return;
-    
+
     try {
       const traktService = TraktService.getInstance();
       const isAuthenticated = await traktService.isAuthenticated();
-      
+
       if (!isAuthenticated) {
         if (__DEV__) console.log(`[MetadataScreen] Not authenticated with Trakt`);
         return;
@@ -425,15 +425,15 @@ const MetadataScreen: React.FC = () => {
 
       // Get all playback progress from Trakt (cached)
       const allProgress = await traktService.getPlaybackProgress();
-      
+
       if (allProgress.length === 0) return;
 
       // Filter progress for current content
       let relevantProgress: TraktPlaybackItem[] = [];
-      
+
       if (type === 'movie') {
-        relevantProgress = allProgress.filter(item => 
-          item.type === 'movie' && 
+        relevantProgress = allProgress.filter(item =>
+          item.type === 'movie' &&
           item.movie?.ids.imdb === id.replace('tt', '')
         );
       } else if (Object.keys(groupedEpisodes).length > 0) {
@@ -447,18 +447,18 @@ const MetadataScreen: React.FC = () => {
 
       // Log only essential progress information for performance
       if (__DEV__) console.log(`[MetadataScreen] Found ${relevantProgress.length} Trakt progress items for ${type}`);
-      
+
       // Find most recent progress if multiple episodes
       if (Object.keys(groupedEpisodes).length > 0 && relevantProgress.length > 1) {
-        const mostRecent = relevantProgress.sort((a, b) => 
+        const mostRecent = relevantProgress.sort((a, b) =>
           new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime()
         )[0];
-        
+
         if (mostRecent.episode && mostRecent.show) {
           if (__DEV__) console.log(`[MetadataScreen] Most recent: S${mostRecent.episode.season}E${mostRecent.episode.number} - ${mostRecent.progress.toFixed(1)}%`);
         }
       }
-        
+
     } catch (error) {
       if (__DEV__) console.error(`[MetadataScreen] Failed to fetch Trakt progress:`, error);
     }
@@ -467,7 +467,7 @@ const MetadataScreen: React.FC = () => {
   // Debounced Trakt progress fetching
   useEffect(() => {
     if (shouldLoadSecondaryData && metadata && id) {
-      const timer = setTimeout(fetchTraktProgress, 500);
+      const timer = setTimeout(fetchTraktProgress, 100);
       return () => clearTimeout(timer);
     }
   }, [shouldLoadSecondaryData, metadata, id, fetchTraktProgress]);
@@ -509,9 +509,9 @@ const MetadataScreen: React.FC = () => {
           const usedMB = Math.round(memory.usedJSHeapSize / 1048576);
           const totalMB = Math.round(memory.totalJSHeapSize / 1048576);
           const limitMB = Math.round(memory.jsHeapSizeLimit / 1048576);
-          
+
           if (__DEV__) console.log(`[MetadataScreen] Memory usage: ${usedMB}MB / ${totalMB}MB (limit: ${limitMB}MB)`);
-          
+
           // Trigger cleanup if memory usage is high
           if (usedMB > limitMB * 0.8) {
             if (__DEV__) console.warn(`[MetadataScreen] High memory usage detected (${usedMB}MB), triggering cleanup`);
@@ -522,17 +522,17 @@ const MetadataScreen: React.FC = () => {
           }
         }
       };
-      
+
       // Monitor memory every 10 seconds
       const interval = setInterval(memoryMonitor, 10000);
-      
+
       return () => clearInterval(interval);
     }
   }, []);
 
   // Memoized derived values for performance
   const isReady = useMemo(() => !loading && metadata && !metadataError, [loading, metadata, metadataError]);
-  
+
   // Log readiness state for debugging
   React.useEffect(() => {
     console.log('🔍 [MetadataScreen] Readiness state:', {
@@ -543,7 +543,7 @@ const MetadataScreen: React.FC = () => {
       errorMessage: metadataError
     });
   }, [isReady, loading, metadata, metadataError]);
-  
+
   // Optimized content ready state management
   useEffect(() => {
     if (isReady && isScreenFocused) {
@@ -582,7 +582,7 @@ const MetadataScreen: React.FC = () => {
     const { watchProgress } = watchProgressData;
 
     // Ensure trailer stops immediately before navigating to Streams
-    try { pauseTrailer(); } catch {}
+    try { pauseTrailer(); } catch { }
 
     // Helper to build episodeId from episode object
     const buildEpisodeId = (ep: any): string => {
@@ -627,18 +627,18 @@ const MetadataScreen: React.FC = () => {
           // This ensures we navigate to the next episode even if it's not yet in our episodes array
           const nextEpisodeId = `${id}:${currentSeason}:${currentEpisode + 1}`;
           if (__DEV__) console.log(`[MetadataScreen] Created next episode ID directly: ${nextEpisodeId}`);
-          
+
           // Still try to find the episode in our list to verify it exists
-          const nextEpisodeExists = episodes.some(ep => 
+          const nextEpisodeExists = episodes.some(ep =>
             ep.season_number === currentSeason && ep.episode_number === (currentEpisode + 1)
           );
-          
+
           if (nextEpisodeExists) {
             if (__DEV__) console.log(`[MetadataScreen] Verified next episode S${currentSeason}E${currentEpisode + 1} exists in episodes list`);
           } else {
             if (__DEV__) console.log(`[MetadataScreen] Warning: Next episode S${currentSeason}E${currentEpisode + 1} not found in episodes list, but proceeding anyway`);
           }
-          
+
           targetEpisodeId = nextEpisodeId;
         }
       }
@@ -674,17 +674,17 @@ const MetadataScreen: React.FC = () => {
 
   const handleEpisodeSelect = useCallback((episode: Episode) => {
     if (!isScreenFocused) return;
-    
+
     if (__DEV__) console.log('[MetadataScreen] Selected Episode:', episode.episode_number, episode.season_number);
     const episodeId = episode.stremioId || `${id}:${episode.season_number}:${episode.episode_number}`;
-    
+
     // Optimize navigation with requestAnimationFrame
     requestAnimationFrame(() => {
       // Ensure trailer stops immediately before navigating to Streams
-      try { pauseTrailer(); } catch {}
-      navigation.navigate('Streams', { 
-        id, 
-        type, 
+      try { pauseTrailer(); } catch { }
+      navigation.navigate('Streams', {
+        id,
+        type,
         episodeId,
         episodeThumbnail: episode.still_path || undefined
       });
@@ -696,7 +696,7 @@ const MetadataScreen: React.FC = () => {
       navigation.goBack();
     }
   }, [navigation, isScreenFocused]);
-  
+
   const handleSelectCastMember = useCallback((castMember: any) => {
     if (!isScreenFocused) return;
     setSelectedCastMember(castMember);
@@ -767,9 +767,9 @@ const MetadataScreen: React.FC = () => {
       // Check for HTTP status codes - handle multiple formats
       // Match patterns like: "status code 500", "status": 500, "Request failed with status code 500"
       const statusCodeMatch = error.match(/status code (\d+)/) ||
-                             error.match(/"status":\s*(\d+)/) ||
-                             error.match(/Request failed with status code (\d+)/) ||
-                             error.match(/\b(\d{3})\b/); // Match any 3-digit number (last resort)
+        error.match(/"status":\s*(\d+)/) ||
+        error.match(/Request failed with status code (\d+)/) ||
+        error.match(/\b(\d{3})\b/); // Match any 3-digit number (last resort)
 
       if (statusCodeMatch) {
         const code = parseInt(statusCodeMatch[1]);
@@ -794,17 +794,17 @@ const MetadataScreen: React.FC = () => {
 
       // Check for network/Axios errors
       if (error.includes('Network Error') ||
-          error.includes('ERR_BAD_RESPONSE') ||
-          error.includes('Request failed') ||
-          error.includes('ERR_NETWORK')) {
+        error.includes('ERR_BAD_RESPONSE') ||
+        error.includes('Request failed') ||
+        error.includes('ERR_NETWORK')) {
         return { code: 'NETWORK', message: 'Network error', userMessage: 'Please check your internet connection and try again.' };
       }
 
       // Check for timeout errors
       if (error.includes('timeout') ||
-          error.includes('timed out') ||
-          error.includes('ECONNABORTED') ||
-          error.includes('ETIMEDOUT')) {
+        error.includes('timed out') ||
+        error.includes('ECONNABORTED') ||
+        error.includes('ETIMEDOUT')) {
         return { code: 'TIMEOUT', message: 'Request timeout', userMessage: 'The request took too long. Please try again.' };
       }
 
@@ -911,195 +911,122 @@ const MetadataScreen: React.FC = () => {
 
   return (
     <Animated.View style={[animatedBackgroundStyle, { flex: 1 }]}>
-    <SafeAreaView 
-      style={[containerStyle, styles.container]}
-      edges={[]}
-    >
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
-      
-      {metadata && (
-        <>
-          {/* Floating Header - Optimized */}
-          <FloatingHeader
-            metadata={metadata}
-            logoLoadError={assetData.logoLoadError}
-            handleBack={handleBack}
-            handleToggleLibrary={handleToggleLibrary}
-            headerElementsY={animations.headerElementsY}
-            inLibrary={inLibrary}
-            headerOpacity={animations.headerOpacity}
-            headerElementsOpacity={animations.headerElementsOpacity}
-            safeAreaTop={safeAreaTop}
-            setLogoLoadError={assetData.setLogoLoadError}
-            stableLogoUri={stableLogoUri}
-          />
+      <SafeAreaView
+        style={[containerStyle, styles.container]}
+        edges={[]}
+      >
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" animated />
 
-          <Animated.ScrollView
-            style={styles.scrollView}
-            showsVerticalScrollIndicator={false}
-            onScroll={animations.scrollHandler}
-            scrollEventThrottle={16}
-            bounces={Platform.OS === 'ios'}
-            overScrollMode={Platform.OS === 'android' ? 'always' : 'always'}
-            nestedScrollEnabled
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Hero Section - Optimized */}
-            <HeroSection
+        {metadata && (
+          <>
+            {/* Floating Header - Optimized */}
+            <FloatingHeader
               metadata={metadata}
-              bannerImage={assetData.bannerImage}
-              loadingBanner={assetData.loadingBanner}
-              scrollY={animations.scrollY}
-              heroHeight={animations.heroHeight}
-              heroOpacity={animations.heroOpacity}
-              logoOpacity={animations.logoOpacity}
-              buttonsOpacity={animations.buttonsOpacity}
-              buttonsTranslateY={animations.buttonsTranslateY}
-              watchProgressOpacity={animations.watchProgressOpacity}
-              watchProgressWidth={animations.watchProgressWidth}
-              watchProgress={watchProgressData.watchProgress}
-              onStableLogoUriChange={setStableLogoUri}
-              type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
-              getEpisodeDetails={watchProgressData.getEpisodeDetails}
-              handleShowStreams={handleShowStreams}
-              handleToggleLibrary={handleToggleLibrary}
-              inLibrary={inLibrary}
-              id={id}
-              navigation={navigation}
-              getPlayButtonText={watchProgressData.getPlayButtonText}
-              setBannerImage={assetData.setBannerImage}
-              groupedEpisodes={groupedEpisodes}
-              // Trakt integration props
-              isAuthenticated={isAuthenticated}
-              isInWatchlist={isInWatchlist(id, type as 'movie' | 'show')}
-              isInCollection={isInCollection(id, type as 'movie' | 'show')}
-              onToggleWatchlist={async () => {
-                if (isInWatchlist(id, type as 'movie' | 'show')) {
-                  await removeFromWatchlist(id, type as 'movie' | 'show');
-                } else {
-                  await addToWatchlist(id, type as 'movie' | 'show');
-                }
-              }}
-              onToggleCollection={async () => {
-                if (isInCollection(id, type as 'movie' | 'show')) {
-                  await removeFromCollection(id, type as 'movie' | 'show');
-                } else {
-                  await addToCollection(id, type as 'movie' | 'show');
-                }
-              }}
-              dynamicBackgroundColor={dynamicBackgroundColor}
+              logoLoadError={assetData.logoLoadError}
               handleBack={handleBack}
-              tmdbId={tmdbId}
+              handleToggleLibrary={handleToggleLibrary}
+              headerElementsY={animations.headerElementsY}
+              inLibrary={inLibrary}
+              headerOpacity={animations.headerOpacity}
+              headerElementsOpacity={animations.headerElementsOpacity}
+              safeAreaTop={safeAreaTop}
+              setLogoLoadError={assetData.setLogoLoadError}
+              stableLogoUri={stableLogoUri}
             />
 
-            {/* Main Content - Optimized */}
-            <Animated.View style={contentStyle}>
-              <MetadataDetails 
+            <Animated.ScrollView
+              style={styles.scrollView}
+              showsVerticalScrollIndicator={false}
+              onScroll={animations.scrollHandler}
+              scrollEventThrottle={16}
+              bounces={Platform.OS === 'ios'}
+              overScrollMode={Platform.OS === 'android' ? 'always' : 'always'}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.scrollContent}
+            >
+              {/* Hero Section - Optimized */}
+              <HeroSection
                 metadata={metadata}
-                imdbId={imdbId}
+                bannerImage={assetData.bannerImage}
+                loadingBanner={assetData.loadingBanner}
+                scrollY={animations.scrollY}
+                heroHeight={animations.heroHeight}
+                heroOpacity={animations.heroOpacity}
+                logoOpacity={animations.logoOpacity}
+                buttonsOpacity={animations.buttonsOpacity}
+                buttonsTranslateY={animations.buttonsTranslateY}
+                watchProgressOpacity={animations.watchProgressOpacity}
+                watchProgressWidth={animations.watchProgressWidth}
+                watchProgress={watchProgressData.watchProgress}
+                onStableLogoUriChange={setStableLogoUri}
                 type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
-                contentId={id}
-                loadingMetadata={false}
-                renderRatings={() => imdbId && shouldLoadSecondaryData ? (
-                  <MemoizedRatingsSection imdbId={imdbId} type={Object.keys(groupedEpisodes).length > 0 ? 'show' : 'movie'} />
-                ) : null}
+                getEpisodeDetails={watchProgressData.getEpisodeDetails}
+                handleShowStreams={handleShowStreams}
+                handleToggleLibrary={handleToggleLibrary}
+                inLibrary={inLibrary}
+                id={id}
+                navigation={navigation}
+                getPlayButtonText={watchProgressData.getPlayButtonText}
+                setBannerImage={assetData.setBannerImage}
+                groupedEpisodes={groupedEpisodes}
+                // Trakt integration props
+                isAuthenticated={isAuthenticated}
+                isInWatchlist={isInWatchlist(id, type as 'movie' | 'show')}
+                isInCollection={isInCollection(id, type as 'movie' | 'show')}
+                onToggleWatchlist={async () => {
+                  if (isInWatchlist(id, type as 'movie' | 'show')) {
+                    await removeFromWatchlist(id, type as 'movie' | 'show');
+                  } else {
+                    await addToWatchlist(id, type as 'movie' | 'show');
+                  }
+                }}
+                onToggleCollection={async () => {
+                  if (isInCollection(id, type as 'movie' | 'show')) {
+                    await removeFromCollection(id, type as 'movie' | 'show');
+                  } else {
+                    await addToCollection(id, type as 'movie' | 'show');
+                  }
+                }}
+                dynamicBackgroundColor={dynamicBackgroundColor}
+                handleBack={handleBack}
+                tmdbId={tmdbId}
               />
 
-              {/* Production info row — shown below description and above cast for series */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.networks && metadata.networks.length > 0 && metadata?.description && (
-                <Animated.View style={[
-                  styles.productionContainer, 
-                  networkSectionAnimatedStyle,
-                  { paddingHorizontal: horizontalPadding }
-                ]}>
-                  <Text style={[
-                    styles.productionHeader,
-                    {
-                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
-                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-                    }
-                  ]}>Network</Text>
-                  <View style={[
-                    styles.productionRow,
-                    {
-                      gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
-                    }
-                  ]}>
-                    {metadata.networks.slice(0, 6).map((net) => (
-                      <View key={String(net.id || net.name)} style={[
-                        styles.productionChip,
-                        {
-                          paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                          paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
-                          minHeight: isTV ? 48 : isLargeTablet ? 44 : isTablet ? 40 : 36,
-                          borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-                        }
-                      ]}>
-                        {net.logo ? (
-                          <FastImage
-                            source={{ uri: net.logo }}
-                            style={[
-                              styles.productionLogo,
-                              {
-                                width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 64,
-                                height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
-                              }
-                            ]}
-                            resizeMode={FastImage.resizeMode.contain}
-                          />
-                        ) : (
-                          <Text style={[
-                            styles.productionText,
-                            {
-                              fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12
-                            }
-                          ]}>{net.name}</Text>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                </Animated.View>
-              )}
-
-              {/* Cast Section with skeleton when loading - Lazy loaded */}
-              {shouldLoadSecondaryData && (
-                <MemoizedCastSection
-                  cast={cast}
-                  loadingCast={loadingCast}
-                  onSelectCastMember={handleSelectCastMember}
-                  isTmdbEnrichmentEnabled={settings.enrichMetadataWithTMDB}
+              {/* Main Content - Optimized */}
+              <Animated.View style={contentStyle}>
+                <MetadataDetails
+                  metadata={metadata}
+                  imdbId={imdbId}
+                  type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
+                  contentId={id}
+                  loadingMetadata={false}
+                  renderRatings={() => imdbId && shouldLoadSecondaryData ? (
+                    <MemoizedRatingsSection imdbId={imdbId} type={Object.keys(groupedEpisodes).length > 0 ? 'show' : 'movie'} />
+                  ) : null}
                 />
-              )}
 
-              {/* Production info row — only render companies with logos */}
-              {shouldLoadSecondaryData &&
-                Object.keys(groupedEpisodes).length === 0 &&
-                metadata?.networks && Array.isArray(metadata.networks) &&
-                metadata.networks.some((n: any) => !!n?.logo) &&
-                metadata?.description && (
-                <Animated.View style={[
-                  styles.productionContainer, 
-                  productionSectionAnimatedStyle,
-                  { paddingHorizontal: horizontalPadding }
-                ]}>
-                  <Text style={[
-                    styles.productionHeader,
-                    {
-                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
-                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-                    }
-                  ]}>Production</Text>
-                  <View style={[
-                    styles.productionRow,
-                    {
-                      gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
-                    }
+                {/* Production info row — shown below description and above cast for series */}
+                {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.networks && metadata.networks.length > 0 && metadata?.description && (
+                  <Animated.View style={[
+                    styles.productionContainer,
+                    networkSectionAnimatedStyle,
+                    { paddingHorizontal: horizontalPadding }
                   ]}>
-                    {metadata.networks
-                      .filter((net: any) => !!net?.logo)
-                      .slice(0, 6)
-                      .map((net: any) => (
+                    <Text style={[
+                      styles.productionHeader,
+                      {
+                        fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                        marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                      }
+                    ]}>Network</Text>
+                    <View style={[
+                      styles.productionRow,
+                      {
+                        gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+                      }
+                    ]}>
+                      {metadata.networks.slice(0, 6).map((net) => (
                         <View key={String(net.id || net.name)} style={[
                           styles.productionChip,
                           {
@@ -1109,315 +1036,388 @@ const MetadataScreen: React.FC = () => {
                             borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
                           }
                         ]}>
-                          <FastImage
-                            source={{ uri: net.logo }}
-                            style={[
-                              styles.productionLogo,
+                          {net.logo ? (
+                            <FastImage
+                              source={{ uri: net.logo }}
+                              style={[
+                                styles.productionLogo,
+                                {
+                                  width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 64,
+                                  height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
+                                }
+                              ]}
+                              resizeMode={FastImage.resizeMode.contain}
+                            />
+                          ) : (
+                            <Text style={[
+                              styles.productionText,
                               {
-                                width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 64,
-                                height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
+                                fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12
                               }
-                            ]}
-                            resizeMode={FastImage.resizeMode.contain}
-                          />
+                            ]}>{net.name}</Text>
+                          )}
                         </View>
                       ))}
+                    </View>
+                  </Animated.View>
+                )}
+
+                {/* Cast Section with skeleton when loading - Lazy loaded */}
+                {shouldLoadSecondaryData && (
+                  <MemoizedCastSection
+                    cast={cast}
+                    loadingCast={loadingCast}
+                    onSelectCastMember={handleSelectCastMember}
+                    isTmdbEnrichmentEnabled={settings.enrichMetadataWithTMDB}
+                  />
+                )}
+
+                {/* Production info row — only render companies with logos */}
+                {shouldLoadSecondaryData &&
+                  Object.keys(groupedEpisodes).length === 0 &&
+                  metadata?.networks && Array.isArray(metadata.networks) &&
+                  metadata.networks.some((n: any) => !!n?.logo) &&
+                  metadata?.description && (
+                    <Animated.View style={[
+                      styles.productionContainer,
+                      productionSectionAnimatedStyle,
+                      { paddingHorizontal: horizontalPadding }
+                    ]}>
+                      <Text style={[
+                        styles.productionHeader,
+                        {
+                          fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                          marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                        }
+                      ]}>Production</Text>
+                      <View style={[
+                        styles.productionRow,
+                        {
+                          gap: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8
+                        }
+                      ]}>
+                        {metadata.networks
+                          .filter((net: any) => !!net?.logo)
+                          .slice(0, 6)
+                          .map((net: any) => (
+                            <View key={String(net.id || net.name)} style={[
+                              styles.productionChip,
+                              {
+                                paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                                paddingHorizontal: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
+                                minHeight: isTV ? 48 : isLargeTablet ? 44 : isTablet ? 40 : 36,
+                                borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                              }
+                            ]}>
+                              <FastImage
+                                source={{ uri: net.logo }}
+                                style={[
+                                  styles.productionLogo,
+                                  {
+                                    width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 64,
+                                    height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
+                                  }
+                                ]}
+                                resizeMode={FastImage.resizeMode.contain}
+                              />
+                            </View>
+                          ))}
+                      </View>
+                    </Animated.View>
+                  )}
+
+                {/* Trailers Section - Lazy loaded */}
+                {shouldLoadSecondaryData && tmdbId && settings.enrichMetadataWithTMDB && (
+                  <TrailersSection
+                    tmdbId={tmdbId}
+                    type={Object.keys(groupedEpisodes).length > 0 ? 'tv' : 'movie'}
+                    contentId={id}
+                    contentTitle={metadata?.name || (metadata as any)?.title || 'Unknown'}
+                  />
+                )}
+
+                {/* Comments Section - Lazy loaded */}
+                {shouldLoadSecondaryData && imdbId && (
+                  <MemoizedCommentsSection
+                    imdbId={imdbId}
+                    type={Object.keys(groupedEpisodes).length > 0 ? 'show' : 'movie'}
+                    onCommentPress={handleCommentPress}
+                  />
+                )}
+
+                {/* Movie Details section - shown above recommendations for movies when TMDB enrichment is ON */}
+                {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.movieDetails && (
+                  <View style={[
+                    styles.tvDetailsContainer,
+                    { paddingHorizontal: horizontalPadding }
+                  ]}>
+                    <Text style={[
+                      styles.tvDetailsHeader,
+                      {
+                        fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                        marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                      }
+                    ]}>Movie Details</Text>
+
+                    {metadata.movieDetails.tagline && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Tagline</Text>
+                        <Text style={[styles.tvDetailValue, { fontStyle: 'italic', fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          "{metadata.movieDetails.tagline}"
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.status && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.status}</Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.releaseDate && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Release Date</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {new Date(metadata.movieDetails.releaseDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.runtime && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Runtime</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {Math.floor(metadata.movieDetails.runtime / 60)}h {metadata.movieDetails.runtime % 60}m
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.budget && metadata.movieDetails.budget > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Budget</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          ${metadata.movieDetails.budget.toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.revenue && metadata.movieDetails.revenue > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Revenue</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          ${metadata.movieDetails.revenue.toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.originCountry && metadata.movieDetails.originCountry.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originCountry.join(', ')}</Text>
+                      </View>
+                    )}
+
+                    {metadata.movieDetails.originalLanguage && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originalLanguage.toUpperCase()}</Text>
+                      </View>
+                    )}
                   </View>
-                </Animated.View>
-              )}
+                )}
 
-              {/* Trailers Section - Lazy loaded */}
-              {shouldLoadSecondaryData && tmdbId && settings.enrichMetadataWithTMDB && (
-                <TrailersSection
-                  tmdbId={tmdbId}
-                  type={Object.keys(groupedEpisodes).length > 0 ? 'tv' : 'movie'}
-                  contentId={id}
-                  contentTitle={metadata?.name || (metadata as any)?.title || 'Unknown'}
-                />
-              )}
+                {/* Backdrop Gallery section - shown after movie details for movies when TMDB ID is available and enrichment is enabled */}
+                {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
+                  <View style={styles.backdropGalleryContainer}>
+                    <TouchableOpacity
+                      style={styles.backdropGalleryButton}
+                      onPress={() => navigation.navigate('BackdropGallery' as any, {
+                        tmdbId: metadata.tmdbId,
+                        type: 'movie',
+                        title: metadata.name || 'Gallery'
+                      })}
+                    >
+                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                      <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-              {/* Comments Section - Lazy loaded */}
-              {shouldLoadSecondaryData && imdbId && (
-                <MemoizedCommentsSection
-                  imdbId={imdbId}
-                  type={Object.keys(groupedEpisodes).length > 0 ? 'show' : 'movie'}
-                  onCommentPress={handleCommentPress}
-                />
-              )}
-
-              {/* Movie Details section - shown above recommendations for movies when TMDB enrichment is ON */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.movieDetails && (
-                <View style={[
-                  styles.tvDetailsContainer,
-                  { paddingHorizontal: horizontalPadding }
-                ]}>
-                  <Text style={[
-                    styles.tvDetailsHeader,
-                    {
-                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
-                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-                    }
-                  ]}>Movie Details</Text>
-
-                  {metadata.movieDetails.tagline && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Tagline</Text>
-                      <Text style={[styles.tvDetailValue, { fontStyle: 'italic', fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        "{metadata.movieDetails.tagline}"
-                      </Text>
-                    </View>
+                {/* Collection Section - Lazy loaded */}
+                {shouldLoadSecondaryData &&
+                  Object.keys(groupedEpisodes).length === 0 &&
+                  metadata?.collection &&
+                  settings.enrichMetadataWithTMDB && (
+                    <CollectionSection
+                      collectionName={metadata.collection.name}
+                      collectionMovies={collectionMovies}
+                      loadingCollection={loadingCollection}
+                    />
                   )}
 
-                  {metadata.movieDetails.status && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.status}</Text>
-                    </View>
-                  )}
+                {/* Series/Movie Content with episode skeleton when loading */}
+                {Object.keys(groupedEpisodes).length > 0 ? (
+                  <MemoizedSeriesContent
+                    episodes={Object.values(groupedEpisodes).flat()}
+                    selectedSeason={selectedSeason}
+                    loadingSeasons={loadingSeasons}
+                    onSeasonChange={handleSeasonChangeWithHaptics}
+                    onSelectEpisode={handleEpisodeSelect}
+                    groupedEpisodes={groupedEpisodes}
+                    metadata={metadata || undefined}
+                  />
+                ) : (
+                  metadata && <MemoizedMovieContent metadata={metadata} />
+                )}
 
-                  {metadata.movieDetails.releaseDate && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Release Date</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        {new Date(metadata.movieDetails.releaseDate).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </Text>
-                    </View>
-                  )}
+                {/* TV Details section - shown after episodes for series when TMDB enrichment is ON */}
+                {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tvDetails && (
+                  <View style={[
+                    styles.tvDetailsContainer,
+                    { paddingHorizontal: horizontalPadding }
+                  ]}>
+                    <Text style={[
+                      styles.tvDetailsHeader,
+                      {
+                        fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
+                        marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
+                      }
+                    ]}>Show Details</Text>
 
-                  {metadata.movieDetails.runtime && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Runtime</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        {Math.floor(metadata.movieDetails.runtime / 60)}h {metadata.movieDetails.runtime % 60}m
-                      </Text>
-                    </View>
-                  )}
+                    {metadata.tvDetails.status && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.status}</Text>
+                      </View>
+                    )}
 
-                  {metadata.movieDetails.budget && metadata.movieDetails.budget > 0 && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Budget</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        ${metadata.movieDetails.budget.toLocaleString()}
-                      </Text>
-                    </View>
-                  )}
+                    {metadata.tvDetails.firstAirDate && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>First Air Date</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {new Date(metadata.tvDetails.firstAirDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    )}
 
-                  {metadata.movieDetails.revenue && metadata.movieDetails.revenue > 0 && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Revenue</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        ${metadata.movieDetails.revenue.toLocaleString()}
-                      </Text>
-                    </View>
-                  )}
+                    {metadata.tvDetails.lastAirDate && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Last Air Date</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {new Date(metadata.tvDetails.lastAirDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    )}
 
-                  {metadata.movieDetails.originCountry && metadata.movieDetails.originCountry.length > 0 && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originCountry.join(', ')}</Text>
-                    </View>
-                  )}
+                    {metadata.tvDetails.numberOfSeasons && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Seasons</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfSeasons}</Text>
+                      </View>
+                    )}
 
-                  {metadata.movieDetails.originalLanguage && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originalLanguage.toUpperCase()}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
+                    {metadata.tvDetails.numberOfEpisodes && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Total Episodes</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfEpisodes}</Text>
+                      </View>
+                    )}
 
-              {/* Backdrop Gallery section - shown after movie details for movies when TMDB ID is available and enrichment is enabled */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length === 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
-                <View style={styles.backdropGalleryContainer}>
-                  <TouchableOpacity
-                    style={styles.backdropGalleryButton}
-                    onPress={() => navigation.navigate('BackdropGallery' as any, {
-                      tmdbId: metadata.tmdbId,
-                      type: 'movie',
-                      title: metadata.name || 'Gallery'
-                    })}
-                  >
-                    <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
-                    <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
-                  </TouchableOpacity>
-                </View>
-              )}
+                    {metadata.tvDetails.episodeRunTime && metadata.tvDetails.episodeRunTime.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Episode Runtime</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {metadata.tvDetails.episodeRunTime.join(' - ')} min
+                        </Text>
+                      </View>
+                    )}
 
-              {/* Collection Section - Lazy loaded */}
-              {shouldLoadSecondaryData && 
-                Object.keys(groupedEpisodes).length === 0 && 
-                metadata?.collection && 
-                settings.enrichMetadataWithTMDB && (
-                <CollectionSection
-                  collectionName={metadata.collection.name}
-                  collectionMovies={collectionMovies}
-                  loadingCollection={loadingCollection}
-                />
-              )}
+                    {metadata.tvDetails.originCountry && metadata.tvDetails.originCountry.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originCountry.join(', ')}</Text>
+                      </View>
+                    )}
 
-              {/* Series/Movie Content with episode skeleton when loading */}
-              {Object.keys(groupedEpisodes).length > 0 ? (
-                <MemoizedSeriesContent
-                  episodes={Object.values(groupedEpisodes).flat()}
-                  selectedSeason={selectedSeason}
-                  loadingSeasons={loadingSeasons}
-                  onSeasonChange={handleSeasonChangeWithHaptics}
-                  onSelectEpisode={handleEpisodeSelect}
-                  groupedEpisodes={groupedEpisodes}
-                  metadata={metadata || undefined}
-                />
-              ) : (
-                metadata && <MemoizedMovieContent metadata={metadata} />
-              )}
+                    {metadata.tvDetails.originalLanguage && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originalLanguage.toUpperCase()}</Text>
+                      </View>
+                    )}
 
-              {/* TV Details section - shown after episodes for series when TMDB enrichment is ON */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tvDetails && (
-                <View style={[
-                  styles.tvDetailsContainer,
-                  { paddingHorizontal: horizontalPadding }
-                ]}>
-                  <Text style={[
-                    styles.tvDetailsHeader,
-                    {
-                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
-                      marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
-                    }
-                  ]}>Show Details</Text>
+                    {metadata.tvDetails.createdBy && metadata.tvDetails.createdBy.length > 0 && (
+                      <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Created By</Text>
+                        <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
+                          {metadata.tvDetails.createdBy.map(creator => creator.name).join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
 
-                  {metadata.tvDetails.status && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.status}</Text>
-                    </View>
-                  )}
+                {/* Backdrop Gallery section - shown after show details for TV shows when TMDB ID is available and enrichment is enabled */}
+                {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
+                  <View style={styles.backdropGalleryContainer}>
+                    <TouchableOpacity
+                      style={styles.backdropGalleryButton}
+                      onPress={() => navigation.navigate('BackdropGallery' as any, {
+                        tmdbId: metadata.tmdbId,
+                        type: 'tv',
+                        title: metadata.name || 'Gallery'
+                      })}
+                    >
+                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                      <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-                  {metadata.tvDetails.firstAirDate && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>First Air Date</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        {new Date(metadata.tvDetails.firstAirDate).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </Text>
-                    </View>
-                  )}
+                {/* Recommendations Section with skeleton when loading - Shown at bottom for shows */}
+                {shouldLoadSecondaryData && (
+                  <MemoizedMoreLikeThisSection
+                    recommendations={recommendations}
+                    loadingRecommendations={loadingRecommendations}
+                  />
+                )}
+              </Animated.View>
+            </Animated.ScrollView>
+          </>
+        )}
 
-                  {metadata.tvDetails.lastAirDate && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Last Air Date</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        {new Date(metadata.tvDetails.lastAirDate).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </Text>
-                    </View>
-                  )}
+        {/* Cast Details Modal - Memoized */}
+        {showCastModal && (
+          <MemoizedCastDetailsModal
+            visible={showCastModal}
+            onClose={() => setShowCastModal(false)}
+            castMember={selectedCastMember}
+          />
+        )}
 
-                  {metadata.tvDetails.numberOfSeasons && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Seasons</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfSeasons}</Text>
-                    </View>
-                  )}
-
-                  {metadata.tvDetails.numberOfEpisodes && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Total Episodes</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfEpisodes}</Text>
-                    </View>
-                  )}
-
-                  {metadata.tvDetails.episodeRunTime && metadata.tvDetails.episodeRunTime.length > 0 && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Episode Runtime</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        {metadata.tvDetails.episodeRunTime.join(' - ')} min
-                      </Text>
-                    </View>
-                  )}
-
-                  {metadata.tvDetails.originCountry && metadata.tvDetails.originCountry.length > 0 && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originCountry.join(', ')}</Text>
-                    </View>
-                  )}
-
-                  {metadata.tvDetails.originalLanguage && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originalLanguage.toUpperCase()}</Text>
-                    </View>
-                  )}
-
-                  {metadata.tvDetails.createdBy && metadata.tvDetails.createdBy.length > 0 && (
-                    <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                      <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Created By</Text>
-                      <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
-                        {metadata.tvDetails.createdBy.map(creator => creator.name).join(', ')}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Backdrop Gallery section - shown after show details for TV shows when TMDB ID is available and enrichment is enabled */}
-              {shouldLoadSecondaryData && Object.keys(groupedEpisodes).length > 0 && metadata?.tmdbId && settings.enrichMetadataWithTMDB && (
-                <View style={styles.backdropGalleryContainer}>
-                  <TouchableOpacity
-                    style={styles.backdropGalleryButton}
-                    onPress={() => navigation.navigate('BackdropGallery' as any, {
-                      tmdbId: metadata.tmdbId,
-                      type: 'tv',
-                      title: metadata.name || 'Gallery'
-                    })}
-                  >
-                    <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
-                    <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* Recommendations Section with skeleton when loading - Shown at bottom for shows */}
-              {shouldLoadSecondaryData && (
-                <MemoizedMoreLikeThisSection
-                  recommendations={recommendations}
-                  loadingRecommendations={loadingRecommendations}
-                />
-              )}
-            </Animated.View>
-          </Animated.ScrollView>
-        </>
-      )}
-      
-      {/* Cast Details Modal - Memoized */}
-      {showCastModal && (
-        <MemoizedCastDetailsModal
-          visible={showCastModal}
-          onClose={() => setShowCastModal(false)}
-          castMember={selectedCastMember}
+        {/* Comment Bottom Sheet - Memoized */}
+        <CommentBottomSheet
+          comment={selectedComment}
+          visible={commentBottomSheetVisible}
+          onClose={handleCommentBottomSheetClose}
+          theme={currentTheme}
+          isSpoilerRevealed={selectedComment ? revealedSpoilers.has(selectedComment.id.toString()) : false}
+          onSpoilerPress={() => selectedComment && handleSpoilerPress(selectedComment)}
         />
-      )}
-
-      {/* Comment Bottom Sheet - Memoized */}
-      <CommentBottomSheet
-        comment={selectedComment}
-        visible={commentBottomSheetVisible}
-        onClose={handleCommentBottomSheetClose}
-        theme={currentTheme}
-        isSpoilerRevealed={selectedComment ? revealedSpoilers.has(selectedComment.id.toString()) : false}
-        onSpoilerPress={() => selectedComment && handleSpoilerPress(selectedComment)}
-      />
-    </SafeAreaView>
+      </SafeAreaView>
     </Animated.View>
   );
 };
