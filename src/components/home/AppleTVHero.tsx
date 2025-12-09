@@ -569,6 +569,33 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     );
   }, [currentIndex, setTrailerPlaying, trailerOpacity, thumbnailOpacity]);
 
+  // Preload next and previous images for instant swiping
+  useEffect(() => {
+    if (items.length <= 1) return;
+
+    const prevIdx = (currentIndex - 1 + items.length) % items.length;
+    const nextIdx = (currentIndex + 1) % items.length;
+
+    const prevItem = items[prevIdx];
+    const nextItem = items[nextIdx];
+
+    const urlsToPreload: { uri: string }[] = [];
+
+    if (prevItem) {
+      const url = prevItem.banner || prevItem.poster;
+      if (url) urlsToPreload.push({ uri: url });
+    }
+
+    if (nextItem) {
+      const url = nextItem.banner || nextItem.poster;
+      if (url) urlsToPreload.push({ uri: url });
+    }
+
+    if (urlsToPreload.length > 0) {
+      FastImage.preload(urlsToPreload);
+    }
+  }, [currentIndex, items]);
+
   // Callback for updating interaction time
   const updateInteractionTime = useCallback(() => {
     lastInteractionRef.current = Date.now();

@@ -226,7 +226,7 @@ class CatalogService {
       if (storedLibrary) {
         const parsedLibrary = JSON.parse(storedLibrary);
         logger.log(`[CatalogService] Raw library data type: ${Array.isArray(parsedLibrary) ? 'ARRAY' : 'OBJECT'}, keys: ${JSON.stringify(Object.keys(parsedLibrary).slice(0, 5))}`);
-        
+
         // Convert array format to object format if needed
         if (Array.isArray(parsedLibrary)) {
           logger.log(`[CatalogService] WARNING: Library is stored as ARRAY format. Converting to OBJECT format.`);
@@ -270,12 +270,12 @@ class CatalogService {
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:stremio-library`;
       const libraryData = JSON.stringify(this.library);
-      
+
       logger.log(`[CatalogService] Saving library with ${itemCount} items to scope: "${scope}" (key: ${scopedKey})`);
-      
+
       await mmkvStorage.setItem(scopedKey, libraryData);
       await mmkvStorage.setItem(this.LEGACY_LIBRARY_KEY, libraryData);
-      
+
       logger.log(`[CatalogService] Library saved successfully with ${itemCount} items`);
     } catch (error: any) {
       logger.error('Failed to save library:', error);
@@ -323,17 +323,16 @@ class CatalogService {
     };
   }
 
-  async getHomeCatalogs(): Promise<CatalogContent[]> {
+  async getHomeCatalogs(limitIds?: string[]): Promise<CatalogContent[]> {
     const addons = await this.getAllAddons();
-    
+
     // Load enabled/disabled settings
     const catalogSettingsJson = await mmkvStorage.getItem(CATALOG_SETTINGS_KEY);
     const catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
 
-    // Create an array of promises for all catalog fetches
-    const catalogPromises: Promise<CatalogContent | null>[] = [];
+    // Collect all potential catalogs first
+    const potentialCatalogs: { addon: StreamingAddon; catalog: any }[] = [];
 
-    // Process addons in order (they're already returned in order from getAllAddons)
     for (const addon of addons) {
       if (addon.catalogs) {
         for (const catalog of addon.catalogs) {
@@ -341,70 +340,84 @@ class CatalogService {
           const isEnabled = catalogSettings[settingKey] ?? true;
 
           if (isEnabled) {
-            // Create a promise for each catalog fetch
-            const catalogPromise = (async () => {
-              try {
-                // Hoist manifest list retrieval and find once
-                const addonManifests = await stremioService.getInstalledAddonsAsync();
-                const manifest = addonManifests.find(a => a.id === addon.id);
-                if (!manifest) return null;
-
-                const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
-                if (metas && metas.length > 0) {
-                  // Cap items per catalog to reduce memory and rendering load
-                  const limited = metas.slice(0, 12);
-                  const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
-                  
-                  // Get potentially custom display name; if customized, respect it as-is
-                  const originalName = catalog.name || catalog.id;
-                  let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
-                  const isCustom = displayName !== originalName;
-
-                  if (!isCustom) {
-                    // Remove duplicate words and clean up the name (case-insensitive)
-                    const words = displayName.split(' ');
-                    const uniqueWords: string[] = [];
-                    const seenWords = new Set<string>();
-                    for (const word of words) {
-                      const lowerWord = word.toLowerCase();
-                      if (!seenWords.has(lowerWord)) {
-                        uniqueWords.push(word);
-                        seenWords.add(lowerWord);
-                      }
-                    }
-                    displayName = uniqueWords.join(' ');
-
-                    // Add content type if not present
-                    const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
-                    if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
-                      displayName = `${displayName} ${contentType}`;
-                    }
-                  }
-                  
-                  return {
-                    addon: addon.id,
-                    type: catalog.type,
-                    id: catalog.id,
-                    name: displayName,
-                    items
-                  };
-                }
-                return null;
-              } catch (error) {
-                logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
-                return null;
-              }
-            })();
-            
-            catalogPromises.push(catalogPromise);
+            potentialCatalogs.push({ addon, catalog });
           }
         }
       }
     }
 
-    // Wait for all catalog fetch promises to resolve in parallel
+    // Determine which catalogs to actually fetch
+    let catalogsToFetch: { addon: StreamingAddon; catalog: any }[] = [];
+
+    if (limitIds && limitIds.length > 0) {
+      // User selected specific catalogs - strict filtering
+      catalogsToFetch = potentialCatalogs.filter(item => {
+        const catalogId = `${item.addon.id}:${item.catalog.type}:${item.catalog.id}`;
+        return limitIds.includes(catalogId);
+      });
+    } else {
+      // "All" mode - Smart Sample: Pick 5 random catalogs to avoid waterfall
+      catalogsToFetch = potentialCatalogs.sort(() => 0.5 - Math.random()).slice(0, 5);
+    }
+
+    // Create promises for the selected catalogs
+    const catalogPromises = catalogsToFetch.map(async ({ addon, catalog }) => {
+      try {
+        // Hoist manifest list retrieval and find once
+        const addonManifests = await stremioService.getInstalledAddonsAsync();
+        const manifest = addonManifests.find(a => a.id === addon.id);
+        if (!manifest) return null;
+
+        const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
+        if (metas && metas.length > 0) {
+          // Cap items per catalog to reduce memory and rendering load
+          const limited = metas.slice(0, 12);
+          const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
+
+          // Get potentially custom display name; if customized, respect it as-is
+          const originalName = catalog.name || catalog.id;
+          let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
+          const isCustom = displayName !== originalName;
+
+          if (!isCustom) {
+            // Remove duplicate words and clean up the name (case-insensitive)
+            const words = displayName.split(' ');
+            const uniqueWords: string[] = [];
+            const seenWords = new Set<string>();
+            for (const word of words) {
+              const lowerWord = word.toLowerCase();
+              if (!seenWords.has(lowerWord)) {
+                uniqueWords.push(word);
+                seenWords.add(lowerWord);
+              }
+            }
+            displayName = uniqueWords.join(' ');
+
+            // Add content type if not present
+            const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+            if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
+              displayName = `${displayName} ${contentType}`;
+            }
+          }
+
+          return {
+            addon: addon.id,
+            type: catalog.type,
+            id: catalog.id,
+            name: displayName,
+            items
+          };
+        }
+        return null;
+      } catch (error) {
+        logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
+        return null;
+      }
+    });
+
+    // Wait for all selected catalog fetch promises to resolve in parallel
     const catalogResults = await Promise.all(catalogPromises);
-    
+
     // Filter out null results
     return catalogResults.filter(catalog => catalog !== null) as CatalogContent[];
   }
@@ -412,16 +425,16 @@ class CatalogService {
   async getCatalogByType(type: string, genreFilter?: string): Promise<CatalogContent[]> {
     // Get the data source preference (default to Stremio addons)
     const dataSourcePreference = await this.getDataSourcePreference();
-    
+
     // If TMDB is selected as the data source, use TMDB API
     if (dataSourcePreference === DataSource.TMDB) {
       return this.getCatalogByTypeFromTMDB(type, genreFilter);
     }
-    
+
     // Otherwise use the original Stremio addons method
     const addons = await this.getAllAddons();
-    
-    const typeAddons = addons.filter(addon => 
+
+    const typeAddons = addons.filter(addon =>
       addon.catalogs && addon.catalogs.some(catalog => catalog.type === type)
     );
 
@@ -440,13 +453,13 @@ class CatalogService {
 
             const filters = genreFilter ? [{ title: 'genre', value: genreFilter }] : [];
             const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
-            
+
             if (metas && metas.length > 0) {
               const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
-              
+
               // Get potentially custom display name
               const displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
-              
+
               return {
                 addon: addon.id,
                 type,
@@ -462,14 +475,14 @@ class CatalogService {
             return null;
           }
         })();
-        
+
         catalogPromises.push(catalogPromise);
       }
     }
 
     // Wait for all catalog fetch promises to resolve in parallel
     const catalogResults = await Promise.all(catalogPromises);
-    
+
     // Filter out null results
     return catalogResults.filter(catalog => catalog !== null) as CatalogContent[];
   }
@@ -480,11 +493,11 @@ class CatalogService {
   private async getCatalogByTypeFromTMDB(type: string, genreFilter?: string): Promise<CatalogContent[]> {
     const tmdbService = TMDBService.getInstance();
     const catalogs: CatalogContent[] = [];
-    
+
     try {
       // Map Stremio content type to TMDB content type
       const tmdbType = type === 'movie' ? 'movie' : 'tv';
-      
+
       // If no genre filter or All is selected, get multiple catalogs
       if (!genreFilter || genreFilter === 'All') {
         // Create an array of promises for all catalog fetches
@@ -494,7 +507,7 @@ class CatalogService {
             const trendingItems = await tmdbService.getTrending(tmdbType, 'week');
             const trendingItemsPromises = trendingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
             const trendingStreamingItems = await Promise.all(trendingItemsPromises);
-            
+
             return {
               addon: 'tmdb',
               type,
@@ -503,13 +516,13 @@ class CatalogService {
               items: trendingStreamingItems
             };
           })(),
-          
+
           // Popular catalog
           (async () => {
             const popularItems = await tmdbService.getPopular(tmdbType, 1);
             const popularItemsPromises = popularItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
             const popularStreamingItems = await Promise.all(popularItemsPromises);
-            
+
             return {
               addon: 'tmdb',
               type,
@@ -518,13 +531,13 @@ class CatalogService {
               items: popularStreamingItems
             };
           })(),
-          
+
           // Upcoming/on air catalog
           (async () => {
             const upcomingItems = await tmdbService.getUpcoming(tmdbType, 1);
             const upcomingItemsPromises = upcomingItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
             const upcomingStreamingItems = await Promise.all(upcomingItemsPromises);
-            
+
             return {
               addon: 'tmdb',
               type,
@@ -534,7 +547,7 @@ class CatalogService {
             };
           })()
         ];
-        
+
         // Wait for all catalog fetches to complete in parallel
         return await Promise.all(catalogFetchPromises);
       } else {
@@ -542,7 +555,7 @@ class CatalogService {
         const genreItems = await tmdbService.discoverByGenre(tmdbType, genreFilter);
         const streamingItemsPromises = genreItems.map(item => this.convertTMDBToStreamingContent(item, tmdbType));
         const streamingItems = await Promise.all(streamingItemsPromises);
-        
+
         return [{
           addon: 'tmdb',
           type,
@@ -565,16 +578,16 @@ class CatalogService {
     const id = item.external_ids?.imdb_id || `tmdb:${item.id}`;
     const name = type === 'movie' ? item.title : item.name;
     const posterPath = item.poster_path;
-    
+
     // Get genres from genre_ids
     let genres: string[] = [];
     if (item.genre_ids && item.genre_ids.length > 0) {
       try {
         const tmdbService = TMDBService.getInstance();
-        const genreLists = type === 'movie' 
-          ? await tmdbService.getMovieGenres() 
+        const genreLists = type === 'movie'
+          ? await tmdbService.getMovieGenres()
           : await tmdbService.getTvGenres();
-        
+
         const genreIds: number[] = item.genre_ids;
         genres = genreIds
           .map(genreId => {
@@ -586,7 +599,7 @@ class CatalogService {
         logger.error('Failed to get genres for TMDB content:', error);
       }
     }
-    
+
     return {
       id,
       type: type === 'movie' ? 'movie' : 'series',
@@ -594,7 +607,7 @@ class CatalogService {
       poster: posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
       posterShape: 'poster',
       banner: item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : undefined,
-      year: type === 'movie' 
+      year: type === 'movie'
         ? (item.release_date ? new Date(item.release_date).getFullYear() : undefined)
         : (item.first_air_date ? new Date(item.first_air_date).getFullYear() : undefined),
       description: item.overview,
@@ -633,29 +646,29 @@ class CatalogService {
       // Try up to 2 times with increasing delays to reduce CPU load
       let meta = null;
       let lastError = null;
-      
+
       for (let i = 0; i < 2; i++) {
         try {
           console.log(`🔍 [CatalogService] Attempt ${i + 1}/2 for getContentDetails:`, { type, id, preferredAddonId });
-          
+
           // Skip meta requests for non-content ids (e.g., provider slugs)
           const isValidId = await stremioService.isValidContentId(type, id);
           console.log(`🔍 [CatalogService] Content ID validation:`, { type, id, isValidId });
-          
+
           if (!isValidId) {
             console.log(`🔍 [CatalogService] Invalid content ID, breaking retry loop`);
             break;
           }
-          
+
           console.log(`🔍 [CatalogService] Calling stremioService.getMetaDetails:`, { type, id, preferredAddonId });
           meta = await stremioService.getMetaDetails(type, id, preferredAddonId);
-          console.log(`🔍 [CatalogService] stremioService.getMetaDetails result:`, { 
-            hasMeta: !!meta, 
-            metaId: meta?.id, 
+          console.log(`🔍 [CatalogService] stremioService.getMetaDetails result:`, {
+            hasMeta: !!meta,
+            metaId: meta?.id,
             metaName: meta?.name,
-            metaType: meta?.type 
+            metaType: meta?.type
           });
-          
+
           if (meta) break;
           await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
         } catch (error) {
@@ -672,30 +685,30 @@ class CatalogService {
       }
 
       if (meta) {
-        console.log(`🔍 [CatalogService] Meta found, converting to StreamingContent:`, { 
-          metaId: meta.id, 
-          metaName: meta.name, 
-          metaType: meta.type 
+        console.log(`🔍 [CatalogService] Meta found, converting to StreamingContent:`, {
+          metaId: meta.id,
+          metaName: meta.name,
+          metaType: meta.type
         });
-        
+
         // Add to recent content using enhanced conversion for full metadata
         const content = this.convertMetaToStreamingContentEnhanced(meta);
         this.addToRecentContent(content);
-        
+
         // Check if it's in the library
         content.inLibrary = this.library[`${type}:${id}`] !== undefined;
-        
-        console.log(`🔍 [CatalogService] Successfully converted meta to StreamingContent:`, { 
-          contentId: content.id, 
-          contentName: content.name, 
+
+        console.log(`🔍 [CatalogService] Successfully converted meta to StreamingContent:`, {
+          contentId: content.id,
+          contentName: content.name,
           contentType: content.type,
           inLibrary: content.inLibrary
         });
-        
+
         return content;
       }
 
-      console.log(`🔍 [CatalogService] No meta found, checking lastError:`, { 
+      console.log(`🔍 [CatalogService] No meta found, checking lastError:`, {
         hasLastError: !!lastError,
         lastErrorMessage: lastError instanceof Error ? lastError.message : String(lastError)
       });
@@ -708,7 +721,7 @@ class CatalogService {
         });
         throw lastError;
       }
-      
+
       console.log(`🔍 [CatalogService] No meta and no error, returning null`);
       return null;
     } catch (error) {
@@ -727,14 +740,14 @@ class CatalogService {
   async getEnhancedContentDetails(type: string, id: string, preferredAddonId?: string): Promise<StreamingContent | null> {
     console.log(`🔍 [CatalogService] getEnhancedContentDetails called:`, { type, id, preferredAddonId });
     logger.log(`🔍 [MetadataScreen] Fetching enhanced metadata for ${type}:${id} ${preferredAddonId ? `from addon ${preferredAddonId}` : ''}`);
-    
+
     try {
       const result = await this.getContentDetails(type, id, preferredAddonId);
-      console.log(`🔍 [CatalogService] getEnhancedContentDetails result:`, { 
-        hasResult: !!result, 
-        resultId: result?.id, 
+      console.log(`🔍 [CatalogService] getEnhancedContentDetails result:`, {
+        hasResult: !!result,
+        resultId: result?.id,
         resultName: result?.name,
-        resultType: result?.type 
+        resultType: result?.type
       });
       return result;
     } catch (error) {
@@ -754,7 +767,7 @@ class CatalogService {
       // Try up to 3 times with increasing delays
       let meta = null;
       let lastError = null;
-      
+
       for (let i = 0; i < 3; i++) {
         try {
           // Skip meta requests for non-content ids (e.g., provider slugs)
@@ -774,17 +787,17 @@ class CatalogService {
       if (meta) {
         // Use basic conversion without enhanced metadata processing
         const content = this.convertMetaToStreamingContent(meta);
-        
+
         // Check if it's in the library
         content.inLibrary = this.library[`${type}:${id}`] !== undefined;
-        
+
         return content;
       }
 
       if (lastError) {
         throw lastError;
       }
-      
+
       return null;
     } catch (error) {
       logger.error(`Failed to get basic content details for ${type}:${id}:`, error);
@@ -799,13 +812,13 @@ class CatalogService {
     if (!posterUrl || posterUrl.trim() === '' || posterUrl === 'null' || posterUrl === 'undefined') {
       posterUrl = 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image';
     }
-    
+
     // Use addon's logo if available, otherwise undefined
     let logoUrl = (meta as any).logo;
     if (!logoUrl || logoUrl.trim() === '' || logoUrl === 'null' || logoUrl === 'undefined') {
       logoUrl = undefined;
     }
-    
+
     return {
       id: meta.id,
       type: meta.type,
@@ -845,8 +858,8 @@ class CatalogService {
       inLibrary: this.library[`${meta.type}:${meta.id}`] !== undefined,
       certification: meta.certification,
       // Enhanced fields from addon metadata
-      directors: (meta as any).director ? 
-        (Array.isArray((meta as any).director) ? (meta as any).director : [(meta as any).director]) 
+      directors: (meta as any).director ?
+        (Array.isArray((meta as any).director) ? (meta as any).director : [(meta as any).director])
         : undefined,
       writer: (meta as any).writer || undefined,
       country: (meta as any).country || undefined,
@@ -938,7 +951,7 @@ class CatalogService {
         }
       });
     });
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.librarySubscribers.indexOf(callback);
@@ -963,8 +976,8 @@ class CatalogService {
     await this.saveLibrary();
     logger.log(`[CatalogService] addToLibrary() completed for: ${content.type}:${content.id}`);
     this.notifyLibrarySubscribers();
-    try { this.libraryAddListeners.forEach(l => l(content)); } catch {}
-    
+    try { this.libraryAddListeners.forEach(l => l(content)); } catch { }
+
     // Auto-setup notifications for series when added to library
     if (content.type === 'series') {
       try {
@@ -989,7 +1002,7 @@ class CatalogService {
     await this.saveLibrary();
     logger.log(`[CatalogService] removeFromLibrary() completed for: ${type}:${id}`);
     this.notifyLibrarySubscribers();
-    try { this.libraryRemoveListeners.forEach(l => l(type, id)); } catch {}
+    try { this.libraryRemoveListeners.forEach(l => l(type, id)); } catch { }
 
     // Cancel notifications for series when removed from library
     if (type === 'series') {
@@ -1009,18 +1022,18 @@ class CatalogService {
 
   private addToRecentContent(content: StreamingContent): void {
     // Remove if it already exists to prevent duplicates
-    this.recentContent = this.recentContent.filter(item => 
+    this.recentContent = this.recentContent.filter(item =>
       !(item.id === content.id && item.type === content.type)
     );
-    
+
     // Add to the beginning of the array
     this.recentContent.unshift(content);
-    
+
     // Trim the array if it exceeds the maximum
     if (this.recentContent.length > this.MAX_RECENT_ITEMS) {
       this.recentContent = this.recentContent.slice(0, this.MAX_RECENT_ITEMS);
     }
-    
+
     this.saveRecentContent();
   }
 
@@ -1048,7 +1061,7 @@ class CatalogService {
             try {
               const filters = [{ title: 'search', value: query }];
               const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1, filters);
-              
+
               if (metas && metas.length > 0) {
                 const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
                 results.push(...items);
@@ -1057,7 +1070,7 @@ class CatalogService {
               logger.error(`Search failed for ${catalog.id} in addon ${addon.id}:`, error);
             }
           })();
-          
+
           searchPromises.push(searchPromise);
         }
       }
@@ -1095,15 +1108,15 @@ class CatalogService {
     // Find all addons that support search
     const searchableAddons = addons.filter(addon => {
       if (!addon.catalogs) return false;
-      
+
       // Check if any catalog supports search
       return addon.catalogs.some(catalog => {
         const extraSupported = catalog.extraSupported || [];
         const extra = catalog.extra || [];
-        
+
         // Check if 'search' is in extraSupported or extra
-        return extraSupported.includes('search') || 
-               extra.some((e: any) => e.name === 'search');
+        return extraSupported.includes('search') ||
+          extra.some((e: any) => e.name === 'search');
       });
     });
 
@@ -1114,17 +1127,17 @@ class CatalogService {
       const searchableCatalogs = (addon.catalogs || []).filter(catalog => {
         const extraSupported = catalog.extraSupported || [];
         const extra = catalog.extra || [];
-        return extraSupported.includes('search') || 
-               extra.some((e: any) => e.name === 'search');
+        return extraSupported.includes('search') ||
+          extra.some((e: any) => e.name === 'search');
       });
 
       // Search all catalogs for this addon in parallel
-      const catalogPromises = searchableCatalogs.map(catalog => 
+      const catalogPromises = searchableCatalogs.map(catalog =>
         this.searchAddonCatalog(addon, catalog.type, catalog.id, trimmedQuery)
       );
 
       const catalogResults = await Promise.allSettled(catalogPromises);
-      
+
       // Collect all results for this addon
       const addonResults: StreamingContent[] = [];
       catalogResults.forEach((result) => {
@@ -1157,7 +1170,7 @@ class CatalogService {
     // Create deduplicated flat list for backwards compatibility
     const allResults: StreamingContent[] = [];
     const globalSeen = new Set<string>();
-    
+
     byAddon.forEach(addonGroup => {
       addonGroup.results.forEach(item => {
         const key = `${item.type}:${item.id}`;
@@ -1262,20 +1275,20 @@ class CatalogService {
    * @returns Promise<StreamingContent[]> - Search results from this specific addon catalog
    */
   private async searchAddonCatalog(
-    addon: any, 
-    type: string, 
-    catalogId: string, 
+    addon: any,
+    type: string,
+    catalogId: string,
     query: string
   ): Promise<StreamingContent[]> {
     try {
       let url: string;
-      
+
       // Special handling for Cinemeta (hardcoded URL)
       if (addon.id === 'com.linvo.cinemeta') {
         const encodedCatalogId = encodeURIComponent(catalogId);
         const encodedQuery = encodeURIComponent(query);
         url = `https://v3-cinemeta.strem.io/catalog/${type}/${encodedCatalogId}/search=${encodedQuery}.json`;
-      } 
+      }
       // Handle other addons
       else {
         // Choose best available URL
@@ -1287,16 +1300,16 @@ class CatalogService {
         // Extract base URL and preserve query params
         const [baseUrlPart, queryParams] = chosenUrl.split('?');
         let cleanBaseUrl = baseUrlPart.replace(/manifest\.json$/, '').replace(/\/$/, '');
-        
+
         // Ensure URL has protocol
         if (!cleanBaseUrl.startsWith('http')) {
           cleanBaseUrl = `https://${cleanBaseUrl}`;
         }
-        
+
         const encodedCatalogId = encodeURIComponent(catalogId);
         const encodedQuery = encodeURIComponent(query);
         url = `${cleanBaseUrl}/catalog/${type}/${encodedCatalogId}/search=${encodedQuery}.json`;
-        
+
         // Append original query params if they existed
         if (queryParams) {
           url += `?${queryParams}`;
@@ -1304,24 +1317,24 @@ class CatalogService {
       }
 
       logger.log(`Searching ${addon.name} (${type}/${catalogId}):`, url);
-      
+
       const response = await axios.get<{ metas: any[] }>(url, {
         timeout: 10000, // 10 second timeout per addon
       });
-      
+
       const metas = response.data?.metas || [];
-      
+
       if (metas.length > 0) {
         const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
         logger.log(`Found ${items.length} results from ${addon.name}`);
         return items;
       }
-      
+
       return [];
     } catch (error: any) {
       // Don't throw, just log and return empty
-      const errorMsg = error?.response?.status 
-        ? `HTTP ${error.response.status}` 
+      const errorMsg = error?.response?.status
+        ? `HTTP ${error.response.status}`
         : error?.message || 'Unknown error';
       logger.error(`Search failed for ${addon.name} (${type}/${catalogId}): ${errorMsg}`);
       return [];
@@ -1334,21 +1347,21 @@ class CatalogService {
       console.log('Input type:', type);
       console.log('Input tmdbId:', tmdbId);
     }
-    
+
     try {
       // For movies, use the tt prefix with IMDb ID
       if (type === 'movie') {
         if (__DEV__) console.log('Processing movie - fetching TMDB details...');
         const tmdbService = TMDBService.getInstance();
         const movieDetails = await tmdbService.getMovieDetails(tmdbId);
-        
+
         if (__DEV__) console.log('Movie details result:', {
           id: movieDetails?.id,
           title: movieDetails?.title,
           imdb_id: movieDetails?.imdb_id,
           hasImdbId: !!movieDetails?.imdb_id
         });
-        
+
         if (movieDetails?.imdb_id) {
           if (__DEV__) console.log('Successfully found IMDb ID:', movieDetails.imdb_id);
           return movieDetails.imdb_id;
@@ -1361,16 +1374,16 @@ class CatalogService {
       else if (type === 'tv' || type === 'series') {
         if (__DEV__) console.log('Processing TV show - fetching TMDB details for IMDb ID...');
         const tmdbService = TMDBService.getInstance();
-        
+
         // Get TV show external IDs to find IMDb ID
         const externalIds = await tmdbService.getShowExternalIds(parseInt(tmdbId));
-        
+
         if (__DEV__) console.log('TV show external IDs result:', {
           tmdbId: tmdbId,
           imdb_id: externalIds?.imdb_id,
           hasImdbId: !!externalIds?.imdb_id
         });
-        
+
         if (externalIds?.imdb_id) {
           if (__DEV__) console.log('Successfully found IMDb ID for TV show:', externalIds.imdb_id);
           return externalIds.imdb_id;

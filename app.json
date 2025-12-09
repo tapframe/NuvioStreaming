@@ -49,7 +49,7 @@
       "permissions": [
         "INTERNET",
         "WAKE_LOCK",
-        "WRITE_SETTINGS"
+        "android.permission.WRITE_SETTINGS"
       ],
       "package": "com.nuvio.app",
       "versionCode": 25,

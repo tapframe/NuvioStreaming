@@ -59,15 +59,15 @@ export function useFeaturedContent() {
 
   const loadFeaturedContent = useCallback(async (forceRefresh = false) => {
     const t0 = Date.now();
-    
+
     // Check if we should use cached data (disabled if DISABLE_CACHE)
     const now = Date.now();
     const cacheAge = now - persistentStore.lastFetchTime;
     if (!DISABLE_CACHE) {
-      if (!forceRefresh && 
-          persistentStore.featuredContent && 
-          persistentStore.allFeaturedContent.length > 0 && 
-          cacheAge < CACHE_TIMEOUT) {
+      if (!forceRefresh &&
+        persistentStore.featuredContent &&
+        persistentStore.allFeaturedContent.length > 0 &&
+        cacheAge < CACHE_TIMEOUT) {
         // Use cached data
         setFeaturedContent(persistentStore.featuredContent);
         setAllFeaturedContent(persistentStore.allFeaturedContent);
@@ -86,23 +86,19 @@ export function useFeaturedContent() {
       let formattedContent: StreamingContent[] = [];
 
       {
-        // Load from installed catalogs
+        // Load from installed catalogs with optimization
         const tCats = Date.now();
-        const catalogs = await catalogService.getHomeCatalogs();
-        
+        // Pass selected catalogs to service for optimized fetching
+        const catalogs = await catalogService.getHomeCatalogs(selectedCatalogs);
+
         if (signal.aborted) return;
 
         // If no catalogs are installed, stop loading and return.
         if (catalogs.length === 0) {
           formattedContent = [];
         } else {
-          // Filter catalogs based on user selection if any catalogs are selected
-          const filteredCatalogs = selectedCatalogs && selectedCatalogs.length > 0
-            ? catalogs.filter(catalog => {
-                const catalogId = `${catalog.addon}:${catalog.type}:${catalog.id}`;
-                return selectedCatalogs.includes(catalogId);
-              })
-            : catalogs; // Use all catalogs if none specifically selected
+          // Use catalogs directly (filtering is now done in service)
+          const filteredCatalogs = catalogs;
 
           // Flatten all catalog items into a single array, filter out items without posters
           const tFlat = Date.now();
@@ -132,7 +128,7 @@ export function useFeaturedContent() {
               genres: (item as any).genres,
               inLibrary: Boolean((item as any).inLibrary),
             };
-            
+
             try {
               if (!settings.enrichMetadataWithTMDB) {
                 // When enrichment is OFF, keep addon logo or undefined
@@ -152,12 +148,12 @@ export function useFeaturedContent() {
                 const found = await tmdbService.findTMDBIdByIMDB(imdbId);
                 tmdbId = found ? String(found) : null;
               }
-              
+
               if (tmdbId) {
                 const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
                 return { ...base, logo: logoUrl || undefined }; // TMDB logo or undefined (no addon fallback)
               }
-              
+
               return { ...base, logo: undefined }; // No TMDB ID means no logo
             } catch (error) {
               return { ...base, logo: undefined }; // Error means no logo
@@ -175,7 +171,7 @@ export function useFeaturedContent() {
                 logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
                 logo: c.logo || undefined,
               }));
-            } catch {}
+            } catch { }
           } else {
             // When enrichment is disabled, prefer addon-provided logos; if missing, fetch basic meta to pull logo (like HeroSection)
             const baseItems = topItems.map((item: any) => {
@@ -231,7 +227,7 @@ export function useFeaturedContent() {
                 logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
                 logo: c.logo || undefined,
               }));
-            } catch {}
+            } catch { }
           }
         }
       }
@@ -250,7 +246,7 @@ export function useFeaturedContent() {
                 ? parsed.allFeaturedContent
                 : [parsed.featuredContent];
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -260,9 +256,9 @@ export function useFeaturedContent() {
         persistentStore.lastFetchTime = now;
       }
       persistentStore.isFirstLoad = false;
-      
+
       setAllFeaturedContent(formattedContent);
-      
+
       if (formattedContent.length > 0) {
         persistentStore.featuredContent = formattedContent[0];
         setFeaturedContent(formattedContent[0]);
@@ -278,14 +274,14 @@ export function useFeaturedContent() {
                 allFeaturedContent: formattedContent,
               })
             );
-          } catch {}
+          } catch { }
         }
       } else {
         persistentStore.featuredContent = null;
         setFeaturedContent(null);
         // Clear persisted cache on empty (skipped when cache disabled)
         if (!DISABLE_CACHE) {
-          try { await mmkvStorage.removeItem(STORAGE_KEY); } catch {}
+          try { await mmkvStorage.removeItem(STORAGE_KEY); } catch { }
         }
       }
     } catch (error) {
@@ -326,7 +322,7 @@ export function useFeaturedContent() {
             setLoading(false);
           }
         }
-      } catch {}
+      } catch { }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -334,12 +330,12 @@ export function useFeaturedContent() {
   // Check for settings changes, including during app restart
   useEffect(() => {
     // Check if settings changed while app was closed
-    const settingsChanged = 
+    const settingsChanged =
       persistentStore.lastSettings.showHeroSection !== settings.showHeroSection ||
       JSON.stringify(persistentStore.lastSettings.selectedHeroCatalogs) !== JSON.stringify(settings.selectedHeroCatalogs) ||
       persistentStore.lastSettings.logoSourcePreference !== settings.logoSourcePreference ||
       persistentStore.lastSettings.tmdbLanguagePreference !== settings.tmdbLanguagePreference;
-    
+
     // Update our tracking of last used settings
     persistentStore.lastSettings = {
       showHeroSection: settings.showHeroSection,
@@ -348,7 +344,7 @@ export function useFeaturedContent() {
       logoSourcePreference: settings.logoSourcePreference,
       tmdbLanguagePreference: settings.tmdbLanguagePreference
     };
-    
+
     // Force refresh if settings changed during app restart, but only if we have content
     if (settingsChanged && persistentStore.featuredContent) {
       loadFeaturedContent(true);
@@ -387,20 +383,16 @@ export function useFeaturedContent() {
         loadFeaturedContent(true);
       }
     };
-    
+
     // Subscribe to settings changes
     const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
-    
+
     return unsubscribe;
   }, [loadFeaturedContent, settings, contentSource, selectedCatalogs]);
 
-  // Load featured content initially and when catalogs selection changes
   useEffect(() => {
     // Always use catalogs
-    setAllFeaturedContent([]);
-    setFeaturedContent(null);
-    persistentStore.allFeaturedContent = [];
-    persistentStore.featuredContent = null;
+    // Don't clear content here to prevent flashing
     loadFeaturedContent(true);
   }, [loadFeaturedContent, selectedCatalogs]);
 
