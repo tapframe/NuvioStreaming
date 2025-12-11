@@ -34,6 +34,7 @@ import { VideoPlayerService } from '../services/videoPlayerService';
 import type { DownloadItem } from '../contexts/DownloadsContext';
 import { useToast } from '../contexts/ToastContext';
 import CustomAlert from '../components/CustomAlert';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const { height, width } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -346,7 +347,6 @@ const DownloadsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
-  const { top: safeAreaTop } = useSafeAreaInsets();
   const { downloads, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
   const { showSuccess, showInfo } = useToast();
 
@@ -355,9 +355,6 @@ const DownloadsScreen: React.FC = () => {
   const [showHelpAlert, setShowHelpAlert] = useState(false);
   const [showRemoveAlert, setShowRemoveAlert] = useState(false);
   const [pendingRemoveItem, setPendingRemoveItem] = useState<DownloadItem | null>(null);
-
-  // Animation values
-  const headerOpacity = useSharedValue(1);
 
   // Filter downloads based on selected filter
   const filteredDownloads = useMemo(() => {
@@ -571,11 +568,6 @@ const DownloadsScreen: React.FC = () => {
     }, [])
   );
 
-  // Animated styles
-  const headerStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-  }));
-
   const renderFilterButton = (filter: typeof selectedFilter, label: string, count: number) => (
     <TouchableOpacity
       key={filter}
@@ -632,22 +624,10 @@ const DownloadsScreen: React.FC = () => {
         backgroundColor="transparent"
       />
 
-      {/* Header */}
-      <Animated.View style={[
-        styles.header,
-        {
-          backgroundColor: currentTheme.colors.darkBackground,
-          paddingTop: (Platform.OS === 'android'
-            ? (StatusBar.currentHeight || 0) + 26
-            : safeAreaTop + 15) + (isTablet ? 64 : 0),
-          borderBottomColor: currentTheme.colors.border,
-        },
-        headerStyle,
-      ]}>
-        <View style={styles.headerTitleRow}>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-            Downloads
-          </Text>
+      {/* ScreenHeader Component */}
+      <ScreenHeader
+        title="Downloads"
+        rightActionComponent={
           <TouchableOpacity
             style={styles.helpButton}
             onPress={showDownloadHelp}
@@ -659,8 +639,9 @@ const DownloadsScreen: React.FC = () => {
               color={currentTheme.colors.mediumEmphasis}
             />
           </TouchableOpacity>
-        </View>
-
+        }
+        isTablet={isTablet}
+      >
         {downloads.length > 0 && (
           <View style={styles.filterContainer}>
             {renderFilterButton('all', 'All', stats.total)}
@@ -669,7 +650,7 @@ const DownloadsScreen: React.FC = () => {
             {renderFilterButton('paused', 'Paused', stats.paused)}
           </View>
         )}
-      </Animated.View>
+      </ScreenHeader>
 
       {/* Content */}
       {downloads.length === 0 ? (
@@ -741,23 +722,6 @@ const DownloadsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: isTablet ? 24 : Math.max(1, width * 0.05),
-    paddingBottom: isTablet ? 20 : 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginBottom: isTablet ? 20 : 16,
-    paddingBottom: 8,
-  },
-  headerTitle: {
-    fontSize: isTablet ? 36 : Math.min(32, width * 0.08),
-    fontWeight: '800',
-    letterSpacing: 0.3,
   },
   helpButton: {
     padding: 8,

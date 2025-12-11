@@ -4,6 +4,7 @@ import { Share } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useToast } from '../contexts/ToastContext';
 import DropUpMenu from '../components/home/DropUpMenu';
+import ScreenHeader from '../components/common/ScreenHeader';
 import {
   View,
   Text,
@@ -107,7 +108,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
       navigation.navigate('Metadata', { id: item.imdbId, type: item.type });
     }
   }, [navigation, item.imdbId, item.type]);
-  
+
   return (
     <TouchableOpacity
       style={[styles.itemContainer, { width }]}
@@ -168,17 +169,17 @@ const SkeletonLoader = () => {
 
   const renderSkeletonItem = () => (
     <View style={[styles.itemContainer, { width: itemWidth }]}>
-      <RNAnimated.View 
+      <RNAnimated.View
         style={[
           styles.posterContainer,
           { opacity, backgroundColor: currentTheme.colors.darkBackground }
-        ]} 
+        ]}
       />
-      <RNAnimated.View 
+      <RNAnimated.View
         style={[
           styles.skeletonTitle,
           { opacity, backgroundColor: currentTheme.colors.darkBackground }
-        ]} 
+        ]}
       />
     </View>
   );
@@ -212,7 +213,7 @@ const LibraryScreen = () => {
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
-  
+
   // Trakt integration
   const {
     isAuthenticated: traktAuthenticated,
@@ -272,14 +273,14 @@ const LibraryScreen = () => {
       setLoading(true);
       try {
         const items = await catalogService.getLibraryItems();
-        
+
         // Sort by date added (most recent first)
         const sortedItems = items.sort((a, b) => {
           const timeA = (a as any).addedToLibraryAt || 0;
           const timeB = (b as any).addedToLibraryAt || 0;
           return timeB - timeA; // Descending order (newest first)
         });
-        
+
         // Load watched status for each item from AsyncStorage
         const updatedItems = await Promise.all(sortedItems.map(async (item) => {
           // Map StreamingContent to LibraryItem shape
@@ -313,7 +314,7 @@ const LibraryScreen = () => {
         const timeB = (b as any).addedToLibraryAt || 0;
         return timeB - timeA; // Descending order (newest first)
       });
-      
+
       // Sync watched status on update
       const updatedItems = await Promise.all(sortedItems.map(async (item) => {
         // Map StreamingContent to LibraryItem shape
@@ -403,8 +404,8 @@ const LibraryScreen = () => {
       activeOpacity={0.7}
     >
       <View>
-        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}> 
-              <FastImage
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
+          <FastImage
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
             resizeMode={FastImage.resizeMode.cover}
@@ -425,7 +426,7 @@ const LibraryScreen = () => {
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}> 
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
           {item.name}
         </Text>
       </View>
@@ -444,11 +445,11 @@ const LibraryScreen = () => {
     >
       <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
         <View style={styles.folderGradient}>
-          <MaterialIcons 
-            name={folder.icon} 
-            size={48} 
-            color={currentTheme.colors.white} 
-            style={{ marginBottom: 8 }} 
+          <MaterialIcons
+            name={folder.icon}
+            size={48}
+            color={currentTheme.colors.white}
+            style={{ marginBottom: 8 }}
           />
           <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
             {folder.name}
@@ -724,8 +725,8 @@ const LibraryScreen = () => {
             <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
               Your Trakt collections will appear here once you start using Trakt
             </Text>
-            <TouchableOpacity 
-              style={[styles.exploreButton, { 
+            <TouchableOpacity
+              style={[styles.exploreButton, {
                 backgroundColor: currentTheme.colors.primary,
                 shadowColor: currentTheme.colors.black
               }]}
@@ -742,22 +743,22 @@ const LibraryScreen = () => {
 
       // Show collection folders
       return (
-         <FlashList
+        <FlashList
           data={traktFolders}
           renderItem={({ item }) => renderTraktCollectionFolder({ folder: item })}
           keyExtractor={item => item.id}
           numColumns={numColumns}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-           onEndReachedThreshold={0.7}
-           onEndReached={() => {}}
+          onEndReachedThreshold={0.7}
+          onEndReached={() => { }}
         />
       );
     }
 
     // Show content for specific folder
     const folderItems = getTraktFolderItems(selectedTraktFolder);
-    
+
     if (folderItems.length === 0) {
       const folderName = traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection';
       return (
@@ -767,8 +768,8 @@ const LibraryScreen = () => {
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
             This collection is empty
           </Text>
-          <TouchableOpacity 
-            style={[styles.exploreButton, { 
+          <TouchableOpacity
+            style={[styles.exploreButton, {
               backgroundColor: currentTheme.colors.primary,
               shadowColor: currentTheme.colors.black
             }]}
@@ -793,14 +794,14 @@ const LibraryScreen = () => {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.7}
-        onEndReached={() => {}}
+        onEndReached={() => { }}
       />
     );
   };
 
   const renderFilter = (filterType: 'trakt' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
     const isActive = filter === filterType;
-    
+
     return (
       <TouchableOpacity
         style={[
@@ -858,9 +859,9 @@ const LibraryScreen = () => {
       const emptySubtitle = 'Add some content to your library to see it here';
       return (
         <View style={styles.emptyContainer}>
-          <MaterialIcons 
-            name="video-library" 
-            size={64} 
+          <MaterialIcons
+            name="video-library"
+            size={64}
             color={currentTheme.colors.lightGray}
           />
           <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
@@ -869,8 +870,8 @@ const LibraryScreen = () => {
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
             {emptySubtitle}
           </Text>
-          <TouchableOpacity 
-            style={[styles.exploreButton, { 
+          <TouchableOpacity
+            style={[styles.exploreButton, {
               backgroundColor: currentTheme.colors.primary,
               shadowColor: currentTheme.colors.black
             }]}
@@ -892,92 +893,53 @@ const LibraryScreen = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.7}
-        onEndReached={() => {}}
+        onEndReached={() => { }}
       />
     );
   };
 
-  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   // Tablet detection aligned with navigation tablet logic
   const isTablet = useMemo(() => {
     const smallestDimension = Math.min(width, height);
     return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
   }, [width, height]);
-  // Keep header below floating top navigator on tablets
-  const tabletNavOffset = isTablet ? 64 : 0;
-  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
-  const headerHeight = headerBaseHeight + topSpacing;
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      {/* Fixed position header background to prevent shifts */}
-      <View style={[styles.headerBackground, { height: headerHeight, backgroundColor: currentTheme.colors.darkBackground }]} />
-      
-      <View style={{ flex: 1 }}>
-        {/* Header Section with proper top spacing */}
-        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <View style={[styles.headerContent, showTraktContent && { justifyContent: 'flex-start' }]}>
-            {showTraktContent ? (
-              <>
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => {
-                    if (selectedTraktFolder) {
-                      setSelectedTraktFolder(null);
-                    } else {
-                      setShowTraktContent(false);
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons 
-                    name="arrow-back" 
-                    size={28} 
-                    color={currentTheme.colors.white} 
-                  />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: currentTheme.colors.white, fontSize: 24, marginLeft: 16 }]}>
-                    {selectedTraktFolder 
-                      ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection'
-                      : 'Trakt Collection'
-                    }
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>Library</Text>
-                <TouchableOpacity
-                  style={styles.calendarButton}
-                  onPress={() => navigation.navigate('Calendar')}
-                  activeOpacity={0.7}
-                >
-                  <Feather 
-                    name="calendar" 
-                    size={24} 
-                    color={currentTheme.colors.white} 
-                  />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
+      {/* ScreenHeader Component */}
+      <ScreenHeader
+        title={showTraktContent
+          ? (selectedTraktFolder
+            ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection'
+            : 'Trakt Collection')
+          : 'Library'
+        }
+        showBackButton={showTraktContent}
+        onBackPress={showTraktContent ? () => {
+          if (selectedTraktFolder) {
+            setSelectedTraktFolder(null);
+          } else {
+            setShowTraktContent(false);
+          }
+        } : undefined}
+        useMaterialIcons={showTraktContent}
+        rightActionIcon={!showTraktContent ? 'calendar' : undefined}
+        onRightActionPress={!showTraktContent ? () => navigation.navigate('Calendar') : undefined}
+        isTablet={isTablet}
+      />
 
-        {/* Content Container */}
-        <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
-            {!showTraktContent && (
-              // Replaced ScrollView with View and used the modified style
-              <View
-                style={styles.filtersContainer}
-              >
-                {renderFilter('trakt', 'Trakt', 'pan-tool')}
-                {renderFilter('movies', 'Movies', 'movie')}
-                {renderFilter('series', 'TV Shows', 'live-tv')}
-              </View>
-            )}
-
-            {showTraktContent ? renderTraktContent() : renderContent()}
+      {/* Content Container */}
+      <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
+        {!showTraktContent && (
+          <View style={styles.filtersContainer}>
+            {renderFilter('trakt', 'Trakt', 'pan-tool')}
+            {renderFilter('movies', 'Movies', 'movie')}
+            {renderFilter('series', 'TV Shows', 'live-tv')}
           </View>
-        </View>
+        )}
+
+        {showTraktContent ? renderTraktContent() : renderContent()}
+      </View>
 
       {/* DropUpMenu integration */}
       {selectedItem && (
@@ -991,45 +953,45 @@ const LibraryScreen = () => {
             if (!selectedItem) return;
             switch (option) {
               case 'library': {
-              try {
-                await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
-                showInfo('Removed from Library', 'Item removed from your library');
-                setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
-                setMenuVisible(false);
-              } catch (error) {
-                showError('Failed to update Library', 'Unable to remove item from library');
-              }
-              break;
+                try {
+                  await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
+                  showInfo('Removed from Library', 'Item removed from your library');
+                  setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
+                  setMenuVisible(false);
+                } catch (error) {
+                  showError('Failed to update Library', 'Unable to remove item from library');
+                }
+                break;
               }
               case 'watched': {
-              try {
-                // Use AsyncStorage to store watched status by key
-                const key = `watched:${selectedItem.type}:${selectedItem.id}`;
-                const newWatched = !selectedItem.watched;
-                await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
-                showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
-                // Instantly update local state
-                setLibraryItems(prev => prev.map(item =>
-                item.id === selectedItem.id && item.type === selectedItem.type
-                  ? { ...item, watched: newWatched }
-                  : item
-                ));
-              } catch (error) {
-                showError('Failed to update watched status', 'Unable to update watched status');
-              }
-              break;
+                try {
+                  // Use AsyncStorage to store watched status by key
+                  const key = `watched:${selectedItem.type}:${selectedItem.id}`;
+                  const newWatched = !selectedItem.watched;
+                  await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
+                  showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
+                  // Instantly update local state
+                  setLibraryItems(prev => prev.map(item =>
+                    item.id === selectedItem.id && item.type === selectedItem.type
+                      ? { ...item, watched: newWatched }
+                      : item
+                  ));
+                } catch (error) {
+                  showError('Failed to update watched status', 'Unable to update watched status');
+                }
+                break;
               }
               case 'share': {
-              let url = '';
-              if (selectedItem.id) {
-                url = `https://www.imdb.com/title/${selectedItem.id}/`;
-              }
-              const message = `${selectedItem.name}\n${url}`;
-              Share.share({ message, url, title: selectedItem.name });
-              break;
+                let url = '';
+                if (selectedItem.id) {
+                  url = `https://www.imdb.com/title/${selectedItem.id}/`;
+                }
+                const message = `${selectedItem.name}\n${url}`;
+                Share.share({ message, url, title: selectedItem.name });
+                break;
               }
               default:
-              break;
+                break;
             }
           }}
         />
@@ -1042,13 +1004,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
   watchedIndicator: {
     position: 'absolute',
     top: 8,
@@ -1059,23 +1014,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    justifyContent: 'flex-end',
-    paddingBottom: 8,
-    backgroundColor: 'transparent',
-    zIndex: 2,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
   filtersContainer: {
     flexDirection: 'row',
@@ -1130,7 +1068,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     elevation: 5,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -1253,7 +1191,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     elevation: 5,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
