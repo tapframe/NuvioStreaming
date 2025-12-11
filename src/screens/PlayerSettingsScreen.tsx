@@ -35,7 +35,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isLast,
 }) => {
   const { currentTheme } = useTheme();
-  
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -175,17 +175,17 @@ const PlayerSettingsScreen: React.FC = () => {
             Settings
           </Text>
         </TouchableOpacity>
-        
+
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
         </View>
       </View>
-      
+
       <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
         Video Player
       </Text>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
@@ -229,7 +229,7 @@ const PlayerSettingsScreen: React.FC = () => {
             ))}
           </View>
         </View>
-        
+
         <View style={styles.section}>
           <Text
             style={[
@@ -322,6 +322,48 @@ const PlayerSettingsScreen: React.FC = () => {
                 />
               </View>
             </View>
+
+            {/* External Player for Downloads */}
+            {((Platform.OS === 'android' && settings.useExternalPlayer) ||
+              (Platform.OS === 'ios' && settings.preferredPlayer !== 'internal')) && (
+                <View style={[styles.settingItem, styles.settingItemBorder, { borderBottomWidth: 0, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="open-in-new"
+                        size={20}
+                        color={currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: currentTheme.colors.text },
+                        ]}
+                      >
+                        External Player for Downloads
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        Play downloaded content in your preferred external player.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={settings.useExternalPlayerForDownloads}
+                      onValueChange={(value) => updateSetting('useExternalPlayerForDownloads', value)}
+                      thumbColor={settings.useExternalPlayerForDownloads ? currentTheme.colors.primary : undefined}
+                    />
+                  </View>
+                </View>
+              )}
           </View>
         </View>
       </ScrollView>
