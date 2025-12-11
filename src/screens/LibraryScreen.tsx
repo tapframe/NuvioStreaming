@@ -36,6 +36,7 @@ import { useTraktContext } from '../contexts/TraktContext';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { traktService, TraktService, TraktImages } from '../services/traktService';
 import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
+import { useSettings } from '../hooks/useSettings'; // ADD THIS IMPORT
 
 // Define interfaces for proper typing
 interface LibraryItem extends StreamingContent {
@@ -87,6 +88,7 @@ function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: nu
 
 const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item: TraktDisplayItem; width: number; navigation: any; currentTheme: any }) => {
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const { settings } = useSettings(); // ADD THIS
 
   useEffect(() => {
     let isMounted = true;
@@ -107,7 +109,7 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
       navigation.navigate('Metadata', { id: item.imdbId, type: item.type });
     }
   }, [navigation, item.imdbId, item.type]);
-  
+
   return (
     <TouchableOpacity
       style={[styles.itemContainer, { width }]}
@@ -128,9 +130,12 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-          {item.name}
-        </Text>
+        {/* Conditionally render title based on settings.showPosterTitles */}
+        {settings.showPosterTitles && (
+          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+            {item.name}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -168,17 +173,17 @@ const SkeletonLoader = () => {
 
   const renderSkeletonItem = () => (
     <View style={[styles.itemContainer, { width: itemWidth }]}>
-      <RNAnimated.View 
+      <RNAnimated.View
         style={[
           styles.posterContainer,
           { opacity, backgroundColor: currentTheme.colors.darkBackground }
-        ]} 
+        ]}
       />
-      <RNAnimated.View 
+      <RNAnimated.View
         style={[
           styles.skeletonTitle,
           { opacity, backgroundColor: currentTheme.colors.darkBackground }
-        ]} 
+        ]}
       />
     </View>
   );
@@ -212,7 +217,8 @@ const LibraryScreen = () => {
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
-  
+  const { settings } = useSettings(); // ADD THIS
+
   // Trakt integration
   const {
     isAuthenticated: traktAuthenticated,
@@ -272,14 +278,14 @@ const LibraryScreen = () => {
       setLoading(true);
       try {
         const items = await catalogService.getLibraryItems();
-        
+
         // Sort by date added (most recent first)
         const sortedItems = items.sort((a, b) => {
           const timeA = (a as any).addedToLibraryAt || 0;
           const timeB = (b as any).addedToLibraryAt || 0;
           return timeB - timeA; // Descending order (newest first)
         });
-        
+
         // Load watched status for each item from AsyncStorage
         const updatedItems = await Promise.all(sortedItems.map(async (item) => {
           // Map StreamingContent to LibraryItem shape
@@ -313,7 +319,7 @@ const LibraryScreen = () => {
         const timeB = (b as any).addedToLibraryAt || 0;
         return timeB - timeA; // Descending order (newest first)
       });
-      
+
       // Sync watched status on update
       const updatedItems = await Promise.all(sortedItems.map(async (item) => {
         // Map StreamingContent to LibraryItem shape
@@ -403,7 +409,7 @@ const LibraryScreen = () => {
       activeOpacity={0.7}
     >
       <View>
-        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}> 
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
               <FastImage
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
             style={styles.poster}
@@ -425,9 +431,12 @@ const LibraryScreen = () => {
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}> 
-          {item.name}
-        </Text>
+        {/* Conditionally render title based on settings.showPosterTitles */}
+        {settings.showPosterTitles && (
+          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+            {item.name}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -444,11 +453,11 @@ const LibraryScreen = () => {
     >
       <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
         <View style={styles.folderGradient}>
-          <MaterialIcons 
-            name={folder.icon} 
-            size={48} 
-            color={currentTheme.colors.white} 
-            style={{ marginBottom: 8 }} 
+          <MaterialIcons
+            name={folder.icon}
+            size={48}
+            color={currentTheme.colors.white}
+            style={{ marginBottom: 8 }}
           />
           <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
             {folder.name}
@@ -458,6 +467,12 @@ const LibraryScreen = () => {
           </Text>
         </View>
       </View>
+      {/* Conditionally render folder title based on settings.showPosterTitles */}
+      {settings.showPosterTitles && (
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+          {folder.name}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 
@@ -489,9 +504,12 @@ const LibraryScreen = () => {
             )}
           </View>
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-          Trakt collections
-        </Text>
+        {/* Conditionally render title based on settings.showPosterTitles */}
+        {settings.showPosterTitles && (
+          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+            Trakt collections
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -724,8 +742,8 @@ const LibraryScreen = () => {
             <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
               Your Trakt collections will appear here once you start using Trakt
             </Text>
-            <TouchableOpacity 
-              style={[styles.exploreButton, { 
+            <TouchableOpacity
+              style={[styles.exploreButton, {
                 backgroundColor: currentTheme.colors.primary,
                 shadowColor: currentTheme.colors.black
               }]}
@@ -757,7 +775,7 @@ const LibraryScreen = () => {
 
     // Show content for specific folder
     const folderItems = getTraktFolderItems(selectedTraktFolder);
-    
+
     if (folderItems.length === 0) {
       const folderName = traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection';
       return (
@@ -767,8 +785,8 @@ const LibraryScreen = () => {
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
             This collection is empty
           </Text>
-          <TouchableOpacity 
-            style={[styles.exploreButton, { 
+          <TouchableOpacity
+            style={[styles.exploreButton, {
               backgroundColor: currentTheme.colors.primary,
               shadowColor: currentTheme.colors.black
             }]}
@@ -800,7 +818,7 @@ const LibraryScreen = () => {
 
   const renderFilter = (filterType: 'trakt' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
     const isActive = filter === filterType;
-    
+
     return (
       <TouchableOpacity
         style={[
@@ -858,9 +876,9 @@ const LibraryScreen = () => {
       const emptySubtitle = 'Add some content to your library to see it here';
       return (
         <View style={styles.emptyContainer}>
-          <MaterialIcons 
-            name="video-library" 
-            size={64} 
+          <MaterialIcons
+            name="video-library"
+            size={64}
             color={currentTheme.colors.lightGray}
           />
           <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
@@ -869,8 +887,8 @@ const LibraryScreen = () => {
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
             {emptySubtitle}
           </Text>
-          <TouchableOpacity 
-            style={[styles.exploreButton, { 
+          <TouchableOpacity
+            style={[styles.exploreButton, {
               backgroundColor: currentTheme.colors.primary,
               shadowColor: currentTheme.colors.black
             }]}
@@ -912,7 +930,7 @@ const LibraryScreen = () => {
     <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       {/* Fixed position header background to prevent shifts */}
       <View style={[styles.headerBackground, { height: headerHeight, backgroundColor: currentTheme.colors.darkBackground }]} />
-      
+
       <View style={{ flex: 1 }}>
         {/* Header Section with proper top spacing */}
         <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
@@ -930,14 +948,14 @@ const LibraryScreen = () => {
                   }}
                   activeOpacity={0.7}
                 >
-                  <MaterialIcons 
-                    name="arrow-back" 
-                    size={28} 
-                    color={currentTheme.colors.white} 
+                  <MaterialIcons
+                    name="arrow-back"
+                    size={28}
+                    color={currentTheme.colors.white}
                   />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: currentTheme.colors.white, fontSize: 24, marginLeft: 16 }]}>
-                    {selectedTraktFolder 
+                    {selectedTraktFolder
                       ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection'
                       : 'Trakt Collection'
                     }
@@ -951,10 +969,10 @@ const LibraryScreen = () => {
                   onPress={() => navigation.navigate('Calendar')}
                   activeOpacity={0.7}
                 >
-                  <Feather 
-                    name="calendar" 
-                    size={24} 
-                    color={currentTheme.colors.white} 
+                  <Feather
+                    name="calendar"
+                    size={24}
+                    color={currentTheme.colors.white}
                   />
                 </TouchableOpacity>
               </>
@@ -1352,4 +1370,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LibraryScreen; 
+export default LibraryScreen;
