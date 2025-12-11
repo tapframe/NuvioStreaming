@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { getDisplayedAppVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
+import ScreenHeader from '../components/common/ScreenHeader';
 import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
 import TMDBIcon from '../components/icons/TMDBIcon';
@@ -883,11 +884,8 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
-  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   // Keep headers below floating top navigator on tablets by adding extra offset
   const tabletNavOffset = isTablet ? 64 : 0;
-  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
-  const headerHeight = headerBaseHeight + topSpacing;
 
   if (isTablet) {
     return (
@@ -1010,12 +1008,10 @@ const SettingsScreen: React.FC = () => {
       { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
       <StatusBar barStyle={'light-content'} />
+      <ScreenHeader
+        title="Settings"
+      />
       <View style={{ flex: 1 }}>
-        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-            Settings
-          </Text>
-        </View>
 
         <View style={styles.contentContainer}>
           <ScrollView
@@ -1123,20 +1119,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // Mobile styles
-  header: {
-    paddingHorizontal: Math.max(16, width * 0.05),
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingBottom: 12,
-    backgroundColor: 'transparent',
-    zIndex: 2,
-  },
-  headerTitle: {
-    fontSize: Math.min(30, width * 0.075),
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
   contentContainer: {
     flex: 1,
     zIndex: 1,
@@ -1169,7 +1151,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   sidebarTitle: {
-    fontSize: 26,
+    fontSize: 42,
     fontWeight: '700',
     letterSpacing: -0.3,
   },

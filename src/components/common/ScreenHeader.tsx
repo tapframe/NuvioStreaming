@@ -151,6 +151,7 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({
                                     style={[
                                         styles.headerTitle,
                                         { color: currentTheme.colors.text },
+                                        isTablet && { fontSize: 48 }, // Increase font size for tablet
                                         showBackButton && styles.headerTitleWithBack,
                                         titleStyle,
                                     ]}
