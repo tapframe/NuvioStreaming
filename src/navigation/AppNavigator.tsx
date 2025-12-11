@@ -1210,7 +1210,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               options={{
                 animation: 'default',
                 animationDuration: 0,
-                // Force fullscreen presentation on iPad
+                // fullScreenModal required for proper video rendering on iOS
                 presentation: 'fullScreenModal',
                 // Disable gestures during video playback
                 gestureEnabled: false,

@@ -16,12 +16,12 @@ import {
   Clipboard,
   Image as RNImage,
 } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming, 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
   withDelay,
-  runOnJS 
+  runOnJS
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -110,7 +110,7 @@ const detectMkvViaHead = async (url: string, headers?: Record<string, string>) =
 
 const QualityTag = React.memo(({ text, color, theme }: { text: string; color: string; theme: any }) => {
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
-  
+
   return (
     <View style={[styles.chip, { backgroundColor: color }]}>
       <Text style={styles.chipText}>{text}</Text>
@@ -149,7 +149,7 @@ export const StreamsScreen = () => {
   const loadStartTimeRef = useRef(0);
   const hasDoneInitialLoadRef = useRef(false);
   const isLoadingStreamsRef = useRef(false);
-  
+
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -165,23 +165,23 @@ export const StreamsScreen = () => {
     if (!isMounted.current) {
       return;
     }
-    
+
     try {
       setAlertTitle(title);
       setAlertMessage(message);
-      setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+      setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => { } }]);
       setAlertVisible(true);
     } catch (error) {
       console.warn('[StreamsScreen] Error showing alert:', error);
     }
   }, []);
 
-  
+
 
   // Track when we started fetching streams so we can show an extended loading state
   const [streamsLoadStart, setStreamsLoadStart] = useState<number | null>(null);
-  const [providerLoadTimes, setProviderLoadTimes] = useState<{[key: string]: number}>({});
-  
+  const [providerLoadTimes, setProviderLoadTimes] = useState<{ [key: string]: number }>({});
+
   // Prevent excessive re-renders by using this guard
   const guardedSetState = useCallback((setter: () => void) => {
     if (isMounted.current) {
@@ -202,7 +202,7 @@ export const StreamsScreen = () => {
   useEffect(() => {
     // Pause trailer when component mounts
     pauseTrailer();
-    
+
     // Resume trailer when component unmounts
     return () => {
       resumeTrailer();
@@ -228,7 +228,7 @@ export const StreamsScreen = () => {
   } = useMetadata({ id, type });
 
   // Get backdrop from metadata assets
-  const setMetadataStub = useCallback(() => {}, []);
+  const setMetadataStub = useCallback(() => { }, []);
   const memoizedSettings = useMemo(() => settings, [settings.logoSourcePreference, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB]);
   const { bannerImage } = useMetadataAssets(metadata, id, type, imdbId, memoizedSettings, setMetadataStub);
 
@@ -240,8 +240,8 @@ export const StreamsScreen = () => {
 
 
   // Add state for provider loading status
-  const [loadingProviders, setLoadingProviders] = useState<{[key: string]: boolean}>({});
-  
+  const [loadingProviders, setLoadingProviders] = useState<{ [key: string]: boolean }>({});
+
   // Add state for more detailed provider loading tracking
   const [providerStatus, setProviderStatus] = useState<{
     [key: string]: {
@@ -264,10 +264,10 @@ export const StreamsScreen = () => {
 
   // Add state for no sources error
   const [showNoSourcesError, setShowNoSourcesError] = useState(false);
-  
+
   // State for movie logo loading error
   const [movieLogoError, setMovieLogoError] = useState(false);
-  
+
   // Scraper logos map to avoid per-card async fetches
   const [scraperLogos, setScraperLogos] = useState<Record<string, string>>({});
   // Preload scraper logos once and expose via state
@@ -296,7 +296,7 @@ export const StreamsScreen = () => {
           const map: Record<string, string> = {};
           // No direct way to iterate Map keys safely without exposing it; copy known ids on demand during render
           setScraperLogos(prev => prev); // no-op to ensure consistency
-        }).catch(() => {});
+        }).catch(() => { });
       }
     };
     preloadScraperLogos();
@@ -306,19 +306,19 @@ export const StreamsScreen = () => {
   useEffect(() => {
     // Skip processing if component is unmounting
     if (!isMounted.current) return;
-    
+
     const currentStreamsData = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
     if (__DEV__) console.log('[StreamsScreen] streams state changed', { providerKeys: Object.keys(currentStreamsData || {}), type });
-    
+
     // Update available providers immediately when streams change
     const providersWithStreams = Object.entries(currentStreamsData)
       .filter(([_, data]) => data.streams && data.streams.length > 0)
       .map(([providerId]) => providerId);
-    
+
     if (providersWithStreams.length > 0) {
       logger.log(`📊 Providers with streams: ${providersWithStreams.join(', ')}`);
       const providersWithStreamsSet = new Set(providersWithStreams);
-      
+
       // Only update if we have new providers, don't remove existing ones during loading
       setAvailableProviders(prevProviders => {
         const newProviders = new Set([...prevProviders, ...providersWithStreamsSet]);
@@ -326,27 +326,27 @@ export const StreamsScreen = () => {
         return newProviders;
       });
     }
-    
+
     // Update loading states for individual providers
     const expectedProviders = ['stremio'];
     const now = Date.now();
-    
+
     setLoadingProviders(prevLoading => {
       const nextLoading = { ...prevLoading };
       let changed = false;
       expectedProviders.forEach(providerId => {
         const providerExists = currentStreamsData[providerId];
         const hasStreams = providerExists &&
-                          currentStreamsData[providerId].streams &&
-                          currentStreamsData[providerId].streams.length > 0;
-        
+          currentStreamsData[providerId].streams &&
+          currentStreamsData[providerId].streams.length > 0;
+
         // Stop loading if:
         // 1. Provider exists (completed) and has streams, OR
         // 2. Provider exists (completed) but has 0 streams, OR  
         // 3. Overall loading is false
         const shouldStopLoading = providerExists || !(loadingStreams || loadingEpisodeStreams);
         const value = !shouldStopLoading;
-        
+
         if (nextLoading[providerId] !== value) {
           nextLoading[providerId] = value;
           changed = true;
@@ -355,7 +355,7 @@ export const StreamsScreen = () => {
       if (changed && __DEV__) console.log('[StreamsScreen] loadingProviders ->', nextLoading);
       return changed ? nextLoading : prevLoading;
     });
-    
+
   }, [loadingStreams, loadingEpisodeStreams, groupedStreams, episodeStreams, type]);
 
   // Reset autoplay state when episode changes (but preserve fromPlayer logic)
@@ -378,8 +378,8 @@ export const StreamsScreen = () => {
     // Check if provider exists in current streams data
     const currentStreamsData = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
     const hasStreamsForProvider = currentStreamsData[selectedProvider] &&
-                                 currentStreamsData[selectedProvider].streams &&
-                                 currentStreamsData[selectedProvider].streams.length > 0;
+      currentStreamsData[selectedProvider].streams &&
+      currentStreamsData[selectedProvider].streams.length > 0;
 
     // Only reset if the provider doesn't exist in available providers AND doesn't have streams
     const isAvailableProvider = availableProviders.has(selectedProvider);
@@ -435,54 +435,54 @@ export const StreamsScreen = () => {
           }, 500);
           return () => clearTimeout(timer);
         } else {
-            // Removed cached streams pre-display logic
+          // Removed cached streams pre-display logic
 
-            // For series episodes, do not wait for metadata; load directly when episodeId is present
-            if (episodeId) {
-              logger.log(`🎬 Loading episode streams for: ${episodeId}`);
-              setLoadingProviders({
-                'stremio': true
-              });
-              setSelectedEpisode(episodeId);
-              setStreamsLoadStart(Date.now());
-              if (__DEV__) console.log('[StreamsScreen] calling loadEpisodeStreams', episodeId);
-              loadEpisodeStreams(episodeId);
-            } else if (type === 'movie') {
-              logger.log(`🎬 Loading movie streams for: ${id}`);
-              setStreamsLoadStart(Date.now());
-              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
-              loadStreams();
-            } else if (type === 'tv') {
-              // TV/live content – fetch streams directly
-              logger.log(`📺 Loading TV streams for: ${id}`);
-              setLoadingProviders({
-                'stremio': true
-              });
-              setStreamsLoadStart(Date.now());
-              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
-              loadStreams();
-            } else {
-              // Fallback: series without explicit episodeId (or other types) – fetch streams directly
-              logger.log(`🎬 Loading streams for: ${id}`);
-              setLoadingProviders({
-                'stremio': true
-              });
-              setStreamsLoadStart(Date.now());
-              if (__DEV__) console.log('[StreamsScreen] calling loadStreams (fallback)', id);
-              loadStreams();
-            }
+          // For series episodes, do not wait for metadata; load directly when episodeId is present
+          if (episodeId) {
+            logger.log(`🎬 Loading episode streams for: ${episodeId}`);
+            setLoadingProviders({
+              'stremio': true
+            });
+            setSelectedEpisode(episodeId);
+            setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadEpisodeStreams', episodeId);
+            loadEpisodeStreams(episodeId);
+          } else if (type === 'movie') {
+            logger.log(`🎬 Loading movie streams for: ${id}`);
+            setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (movie)', id);
+            loadStreams();
+          } else if (type === 'tv') {
+            // TV/live content – fetch streams directly
+            logger.log(`📺 Loading TV streams for: ${id}`);
+            setLoadingProviders({
+              'stremio': true
+            });
+            setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (tv)', id);
+            loadStreams();
+          } else {
+            // Fallback: series without explicit episodeId (or other types) – fetch streams directly
+            logger.log(`🎬 Loading streams for: ${id}`);
+            setLoadingProviders({
+              'stremio': true
+            });
+            setStreamsLoadStart(Date.now());
+            if (__DEV__) console.log('[StreamsScreen] calling loadStreams (fallback)', id);
+            loadStreams();
+          }
 
-            // Reset autoplay state when content changes
-            setAutoplayTriggered(false);
-            if (settings.autoplayBestStream && !fromPlayer) {
-              setIsAutoplayWaiting(true);
-              logger.log('🔄 Autoplay enabled, waiting for best stream...');
-            } else {
-              setIsAutoplayWaiting(false);
-              if (fromPlayer) {
-                logger.log('🚫 Autoplay disabled: returning from player');
-              }
+          // Reset autoplay state when content changes
+          setAutoplayTriggered(false);
+          if (settings.autoplayBestStream && !fromPlayer) {
+            setIsAutoplayWaiting(true);
+            logger.log('🔄 Autoplay enabled, waiting for best stream...');
+          } else {
+            setIsAutoplayWaiting(false);
+            if (fromPlayer) {
+              logger.log('🚫 Autoplay disabled: returning from player');
             }
+          }
         }
       } finally {
         isLoadingStreamsRef.current = false;
@@ -561,7 +561,7 @@ export const StreamsScreen = () => {
       // Check if any excluded language is found in the stream title or description
       const hasExcludedLanguage = settings.excludedLanguages.some(excludedLanguage => {
         const langLower = excludedLanguage.toLowerCase();
-        
+
         // Check multiple variations of the language name
         const variations = [langLower];
 
@@ -595,9 +595,9 @@ export const StreamsScreen = () => {
         } else if (langLower === 'hindi') {
           variations.push('hin');
         }
-        
+
         const matches = variations.some(variant => searchText.includes(variant));
-        
+
         if (matches) {
           console.log(`🔍 [filterStreamsByLanguage] ✕ Excluding stream with ${excludedLanguage}:`, streamName.substring(0, 100));
         }
@@ -623,19 +623,19 @@ export const StreamsScreen = () => {
     // Helper function to extract quality as number
     const getQualityNumeric = (title: string | undefined): number => {
       if (!title) return 0;
-      
+
       // Check for 4K first (treat as 2160p)
       if (/\b4k\b/i.test(title)) {
         return 2160;
       }
-      
+
       const matchWithP = title.match(/(\d+)p/i);
       if (matchWithP) return parseInt(matchWithP[1], 10);
-      
+
       const qualityPatterns = [
         /\b(240|360|480|720|1080|1440|2160|4320|8000)\b/i
       ];
-      
+
       for (const pattern of qualityPatterns) {
         const match = title.match(pattern);
         if (match) {
@@ -651,12 +651,12 @@ export const StreamsScreen = () => {
       // Get Stremio addon installation order (earlier = higher priority)
       const installedAddons = stremioService.getInstalledAddons();
       const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
-      
+
       if (addonIndex !== -1) {
         // Higher priority for addons installed earlier (reverse index)
         return 50 - addonIndex;
       }
-      
+
       return 0; // Unknown providers get lowest priority
     };
 
@@ -671,7 +671,7 @@ export const StreamsScreen = () => {
       // Apply quality and language filtering to streams before processing
       const qualityFiltered = filterStreamsByQuality(streams);
       const filteredStreams = filterStreamsByLanguage(qualityFiltered);
-      
+
       filteredStreams.forEach(stream => {
         const quality = getQualityNumeric(stream.name || stream.title);
         const providerPriority = getProviderPriority(addonId);
@@ -701,7 +701,7 @@ export const StreamsScreen = () => {
     });
 
     logger.log(`🎯 Best stream selected: ${allStreams[0].stream.name || allStreams[0].stream.title} (Quality: ${allStreams[0].quality}p, Provider Priority: ${allStreams[0].providerPriority})`);
-    
+
     return allStreams[0].stream;
   }, [filterStreamsByQuality]);
 
@@ -710,8 +710,8 @@ export const StreamsScreen = () => {
 
     // Search through all episodes in all seasons
     const allEpisodes = Object.values(groupedEpisodes).flat();
-    return allEpisodes.find(ep => 
-      ep.stremioId === selectedEpisode || 
+    return allEpisodes.find(ep =>
+      ep.stremioId === selectedEpisode ||
       `${id}:${ep.season_number}:${ep.episode_number}` === selectedEpisode
     );
   }, [selectedEpisode, groupedEpisodes, id]);
@@ -776,7 +776,7 @@ export const StreamsScreen = () => {
 
         // Fetch IMDb ratings for all seasons
         const ratings = await tmdbService.getIMDbRatings(tmdbShowId);
-        
+
         if (ratings) {
           // Create a lookup map for O(1) access: key format "season:episode" -> rating
           const ratingsMap: { [key: string]: number } = {};
@@ -790,7 +790,7 @@ export const StreamsScreen = () => {
               });
             }
           });
-          
+
           setImdbRatingsMap(ratingsMap);
         }
       } catch (err) {
@@ -805,18 +805,18 @@ export const StreamsScreen = () => {
     // Filter headers for Vidrock - only send essential headers
     const filterHeadersForVidrock = (headers: Record<string, string> | undefined): Record<string, string> | undefined => {
       if (!headers) return undefined;
-      
+
       // Only keep essential headers for Vidrock
       const essentialHeaders: Record<string, string> = {};
       if (headers['User-Agent']) essentialHeaders['User-Agent'] = headers['User-Agent'];
       if (headers['Referer']) essentialHeaders['Referer'] = headers['Referer'];
       if (headers['Origin']) essentialHeaders['Origin'] = headers['Origin'];
-      
+
       return Object.keys(essentialHeaders).length > 0 ? essentialHeaders : undefined;
     };
 
     const finalHeaders = filterHeadersForVidrock(options?.headers || stream.headers);
-    
+
     // Add logging here
     console.log('[StreamsScreen] Navigating to player with headers:', {
       streamHeaders: stream.headers,
@@ -825,17 +825,14 @@ export const StreamsScreen = () => {
       streamUrl: stream.url,
       streamName: stream.name || stream.title
     });
-    
-    // Add 50ms delay before navigating to player
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
+
     // Prepare available streams for the change source feature
     const streamsToPass = (type === 'series' || (type === 'other' && selectedEpisode)) ? episodeStreams : groupedStreams;
-    
+
     // Determine the stream name using the same logic as StreamCard
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
-    
+
     // Do NOT pre-force VLC. Let ExoPlayer try first; fallback occurs on decoder error in the player.
     let forceVlc = !!options?.forceVlc;
 
@@ -845,7 +842,7 @@ export const StreamsScreen = () => {
       const season = (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined;
       const episode = (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined;
       const episodeTitle = (type === 'series' || type === 'other') ? currentEpisode?.name : undefined;
-      
+
       await streamCacheService.saveStreamToCache(
         id,
         type,
@@ -864,7 +861,7 @@ export const StreamsScreen = () => {
 
     // Show a quick full-screen black overlay to mask rotation flicker
     // by setting a transient state that renders a covering View (implementation already supported by dark backgrounds)
-    
+
     // Infer video type for player (helps Android ExoPlayer choose correct extractor)
     const inferVideoTypeFromUrl = (u?: string): string | undefined => {
       if (!u) return undefined;
@@ -881,11 +878,11 @@ export const StreamsScreen = () => {
       if (!videoType && /xprime/i.test(providerId)) {
         videoType = 'm3u8';
       }
-    } catch {}
+    } catch { }
 
     // Simple platform check - iOS uses KSPlayerCore, Android uses AndroidVideoPlayer
     const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
-    
+
     navigation.navigate(playerRoute as any, {
       uri: stream.url,
       title: metadata?.name || '',
@@ -920,7 +917,7 @@ export const StreamsScreen = () => {
         if (typeof stream.url === 'string' && stream.url.startsWith('magnet:')) {
           try {
             openAlert('Not supported', 'Torrent streaming is not supported yet.');
-          } catch (_e) {}
+          } catch (_e) { }
           return;
         }
         // If stream is actually MKV format, force the in-app VLC-based player on iOS
@@ -975,14 +972,14 @@ export const StreamsScreen = () => {
           useExternalPlayer: settings.useExternalPlayer,
           preferredPlayer: settings.preferredPlayer
         });
-        
+
         // For iOS, try to open with the preferred external player
         if (Platform.OS === 'ios' && settings.preferredPlayer !== 'internal') {
           try {
             // Format the URL for the selected player
             const streamUrl = encodeURIComponent(stream.url);
             let externalPlayerUrls: string[] = [];
-            
+
             // Configure URL formats based on the selected player
             switch (settings.preferredPlayer) {
               case 'vlc':
@@ -992,7 +989,7 @@ export const StreamsScreen = () => {
                   `vlc://${streamUrl}`
                 ];
                 break;
-                
+
               case 'outplayer':
                 externalPlayerUrls = [
                   `outplayer://${stream.url}`,
@@ -1002,7 +999,7 @@ export const StreamsScreen = () => {
                   `outplayer://play/browser?url=${streamUrl}`
                 ];
                 break;
-                
+
               case 'infuse':
                 externalPlayerUrls = [
                   `infuse://x-callback-url/play?url=${streamUrl}`,
@@ -1010,14 +1007,14 @@ export const StreamsScreen = () => {
                   `infuse://${streamUrl}`
                 ];
                 break;
-                
+
               case 'vidhub':
                 externalPlayerUrls = [
                   `vidhub://play?url=${streamUrl}`,
                   `vidhub://${streamUrl}`
                 ];
                 break;
-                
+
               case 'infuse_livecontainer':
                 const infuseUrls = [
                   `infuse://x-callback-url/play?url=${streamUrl}`,
@@ -1029,15 +1026,15 @@ export const StreamsScreen = () => {
                   return `livecontainer://open-url?url=${encoded}`;
                 });
                 break;
-              
+
               default:
                 // If no matching player or the setting is somehow invalid, use internal player
                 navigateToPlayer(stream);
                 return;
             }
-            
+
             if (__DEV__) console.log(`Attempting to open stream in ${settings.preferredPlayer}`);
-            
+
             // Try each URL format in sequence
             const tryNextUrl = (index: number) => {
               if (index >= externalPlayerUrls.length) {
@@ -1051,10 +1048,10 @@ export const StreamsScreen = () => {
                   });
                 return;
               }
-              
+
               const url = externalPlayerUrls[index];
               if (__DEV__) console.log(`Trying ${settings.preferredPlayer} URL format ${index + 1}: ${url}`);
-              
+
               Linking.openURL(url)
                 .then(() => { if (__DEV__) console.log(`Successfully opened stream with ${settings.preferredPlayer} format ${index + 1}`); })
                 .catch(err => {
@@ -1062,31 +1059,31 @@ export const StreamsScreen = () => {
                   tryNextUrl(index + 1);
                 });
             };
-            
+
             // Start with the first URL format
             tryNextUrl(0);
-            
+
           } catch (error) {
             if (__DEV__) console.error(`Error with ${settings.preferredPlayer}:`, error);
             // Fallback to the built-in player
             navigateToPlayer(stream);
           }
-        } 
+        }
         // For Android with external player preference
         else if (Platform.OS === 'android' && settings.useExternalPlayer) {
           try {
             if (__DEV__) console.log('Opening stream with Android native app chooser');
-            
+
             // For Android, determine if the URL is a direct http/https URL or a magnet link
             const isMagnet = typeof stream.url === 'string' && stream.url.startsWith('magnet:');
-            
+
             if (isMagnet) {
               // For magnet links, open directly which will trigger the torrent app chooser
               if (__DEV__) console.log('Opening magnet link directly');
               Linking.openURL(stream.url)
                 .then(() => { if (__DEV__) console.log('Successfully opened magnet link'); })
-                  .catch(err => {
-                    if (__DEV__) console.error('Failed to open magnet link:', err);
+                .catch(err => {
+                  if (__DEV__) console.error('Failed to open magnet link:', err);
                   // No good fallback for magnet links
                   navigateToPlayer(stream);
                 });
@@ -1098,10 +1095,10 @@ export const StreamsScreen = () => {
                 episodeTitle: (type === 'series' || type === 'other') ? currentEpisode?.name : undefined,
                 episodeNumber: (type === 'series' || type === 'other') && currentEpisode ? `S${currentEpisode.season_number}E${currentEpisode.episode_number}` : undefined,
               });
-              
+
               if (!success) {
                 if (__DEV__) console.log('VideoPlayerService failed, falling back to built-in player');
-                      navigateToPlayer(stream);
+                navigateToPlayer(stream);
               }
             }
           } catch (error) {
@@ -1132,32 +1129,32 @@ export const StreamsScreen = () => {
           // Trigger a small state update to force re-render
           setStreamsLoadStart(prev => prev);
         }, 100);
-        
+
         return () => {
           clearTimeout(renderTimer);
         };
       }
-      return () => {};
+      return () => { };
     }, [])
   );
 
   // Autoplay effect - triggers immediately when streams are available and autoplay is enabled
   useEffect(() => {
     if (
-      settings.autoplayBestStream && 
-      !autoplayTriggered && 
+      settings.autoplayBestStream &&
+      !autoplayTriggered &&
       isAutoplayWaiting
     ) {
       const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
-      
+
       if (Object.keys(streams).length > 0) {
         const bestStream = getBestStream(streams);
-        
+
         if (bestStream) {
           logger.log('🚀 Autoplay: Best stream found, starting playback immediately...');
           setAutoplayTriggered(true);
           setIsAutoplayWaiting(false);
-          
+
           // Start playback immediately - no delay needed
           handleStreamPress(bestStream);
         } else {
@@ -1180,20 +1177,20 @@ export const StreamsScreen = () => {
   const filterItems = useMemo(() => {
     const installedAddons = stremioService.getInstalledAddons();
     const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
-    
+
     // Only include providers that actually have streams
     const providersWithStreams = Object.keys(streams).filter(key => {
       const providerData = streams[key];
       if (!providerData || !providerData.streams) {
         return false;
       }
-      
+
       // Only show providers (addons or plugins) if they have actual streams
       return providerData.streams.length > 0;
     });
-    
+
     const allProviders = new Set([
-      ...Array.from(availableProviders).filter((provider: string) => 
+      ...Array.from(availableProviders).filter((provider: string) =>
         streams[provider] && streams[provider].streams && streams[provider].streams.length > 0
       ),
       ...providersWithStreams
@@ -1203,7 +1200,7 @@ export const StreamsScreen = () => {
     if (settings.streamDisplayMode === 'grouped') {
       const addonProviders: string[] = [];
       const pluginProviders: string[] = [];
-      
+
       Array.from(allProviders).forEach(provider => {
         const isInstalledAddon = installedAddons.some(addon => addon.id === provider);
         if (isInstalledAddon) {
@@ -1212,9 +1209,9 @@ export const StreamsScreen = () => {
           pluginProviders.push(provider);
         }
       });
-      
+
       const filterChips = [{ id: 'all', name: 'All Providers' }];
-      
+
       // Add individual addon chips
       addonProviders
         .sort((a, b) => {
@@ -1226,12 +1223,12 @@ export const StreamsScreen = () => {
           const installedAddon = installedAddons.find(addon => addon.id === provider);
           filterChips.push({ id: provider, name: installedAddon?.name || provider });
         });
-      
+
       // Add single grouped plugins chip if there are any plugins with streams
       if (pluginProviders.length > 0) {
         filterChips.push({ id: 'grouped-plugins', name: localScraperService.getRepositoryName() });
       }
-      
+
       return filterChips;
     }
 
@@ -1243,7 +1240,7 @@ export const StreamsScreen = () => {
           // Sort by Stremio addon installation order
           const indexA = installedAddons.findIndex(addon => addon.id === a);
           const indexB = installedAddons.findIndex(addon => addon.id === b);
-          
+
           if (indexA !== -1 && indexB !== -1) return indexA - indexB;
           if (indexA !== -1) return -1;
           if (indexB !== -1) return 1;
@@ -1251,14 +1248,14 @@ export const StreamsScreen = () => {
         })
         .map(provider => {
           const addonInfo = streams[provider];
-          
+
           // Standard handling for Stremio addons
           const installedAddon = installedAddons.find(addon => addon.id === provider);
-          
+
           let displayName = provider;
           if (installedAddon) displayName = installedAddon.name;
           else if (addonInfo?.addonName) displayName = addonInfo.addonName;
-          
+
           return { id: provider, name: displayName };
         })
     ];
@@ -1267,7 +1264,7 @@ export const StreamsScreen = () => {
   const sections: Array<{ title: string; addonId: string; data: Stream[]; isEmptyDueToQualityFilter?: boolean } | null> = useMemo(() => {
     const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
-    
+
     console.log('🔍 [StreamsScreen] Sections debug:', {
       streamsKeys: Object.keys(streams),
       installedAddons: installedAddons.map(a => ({ id: a.id, name: a.name })),
@@ -1297,7 +1294,7 @@ export const StreamsScreen = () => {
         // Otherwise only show the selected provider
         return addonId === selectedProvider;
       });
-      
+
     console.log('🔍 [StreamsScreen] Filtered entries:', {
       filteredCount: filteredEntries.length,
       filteredEntries: filteredEntries.map(([addonId, data]) => ({
@@ -1306,24 +1303,24 @@ export const StreamsScreen = () => {
         streamCount: data.streams?.length || 0
       }))
     });
-    
+
     const sortedEntries = filteredEntries.sort(([addonIdA], [addonIdB]) => {
-        // Sort by response order (actual order addons responded)
-        const indexA = addonResponseOrder.indexOf(addonIdA);
-        const indexB = addonResponseOrder.indexOf(addonIdB);
-        
-        // If both are in response order, sort by response order
-        if (indexA !== -1 && indexB !== -1) {
-          return indexA - indexB;
-        }
-        
-        // If only one is in response order, prioritize it
-        if (indexA !== -1) return -1;
-        if (indexB !== -1) return 1;
-        
-        // If neither is in response order, maintain original order
-        return 0;
-      });
+      // Sort by response order (actual order addons responded)
+      const indexA = addonResponseOrder.indexOf(addonIdA);
+      const indexB = addonResponseOrder.indexOf(addonIdB);
+
+      // If both are in response order, sort by response order
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+
+      // If only one is in response order, prioritize it
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+
+      // If neither is in response order, maintain original order
+      return 0;
+    });
 
     // Check if we should group all streams under one section
     if (settings.streamDisplayMode === 'grouped') {
@@ -1436,7 +1433,7 @@ export const StreamsScreen = () => {
         data: combinedStreams,
         isEmptyDueToQualityFilter: false
       }];
-      
+
       console.log('🔍 [StreamsScreen] Grouped mode result:', {
         resultCount: result.length,
         combinedStreamsCount: combinedStreams.length,
@@ -1444,7 +1441,7 @@ export const StreamsScreen = () => {
         pluginStreamsCount: pluginStreams.length,
         totalOriginalCount
       });
-      
+
       return result;
     } else {
       // Use separate sections for each provider (current behavior)
@@ -1554,7 +1551,7 @@ export const StreamsScreen = () => {
           data: processedStreams,
           isEmptyDueToQualityFilter: false
         };
-        
+
         console.log('🔍 [StreamsScreen] Individual mode result:', {
           addonId,
           addonName,
@@ -1562,12 +1559,12 @@ export const StreamsScreen = () => {
           originalCount,
           isInstalledAddon
         });
-        
+
         return result;
       }).filter(Boolean); // Filter out null values
     }
   }, [selectedProvider, type, episodeStreams, groupedStreams, settings.streamDisplayMode, filterStreamsByQuality, addonResponseOrder, settings.streamSortMode, selectedEpisode, metadata]);
-  
+
   // Debug log for sections result
   React.useEffect(() => {
     console.log('🔍 [StreamsScreen] Final sections:', {
@@ -1611,13 +1608,13 @@ export const StreamsScreen = () => {
   // Effective rating for hero (series) - prioritize IMDb, fallback to TMDB
   const effectiveEpisodeVote = useMemo(() => {
     if (!currentEpisode) return 0;
-    
+
     // Try IMDb rating first
     const imdbRating = getIMDbRating(currentEpisode.season_number, currentEpisode.episode_number);
     if (imdbRating !== null) {
       return imdbRating;
     }
-    
+
     // Fallback to TMDB
     const v = (tmdbEpisodeOverride?.vote_average ?? currentEpisode.vote_average) || 0;
     return typeof v === 'number' ? v : Number(v) || 0;
@@ -1646,14 +1643,14 @@ export const StreamsScreen = () => {
         return bannerImage;
       }
     }
-    
+
     // For movies: prioritize bannerImage
     if (type === 'movie') {
       if (bannerImage) {
         return bannerImage;
       }
     }
-    
+
     // For other types or when no specific image available
     return bannerImage || episodeImage;
   }, [type, selectedEpisode, episodeImage, bannerImage]);
@@ -1664,7 +1661,7 @@ export const StreamsScreen = () => {
     if (!settings.enableStreamsBackdrop) {
       return null;
     }
-    
+
     if (type === 'series' || (type === 'other' && selectedEpisode)) {
       // Only use episodeImage - don't fallback to bannerImage
       // This ensures we get episode-specific colors, not show-wide colors
@@ -1687,7 +1684,7 @@ export const StreamsScreen = () => {
     }
     // Deduplicate and prefetch
     Array.from(new Set(urls)).forEach(u => {
-      RNImage.prefetch(u).catch(() => {});
+      RNImage.prefetch(u).catch(() => { });
     });
   }, [episodeImage, bannerImage, metadata]);
 
@@ -1697,10 +1694,10 @@ export const StreamsScreen = () => {
     if (settings.enableStreamsBackdrop) {
       return ['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.95)'];
     }
-    
+
     // When backdrop is disabled, use theme background gradient
     const themeBg = colors.darkBackground;
-    
+
     // Handle hex color format (e.g., #1a1a1a)
     if (themeBg.startsWith('#')) {
       const r = parseInt(themeBg.substr(1, 2), 16);
@@ -1714,7 +1711,7 @@ export const StreamsScreen = () => {
         `rgba(${r},${g},${b},0.95)`,
       ];
     }
-    
+
     // Handle rgb color format (e.g., rgb(26, 26, 26))
     const rgbMatch = themeBg.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
     if (rgbMatch) {
@@ -1727,17 +1724,17 @@ export const StreamsScreen = () => {
         `rgba(${r},${g},${b},0.95)`,
       ];
     }
-    
+
     if (!baseColor || baseColor === '#1a1a1a') {
       // Fallback to black gradient with stronger bottom edge
       return ['rgba(0,0,0,0)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.85)', 'rgba(0,0,0,0.95)'];
     }
-    
+
     // Convert hex to RGB
     const r = parseInt(baseColor.substr(1, 2), 16);
     const g = parseInt(baseColor.substr(3, 2), 16);
     const b = parseInt(baseColor.substr(5, 2), 16);
-    
+
     // Create gradient stops with much stronger opacity at bottom
     return [
       `rgba(${r},${g},${b},0)`,
@@ -1748,8 +1745,8 @@ export const StreamsScreen = () => {
     ];
   }, [settings.enableStreamsBackdrop, colors.darkBackground]);
 
-  const gradientColors = useMemo(() => 
-    createGradientColors(dominantColor), 
+  const gradientColors = useMemo(() =>
+    createGradientColors(dominantColor),
     [dominantColor, createGradientColors]
   );
 
@@ -1757,7 +1754,7 @@ export const StreamsScreen = () => {
   const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
 
   // Determine extended loading phases
-  const streamsEmpty = Object.keys(streams).length === 0 || 
+  const streamsEmpty = Object.keys(streams).length === 0 ||
     Object.values(streams).every(provider => !provider.streams || provider.streams.length === 0);
   const loadElapsed = streamsLoadStart ? Date.now() - streamsLoadStart : 0;
   const showInitialLoading = streamsEmpty && (streamsLoadStart === null || loadElapsed < 10000);
@@ -1818,266 +1815,266 @@ export const StreamsScreen = () => {
 
   return (
     <PaperProvider>
-    <View style={styles.container}>
-      <StatusBar
-        translucent
-        backgroundColor="transparent"
-        barStyle="light-content"
-      />
-      
-      
-      {Platform.OS !== 'ios' && (
-        <View
-          style={[styles.backButtonContainer, isTablet && styles.backButtonContainerTablet]}
-        >
-          <TouchableOpacity 
-            style={[
-              styles.backButton,
-              Platform.OS === 'android' ? { paddingTop: 45 } : null
-            ]}
-            onPress={handleBack}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={colors.white} />
-            <Text style={styles.backButtonText}>
-              {metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? 'Back to Episodes' : 'Back to Info'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {isTablet ? (
-        <TabletStreamsLayout
-          episodeImage={episodeImage}
-          bannerImage={bannerImage}
-          metadata={metadata}
-          type={type}
-          currentEpisode={currentEpisode}
-          movieLogoError={movieLogoError}
-          setMovieLogoError={setMovieLogoError}
-          streamsEmpty={streamsEmpty}
-          selectedProvider={selectedProvider}
-          filterItems={filterItems}
-          handleProviderChange={handleProviderChange}
-          activeFetchingScrapers={activeFetchingScrapers}
-          isAutoplayWaiting={isAutoplayWaiting}
-          autoplayTriggered={autoplayTriggered}
-          showNoSourcesError={showNoSourcesError}
-          showInitialLoading={showInitialLoading}
-          showStillFetching={showStillFetching}
-          sections={sections}
-          renderSectionHeader={renderSectionHeader}
-          handleStreamPress={handleStreamPress}
-          openAlert={openAlert}
-          settings={settings}
-          currentTheme={currentTheme}
-          colors={colors}
-          navigation={navigation}
-          insets={insets}
-          streams={streams}
-          scraperLogos={scraperLogos}
-          id={id}
-          imdbId={imdbId || undefined}
-          loadingStreams={loadingStreams}
-          loadingEpisodeStreams={loadingEpisodeStreams}
-          hasStremioStreamProviders={hasStremioStreamProviders}
+      <View style={styles.container}>
+        <StatusBar
+          translucent
+          backgroundColor="transparent"
+          barStyle="light-content"
         />
-      ) : (
-        // PHONE LAYOUT (existing structure)
-        <>
-          {/* Full Screen Background for Mobile */}
-          {settings.enableStreamsBackdrop ? (
-            <View style={StyleSheet.absoluteFill}>
-              {mobileBackdropSource ? (
-                <AnimatedImage
-                  source={{ uri: mobileBackdropSource }}
-                  style={styles.mobileFullScreenBackground}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={styles.mobileNoBackdropBackground} />
-              )}
-              {Platform.OS === 'android' && AndroidBlurView ? (
-                <AndroidBlurView
-                  blurAmount={15}
-                  blurRadius={25}
-                  overlayColor={"rgba(0,0,0,0.85)"}
-                  style={StyleSheet.absoluteFill}
-                />
-              ) : (
-                <ExpoBlurView
-                  intensity={60}
-                  tint="dark"
-                  style={StyleSheet.absoluteFill}
-                />
-              )}
-              {/* Dark overlay to reduce brightness */}
-              {Platform.OS === 'ios' && (
-                <View style={[
-                  StyleSheet.absoluteFill,
-                  { backgroundColor: 'rgba(0,0,0,0.8)' }
-                ]} />
-              )}
-            </View>
-          ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.darkBackground }]} />
-          )}
 
-          {type === 'movie' && metadata && (
-            <View style={[
-              styles.movieTitleContainer,
-              !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
-            ]}>
-              <View style={styles.movieTitleContent}>
-                {metadata.logo && !movieLogoError ? (
-                  <FastImage
-                    source={{ uri: metadata.logo }}
-                    style={styles.movieLogo}
-                    resizeMode={FastImage.resizeMode.contain}
-                    onError={() => setMovieLogoError(true)}
-                  />
-                ) : (
-                  <AnimatedText style={styles.movieTitle} numberOfLines={2}>
-                    {metadata.name}
-                  </AnimatedText>
-                )}
-              </View>
-            </View>
-          )}
 
-{currentEpisode && (
-            <View style={[
-              styles.streamsHeroContainer,
-              !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
-            ]}>
+        {Platform.OS !== 'ios' && (
+          <View
+            style={[styles.backButtonContainer, isTablet && styles.backButtonContainerTablet]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.backButton,
+                Platform.OS === 'android' ? { paddingTop: 45 } : null
+              ]}
+              onPress={handleBack}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="arrow-back" size={24} color={colors.white} />
+              <Text style={styles.backButtonText}>
+                {metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? 'Back to Episodes' : 'Back to Info'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isTablet ? (
+          <TabletStreamsLayout
+            episodeImage={episodeImage}
+            bannerImage={bannerImage}
+            metadata={metadata}
+            type={type}
+            currentEpisode={currentEpisode}
+            movieLogoError={movieLogoError}
+            setMovieLogoError={setMovieLogoError}
+            streamsEmpty={streamsEmpty}
+            selectedProvider={selectedProvider}
+            filterItems={filterItems}
+            handleProviderChange={handleProviderChange}
+            activeFetchingScrapers={activeFetchingScrapers}
+            isAutoplayWaiting={isAutoplayWaiting}
+            autoplayTriggered={autoplayTriggered}
+            showNoSourcesError={showNoSourcesError}
+            showInitialLoading={showInitialLoading}
+            showStillFetching={showStillFetching}
+            sections={sections}
+            renderSectionHeader={renderSectionHeader}
+            handleStreamPress={handleStreamPress}
+            openAlert={openAlert}
+            settings={settings}
+            currentTheme={currentTheme}
+            colors={colors}
+            navigation={navigation}
+            insets={insets}
+            streams={streams}
+            scraperLogos={scraperLogos}
+            id={id}
+            imdbId={imdbId || undefined}
+            loadingStreams={loadingStreams}
+            loadingEpisodeStreams={loadingEpisodeStreams}
+            hasStremioStreamProviders={hasStremioStreamProviders}
+          />
+        ) : (
+          // PHONE LAYOUT (existing structure)
+          <>
+            {/* Full Screen Background for Mobile */}
+            {settings.enableStreamsBackdrop ? (
               <View style={StyleSheet.absoluteFill}>
-                <View
-                  style={StyleSheet.absoluteFill}
-                >
+                {mobileBackdropSource ? (
                   <AnimatedImage
-                    source={episodeImage ? { uri: episodeImage } : undefined}
-                    style={styles.streamsHeroBackground}
+                    source={{ uri: mobileBackdropSource }}
+                    style={styles.mobileFullScreenBackground}
                     contentFit="cover"
                   />
-                   <LinearGradient
-                     colors={gradientColors}
-                     locations={[0, 0.4, 0.6, 0.8, 1]}
-                     style={styles.streamsHeroGradient}
-                   >
-                    <View style={styles.streamsHeroContent}>
-                      {currentEpisode ? (
-                        <View style={styles.streamsHeroInfo}>
-                          <AnimatedText style={styles.streamsHeroEpisodeNumber} delay={50}>
-                            {currentEpisode.episodeString}
-                          </AnimatedText>
-                          <AnimatedText style={styles.streamsHeroTitle} numberOfLines={1} delay={100}>
-                            {currentEpisode.name}
-                          </AnimatedText>
-                          {!!currentEpisode.overview && (
-                            <AnimatedView delay={150}>
-                              <Text style={styles.streamsHeroOverview} numberOfLines={2}>
-                                {currentEpisode.overview}
-                              </Text>
-                            </AnimatedView>
-                          )}
-                          <AnimatedView style={styles.streamsHeroMeta} delay={200}>
-                            <Text style={styles.streamsHeroReleased}>
-                              {tmdbService.formatAirDate(currentEpisode.air_date)}
-                            </Text>
-                            {effectiveEpisodeVote > 0 && (
-                              <View style={styles.streamsHeroRating}>
-                                {hasIMDbRating ? (
-                                  <>
-                                    <FastImage source={{ uri: IMDb_LOGO }} style={styles.imdbLogo} resizeMode={FastImage.resizeMode.contain} />
-                                    <Text style={[styles.streamsHeroRatingText, { color: '#F5C518' }]}>
-                                      {effectiveEpisodeVote.toFixed(1)}
-                                    </Text>
-                                  </>
-                                ) : (
-                                  <>
-                                    <FastImage source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} resizeMode={FastImage.resizeMode.contain} />
-                                    <Text style={styles.streamsHeroRatingText}>
-                                      {effectiveEpisodeVote.toFixed(1)}
-                                    </Text>
-                                  </>
-                                )}
-                              </View>
-                            )}
-                            {!!effectiveEpisodeRuntime && (
-                              <View style={styles.streamsHeroRuntime}>
-                                <MaterialIcons name="schedule" size={16} color={colors.mediumEmphasis} />
-                                <Text style={styles.streamsHeroRuntimeText}>
-                                  {effectiveEpisodeRuntime >= 60
-                                    ? `${Math.floor(effectiveEpisodeRuntime / 60)}h ${effectiveEpisodeRuntime % 60}m`
-                                    : `${effectiveEpisodeRuntime}m`}
-                                </Text>
-                              </View>
-                            )}
-                          </AnimatedView>
-                        </View>
-                      ) : (
-                        // Placeholder to reserve space and avoid layout shift while loading
-                        <View style={{ width: '100%', height: 120 }} />
-                      )}
-                    </View>
-                  </LinearGradient>
-                </View>
+                ) : (
+                  <View style={styles.mobileNoBackdropBackground} />
+                )}
+                {Platform.OS === 'android' && AndroidBlurView ? (
+                  <AndroidBlurView
+                    blurAmount={15}
+                    blurRadius={25}
+                    overlayColor={"rgba(0,0,0,0.85)"}
+                    style={StyleSheet.absoluteFill}
+                  />
+                ) : (
+                  <ExpoBlurView
+                    intensity={60}
+                    tint="dark"
+                    style={StyleSheet.absoluteFill}
+                  />
+                )}
+                {/* Dark overlay to reduce brightness */}
+                {Platform.OS === 'ios' && (
+                  <View style={[
+                    StyleSheet.absoluteFill,
+                    { backgroundColor: 'rgba(0,0,0,0.8)' }
+                  ]} />
+                )}
               </View>
-            </View>
-          )}
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.darkBackground }]} />
+            )}
 
-          {/* Gradient overlay to blend hero section with streams container */}
-          {metadata?.videos && metadata.videos.length > 1 && selectedEpisode && (
-            <View style={styles.heroBlendOverlay}>
-              <LinearGradient
-                colors={settings.enableStreamsBackdrop ? [
-                  'rgba(0,0,0,0.98)',
-                  'rgba(0,0,0,0.85)',
-                  'transparent'
-                ] : [
-                  colors.darkBackground,
-                  colors.darkBackground,
-                  'transparent'
-                ]}
-                locations={[0, 0.4, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-            </View>
-          )}
-
-          <View style={[
-            styles.streamsMainContent,
-            type === 'movie' && styles.streamsMainContentMovie,
-            !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
-          ]}>
-            <View style={[styles.filterContainer]}>
-              {!streamsEmpty && (
-                <ProviderFilter
-                  selectedProvider={selectedProvider}
-                  providers={filterItems}
-                  onSelect={handleProviderChange}
-                  theme={currentTheme}
-                />
-              )}
-            </View>
-
-            {/* Active Scrapers Status */}
-            {activeFetchingScrapers.length > 0 && (
-              <View 
-                style={styles.activeScrapersContainer}
-              >
-                <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
-                <View style={styles.activeScrapersRow}>
-                  {activeFetchingScrapers.map((scraperName, index) => (
-                    <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
-                  ))}
+            {type === 'movie' && metadata && (
+              <View style={[
+                styles.movieTitleContainer,
+                !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
+              ]}>
+                <View style={styles.movieTitleContent}>
+                  {metadata.logo && !movieLogoError ? (
+                    <FastImage
+                      source={{ uri: metadata.logo }}
+                      style={styles.movieLogo}
+                      resizeMode={FastImage.resizeMode.contain}
+                      onError={() => setMovieLogoError(true)}
+                    />
+                  ) : (
+                    <AnimatedText style={styles.movieTitle} numberOfLines={2}>
+                      {metadata.name}
+                    </AnimatedText>
+                  )}
                 </View>
               </View>
             )}
 
-            {/* Update the streams/loading state display logic */}
-            { showNoSourcesError ? (
-                <View 
+            {currentEpisode && (
+              <View style={[
+                styles.streamsHeroContainer,
+                !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
+              ]}>
+                <View style={StyleSheet.absoluteFill}>
+                  <View
+                    style={StyleSheet.absoluteFill}
+                  >
+                    <AnimatedImage
+                      source={episodeImage ? { uri: episodeImage } : undefined}
+                      style={styles.streamsHeroBackground}
+                      contentFit="cover"
+                    />
+                    <LinearGradient
+                      colors={gradientColors}
+                      locations={[0, 0.4, 0.6, 0.8, 1]}
+                      style={styles.streamsHeroGradient}
+                    >
+                      <View style={styles.streamsHeroContent}>
+                        {currentEpisode ? (
+                          <View style={styles.streamsHeroInfo}>
+                            <AnimatedText style={styles.streamsHeroEpisodeNumber} delay={50}>
+                              {currentEpisode.episodeString}
+                            </AnimatedText>
+                            <AnimatedText style={styles.streamsHeroTitle} numberOfLines={1} delay={100}>
+                              {currentEpisode.name}
+                            </AnimatedText>
+                            {!!currentEpisode.overview && (
+                              <AnimatedView delay={150}>
+                                <Text style={styles.streamsHeroOverview} numberOfLines={2}>
+                                  {currentEpisode.overview}
+                                </Text>
+                              </AnimatedView>
+                            )}
+                            <AnimatedView style={styles.streamsHeroMeta} delay={200}>
+                              <Text style={styles.streamsHeroReleased}>
+                                {tmdbService.formatAirDate(currentEpisode.air_date)}
+                              </Text>
+                              {effectiveEpisodeVote > 0 && (
+                                <View style={styles.streamsHeroRating}>
+                                  {hasIMDbRating ? (
+                                    <>
+                                      <FastImage source={{ uri: IMDb_LOGO }} style={styles.imdbLogo} resizeMode={FastImage.resizeMode.contain} />
+                                      <Text style={[styles.streamsHeroRatingText, { color: '#F5C518' }]}>
+                                        {effectiveEpisodeVote.toFixed(1)}
+                                      </Text>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <FastImage source={{ uri: TMDB_LOGO }} style={styles.tmdbLogo} resizeMode={FastImage.resizeMode.contain} />
+                                      <Text style={styles.streamsHeroRatingText}>
+                                        {effectiveEpisodeVote.toFixed(1)}
+                                      </Text>
+                                    </>
+                                  )}
+                                </View>
+                              )}
+                              {!!effectiveEpisodeRuntime && (
+                                <View style={styles.streamsHeroRuntime}>
+                                  <MaterialIcons name="schedule" size={16} color={colors.mediumEmphasis} />
+                                  <Text style={styles.streamsHeroRuntimeText}>
+                                    {effectiveEpisodeRuntime >= 60
+                                      ? `${Math.floor(effectiveEpisodeRuntime / 60)}h ${effectiveEpisodeRuntime % 60}m`
+                                      : `${effectiveEpisodeRuntime}m`}
+                                  </Text>
+                                </View>
+                              )}
+                            </AnimatedView>
+                          </View>
+                        ) : (
+                          // Placeholder to reserve space and avoid layout shift while loading
+                          <View style={{ width: '100%', height: 120 }} />
+                        )}
+                      </View>
+                    </LinearGradient>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Gradient overlay to blend hero section with streams container */}
+            {metadata?.videos && metadata.videos.length > 1 && selectedEpisode && (
+              <View style={styles.heroBlendOverlay}>
+                <LinearGradient
+                  colors={settings.enableStreamsBackdrop ? [
+                    'rgba(0,0,0,0.98)',
+                    'rgba(0,0,0,0.85)',
+                    'transparent'
+                  ] : [
+                    colors.darkBackground,
+                    colors.darkBackground,
+                    'transparent'
+                  ]}
+                  locations={[0, 0.4, 1]}
+                  style={StyleSheet.absoluteFill}
+                />
+              </View>
+            )}
+
+            <View style={[
+              styles.streamsMainContent,
+              type === 'movie' && styles.streamsMainContentMovie,
+              !settings.enableStreamsBackdrop && { backgroundColor: colors.darkBackground }
+            ]}>
+              <View style={[styles.filterContainer]}>
+                {!streamsEmpty && (
+                  <ProviderFilter
+                    selectedProvider={selectedProvider}
+                    providers={filterItems}
+                    onSelect={handleProviderChange}
+                    theme={currentTheme}
+                  />
+                )}
+              </View>
+
+              {/* Active Scrapers Status */}
+              {activeFetchingScrapers.length > 0 && (
+                <View
+                  style={styles.activeScrapersContainer}
+                >
+                  <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
+                  <View style={styles.activeScrapersRow}>
+                    {activeFetchingScrapers.map((scraperName, index) => (
+                      <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Update the streams/loading state display logic */}
+              {showNoSourcesError ? (
+                <View
                   style={styles.noStreams}
                 >
                   <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
@@ -2092,140 +2089,140 @@ export const StreamsScreen = () => {
                     <Text style={styles.addSourcesButtonText}>Add Sources</Text>
                   </TouchableOpacity>
                 </View>
-            ) : streamsEmpty ? (
-              showInitialLoading ? (
-                <View 
-                  style={styles.loadingContainer}
-                >
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={styles.loadingText}>
-                    {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
-                  </Text>
-                </View>
-              ) : showStillFetching ? (
-                <View 
-                  style={styles.loadingContainer}
-                >
-                  <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
-                  <Text style={styles.loadingText}>Still fetching streams…</Text>
-                </View>
-              ) : (
-                // No streams and not loading = no streams available
-                <View 
-                  style={styles.noStreams}
-                >
-                  <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
-                  <Text style={styles.noStreamsText}>No streams available</Text>
-                </View>
-              )
-            ) : (
-              // Show streams immediately when available, even if still loading others
-              <View collapsable={false} style={{ flex: 1 }}>
-                {/* Show autoplay loading overlay if waiting for autoplay */}
-                {isAutoplayWaiting && !autoplayTriggered && (
-                  <View 
-                    style={styles.autoplayOverlay}
+              ) : streamsEmpty ? (
+                showInitialLoading ? (
+                  <View
+                    style={styles.loadingContainer}
                   >
-                    <View style={styles.autoplayIndicator}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={styles.autoplayText}>Starting best stream...</Text>
-                    </View>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={styles.loadingText}>
+                      {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
+                    </Text>
                   </View>
-                )}
-                
-                <ScrollView
-                  style={styles.streamsContent}
-                  contentContainerStyle={[
-                    styles.streamsContainer,
-                    { paddingBottom: insets.bottom + 100 } // Add safe area + extra padding
-                  ]}
-                  showsVerticalScrollIndicator={false}
-                  bounces={true}
-                  overScrollMode="never"
-                  // iOS-specific fixes for navigation transition glitches
-                  {...(Platform.OS === 'ios' && {
-                    // Ensure proper rendering during transitions
-                    removeClippedSubviews: false, // Prevent iOS from clipping views during transitions
-                    // Force hardware acceleration for smoother transitions
-                    scrollEventThrottle: 16,
-                  })}
-                >
-                  {sections.filter(Boolean).map((section, sectionIndex) => (
-                    <View key={section!.addonId || sectionIndex}>
-                      {/* Section Header */}
-                      {renderSectionHeader({ section: section! })}
-                      
-                      {/* Stream Cards using FlatList */}
-                      {section!.data && section!.data.length > 0 ? (
-                        <FlatList
-                          data={section!.data}
-                          keyExtractor={(item, index) => {
-                            if (item && item.url) {
-                              return `${item.url}-${sectionIndex}-${index}`;
-                            }
-                            return `empty-${sectionIndex}-${index}`;
-                          }}
-                          renderItem={({ item, index }) => (
-                            <View>
-                              <StreamCard
-                                stream={item}
-                                onPress={() => handleStreamPress(item)}
-                                index={index}
-                                isLoading={false}
-                                statusMessage={undefined}
-                                theme={currentTheme}
-                                showLogos={settings.showScraperLogos}
-                                scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
-                                showAlert={(t, m) => openAlert(t, m)}
-                                parentTitle={metadata?.name}
-                                parentType={type as 'movie' | 'series'}
-                                parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
-                                parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
-                                parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
-                                parentPosterUrl={episodeImage || metadata?.poster || undefined}
-                                providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
-                                parentId={id}
-                                parentImdbId={imdbId || undefined}
-                              />
-                            </View>
-                          )}
-                          scrollEnabled={false}
-                          initialNumToRender={6}
-                          maxToRenderPerBatch={2}
-                          windowSize={3}
-                          removeClippedSubviews={true}
-                          showsVerticalScrollIndicator={false}
-                          getItemLayout={(data, index) => ({
-                            length: 78, // Approximate height of StreamCard (68 minHeight + 10 marginBottom)
-                            offset: 78 * index,
-                            index,
-                          })}
-                        />
-                      ) : null}
-                    </View>
-                  ))}
-                  
-                  {/* Footer Loading */}
-                  {(loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders && (
-                    <View style={styles.footerLoading}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                      <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+                ) : showStillFetching ? (
+                  <View
+                    style={styles.loadingContainer}
+                  >
+                    <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
+                    <Text style={styles.loadingText}>Still fetching streams…</Text>
+                  </View>
+                ) : (
+                  // No streams and not loading = no streams available
+                  <View
+                    style={styles.noStreams}
+                  >
+                    <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
+                    <Text style={styles.noStreamsText}>No streams available</Text>
+                  </View>
+                )
+              ) : (
+                // Show streams immediately when available, even if still loading others
+                <View collapsable={false} style={{ flex: 1 }}>
+                  {/* Show autoplay loading overlay if waiting for autoplay */}
+                  {isAutoplayWaiting && !autoplayTriggered && (
+                    <View
+                      style={styles.autoplayOverlay}
+                    >
+                      <View style={styles.autoplayIndicator}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={styles.autoplayText}>Starting best stream...</Text>
+                      </View>
                     </View>
                   )}
-                </ScrollView>
-              </View>
-            )}
-          </View>
-        </>
-      )}
-      <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        actions={alertActions}
-        onClose={() => setAlertVisible(false)}
-      />
-    </View>
+
+                  <ScrollView
+                    style={styles.streamsContent}
+                    contentContainerStyle={[
+                      styles.streamsContainer,
+                      { paddingBottom: insets.bottom + 100 } // Add safe area + extra padding
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                    bounces={true}
+                    overScrollMode="never"
+                    // iOS-specific fixes for navigation transition glitches
+                    {...(Platform.OS === 'ios' && {
+                      // Ensure proper rendering during transitions
+                      removeClippedSubviews: false, // Prevent iOS from clipping views during transitions
+                      // Force hardware acceleration for smoother transitions
+                      scrollEventThrottle: 16,
+                    })}
+                  >
+                    {sections.filter(Boolean).map((section, sectionIndex) => (
+                      <View key={section!.addonId || sectionIndex}>
+                        {/* Section Header */}
+                        {renderSectionHeader({ section: section! })}
+
+                        {/* Stream Cards using FlatList */}
+                        {section!.data && section!.data.length > 0 ? (
+                          <FlatList
+                            data={section!.data}
+                            keyExtractor={(item, index) => {
+                              if (item && item.url) {
+                                return `${item.url}-${sectionIndex}-${index}`;
+                              }
+                              return `empty-${sectionIndex}-${index}`;
+                            }}
+                            renderItem={({ item, index }) => (
+                              <View>
+                                <StreamCard
+                                  stream={item}
+                                  onPress={() => handleStreamPress(item)}
+                                  index={index}
+                                  isLoading={false}
+                                  statusMessage={undefined}
+                                  theme={currentTheme}
+                                  showLogos={settings.showScraperLogos}
+                                  scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogoCache.get((item.addonId || (item as any).addon) as string) || null : null}
+                                  showAlert={(t, m) => openAlert(t, m)}
+                                  parentTitle={metadata?.name}
+                                  parentType={type as 'movie' | 'series'}
+                                  parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
+                                  parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
+                                  parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
+                                  parentPosterUrl={episodeImage || metadata?.poster || undefined}
+                                  providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
+                                  parentId={id}
+                                  parentImdbId={imdbId || undefined}
+                                />
+                              </View>
+                            )}
+                            scrollEnabled={false}
+                            initialNumToRender={6}
+                            maxToRenderPerBatch={2}
+                            windowSize={3}
+                            removeClippedSubviews={true}
+                            showsVerticalScrollIndicator={false}
+                            getItemLayout={(data, index) => ({
+                              length: 78, // Approximate height of StreamCard (68 minHeight + 10 marginBottom)
+                              offset: 78 * index,
+                              index,
+                            })}
+                          />
+                        ) : null}
+                      </View>
+                    ))}
+
+                    {/* Footer Loading */}
+                    {(loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders && (
+                      <View style={styles.footerLoading}>
+                        <ActivityIndicator size="small" color={colors.primary} />
+                        <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          </>
+        )}
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          actions={alertActions}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
     </PaperProvider>
   );
 };
