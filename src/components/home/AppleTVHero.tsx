@@ -43,6 +43,8 @@ import { useLibrary } from '../../hooks/useLibrary';
 import { useToast } from '../../contexts/ToastContext';
 import { useTraktContext } from '../../contexts/TraktContext';
 import { BlurView as ExpoBlurView } from 'expo-blur';
+import { useWatchProgress } from '../../hooks/useWatchProgress';
+import { streamCacheService } from '../../services/streamCacheService';
 
 interface AppleTVHeroProps {
   featuredContent: StreamingContent | null;
@@ -198,6 +200,18 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   }, [settings?.showTrailers]);
 
   const currentItem = items[currentIndex] || null;
+
+  // Use watch progress hook
+  const {
+    watchProgress,
+    getPlayButtonText: getProgressPlayButtonText,
+    loadWatchProgress
+  } = useWatchProgress(
+    currentItem?.id || '',
+    type,
+    undefined,
+    [] // Pass episodes if you have them for series
+  );
 
   // Animation values
   const dragProgress = useSharedValue(0);
@@ -503,15 +517,30 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     logger.error('[AppleTVHero] Trailer playback error');
   }, [trailerOpacity, thumbnailOpacity, setTrailerPlaying]);
 
-
-
-  // Update state when current item changes
+  // Update state when current item changes and load watch progress
   useEffect(() => {
     if (currentItem) {
       setType(currentItem.type as 'movie' | 'series');
       checkItemStatus(currentItem.id);
+      loadWatchProgress();
     }
-  }, [currentItem]);
+  }, [currentItem, loadWatchProgress]);
+
+  // Update play button text and watched state when watch progress changes
+  useEffect(() => {
+    if (currentItem) {
+      const buttonText = getProgressPlayButtonText();
+      setPlayButtonText(buttonText);
+
+      // Update watched state based on progress
+      if (watchProgress) {
+        const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
+        setIsWatched(progressPercent >= 85); // Consider watched if 85% or more completed
+      } else {
+        setIsWatched(false);
+      }
+    }
+  }, [watchProgress, getProgressPlayButtonText, currentItem]);
 
   // Function to check item status
   const checkItemStatus = useCallback(async (itemId: string) => {
@@ -525,11 +554,6 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         // await traktService.isInWatchlist(itemId);
         setIsInWatchlist(Math.random() > 0.5); // Replace with actual Trakt call
       }
-
-      // TODO: Check watch progress
-      // const progress = await watchProgressService.getProgress(itemId);
-      setIsWatched(Math.random() > 0.7); // Replace with actual progress check
-      setPlayButtonText(Math.random() > 0.5 ? 'Resume' : 'Play');
     } catch (error) {
       logger.error('[AppleTVHero] Error checking item status:', error);
     }
@@ -579,15 +603,97 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     }
   }, [currentItem, inLibrary, isInWatchlist, isTraktAuthenticated, toggleLibrary, showSaved, showTraktSaved, showRemoved, showTraktRemoved]);
 
-   // Play button handler - navigates to Streams screen
-   const handlePlayAction = useCallback(() => {
-      logger.info('[AppleTVHero] Play button pressed for:', currentItem?.name);
-      if (!currentItem) return;
-      // Stop any playing trailer
-      try {
-        setTrailerPlaying(false);
-      } catch {}
-      // Navigate to Streams screen
+  // Play button handler - navigates to Streams screen with progress data if available
+  const handlePlayAction = useCallback(async () => {
+    logger.info('[AppleTVHero] Play button pressed for:', currentItem?.name);
+    if (!currentItem) return;
+
+    // Stop any playing trailer
+    try {
+      setTrailerPlaying(false);
+    } catch {}
+
+    // Check if we should resume based on watch progress
+    const shouldResume = watchProgress &&
+      watchProgress.currentTime > 0 &&
+      (watchProgress.currentTime / watchProgress.duration) < 0.85;
+
+    logger.info('[AppleTVHero] Should resume:', shouldResume, watchProgress);
+
+    try {
+      // Check if we have a cached stream for this content
+      const episodeId = currentItem.type === 'series' && watchProgress?.episodeId
+        ? watchProgress.episodeId
+        : undefined;
+
+      logger.info('[AppleTVHero] Looking for cached stream with episodeId:', episodeId);
+
+      const cachedStream = await streamCacheService.getCachedStream(currentItem.id, currentItem.type, episodeId);
+
+      if (cachedStream && cachedStream.stream?.url) {
+        // We have a valid cached stream, navigate directly to player
+        logger.info('[AppleTVHero] Using cached stream for:', currentItem.name);
+
+        // Determine the player route based on platform
+        const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
+
+        // Navigate directly to player with cached stream data AND RESUME DATA
+        navigation.navigate(playerRoute as any, {
+          uri: cachedStream.stream.url,
+          title: cachedStream.metadata?.name || currentItem.name,
+          episodeTitle: cachedStream.episodeTitle,
+          season: cachedStream.season,
+          episode: cachedStream.episode,
+          quality: (cachedStream.stream.title?.match(/(\d+)p/) || [])[1] || undefined,
+          year: cachedStream.metadata?.year || currentItem.year,
+          streamProvider: cachedStream.stream.addonId || cachedStream.stream.addonName || cachedStream.stream.name,
+          streamName: cachedStream.stream.name || cachedStream.stream.title || 'Unnamed Stream',
+          headers: cachedStream.stream.headers || undefined,
+          forceVlc: false,
+          id: currentItem.id,
+          type: currentItem.type,
+          episodeId: episodeId,
+          imdbId: cachedStream.imdbId || cachedStream.metadata?.imdbId || currentItem.imdb_id,
+          backdrop: cachedStream.metadata?.backdrop || currentItem.banner,
+          videoType: undefined, // Let player auto-detect
+          // ADD RESUME DATA if we should resume
+          ...(shouldResume && watchProgress && {
+            resumeTime: watchProgress.currentTime,
+            duration: watchProgress.duration
+          })
+        } as any);
+
+        return;
+      }
+
+      // No cached stream, navigate to Streams screen with resume data
+      logger.info('[AppleTVHero] No cached stream, navigating to StreamsScreen for:', currentItem.name);
+
+      const navigationParams: any = {
+        id: currentItem.id,
+        type: currentItem.type,
+        title: currentItem.name,
+        metadata: {
+          poster: currentItem.poster,
+          banner: currentItem.banner,
+          releaseInfo: currentItem.releaseInfo,
+          genres: currentItem.genres
+        }
+      };
+
+      // Add resume data if we have progress that's not near completion
+      if (shouldResume && watchProgress) {
+        navigationParams.resumeTime = watchProgress.currentTime;
+        navigationParams.duration = watchProgress.duration;
+        navigationParams.episodeId = watchProgress.episodeId;
+        logger.info('[AppleTVHero] Passing resume data to Streams:', watchProgress.currentTime, watchProgress.duration);
+      }
+
+      navigation.navigate('Streams', navigationParams);
+
+    } catch (error) {
+      logger.error('[AppleTVHero] Error handling play action:', error);
+      // Fallback to StreamsScreen on any error
       navigation.navigate('Streams', {
         id: currentItem.id,
         type: currentItem.type,
@@ -599,7 +705,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
           genres: currentItem.genres
         }
       });
-    }, [currentItem, navigation, setTrailerPlaying]);
+    }
+  }, [currentItem, navigation, setTrailerPlaying, watchProgress]);
 
   // Handle fullscreen toggle
   const handleFullscreenToggle = useCallback(async () => {
@@ -1133,7 +1240,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
               activeOpacity={0.85}
             >
               <MaterialIcons
-                name="play-arrow"
+                name={playButtonText === 'Resume' ? "replay" : "play-arrow"}
                 size={24}
                 color="#000"
               />
