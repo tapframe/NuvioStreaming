@@ -135,7 +135,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   showPosterTitles: true,
   enableHomeHeroBackground: true,
   // Trailer settings
-  showTrailers: true, // Enable trailers by default
+  showTrailers: false, // Hide trailers by default
   trailerMuted: true, // Default to muted for better user experience
   // AI
   aiChatEnabled: false,

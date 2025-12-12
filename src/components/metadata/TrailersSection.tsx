@@ -74,7 +74,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -82,13 +82,13 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced spacing and padding
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -102,7 +102,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         return 16; // phone
     }
   }, [deviceType]);
-  
+
   // Enhanced trailer card sizing
   const trailerCardWidth = useMemo(() => {
     switch (deviceType) {
@@ -116,7 +116,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         return 200; // phone
     }
   }, [deviceType]);
-  
+
   const trailerCardSpacing = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -293,7 +293,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
           // Auto-select the first available category, preferring "Trailer"
           const availableCategories = Object.keys(categorized);
           const preferredCategory = availableCategories.includes('Trailer') ? 'Trailer' :
-                                   availableCategories.includes('Teaser') ? 'Teaser' : availableCategories[0];
+            availableCategories.includes('Teaser') ? 'Teaser' : availableCategories[0];
           setSelectedCategory(preferredCategory);
         }
       } catch (err) {
@@ -379,7 +379,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
     } catch (error) {
       logger.warn('TrailersSection', 'Error pausing hero trailer:', error);
     }
-    
+
     setSelectedTrailer(trailer);
     setModalVisible(true);
   };
@@ -449,6 +449,9 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
     }
   };
 
+  // Permanently hide the trailers section
+  return null;
+
   if (!tmdbId) {
     return null; // Don't show if no TMDB ID
   }
@@ -499,15 +502,15 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
 
   return (
     <Animated.View style={[
-      styles.container, 
+      styles.container,
       sectionAnimatedStyle,
       { paddingHorizontal: horizontalPadding }
     ]}>
       {/* Enhanced Header with Category Selector */}
       <View style={styles.header}>
         <Text style={[
-          styles.headerTitle, 
-          { 
+          styles.headerTitle,
+          {
             color: currentTheme.colors.highEmphasis,
             fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 20
           }
@@ -519,8 +522,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
         {trailerCategories.length > 0 && selectedCategory && (
           <TouchableOpacity
             style={[
-              styles.categorySelector, 
-              { 
+              styles.categorySelector,
+              {
                 borderColor: 'rgba(255,255,255,0.6)',
                 paddingHorizontal: isTV ? 14 : isLargeTablet ? 12 : isTablet ? 10 : 10,
                 paddingVertical: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 5 : 5,
@@ -533,8 +536,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
           >
             <Text
               style={[
-                styles.categorySelectorText, 
-                { 
+                styles.categorySelectorText,
+                {
                   color: currentTheme.colors.highEmphasis,
                   fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
                   maxWidth: isTV ? 150 : isLargeTablet ? 130 : isTablet ? 120 : 120
@@ -587,7 +590,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
               >
                 <View style={styles.dropdownItemContent}>
                   <View style={[
-                    styles.categoryIconContainer, 
+                    styles.categoryIconContainer,
                     {
                       backgroundColor: currentTheme.colors.primary + '15',
                       width: isTV ? 36 : isLargeTablet ? 32 : isTablet ? 28 : 28,
@@ -601,18 +604,18 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                       color={currentTheme.colors.primary}
                     />
                   </View>
-                    <Text style={[
-                      styles.dropdownItemText,
-                      { 
-                        color: currentTheme.colors.highEmphasis,
-                        fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 16
-                      }
-                    ]}>
+                  <Text style={[
+                    styles.dropdownItemText,
+                    {
+                      color: currentTheme.colors.highEmphasis,
+                      fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 16
+                    }
+                  ]}>
                     {formatTrailerType(category)}
                   </Text>
                   <Text style={[
-                    styles.dropdownItemCount, 
-                    { 
+                    styles.dropdownItemCount,
+                    {
                       color: currentTheme.colors.textMuted,
                       fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
                       paddingHorizontal: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8,
@@ -690,8 +693,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                 <View style={styles.trailerInfoBelow}>
                   <Text
                     style={[
-                      styles.trailerTitle, 
-                      { 
+                      styles.trailerTitle,
+                      {
                         color: currentTheme.colors.highEmphasis,
                         fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
                         lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 16,
@@ -704,8 +707,8 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                     {trailer.displayName || trailer.name}
                   </Text>
                   <Text style={[
-                    styles.trailerMeta, 
-                    { 
+                    styles.trailerMeta,
+                    {
                       color: currentTheme.colors.textMuted,
                       fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 10
                     }

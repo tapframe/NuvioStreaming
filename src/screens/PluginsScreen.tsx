@@ -1406,7 +1406,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Enable Plugins</Text>
               <Text style={styles.settingDescription}>
-                Allow the app to use installed plugins for finding streams
+                Allow the app to use installed plugins for enhanced content integration
               </Text>
             </View>
             <Switch
@@ -1427,7 +1427,7 @@ const PluginsScreen: React.FC = () => {
           styles={styles}
         >
           <Text style={styles.sectionDescription}>
-            Manage multiple plugin repositories. Switch between repositories to access different sets of plugins.
+            Manage multiple plugin repositories. Switch between repositories to access different community extensions.
           </Text>
 
           {/* Current Repository */}
@@ -1752,7 +1752,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Enable URL Validation</Text>
               <Text style={styles.settingDescription}>
-                Validate streaming URLs before returning them (may slow down results but improves reliability)
+                Validate source URLs before returning them (may slow down results but improves reliability)
               </Text>
             </View>
             <Switch
@@ -1768,7 +1768,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Group Plugin Streams</Text>
               <Text style={styles.settingDescription}>
-                When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
+                When enabled, all plugin sources are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
               </Text>
             </View>
             <Switch
@@ -1790,7 +1790,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Sort by Quality First</Text>
               <Text style={styles.settingDescription}>
-                When enabled, streams are sorted by quality first, then by plugin. When disabled, streams are sorted by plugin first, then by quality. Only available when grouping is enabled.
+                When enabled, sources are sorted by quality first, then by plugin. When disabled, streams are sorted by plugin first, then by quality. Only available when grouping is enabled.
               </Text>
             </View>
             <Switch
@@ -1806,7 +1806,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Show Plugin Logos</Text>
               <Text style={styles.settingDescription}>
-                Display plugin logos next to streaming links on the streams screen.
+                Display plugin logos next to source links on the sources screen.
               </Text>
             </View>
             <Switch
@@ -1917,13 +1917,11 @@ const PluginsScreen: React.FC = () => {
         <View style={[styles.section, styles.lastSection]}>
           <Text style={styles.sectionTitle}>About Plugins</Text>
           <Text style={styles.infoText}>
-            Plugins are JavaScript modules that can search for streaming links from various sources.
-            They run locally on your device and can be installed from trusted repositories.
+            Plugins extend app functionality by connecting to additional content providers.
+            Add repositories to discover and enable plugins.
           </Text>
 
-          <Text style={[styles.infoText, { marginTop: 8, fontSize: 13, color: colors.mediumEmphasis }]}>
-            <Text style={{ fontWeight: '600' }}>Note:</Text> Providers marked as "Limited" depend on external APIs that may stop working without notice.
-          </Text>
+
         </View>
       </ScrollView>
 
@@ -1941,13 +1939,13 @@ const PluginsScreen: React.FC = () => {
               1. <Text style={{ fontWeight: '600' }}>Enable Plugins</Text> - Turn on the main switch to allow plugins
             </Text>
             <Text style={styles.modalText}>
-              2. <Text style={{ fontWeight: '600' }}>Add Repository</Text> - Add a GitHub raw URL or use the default repository
+              2. <Text style={{ fontWeight: '600' }}>Add Repository</Text> - Add a repository URL to discover plugins
             </Text>
             <Text style={styles.modalText}>
-              3. <Text style={{ fontWeight: '600' }}>Refresh Repository</Text> - Download available plugins from the repository
+              3. <Text style={{ fontWeight: '600' }}>Refresh Repository</Text> - Update plugins from the repository
             </Text>
             <Text style={styles.modalText}>
-              4. <Text style={{ fontWeight: '600' }}>Enable Plugins</Text> - Turn on the plugins you want to use for streaming
+              4. <Text style={{ fontWeight: '600' }}>Enable Plugins</Text> - Turn on the plugins you want to use
             </Text>
             <TouchableOpacity
               style={styles.modalButton}

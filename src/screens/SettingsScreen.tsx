@@ -548,6 +548,8 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('Addons')}
               isTablet={isTablet}
             />
+
+            {/*
             <SettingItem
               title="Debrid Integration"
               description="Connect Torbox for premium streams"
@@ -556,6 +558,7 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('DebridIntegration')}
               isTablet={isTablet}
             />
+            */}
             <SettingItem
               title="Plugins"
               description="Manage plugins and repositories"
@@ -686,6 +689,9 @@ const SettingsScreen: React.FC = () => {
               onPress={() => navigation.navigate('PlayerSettings')}
               isTablet={isTablet}
             />
+
+
+            {/*
             <SettingItem
               title="Show Trailers"
               description="Display trailers in hero section"
@@ -700,6 +706,7 @@ const SettingsScreen: React.FC = () => {
               )}
               isTablet={isTablet}
             />
+            */}
             <SettingItem
               title="Enable Downloads (Beta)"
               description="Show Downloads tab and enable saving streams"

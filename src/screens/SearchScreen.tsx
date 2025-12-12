@@ -377,14 +377,40 @@ const SearchScreen = () => {
     }
   };
 
+  const [hasAddons, setHasAddons] = useState<boolean | null>(null);
+
+  // Check for search-capable addons on focus
+  useEffect(() => {
+    const checkAddons = async () => {
+      try {
+        const addons = await catalogService.getAllAddons();
+        // Check if any addon supports search (catalog resource with extra search or just any addon)
+        // For now, simpler consistent check: just if any addon is installed
+        setHasAddons(addons.length > 0);
+      } catch (error) {
+        setHasAddons(false);
+      }
+    };
+
+    checkAddons();
+    const unsubscribe = navigation.addListener('focus', checkAddons);
+    return unsubscribe;
+  }, [navigation]);
+
   // Create a stable debounced search function using useMemo
   const debouncedSearch = useMemo(() => {
     return debounce(async (searchQuery: string) => {
       if (!searchQuery.trim()) {
-        // Cancel any in-flight live search
+        // Cancel any, in-flight live search
         liveSearchHandle.current?.cancel();
         liveSearchHandle.current = null;
         setResults({ byAddon: [], allResults: [] });
+        setSearching(false);
+        return;
+      }
+
+      // Block search if no addons
+      if (hasAddons === false) {
         setSearching(false);
         return;
       }
@@ -449,7 +475,7 @@ const SearchScreen = () => {
       });
       liveSearchHandle.current = handle;
     }, 800);
-  }, []); // Empty dependency array - create once and never recreate
+  }, [hasAddons]); // Re-create if hasAddons changes
 
   useEffect(() => {
     // Skip initial mount to prevent unnecessary operations
@@ -460,9 +486,12 @@ const SearchScreen = () => {
     }
 
     if (query.trim() && query.trim().length >= 2) {
-      setSearching(true);
-      setSearched(true);
-      setShowRecent(false);
+      // Don't set searching state if no addons, to avoid flicker
+      if (hasAddons !== false) {
+        setSearching(true);
+        setSearched(true);
+        setShowRecent(false);
+      }
       debouncedSearch(query);
     } else if (query.trim().length < 2 && query.trim().length > 0) {
       // Show that we're waiting for more characters
@@ -486,7 +515,7 @@ const SearchScreen = () => {
     return () => {
       debouncedSearch.cancel();
     };
-  }, [query]); // Removed debouncedSearch since it's now stable with useMemo
+  }, [query, hasAddons]); // Added hasAddons dependency
 
   const handleClearSearch = () => {
     setQuery('');
@@ -883,6 +912,23 @@ const SearchScreen = () => {
               offsetY={-60}
             />
           </View>
+        ) : hasAddons === false ? (
+          <Animated.View
+            style={styles.emptyContainer}
+            entering={FadeIn.duration(300)}
+          >
+            <MaterialIcons
+              name="extension-off"
+              size={64}
+              color={currentTheme.colors.lightGray}
+            />
+            <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+              No Addons Installed
+            </Text>
+            <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray, marginBottom: 24 }]}>
+              Install addons to enable search functionality
+            </Text>
+          </Animated.View>
         ) : query.trim().length === 1 ? (
           <Animated.View
             style={styles.emptyContainer}

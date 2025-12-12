@@ -132,14 +132,14 @@ const ThemedApp = () => {
         await aiService.initialize();
         console.log('AI service initialized');
 
-        // Check if announcement should be shown (version 1.0.0)
-        const announcementShown = await mmkvStorage.getItem('announcement_v1.0.0_shown');
-        if (!announcementShown && onboardingCompleted === 'true') {
-          // Show announcement only after app is ready
-          setTimeout(() => {
-            setShowAnnouncement(true);
-          }, 1000);
-        }
+        // What's New announcement disabled
+        // const announcementShown = await mmkvStorage.getItem('announcement_v1.0.0_shown');
+        // if (!announcementShown && onboardingCompleted === 'true') {
+        //   // Show announcement only after app is ready
+        //   setTimeout(() => {
+        //     setShowAnnouncement(true);
+        //   }, 1000);
+        // }
 
       } catch (error) {
         console.error('Error initializing app:', error);
