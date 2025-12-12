@@ -28,7 +28,7 @@ import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CustomAlert from '../components/CustomAlert';
-// (duplicate import removed)
+import TMDBIcon from '../components/icons/TMDBIcon';
 
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
@@ -36,27 +36,27 @@ const TMDB_API_KEY = '439c478a771f35c05022f9feabcca01c';
 
 // Define example shows with their IMDB IDs and TMDB IDs
 const EXAMPLE_SHOWS = [
-  { 
-    name: 'Breaking Bad', 
-    imdbId: 'tt0903747', 
+  {
+    name: 'Breaking Bad',
+    imdbId: 'tt0903747',
     tmdbId: '1396',
     type: 'tv' as const
   },
-  { 
-    name: 'Friends', 
-    imdbId: 'tt0108778', 
+  {
+    name: 'Friends',
+    imdbId: 'tt0108778',
     tmdbId: '1668',
     type: 'tv' as const
   },
-  { 
-    name: 'Stranger Things', 
-    imdbId: 'tt4574334', 
+  {
+    name: 'Stranger Things',
+    imdbId: 'tt4574334',
     tmdbId: '66732',
     type: 'tv' as const
   },
-  { 
-    name: 'Avatar', 
-    imdbId: 'tt0499549', 
+  {
+    name: 'Avatar',
+    imdbId: 'tt0499549',
     tmdbId: '19995',
     type: 'movie' as const
   },
@@ -82,7 +82,7 @@ const TMDBSettingsScreen = () => {
   const { settings, updateSetting } = useSettings();
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [languageSearch, setLanguageSearch] = useState('');
-  
+
   // Logo preview state
   const [selectedShow, setSelectedShow] = useState(EXAMPLE_SHOWS[0]);
   const [tmdbLogo, setTmdbLogo] = useState<string | null>(null);
@@ -126,7 +126,7 @@ const TMDBSettingsScreen = () => {
     try {
       const keys = await mmkvStorage.getAllKeys();
       const tmdbKeys = keys.filter(key => key.startsWith('tmdb_cache_'));
-      
+
       let totalSize = 0;
       for (const key of tmdbKeys) {
         const value = mmkvStorage.getString(key);
@@ -134,7 +134,7 @@ const TMDBSettingsScreen = () => {
           totalSize += value.length;
         }
       }
-      
+
       // Convert to KB/MB
       let sizeStr = '';
       if (totalSize < 1024) {
@@ -144,7 +144,7 @@ const TMDBSettingsScreen = () => {
       } else {
         sizeStr = `${(totalSize / (1024 * 1024)).toFixed(2)} MB`;
       }
-      
+
       setCacheSize(sizeStr);
     } catch (error) {
       logger.error('[TMDBSettingsScreen] Error calculating cache size:', error);
@@ -187,17 +187,17 @@ const TMDBSettingsScreen = () => {
         mmkvStorage.getItem(TMDB_API_KEY_STORAGE_KEY),
         mmkvStorage.getItem(USE_CUSTOM_TMDB_API_KEY)
       ]);
-      
+
       logger.log('[TMDBSettingsScreen] API key status:', savedKey ? 'Found' : 'Not found');
       logger.log('[TMDBSettingsScreen] Use custom API setting:', savedUseCustomKey);
-      
+
       if (savedKey) {
         setApiKey(savedKey);
         setIsKeySet(true);
       } else {
         setIsKeySet(false);
       }
-      
+
       setUseCustomKey(savedUseCustomKey === 'true');
     } catch (error) {
       logger.error('[TMDBSettingsScreen] Failed to load settings:', error);
@@ -212,7 +212,7 @@ const TMDBSettingsScreen = () => {
   const saveApiKey = async () => {
     logger.log('[TMDBSettingsScreen] Starting API key save');
     Keyboard.dismiss();
-    
+
     try {
       const trimmedKey = apiKey.trim();
       if (!trimmedKey) {
@@ -299,27 +299,27 @@ const TMDBSettingsScreen = () => {
     try {
       await mmkvStorage.setItem(USE_CUSTOM_TMDB_API_KEY, value ? 'true' : 'false');
       setUseCustomKey(value);
-      
+
       if (!value) {
         // If switching to built-in key, show confirmation
         logger.log('[TMDBSettingsScreen] Switching to built-in API key');
-        setTestResult({ 
-          success: true, 
-          message: 'Now using the built-in TMDb API key.' 
+        setTestResult({
+          success: true,
+          message: 'Now using the built-in TMDb API key.'
         });
       } else if (apiKey && isKeySet) {
         // If switching to custom key and we have a key
         logger.log('[TMDBSettingsScreen] Switching to custom API key');
-        setTestResult({ 
-          success: true, 
-          message: 'Now using your custom TMDb API key.' 
+        setTestResult({
+          success: true,
+          message: 'Now using your custom TMDb API key.'
         });
       } else {
         // If switching to custom key but don't have a key yet
         logger.log('[TMDBSettingsScreen] No custom key available yet');
-        setTestResult({ 
-          success: false, 
-          message: 'Please enter and save your custom TMDb API key.' 
+        setTestResult({
+          success: false,
+          message: 'Please enter and save your custom TMDb API key.'
         });
       }
     } catch (error) {
@@ -355,27 +355,27 @@ const TMDBSettingsScreen = () => {
     setLoadingLogos(true);
     setTmdbLogo(null);
     setTmdbBanner(null);
-    
+
     try {
       const tmdbId = show.tmdbId;
       const contentType = show.type;
-      
+
       logger.log(`[TMDBSettingsScreen] Fetching ${show.name} with TMDB ID: ${tmdbId}`);
-      
+
       const preferredTmdbLanguage = settings.tmdbLanguagePreference || 'en';
-      
+
       const apiKey = TMDB_API_KEY;
       const endpoint = contentType === 'tv' ? 'tv' : 'movie';
       const response = await fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}/images?api_key=${apiKey}`);
       const imagesData = await response.json();
-      
+
       if (imagesData.logos && imagesData.logos.length > 0) {
         let logoPath: string | null = null;
         let logoLanguage = preferredTmdbLanguage;
-        
+
         // Try to find logo in preferred language
         const preferredLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === preferredTmdbLanguage);
-        
+
         if (preferredLogo) {
           logoPath = preferredLogo.file_path;
           logoLanguage = preferredTmdbLanguage;
@@ -383,7 +383,7 @@ const TMDBSettingsScreen = () => {
         } else {
           // Fallback to English
           const englishLogo = imagesData.logos.find((logo: { iso_639_1: string; file_path: string }) => logo.iso_639_1 === 'en');
-          
+
           if (englishLogo) {
             logoPath = englishLogo.file_path;
             logoLanguage = 'en';
@@ -395,7 +395,7 @@ const TMDBSettingsScreen = () => {
             setIsPreviewFallback(true);
           }
         }
-        
+
         if (logoPath) {
           setTmdbLogo(`https://image.tmdb.org/t/p/original${logoPath}`);
           setPreviewLanguage(logoLanguage);
@@ -407,7 +407,7 @@ const TMDBSettingsScreen = () => {
         setPreviewLanguage('');
         setIsPreviewFallback(false);
       }
-      
+
       // Get TMDB banner (backdrop)
       if (imagesData.backdrops && imagesData.backdrops.length > 0) {
         const backdropPath = imagesData.backdrops[0].file_path;
@@ -415,7 +415,7 @@ const TMDBSettingsScreen = () => {
       } else {
         const detailsResponse = await fetch(`https://api.themoviedb.org/3/${endpoint}/${tmdbId}?api_key=${apiKey}`);
         const details = await detailsResponse.json();
-        
+
         if (details.backdrop_path) {
           setTmdbBanner(`https://image.tmdb.org/t/p/original${details.backdrop_path}`);
         }
@@ -444,17 +444,17 @@ const TMDBSettingsScreen = () => {
         </View>
       );
     }
-    
+
     return (
       <View style={styles.bannerContainer}>
-        <FastImage 
+        <FastImage
           source={{ uri: banner || undefined }}
           style={styles.bannerImage}
           resizeMode={FastImage.resizeMode.cover}
         />
         <View style={styles.bannerOverlay} />
         {logo && (
-          <FastImage 
+          <FastImage
             source={{ uri: logo }}
             style={styles.logoOverBanner}
             resizeMode={FastImage.resizeMode.contain}
@@ -491,7 +491,7 @@ const TMDBSettingsScreen = () => {
         if (__DEV__) console.error('Error loading selected show:', e);
       }
     };
-    
+
     loadSelectedShow();
   }, []);
 
@@ -512,7 +512,7 @@ const TMDBSettingsScreen = () => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}> 
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle="light-content" />
       <View style={[styles.headerContainer, { paddingTop: topSpacing }]}>
         <View style={styles.header}>
@@ -520,7 +520,7 @@ const TMDBSettingsScreen = () => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} /> 
+            <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} />
             <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
           </TouchableOpacity>
         </View>
@@ -602,7 +602,7 @@ const TMDBSettingsScreen = () => {
 
                   {/* Logo Preview */}
                   <View style={styles.divider} />
-                  
+
                   <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 8 }]}>Logo Preview</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, marginBottom: 12 }]}>
                     Preview shows how localized logos will appear in the selected language.
@@ -610,8 +610,8 @@ const TMDBSettingsScreen = () => {
 
                   {/* Show selector */}
                   <Text style={[styles.selectorLabel, { color: currentTheme.colors.mediumEmphasis }]}>Example:</Text>
-                  <ScrollView 
-                    horizontal 
+                  <ScrollView
+                    horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.showsScrollContent}
                     style={styles.showsScrollView}
@@ -627,7 +627,7 @@ const TMDBSettingsScreen = () => {
                         onPress={() => handleShowSelect(show)}
                         activeOpacity={0.7}
                       >
-                        <Text 
+                        <Text
                           style={[
                             styles.showItemText,
                             { color: currentTheme.colors.mediumEmphasis },
@@ -795,7 +795,7 @@ const TMDBSettingsScreen = () => {
 
           {/* Cache Management Section */}
           <View style={styles.divider} />
-          
+
           <View style={styles.settingRow}>
             <View style={styles.settingTextContainer}>
               <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Cache Size</Text>
@@ -821,6 +821,14 @@ const TMDBSettingsScreen = () => {
               TMDB responses are cached for 7 days to improve performance
             </Text>
           </View>
+        </View>
+
+        {/* TMDB Attribution Section */}
+        <View style={styles.attributionContainer}>
+          <TMDBIcon size={40} color={currentTheme.colors.primary} />
+          <Text style={[styles.attributionText, { color: currentTheme.colors.mediumEmphasis }]}>
+            This product uses the TMDB API but is not endorsed or certified by TMDB.
+          </Text>
         </View>
 
         {/* Language Picker Modal */}
@@ -955,42 +963,42 @@ const TMDBSettingsScreen = () => {
                         return (
                           <>
                             {filteredLanguages.map(({ code, label, native }) => (
-                        <TouchableOpacity
-                          key={code}
-                          onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }}
-                          style={[
-                            styles.languageItem,
-                            settings.tmdbLanguagePreference === code && styles.selectedLanguageItem
-                          ]}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.languageContent}>
-                            <View style={styles.languageInfo}>
-                              <Text style={[
-                                styles.languageName,
-                                settings.tmdbLanguagePreference === code && styles.selectedLanguageName,
-                                {
-                                  color: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.text,
-                                }
-                              ]}>
-                                {native}
-                              </Text>
-                              <Text style={[
-                                styles.languageCode,
-                                settings.tmdbLanguagePreference === code && styles.selectedLanguageCode,
-                                {
-                                  color: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis,
-                                }
-                              ]}>
-                                {label} • {code.toUpperCase()}
-                              </Text>
-                            </View>
-                            {settings.tmdbLanguagePreference === code && (
-                              <View style={styles.checkmarkContainer}>
-                                <MaterialIcons name="check-circle" size={24} color={currentTheme.colors.primary} />
-                              </View>
-                            )}
-                          </View>
+                              <TouchableOpacity
+                                key={code}
+                                onPress={() => { updateSetting('tmdbLanguagePreference', code); setLanguagePickerVisible(false); }}
+                                style={[
+                                  styles.languageItem,
+                                  settings.tmdbLanguagePreference === code && styles.selectedLanguageItem
+                                ]}
+                                activeOpacity={0.7}
+                              >
+                                <View style={styles.languageContent}>
+                                  <View style={styles.languageInfo}>
+                                    <Text style={[
+                                      styles.languageName,
+                                      settings.tmdbLanguagePreference === code && styles.selectedLanguageName,
+                                      {
+                                        color: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.text,
+                                      }
+                                    ]}>
+                                      {native}
+                                    </Text>
+                                    <Text style={[
+                                      styles.languageCode,
+                                      settings.tmdbLanguagePreference === code && styles.selectedLanguageCode,
+                                      {
+                                        color: settings.tmdbLanguagePreference === code ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis,
+                                      }
+                                    ]}>
+                                      {label} • {code.toUpperCase()}
+                                    </Text>
+                                  </View>
+                                  {settings.tmdbLanguagePreference === code && (
+                                    <View style={styles.checkmarkContainer}>
+                                      <MaterialIcons name="check-circle" size={24} color={currentTheme.colors.primary} />
+                                    </View>
+                                  )}
+                                </View>
                               </TouchableOpacity>
                             ))}
                             {languageSearch.length > 0 && filteredLanguages.length === 0 && (
@@ -1518,6 +1526,20 @@ const styles = StyleSheet.create({
   logoSourceLabel: {
     fontSize: 11,
     marginTop: 6,
+  },
+  attributionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    marginBottom: 20,
+    opacity: 0.8,
+  },
+  attributionText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 12,
+    maxWidth: '80%',
+    lineHeight: 18,
   },
 });
 
