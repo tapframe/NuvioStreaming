@@ -913,13 +913,13 @@ export const StreamsScreen = () => {
   const handleStreamPress = useCallback(async (stream: Stream) => {
     try {
       if (stream.url) {
-        // Block magnet links - not supported yet
+
+        // Block magnet links with sanitized message
         if (typeof stream.url === 'string' && stream.url.startsWith('magnet:')) {
-          try {
-            openAlert('Not supported', 'Torrent streaming is not supported yet.');
-          } catch (_e) { }
+          openAlert('Stream Not Supported', 'This stream format is not supported.');
           return;
         }
+
         // If stream is actually MKV format, force the in-app VLC-based player on iOS
         try {
           if (Platform.OS === 'ios' && settings.preferredPlayer === 'internal') {
@@ -1078,7 +1078,7 @@ export const StreamsScreen = () => {
             const isMagnet = typeof stream.url === 'string' && stream.url.startsWith('magnet:');
 
             if (isMagnet) {
-              // For magnet links, open directly which will trigger the torrent app chooser
+              // For magnet links, open directly
               if (__DEV__) console.log('Opening magnet link directly');
               Linking.openURL(stream.url)
                 .then(() => { if (__DEV__) console.log('Successfully opened magnet link'); })

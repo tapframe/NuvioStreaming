@@ -561,7 +561,7 @@ const SettingsScreen: React.FC = () => {
               description="Manage plugins and repositories"
               customIcon={<PluginIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
               renderControl={ChevronRight}
-              onPress={() => navigation.navigate('ScraperSettings')}
+              onPress={() => navigation.navigate('PluginSettings')}
               isTablet={isTablet}
             />
             <SettingItem

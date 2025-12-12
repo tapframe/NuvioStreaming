@@ -155,7 +155,7 @@ export type RootStackParamList = {
   TraktSettings: undefined;
   PlayerSettings: undefined;
   ThemeSettings: undefined;
-  ScraperSettings: undefined;
+  PluginSettings: undefined;
   CastMovies: {
     castMember: {
       id: number;
@@ -1463,7 +1463,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               }}
             />
             <Stack.Screen
-              name="ScraperSettings"
+              name="PluginSettings"
               component={PluginsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',

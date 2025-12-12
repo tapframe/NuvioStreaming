@@ -46,7 +46,7 @@ if (Platform.OS === 'ios') {
   }
 }
 // Removed community blur and expo-constants for Android overlay
-import axios from 'axios';
+
 import { useTheme } from '../contexts/ThemeContext';
 
 // Extend Manifest type to include logo only (remove disabled status)
@@ -60,11 +60,7 @@ interface ExtendedManifest extends Manifest {
   };
 }
 
-// Interface for Community Addon structure from the JSON URL
-interface CommunityAddon {
-  transportUrl: string;
-  manifest: ExtendedManifest;
-}
+
 
 const { width } = Dimensions.get('window');
 
@@ -623,10 +619,7 @@ const AddonsScreen = () => {
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
 
-  // State for community addons
-  const [communityAddons, setCommunityAddons] = useState<CommunityAddon[]>([]);
-  const [communityLoading, setCommunityLoading] = useState(true);
-  const [communityError, setCommunityError] = useState<string | null>(null);
+
 
   // Promotional addon: Nuvio Streams
   const PROMO_ADDON_URL = 'https://nuviostreams.hayd.uk/manifest.json';
@@ -652,7 +645,6 @@ const AddonsScreen = () => {
 
   useEffect(() => {
     loadAddons();
-    loadCommunityAddons();
   }, []);
 
   const loadAddons = async () => {
@@ -702,27 +694,7 @@ const AddonsScreen = () => {
     }
   };
 
-  // Function to load community addons
-  const loadCommunityAddons = async () => {
-    setCommunityLoading(true);
-    setCommunityError(null);
-    try {
-      const response = await axios.get<CommunityAddon[]>('https://stremio-addons.com/catalog.json');
-      // Filter out addons without a manifest or transportUrl (basic validation)
-      let validAddons = response.data.filter(addon => addon.manifest && addon.transportUrl);
 
-      // Filter out Cinemeta since it's now pre-installed
-      validAddons = validAddons.filter(addon => addon.manifest.id !== 'com.linvo.cinemeta');
-
-      setCommunityAddons(validAddons);
-    } catch (error) {
-      logger.error('Failed to load community addons:', error);
-      setCommunityError('Failed to load community addons. Please try again later.');
-      setCommunityAddons([]);
-    } finally {
-      setCommunityLoading(false);
-    }
-  };
 
   const handleAddAddon = async (url?: string) => {
     let urlToInstall = url || addonUrl;
@@ -783,7 +755,6 @@ const AddonsScreen = () => {
 
   const refreshAddons = async () => {
     loadAddons();
-    loadCommunityAddons();
   };
 
   const moveAddonUp = (addon: ExtendedManifest) => {
@@ -835,7 +806,7 @@ const AddonsScreen = () => {
       configUrl = addon.behaviorHints.configurationURL;
       logger.info(`Using configurationURL from behaviorHints: ${configUrl}`);
     }
-    // If a transport URL was provided directly (for community addons)
+    // If a transport URL was provided directly
     else if (transportUrl) {
       // Remove any trailing filename like manifest.json
       const baseUrl = transportUrl.replace(/\/[^\/]+\.json$/, '/');
@@ -1057,65 +1028,7 @@ const AddonsScreen = () => {
     );
   };
 
-  // Function to render community addon items
-  const renderCommunityAddonItem = ({ item }: { item: CommunityAddon }) => {
-    const { manifest, transportUrl } = item;
-    const types = manifest.types || [];
-    const description = manifest.description || 'No description provided.';
-    // @ts-ignore - logo might exist
-    const logo = manifest.logo || null;
-    const categoryText = types.length > 0
-      ? types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ')
-      : 'General';
-    // Check if addon is configurable
-    const isConfigurable = manifest.behaviorHints?.configurable === true;
 
-    return (
-      <View style={styles.communityAddonItem}>
-        {logo ? (
-          <FastImage
-            source={{ uri: logo }}
-            style={styles.communityAddonIcon}
-            resizeMode={FastImage.resizeMode.contain}
-          />
-        ) : (
-          <View style={styles.communityAddonIconPlaceholder}>
-            <MaterialIcons name="extension" size={22} color={colors.darkGray} />
-          </View>
-        )}
-        <View style={styles.communityAddonDetails}>
-          <Text style={styles.communityAddonName}>{manifest.name}</Text>
-          <Text style={styles.communityAddonDesc} numberOfLines={2}>{description}</Text>
-          <View style={styles.communityAddonMetaContainer}>
-            <Text style={styles.communityAddonVersion}>v{manifest.version || 'N/A'}</Text>
-            <Text style={styles.communityAddonDot}>•</Text>
-            <Text style={styles.communityAddonCategory}>{categoryText}</Text>
-          </View>
-        </View>
-        <View style={styles.addonActionButtons}>
-          {isConfigurable && (
-            <TouchableOpacity
-              style={styles.configButton}
-              onPress={() => handleConfigureAddon(manifest, transportUrl)}
-            >
-              <MaterialIcons name="settings" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.installButton, installing && { opacity: 0.6 }]}
-            onPress={() => handleAddAddon(transportUrl)}
-            disabled={installing}
-          >
-            {installing ? (
-              <ActivityIndicator size="small" color={colors.white} />
-            ) : (
-              <MaterialIcons name="add" size={20} color={colors.white} />
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
 
   const StatsCard = ({ value, label }: { value: number; label: string }) => (
     <View style={styles.statsCard}>
@@ -1316,91 +1229,7 @@ const AddonsScreen = () => {
             </View>
           )}
 
-          {/* Community Addons Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>COMMUNITY ADDONS</Text>
-            <View style={styles.addonList}>
-              {communityLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                </View>
-              ) : communityError ? (
-                <View style={styles.emptyContainer}>
-                  <MaterialIcons name="error-outline" size={32} color={colors.error} />
-                  <Text style={styles.emptyText}>{communityError}</Text>
-                </View>
-              ) : communityAddons.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <MaterialIcons name="extension-off" size={32} color={colors.mediumGray} />
-                  <Text style={styles.emptyText}>No community addons available</Text>
-                </View>
-              ) : (
-                communityAddons.map((item, index) => (
-                  <View
-                    key={item.transportUrl}
-                    style={{ marginBottom: index === communityAddons.length - 1 ? 32 : 16 }}
-                  >
-                    <View style={styles.addonItem}>
-                      <View style={styles.addonHeader}>
-                        {item.manifest.logo ? (
-                          <FastImage
-                            source={{ uri: item.manifest.logo }}
-                            style={styles.addonIcon}
-                            resizeMode={FastImage.resizeMode.contain}
-                          />
-                        ) : (
-                          <View style={styles.addonIconPlaceholder}>
-                            <MaterialIcons name="extension" size={22} color={colors.mediumGray} />
-                          </View>
-                        )}
-                        <View style={styles.addonTitleContainer}>
-                          <Text style={styles.addonName}>{item.manifest.name}</Text>
-                          <View style={styles.addonMetaContainer}>
-                            <Text style={styles.addonVersion}>v{item.manifest.version || 'N/A'}</Text>
-                            <Text style={styles.addonDot}>•</Text>
-                            <Text style={styles.addonCategory}>
-                              {item.manifest.types && item.manifest.types.length > 0
-                                ? item.manifest.types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ')
-                                : 'General'}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.addonActions}>
-                          {item.manifest.behaviorHints?.configurable && (
-                            <TouchableOpacity
-                              style={styles.configButton}
-                              onPress={() => handleConfigureAddon(item.manifest, item.transportUrl)}
-                            >
-                              <MaterialIcons name="settings" size={20} color={colors.primary} />
-                            </TouchableOpacity>
-                          )}
-                          <TouchableOpacity
-                            style={[styles.installButton, installing && { opacity: 0.6 }]}
-                            onPress={() => handleAddAddon(item.transportUrl)}
-                            disabled={installing}
-                          >
-                            {installing ? (
-                              <ActivityIndicator size="small" color={colors.white} />
-                            ) : (
-                              <MaterialIcons name="add" size={20} color={colors.white} />
-                            )}
-                          </TouchableOpacity>
-                        </View>
-                      </View>
 
-                      <Text style={styles.addonDescription}>
-                        {item.manifest.description
-                          ? (item.manifest.description.length > 100
-                            ? item.manifest.description.substring(0, 100) + '...'
-                            : item.manifest.description)
-                          : 'No description provided.'}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-          </View>
         </ScrollView>
       )}
 
