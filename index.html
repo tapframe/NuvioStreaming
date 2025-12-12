@@ -1753,41 +1753,44 @@
                 <p class="last-updated">Last updated: January 2025</p>
                 
                 <div class="privacy-section">
-                    <h2>Data Collection</h2>
-                    <p>Nuvio does not collect personal information. We only store:</p>
-                    <ul>
-                        <li><strong>User preferences:</strong> App settings and viewing preferences for account sync</li>
-                        <li><strong>Viewing history:</strong> Stored locally on your device for your own use</li>
-                    </ul>
+                    <h2>No Account Sync</h2>
+                    <p>Nuvio operates entirely offline regarding user data. We <strong>do not</strong> have servers to store your account, preferences, or viewing history. All data is stored locally on your device.</p>
                 </div>
 
                 <div class="privacy-section">
-                    <h2>How We Use Your Data</h2>
-                    <p>Your data is stored for your own purposes:</p>
+                    <h2>Data Storage & Backup</h2>
+                    <p>We use <strong>React Native MMKV</strong> for high-performance local storage. This includes:</p>
                     <ul>
-                        <li>Sync your preferences and viewing history across your devices</li>
-                        <li>Maintain your app settings and customizations</li>
+                        <li>Library and favorites</li>
+                        <li>Watch history and progress</li>
+                        <li>App settings and customization</li>
                     </ul>
-                    <p>We do not personalize recommendations or use your data for any other purposes.</p>
+                    <p><strong>Important:</strong> Since data is stored only on your device, you are responsible for backing it up. If you uninstall the app or clear its data without a backup, your personalized data will be lost permanently.</p>
                 </div>
 
                 <div class="privacy-section">
                     <h2>Third-Party Services</h2>
-                    <p>Nuvio integrates with third-party services that have their own privacy policies:</p>
+                    <p>Nuvio integrates with external services to provide content and features:</p>
                     <ul>
-                        <li><strong>Trakt.tv:</strong> For tracking viewing progress (optional)</li>
-                        <li><strong>TMDB:</strong> For movie and TV show information</li>
+                        <li><strong>TMDB (The Movie Database):</strong> Used to fetch metadata like posters, plot summaries, and cast info.</li>
+                        <li><strong>Trakt.tv (Optional):</strong> If you choose to connect your account, your watch history will be synced with Trakt.tv subject to their privacy policy.</li>
+                        <li><strong>Sentry:</strong> We use Sentry for anonymous crash reporting to help us identify and fix bugs. No personal identifiable information (PII) is sent.</li>
                     </ul>
                 </div>
 
                 <div class="privacy-section">
+                    <h2>Content Disclaimer</h2>
+                    <p>Nuvio is a media player and aggregator. We <strong>do not host</strong> any content. All video content is provided by user-installed addons. Nuvio has no control over and assumes no responsibility for the content provided by third-party addons.</p>
+                </div>
+
+                <div class="privacy-section">
                     <h2>Open Source</h2>
-                    <p>Nuvio is open-source. You can review our code and data handling on our <a href="https://github.com/tapframe/NuvioStreaming" target="_blank">GitHub repository</a> to verify our privacy practices.</p>
+                    <p>Nuvio is open-source software. You can review our source code to verify our data handling practices on our <a href="https://github.com/tapframe/NuvioStreaming" target="_blank">GitHub repository</a>.</p>
                 </div>
 
                 <div class="privacy-section">
                     <h2>Contact</h2>
-                    <p>Questions about this policy? Contact us through our <a href="https://github.com/tapframe/NuvioStreaming/issues" target="_blank">GitHub repository</a>.</p>
+                    <p>Questions or concerns? Please reach out via our <a href="https://github.com/tapframe/NuvioStreaming/issues" target="_blank">GitHub Issues</a>.</p>
                 </div>
             </div>
         </div>
