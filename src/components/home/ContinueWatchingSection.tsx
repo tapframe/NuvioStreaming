@@ -240,6 +240,44 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
   }, []);
 
+  // Helper function to find the next episode
+  const findNextEpisode = useCallback((currentSeason: number, currentEpisode: number, videos: any[]) => {
+    if (!videos || !Array.isArray(videos)) return null;
+
+    // Sort videos to ensure correct order
+    const sortedVideos = [...videos].sort((a, b) => {
+      if (a.season !== b.season) return a.season - b.season;
+      return a.episode - b.episode;
+    });
+
+    // Strategy 1: Look for next episode in the same season
+    let nextEp = sortedVideos.find(v => v.season === currentSeason && v.episode === currentEpisode + 1);
+
+    // Strategy 2: If not found, look for the first episode of the next season
+    if (!nextEp) {
+      nextEp = sortedVideos.find(v => v.season === currentSeason + 1 && v.episode === 1);
+    }
+
+    // Strategy 3: Just find the very next video in the list after the current one
+    // This handles cases where episode numbering isn't sequential or S+1 E1 isn't the standard start
+    if (!nextEp) {
+      const currentIndex = sortedVideos.findIndex(v => v.season === currentSeason && v.episode === currentEpisode);
+      if (currentIndex !== -1 && currentIndex + 1 < sortedVideos.length) {
+        const candidate = sortedVideos[currentIndex + 1];
+        // Ensure we didn't just jump to a random special; check reasonable bounds if needed,
+        // but generally taking the next sorted item is correct for sequential viewing.
+        nextEp = candidate;
+      }
+    }
+
+    // Verify the found episode is released
+    if (nextEp && isEpisodeReleased(nextEp)) {
+      return nextEp;
+    }
+
+    return null;
+  }, []);
+
   // Modified loadContinueWatching to render incrementally
   const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
     if (isRefreshingRef.current) {
@@ -432,42 +470,42 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             const { episodeId, progress, progressPercent } = episode;
 
             if (group.type === 'series' && progressPercent >= 85) {
-              let nextSeason: number | undefined;
-              let nextEpisode: number | undefined;
+              // Local progress completion check
               if (episodeId) {
+                let currentSeason: number | undefined;
+                let currentEpisode: number | undefined;
+
                 const match = episodeId.match(/s(\d+)e(\d+)/i);
                 if (match) {
-                  const currentSeason = parseInt(match[1], 10);
-                  const currentEpisode = parseInt(match[2], 10);
-                  nextSeason = currentSeason;
-                  nextEpisode = currentEpisode + 1;
+                  currentSeason = parseInt(match[1], 10);
+                  currentEpisode = parseInt(match[2], 10);
                 } else {
                   const parts = episodeId.split(':');
                   if (parts.length >= 2) {
                     const seasonNum = parseInt(parts[parts.length - 2], 10);
                     const episodeNum = parseInt(parts[parts.length - 1], 10);
                     if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
-                      nextSeason = seasonNum;
-                      nextEpisode = episodeNum + 1;
+                      currentSeason = seasonNum;
+                      currentEpisode = episodeNum;
                     }
                   }
                 }
-              }
-              if (nextSeason !== undefined && nextEpisode !== undefined && metadata?.videos && Array.isArray(metadata.videos)) {
-                const nextEpisodeVideo = metadata.videos.find((video: any) =>
-                  video.season === nextSeason && video.episode === nextEpisode
-                );
-                if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
-                  batch.push({
-                    ...basicContent,
-                    id: group.id,
-                    type: group.type,
-                    progress: 0,
-                    lastUpdated: progress.lastUpdated,
-                    season: nextSeason,
-                    episode: nextEpisode,
-                    episodeTitle: `Episode ${nextEpisode}`,
-                  } as ContinueWatchingItem);
+
+                if (currentSeason !== undefined && currentEpisode !== undefined && metadata?.videos) {
+                  const nextEpisodeVideo = findNextEpisode(currentSeason, currentEpisode, metadata.videos);
+
+                  if (nextEpisodeVideo) {
+                    batch.push({
+                      ...basicContent,
+                      id: group.id,
+                      type: group.type,
+                      progress: 0,
+                      lastUpdated: progress.lastUpdated,
+                      season: nextEpisodeVideo.season,
+                      episode: nextEpisodeVideo.episode,
+                      episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
+                    } as ContinueWatchingItem);
+                  }
                 }
               }
               continue;
@@ -532,23 +570,18 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
             // If watched on Trakt, treat it as completed (try to find next episode)
             if (isWatchedOnTrakt) {
-              let nextSeason = season;
-              let nextEpisode = (episodeNumber || 0) + 1;
-
-              if (nextSeason !== undefined && nextEpisode !== undefined && metadata?.videos && Array.isArray(metadata.videos)) {
-                const nextEpisodeVideo = metadata.videos.find((video: any) =>
-                  video.season === nextSeason && video.episode === nextEpisode
-                );
-                if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
+              if (season !== undefined && episodeNumber !== undefined && metadata?.videos) {
+                const nextEpisodeVideo = findNextEpisode(season, episodeNumber, metadata.videos);
+                if (nextEpisodeVideo) {
                   batch.push({
                     ...basicContent,
                     id: group.id,
                     type: group.type,
                     progress: 0,
                     lastUpdated: progress.lastUpdated,
-                    season: nextSeason,
-                    episode: nextEpisode,
-                    episodeTitle: `Episode ${nextEpisode}`,
+                    season: nextEpisodeVideo.season,
+                    episode: nextEpisodeVideo.episode,
+                    episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
                   } as ContinueWatchingItem);
                 }
               }
@@ -614,28 +647,25 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 continue;
               }
 
-              const nextEpisode = info.episode + 1;
               const cachedData = await getCachedMetadata('series', showId);
               if (!cachedData?.basicContent) continue;
               const { metadata, basicContent } = cachedData;
-              let nextEpisodeVideo = null;
-              if (metadata?.videos && Array.isArray(metadata.videos)) {
-                nextEpisodeVideo = metadata.videos.find((video: any) =>
-                  video.season === info.season && video.episode === nextEpisode
-                );
-              }
-              if (nextEpisodeVideo && isEpisodeReleased(nextEpisodeVideo)) {
-                logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${info.season}E${nextEpisode}`);
-                traktBatch.push({
-                  ...basicContent,
-                  id: showId,
-                  type: 'series',
-                  progress: 0,
-                  lastUpdated: info.watchedAt,
-                  season: info.season,
-                  episode: nextEpisode,
-                  episodeTitle: `Episode ${nextEpisode}`,
-                } as ContinueWatchingItem);
+
+              if (metadata?.videos) {
+                const nextEpisodeVideo = findNextEpisode(info.season, info.episode, metadata.videos);
+                if (nextEpisodeVideo) {
+                  logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${nextEpisodeVideo.season}E${nextEpisodeVideo.episode}`);
+                  traktBatch.push({
+                    ...basicContent,
+                    id: showId,
+                    type: 'series',
+                    progress: 0,
+                    lastUpdated: info.watchedAt,
+                    season: nextEpisodeVideo.season,
+                    episode: nextEpisodeVideo.episode,
+                    episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
+                  } as ContinueWatchingItem);
+                }
               }
 
               // Persist "watched" progress for the episode that Trakt reported (only if not recently removed)

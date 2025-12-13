@@ -66,6 +66,9 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 
 ### iOS
 
+#### TestFlight (Recommended)
+<img src="https://upload.wikimedia.org/wikipedia/fr/b/bc/TestFlight-icon.png" width="24" height="24" align="left"> [![Join TestFlight](https://img.shields.io/badge/Join-TestFlight-blue?style=for-the-badge)](https://testflight.apple.com/join/QkKMGRqp)
+
 #### AltStore
 <img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="24" height="24" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
 
