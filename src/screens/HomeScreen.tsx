@@ -135,7 +135,7 @@ const HomeScreen = () => {
   const [hasAddons, setHasAddons] = useState<boolean | null>(null);
   const [hintVisible, setHintVisible] = useState(false);
   const totalCatalogsRef = useRef(0);
-      const [visibleCatalogCount, setVisibleCatalogCount] = useState(5); // Reduced for memory
+  const [visibleCatalogCount, setVisibleCatalogCount] = useState(5); // Reduced for memory
   const insets = useSafeAreaInsets();
 
   // Stabilize insets to prevent iOS layout shifts
@@ -147,7 +147,7 @@ const HomeScreen = () => {
     }, 100);
     return () => clearTimeout(timer);
   }, [insets.top]);
-  
+
   const {
     featuredContent,
     allFeaturedContent,
@@ -158,43 +158,49 @@ const HomeScreen = () => {
     refreshFeatured
   } = useFeaturedContent();
 
+  // Guard to prevent overlapping fetch calls
+  const isFetchingRef = useRef(false);
+
   // Progressive catalog loading function with performance optimizations
   const loadCatalogsProgressively = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setCatalogsLoading(true);
     setCatalogs([]);
     setLoadedCatalogCount(0);
-    
+
     try {
       // Check cache first
       let catalogSettings: Record<string, boolean> = {};
       const now = Date.now();
-      
+
       if (cachedCatalogSettings && (now - catalogSettingsCacheTimestamp) < CATALOG_SETTINGS_CACHE_TTL) {
         catalogSettings = cachedCatalogSettings;
       } else {
         // Load from storage
         const catalogSettingsJson = await mmkvStorage.getItem(CATALOG_SETTINGS_KEY);
         catalogSettings = catalogSettingsJson ? JSON.parse(catalogSettingsJson) : {};
-        
+
         // Update cache
         cachedCatalogSettings = catalogSettings;
         catalogSettingsCacheTimestamp = now;
       }
-      
+
       const [addons, addonManifests] = await Promise.all([
         catalogService.getAllAddons(),
         stremioService.getInstalledAddonsAsync()
       ]);
-      
+
       // Set hasAddons state based on whether we have any addons - ensure on main thread
       InteractionManager.runAfterInteractions(() => {
         setHasAddons(addons.length > 0);
       });
-      
+
       // Create placeholder array with proper order and track indices
       let catalogIndex = 0;
       const catalogQueue: (() => Promise<void>)[] = [];
-      
+
       // Launch all catalog loaders in parallel
       const launchAllCatalogs = () => {
         while (catalogQueue.length > 0) {
@@ -204,18 +210,18 @@ const HomeScreen = () => {
           }
         }
       };
-      
+
       for (const addon of addons) {
         if (addon.catalogs) {
           for (const catalog of addon.catalogs) {
             // Check if this catalog is enabled (default to true if no setting exists)
             const settingKey = `${addon.id}:${catalog.type}:${catalog.id}`;
             const isEnabled = catalogSettings[settingKey] ?? true;
-            
+
             // Only load enabled catalogs
             if (isEnabled) {
               const currentIndex = catalogIndex;
-              
+
               const catalogLoader = async () => {
                 try {
                   const manifest = addonManifests.find((a: any) => a.id === addon.id);
@@ -226,7 +232,7 @@ const HomeScreen = () => {
                     // Aggressively limit items per catalog on Android to reduce memory usage
                     const limit = Platform.OS === 'android' ? 18 : 30;
                     const limitedMetas = metas.slice(0, limit);
-                    
+
                     const items = limitedMetas.map((meta: any) => ({
                       id: meta.id,
                       type: meta.type,
@@ -267,7 +273,7 @@ const HomeScreen = () => {
                         displayName = `${displayName} ${contentType}`;
                       }
                     }
-                    
+
                     const catalogContent = {
                       addon: addon.id,
                       type: catalog.type,
@@ -275,7 +281,7 @@ const HomeScreen = () => {
                       name: displayName,
                       items
                     };
-                    
+
                     // Update the catalog at its specific position - ensure on main thread
                     InteractionManager.runAfterInteractions(() => {
                       setCatalogs(prevCatalogs => {
@@ -296,26 +302,37 @@ const HomeScreen = () => {
                       if (prev === 0) {
                         setCatalogsLoading(false);
                       }
+                      // ** Crucial: If all catalogs processed, release the fetch guard **
+                      if (next >= totalCatalogsRef.current) {
+                        isFetchingRef.current = false;
+                      }
                       return next;
                     });
                   });
                 }
               };
-              
+
               catalogQueue.push(catalogLoader);
               catalogIndex++;
             }
           }
         }
       }
-      
+
       totalCatalogsRef.current = catalogIndex;
-      
+
+      // If no catalogs to load, release locks immediately
+      if (catalogIndex === 0) {
+        setCatalogsLoading(false);
+        isFetchingRef.current = false;
+        return;
+      }
+
       // Initialize catalogs array with proper length - ensure on main thread
       InteractionManager.runAfterInteractions(() => {
         setCatalogs(new Array(catalogIndex).fill(null));
       });
-      
+
       // Start all catalog requests in parallel
       launchAllCatalogs();
     } catch (error) {
@@ -323,6 +340,7 @@ const HomeScreen = () => {
       InteractionManager.runAfterInteractions(() => {
         setCatalogsLoading(false);
       });
+      isFetchingRef.current = false;
     }
   }, []);
 
@@ -371,7 +389,7 @@ const HomeScreen = () => {
           // Also show a global toast for consistency across screens
           // showInfo('Sign In Available', 'You can sign in anytime from Settings → Account');
         }
-      } catch {}
+      } catch { }
     })();
     return () => {
       if (hideTimer) clearTimeout(hideTimer);
@@ -389,10 +407,10 @@ const HomeScreen = () => {
       setShowHeroSection(settings.showHeroSection);
       setFeaturedContentSource(settings.featuredContentSource);
     };
-    
+
     // Subscribe to settings changes
     const unsubscribe = settingsEmitter.addListener(handleSettingsChange);
-    
+
     return unsubscribe;
   }, [settings.showHeroSection, settings.featuredContentSource]);
 
@@ -409,12 +427,12 @@ const HomeScreen = () => {
           StatusBar.setHidden(false);
         }
       };
-      
+
       statusBarConfig();
-      
+
       // Unlock orientation to allow free rotation
-      ScreenOrientation.unlockAsync().catch(() => {});
-      
+      ScreenOrientation.unlockAsync().catch(() => { });
+
       return () => {
         // Stop trailer when screen loses focus (navigating to other screens)
         setTrailerPlaying(false);
@@ -450,12 +468,12 @@ const HomeScreen = () => {
         StatusBar.setTranslucent(false);
         StatusBar.setBackgroundColor(currentTheme.colors.darkBackground);
       }
-      
+
       // Clean up any lingering timeouts
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
-      
+
       // Don't clear FastImage cache on unmount - it causes broken images on remount
       // FastImage's native libraries (SDWebImage/Glide) handle memory automatically
       // Cache clearing only happens on app background (see AppState handler above)
@@ -468,11 +486,11 @@ const HomeScreen = () => {
   // Balanced preload images function using FastImage
   const preloadImages = useCallback(async (content: StreamingContent[]) => {
     if (!content.length) return;
-    
+
     try {
       // Moderate prefetching for better performance balance
       const MAX_IMAGES = 10; // Preload 10 most important images
-      
+
       // Only preload poster images (skip banner and logo entirely)
       const posterImages = content.slice(0, MAX_IMAGES)
         .map(item => item.poster)
@@ -499,24 +517,24 @@ const HomeScreen = () => {
 
   const handlePlayStream = useCallback(async (stream: Stream) => {
     if (!featuredContent) return;
-    
+
     try {
       // Don't clear cache before player - causes broken images on return
       // FastImage's native libraries handle memory efficiently
-      
+
       // Lock orientation to landscape before navigation to prevent glitches
       try {
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-      
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+
         // Longer delay to ensure orientation is fully set before navigation
         await new Promise(resolve => setTimeout(resolve, 200));
       } catch (orientationError) {
         // If orientation lock fails, continue anyway but log it
         logger.warn('[HomeScreen] Orientation lock failed:', orientationError);
         // Still add a small delay
-      await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
+
       navigation.navigate(Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid', {
         uri: stream.url,
         title: featuredContent.name,
@@ -528,7 +546,7 @@ const HomeScreen = () => {
       });
     } catch (error) {
       logger.error('[HomeScreen] Error in handlePlayStream:', error);
-      
+
       // Fallback: navigate anyway
       navigation.navigate(Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid', {
         uri: stream.url,
@@ -545,9 +563,9 @@ const HomeScreen = () => {
   const refreshContinueWatching = useCallback(async () => {
     if (continueWatchingRef.current) {
       try {
-      const hasContent = await continueWatchingRef.current.refresh();
-      setHasContinueWatching(hasContent);
-        
+        const hasContent = await continueWatchingRef.current.refresh();
+        setHasContinueWatching(hasContent);
+
       } catch (error) {
         if (__DEV__) console.error('[HomeScreen] Error refreshing continue watching:', error);
         setHasContinueWatching(false);
@@ -555,19 +573,31 @@ const HomeScreen = () => {
     }
   }, []);
 
+  // Use refs to track state for event listeners without triggering re-effects
+  const catalogsLengthRef = useRef(catalogs.length);
+  const catalogsLoadingRef = useRef(catalogsLoading);
+
+  useEffect(() => {
+    catalogsLengthRef.current = catalogs.length;
+  }, [catalogs.length]);
+
+  useEffect(() => {
+    catalogsLoadingRef.current = catalogsLoading;
+  }, [catalogsLoading]);
+
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       // Only refresh continue watching section on focus
       refreshContinueWatching();
       // Don't reload catalogs unless they haven't been loaded yet
-      // Catalogs will be refreshed through context updates when addons change
-      if (catalogs.length === 0 && !catalogsLoading) {
+      // Uses refs to avoid re-binding the listener on every state change
+      if (catalogsLengthRef.current === 0 && !catalogsLoadingRef.current) {
         loadCatalogsProgressively();
       }
     });
 
     return unsubscribe;
-  }, [navigation, refreshContinueWatching, loadCatalogsProgressively, catalogs.length, catalogsLoading]);
+  }, [navigation, refreshContinueWatching, loadCatalogsProgressively]);
 
   // Memoize the loading screen to prevent unnecessary re-renders
   const renderLoadingScreen = useMemo(() => {
@@ -603,7 +633,7 @@ const HomeScreen = () => {
 
     // Only show a limited number of catalogs initially for performance
     const catalogsToShow = catalogs.slice(0, visibleCatalogCount);
-    
+
     catalogsToShow.forEach((catalog, index) => {
       if (catalog) {
         data.push({ type: 'catalog', catalog, key: `${catalog.addon}-${catalog.id}-${index}` });
@@ -637,7 +667,7 @@ const HomeScreen = () => {
   // Memoize individual section components to prevent re-renders
   const memoizedFeaturedContent = useMemo(() => {
     const heroStyleToUse = settings.heroStyle;
-    
+
     // AppleTVHero is only available on mobile devices (not tablets)
     if (heroStyleToUse === 'appletv' && !isTablet) {
       return (
@@ -694,7 +724,7 @@ const HomeScreen = () => {
   const lastToggleRef = useRef(0);
   const scrollAnimationFrameRef = useRef<number | null>(null);
   const isScrollingRef = useRef(false);
-  
+
   const toggleHeader = useCallback((hide: boolean) => {
     const now = Date.now();
     if (now - lastToggleRef.current < 120) return; // debounce
@@ -783,26 +813,26 @@ const HomeScreen = () => {
   const handleScroll = useCallback((event: any) => {
     // Persist the event before using requestAnimationFrame to prevent event pooling issues
     event.persist();
-    
+
     // Cancel any pending animation frame
     if (scrollAnimationFrameRef.current !== null) {
       cancelAnimationFrame(scrollAnimationFrameRef.current);
     }
-    
+
     // Capture scroll values immediately before async operation
     const scrollYValue = event.nativeEvent.contentOffset.y;
-    
+
     // Update shared value for parallax (on UI thread)
     scrollY.value = scrollYValue;
-    
+
     // Use requestAnimationFrame to throttle scroll handling
     scrollAnimationFrameRef.current = requestAnimationFrame(() => {
       const y = scrollYValue;
       const dy = y - lastScrollYRef.current;
       lastScrollYRef.current = y;
-      
+
       isScrollingRef.current = Math.abs(dy) > 0;
-      
+
       if (y <= 10) {
         toggleHeader(false);
         return;
@@ -813,7 +843,7 @@ const HomeScreen = () => {
       } else if (dy < -6) {
         toggleHeader(false); // scrolling up
       }
-      
+
       scrollAnimationFrameRef.current = null;
     });
   }, [toggleHeader]);
@@ -823,9 +853,9 @@ const HomeScreen = () => {
   const contentContainerStyle = useMemo(() => {
     const heroStyleToUse = settings.heroStyle;
     const isUsingAppleTVHero = heroStyleToUse === 'appletv' && !isTablet && showHeroSection;
-    
+
     return StyleSheet.flatten([
-      styles.scrollContent, 
+      styles.scrollContent,
       { paddingTop: isUsingAppleTVHero ? 0 : stableInsetsTop }
     ]);
   }, [stableInsetsTop, settings.heroStyle, isTablet, showHeroSection]);
@@ -833,9 +863,9 @@ const HomeScreen = () => {
   // Memoize the main content section
   const renderMainContent = useMemo(() => {
     if (isLoading) return null;
-    
+
     return (
-      <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}> 
+      <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar
           barStyle="light-content"
           backgroundColor="transparent"
@@ -882,13 +912,13 @@ const calculatePosterLayout = (screenWidth: number) => {
   const MAX_POSTER_WIDTH = 130; // Reduced maximum for more posters
   const LEFT_PADDING = 16; // Left padding
   const SPACING = 8; // Space between posters
-  
+
   // Calculate available width for posters (reserve space for left padding)
   const availableWidth = screenWidth - LEFT_PADDING;
-  
+
   // Try different numbers of full posters to find the best fit
   let bestLayout = { numFullPosters: 3, posterWidth: 120 };
-  
+
   for (let n = 3; n <= 6; n++) {
     // Calculate poster width needed for N full posters + 0.25 partial poster
     // Formula: N * posterWidth + (N-1) * spacing + 0.25 * posterWidth = availableWidth - rightPadding
@@ -896,12 +926,12 @@ const calculatePosterLayout = (screenWidth: number) => {
     // We'll use minimal right padding (8px) to maximize space
     const usableWidth = availableWidth - 8;
     const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
-    
+
     if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
       bestLayout = { numFullPosters: n, posterWidth };
     }
   }
-  
+
   return {
     numFullPosters: bestLayout.numFullPosters,
     posterWidth: bestLayout.posterWidth,
@@ -966,7 +996,7 @@ const styles = StyleSheet.create<any>({
   },
   placeholderPoster: {
     width: POSTER_WIDTH,
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     borderRadius: 12,
     marginRight: 2,
   },
@@ -1203,7 +1233,7 @@ const styles = StyleSheet.create<any>({
   },
   contentItem: {
     width: POSTER_WIDTH,
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     margin: 0,
     borderRadius: 4,
     overflow: 'hidden',

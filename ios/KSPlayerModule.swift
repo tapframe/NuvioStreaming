@@ -25,7 +25,11 @@ class KSPlayerModule: RCTEventEmitter {
         ]
     }
 
-    @objc func getTracks(_ nodeTag: NSNumber, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getTracks(_ nodeTag: NSNumber?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let nodeTag = nodeTag else {
+            reject("INVALID_ARGUMENT", "nodeTag must not be nil", nil)
+            return
+        }
         DispatchQueue.main.async {
             if let viewManager = self.bridge.module(for: KSPlayerViewManager.self) as? KSPlayerViewManager {
                 viewManager.getTracks(nodeTag, resolve: resolve, reject: reject)
@@ -35,7 +39,11 @@ class KSPlayerModule: RCTEventEmitter {
         }
     }
     
-    @objc func getAirPlayState(_ nodeTag: NSNumber, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+    @objc func getAirPlayState(_ nodeTag: NSNumber?, resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        guard let nodeTag = nodeTag else {
+            reject("INVALID_ARGUMENT", "nodeTag must not be nil", nil)
+            return
+        }
         DispatchQueue.main.async {
             if let viewManager = self.bridge.module(for: KSPlayerViewManager.self) as? KSPlayerViewManager {
                 viewManager.getAirPlayState(nodeTag, resolve: resolve, reject: reject)
@@ -45,7 +53,11 @@ class KSPlayerModule: RCTEventEmitter {
         }
     }
     
-    @objc func showAirPlayPicker(_ nodeTag: NSNumber) {
+    @objc func showAirPlayPicker(_ nodeTag: NSNumber?) {
+        guard let nodeTag = nodeTag else {
+             print("[KSPlayerModule] showAirPlayPicker called with nil nodeTag")
+             return
+        }
         print("[KSPlayerModule] showAirPlayPicker called for nodeTag: \(nodeTag)")
         DispatchQueue.main.async {
             if let viewManager = self.bridge.module(for: KSPlayerViewManager.self) as? KSPlayerViewManager {

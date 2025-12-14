@@ -543,7 +543,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
 
 
-    const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
+    const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => {
+      if (a === 0) return 1;
+      if (b === 0) return -1;
+      return a - b;
+    });
 
     return (
       <View style={[
@@ -660,7 +664,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                         { color: currentTheme.colors.highEmphasis }
                       ]
                     ]} numberOfLines={1}>
-                      Season {season}
+                      {season === 0 ? 'Specials' : `Season ${season}`}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -723,7 +727,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                       ]
                     ]}
                   >
-                    Season {season}
+                    {season === 0 ? 'Specials' : `Season ${season}`}
                   </Text>
                 </TouchableOpacity>
               </View>

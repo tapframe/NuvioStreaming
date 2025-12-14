@@ -1181,14 +1181,59 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Determine initial season only once per series
         const seasons = Object.keys(groupedAddonEpisodes).map(Number);
-        const firstSeason = Math.min(...seasons);
+        const nonZeroSeasons = seasons.filter(s => s !== 0);
+        const firstSeason = nonZeroSeasons.length > 0 ? Math.min(...nonZeroSeasons) : Math.min(...seasons);
         if (!initializedSeasonRef.current) {
-          const nextSeason = firstSeason;
-          if (selectedSeason !== nextSeason) {
-            logger.log(`📺 Setting season ${nextSeason} as selected (${groupedAddonEpisodes[nextSeason]?.length || 0} episodes)`);
-            setSelectedSeason(nextSeason);
+          // Check for watch progress to auto-select season
+          let selectedSeasonNumber = firstSeason;
+          try {
+            const allProgress = await storageService.getAllWatchProgress();
+            let mostRecentEpisodeId = '';
+            let mostRecentTimestamp = 0;
+            Object.entries(allProgress).forEach(([key, progress]) => {
+              if (key.includes(`series:${id}:`)) {
+                const episodeId = key.split(`series:${id}:`)[1];
+                if (progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
+                  mostRecentTimestamp = progress.lastUpdated;
+                  mostRecentEpisodeId = episodeId;
+                }
+              }
+            });
+
+            if (mostRecentEpisodeId) {
+              // Try to parse season from ID or find matching episode
+              const parts = mostRecentEpisodeId.split(':');
+              if (parts.length === 3) {
+                // Format: showId:season:episode
+                const watchProgressSeason = parseInt(parts[1], 10);
+                if (groupedAddonEpisodes[watchProgressSeason]) {
+                  selectedSeasonNumber = watchProgressSeason;
+                  logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for ${mostRecentEpisodeId}`);
+                }
+              } else {
+                // Try to find by stremioId
+                const allEpisodesList = Object.values(groupedAddonEpisodes).flat();
+                const episode = allEpisodesList.find(ep => ep.stremioId === mostRecentEpisodeId);
+                if (episode) {
+                  selectedSeasonNumber = episode.season_number;
+                  logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for episode with stremioId ${mostRecentEpisodeId}`);
+                }
+              }
+            } else {
+              // No watch progress, try persistent storage
+              selectedSeasonNumber = getSeason(id, firstSeason);
+              logger.log(`[useMetadata] No watch progress found, using persistent season ${selectedSeasonNumber}`);
+            }
+          } catch (error) {
+            logger.error('[useMetadata] Error checking watch progress for season selection:', error);
+            selectedSeasonNumber = getSeason(id, firstSeason);
           }
-          setEpisodes(groupedAddonEpisodes[nextSeason] || []);
+
+          if (selectedSeason !== selectedSeasonNumber) {
+            logger.log(`📺 Setting season ${selectedSeasonNumber} as selected`);
+            setSelectedSeason(selectedSeasonNumber);
+          }
+          setEpisodes(groupedAddonEpisodes[selectedSeasonNumber] || []);
           initializedSeasonRef.current = true;
         } else {
           // Keep current selection; refresh episode list for selected season
@@ -1238,8 +1283,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         setGroupedEpisodes(transformedEpisodes);
 
-        // Get the first available season as fallback
-        const firstSeason = Math.min(...Object.keys(allEpisodes).map(Number));
+        // Get the first available season as fallback (preferring non-zero seasons)
+        const availableSeasons = Object.keys(allEpisodes).map(Number);
+        const nonZeroSeasons = availableSeasons.filter(s => s !== 0);
+        const firstSeason = nonZeroSeasons.length > 0 ? Math.min(...nonZeroSeasons) : Math.min(...availableSeasons);
 
         if (!initializedSeasonRef.current) {
           // Check for watch progress to auto-select season
