@@ -410,9 +410,9 @@ export const StreamsScreen = () => {
       isLoadingStreamsRef.current = true;
 
       try {
-        // Check for Stremio addons
-        const hasStremioProviders = await stremioService.hasStreamProviders();
-        if (__DEV__) console.log('[StreamsScreen] hasStremioProviders:', hasStremioProviders);
+        // Check for Stremio addons that support this content type (including embedded streams)
+        const hasStremioProviders = await stremioService.hasStreamProviders(type);
+        if (__DEV__) console.log('[StreamsScreen] hasStremioProviders:', hasStremioProviders, 'for type:', type);
 
         // Check for local scrapers (only if enabled in settings)
         const hasLocalScrapers = settings.enableLocalScrapers && await localScraperService.hasScrapers();

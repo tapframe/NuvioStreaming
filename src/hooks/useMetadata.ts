@@ -1064,10 +1064,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const groupedAddonEpisodes: GroupedEpisodes = {};
 
         addonVideos.forEach((video: any) => {
-          const seasonNumber = video.season;
-          if (!seasonNumber || seasonNumber < 1) {
-            return; // Skip season 0, which often contains extras
-          }
+          // Use season 0 for videos without season numbers (PPV-style content, specials, etc.)
+          const seasonNumber = video.season || 0;
           const episodeNumber = video.episode || video.number || 1;
 
           if (!groupedAddonEpisodes[seasonNumber]) {
@@ -1318,6 +1316,60 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     setError(null);
   };
 
+  // Extract embedded streams from metadata videos (used by PPV-style addons)
+  const extractEmbeddedStreams = useCallback(() => {
+    if (!metadata?.videos) return;
+
+    // Check if any video has embedded streams
+    const videosWithStreams = (metadata.videos as any[]).filter(
+      (video: any) => video.streams && Array.isArray(video.streams) && video.streams.length > 0
+    );
+
+    if (videosWithStreams.length === 0) return;
+
+    // Get the addon info from metadata if available
+    const addonId = (metadata as any).addonId || 'embedded';
+    const addonName = (metadata as any).addonName || metadata.name || 'Embedded Streams';
+
+    // Extract all streams from videos
+    const embeddedStreams: Stream[] = [];
+    for (const video of videosWithStreams) {
+      for (const stream of video.streams) {
+        embeddedStreams.push({
+          ...stream,
+          name: stream.name || stream.title || video.title,
+          title: stream.title || video.title,
+          addonId,
+          addonName,
+        });
+      }
+    }
+
+    if (embeddedStreams.length > 0) {
+      if (__DEV__) console.log(`✅ [extractEmbeddedStreams] Found ${embeddedStreams.length} embedded streams from ${addonName}`);
+
+      // Add to grouped streams
+      setGroupedStreams(prevStreams => ({
+        ...prevStreams,
+        [addonId]: {
+          addonName,
+          streams: embeddedStreams,
+        },
+      }));
+
+      // Track addon response order
+      setAddonResponseOrder(prevOrder => {
+        if (!prevOrder.includes(addonId)) {
+          return [...prevOrder, addonId];
+        }
+        return prevOrder;
+      });
+
+      // Mark loading as complete since we have streams
+      setLoadingStreams(false);
+    }
+  }, [metadata]);
+
   const loadStreams = async () => {
     const startTime = Date.now();
     try {
@@ -1477,6 +1529,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Start Stremio request using the converted ID format
       if (__DEV__) console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
       processStremioSource(type, stremioId, false);
+
+      // Also extract any embedded streams from metadata (PPV-style addons)
+      extractEmbeddedStreams();
 
       // Monitor scraper completion status instead of using fixed timeout
       const checkScrapersCompletion = () => {
@@ -1814,8 +1869,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     if (metadata && metadata.videos && metadata.videos.length > 0) {
       logger.log(`🎬 Metadata updated with ${metadata.videos.length} episodes, reloading series data`);
       loadSeriesData().catch((error) => { if (__DEV__) console.error(error); });
+      // Also extract embedded streams from metadata videos (PPV-style addons)
+      extractEmbeddedStreams();
     }
-  }, [metadata?.videos, type]);
+  }, [metadata?.videos, type, extractEmbeddedStreams]);
 
   const loadRecommendations = useCallback(async () => {
     if (!settings.enrichMetadataWithTMDB) {
