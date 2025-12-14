@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.2.11",
+          "buildVersion": "27",
+          "date": "2025-12-15",
+          "localizedDescription": "# Nuvio Media Hub – v1.2.11  \n\n## Update Notes\n- **Dependency updates** for improved stability  \n- **Android animation improvements** for smoother UI interactions  \n- Multiple **backend bug fixes**  \n\n## Note for iOS Users\n- iOS users can continue using the **TestFlight build**  \n- It may show version **1.2.10 (27)**, but the **build is the same as 1.2.11**  \n- This is intentional, as bumping the version would require a manual TestFlight review",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.2.11/Stable_1-2-11.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.2.10",
           "buildVersion": "25",
           "date": "2025-11-25",
