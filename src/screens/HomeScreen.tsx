@@ -765,7 +765,7 @@ const HomeScreen = () => {
         );
       case 'loadMore':
         return (
-          <Animated.View entering={FadeIn.duration(300)}>
+          <View>
             <View style={styles.loadMoreContainer}>
               <TouchableOpacity
                 style={[styles.loadMoreButton, { backgroundColor: currentTheme.colors.primary }]}
@@ -777,7 +777,7 @@ const HomeScreen = () => {
                 </Text>
               </TouchableOpacity>
             </View>
-          </Animated.View>
+          </View>
         );
       case 'welcome':
         return <FirstTimeWelcome />;

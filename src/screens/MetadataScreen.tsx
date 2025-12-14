@@ -41,7 +41,11 @@ import Animated, {
   Easing,
   interpolateColor,
   withSpring,
+  createAnimatedComponent,
 } from 'react-native-reanimated';
+
+// Create animated version of SafeAreaView for use with Reanimated styles
+const AnimatedSafeAreaView = createAnimatedComponent(SafeAreaView);
 import { RouteProp } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -911,7 +915,7 @@ const MetadataScreen: React.FC = () => {
 
   return (
     <Animated.View style={[animatedBackgroundStyle, { flex: 1 }]}>
-      <SafeAreaView
+      <AnimatedSafeAreaView
         style={[containerStyle, styles.container]}
         edges={[]}
       >
@@ -1417,7 +1421,7 @@ const MetadataScreen: React.FC = () => {
           isSpoilerRevealed={selectedComment ? revealedSpoilers.has(selectedComment.id.toString()) : false}
           onSpoilerPress={() => selectedComment && handleSpoilerPress(selectedComment)}
         />
-      </SafeAreaView>
+      </AnimatedSafeAreaView>
     </Animated.View>
   );
 };

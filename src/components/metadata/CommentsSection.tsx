@@ -200,7 +200,7 @@ const CompactCommentCard: React.FC<{
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -208,13 +208,13 @@ const CompactCommentCard: React.FC<{
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced comment card sizing
   const commentCardWidth = useMemo(() => {
     switch (deviceType) {
@@ -228,7 +228,7 @@ const CompactCommentCard: React.FC<{
         return 280; // phone
     }
   }, [deviceType]);
-  
+
   const commentCardHeight = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -241,7 +241,7 @@ const CompactCommentCard: React.FC<{
         return 170; // phone
     }
   }, [deviceType]);
-  
+
   const commentCardSpacing = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -354,156 +354,156 @@ const CompactCommentCard: React.FC<{
         }}
         activeOpacity={1}
       >
-      {/* Trakt Icon - Top Right Corner */}
-      <View style={styles.traktIconContainer}>
-        <TraktIcon width={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} height={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} />
-      </View>
-
-      {/* Header Section - Fixed at top */}
-      <View style={[
-        styles.compactHeader,
-        {
-          marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
-        }
-      ]}>
-        <View style={styles.usernameContainer}>
-          <Text style={[
-            styles.compactUsername, 
-            { 
-              color: theme.colors.highEmphasis,
-              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 16
-            }
-          ]}>
-            {username}
-          </Text>
-          {user.vip && (
-            <View style={[
-              styles.miniVipBadge,
-              {
-                paddingHorizontal: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4,
-                paddingVertical: isTV ? 2 : isLargeTablet ? 2 : isTablet ? 1 : 1,
-                borderRadius: isTV ? 8 : isLargeTablet ? 7 : isTablet ? 6 : 6
-              }
-            ]}>
-              <Text style={[
-                styles.miniVipText,
-                {
-                  fontSize: isTV ? 11 : isLargeTablet ? 10 : isTablet ? 9 : 9
-                }
-              ]}>VIP</Text>
-            </View>
-          )}
+        {/* Trakt Icon - Top Right Corner */}
+        <View style={styles.traktIconContainer}>
+          <TraktIcon width={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} height={isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16} />
         </View>
-      </View>
 
-      {/* Rating - Show stars */}
-      {comment.user_stats?.rating && (
+        {/* Header Section - Fixed at top */}
         <View style={[
-          styles.compactRating,
+          styles.compactHeader,
           {
             marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
           }
         ]}>
-          {renderCompactStars(comment.user_stats.rating)}
-          <Text style={[
-            styles.compactRatingText, 
-            { 
-              color: theme.colors.mediumEmphasis,
-              fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
+          <View style={styles.usernameContainer}>
+            <Text style={[
+              styles.compactUsername,
+              {
+                color: theme.colors.highEmphasis,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 16
+              }
+            ]}>
+              {username}
+            </Text>
+            {user.vip && (
+              <View style={[
+                styles.miniVipBadge,
+                {
+                  paddingHorizontal: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4,
+                  paddingVertical: isTV ? 2 : isLargeTablet ? 2 : isTablet ? 1 : 1,
+                  borderRadius: isTV ? 8 : isLargeTablet ? 7 : isTablet ? 6 : 6
+                }
+              ]}>
+                <Text style={[
+                  styles.miniVipText,
+                  {
+                    fontSize: isTV ? 11 : isLargeTablet ? 10 : isTablet ? 9 : 9
+                  }
+                ]}>VIP</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Rating - Show stars */}
+        {comment.user_stats?.rating && (
+          <View style={[
+            styles.compactRating,
+            {
+              marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
             }
           ]}>
-            {comment.user_stats.rating}/10
-          </Text>
-        </View>
-      )}
+            {renderCompactStars(comment.user_stats.rating)}
+            <Text style={[
+              styles.compactRatingText,
+              {
+                color: theme.colors.mediumEmphasis,
+                fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
+              }
+            ]}>
+              {comment.user_stats.rating}/10
+            </Text>
+          </View>
+        )}
 
-      {/* Comment Preview - Flexible area that fills space */}
-      <View style={[
-        styles.commentContainer, 
-        shouldBlurContent ? styles.blurredContent : undefined,
-        {
-          marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
-        }
-      ]}>
-        {shouldBlurContent ? (
-          <Text style={[
-            styles.compactComment, 
-            { 
-              color: theme.colors.highEmphasis,
-              fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
-              lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18
-            }
-          ]}>⚠️ This comment contains spoilers. Tap to reveal.</Text>
-        ) : (
-          <MarkdownText
-            text={comment.comment}
-            theme={theme}
-            numberOfLines={isLargeScreen ? 4 : 3}
-            revealedInlineSpoilers={isSpoilerRevealed}
-            onSpoilerPress={onSpoilerPress}
-            textStyle={[
+        {/* Comment Preview - Flexible area that fills space */}
+        <View style={[
+          styles.commentContainer,
+          shouldBlurContent ? styles.blurredContent : undefined,
+          {
+            marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 8 : 8
+          }
+        ]}>
+          {shouldBlurContent ? (
+            <Text style={[
               styles.compactComment,
               {
+                color: theme.colors.highEmphasis,
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
                 lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18
               }
-            ]}
-          />
-        )}
-      </View>
+            ]}>⚠️ This comment contains spoilers. Tap to reveal.</Text>
+          ) : (
+            <MarkdownText
+              text={comment.comment}
+              theme={theme}
+              numberOfLines={isLargeScreen ? 4 : 3}
+              revealedInlineSpoilers={isSpoilerRevealed}
+              onSpoilerPress={onSpoilerPress}
+              textStyle={[
+                styles.compactComment,
+                {
+                  fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                  lineHeight: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18
+                }
+              ]}
+            />
+          )}
+        </View>
 
-      {/* Meta Info - Fixed at bottom */}
-      <View style={[
-        styles.compactMeta,
-        {
-          paddingTop: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 6 : 6
-        }
-      ]}>
-        <View style={styles.compactBadges}>
-          {comment.spoiler && (
+        {/* Meta Info - Fixed at bottom */}
+        <View style={[
+          styles.compactMeta,
+          {
+            paddingTop: isTV ? 8 : isLargeTablet ? 6 : isTablet ? 6 : 6
+          }
+        ]}>
+          <View style={styles.compactBadges}>
+            {comment.spoiler && (
+              <Text style={[
+                styles.spoilerMiniText,
+                {
+                  color: theme.colors.error,
+                  fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11
+                }
+              ]}>Spoiler</Text>
+            )}
+          </View>
+          <View style={styles.compactStats}>
             <Text style={[
-              styles.spoilerMiniText, 
-              { 
-                color: theme.colors.error,
+              styles.compactTime,
+              {
+                color: theme.colors.mediumEmphasis,
                 fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11
               }
-            ]}>Spoiler</Text>
-          )}
-        </View>
-        <View style={styles.compactStats}>
-          <Text style={[
-            styles.compactTime, 
-            { 
-              color: theme.colors.mediumEmphasis,
-              fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11
-            }
-          ]}>
-            {formatRelativeTime(comment.created_at)}
-          </Text>
-          {comment.likes > 0 && (
-            <Text style={[
-              styles.compactStat, 
-              { 
-                color: theme.colors.mediumEmphasis,
-                fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 12 : 12
-              }
             ]}>
-              👍 {comment.likes}
+              {formatRelativeTime(comment.created_at)}
             </Text>
-          )}
-          {comment.replies > 0 && (
-            <Text style={[
-              styles.compactStat, 
-              { 
-                color: theme.colors.mediumEmphasis,
-                fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 12 : 12
-              }
-            ]}>
-              💬 {comment.replies}
-            </Text>
-          )}
+            {comment.likes > 0 && (
+              <Text style={[
+                styles.compactStat,
+                {
+                  color: theme.colors.mediumEmphasis,
+                  fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 12 : 12
+                }
+              ]}>
+                👍 {comment.likes}
+              </Text>
+            )}
+            {comment.replies > 0 && (
+              <Text style={[
+                styles.compactStat,
+                {
+                  color: theme.colors.mediumEmphasis,
+                  fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 12 : 12
+                }
+              ]}>
+                💬 {comment.replies}
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -614,105 +614,105 @@ const ExpandedCommentBottomSheet: React.FC<{
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
       >
-          {/* Close Button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <MaterialIcons name="close" size={24} color={theme.colors.highEmphasis} />
-          </TouchableOpacity>
+        {/* Close Button */}
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <MaterialIcons name="close" size={24} color={theme.colors.highEmphasis} />
+        </TouchableOpacity>
 
-          {/* User Info */}
-          <View style={styles.modalHeader}>
-            <View style={styles.userInfo}>
-              <Text
-                style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {username}
-              </Text>
-              {user.vip && (
-                <View style={styles.vipBadge}>
-                  <Text style={styles.vipText}>VIP</Text>
-                </View>
-              )}
-            </View>
-            {(() => {
-              const { datePart, timePart } = formatDateParts(comment.created_at);
-              return (
-                <View style={styles.dateTimeContainer}>
-                  <Text style={[styles.modalDate, { color: theme.colors.mediumEmphasis }]}>
-                    {datePart}
-                  </Text>
-                  {!!timePart && (
-                    <Text style={[styles.modalTime, { color: theme.colors.mediumEmphasis }]}>
-                      {timePart}
-                    </Text>
-                  )}
-                </View>
-              );
-            })()}
-          </View>
-
-          {/* Rating */}
-          {comment.user_stats?.rating && (
-            <View style={styles.modalRating}>
-              {renderStars(comment.user_stats.rating)}
-              <Text style={[styles.modalRatingText, { color: theme.colors.mediumEmphasis }]}>
-                {comment.user_stats.rating}/10
-              </Text>
-            </View>
-          )}
-
-          {/* Full Comment (Markdown with inline spoilers) */}
-          {shouldBlurModalContent ? (
-            <View style={styles.spoilerContainer}>
-              <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
-                <MaterialIcons name="visibility-off" size={20} color={theme.colors.mediumEmphasis} />
+        {/* User Info */}
+        <View style={styles.modalHeader}>
+          <View style={styles.userInfo}>
+            <Text
+              style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {username}
+            </Text>
+            {user.vip && (
+              <View style={styles.vipBadge}>
+                <Text style={styles.vipText}>VIP</Text>
               </View>
-              <Text style={[styles.spoilerTitle, { color: theme.colors.highEmphasis }]}>Contains spoilers</Text>
-              <TouchableOpacity
-                style={[styles.revealButton, { borderColor: theme.colors.primary }]}
-                onPress={onSpoilerPress}
-                activeOpacity={0.9}
-              >
-                <MaterialIcons name="visibility" size={18} color={theme.colors.primary} />
-                <Text style={[styles.revealButtonText, { color: theme.colors.primary }]}>Reveal</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={{ marginBottom: 16 }}>
-              <MarkdownText
-                text={comment.comment}
-                theme={theme}
-                revealedInlineSpoilers={true}
-                textStyle={styles.modalComment}
-              />
-            </View>
-          )}
-
-          {/* Comment Meta */}
-          <View style={styles.modalMeta}>
-            {comment.spoiler && (
-              <Text style={[styles.spoilerText, { color: theme.colors.error }]}>Spoiler</Text>
             )}
-            <View style={styles.modalStats}>
-              {comment.likes > 0 && (
-                <View style={styles.likesContainer}>
-                  <MaterialIcons name="thumb-up" size={16} color={theme.colors.mediumEmphasis} />
-                  <Text style={[styles.likesText, { color: theme.colors.mediumEmphasis }]}>
-                    {comment.likes}
-                  </Text>
-                </View>
-              )}
-              {comment.replies > 0 && (
-                <View style={styles.repliesContainer}>
-                  <MaterialIcons name="chat-bubble-outline" size={16} color={theme.colors.mediumEmphasis} />
-                  <Text style={[styles.repliesText, { color: theme.colors.mediumEmphasis }]}>
-                    {comment.replies}
-                  </Text>
-                </View>
-              )}
-            </View>
           </View>
+          {(() => {
+            const { datePart, timePart } = formatDateParts(comment.created_at);
+            return (
+              <View style={styles.dateTimeContainer}>
+                <Text style={[styles.modalDate, { color: theme.colors.mediumEmphasis }]}>
+                  {datePart}
+                </Text>
+                {!!timePart && (
+                  <Text style={[styles.modalTime, { color: theme.colors.mediumEmphasis }]}>
+                    {timePart}
+                  </Text>
+                )}
+              </View>
+            );
+          })()}
+        </View>
+
+        {/* Rating */}
+        {comment.user_stats?.rating && (
+          <View style={styles.modalRating}>
+            {renderStars(comment.user_stats.rating)}
+            <Text style={[styles.modalRatingText, { color: theme.colors.mediumEmphasis }]}>
+              {comment.user_stats.rating}/10
+            </Text>
+          </View>
+        )}
+
+        {/* Full Comment (Markdown with inline spoilers) */}
+        {shouldBlurModalContent ? (
+          <View style={styles.spoilerContainer}>
+            <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
+              <MaterialIcons name="visibility-off" size={20} color={theme.colors.mediumEmphasis} />
+            </View>
+            <Text style={[styles.spoilerTitle, { color: theme.colors.highEmphasis }]}>Contains spoilers</Text>
+            <TouchableOpacity
+              style={[styles.revealButton, { borderColor: theme.colors.primary }]}
+              onPress={onSpoilerPress}
+              activeOpacity={0.9}
+            >
+              <MaterialIcons name="visibility" size={18} color={theme.colors.primary} />
+              <Text style={[styles.revealButtonText, { color: theme.colors.primary }]}>Reveal</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ marginBottom: 16 }}>
+            <MarkdownText
+              text={comment.comment}
+              theme={theme}
+              revealedInlineSpoilers={true}
+              textStyle={styles.modalComment}
+            />
+          </View>
+        )}
+
+        {/* Comment Meta */}
+        <View style={styles.modalMeta}>
+          {comment.spoiler && (
+            <Text style={[styles.spoilerText, { color: theme.colors.error }]}>Spoiler</Text>
+          )}
+          <View style={styles.modalStats}>
+            {comment.likes > 0 && (
+              <View style={styles.likesContainer}>
+                <MaterialIcons name="thumb-up" size={16} color={theme.colors.mediumEmphasis} />
+                <Text style={[styles.likesText, { color: theme.colors.mediumEmphasis }]}>
+                  {comment.likes}
+                </Text>
+              </View>
+            )}
+            {comment.replies > 0 && (
+              <View style={styles.repliesContainer}>
+                <MaterialIcons name="chat-bubble-outline" size={16} color={theme.colors.mediumEmphasis} />
+                <Text style={[styles.repliesText, { color: theme.colors.mediumEmphasis }]}>
+                  {comment.replies}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
       </BottomSheetScrollView>
     </BottomSheet>
   );
@@ -732,7 +732,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -740,13 +740,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced spacing and padding
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -772,7 +772,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   } = useTraktComments({
     imdbId,
     type: type === 'show' ? (season !== undefined && episode !== undefined ? 'episode' :
-             season !== undefined ? 'season' : 'show') : 'movie',
+      season !== undefined ? 'season' : 'show') : 'movie',
     season,
     episode,
     enabled: true,
@@ -924,8 +924,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         }
       ]}>
         <Text style={[
-          styles.title, 
-          { 
+          styles.title,
+          {
             color: currentTheme.colors.highEmphasis,
             fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 20
           }
@@ -992,7 +992,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                     <ActivityIndicator size="small" color={currentTheme.colors.primary} />
                   ) : (
                     <>
-                      <Text style={[styles.loadMoreText, { color: currentTheme.colors.primary }]}> 
+                      <Text style={[styles.loadMoreText, { color: currentTheme.colors.primary }]}>
                         Load More
                       </Text>
                       <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.primary} />
@@ -1022,14 +1022,18 @@ export const CommentBottomSheet: React.FC<{
 }> = ({ comment, visible, onClose, theme, isSpoilerRevealed, onSpoilerPress }) => {
   const bottomSheetRef = useRef<BottomSheet>(null);
 
+  // Early return before any Reanimated components are rendered
+  // This prevents the BottomSheet from initializing when not needed
+  if (!visible || !comment) {
+    return null;
+  }
+
   console.log('CommentBottomSheet: Rendered with visible:', visible, 'comment:', comment?.id);
 
   // Calculate the index based on visibility - start at medium height (50%)
-  const sheetIndex = visible && comment ? 1 : -1;
+  const sheetIndex = 1; // Always 1 when visible and comment are truthy
 
   console.log('CommentBottomSheet: Calculated sheetIndex:', sheetIndex);
-
-  if (!comment) return null;
 
   const user = comment.user || {};
   const username = user.name || user.username || 'Anonymous User';
@@ -1115,100 +1119,100 @@ export const CommentBottomSheet: React.FC<{
         nestedScrollEnabled
         keyboardShouldPersistTaps="handled"
       >
-          {/* User Info */}
-          <View style={styles.modalHeader}>
-            <View style={styles.userInfo}>
-              <Text
-                style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {username}
-              </Text>
-              {user.vip && (
-                <View style={styles.vipBadge}>
-                  <Text style={styles.vipText}>VIP</Text>
-                </View>
-              )}
-            </View>
-            {(() => {
-              const { datePart, timePart } = formatDateParts(comment.created_at);
-              return (
-                <View style={styles.dateTimeContainer}>
-                  <Text style={[styles.modalDate, { color: theme.colors.mediumEmphasis }]}>
-                    {datePart}
-                  </Text>
-                  {!!timePart && (
-                    <Text style={[styles.modalTime, { color: theme.colors.mediumEmphasis }]}>
-                      {timePart}
-                    </Text>
-                  )}
-                </View>
-              );
-            })()}
-          </View>
-
-          {/* Rating */}
-          {comment.user_stats?.rating && (
-            <View style={styles.modalRating}>
-              {renderStars(comment.user_stats.rating)}
-              <Text style={[styles.modalRatingText, { color: theme.colors.mediumEmphasis }]}>
-                {comment.user_stats.rating}/10
-              </Text>
-            </View>
-          )}
-
-          {/* Full Comment (Markdown with inline spoilers) */}
-          {shouldBlurModalContent ? (
-            <View style={styles.spoilerContainer}>
-              <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
-                <MaterialIcons name="visibility-off" size={20} color={theme.colors.mediumEmphasis} />
+        {/* User Info */}
+        <View style={styles.modalHeader}>
+          <View style={styles.userInfo}>
+            <Text
+              style={[styles.modalUsername, { color: theme.colors.highEmphasis }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {username}
+            </Text>
+            {user.vip && (
+              <View style={styles.vipBadge}>
+                <Text style={styles.vipText}>VIP</Text>
               </View>
-              <Text style={[styles.spoilerTitle, { color: theme.colors.highEmphasis }]}>Contains spoilers</Text>
-              <TouchableOpacity
-                style={[styles.revealButton, { borderColor: theme.colors.primary }]}
-                onPress={onSpoilerPress}
-                activeOpacity={0.9}
-              >
-                <MaterialIcons name="visibility" size={18} color={theme.colors.primary} />
-                <Text style={[styles.revealButtonText, { color: theme.colors.primary }]}>Reveal</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={{ marginBottom: 16 }}>
-              <MarkdownText
-                text={comment.comment}
-                theme={theme}
-                revealedInlineSpoilers={true}
-                textStyle={styles.modalComment}
-              />
-            </View>
-          )}
-
-          {/* Comment Meta */}
-          <View style={styles.modalMeta}>
-            {comment.spoiler && (
-              <Text style={[styles.spoilerText, { color: theme.colors.error }]}>Spoiler</Text>
             )}
-            <View style={styles.modalStats}>
-              {comment.likes > 0 && (
-                <View style={styles.likesContainer}>
-                  <MaterialIcons name="thumb-up" size={16} color={theme.colors.mediumEmphasis} />
-                  <Text style={[styles.likesText, { color: theme.colors.mediumEmphasis }]}>
-                    {comment.likes}
-                  </Text>
-                </View>
-              )}
-              {comment.replies > 0 && (
-                <View style={styles.repliesContainer}>
-                  <MaterialIcons name="chat-bubble-outline" size={16} color={theme.colors.mediumEmphasis} />
-                  <Text style={[styles.repliesText, { color: theme.colors.mediumEmphasis }]}>
-                    {comment.replies}
-                  </Text>
-                </View>
-              )}
-            </View>
           </View>
+          {(() => {
+            const { datePart, timePart } = formatDateParts(comment.created_at);
+            return (
+              <View style={styles.dateTimeContainer}>
+                <Text style={[styles.modalDate, { color: theme.colors.mediumEmphasis }]}>
+                  {datePart}
+                </Text>
+                {!!timePart && (
+                  <Text style={[styles.modalTime, { color: theme.colors.mediumEmphasis }]}>
+                    {timePart}
+                  </Text>
+                )}
+              </View>
+            );
+          })()}
+        </View>
+
+        {/* Rating */}
+        {comment.user_stats?.rating && (
+          <View style={styles.modalRating}>
+            {renderStars(comment.user_stats.rating)}
+            <Text style={[styles.modalRatingText, { color: theme.colors.mediumEmphasis }]}>
+              {comment.user_stats.rating}/10
+            </Text>
+          </View>
+        )}
+
+        {/* Full Comment (Markdown with inline spoilers) */}
+        {shouldBlurModalContent ? (
+          <View style={styles.spoilerContainer}>
+            <View style={[styles.spoilerIcon, { backgroundColor: theme.colors.card }]}>
+              <MaterialIcons name="visibility-off" size={20} color={theme.colors.mediumEmphasis} />
+            </View>
+            <Text style={[styles.spoilerTitle, { color: theme.colors.highEmphasis }]}>Contains spoilers</Text>
+            <TouchableOpacity
+              style={[styles.revealButton, { borderColor: theme.colors.primary }]}
+              onPress={onSpoilerPress}
+              activeOpacity={0.9}
+            >
+              <MaterialIcons name="visibility" size={18} color={theme.colors.primary} />
+              <Text style={[styles.revealButtonText, { color: theme.colors.primary }]}>Reveal</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ marginBottom: 16 }}>
+            <MarkdownText
+              text={comment.comment}
+              theme={theme}
+              revealedInlineSpoilers={true}
+              textStyle={styles.modalComment}
+            />
+          </View>
+        )}
+
+        {/* Comment Meta */}
+        <View style={styles.modalMeta}>
+          {comment.spoiler && (
+            <Text style={[styles.spoilerText, { color: theme.colors.error }]}>Spoiler</Text>
+          )}
+          <View style={styles.modalStats}>
+            {comment.likes > 0 && (
+              <View style={styles.likesContainer}>
+                <MaterialIcons name="thumb-up" size={16} color={theme.colors.mediumEmphasis} />
+                <Text style={[styles.likesText, { color: theme.colors.mediumEmphasis }]}>
+                  {comment.likes}
+                </Text>
+              </View>
+            )}
+            {comment.replies > 0 && (
+              <View style={styles.repliesContainer}>
+                <MaterialIcons name="chat-bubble-outline" size={16} color={theme.colors.mediumEmphasis} />
+                <Text style={[styles.repliesText, { color: theme.colors.mediumEmphasis }]}>
+                  {comment.replies}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
       </BottomSheetScrollView>
     </BottomSheet>
   );

@@ -1157,9 +1157,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <Animated.View
+    <View
       style={styles.container}
-      entering={FadeIn.duration(350)}
     >
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.titleContainer}>
@@ -1207,7 +1206,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         actions={alertActions}
         onClose={() => setAlertVisible(false)}
       />
-    </Animated.View>
+    </View>
   );
 });
 

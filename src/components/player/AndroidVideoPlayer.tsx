@@ -3124,7 +3124,7 @@ const AndroidVideoPlayer: React.FC = () => {
           }
         ]}
       >
-        {/* Combined gesture handler for left side - brightness + tap + long press */}
+        {/* Left side gesture handler - tap + long press (brightness gesture disabled) */}
         <LongPressGestureHandler
           onActivated={onLongPressActivated}
           onEnded={onLongPressEnd}
@@ -3133,29 +3133,20 @@ const AndroidVideoPlayer: React.FC = () => {
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
         >
-          <PanGestureHandler
-            onGestureEvent={gestureControls.onBrightnessGestureEvent}
-            activeOffsetY={[-10, 10]}
-            failOffsetX={[-30, 30]}
+          <TapGestureHandler
+            onActivated={toggleControls}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
-            maxPointers={1}
           >
-            <TapGestureHandler
-              onActivated={toggleControls}
-              shouldCancelWhenOutside={false}
-              simultaneousHandlers={[]}
-            >
-              <View style={{
-                position: 'absolute',
-                top: screenDimensions.height * 0.15, // Back to original margin
-                left: 0,
-                width: screenDimensions.width * 0.4, // Back to larger area (40% of screen)
-                height: screenDimensions.height * 0.7, // Back to larger middle portion (70% of screen)
-                zIndex: 10, // Higher z-index to capture gestures
-              }} />
-            </TapGestureHandler>
-          </PanGestureHandler>
+            <View style={{
+              position: 'absolute',
+              top: screenDimensions.height * 0.15,
+              left: 0,
+              width: screenDimensions.width * 0.4,
+              height: screenDimensions.height * 0.7,
+              zIndex: 10,
+            }} />
+          </TapGestureHandler>
         </LongPressGestureHandler>
 
         {/* Combined gesture handler for right side - volume + tap + long press */}

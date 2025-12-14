@@ -18,7 +18,7 @@ import {
   Platform,
   Easing,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { catalogService, StreamingContent, GroupedSearchResults, AddonSearchResults } from '../services/catalogService';
@@ -235,6 +235,15 @@ const SearchScreen = () => {
   const addonOrderRankRef = useRef<Record<string, number>>({});
   // Track if this is the initial mount to prevent unnecessary operations
   const isInitialMount = useRef(true);
+  // Track mount status for async operations
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
   // DropUpMenu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<StreamingContent | null>(null);
@@ -380,45 +389,87 @@ const SearchScreen = () => {
   // Create a stable debounced search function using useMemo
   const debouncedSearch = useMemo(() => {
     return debounce(async (searchQuery: string) => {
-      if (!searchQuery.trim()) {
-        // Cancel any in-flight live search
-        liveSearchHandle.current?.cancel();
-        liveSearchHandle.current = null;
-        setResults({ byAddon: [], allResults: [] });
-        setSearching(false);
-        return;
+      // Cancel any in-flight live search
+      liveSearchHandle.current?.cancel();
+      liveSearchHandle.current = null;
+      performLiveSearch(searchQuery);
+    }, 800);
+  }, []); // Empty dependency array - create once and never recreate
+
+  // Track focus state to strictly prevent updates when blurred (fixes Telemetry crash)
+  useFocusEffect(
+    useCallback(() => {
+      isMounted.current = true;
+      return () => {
+        isMounted.current = false;
+        // Cancel any active searches immediately on blur
+        if (liveSearchHandle.current) {
+          liveSearchHandle.current.cancel();
+          liveSearchHandle.current = null;
+        }
+        debouncedSearch.cancel();
+      };
+    }, [debouncedSearch])
+  );
+
+  // Live search implementation
+  const performLiveSearch = async (searchQuery: string) => {
+    // strict guard: don't search if unmounted or blurred
+    if (!isMounted.current) return;
+
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      setResults({ byAddon: [], allResults: [] });
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    setResults({ byAddon: [], allResults: [] });
+    // Reset order rank for new search
+    addonOrderRankRef.current = {};
+
+    try {
+      if (liveSearchHandle.current) {
+        liveSearchHandle.current.cancel();
       }
 
-      // Cancel prior live search
-      liveSearchHandle.current?.cancel();
-      setResults({ byAddon: [], allResults: [] });
-      setSearching(true);
+      // Pre-fetch addon list to establish a stable order rank
+      const addons = await catalogService.getAllAddons();
+      // ... (rank logic) ...
+      const rank: Record<string, number> = {};
+      let rankCounter = 0;
 
-      logger.info('Starting live search for:', searchQuery);
-      // Preload addon order to keep sections sorted by installation order
-      try {
-        const addons = await catalogService.getAllAddons();
-        const rank: Record<string, number> = {};
-        addons.forEach((a, idx) => { rank[a.id] = idx; });
-        addonOrderRankRef.current = rank;
-      } catch { }
+      // Cinemeta first
+      rank['com.linvo.cinemeta'] = rankCounter++;
+
+      // Then others
+      addons.forEach(addon => {
+        if (addon.id !== 'com.linvo.cinemeta') {
+          rank[addon.id] = rankCounter++;
+        }
+      });
+      addonOrderRankRef.current = rank;
 
       const handle = catalogService.startLiveSearch(searchQuery, async (section: AddonSearchResults) => {
-        // Append/update this addon section immediately with minimal changes
-        setResults(prev => {
-          const rank = addonOrderRankRef.current;
-          const getRank = (id: string) => rank[id] ?? Number.MAX_SAFE_INTEGER;
+        // Prevent updates if component is unmounted or blurred
+        if (!isMounted.current) return;
 
+        // Append/update this addon section...
+        setResults(prev => {
+          // ... (existing update logic) ...
+          if (!isMounted.current) return prev; // Extra guard inside setter
+
+          const getRank = (id: string) => addonOrderRankRef.current[id] ?? Number.MAX_SAFE_INTEGER;
+          // ... (same logic as before) ...
           const existingIndex = prev.byAddon.findIndex(s => s.addonId === section.addonId);
 
           if (existingIndex >= 0) {
-            // Update existing section in-place (preserve order and other sections)
             const copy = prev.byAddon.slice();
             copy[existingIndex] = section;
             return { byAddon: copy, allResults: prev.allResults };
           }
 
-          // Insert new section at correct position based on rank
+          // Insert new section
           const insertRank = getRank(section.addonId);
           let insertAt = prev.byAddon.length;
           for (let i = 0; i < prev.byAddon.length; i++) {
@@ -442,15 +493,24 @@ const SearchScreen = () => {
           return { byAddon: nextByAddon, allResults: prev.allResults };
         });
 
-        // Save to recents after first result batch
         try {
           await saveRecentSearch(searchQuery);
         } catch { }
       });
-      liveSearchHandle.current = handle;
-    }, 800);
-  }, []); // Empty dependency array - create once and never recreate
 
+      liveSearchHandle.current = handle;
+      await handle.done;
+
+      if (isMounted.current) {
+        setSearching(false);
+      }
+    } catch (error) {
+      if (isMounted.current) {
+        console.error('Live search error:', error);
+        setSearching(false);
+      }
+    }
+  };
   useEffect(() => {
     // Skip initial mount to prevent unnecessary operations
     if (isInitialMount.current) {
@@ -503,22 +563,20 @@ const SearchScreen = () => {
     if (!showRecent || recentSearches.length === 0) return null;
 
     return (
-      <Animated.View
+      <View
         style={styles.recentSearchesContainer}
-        entering={FadeIn.duration(300)}
       >
         <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
           Recent Searches
         </Text>
         {recentSearches.map((search, index) => (
-          <AnimatedTouchable
+          <TouchableOpacity
             key={index}
             style={styles.recentSearchItem}
             onPress={() => {
               setQuery(search);
               Keyboard.dismiss();
             }}
-            entering={FadeIn.duration(300).delay(index * 50)}
           >
             <MaterialIcons
               name="history"
@@ -541,9 +599,9 @@ const SearchScreen = () => {
             >
               <MaterialIcons name="close" size={16} color={currentTheme.colors.lightGray} />
             </TouchableOpacity>
-          </AnimatedTouchable>
+          </TouchableOpacity>
         ))}
-      </Animated.View>
+      </View>
     );
   };
 
@@ -573,7 +631,7 @@ const SearchScreen = () => {
       return () => unsubscribe();
     }, [item.id, item.type]);
     return (
-      <AnimatedTouchable
+      <TouchableOpacity
         style={styles.horizontalItem}
         onPress={() => {
           navigation.navigate('Metadata', { id: item.id, type: item.type });
@@ -584,7 +642,6 @@ const SearchScreen = () => {
           // Do NOT toggle refreshFlag here
         }}
         delayLongPress={300}
-        entering={FadeIn.duration(300).delay(index * 50)}
         activeOpacity={0.7}
       >
         <View style={[styles.horizontalItemPosterContainer, {
@@ -634,7 +691,7 @@ const SearchScreen = () => {
             {item.year}
           </Text>
         )}
-      </AnimatedTouchable>
+      </TouchableOpacity>
     );
   };
 
@@ -664,7 +721,7 @@ const SearchScreen = () => {
     );
 
     return (
-      <Animated.View entering={FadeIn.duration(300).delay(addonIndex * 50)}>
+      <View>
         {/* Addon Header */}
         <View style={styles.addonHeaderContainer}>
           <Text style={[styles.addonHeaderText, { color: currentTheme.colors.white }]}>
@@ -679,7 +736,7 @@ const SearchScreen = () => {
 
         {/* Movies */}
         {movieResults.length > 0 && (
-          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]}>
             <Text style={[
               styles.carouselSubtitle,
               {
@@ -708,12 +765,12 @@ const SearchScreen = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
             />
-          </Animated.View>
+          </View>
         )}
 
         {/* TV Shows */}
         {seriesResults.length > 0 && (
-          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]}>
             <Text style={[
               styles.carouselSubtitle,
               {
@@ -742,12 +799,12 @@ const SearchScreen = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
             />
-          </Animated.View>
+          </View>
         )}
 
         {/* Other types */}
         {otherResults.length > 0 && (
-          <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
+          <View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]}>
             <Text style={[
               styles.carouselSubtitle,
               {
@@ -776,9 +833,9 @@ const SearchScreen = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.horizontalListContent}
             />
-          </Animated.View>
+          </View>
         )}
-      </Animated.View>
+      </View>
     );
   }, (prev, next) => {
     // Only re-render if this section's reference changed
@@ -804,13 +861,8 @@ const SearchScreen = () => {
   }, []);
 
   return (
-    <Animated.View
+    <View
       style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
-      entering={Platform.OS === 'android' ? undefined : FadeIn.duration(350)}
-      exiting={Platform.OS === 'android' ?
-        FadeOut.duration(200).withInitialValues({ opacity: 1 }) :
-        FadeOut.duration(250)
-      }
     >
       <StatusBar
         barStyle="light-content"
@@ -884,9 +936,8 @@ const SearchScreen = () => {
             />
           </View>
         ) : query.trim().length === 1 ? (
-          <Animated.View
+          <View
             style={styles.emptyContainer}
-            entering={FadeIn.duration(300)}
           >
             <MaterialIcons
               name="search"
@@ -899,11 +950,10 @@ const SearchScreen = () => {
             <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
               Type at least 2 characters to search
             </Text>
-          </Animated.View>
+          </View>
         ) : searched && !hasResultsToShow ? (
-          <Animated.View
+          <View
             style={styles.emptyContainer}
-            entering={FadeIn.duration(300)}
           >
             <MaterialIcons
               name="search-off"
@@ -916,14 +966,13 @@ const SearchScreen = () => {
             <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
               Try different keywords or check your spelling
             </Text>
-          </Animated.View>
+          </View>
         ) : (
-          <Animated.ScrollView
+          <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollViewContent}
             keyboardShouldPersistTaps="handled"
             onScrollBeginDrag={Keyboard.dismiss}
-            entering={FadeIn.duration(300)}
             showsVerticalScrollIndicator={false}
           >
             {!query.trim() && renderRecentSearches()}
@@ -935,7 +984,7 @@ const SearchScreen = () => {
                 addonIndex={addonIndex}
               />
             ))}
-          </Animated.ScrollView>
+          </ScrollView>
         )}
       </View>
       {/* DropUpMenu integration for search results */}
@@ -981,7 +1030,7 @@ const SearchScreen = () => {
           }}
         />
       )}
-    </Animated.View>
+    </View>
   );
 };
 

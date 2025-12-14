@@ -95,7 +95,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   // Optimized: update background as soon as scroll starts, without waiting for momentum end
   const scrollX = useSharedValue(0);
   const paginationProgress = useSharedValue(0);
-  
+
   // Parallel image prefetch: start fetching banners and logos as soon as data arrives
   const itemsToPreload = useMemo(() => data.slice(0, 12), [data]);
   useEffect(() => {
@@ -121,7 +121,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
       // no-op: prefetch is best-effort
     }
   }, [itemsToPreload]);
-  
+
   // Comprehensive reset when component mounts/remounts to prevent glitching
   useEffect(() => {
     // Start at the first real item for looping
@@ -158,7 +158,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     }, 50);
     return () => clearTimeout(timer);
   }, [windowWidth, windowHeight, interval, loopingEnabled]);
-  
+
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
@@ -192,12 +192,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     },
     (idx, prevIdx) => {
       if (idx == null || idx === prevIdx) return;
-      
+
       // Debounce updates to reduce JS bridge crossings
       const now = Date.now();
       if (now - lastIndexUpdateRef.current < 100) return; // 100ms debounce
       lastIndexUpdateRef.current = now;
-      
+
       // Clamp to bounds to avoid out-of-range access
       const clamped = Math.max(0, Math.min(idx, data.length - 1));
       runOnJS(setActiveIndex)(clamped);
@@ -289,11 +289,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   }
 
   // Memoized background component with improved timing
-  const BackgroundImage = React.memo(({ 
-    item, 
+  const BackgroundImage = React.memo(({
+    item,
     insets
-  }: { 
-    item: StreamingContent; 
+  }: {
+    item: StreamingContent;
     insets: any;
   }) => {
     return (
@@ -317,7 +317,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           ) : (
             <>
               <FastImage
-                source={{ 
+                source={{
                   uri: item.banner || item.poster,
                   priority: FastImage.priority.low,
                   cache: FastImage.cacheControl.immutable
@@ -352,15 +352,15 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   if (!hasData) return null;
 
   return (
-    <Animated.View entering={FadeIn.duration(150).easing(Easing.out(Easing.cubic))}>
+    <View>
       <Animated.View style={[styles.container as ViewStyle, { paddingTop: 12 + effectiveTopOffset }]}>
         {/* Removed preload images for performance - let FastImage cache handle it naturally */}
-          {settings.enableHomeHeroBackground && data[activeIndex] && (
-            <BackgroundImage
-              item={data[activeIndex]}
-              insets={insets}
-            />
-          )}
+        {settings.enableHomeHeroBackground && data[activeIndex] && (
+          <BackgroundImage
+            item={data[activeIndex]}
+            insets={insets}
+          />
+        )}
         {/* Bottom blend to HomeScreen background (not the card) */}
         {settings.enableHomeHeroBackground && (
           <LinearGradient
@@ -444,7 +444,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           }}
         />
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -467,13 +467,13 @@ interface CarouselCardProps {
 const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet }) => {
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
-  
+
   const bannerOpacity = useSharedValue(0);
   const logoOpacity = useSharedValue(0);
   const genresOpacity = useSharedValue(0);
   const actionsOpacity = useSharedValue(0);
   const isFlipped = useSharedValue(flipped ? 1 : 0);
-  
+
   // Reset animations when component mounts/remounts to prevent glitching
   useEffect(() => {
     bannerOpacity.value = 0;
@@ -484,17 +484,17 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     setBannerLoaded(false);
     setLogoLoaded(false);
   }, [item.id]);
-  
+
   const inputRange = [
     (index - 1) * interval,
     index * interval,
     (index + 1) * interval,
   ];
-  
+
   const bannerAnimatedStyle = useAnimatedStyle(() => ({
     opacity: bannerOpacity.value,
   }));
-  
+
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
   }));
@@ -538,52 +538,52 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     const translateX = scrollX.value;
     const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);
-    
+
     // AGGRESSIVE early exit for cards far from center
     if (distance > interval * 1.2) {
       return { opacity: 0 };
     }
-    
+
     const maxDistance = interval * 0.5;
     const progress = Math.min(distance / maxDistance, 1);
     const opacity = 1 - progress;
     const clampedOpacity = Math.max(0, Math.min(1, opacity));
-    
+
     return {
       opacity: clampedOpacity,
     };
   });
-  
+
   // ULTRA-OPTIMIZED: Only animate center card and ±1 neighbors
   const cardAnimatedStyle = useAnimatedStyle(() => {
     const translateX = scrollX.value;
     const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);
-    
+
     // AGGRESSIVE early exit for cards far from center
     if (distance > interval * 1.5) {
-      return { 
-        transform: [{ scale: isTablet ? 0.95 : 0.9 }], 
-        opacity: isTablet ? 0.85 : 0.7 
+      return {
+        transform: [{ scale: isTablet ? 0.95 : 0.9 }],
+        opacity: isTablet ? 0.85 : 0.7
       };
     }
-    
+
     const maxDistance = interval;
-    
+
     // Scale animation based on distance from center
     const scale = 1 - (distance / maxDistance) * 0.1;
     const clampedScale = Math.max(isTablet ? 0.95 : 0.9, Math.min(1, scale));
-    
+
     // Opacity animation for cards that are far from center
     const opacity = 1 - (distance / maxDistance) * 0.3;
     const clampedOpacity = Math.max(isTablet ? 0.85 : 0.7, Math.min(1, opacity));
-    
+
     return {
       transform: [{ scale: clampedScale }],
       opacity: clampedOpacity,
     };
   });
-  
+
   // TEMPORARILY DISABLED FOR PERFORMANCE TESTING
   // const bannerParallaxStyle = useAnimatedStyle(() => {
   //   const translateX = scrollX.value;
@@ -597,7 +597,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   //     transform: [{ translateX: parallaxOffset }],
   //   };
   // });
-  
+
   // TEMPORARILY DISABLED FOR PERFORMANCE TESTING
   // const infoParallaxStyle = useAnimatedStyle(() => {
   //   const translateX = scrollX.value;
@@ -618,21 +618,21 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   //     opacity: clampedOpacity,
   //   };
   // });
-  
+
   useEffect(() => {
     if (bannerLoaded) {
-      bannerOpacity.value = withTiming(1, { 
-        duration: 250, 
-        easing: Easing.out(Easing.ease) 
+      bannerOpacity.value = withTiming(1, {
+        duration: 250,
+        easing: Easing.out(Easing.ease)
       });
     }
   }, [bannerLoaded]);
-  
+
   useEffect(() => {
     if (logoLoaded) {
-      logoOpacity.value = withTiming(1, { 
-        duration: 300, 
-        easing: Easing.out(Easing.ease) 
+      logoOpacity.value = withTiming(1, {
+        duration: 300,
+        easing: Easing.out(Easing.ease)
       });
     }
   }, [logoLoaded]);
@@ -757,23 +757,23 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     </View>
                   ) : (
                     <View style={styles.titleOverlay as ViewStyle} pointerEvents="none">
-                      <Animated.View entering={FadeIn.duration(300)}>
+                      <View>
                         <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
                           {item.name}
                         </Text>
-                      </Animated.View>
+                      </View>
                     </View>
                   )}
                   {item.genres && (
                     <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
-                      <Animated.View entering={FadeIn.duration(400).delay(100)}>
+                      <View>
                         <Animated.Text
                           style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, overlayAnimatedStyle]}
                           numberOfLines={1}
                         >
                           {item.genres.slice(0, 3).join(' • ')}
                         </Animated.Text>
-                      </Animated.View>
+                      </View>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)'
   },
-  
+
   info: {
     position: 'absolute',
     left: 0,
