@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTraktContext } from '../contexts/TraktContext';
 import { logger } from '../utils/logger';
@@ -22,14 +22,19 @@ export const useWatchProgress = (
   const [watchProgress, setWatchProgress] = useState<WatchProgressData | null>(null);
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
 
+  // Use ref for episodes to avoid infinite loops - episodes array changes on every render
+  const episodesRef = useRef(episodes);
+  episodesRef.current = episodes;
+
   // Function to get episode details from episodeId
   const getEpisodeDetails = useCallback((episodeId: string): { seasonNumber: string; episodeNumber: string; episodeName: string } | null => {
+    const currentEpisodes = episodesRef.current;
     // Try to parse from format "seriesId:season:episode"
     const parts = episodeId.split(':');
     if (parts.length === 3) {
       const [, seasonNum, episodeNum] = parts;
       // Find episode in our local episodes array
-      const episode = episodes.find(
+      const episode = currentEpisodes.find(
         ep => ep.season_number === parseInt(seasonNum) &&
           ep.episode_number === parseInt(episodeNum)
       );
@@ -44,7 +49,7 @@ export const useWatchProgress = (
     }
 
     // If not found by season/episode, try stremioId
-    const episodeByStremioId = episodes.find(ep => ep.stremioId === episodeId);
+    const episodeByStremioId = currentEpisodes.find(ep => ep.stremioId === episodeId);
     if (episodeByStremioId) {
       return {
         seasonNumber: episodeByStremioId.season_number.toString(),
@@ -54,7 +59,7 @@ export const useWatchProgress = (
     }
 
     return null;
-  }, [episodes]);
+  }, []); // Removed episodes dependency - using ref instead
 
   // Enhanced load watch progress with Trakt integration
   const loadWatchProgress = useCallback(async () => {
@@ -148,7 +153,7 @@ export const useWatchProgress = (
       logger.error('[useWatchProgress] Error loading watch progress:', error);
       setWatchProgress(null);
     }
-  }, [id, type, episodeId, episodes]);
+  }, [id, type, episodeId]); // Removed episodes dependency - using ref instead
 
   // Enhanced function to get play button text with Trakt awareness
   const getPlayButtonText = useCallback(() => {
