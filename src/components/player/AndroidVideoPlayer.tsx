@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState, Image } from 'react-native';
+import { View, TouchableOpacity, TouchableWithoutFeedback, Dimensions, Animated, ActivityIndicator, Platform, NativeModules, StatusBar, Text, StyleSheet, Modal, AppState, Image, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video, { VideoRef, SelectedTrack, SelectedTrackType, BufferingStrategyType, ViewType } from 'react-native-video';
 import FastImage from '@d11/react-native-fast-image';
@@ -641,43 +641,51 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Prefetch backdrop and title logo for faster loading screen appearance
   useEffect(() => {
-    if (backdrop && typeof backdrop === 'string') {
-      // Reset loading state
-      setIsBackdropLoaded(false);
-      backdropImageOpacityAnim.setValue(0);
+    // Defer prefetching until after navigation animation completes
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (backdrop && typeof backdrop === 'string') {
+        // Reset loading state
+        setIsBackdropLoaded(false);
+        backdropImageOpacityAnim.setValue(0);
 
-      // Prefetch the image
-      try {
-        FastImage.preload([{ uri: backdrop }]);
-        // Image prefetch initiated, fade it in smoothly
+        // Prefetch the image
+        try {
+          FastImage.preload([{ uri: backdrop }]);
+          // Image prefetch initiated, fade it in smoothly
+          setIsBackdropLoaded(true);
+          Animated.timing(backdropImageOpacityAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
+        } catch (error) {
+          // If prefetch fails, still show the image but without animation
+          if (__DEV__) logger.warn('[AndroidVideoPlayer] Backdrop prefetch failed, showing anyway:', error);
+          setIsBackdropLoaded(true);
+          backdropImageOpacityAnim.setValue(1);
+        }
+      } else {
+        // No backdrop provided, consider it "loaded"
         setIsBackdropLoaded(true);
-        Animated.timing(backdropImageOpacityAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }).start();
-      } catch (error) {
-        // If prefetch fails, still show the image but without animation
-        if (__DEV__) logger.warn('[AndroidVideoPlayer] Backdrop prefetch failed, showing anyway:', error);
-        setIsBackdropLoaded(true);
-        backdropImageOpacityAnim.setValue(1);
+        backdropImageOpacityAnim.setValue(0);
       }
-    } else {
-      // No backdrop provided, consider it "loaded"
-      setIsBackdropLoaded(true);
-      backdropImageOpacityAnim.setValue(0);
-    }
+    });
+    return () => task.cancel();
   }, [backdrop]);
 
   useEffect(() => {
-    const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
-    if (logoUrl && typeof logoUrl === 'string') {
-      try {
-        FastImage.preload([{ uri: logoUrl }]);
-      } catch (error) {
-        // Silently ignore logo prefetch errors
+    // Defer logo prefetch until after navigation animation
+    const task = InteractionManager.runAfterInteractions(() => {
+      const logoUrl = (metadata && (metadata as any).logo) as string | undefined;
+      if (logoUrl && typeof logoUrl === 'string') {
+        try {
+          FastImage.preload([{ uri: logoUrl }]);
+        } catch (error) {
+          // Silently ignore logo prefetch errors
+        }
       }
-    }
+    });
+    return () => task.cancel();
   }, [metadata]);
 
   // Resolve current episode description for series

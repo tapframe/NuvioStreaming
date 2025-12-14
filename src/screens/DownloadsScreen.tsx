@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   Clipboard,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -28,9 +29,12 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
 import { useDownloads } from '../contexts/DownloadsContext';
+import { useSettings } from '../hooks/useSettings';
+import { VideoPlayerService } from '../services/videoPlayerService';
 import type { DownloadItem } from '../contexts/DownloadsContext';
 import { useToast } from '../contexts/ToastContext';
 import CustomAlert from '../components/CustomAlert';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const { height, width } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -60,7 +64,7 @@ const optimizePosterUrl = (poster: string | undefined | null): string => {
 // Empty state component
 const EmptyDownloadsState: React.FC<{ navigation: NavigationProp<RootStackParamList> }> = ({ navigation }) => {
   const { currentTheme } = useTheme();
-  
+
   return (
     <View style={styles.emptyContainer}>
       <View style={[styles.emptyIconContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
@@ -76,7 +80,7 @@ const EmptyDownloadsState: React.FC<{ navigation: NavigationProp<RootStackParamL
       <Text style={[styles.emptySubtitle, { color: currentTheme.colors.mediumEmphasis }]}>
         Downloaded content will appear here for offline viewing
       </Text>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.exploreButton, { backgroundColor: currentTheme.colors.primary }]}
         onPress={() => {
           navigation.navigate('Search');
@@ -129,12 +133,12 @@ const DownloadItemComponent: React.FC<{
 
   const formatBytes = (bytes?: number) => {
     if (!bytes || bytes <= 0) return '0 B';
-    const sizes = ['B','KB','MB','GB','TB'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     const v = bytes / Math.pow(1024, i);
     return `${v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2)} ${sizes[i]}`;
   };
-  
+
   const getStatusColor = () => {
     switch (item.status) {
       case 'downloading':
@@ -218,10 +222,10 @@ const DownloadItemComponent: React.FC<{
           <MaterialCommunityIcons
             name={
               item.status === 'completed' ? 'check' :
-              item.status === 'downloading' ? 'download' :
-              item.status === 'paused' ? 'pause' :
-              item.status === 'error' ? 'alert-circle' :
-              'clock'
+                item.status === 'downloading' ? 'download' :
+                  item.status === 'paused' ? 'pause' :
+                    item.status === 'error' ? 'alert-circle' :
+                      'clock'
             }
             size={12}
             color="white"
@@ -234,10 +238,10 @@ const DownloadItemComponent: React.FC<{
         <View style={styles.downloadHeader}>
           <View style={styles.titleContainer}>
             <Text style={[styles.downloadTitle, { color: currentTheme.colors.text }]} numberOfLines={1}>
-              {item.title}{item.type === 'series' && item.season && item.episode ? `  S${String(item.season).padStart(2,'0')}E${String(item.episode).padStart(2,'0')}` : ''}
+              {item.title}{item.type === 'series' && item.season && item.episode ? `  S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}` : ''}
             </Text>
           </View>
-          
+
           {item.type === 'series' && (
             <Text style={[styles.episodeInfo, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={1}>
               S{item.season?.toString().padStart(2, '0')}E{item.episode?.toString().padStart(2, '0')} • {item.episodeTitle}
@@ -293,7 +297,7 @@ const DownloadItemComponent: React.FC<{
               ]}
             />
           </View>
-          
+
           <View style={styles.progressDetails}>
             <Text style={[styles.progressPercentage, { color: currentTheme.colors.text }]}>
               {item.progress || 0}%
@@ -322,7 +326,7 @@ const DownloadItemComponent: React.FC<{
             />
           </TouchableOpacity>
         )}
-        
+
         <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
           onPress={() => onRequestRemove(item)}
@@ -342,7 +346,7 @@ const DownloadItemComponent: React.FC<{
 const DownloadsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
-  const { top: safeAreaTop } = useSafeAreaInsets();
+  const { settings } = useSettings();
   const { downloads, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
   const { showSuccess, showInfo } = useToast();
 
@@ -351,9 +355,6 @@ const DownloadsScreen: React.FC = () => {
   const [showHelpAlert, setShowHelpAlert] = useState(false);
   const [showRemoveAlert, setShowRemoveAlert] = useState(false);
   const [pendingRemoveItem, setPendingRemoveItem] = useState<DownloadItem | null>(null);
-
-  // Animation values
-  const headerOpacity = useSharedValue(1);
 
   // Filter downloads based on selected filter
   const filteredDownloads = useMemo(() => {
@@ -394,7 +395,7 @@ const DownloadsScreen: React.FC = () => {
     setIsRefreshing(false);
   }, []);
 
-  const handleDownloadPress = useCallback((item: DownloadItem) => {
+  const handleDownloadPress = useCallback(async (item: DownloadItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.status !== 'completed') {
       Alert.alert('Download not ready', 'Please wait until the download completes.');
@@ -411,33 +412,132 @@ const DownloadsScreen: React.FC = () => {
     const isMp4 = /\.mp4(\?|$)/i.test(lower);
     const videoType = isM3u8 ? 'm3u8' : isMpd ? 'mpd' : isMp4 ? 'mp4' : undefined;
 
-    // Build episodeId for series progress tracking (format: contentId:season:episode)
-    const episodeId = item.type === 'series' && item.season && item.episode
-      ? `${item.contentId}:${item.season}:${item.episode}`
-      : undefined;
+    // Use external player if enabled in settings
+    if (settings.useExternalPlayerForDownloads) {
+      if (Platform.OS === 'android') {
+        try {
+          // Use VideoPlayerService for Android external playback
+          const success = await VideoPlayerService.playVideo(uri, {
+            useExternalPlayer: true,
+            title: item.title,
+            episodeTitle: item.type === 'series' ? item.episodeTitle : undefined,
+            episodeNumber: item.type === 'series' && item.season && item.episode ? `S${item.season}E${item.episode}` : undefined,
+          });
 
-    const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
-    navigation.navigate(playerRoute as any, {
-      uri,
-      title: item.title,
-      episodeTitle: item.type === 'series' ? item.episodeTitle : undefined,
-      season: item.type === 'series' ? item.season : undefined,
-      episode: item.type === 'series' ? item.episode : undefined,
-      quality: item.quality,
-      year: undefined,
-      streamProvider: 'Downloads',
-      streamName: item.providerName || 'Offline',
-      headers: undefined,
-      forceVlc: Platform.OS === 'android' ? isMkv : false,
-      id: item.contentId, // Use contentId (base ID) instead of compound id for progress tracking
-      type: item.type,
-      episodeId: episodeId, // Pass episodeId for series progress tracking
-      imdbId: (item as any).imdbId || item.contentId, // Use imdbId if available, fallback to contentId
-      availableStreams: {},
-      backdrop: undefined,
-      videoType,
-    } as any);
-  }, [navigation]);
+          if (success) return;
+          // Fall through to internal player if external fails
+        } catch (error) {
+          console.error('External player failed:', error);
+          // Fall through to internal player
+        }
+      } else if (Platform.OS === 'ios') {
+        const streamUrl = encodeURIComponent(uri);
+        let externalPlayerUrls: string[] = [];
+
+        switch (settings.preferredPlayer) {
+          case 'vlc':
+            externalPlayerUrls = [
+              `vlc://${uri}`,
+              `vlc-x-callback://x-callback-url/stream?url=${streamUrl}`,
+              `vlc://${streamUrl}`
+            ];
+            break;
+
+          case 'outplayer':
+            externalPlayerUrls = [
+              `outplayer://${uri}`,
+              `outplayer://${streamUrl}`,
+              `outplayer://play?url=${streamUrl}`,
+              `outplayer://stream?url=${streamUrl}`,
+              `outplayer://play/browser?url=${streamUrl}`
+            ];
+            break;
+
+          case 'infuse':
+            externalPlayerUrls = [
+              `infuse://x-callback-url/play?url=${streamUrl}`,
+              `infuse://play?url=${streamUrl}`,
+              `infuse://${streamUrl}`
+            ];
+            break;
+
+          case 'vidhub':
+            externalPlayerUrls = [
+              `vidhub://play?url=${streamUrl}`,
+              `vidhub://${streamUrl}`
+            ];
+            break;
+
+          case 'infuse_livecontainer':
+            const infuseUrls = [
+              `infuse://x-callback-url/play?url=${streamUrl}`,
+              `infuse://play?url=${streamUrl}`,
+              `infuse://${streamUrl}`
+            ];
+            externalPlayerUrls = infuseUrls.map(infuseUrl => {
+              const encoded = Buffer.from(infuseUrl).toString('base64');
+              return `livecontainer://open-url?url=${encoded}`;
+            });
+            break;
+
+          default:
+            // Internal logic will handle 'internal' choice
+            break;
+        }
+
+        if (settings.preferredPlayer !== 'internal') {
+          // Try each URL format in sequence
+          const tryNextUrl = (index: number) => {
+            if (index >= externalPlayerUrls.length) {
+              // Fallback to internal player if all external attempts fail
+              openInternalPlayer();
+              return;
+            }
+
+            const url = externalPlayerUrls[index];
+            Linking.openURL(url)
+              .catch(() => tryNextUrl(index + 1));
+          };
+
+          if (externalPlayerUrls.length > 0) {
+            tryNextUrl(0);
+            return;
+          }
+        }
+      }
+    }
+
+    const openInternalPlayer = () => {
+      // Build episodeId for series progress tracking (format: contentId:season:episode)
+      const episodeId = item.type === 'series' && item.season && item.episode
+        ? `${item.contentId}:${item.season}:${item.episode}`
+        : undefined;
+
+      const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
+      navigation.navigate(playerRoute as any, {
+        uri,
+        title: item.title,
+        episodeTitle: item.type === 'series' ? item.episodeTitle : undefined,
+        season: item.type === 'series' ? item.season : undefined,
+        episode: item.type === 'series' ? item.episode : undefined,
+        quality: item.quality,
+        year: undefined,
+        streamProvider: 'Downloads',
+        streamName: item.providerName || 'Offline',
+        headers: undefined,
+        forceVlc: Platform.OS === 'android' ? isMkv : false,
+        id: item.contentId, // Use contentId (base ID) instead of compound id for progress tracking
+        type: item.type,
+        episodeId: episodeId, // Pass episodeId for series progress tracking
+        imdbId: (item as any).imdbId || item.contentId, // Use imdbId if available, fallback to contentId
+        availableStreams: {},
+        backdrop: undefined,
+        videoType,
+      } as any);
+    };
+
+    openInternalPlayer();
+  }, [navigation, settings]);
 
   const handleDownloadAction = useCallback((item: DownloadItem, action: 'pause' | 'resume' | 'cancel' | 'retry') => {
     if (action === 'pause') pauseDownload(item.id);
@@ -468,19 +568,14 @@ const DownloadsScreen: React.FC = () => {
     }, [])
   );
 
-  // Animated styles
-  const headerStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-  }));
-
   const renderFilterButton = (filter: typeof selectedFilter, label: string, count: number) => (
     <TouchableOpacity
       key={filter}
       style={[
         styles.filterButton,
         {
-          backgroundColor: selectedFilter === filter 
-            ? currentTheme.colors.primary 
+          backgroundColor: selectedFilter === filter
+            ? currentTheme.colors.primary
             : currentTheme.colors.elevation1,
         }
       ]}
@@ -490,8 +585,8 @@ const DownloadsScreen: React.FC = () => {
       <Text style={[
         styles.filterButtonText,
         {
-          color: selectedFilter === filter 
-            ? currentTheme.colors.white 
+          color: selectedFilter === filter
+            ? currentTheme.colors.white
             : currentTheme.colors.text,
         }
       ]}>
@@ -501,16 +596,16 @@ const DownloadsScreen: React.FC = () => {
         <View style={[
           styles.filterBadge,
           {
-            backgroundColor: selectedFilter === filter 
-              ? currentTheme.colors.white 
+            backgroundColor: selectedFilter === filter
+              ? currentTheme.colors.white
               : currentTheme.colors.primary,
           }
         ]}>
           <Text style={[
             styles.filterBadgeText,
             {
-              color: selectedFilter === filter 
-                ? currentTheme.colors.primary 
+              color: selectedFilter === filter
+                ? currentTheme.colors.primary
                 : currentTheme.colors.white,
             }
           ]}>
@@ -529,22 +624,10 @@ const DownloadsScreen: React.FC = () => {
         backgroundColor="transparent"
       />
 
-      {/* Header */}
-      <Animated.View style={[
-        styles.header,
-        {
-          backgroundColor: currentTheme.colors.darkBackground,
-          paddingTop: (Platform.OS === 'android' 
-            ? (StatusBar.currentHeight || 0) + 26 
-            : safeAreaTop + 15) + (isTablet ? 64 : 0),
-          borderBottomColor: currentTheme.colors.border,
-        },
-        headerStyle,
-      ]}>
-        <View style={styles.headerTitleRow}>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-            Downloads
-          </Text>
+      {/* ScreenHeader Component */}
+      <ScreenHeader
+        title="Downloads"
+        rightActionComponent={
           <TouchableOpacity
             style={styles.helpButton}
             onPress={showDownloadHelp}
@@ -556,8 +639,9 @@ const DownloadsScreen: React.FC = () => {
               color={currentTheme.colors.mediumEmphasis}
             />
           </TouchableOpacity>
-        </View>
-        
+        }
+        isTablet={isTablet}
+      >
         {downloads.length > 0 && (
           <View style={styles.filterContainer}>
             {renderFilterButton('all', 'All', stats.total)}
@@ -566,7 +650,7 @@ const DownloadsScreen: React.FC = () => {
             {renderFilterButton('paused', 'Paused', stats.paused)}
           </View>
         )}
-      </Animated.View>
+      </ScreenHeader>
 
       {/* Content */}
       {downloads.length === 0 ? (
@@ -624,10 +708,10 @@ const DownloadsScreen: React.FC = () => {
       <CustomAlert
         visible={showRemoveAlert}
         title="Remove Download"
-        message={pendingRemoveItem ? `Remove \"${pendingRemoveItem.title}\"${pendingRemoveItem.type === 'series' && pendingRemoveItem.season && pendingRemoveItem.episode ? ` S${String(pendingRemoveItem.season).padStart(2,'0')}E${String(pendingRemoveItem.episode).padStart(2,'0')}` : ''}?` : 'Remove this download?'}
+        message={pendingRemoveItem ? `Remove \"${pendingRemoveItem.title}\"${pendingRemoveItem.type === 'series' && pendingRemoveItem.season && pendingRemoveItem.episode ? ` S${String(pendingRemoveItem.season).padStart(2, '0')}E${String(pendingRemoveItem.episode).padStart(2, '0')}` : ''}?` : 'Remove this download?'}
         actions={[
           { label: 'Cancel', onPress: () => setShowRemoveAlert(false) },
-          { label: 'Remove', onPress: () => { if (pendingRemoveItem) { cancelDownload(pendingRemoveItem.id); } setShowRemoveAlert(false); setPendingRemoveItem(null); }, style: { } },
+          { label: 'Remove', onPress: () => { if (pendingRemoveItem) { cancelDownload(pendingRemoveItem.id); } setShowRemoveAlert(false); setPendingRemoveItem(null); }, style: {} },
         ]}
         onClose={() => { setShowRemoveAlert(false); setPendingRemoveItem(null); }}
       />
@@ -638,23 +722,6 @@ const DownloadsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: isTablet ? 24 : Math.max(1, width * 0.05),
-    paddingBottom: isTablet ? 20 : 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginBottom: isTablet ? 20 : 16,
-    paddingBottom: 8,
-  },
-  headerTitle: {
-    fontSize: isTablet ? 36 : Math.min(32, width * 0.08),
-    fontWeight: '800',
-    letterSpacing: 0.3,
   },
   helpButton: {
     padding: 8,

@@ -52,11 +52,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const { settings } = useSettings();
   const { width } = useWindowDimensions();
   const isDarkMode = useColorScheme() === 'dark';
-  
+
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -64,13 +64,13 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced spacing and padding for seasons section
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -124,7 +124,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         return 16;
     }
   }, [deviceType]);
-  
+
   // Enhanced season poster sizing
   const seasonPosterWidth = useMemo(() => {
     switch (deviceType) {
@@ -138,7 +138,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         return 100; // phone
     }
   }, [deviceType]);
-  
+
   const seasonPosterHeight = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -151,7 +151,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         return 150; // phone
     }
   }, [deviceType]);
-  
+
   const seasonButtonSpacing = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -164,7 +164,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         return 16; // phone
     }
   }, [deviceType]);
-  
+
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: { currentTime: number; duration: number; lastUpdated: number } }>({});
   // Delay item entering animations to avoid FlashList initial layout glitches
   const [enableItemAnimations, setEnableItemAnimations] = useState(false);
@@ -172,14 +172,14 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   const [tmdbEpisodeOverrides, setTmdbEpisodeOverrides] = useState<{ [epKey: string]: { vote_average?: number; runtime?: number; still_path?: string } }>({});
   // IMDb ratings for episodes - using a map for O(1) lookups instead of array searches
   const [imdbRatingsMap, setImdbRatingsMap] = useState<{ [key: string]: number }>({});
-  
+
   // Add state for season view mode (persists for current show across navigation)
   const [seasonViewMode, setSeasonViewMode] = useState<'posters' | 'text'>('posters');
-  
+
   // View mode state (no animations)
   const [posterViewVisible, setPosterViewVisible] = useState(true);
   const [textViewVisible, setTextViewVisible] = useState(false);
-  
+
   // Add refs for the scroll views
   const seasonScrollViewRef = useRef<ScrollView | null>(null);
   const episodeScrollViewRef = useRef<FlashListRef<Episode>>(null);
@@ -198,7 +198,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         if (__DEV__) console.log('[SeriesContent] Error loading global view mode preference:', error);
       }
     };
-    
+
     loadViewModePreference();
   }, []);
 
@@ -222,17 +222,17 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       if (__DEV__) console.log('[SeriesContent] Error saving global view mode preference:', error);
     });
   };
-  
+
   // Add refs for the scroll views
-  
+
 
 
   const loadEpisodesProgress = async () => {
     if (!metadata?.id) return;
-    
+
     const allProgress = await storageService.getAllWatchProgress();
     const progress: { [key: string]: { currentTime: number; duration: number; lastUpdated: number } } = {};
-    
+
     episodes.forEach(episode => {
       const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
       const key = `series:${metadata.id}:${episodeId}`;
@@ -244,7 +244,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         };
       }
     });
-    
+
     // ---------------- Trakt watched-history integration ----------------
     try {
       const traktService = TraktService.getInstance();
@@ -254,7 +254,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         // Each page has up to 100 items by default, fetch enough to cover ~12+ seasons
         let allHistoryItems: any[] = [];
         const pageLimit = 10; // Fetch up to 10 pages (max 1000 items) to cover extensive libraries
-        
+
         for (let page = 1; page <= pageLimit; page++) {
           const historyItems = await traktService.getWatchedEpisodesHistory(page, 100);
           if (!historyItems || historyItems.length === 0) {
@@ -295,7 +295,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     } catch (err) {
       logger.error('[SeriesContent] Failed to merge Trakt history:', err);
     }
-    
+
     setEpisodeProgress(progress);
   };
 
@@ -304,28 +304,28 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     if (!metadata?.id || !settings?.episodeLayoutStyle || settings.episodeLayoutStyle !== 'horizontal') {
       return;
     }
-    
+
     const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
     if (currentSeasonEpisodes.length === 0) {
       return;
     }
-    
+
     // Find the most recently watched episode in the current season
     let mostRecentEpisodeIndex = -1;
     let mostRecentTimestamp = 0;
     let mostRecentEpisodeName = '';
-    
+
     currentSeasonEpisodes.forEach((episode, index) => {
       const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
       const progress = episodeProgress[episodeId];
-      
+
       if (progress && progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
         mostRecentTimestamp = progress.lastUpdated;
         mostRecentEpisodeIndex = index;
         mostRecentEpisodeName = episode.name;
       }
     });
-    
+
     // Scroll to the most recently watched episode if found
     if (mostRecentEpisodeIndex >= 0) {
       setTimeout(() => {
@@ -369,7 +369,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         } else {
           logger.log('[SeriesContent] metadata.id does not start with tmdb: or tt:', metadata.id);
         }
-        
+
         if (!tmdbShowId) {
           logger.warn('[SeriesContent] Could not resolve TMDB show ID, skipping IMDb ratings fetch');
           return;
@@ -378,10 +378,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         logger.log('[SeriesContent] Fetching IMDb ratings for TMDB ID:', tmdbShowId);
         // Fetch IMDb ratings for all seasons
         const ratings = await tmdbService.getIMDbRatings(tmdbShowId);
-        
+
         if (ratings) {
           logger.log('[SeriesContent] IMDb ratings fetched successfully. Seasons:', ratings.length);
-          
+
           // Create a lookup map for O(1) access: key format "season:episode" -> rating
           const ratingsMap: { [key: string]: number } = {};
           ratings.forEach(season => {
@@ -394,7 +394,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               });
             }
           });
-          
+
           logger.log('[SeriesContent] IMDb ratings map created with', Object.keys(ratingsMap).length, 'episodes');
           setImdbRatingsMap(ratingsMap);
         } else {
@@ -472,7 +472,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     return () => {
       // Clear any pending timeouts
       if (__DEV__) console.log('[SeriesContent] Component unmounted, cleaning up memory');
-      
+
       // Force garbage collection if available (development only)
       if (__DEV__ && global.gc) {
         global.gc();
@@ -486,7 +486,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       // Find the index of the selected season
       const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
       const selectedIndex = seasons.findIndex(season => season === selectedSeason);
-      
+
       if (selectedIndex !== -1) {
         // Wait a small amount of time for layout to be ready
         setTimeout(() => {
@@ -540,11 +540,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     if (!groupedEpisodes || Object.keys(groupedEpisodes).length <= 1) {
       return null;
     }
-    
-    if (__DEV__) console.log('[SeriesContent] renderSeasonSelector called, current view mode:', seasonViewMode);
-    
+
+
+
     const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
-    
+
     return (
       <View style={[
         styles.seasonSelectorWrapper,
@@ -558,22 +558,22 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         ]}>
           <Text style={[
             styles.seasonSelectorTitle,
-            { 
+            {
               color: currentTheme.colors.highEmphasis,
               fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 18
             }
           ]}>Seasons</Text>
-          
+
           {/* Dropdown Toggle Button */}
           <TouchableOpacity
             style={[
-              styles.seasonViewToggle, 
-              { 
-                backgroundColor: seasonViewMode === 'posters' 
-                  ? currentTheme.colors.elevation2 
+              styles.seasonViewToggle,
+              {
+                backgroundColor: seasonViewMode === 'posters'
+                  ? currentTheme.colors.elevation2
                   : currentTheme.colors.elevation3,
-                borderColor: seasonViewMode === 'posters' 
-                  ? 'rgba(255,255,255,0.2)' 
+                borderColor: seasonViewMode === 'posters'
+                  ? 'rgba(255,255,255,0.2)'
                   : 'rgba(255,255,255,0.3)',
                 paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
                 paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4,
@@ -588,10 +588,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             activeOpacity={0.7}
           >
             <Text style={[
-              styles.seasonViewToggleText, 
-              { 
-                color: seasonViewMode === 'posters' 
-                  ? currentTheme.colors.mediumEmphasis 
+              styles.seasonViewToggleText,
+              {
+                color: seasonViewMode === 'posters'
+                  ? currentTheme.colors.mediumEmphasis
                   : currentTheme.colors.highEmphasis,
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12
               }
@@ -600,7 +600,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         <FlatList
           ref={seasonScrollViewRef as React.RefObject<FlatList<any>>}
           data={seasons}
@@ -618,7 +618,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           windowSize={3}
           renderItem={({ item: season }) => {
             const seasonEpisodes = groupedEpisodes[season] || [];
-            
+
             // Get season poster URL (needed for both views)
             let seasonPoster = DEFAULT_PLACEHOLDER;
             if (seasonEpisodes[0]?.season_poster_path) {
@@ -627,12 +627,12 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             } else if (metadata?.poster) {
               seasonPoster = metadata.poster;
             }
-            
+
             if (seasonViewMode === 'text') {
               // Text-only view
-              if (__DEV__) console.log('[SeriesContent] Rendering text view for season:', season, 'View mode ref:', seasonViewMode);
+
               return (
-                <View 
+                <View
                   key={season}
                   style={{ opacity: textViewVisible ? 1 : 0 }}
                 >
@@ -666,11 +666,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                 </View>
               );
             }
-            
+
             // Poster view (current implementation)
-            if (__DEV__) console.log('[SeriesContent] Rendering poster view for season:', season, 'View mode ref:', seasonViewMode);
+
             return (
-              <View 
+              <View
                 key={season}
                 style={{ opacity: posterViewVisible ? 1 : 0 }}
               >
@@ -710,10 +710,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     )}
 
                   </View>
-                  <Text 
+                  <Text
                     style={[
                       styles.seasonButtonText,
-                      { 
+                      {
                         color: currentTheme.colors.mediumEmphasis,
                         fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14
                       },
@@ -726,9 +726,9 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     Season {season}
                   </Text>
                 </TouchableOpacity>
-                </View>
-              );
-            }}
+              </View>
+            );
+          }}
           keyExtractor={season => season.toString()}
         />
       </View>
@@ -763,11 +763,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     };
 
     let episodeImage = resolveEpisodeImage();
-    
+
     const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
     const seasonNumber = typeof episode.season_number === 'number' ? episode.season_number.toString() : '';
     const episodeString = seasonNumber && episodeNumber ? `S${seasonNumber.padStart(2, '0')}E${episodeNumber.padStart(2, '0')}` : '';
-    
+
     const formatDate = (dateString: string) => {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
@@ -795,9 +795,9 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     const tmdbRating = tmdbOverride?.vote_average ?? episode.vote_average;
     const effectiveVote = imdbRating ?? tmdbRating ?? 0;
     const isImdbRating = imdbRating !== null;
-    
-    logger.log(`[SeriesContent] Vertical card S${episode.season_number}E${episode.episode_number}: IMDb=${imdbRating}, TMDB=${tmdbRating}, effective=${effectiveVote}, isImdb=${isImdbRating}`);
-    
+
+
+
     const effectiveRuntime = tmdbOverride?.runtime ?? (episode as any).runtime;
     if (!episode.still_path && tmdbOverride?.still_path) {
       const tmdbUrl = tmdbService.getImageUrl(tmdbOverride.still_path, 'original');
@@ -805,7 +805,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     }
     const progress = episodeProgress[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
-    
+
     // Don't show progress bar if episode is complete (>= 85%)
     const showProgress = progress && progressPercent < 85;
 
@@ -813,8 +813,8 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       <TouchableOpacity
         key={episode.id}
         style={[
-          styles.episodeCardVertical, 
-          { 
+          styles.episodeCardVertical,
+          {
             backgroundColor: currentTheme.colors.elevation2,
             borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
             marginBottom: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
@@ -854,11 +854,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           </View>
           {showProgress && (
             <View style={styles.progressBarContainer}>
-              <View 
+              <View
                 style={[
                   styles.progressBar,
                   { width: `${progressPercent}%`, backgroundColor: currentTheme.colors.primary }
-                ]} 
+                ]}
               />
             </View>
           )}
@@ -907,7 +907,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           ]}>
             <Text style={[
               styles.episodeTitle,
-              { 
+              {
                 color: currentTheme.colors.text,
                 fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
                 lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 18,
@@ -1002,7 +1002,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               )}
             </View>
           </View>
-          <Text style={[ 
+          <Text style={[
             styles.episodeOverview,
             {
               color: currentTheme.colors.mediumEmphasis,
@@ -1042,11 +1042,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     };
 
     let episodeImage = resolveEpisodeImage();
-    
+
     const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
     const seasonNumber = typeof episode.season_number === 'number' ? episode.season_number.toString() : '';
     const episodeString = seasonNumber && episodeNumber ? `EPISODE ${episodeNumber}` : '';
-    
+
     const formatRuntime = (runtime: number) => {
       if (!runtime) return null;
       const hours = Math.floor(runtime / 60);
@@ -1066,9 +1066,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     const effectiveVote = imdbRating ?? tmdbRating ?? 0;
     const isImdbRating = imdbRating !== null;
     const effectiveRuntime = tmdbOverride?.runtime ?? (episode as any).runtime;
-    
-    logger.log(`[SeriesContent] Horizontal card S${episode.season_number}E${episode.episode_number}: IMDb=${imdbRating}, TMDB=${tmdbRating}, effective=${effectiveVote}, isImdb=${isImdbRating}`);
-    
+
     const formatDate = (dateString: string) => {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
@@ -1077,10 +1075,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         year: 'numeric'
       });
     };
-    
+
     const progress = episodeProgress[episodeId];
     const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
-    
+
     // Don't show progress bar if episode is complete (>= 85%)
     const showProgress = progress && progressPercent < 85;
 
@@ -1097,7 +1095,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             shadowRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 8
           },
           // Gradient border styling
-          { 
+          {
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.12)',
             shadowColor: '#000',
@@ -1115,12 +1113,12 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           style={styles.episodeBackgroundImage}
           resizeMode={FastImage.resizeMode.cover}
         />
-        
+
         {/* Standard Gradient Overlay */}
         <LinearGradient
           colors={[
             'rgba(0,0,0,0.05)',
-            'rgba(0,0,0,0.2)', 
+            'rgba(0,0,0,0.2)',
             'rgba(0,0,0,0.6)',
             'rgba(0,0,0,0.85)',
             'rgba(0,0,0,0.95)'
@@ -1146,15 +1144,15 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                 marginBottom: isTV ? 10 : isLargeTablet ? 8 : isTablet ? 6 : 6
               }
             ]}>
-            <Text style={[
-              styles.episodeNumberHorizontal,
-              {
-                fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 10,
-                fontWeight: isTV ? '700' : isLargeTablet ? '700' : isTablet ? '600' : '600'
-              }
-            ]}>{episodeString}</Text>
+              <Text style={[
+                styles.episodeNumberHorizontal,
+                {
+                  fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 10,
+                  fontWeight: isTV ? '700' : isLargeTablet ? '700' : isTablet ? '600' : '600'
+                }
+              ]}>{episodeString}</Text>
             </View>
-            
+
             {/* Episode Title */}
             <Text style={[
               styles.episodeTitleHorizontal,
@@ -1167,9 +1165,9 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             ]} numberOfLines={2}>
               {episode.name}
             </Text>
-            
+
             {/* Episode Description */}
-            <Text style={[ 
+            <Text style={[
               styles.episodeDescriptionHorizontal,
               {
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 12,
@@ -1180,7 +1178,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             ]} numberOfLines={isLargeScreen ? 4 : 3}>
               {(episode.overview || (episode as any).description || (episode as any).plot || (episode as any).synopsis || 'No description available')}
             </Text>
-            
+
             {/* Metadata Row */}
             <View style={[
               styles.episodeMetadataRowHorizontal,
@@ -1258,27 +1256,27 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               )}
             </View>
           </View>
-          
+
           {/* Progress Bar */}
           {showProgress && (
             <View style={styles.progressBarContainerHorizontal}>
-              <View 
+              <View
                 style={[
                   styles.progressBarHorizontal,
-                  { 
-                    width: `${progressPercent}%`, 
+                  {
+                    width: `${progressPercent}%`,
                     backgroundColor: currentTheme.colors.primary,
                   }
-                ]} 
+                ]}
               />
             </View>
           )}
-          
+
           {/* Completed Badge */}
           {progressPercent >= 85 && (
             <View style={[
               styles.completedBadgeHorizontal,
-              { 
+              {
                 backgroundColor: currentTheme.colors.primary,
                 width: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
                 height: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 24,
@@ -1304,7 +1302,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               opacity: 0.9,
             }} />
           )}
-          
+
         </LinearGradient>
       </TouchableOpacity>
     );
@@ -1314,13 +1312,13 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 
   return (
     <View style={styles.container}>
-      <Animated.View 
+      <Animated.View
         entering={FadeIn.duration(300).delay(50)}
       >
         {renderSeasonSelector()}
       </Animated.View>
-      
-      <Animated.View 
+
+      <Animated.View
         entering={FadeIn.duration(300).delay(100)}
       >
         <Text style={[
@@ -1334,7 +1332,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         ]}>
           {currentSeasonEpisodes.length} {currentSeasonEpisodes.length === 1 ? 'Episode' : 'Episodes'}
         </Text>
-        
+
         {/* Show message when no episodes are available for selected season */}
         {currentSeasonEpisodes.length === 0 && (
           <View style={styles.centeredContainer}>
@@ -1347,7 +1345,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             </Text>
           </View>
         )}
-        
+
         {/* Only render episode list if there are episodes */}
         {currentSeasonEpisodes.length > 0 && (
           (settings?.episodeLayoutStyle === 'horizontal') ? (
@@ -1417,7 +1415,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               ref={episodeScrollViewRef}
               data={currentSeasonEpisodes}
               renderItem={({ item: episode, index }) => (
-                <Animated.View 
+                <Animated.View
                   entering={enableItemAnimations ? FadeIn.duration(300).delay(100 + index * 30) : undefined as any}
                 >
                   {renderVerticalEpisodeCard(episode)}
@@ -1474,7 +1472,7 @@ const styles = StyleSheet.create({
   episodeList: {
     flex: 1,
   },
-  
+
   // Vertical Layout Styles
   episodeListContentVertical: {
     paddingBottom: 8,

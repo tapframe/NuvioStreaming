@@ -87,6 +87,7 @@ export interface AppSettings {
   openMetadataScreenWhenCacheDisabled: boolean; // When cache disabled, open MetadataScreen instead of StreamsScreen
   streamCacheTTL: number; // Stream cache duration in milliseconds (default: 1 hour)
   enableStreamsBackdrop: boolean; // Enable blurred backdrop background on StreamsScreen mobile
+  useExternalPlayerForDownloads: boolean; // Enable/disable external player for downloaded content
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -122,6 +123,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   alwaysResume: true,
   // Downloads
   enableDownloads: false,
+  useExternalPlayerForDownloads: false,
   // Theme defaults
   themeId: 'default',
   customThemes: [],
@@ -162,12 +164,12 @@ export const useSettings = () => {
 
   useEffect(() => {
     loadSettings();
-    
+
     // Subscribe to settings changes
     const unsubscribe = settingsEmitter.addListener(() => {
       loadSettings();
     });
-    
+
     return unsubscribe;
   }, []);
 
@@ -183,13 +185,13 @@ export const useSettings = () => {
 
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
-      
+
       // Use synchronous MMKV reads for better performance
       const [scopedJson, legacyJson] = await Promise.all([
         mmkvStorage.getItem(scopedKey),
         mmkvStorage.getItem(SETTINGS_STORAGE_KEY),
       ]);
-      
+
       const parsedScoped = scopedJson ? JSON.parse(scopedJson) : null;
       const parsedLegacy = legacyJson ? JSON.parse(legacyJson) : null;
 
@@ -202,16 +204,16 @@ export const useSettings = () => {
         if (scoped) {
           try {
             merged = JSON.parse(scoped);
-          } catch {}
+          } catch { }
         }
       }
 
       const finalSettings = merged ? { ...DEFAULT_SETTINGS, ...merged } : DEFAULT_SETTINGS;
-      
+
       // Update cache
       cachedSettings = finalSettings;
       settingsCacheTimestamp = now;
-      
+
       setSettings(finalSettings);
     } catch (error) {
       if (__DEV__) console.error('Failed to load settings:', error);
@@ -231,23 +233,23 @@ export const useSettings = () => {
   ) => {
     const newSettings = { ...settings, [key]: value };
     try {
-    const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
-    const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
-    // Write to both scoped key (multi-user aware) and legacy key for backward compatibility
-    await Promise.all([
-      mmkvStorage.setItem(scopedKey, JSON.stringify(newSettings)),
-      mmkvStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings)),
-    ]);
-    // Ensure a current scope exists to avoid future loads missing the chosen scope
-    await mmkvStorage.setItem('@user:current', scope);
-      
+      const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
+      const scopedKey = `@user:${scope}:${SETTINGS_STORAGE_KEY}`;
+      // Write to both scoped key (multi-user aware) and legacy key for backward compatibility
+      await Promise.all([
+        mmkvStorage.setItem(scopedKey, JSON.stringify(newSettings)),
+        mmkvStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings)),
+      ]);
+      // Ensure a current scope exists to avoid future loads missing the chosen scope
+      await mmkvStorage.setItem('@user:current', scope);
+
       // Update cache
       cachedSettings = newSettings;
       settingsCacheTimestamp = Date.now();
-      
+
       setSettings(newSettings);
       if (__DEV__) console.log(`Setting updated: ${key}`, value);
-      
+
       // Notify all subscribers that settings have changed (if requested)
       if (emitEvent) {
         if (__DEV__) console.log('Emitting settings change event');

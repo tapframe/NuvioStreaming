@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { getDisplayedAppVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
+import ScreenHeader from '../components/common/ScreenHeader';
 import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
 import TMDBIcon from '../components/icons/TMDBIcon';
@@ -86,7 +87,11 @@ const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet =
       )}
       <View style={[
         styles.card,
-        { backgroundColor: currentTheme.colors.elevation1 },
+        {
+          backgroundColor: currentTheme.colors.elevation1,
+          borderWidth: 1,
+          borderColor: currentTheme.colors.elevation2,
+        },
         isTablet && styles.tabletCard
       ]}>
         {children}
@@ -134,9 +139,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
       <View style={[
         styles.settingIconContainer,
         {
-          backgroundColor: currentTheme.colors.darkGray,
-          borderWidth: 1,
-          borderColor: currentTheme.colors.primary + '20'
+          backgroundColor: currentTheme.colors.primary + '12',
         },
         isTablet && styles.tabletSettingIconContainer
       ]}>
@@ -145,7 +148,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
         ) : (
           <Feather
             name={icon! as any}
-            size={isTablet ? 24 : 20}
+            size={isTablet ? 22 : 18}
             color={currentTheme.colors.primary}
           />
         )}
@@ -195,11 +198,18 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, currentTheme, categories, extraTopPadding = 0 }) => {
   return (
-    <View style={[styles.sidebar, { backgroundColor: currentTheme.colors.elevation1 }]}>
+    <View style={[
+      styles.sidebar,
+      {
+        backgroundColor: currentTheme.colors.elevation1,
+        borderRightColor: currentTheme.colors.elevation2,
+      }
+    ]}>
       <View style={[
         styles.sidebarHeader,
         {
           paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48) + extraTopPadding,
+          borderBottomColor: currentTheme.colors.elevation2,
         }
       ]}>
         <Text style={[styles.sidebarTitle, { color: currentTheme.colors.highEmphasis }]}>
@@ -215,26 +225,37 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
               styles.sidebarItem,
               selectedCategory === category.id && [
                 styles.sidebarItemActive,
-                { backgroundColor: `${currentTheme.colors.primary}15` }
+                { backgroundColor: currentTheme.colors.primary + '10' }
               ]
             ]}
             onPress={() => onCategorySelect(category.id)}
+            activeOpacity={0.6}
           >
-            <Feather
-              name={category.icon as any}
-              size={22}
-              color={
-                selectedCategory === category.id
-                  ? currentTheme.colors.primary
-                  : currentTheme.colors.mediumEmphasis
+            <View style={[
+              styles.sidebarItemIconContainer,
+              {
+                backgroundColor: selectedCategory === category.id
+                  ? currentTheme.colors.primary + '15'
+                  : 'transparent',
               }
-            />
+            ]}>
+              <Feather
+                name={category.icon as any}
+                size={20}
+                color={
+                  selectedCategory === category.id
+                    ? currentTheme.colors.primary
+                    : currentTheme.colors.mediumEmphasis
+                }
+              />
+            </View>
             <Text style={[
               styles.sidebarItemText,
               {
                 color: selectedCategory === category.id
-                  ? currentTheme.colors.primary
-                  : currentTheme.colors.mediumEmphasis
+                  ? currentTheme.colors.highEmphasis
+                  : currentTheme.colors.mediumEmphasis,
+                fontWeight: selectedCategory === category.id ? '600' : '500',
               }
             ]}>
               {category.title}
@@ -863,11 +884,8 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
-  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   // Keep headers below floating top navigator on tablets by adding extra offset
   const tabletNavOffset = isTablet ? 64 : 0;
-  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
-  const headerHeight = headerBaseHeight + topSpacing;
 
   if (isTablet) {
     return (
@@ -917,7 +935,21 @@ const SettingsScreen: React.FC = () => {
                     </Text>
                   </View>
                   <View style={styles.discordContainer}>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0, marginBottom: 8 }]}
+                      onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
+                        presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
+                      })}
+                      activeOpacity={0.7}
+                    >
+                      <FastImage
+                        source={require('../../assets/support_me_on_kofi_red.png')}
+                        style={styles.kofiImage}
+                        resizeMode={FastImage.resizeMode.contain}
+                      />
+                    </TouchableOpacity>
+
+                    <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
                       <TouchableOpacity
                         style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
                         onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
@@ -930,23 +962,26 @@ const SettingsScreen: React.FC = () => {
                             resizeMode={FastImage.resizeMode.contain}
                           />
                           <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
-                            Join Discord
+                            Discord
                           </Text>
                         </View>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
-                        onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
-                          presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
-                        })}
+                        style={[styles.discordButton, { backgroundColor: '#FF4500' + '15' }]}
+                        onPress={() => Linking.openURL('https://www.reddit.com/r/Nuvio/')}
                         activeOpacity={0.7}
                       >
-                        <FastImage
-                          source={require('../../assets/support_me_on_kofi_red.png')}
-                          style={styles.kofiImage}
-                          resizeMode={FastImage.resizeMode.contain}
-                        />
+                        <View style={styles.discordButtonContent}>
+                          <FastImage
+                            source={{ uri: 'https://www.iconpacks.net/icons/2/free-reddit-logo-icon-2436-thumb.png' }}
+                            style={styles.discordLogo}
+                            resizeMode={FastImage.resizeMode.contain}
+                          />
+                          <Text style={[styles.discordButtonText, { color: '#FF4500' }]}>
+                            Reddit
+                          </Text>
+                        </View>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -973,12 +1008,10 @@ const SettingsScreen: React.FC = () => {
       { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
       <StatusBar barStyle={'light-content'} />
+      <ScreenHeader
+        title="Settings"
+      />
       <View style={{ flex: 1 }}>
-        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-            Settings
-          </Text>
-        </View>
 
         <View style={styles.contentContainer}>
           <ScrollView
@@ -1017,7 +1050,21 @@ const SettingsScreen: React.FC = () => {
 
             {/* Support & Community Buttons */}
             <View style={styles.discordContainer}>
-              <View style={{ flexDirection: 'row', gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0, marginBottom: 8 }]}
+                onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
+                  presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
+                })}
+                activeOpacity={0.7}
+              >
+                <FastImage
+                  source={require('../../assets/support_me_on_kofi_red.png')}
+                  style={styles.kofiImage}
+                  resizeMode={FastImage.resizeMode.contain}
+                />
+              </TouchableOpacity>
+
+              <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <TouchableOpacity
                   style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
                   onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
@@ -1030,23 +1077,26 @@ const SettingsScreen: React.FC = () => {
                       resizeMode={FastImage.resizeMode.contain}
                     />
                     <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
-                      Join Discord
+                      Discord
                     </Text>
                   </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0 }]}
-                  onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
-                    presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
-                  })}
+                  style={[styles.discordButton, { backgroundColor: '#FF4500' + '15' }]}
+                  onPress={() => Linking.openURL('https://www.reddit.com/r/Nuvio/')}
                   activeOpacity={0.7}
                 >
-                  <FastImage
-                    source={require('../../assets/support_me_on_kofi_red.png')}
-                    style={styles.kofiImage}
-                    resizeMode={FastImage.resizeMode.contain}
-                  />
+                  <View style={styles.discordButtonContent}>
+                    <FastImage
+                      source={{ uri: 'https://www.iconpacks.net/icons/2/free-reddit-logo-icon-2436-thumb.png' }}
+                      style={styles.discordLogo}
+                      resizeMode={FastImage.resizeMode.contain}
+                    />
+                    <Text style={[styles.discordButtonText, { color: '#FF4500' }]}>
+                      Reddit
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1069,20 +1119,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // Mobile styles
-  header: {
-    paddingHorizontal: Math.max(1, width * 0.05),
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingBottom: 8,
-    backgroundColor: 'transparent',
-    zIndex: 2,
-  },
-  headerTitle: {
-    fontSize: Math.min(32, width * 0.08),
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
   contentContainer: {
     flex: 1,
     zIndex: 1,
@@ -1095,7 +1131,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     width: '100%',
-    paddingBottom: 90,
+    paddingTop: 8,
+    paddingBottom: 100,
   },
 
   // Tablet-specific styles
@@ -1106,39 +1143,45 @@ const styles = StyleSheet.create({
   sidebar: {
     width: 280,
     borderRightWidth: 1,
-    borderRightColor: 'rgba(255,255,255,0.1)',
   },
   sidebarHeader: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 24 : 48,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   sidebarTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: 42,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   sidebarContent: {
     flex: 1,
-    paddingTop: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
   sidebarItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     marginHorizontal: 12,
     marginVertical: 2,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   sidebarItemActive: {
-    borderRadius: 12,
+    borderRadius: 10,
+  },
+  sidebarItemIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sidebarItemText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 16,
+    fontSize: 15,
+    marginLeft: 12,
   },
   tabletContent: {
     flex: 1,
@@ -1146,80 +1189,74 @@ const styles = StyleSheet.create({
   },
   tabletScrollView: {
     flex: 1,
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
   },
   tabletScrollContent: {
-    paddingBottom: 32,
+    paddingTop: 8,
+    paddingBottom: 40,
   },
 
   // Common card styles
   cardContainer: {
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   tabletCardContainer: {
-    marginBottom: 32,
+    marginBottom: 28,
   },
   cardTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.8,
-    marginLeft: Math.max(12, width * 0.04),
-    marginBottom: 8,
+    letterSpacing: 1,
+    marginLeft: Math.max(16, width * 0.045),
+    marginBottom: 10,
+    textTransform: 'uppercase',
   },
   tabletCardTitle: {
-    fontSize: 14,
-    marginLeft: 0,
+    fontSize: 12,
+    marginLeft: 4,
     marginBottom: 12,
   },
   card: {
-    marginHorizontal: Math.max(12, width * 0.04),
-    borderRadius: 16,
+    marginHorizontal: Math.max(16, width * 0.04),
+    borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     width: undefined,
   },
   tabletCard: {
     marginHorizontal: 0,
-    borderRadius: 20,
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    borderRadius: 16,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: Math.max(12, width * 0.04),
-    borderBottomWidth: 0.5,
-    minHeight: Math.max(54, width * 0.14),
+    paddingVertical: 14,
+    paddingHorizontal: Math.max(14, width * 0.04),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    minHeight: Math.max(60, width * 0.15),
     width: '100%',
   },
   tabletSettingItem: {
     paddingVertical: 16,
-    paddingHorizontal: 24,
-    minHeight: 70,
+    paddingHorizontal: 20,
+    minHeight: 68,
   },
   settingItemBorder: {
     // Border styling handled directly in the component with borderBottomWidth
   },
   settingIconContainer: {
-    marginRight: 16,
-    width: 36,
-    height: 36,
+    marginRight: 14,
+    width: 38,
+    height: 38,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabletSettingIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    marginRight: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 11,
+    marginRight: 16,
   },
   settingContent: {
     flex: 1,
@@ -1230,32 +1267,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingTitle: {
-    fontSize: Math.min(16, width * 0.042),
+    fontSize: Math.min(16, width * 0.04),
+    fontWeight: '500',
+    marginBottom: 2,
+    letterSpacing: -0.2,
+  },
+  tabletSettingTitle: {
+    fontSize: 17,
     fontWeight: '500',
     marginBottom: 3,
   },
-  tabletSettingTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
   settingDescription: {
-    fontSize: Math.min(14, width * 0.037),
-    opacity: 0.8,
+    fontSize: Math.min(13, width * 0.034),
+    opacity: 0.7,
   },
   tabletSettingDescription: {
-    fontSize: 16,
-    opacity: 0.7,
+    fontSize: 14,
+    opacity: 0.6,
   },
   settingControl: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 12,
+    paddingLeft: 10,
   },
   badge: {
-    height: 22,
-    minWidth: 22,
-    borderRadius: 11,
+    height: 20,
+    minWidth: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
@@ -1263,8 +1301,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
   },
   segmentedControl: {
     flexDirection: 'row',
@@ -1293,26 +1331,27 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
-    marginBottom: 8,
+    marginTop: 24,
+    marginBottom: 12,
   },
   footerText: {
-    fontSize: 14,
+    fontSize: 13,
     opacity: 0.5,
+    letterSpacing: 0.2,
   },
-  // New styles for Discord button
+  // Support buttons
   discordContainer: {
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: 12,
+    marginBottom: 24,
     alignItems: 'center',
   },
   discordButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
     maxWidth: 200,
   },
   discordButtonContent: {
@@ -1320,34 +1359,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   discordLogo: {
-    width: 16,
-    height: 16,
-    marginRight: 8,
+    width: 18,
+    height: 18,
+    marginRight: 10,
   },
   discordButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   kofiImage: {
-    height: 32,
-    width: 150,
+    height: 34,
+    width: 155,
   },
   downloadsContainer: {
-    marginTop: 20,
-    marginBottom: 12,
+    marginTop: 32,
+    marginBottom: 16,
     alignItems: 'center',
   },
   downloadsNumber: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 4,
+    letterSpacing: 0.5,
+    marginBottom: 6,
   },
   downloadsLabel: {
     fontSize: 11,
     fontWeight: '600',
-    opacity: 0.6,
-    letterSpacing: 1.2,
+    opacity: 0.5,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   loadingSpinner: {

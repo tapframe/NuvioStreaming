@@ -27,11 +27,11 @@ import debounce from 'lodash/debounce';
 import { DropUpMenu } from '../components/home/DropUpMenu';
 import { DeviceEventEmitter, Share } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
-import Animated, { 
-  FadeIn, 
-  FadeOut, 
-  useAnimatedStyle, 
-  useSharedValue, 
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
   withTiming,
   interpolate,
   withSpring,
@@ -43,6 +43,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import ScreenHeader from '../components/common/ScreenHeader';
 
 const { width, height } = Dimensions.get('window');
 
@@ -110,21 +111,21 @@ const SkeletonLoader = () => {
   const renderSkeletonItem = () => (
     <View style={styles.skeletonVerticalItem}>
       <RNAnimated.View style={[
-        styles.skeletonPoster, 
+        styles.skeletonPoster,
         { opacity, backgroundColor: currentTheme.colors.darkBackground }
       ]} />
       <View style={styles.skeletonItemDetails}>
         <RNAnimated.View style={[
-          styles.skeletonTitle, 
+          styles.skeletonTitle,
           { opacity, backgroundColor: currentTheme.colors.darkBackground }
         ]} />
         <View style={styles.skeletonMetaRow}>
           <RNAnimated.View style={[
-            styles.skeletonMeta, 
+            styles.skeletonMeta,
             { opacity, backgroundColor: currentTheme.colors.darkBackground }
           ]} />
           <RNAnimated.View style={[
-            styles.skeletonMeta, 
+            styles.skeletonMeta,
             { opacity, backgroundColor: currentTheme.colors.darkBackground }
           ]} />
         </View>
@@ -138,7 +139,7 @@ const SkeletonLoader = () => {
         <View key={index}>
           {index === 0 && (
             <RNAnimated.View style={[
-              styles.skeletonSectionHeader, 
+              styles.skeletonSectionHeader,
               { opacity, backgroundColor: currentTheme.colors.darkBackground }
             ]} />
           )}
@@ -157,7 +158,7 @@ const SimpleSearchAnimation = () => {
   const spinAnim = React.useRef(new RNAnimated.Value(0)).current;
   const fadeAnim = React.useRef(new RNAnimated.Value(0)).current;
   const { currentTheme } = useTheme();
-  
+
   React.useEffect(() => {
     // Rotation animation
     const spin = RNAnimated.loop(
@@ -168,32 +169,32 @@ const SimpleSearchAnimation = () => {
         useNativeDriver: true,
       })
     );
-    
+
     // Fade animation
     const fade = RNAnimated.timing(fadeAnim, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true,
     });
-    
+
     // Start animations
     spin.start();
     fade.start();
-    
+
     // Clean up
     return () => {
       spin.stop();
     };
   }, [spinAnim, fadeAnim]);
-  
+
   // Simple rotation interpolation
   const spin = spinAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-  
+
   return (
-    <RNAnimated.View 
+    <RNAnimated.View
       style={[
         styles.simpleAnimationContainer,
         { opacity: fadeAnim }
@@ -204,10 +205,10 @@ const SimpleSearchAnimation = () => {
           styles.spinnerContainer,
           { transform: [{ rotate: spin }], backgroundColor: currentTheme.colors.primary }
         ]}>
-          <MaterialIcons 
-            name="search" 
-            size={32} 
-            color={currentTheme.colors.white} 
+          <MaterialIcons
+            name="search"
+            size={32}
+            color={currentTheme.colors.white}
           />
         </RNAnimated.View>
         <Text style={[styles.simpleAnimationText, { color: currentTheme.colors.white }]}>Searching</Text>
@@ -268,9 +269,9 @@ const SearchScreen = () => {
         StatusBar.setBackgroundColor('transparent');
       }
     };
-    
+
     applyStatusBarConfig();
-    
+
     // Re-apply on focus
     const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
     return unsubscribe;
@@ -284,7 +285,7 @@ const SearchScreen = () => {
 
   useEffect(() => {
     loadRecentSearches();
-    
+
     // Cleanup function to cancel pending searches on unmount
     return () => {
       debouncedSearch.cancel();
@@ -302,12 +303,12 @@ const SearchScreen = () => {
     return {
       opacity: backButtonOpacity.value,
       transform: [
-        { 
+        {
           translateX: interpolate(
             backButtonOpacity.value,
             [0, 1],
             [-20, 0]
-          ) 
+          )
         }
       ]
     };
@@ -361,14 +362,14 @@ const SearchScreen = () => {
   const saveRecentSearch = async (searchQuery: string) => {
     try {
       setRecentSearches(prevSearches => {
-      const newRecentSearches = [
-        searchQuery,
+        const newRecentSearches = [
+          searchQuery,
           ...prevSearches.filter(s => s !== searchQuery)
-      ].slice(0, MAX_RECENT_SEARCHES);
-      
+        ].slice(0, MAX_RECENT_SEARCHES);
+
         // Save to AsyncStorage
         mmkvStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newRecentSearches));
-        
+
         return newRecentSearches;
       });
     } catch (error) {
@@ -400,7 +401,7 @@ const SearchScreen = () => {
         const rank: Record<string, number> = {};
         addons.forEach((a, idx) => { rank[a.id] = idx; });
         addonOrderRankRef.current = rank;
-      } catch {}
+      } catch { }
 
       const handle = catalogService.startLiveSearch(searchQuery, async (section: AddonSearchResults) => {
         // Append/update this addon section immediately with minimal changes
@@ -444,7 +445,7 @@ const SearchScreen = () => {
         // Save to recents after first result batch
         try {
           await saveRecentSearch(searchQuery);
-        } catch {}
+        } catch { }
       });
       liveSearchHandle.current = handle;
     }, 800);
@@ -502,7 +503,7 @@ const SearchScreen = () => {
     if (!showRecent || recentSearches.length === 0) return null;
 
     return (
-      <Animated.View 
+      <Animated.View
         style={styles.recentSearchesContainer}
         entering={FadeIn.duration(300)}
       >
@@ -586,10 +587,10 @@ const SearchScreen = () => {
         entering={FadeIn.duration(300).delay(index * 50)}
         activeOpacity={0.7}
       >
-        <View style={[styles.horizontalItemPosterContainer, { 
+        <View style={[styles.horizontalItemPosterContainer, {
           backgroundColor: currentTheme.colors.darkBackground,
           borderColor: 'rgba(255,255,255,0.05)'
-        }]}> 
+        }]}>
           <FastImage
             source={{ uri: item.poster || PLACEHOLDER_POSTER }}
             style={styles.horizontalItemPoster}
@@ -597,28 +598,28 @@ const SearchScreen = () => {
           />
           {/* Bookmark and watched icons top right, bookmark to the left of watched */}
           {inLibrary && (
-            <View style={[styles.libraryBadge, { position: 'absolute', top: 8, right: 36, backgroundColor: 'transparent', zIndex: 2 }] }>
+            <View style={[styles.libraryBadge, { position: 'absolute', top: 8, right: 36, backgroundColor: 'transparent', zIndex: 2 }]}>
               <Feather name="bookmark" size={16} color={currentTheme.colors.white} />
             </View>
           )}
           {watched && (
-            <View style={[styles.watchedIndicator, { position: 'absolute', top: 8, right: 8, backgroundColor: 'transparent', zIndex: 2 }] }>
+            <View style={[styles.watchedIndicator, { position: 'absolute', top: 8, right: 8, backgroundColor: 'transparent', zIndex: 2 }]}>
               <MaterialIcons name="check-circle" size={20} color={currentTheme.colors.success || '#4CAF50'} />
             </View>
           )}
           {item.imdbRating && (
             <View style={styles.ratingContainer}>
               <MaterialIcons name="star" size={12} color="#FFC107" />
-              <Text style={[styles.ratingText, { color: currentTheme.colors.white }]}> 
+              <Text style={[styles.ratingText, { color: currentTheme.colors.white }]}>
                 {item.imdbRating}
               </Text>
             </View>
           )}
         </View>
-        <Text 
+        <Text
           style={[
-            styles.horizontalItemTitle, 
-            { 
+            styles.horizontalItemTitle,
+            {
               color: currentTheme.colors.white,
               fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 14,
               lineHeight: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 18,
@@ -629,36 +630,36 @@ const SearchScreen = () => {
           {item.name}
         </Text>
         {item.year && (
-          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray, fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 12 }]}> 
+          <Text style={[styles.yearText, { color: currentTheme.colors.mediumGray, fontSize: isTV ? 12 : isLargeTablet ? 11 : isTablet ? 10 : 12 }]}>
             {item.year}
           </Text>
         )}
       </AnimatedTouchable>
     );
   };
-  
+
   const hasResultsToShow = useMemo(() => {
     return results.byAddon.length > 0;
   }, [results]);
 
   // Memoized addon section to prevent re-rendering unchanged sections
-  const AddonSection = React.memo(({ 
-    addonGroup, 
-    addonIndex 
-  }: { 
-    addonGroup: AddonSearchResults; 
+  const AddonSection = React.memo(({
+    addonGroup,
+    addonIndex
+  }: {
+    addonGroup: AddonSearchResults;
     addonIndex: number;
   }) => {
-    const movieResults = useMemo(() => 
-      addonGroup.results.filter(item => item.type === 'movie'), 
+    const movieResults = useMemo(() =>
+      addonGroup.results.filter(item => item.type === 'movie'),
       [addonGroup.results]
     );
-    const seriesResults = useMemo(() => 
-      addonGroup.results.filter(item => item.type === 'series'), 
+    const seriesResults = useMemo(() =>
+      addonGroup.results.filter(item => item.type === 'series'),
       [addonGroup.results]
     );
-    const otherResults = useMemo(() => 
-      addonGroup.results.filter(item => item.type !== 'movie' && item.type !== 'series'), 
+    const otherResults = useMemo(() =>
+      addonGroup.results.filter(item => item.type !== 'movie' && item.type !== 'series'),
       [addonGroup.results]
     );
 
@@ -679,15 +680,15 @@ const SearchScreen = () => {
         {/* Movies */}
         {movieResults.length > 0 && (
           <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
-          <Text style={[
-            styles.carouselSubtitle,
-            { 
-              color: currentTheme.colors.lightGray,
-              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
-              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
-              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
-            }
-          ]}> 
+            <Text style={[
+              styles.carouselSubtitle,
+              {
+                color: currentTheme.colors.lightGray,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+                marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+                paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+              }
+            ]}>
               Movies ({movieResults.length})
             </Text>
             <FlatList
@@ -713,15 +714,15 @@ const SearchScreen = () => {
         {/* TV Shows */}
         {seriesResults.length > 0 && (
           <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
-          <Text style={[
-            styles.carouselSubtitle,
-            { 
-              color: currentTheme.colors.lightGray,
-              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
-              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
-              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
-            }
-          ]}> 
+            <Text style={[
+              styles.carouselSubtitle,
+              {
+                color: currentTheme.colors.lightGray,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+                marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+                paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+              }
+            ]}>
               TV Shows ({seriesResults.length})
             </Text>
             <FlatList
@@ -747,15 +748,15 @@ const SearchScreen = () => {
         {/* Other types */}
         {otherResults.length > 0 && (
           <Animated.View style={[styles.carouselContainer, { marginBottom: isTV ? 40 : isLargeTablet ? 36 : isTablet ? 32 : 24 }]} entering={FadeIn.duration(300)}>
-          <Text style={[
-            styles.carouselSubtitle,
-            { 
-              color: currentTheme.colors.lightGray,
-              fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
-              marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
-              paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
-            }
-          ]}> 
+            <Text style={[
+              styles.carouselSubtitle,
+              {
+                color: currentTheme.colors.lightGray,
+                fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 14,
+                marginBottom: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 8,
+                paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
+              }
+            ]}>
               {otherResults[0].type.charAt(0).toUpperCase() + otherResults[0].type.slice(1)} ({otherResults.length})
             </Text>
             <FlatList
@@ -784,12 +785,6 @@ const SearchScreen = () => {
     return prev.addonGroup === next.addonGroup && prev.addonIndex === next.addonIndex;
   });
 
-  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
-  // Keep header below floating top navigator on tablets by adding extra offset
-  const tabletNavOffset = (isTV || isLargeTablet || isTablet) ? 64 : 0;
-  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
-  const headerHeight = headerBaseHeight + topSpacing + 60;
-
   // Set up listeners for watched status and library updates
   // These will trigger re-renders in individual SearchResultItem components
   useEffect(() => {
@@ -809,11 +804,11 @@ const SearchScreen = () => {
   }, []);
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}
       entering={Platform.OS === 'android' ? undefined : FadeIn.duration(350)}
-      exiting={Platform.OS === 'android' ? 
-        FadeOut.duration(200).withInitialValues({ opacity: 1 }) : 
+      exiting={Platform.OS === 'android' ?
+        FadeOut.duration(200).withInitialValues({ opacity: 1 }) :
         FadeOut.duration(250)
       }
     >
@@ -822,172 +817,170 @@ const SearchScreen = () => {
         backgroundColor="transparent"
         translucent
       />
-      {/* Fixed position header background to prevent shifts */}
-      <View style={[styles.headerBackground, { 
-        height: headerHeight,
-        backgroundColor: currentTheme.colors.darkBackground 
-      }]} />
-      <View style={{ flex: 1 }}>
-        {/* Header Section with proper top spacing */}
-        <View style={[styles.header, { height: headerHeight, paddingTop: topSpacing }]}>
-          <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>Search</Text>
-          <View style={styles.searchBarContainer}>
+
+      {/* ScreenHeader Component */}
+      <ScreenHeader
+        title="Search"
+        isTablet={isTV || isLargeTablet || isTablet}
+      >
+        {/* Search Bar */}
+        <View style={styles.searchBarContainer}>
+          <View style={[
+            styles.searchBarWrapper,
+            { width: '100%' }
+          ]}>
             <View style={[
-              styles.searchBarWrapper,
-              { width: '100%' }
+              styles.searchBar,
+              {
+                backgroundColor: currentTheme.colors.elevation2,
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+              }
             ]}>
-              <View style={[
-                styles.searchBar, 
-                { 
-                  backgroundColor: currentTheme.colors.elevation2,
-                  borderColor: 'rgba(255,255,255,0.1)',
-                  borderWidth: 1,
-                }
-              ]}>
-                <MaterialIcons 
-                  name="search" 
-                  size={24} 
-                  color={currentTheme.colors.lightGray}
-                  style={styles.searchIcon}
-                />
-                <TextInput
-                  style={[
-                    styles.searchInput,
-                    { color: currentTheme.colors.white }
-                  ]}
-                  placeholder="Search movies, shows..."
-                  placeholderTextColor={currentTheme.colors.lightGray}
-                  value={query}
-                  onChangeText={setQuery}
-                  returnKeyType="search"
-                  keyboardAppearance="dark"
-                  ref={inputRef}
-                />
-                {query.length > 0 && (
-                  <TouchableOpacity 
-                    onPress={handleClearSearch} 
-                    style={styles.clearButton}
-                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                  >
-                    <MaterialIcons 
-                      name="close" 
-                      size={20} 
-                      color={currentTheme.colors.lightGray}
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
+              <MaterialIcons
+                name="search"
+                size={24}
+                color={currentTheme.colors.lightGray}
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  { color: currentTheme.colors.white }
+                ]}
+                placeholder="Search movies, shows..."
+                placeholderTextColor={currentTheme.colors.lightGray}
+                value={query}
+                onChangeText={setQuery}
+                returnKeyType="search"
+                keyboardAppearance="dark"
+                ref={inputRef}
+              />
+              {query.length > 0 && (
+                <TouchableOpacity
+                  onPress={handleClearSearch}
+                  style={styles.clearButton}
+                  hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                >
+                  <MaterialIcons
+                    name="close"
+                    size={20}
+                    color={currentTheme.colors.lightGray}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
-        {/* Content Container */}
-        <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
-          {searching ? (
-            <View style={styles.loadingOverlay} pointerEvents="none">
-              <LoadingSpinner 
-                size="large" 
-                offsetY={-60}
+      </ScreenHeader>
+
+      {/* Content Container */}
+      <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
+        {searching ? (
+          <View style={styles.loadingOverlay} pointerEvents="none">
+            <LoadingSpinner
+              size="large"
+              offsetY={-60}
+            />
+          </View>
+        ) : query.trim().length === 1 ? (
+          <Animated.View
+            style={styles.emptyContainer}
+            entering={FadeIn.duration(300)}
+          >
+            <MaterialIcons
+              name="search"
+              size={64}
+              color={currentTheme.colors.lightGray}
+            />
+            <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+              Keep typing...
+            </Text>
+            <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+              Type at least 2 characters to search
+            </Text>
+          </Animated.View>
+        ) : searched && !hasResultsToShow ? (
+          <Animated.View
+            style={styles.emptyContainer}
+            entering={FadeIn.duration(300)}
+          >
+            <MaterialIcons
+              name="search-off"
+              size={64}
+              color={currentTheme.colors.lightGray}
+            />
+            <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+              No results found
+            </Text>
+            <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
+              Try different keywords or check your spelling
+            </Text>
+          </Animated.View>
+        ) : (
+          <Animated.ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollViewContent}
+            keyboardShouldPersistTaps="handled"
+            onScrollBeginDrag={Keyboard.dismiss}
+            entering={FadeIn.duration(300)}
+            showsVerticalScrollIndicator={false}
+          >
+            {!query.trim() && renderRecentSearches()}
+            {/* Render results grouped by addon using memoized component */}
+            {results.byAddon.map((addonGroup, addonIndex) => (
+              <AddonSection
+                key={addonGroup.addonId}
+                addonGroup={addonGroup}
+                addonIndex={addonIndex}
               />
-            </View>
-          ) : query.trim().length === 1 ? (
-            <Animated.View 
-              style={styles.emptyContainer}
-              entering={FadeIn.duration(300)}
-            >
-              <MaterialIcons 
-                name="search" 
-                size={64} 
-                color={currentTheme.colors.lightGray}
-              />
-              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}> 
-                Keep typing...
-              </Text>
-              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}> 
-                Type at least 2 characters to search
-              </Text>
-            </Animated.View>
-          ) : searched && !hasResultsToShow ? (
-            <Animated.View 
-              style={styles.emptyContainer}
-              entering={FadeIn.duration(300)}
-            >
-              <MaterialIcons 
-                name="search-off" 
-                size={64} 
-                color={currentTheme.colors.lightGray}
-              />
-              <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}> 
-                No results found
-              </Text>
-              <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}> 
-                Try different keywords or check your spelling
-              </Text>
-            </Animated.View>
-          ) : (
-            <Animated.ScrollView 
-              style={styles.scrollView} 
-              contentContainerStyle={styles.scrollViewContent}
-              keyboardShouldPersistTaps="handled"
-              onScrollBeginDrag={Keyboard.dismiss}
-              entering={FadeIn.duration(300)}
-              showsVerticalScrollIndicator={false}
-            >
-              {!query.trim() && renderRecentSearches()}
-              {/* Render results grouped by addon using memoized component */}
-              {results.byAddon.map((addonGroup, addonIndex) => (
-                <AddonSection
-                  key={addonGroup.addonId}
-                  addonGroup={addonGroup}
-                  addonIndex={addonIndex}
-                />
-              ))}
-            </Animated.ScrollView>
-          )}
-        </View>
-        {/* DropUpMenu integration for search results */}
-        {selectedItem && (
-          <DropUpMenu
-            visible={menuVisible}
-            onClose={() => setMenuVisible(false)}
-            item={selectedItem}
-            isSaved={isSaved}
-            isWatched={isWatched}
-            onOptionSelect={async (option: string) => {
-              if (!selectedItem) return;
-              switch (option) {
-                case 'share': {
-                  let url = '';
-                  if (selectedItem.id) {
-                    url = `https://www.imdb.com/title/${selectedItem.id}/`;
-                  }
-                  const message = `${selectedItem.name}\n${url}`;
-                  Share.share({ message, url, title: selectedItem.name });
-                  break;
-                }
-                case 'library': {
-                  if (isSaved) {
-                    await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
-                    setIsSaved(false);
-                  } else {
-                    await catalogService.addToLibrary(selectedItem);
-                    setIsSaved(true);
-                  }
-                  break;
-                }
-                case 'watched': {
-                  const key = `watched:${selectedItem.type}:${selectedItem.id}`;
-                  const newWatched = !isWatched;
-                  await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
-                  setIsWatched(newWatched);
-                  break;
-                }
-                default:
-                  break;
-              }
-            }}
-          />
+            ))}
+          </Animated.ScrollView>
         )}
       </View>
+      {/* DropUpMenu integration for search results */}
+      {selectedItem && (
+        <DropUpMenu
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          item={selectedItem}
+          isSaved={isSaved}
+          isWatched={isWatched}
+          onOptionSelect={async (option: string) => {
+            if (!selectedItem) return;
+            switch (option) {
+              case 'share': {
+                let url = '';
+                if (selectedItem.id) {
+                  url = `https://www.imdb.com/title/${selectedItem.id}/`;
+                }
+                const message = `${selectedItem.name}\n${url}`;
+                Share.share({ message, url, title: selectedItem.name });
+                break;
+              }
+              case 'library': {
+                if (isSaved) {
+                  await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
+                  setIsSaved(false);
+                } else {
+                  await catalogService.addToLibrary(selectedItem);
+                  setIsSaved(true);
+                }
+                break;
+              }
+              case 'watched': {
+                const key = `watched:${selectedItem.type}:${selectedItem.id}`;
+                const newWatched = !isWatched;
+                await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
+                setIsWatched(newWatched);
+                break;
+              }
+              default:
+                break;
+            }
+          }}
+        />
+      )}
     </Animated.View>
   );
 };
@@ -996,29 +989,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
   contentContainer: {
     flex: 1,
     paddingTop: 0,
-  },
-  header: {
-    paddingHorizontal: 15,
-    justifyContent: 'flex-end',
-    paddingBottom: 0,
-    backgroundColor: 'transparent',
-    zIndex: 2,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 12,
   },
   searchBarContainer: {
     flexDirection: 'row',

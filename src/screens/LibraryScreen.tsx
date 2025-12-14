@@ -4,6 +4,7 @@ import { Share } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useToast } from '../contexts/ToastContext';
 import DropUpMenu from '../components/home/DropUpMenu';
+import ScreenHeader from '../components/common/ScreenHeader';
 import {
   View,
   Text,
@@ -217,7 +218,7 @@ const LibraryScreen = () => {
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
-  const { settings } = useSettings(); // ADD THIS
+  const { settings } = useSettings();
 
   // Trakt integration
   const {
@@ -760,15 +761,15 @@ const LibraryScreen = () => {
 
       // Show collection folders
       return (
-         <FlashList
+        <FlashList
           data={traktFolders}
           renderItem={({ item }) => renderTraktCollectionFolder({ folder: item })}
           keyExtractor={item => item.id}
           numColumns={numColumns}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
-           onEndReachedThreshold={0.7}
-           onEndReached={() => {}}
+          onEndReachedThreshold={0.7}
+          onEndReached={() => { }}
         />
       );
     }
@@ -811,7 +812,7 @@ const LibraryScreen = () => {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.7}
-        onEndReached={() => {}}
+        onEndReached={() => { }}
       />
     );
   };
@@ -910,21 +911,16 @@ const LibraryScreen = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.7}
-        onEndReached={() => {}}
+        onEndReached={() => { }}
       />
     );
   };
 
-  const headerBaseHeight = Platform.OS === 'android' ? 80 : 60;
   // Tablet detection aligned with navigation tablet logic
   const isTablet = useMemo(() => {
     const smallestDimension = Math.min(width, height);
     return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
   }, [width, height]);
-  // Keep header below floating top navigator on tablets
-  const tabletNavOffset = isTablet ? 64 : 0;
-  const topSpacing = (Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : insets.top) + tabletNavOffset;
-  const headerHeight = headerBaseHeight + topSpacing;
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -993,9 +989,18 @@ const LibraryScreen = () => {
               </View>
             )}
 
-            {showTraktContent ? renderTraktContent() : renderContent()}
+      {/* Content Container */}
+      <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
+        {!showTraktContent && (
+          <View style={styles.filtersContainer}>
+            {renderFilter('trakt', 'Trakt', 'pan-tool')}
+            {renderFilter('movies', 'Movies', 'movie')}
+            {renderFilter('series', 'TV Shows', 'live-tv')}
           </View>
-        </View>
+        )}
+
+        {showTraktContent ? renderTraktContent() : renderContent()}
+      </View>
 
       {/* DropUpMenu integration */}
       {selectedItem && (
@@ -1009,45 +1014,45 @@ const LibraryScreen = () => {
             if (!selectedItem) return;
             switch (option) {
               case 'library': {
-              try {
-                await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
-                showInfo('Removed from Library', 'Item removed from your library');
-                setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
-                setMenuVisible(false);
-              } catch (error) {
-                showError('Failed to update Library', 'Unable to remove item from library');
-              }
-              break;
+                try {
+                  await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
+                  showInfo('Removed from Library', 'Item removed from your library');
+                  setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
+                  setMenuVisible(false);
+                } catch (error) {
+                  showError('Failed to update Library', 'Unable to remove item from library');
+                }
+                break;
               }
               case 'watched': {
-              try {
-                // Use AsyncStorage to store watched status by key
-                const key = `watched:${selectedItem.type}:${selectedItem.id}`;
-                const newWatched = !selectedItem.watched;
-                await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
-                showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
-                // Instantly update local state
-                setLibraryItems(prev => prev.map(item =>
-                item.id === selectedItem.id && item.type === selectedItem.type
-                  ? { ...item, watched: newWatched }
-                  : item
-                ));
-              } catch (error) {
-                showError('Failed to update watched status', 'Unable to update watched status');
-              }
-              break;
+                try {
+                  // Use AsyncStorage to store watched status by key
+                  const key = `watched:${selectedItem.type}:${selectedItem.id}`;
+                  const newWatched = !selectedItem.watched;
+                  await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
+                  showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
+                  // Instantly update local state
+                  setLibraryItems(prev => prev.map(item =>
+                    item.id === selectedItem.id && item.type === selectedItem.type
+                      ? { ...item, watched: newWatched }
+                      : item
+                  ));
+                } catch (error) {
+                  showError('Failed to update watched status', 'Unable to update watched status');
+                }
+                break;
               }
               case 'share': {
-              let url = '';
-              if (selectedItem.id) {
-                url = `https://www.imdb.com/title/${selectedItem.id}/`;
-              }
-              const message = `${selectedItem.name}\n${url}`;
-              Share.share({ message, url, title: selectedItem.name });
-              break;
+                let url = '';
+                if (selectedItem.id) {
+                  url = `https://www.imdb.com/title/${selectedItem.id}/`;
+                }
+                const message = `${selectedItem.name}\n${url}`;
+                Share.share({ message, url, title: selectedItem.name });
+                break;
               }
               default:
-              break;
+                break;
             }
           }}
         />
@@ -1060,13 +1065,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  headerBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
   watchedIndicator: {
     position: 'absolute',
     top: 8,
@@ -1077,23 +1075,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-  },
-  header: {
-    paddingHorizontal: 20,
-    justifyContent: 'flex-end',
-    paddingBottom: 8,
-    backgroundColor: 'transparent',
-    zIndex: 2,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
   filtersContainer: {
     flexDirection: 'row',
@@ -1148,7 +1129,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     elevation: 5,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -1271,7 +1252,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
-    aspectRatio: 2/3,
+    aspectRatio: 2 / 3,
     elevation: 5,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
