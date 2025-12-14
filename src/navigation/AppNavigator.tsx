@@ -1174,8 +1174,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               component={MetadataScreen}
               options={{
                 headerShown: false,
-                animation: Platform.OS === 'android' ? 'none' : 'fade',
-                animationDuration: Platform.OS === 'android' ? 0 : 300,
+                animation: Platform.OS === 'android' ? 'fade' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 200 : 300,
                 ...(Platform.OS === 'ios' && {
                   cardStyleInterpolator: customFadeInterpolator,
                   animationTypeForReplace: 'push',
@@ -1192,8 +1192,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               component={StreamsScreen as any}
               options={{
                 headerShown: false,
-                animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'none',
-                animationDuration: Platform.OS === 'android' ? 0 : 300,
+                animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 200 : 300,
                 gestureEnabled: true,
                 gestureDirection: Platform.OS === 'ios' ? 'vertical' : 'horizontal',
                 ...(Platform.OS === 'ios' && { presentation: 'modal' }),
@@ -1542,8 +1542,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="AIChat"
               component={AIChatScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
-                animationDuration: Platform.OS === 'android' ? 220 : 300,
+                animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 200 : 300,
                 presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'modal',
                 gestureEnabled: true,
                 gestureDirection: Platform.OS === 'ios' ? 'horizontal' : 'vertical',

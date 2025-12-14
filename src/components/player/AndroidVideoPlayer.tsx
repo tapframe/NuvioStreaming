@@ -861,18 +861,21 @@ const AndroidVideoPlayer: React.FC = () => {
       // Re-apply immersive mode on layout changes to keep system bars hidden
       enableImmersiveMode();
     });
-    const initializePlayer = async () => {
-      StatusBar.setHidden(true, 'none');
-      enableImmersiveMode();
-      startOpeningAnimation();
 
-      // Initialize current volume and brightness levels
-      // Volume starts at 1.0 (full volume) - React Native Video handles this natively
-      setVolume(1.0);
-      if (DEBUG_MODE) {
-        logger.log(`[AndroidVideoPlayer] Initial volume: 1.0 (native)`);
-      }
+    // Immediate player setup - UI critical
+    StatusBar.setHidden(true, 'none');
+    enableImmersiveMode();
+    startOpeningAnimation();
 
+    // Initialize volume immediately (no async)
+    setVolume(1.0);
+    if (DEBUG_MODE) {
+      logger.log(`[AndroidVideoPlayer] Initial volume: 1.0 (native)`);
+    }
+
+    // Defer brightness initialization until after navigation animation completes
+    // This prevents sluggish player entry
+    const brightnessTask = InteractionManager.runAfterInteractions(async () => {
       try {
         // Capture Android system brightness and mode to restore later
         if (Platform.OS === 'android') {
@@ -900,10 +903,11 @@ const AndroidVideoPlayer: React.FC = () => {
         // Fallback to 1.0 if brightness API fails
         setBrightness(1.0);
       }
-    };
-    initializePlayer();
+    });
+
     return () => {
       subscription?.remove();
+      brightnessTask.cancel();
       disableImmersiveMode();
     };
   }, []);
@@ -1772,49 +1776,46 @@ const AndroidVideoPlayer: React.FC = () => {
       }
     };
 
-    await restoreSystemBrightness();
+    // Don't await brightness restoration - do it in background
+    restoreSystemBrightness();
 
-    // Navigate immediately without delay
-    ScreenOrientation.unlockAsync().then(() => {
-      // On tablets keep rotation unlocked; on phones, return to portrait
-      const { width: dw, height: dh } = Dimensions.get('window');
-      const isTablet = Math.min(dw, dh) >= 768 || ((Platform as any).isPad === true);
-      if (!isTablet) {
-        setTimeout(() => {
-          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
-        }, 50);
-      } else {
-        ScreenOrientation.unlockAsync().catch(() => { });
-      }
-      disableImmersiveMode();
+    // Disable immersive mode immediately (synchronous)
+    disableImmersiveMode();
 
-      // Simple back navigation (StreamsScreen should be below Player)
-      if ((navigation as any).canGoBack && (navigation as any).canGoBack()) {
-        (navigation as any).goBack();
-      } else {
-        // Fallback to Streams if stack isn't present
-        (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
-      }
-    }).catch(() => {
-      // Fallback: still try to restore portrait on phones then navigate
-      const { width: dw, height: dh } = Dimensions.get('window');
-      const isTablet = Math.min(dw, dh) >= 768 || ((Platform as any).isPad === true);
-      if (!isTablet) {
-        setTimeout(() => {
-          ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
-        }, 50);
-      } else {
-        ScreenOrientation.unlockAsync().catch(() => { });
-      }
-      disableImmersiveMode();
+    // Navigate IMMEDIATELY - don't wait for orientation changes
+    if ((navigation as any).canGoBack && (navigation as any).canGoBack()) {
+      (navigation as any).goBack();
+    } else {
+      // Fallback to Streams if stack isn't present
+      (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
+    }
 
-      // Simple back navigation fallback path
-      if ((navigation as any).canGoBack && (navigation as any).canGoBack()) {
-        (navigation as any).goBack();
-      } else {
-        (navigation as any).navigate('Streams', { id, type, episodeId, fromPlayer: true });
-      }
-    });
+    // Fire orientation changes in background - don't await
+    ScreenOrientation.unlockAsync()
+      .then(() => {
+        // On tablets keep rotation unlocked; on phones, return to portrait
+        const { width: dw, height: dh } = Dimensions.get('window');
+        const isTablet = Math.min(dw, dh) >= 768 || ((Platform as any).isPad === true);
+        if (!isTablet) {
+          setTimeout(() => {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
+          }, 50);
+        } else {
+          ScreenOrientation.unlockAsync().catch(() => { });
+        }
+      })
+      .catch(() => {
+        // Fallback: still try to restore portrait on phones
+        const { width: dw, height: dh } = Dimensions.get('window');
+        const isTablet = Math.min(dw, dh) >= 768 || ((Platform as any).isPad === true);
+        if (!isTablet) {
+          setTimeout(() => {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
+          }, 50);
+        } else {
+          ScreenOrientation.unlockAsync().catch(() => { });
+        }
+      });
 
     // Send Trakt sync in background (don't await)
     const backgroundSync = async () => {
