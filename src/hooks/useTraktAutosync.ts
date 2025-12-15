@@ -29,9 +29,9 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     stopWatching,
     stopWatchingImmediate
   } = useTraktIntegration();
-  
+
   const { settings: autosyncSettings } = useTraktAutosyncSettings();
-  
+
   const hasStartedWatching = useRef(false);
   const hasStopped = useRef(false); // New: Track if we've already stopped for this session
   const isSessionComplete = useRef(false); // New: Track if session is completely finished (scrobbled)
@@ -41,66 +41,106 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
   const sessionKey = useRef<string | null>(null);
   const unmountCount = useRef(0);
   const lastStopCall = useRef(0); // New: Track last stop call timestamp
-  
+
   // Generate a unique session key for this content instance
   useEffect(() => {
     const contentKey = options.type === 'movie'
       ? `movie:${options.imdbId}`
       : `episode:${options.showImdbId || options.imdbId}:${options.season}:${options.episode}`;
     sessionKey.current = `${contentKey}:${Date.now()}`;
-    
+
     // Reset all session state for new content
     hasStartedWatching.current = false;
     hasStopped.current = false;
     isSessionComplete.current = false;
     isUnmounted.current = false; // Reset unmount flag for new mount
     lastStopCall.current = 0;
-    
+
     logger.log(`[TraktAutosync] Session started for: ${sessionKey.current}`);
-    
+
     return () => {
       unmountCount.current++;
       isUnmounted.current = true; // Mark as unmounted to prevent post-unmount operations
       logger.log(`[TraktAutosync] Component unmount #${unmountCount.current} for: ${sessionKey.current}`);
     };
   }, [options.imdbId, options.season, options.episode, options.type]);
-  
+
   // Build Trakt content data from options
-  const buildContentData = useCallback((): TraktContentData => {
-    // Ensure year is a number and valid
-    const parseYear = (year: number | string | undefined): number => {
-      if (!year) return 0;
-      if (typeof year === 'number') return year;
+  // Returns null if required fields are missing or invalid
+  const buildContentData = useCallback((): TraktContentData | null => {
+    // Parse and validate year - returns undefined for invalid/missing years
+    const parseYear = (year: number | string | undefined): number | undefined => {
+      if (year === undefined || year === null || year === '') return undefined;
+      if (typeof year === 'number') {
+        // Year must be a reasonable value (between 1800 and current year + 10)
+        const currentYear = new Date().getFullYear();
+        if (year <= 0 || year < 1800 || year > currentYear + 10) {
+          logger.warn(`[TraktAutosync] Invalid year value: ${year}`);
+          return undefined;
+        }
+        return year;
+      }
       const parsed = parseInt(year.toString(), 10);
-      return isNaN(parsed) ? 0 : parsed;
+      if (isNaN(parsed) || parsed <= 0) {
+        logger.warn(`[TraktAutosync] Failed to parse year: ${year}`);
+        return undefined;
+      }
+      // Validate parsed year range
+      const currentYear = new Date().getFullYear();
+      if (parsed < 1800 || parsed > currentYear + 10) {
+        logger.warn(`[TraktAutosync] Year out of valid range: ${parsed}`);
+        return undefined;
+      }
+      return parsed;
     };
-    
+
+    // Validate required fields early
+    if (!options.title || options.title.trim() === '') {
+      logger.error('[TraktAutosync] Cannot build content data: missing or empty title');
+      return null;
+    }
+
+    if (!options.imdbId || options.imdbId.trim() === '') {
+      logger.error('[TraktAutosync] Cannot build content data: missing or empty imdbId');
+      return null;
+    }
+
     const numericYear = parseYear(options.year);
     const numericShowYear = parseYear(options.showYear);
-    
-    // Validate required fields
-    if (!options.title || !options.imdbId) {
-      logger.warn('[TraktAutosync] Missing required fields:', { title: options.title, imdbId: options.imdbId });
+
+    // Log warning if year is missing (but don't fail - Trakt can sometimes work with IMDb ID alone)
+    if (numericYear === undefined) {
+      logger.warn('[TraktAutosync] Year is missing or invalid, proceeding without year');
     }
-    
+
     if (options.type === 'movie') {
       return {
         type: 'movie',
-        imdbId: options.imdbId,
-        title: options.title,
-        year: numericYear
+        imdbId: options.imdbId.trim(),
+        title: options.title.trim(),
+        year: numericYear // Can be undefined now
       };
     } else {
+      // For episodes, also validate season and episode numbers
+      if (options.season === undefined || options.season === null || options.season < 0) {
+        logger.error('[TraktAutosync] Cannot build episode content data: invalid season');
+        return null;
+      }
+      if (options.episode === undefined || options.episode === null || options.episode < 0) {
+        logger.error('[TraktAutosync] Cannot build episode content data: invalid episode');
+        return null;
+      }
+
       return {
         type: 'episode',
-        imdbId: options.imdbId,
-        title: options.title,
+        imdbId: options.imdbId.trim(),
+        title: options.title.trim(),
         year: numericYear,
         season: options.season,
         episode: options.episode,
-        showTitle: options.showTitle || options.title,
+        showTitle: (options.showTitle || options.title).trim(),
         showYear: numericShowYear || numericYear,
-        showImdbId: options.showImdbId || options.imdbId
+        showImdbId: (options.showImdbId || options.imdbId).trim()
       };
     }
   }, [options]);
@@ -143,7 +183,13 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       const rawProgress = (currentTime / duration) * 100;
       const progressPercent = Math.min(100, Math.max(0, rawProgress));
       const contentData = buildContentData();
-      
+
+      // Skip if content data is invalid
+      if (!contentData) {
+        logger.warn('[TraktAutosync] Skipping start: invalid content data');
+        return;
+      }
+
       const success = await startWatching(contentData, progressPercent);
       if (success) {
         hasStartedWatching.current = true;
@@ -184,6 +230,10 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       if (force) {
         // IMMEDIATE: User action (pause/unpause) - bypass queue
         const contentData = buildContentData();
+        if (!contentData) {
+          logger.warn('[TraktAutosync] Skipping progress update: invalid content data');
+          return;
+        }
         success = await updateProgressImmediate(contentData, progressPercent);
 
         if (success) {
@@ -212,6 +262,10 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         }
 
         const contentData = buildContentData();
+        if (!contentData) {
+          logger.warn('[TraktAutosync] Skipping progress update: invalid content data');
+          return;
+        }
         success = await updateProgress(contentData, progressPercent, force);
 
         if (success) {
@@ -335,9 +389,11 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       // If we have valid progress but no started session, force start one first
       if (!hasStartedWatching.current && progressPercent > 1) {
         const contentData = buildContentData();
-        const success = await startWatching(contentData, progressPercent);
-        if (success) {
-          hasStartedWatching.current = true;
+        if (contentData) {
+          const success = await startWatching(contentData, progressPercent);
+          if (success) {
+            hasStartedWatching.current = true;
+          }
         }
       }
 
@@ -355,6 +411,13 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       hasStopped.current = true;
 
       const contentData = buildContentData();
+
+      // Skip if content data is invalid
+      if (!contentData) {
+        logger.warn('[TraktAutosync] Skipping stop: invalid content data');
+        hasStopped.current = false; // Allow retry with valid data
+        return;
+      }
 
       // IMMEDIATE: Use immediate method for user-initiated closes, regular method for natural ends
       const success = useImmediate
@@ -394,7 +457,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
                 { forceNotify: true }
               );
             }
-          } catch {}
+          } catch { }
         }
 
         logger.log(`[TraktAutosync] ${useImmediate ? 'IMMEDIATE: ' : ''}Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);

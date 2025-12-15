@@ -251,11 +251,25 @@ export interface TraktScrobbleResponse {
   alreadyScrobbled?: boolean;
 }
 
+/**
+ * Content data for Trakt scrobbling.
+ * 
+ * Required fields:
+ * - type: 'movie' or 'episode'
+ * - imdbId: A valid IMDb ID (with or without 'tt' prefix)
+ * - title: Non-empty content title
+ * 
+ * Optional fields:
+ * - year: Release year (must be valid if provided, e.g., 1800-current year+10)
+ * - season/episode: Required for episode type
+ * - showTitle/showYear/showImdbId: Show metadata for episodes
+ */
 export interface TraktContentData {
   type: 'movie' | 'episode';
   imdbId: string;
   title: string;
-  year: number;
+  /** Release year - optional as Trakt can often resolve content via IMDb ID alone */
+  year?: number;
   season?: number;
   episode?: number;
   showTitle?: string;
@@ -1527,11 +1541,26 @@ export class TraktService {
 
   /**
    * Build scrobble payload for API requests
+   * Returns null if required data is missing or invalid
    */
   private async buildScrobblePayload(contentData: TraktContentData, progress: number): Promise<any | null> {
     try {
       // Clamp progress between 0 and 100 and round to 2 decimals for API
       const clampedProgress = Math.min(100, Math.max(0, Math.round(progress * 100) / 100));
+
+      // Helper function to validate year
+      const isValidYear = (year: number | undefined): year is number => {
+        if (year === undefined || year === null) return false;
+        if (typeof year !== 'number' || isNaN(year)) return false;
+        // Year must be between 1800 and current year + 10
+        const currentYear = new Date().getFullYear();
+        return year > 0 && year >= 1800 && year <= currentYear + 10;
+      };
+
+      // Helper function to validate title
+      const isValidTitle = (title: string | undefined): title is string => {
+        return typeof title === 'string' && title.trim().length > 0;
+      };
 
       // Enhanced debug logging for payload building
       logger.log('[TraktService] Building scrobble payload:', {
@@ -1548,9 +1577,14 @@ export class TraktService {
       });
 
       if (contentData.type === 'movie') {
-        if (!contentData.imdbId || !contentData.title) {
-          logger.error('[TraktService] Missing movie data for scrobbling:', {
-            imdbId: contentData.imdbId,
+        // Validate required movie fields
+        if (!contentData.imdbId || contentData.imdbId.trim() === '') {
+          logger.error('[TraktService] Missing movie imdbId for scrobbling');
+          return null;
+        }
+
+        if (!isValidTitle(contentData.title)) {
+          logger.error('[TraktService] Missing or empty movie title for scrobbling:', {
             title: contentData.title
           });
           return null;
@@ -1561,36 +1595,70 @@ export class TraktService {
           ? contentData.imdbId
           : `tt${contentData.imdbId}`;
 
+        // Build movie payload - only include year if valid
+        const movieData: { title: string; year?: number; ids: { imdb: string } } = {
+          title: contentData.title.trim(),
+          ids: {
+            imdb: imdbIdWithPrefix
+          }
+        };
+
+        // Only add year if it's valid (prevents year: 0 or invalid years)
+        if (isValidYear(contentData.year)) {
+          movieData.year = contentData.year;
+        } else {
+          logger.warn('[TraktService] Movie year is missing or invalid, omitting from payload:', {
+            year: contentData.year
+          });
+        }
+
         const payload = {
-          movie: {
-            title: contentData.title,
-            year: contentData.year,
-            ids: {
-              imdb: imdbIdWithPrefix
-            }
-          },
+          movie: movieData,
           progress: clampedProgress
         };
 
         logger.log('[TraktService] Movie payload built:', payload);
         return payload;
       } else if (contentData.type === 'episode') {
-        if (!contentData.season || !contentData.episode || !contentData.showTitle || !contentData.showYear) {
-          logger.error('[TraktService] Missing episode data for scrobbling:', {
-            season: contentData.season,
-            episode: contentData.episode,
-            showTitle: contentData.showTitle,
-            showYear: contentData.showYear
+        // Validate season and episode numbers
+        if (contentData.season === undefined || contentData.season === null || contentData.season < 0) {
+          logger.error('[TraktService] Invalid season for episode scrobbling:', {
+            season: contentData.season
           });
           return null;
         }
 
+        if (contentData.episode === undefined || contentData.episode === null || contentData.episode <= 0) {
+          logger.error('[TraktService] Invalid episode number for scrobbling:', {
+            episode: contentData.episode
+          });
+          return null;
+        }
+
+        if (!isValidTitle(contentData.showTitle)) {
+          logger.error('[TraktService] Missing or empty show title for episode scrobbling:', {
+            showTitle: contentData.showTitle
+          });
+          return null;
+        }
+
+        // Build show data - only include year if valid
+        const showData: { title: string; year?: number; ids: { imdb?: string } } = {
+          title: contentData.showTitle.trim(),
+          ids: {}
+        };
+
+        // Only add year if it's valid
+        if (isValidYear(contentData.showYear)) {
+          showData.year = contentData.showYear;
+        } else {
+          logger.warn('[TraktService] Show year is missing or invalid, omitting from payload:', {
+            showYear: contentData.showYear
+          });
+        }
+
         const payload: any = {
-          show: {
-            title: contentData.showTitle,
-            year: contentData.showYear,
-            ids: {}
-          },
+          show: showData,
           episode: {
             season: contentData.season,
             number: contentData.episode
@@ -1599,7 +1667,7 @@ export class TraktService {
         };
 
         // Add show IMDB ID if available
-        if (contentData.showImdbId) {
+        if (contentData.showImdbId && contentData.showImdbId.trim() !== '') {
           const showImdbWithPrefix = contentData.showImdbId.startsWith('tt')
             ? contentData.showImdbId
             : `tt${contentData.showImdbId}`;
@@ -1607,7 +1675,7 @@ export class TraktService {
         }
 
         // Add episode IMDB ID if available (for specific episode IDs)
-        if (contentData.imdbId && contentData.imdbId !== contentData.showImdbId) {
+        if (contentData.imdbId && contentData.imdbId.trim() !== '' && contentData.imdbId !== contentData.showImdbId) {
           const episodeImdbWithPrefix = contentData.imdbId.startsWith('tt')
             ? contentData.imdbId
             : `tt${contentData.imdbId}`;

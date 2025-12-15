@@ -71,6 +71,16 @@ import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsS
 import ContributorsScreen from '../screens/ContributorsScreen';
 import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
 
+// Optional Android immersive mode module
+let RNImmersiveMode: any = null;
+if (Platform.OS === 'android') {
+  try {
+    RNImmersiveMode = require('react-native-immersive-mode').default;
+  } catch {
+    RNImmersiveMode = null;
+  }
+}
+
 // Stack navigator types
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -91,9 +101,18 @@ export type RootStackParamList = {
   Streams: {
     id: string;
     type: string;
+    title?: string;
     episodeId?: string;
     episodeThumbnail?: string;
     fromPlayer?: boolean;
+    metadata?: {
+      poster?: string;
+      banner?: string;
+      releaseInfo?: string;
+      genres?: string[];
+    };
+    resumeTime?: number;
+    duration?: number;
   };
   PlayerIOS: {
     uri: string;
@@ -1066,8 +1085,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
     if (Platform.OS === 'android') {
       // Ensure system navigation bar is shown by default
       try {
-        RNImmersiveMode.setBarMode('Normal');
-        RNImmersiveMode.fullLayout(false);
+        if (RNImmersiveMode) {
+          RNImmersiveMode.setBarMode('Normal');
+          RNImmersiveMode.fullLayout(false);
+        }
       } catch (error) {
         console.log('Immersive mode error:', error);
       }

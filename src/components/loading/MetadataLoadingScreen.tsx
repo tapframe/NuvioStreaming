@@ -19,6 +19,7 @@ import Animated, {
   interpolate,
   cancelAnimation,
   runOnJS,
+  SharedValue,
 } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -59,7 +60,7 @@ const ShimmerSkeleton = ({
   marginBottom?: number;
   style?: any;
   delay?: number;
-  shimmerProgress: Animated.SharedValue<number>;
+  shimmerProgress: SharedValue<number>;
   baseColor: string;
   highlightColor: string;
 }) => {

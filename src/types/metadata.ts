@@ -11,42 +11,74 @@ export type RouteParams = {
   episodeId?: string;
 };
 
-// Stream related types
+// Stream related types - aligned with Stremio protocol
+export interface Subtitle {
+  id: string;           // Required per protocol
+  url: string;
+  lang: string;
+  fps?: number;
+  addon?: string;
+  addonName?: string;
+  format?: 'srt' | 'vtt' | 'ass' | 'ssa';
+}
+
 export interface Stream {
+  // Primary stream source - one of these must be provided per protocol
+  url?: string;                    // Direct HTTP URL (now optional)
+  ytId?: string;                   // YouTube video ID
+  infoHash?: string;               // BitTorrent info hash
+  externalUrl?: string;            // External URL to open in browser
+
+  // Display information
   name?: string;
   title?: string;
-  url: string;
+  description?: string;
+
+  // Addon identification  
+  addon?: string;
   addonId?: string;
   addonName?: string;
-  behaviorHints?: {
-    cached?: boolean;
-    [key: string]: any;
-  };
+
+  // Stream properties
+  size?: number;
+  isFree?: boolean;
+  isDebrid?: boolean;
   quality?: string;
   type?: string;
   lang?: string;
+  fileIdx?: number;
+
   headers?: {
     Referer?: string;
     'User-Agent'?: string;
     Origin?: string;
+    [key: string]: string | undefined;
   };
+
   files?: {
     file: string;
     type: string;
     quality: string;
     lang: string;
   }[];
-  subtitles?: {
-    url: string;
-    lang: string;
-  }[];
-  addon?: string;
-  description?: string;
-  infoHash?: string;
-  fileIdx?: number;
-  size?: number;
-  isFree?: boolean;
-  isDebrid?: boolean;
+
+  subtitles?: Subtitle[];
+  sources?: string[];
+
+  behaviorHints?: {
+    bingeGroup?: string;
+    notWebReady?: boolean;
+    countryWhitelist?: string[];
+    cached?: boolean;
+    proxyHeaders?: {
+      request?: Record<string, string>;
+      response?: Record<string, string>;
+    };
+    videoHash?: string;
+    videoSize?: number;
+    filename?: string;
+    [key: string]: any;
+  };
 }
 
 export interface GroupedStreams {
