@@ -1326,11 +1326,15 @@ export class TraktService {
     try {
       const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
       if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
         return false;
       }
 
+      logger.log(`[TraktService] Marking S${season}E${episode} as watched for show ${imdbId} (trakt: ${traktId})`);
+
+      // Use shows array with seasons/episodes structure per Trakt API docs
       await this.apiRequest('/sync/history', 'POST', {
-        episodes: [
+        shows: [
           {
             ids: {
               trakt: traktId
@@ -1349,9 +1353,198 @@ export class TraktService {
           }
         ]
       });
+      logger.log(`[TraktService] Successfully marked S${season}E${episode} as watched`);
       return true;
     } catch (error) {
       logger.error('[TraktService] Failed to mark episode as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark an entire season as watched on Trakt
+   * @param imdbId - The IMDb ID of the show
+   * @param season - The season number to mark as watched
+   * @param watchedAt - Optional date when watched (defaults to now)
+   */
+  public async markSeasonAsWatched(
+    imdbId: string,
+    season: number,
+    watchedAt: Date = new Date()
+  ): Promise<boolean> {
+    try {
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
+        return false;
+      }
+
+      logger.log(`[TraktService] Marking entire season ${season} as watched for show ${imdbId} (trakt: ${traktId})`);
+
+      // Mark entire season - Trakt will mark all episodes in the season
+      await this.apiRequest('/sync/history', 'POST', {
+        shows: [
+          {
+            ids: {
+              trakt: traktId
+            },
+            seasons: [
+              {
+                number: season,
+                watched_at: watchedAt.toISOString()
+              }
+            ]
+          }
+        ]
+      });
+      logger.log(`[TraktService] Successfully marked season ${season} as watched`);
+      return true;
+    } catch (error) {
+      logger.error('[TraktService] Failed to mark season as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark multiple episodes as watched on Trakt (batch operation)
+   * @param imdbId - The IMDb ID of the show
+   * @param episodes - Array of episodes to mark as watched
+   * @param watchedAt - Optional date when watched (defaults to now)
+   */
+  public async markEpisodesAsWatched(
+    imdbId: string,
+    episodes: Array<{ season: number; episode: number }>,
+    watchedAt: Date = new Date()
+  ): Promise<boolean> {
+    try {
+      if (episodes.length === 0) {
+        logger.warn('[TraktService] No episodes provided to mark as watched');
+        return false;
+      }
+
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
+        return false;
+      }
+
+      logger.log(`[TraktService] Marking ${episodes.length} episodes as watched for show ${imdbId}`);
+
+      // Group episodes by season for the API call
+      const seasonMap = new Map<number, Array<{ number: number; watched_at: string }>>();
+      for (const ep of episodes) {
+        if (!seasonMap.has(ep.season)) {
+          seasonMap.set(ep.season, []);
+        }
+        seasonMap.get(ep.season)!.push({
+          number: ep.episode,
+          watched_at: watchedAt.toISOString()
+        });
+      }
+
+      const seasons = Array.from(seasonMap.entries()).map(([seasonNum, eps]) => ({
+        number: seasonNum,
+        episodes: eps
+      }));
+
+      await this.apiRequest('/sync/history', 'POST', {
+        shows: [
+          {
+            ids: {
+              trakt: traktId
+            },
+            seasons
+          }
+        ]
+      });
+      logger.log(`[TraktService] Successfully marked ${episodes.length} episodes as watched`);
+      return true;
+    } catch (error) {
+      logger.error('[TraktService] Failed to mark episodes as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark entire show as watched on Trakt (all seasons and episodes)
+   * @param imdbId - The IMDb ID of the show
+   * @param watchedAt - Optional date when watched (defaults to now)
+   */
+  public async markShowAsWatched(
+    imdbId: string,
+    watchedAt: Date = new Date()
+  ): Promise<boolean> {
+    try {
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
+        return false;
+      }
+
+      logger.log(`[TraktService] Marking entire show as watched: ${imdbId} (trakt: ${traktId})`);
+
+      // Mark entire show - Trakt will mark all episodes
+      await this.apiRequest('/sync/history', 'POST', {
+        shows: [
+          {
+            ids: {
+              trakt: traktId
+            },
+            watched_at: watchedAt.toISOString()
+          }
+        ]
+      });
+      logger.log(`[TraktService] Successfully marked entire show as watched`);
+      return true;
+    } catch (error) {
+      logger.error('[TraktService] Failed to mark show as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove an entire season from watched history on Trakt
+   * @param imdbId - The IMDb ID of the show
+   * @param season - The season number to remove from history
+   */
+  public async removeSeasonFromHistory(
+    imdbId: string,
+    season: number
+  ): Promise<boolean> {
+    try {
+      logger.log(`[TraktService] Removing season ${season} from history for show: ${imdbId}`);
+
+      const fullImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const payload: TraktHistoryRemovePayload = {
+        shows: [
+          {
+            ids: {
+              imdb: fullImdbId
+            },
+            seasons: [
+              {
+                number: season
+              }
+            ]
+          }
+        ]
+      };
+
+      logger.log(`[TraktService] Sending removeSeasonFromHistory payload:`, JSON.stringify(payload, null, 2));
+
+      const result = await this.removeFromHistory(payload);
+
+      if (result) {
+        const success = result.deleted.episodes > 0;
+        logger.log(`[TraktService] Season removal success: ${success} (${result.deleted.episodes} episodes deleted)`);
+        return success;
+      }
+
+      logger.log(`[TraktService] No result from removeSeasonFromHistory`);
+      return false;
+    } catch (error) {
+      logger.error('[TraktService] Failed to remove season from history:', error);
       return false;
     }
   }

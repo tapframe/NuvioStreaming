@@ -1274,6 +1274,7 @@ const MetadataScreen: React.FC = () => {
                     onSelectEpisode={handleEpisodeSelect}
                     groupedEpisodes={groupedEpisodes}
                     metadata={metadata || undefined}
+                    imdbId={imdbId || undefined}
                   />
                 ) : (
                   metadata && <MemoizedMovieContent metadata={metadata} />

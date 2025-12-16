@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import * as Updates from 'expo-updates';
 import { getDisplayedAppVersion } from '../utils/version';
@@ -23,6 +24,7 @@ export function useGithubMajorUpdate(): MajorUpdateData {
   const [releaseUrl, setReleaseUrl] = useState<string | undefined>();
 
   const check = useCallback(async () => {
+    if (Platform.OS === 'ios') return;
     try {
       // Always compare with Settings screen version
       const current = getDisplayedAppVersion() || Updates.runtimeVersion || '0.0.0';
