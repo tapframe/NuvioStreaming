@@ -15,7 +15,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useTheme } from '../contexts/ThemeContext';
-import { Portal, Dialog, Button } from 'react-native-paper';
+import { Portal } from 'react-native-paper';
 
 interface CustomAlertProps {
   visible: boolean;
@@ -40,8 +40,8 @@ export const CustomAlert = ({
 }: CustomAlertProps) => {
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.95);
-  const isDarkMode = useColorScheme() === 'dark';
   const { currentTheme } = useTheme();
+  // Using hardcoded dark theme values to match SeriesContent modal
   const themeColors = currentTheme.colors;
 
   useEffect(() => {
@@ -68,10 +68,11 @@ export const CustomAlert = ({
   const handleActionPress = useCallback((action: { label: string; onPress: () => void; style?: object }) => {
     try {
       action.onPress();
+      // Don't auto-close here if the action handles it, or check if we should
+      // Standard behavior is to close
       onClose();
     } catch (error) {
       console.warn('[CustomAlert] Error in action handler:', error);
-      // Still close the alert even if action fails
       onClose();
     }
   }, [onClose]);
@@ -91,7 +92,7 @@ export const CustomAlert = ({
         <Animated.View
           style={[
             styles.overlay,
-            { backgroundColor: 'rgba(0,0,0,0.6)' },
+            { backgroundColor: 'rgba(0, 0, 0, 0.85)' },
             overlayStyle
           ]}
         >
@@ -100,23 +101,22 @@ export const CustomAlert = ({
             <Animated.View style={[
               styles.alertContainer,
               alertStyle,
-              {
-                backgroundColor: themeColors.darkBackground,
-                borderColor: themeColors.primary,
-              }
             ]}>
               {/* Title */}
-              <Text style={[styles.title, { color: themeColors.highEmphasis }]}>
+              <Text style={styles.title}>
                 {title}
               </Text>
 
               {/* Message */}
-              <Text style={[styles.message, { color: themeColors.mediumEmphasis }]}>
+              <Text style={styles.message}>
                 {message}
               </Text>
 
               {/* Actions */}
-              <View style={styles.actionsRow}>
+              <View style={[
+                styles.actionsRow,
+                actions.length === 1 && { justifyContent: 'center' }
+              ]}>
                 {actions.map((action, idx) => {
                   const isPrimary = idx === actions.length - 1;
                   return (
@@ -125,9 +125,10 @@ export const CustomAlert = ({
                       style={[
                         styles.actionButton,
                         isPrimary
-                          ? { ...styles.primaryButton, backgroundColor: themeColors.primary }
+                          ? { backgroundColor: themeColors.primary }
                           : styles.secondaryButton,
-                        action.style
+                        action.style,
+                        actions.length === 1 && { minWidth: 120, maxWidth: '100%' }
                       ]}
                       onPress={() => handleActionPress(action)}
                       activeOpacity={0.7}
@@ -135,8 +136,8 @@ export const CustomAlert = ({
                       <Text style={[
                         styles.actionText,
                         isPrimary
-                          ? { color: themeColors.white }
-                          : { color: themeColors.primary }
+                          ? { color: '#FFFFFF' }
+                          : { color: '#FFFFFF' }
                       ]}>
                         {action.label}
                       </Text>
@@ -157,6 +158,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 9999,
   },
   overlayPressable: {
     ...StyleSheet.absoluteFillObject,
@@ -165,29 +167,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+    width: '100%',
   },
   alertContainer: {
     width: '100%',
-    maxWidth: 340,
-    borderRadius: 24,
-    padding: 28,
+    maxWidth: 400,
+    backgroundColor: '#1E1E1E', // Solid opaque dark background
+    borderRadius: 16,
+    padding: 24,
     borderWidth: 1,
-    borderColor: '#007AFF', // iOS blue - will be overridden by theme
-    overflow: 'hidden', // Ensure background fills entire card
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.51,
+        shadowRadius: 13.16,
       },
       android: {
-        elevation: 12,
+        elevation: 20,
       },
     }),
   },
   title: {
+    color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 8,
@@ -195,6 +200,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   message: {
+    color: '#AAAAAA',
     fontSize: 15,
     marginBottom: 24,
     textAlign: 'center',
@@ -209,17 +215,16 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     paddingHorizontal: 20,
-    paddingVertical: 11,
+    paddingVertical: 12,
     borderRadius: 12,
     minWidth: 80,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  primaryButton: {
-    // Background color set dynamically via theme
+    flex: 1, // Distribute space
+    maxWidth: 200, // But limit width
   },
   secondaryButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   actionText: {
     fontSize: 16,
