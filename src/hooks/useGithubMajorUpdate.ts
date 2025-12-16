@@ -26,6 +26,12 @@ export function useGithubMajorUpdate(): MajorUpdateData {
   const check = useCallback(async () => {
     if (Platform.OS === 'ios') return;
     try {
+      // Check if major update alerts are disabled
+      const majorAlertsEnabled = await mmkvStorage.getItem('@major_updates_alerts_enabled');
+      if (majorAlertsEnabled === 'false') {
+        return; // Major update alerts are disabled by user
+      }
+
       // Always compare with Settings screen version
       const current = getDisplayedAppVersion() || Updates.runtimeVersion || '0.0.0';
       const info = await fetchLatestGithubRelease();

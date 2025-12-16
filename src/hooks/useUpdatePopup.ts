@@ -28,6 +28,11 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
 
   const checkForUpdates = useCallback(async (forceCheck = false) => {
     try {
+      // Check if OTA update alerts are disabled
+      const otaAlertsEnabled = await mmkvStorage.getItem('@ota_updates_alerts_enabled');
+      if (otaAlertsEnabled === 'false' && !forceCheck) {
+        return; // OTA alerts are disabled by user
+      }
 
       // Check if user has dismissed the popup for this version
       const dismissedVersion = await mmkvStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
@@ -66,9 +71,9 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
     try {
       setIsInstalling(true);
       setShowUpdatePopup(false);
-      
+
       const success = await UpdateService.downloadAndInstallUpdate();
-      
+
       if (success) {
         // Update installed successfully - no restart alert needed
         // The app will automatically reload with the new version
@@ -152,7 +157,7 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
         try {
           const dismissedVersion = await mmkvStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
           const currentVersion = updateInfo.manifest?.id;
-          
+
           if (dismissedVersion !== currentVersion) {
             setShowUpdatePopup(true);
           }
