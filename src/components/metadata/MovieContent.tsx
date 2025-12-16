@@ -8,31 +8,7 @@ interface MovieContentProps {
 }
 
 export const MovieContent: React.FC<MovieContentProps> = ({ metadata }) => {
-  const { currentTheme } = useTheme();
-  const hasCast = Array.isArray(metadata.cast) && metadata.cast.length > 0;
-  const castDisplay = hasCast ? metadata.cast!.slice(0, 5).join(', ') : '';
-  
-  return (
-    <View style={styles.container}>
-      {/* Additional metadata */}
-      <View style={styles.additionalInfo}>
-        {metadata.director && (
-          <View style={styles.metadataRow}>
-            <Text style={[styles.metadataLabel, { color: currentTheme.colors.textMuted }]}>Director:</Text>
-            <Text style={[styles.metadataValue, { color: currentTheme.colors.text }]}>{metadata.director}</Text>
-          </View>
-        )}
-        
-        
-        {hasCast && (
-          <View style={styles.metadataRow}>
-            <Text style={[styles.metadataLabel, { color: currentTheme.colors.textMuted }]}>Cast:</Text>
-            <Text style={[styles.metadataValue, { color: currentTheme.colors.text }]}>{castDisplay}</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
+  return null;
 };
 
 const styles = StyleSheet.create({

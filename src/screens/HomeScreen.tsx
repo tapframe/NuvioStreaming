@@ -535,8 +535,9 @@ const HomeScreen = () => {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
+      // @ts-ignore
       navigation.navigate(Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid', {
-        uri: stream.url,
+        uri: stream.url as any,
         title: featuredContent.name,
         year: featuredContent.year,
         quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
@@ -548,8 +549,10 @@ const HomeScreen = () => {
       logger.error('[HomeScreen] Error in handlePlayStream:', error);
 
       // Fallback: navigate anyway
+      // Fallback: navigate anyway
+      // @ts-ignore
       navigation.navigate(Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid', {
-        uri: stream.url,
+        uri: stream.url as any,
         title: featuredContent.name,
         year: featuredContent.year,
         quality: stream.title?.match(/(\d+)p/)?.[1] || undefined,
