@@ -615,6 +615,25 @@ const SearchScreen = () => {
   }) => {
     const [inLibrary, setInLibrary] = React.useState(!!item.inLibrary);
     const [watched, setWatched] = React.useState(false);
+
+    // Calculate dimensions based on poster shape
+    const { itemWidth, aspectRatio } = useMemo(() => {
+      const shape = item.posterShape || 'poster';
+      const baseHeight = HORIZONTAL_POSTER_HEIGHT;
+
+      let w = HORIZONTAL_ITEM_WIDTH;
+      let r = 2 / 3;
+
+      if (shape === 'landscape') {
+        r = 16 / 9;
+        w = baseHeight * r;
+      } else if (shape === 'square') {
+        r = 1;
+        w = baseHeight;
+      }
+      return { itemWidth: w, aspectRatio: r };
+    }, [item.posterShape]);
+
     React.useEffect(() => {
       const updateWatched = () => {
         mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then(val => setWatched(val === 'true'));
@@ -630,9 +649,10 @@ const SearchScreen = () => {
       });
       return () => unsubscribe();
     }, [item.id, item.type]);
+
     return (
       <TouchableOpacity
-        style={styles.horizontalItem}
+        style={[styles.horizontalItem, { width: itemWidth }]}
         onPress={() => {
           navigation.navigate('Metadata', { id: item.id, type: item.type });
         }}
@@ -645,6 +665,11 @@ const SearchScreen = () => {
         activeOpacity={0.7}
       >
         <View style={[styles.horizontalItemPosterContainer, {
+          width: itemWidth,
+          height: undefined, // Let aspect ratio control height or keep fixed height with width? 
+          // Actually, since we derived width from fixed height, we can keep height fixed or use aspect.
+          // Using aspect ratio is safer if baseHeight changes.
+          aspectRatio: aspectRatio,
           backgroundColor: currentTheme.colors.darkBackground,
           borderColor: 'rgba(255,255,255,0.05)'
         }]}>

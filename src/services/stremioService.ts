@@ -20,6 +20,7 @@ export interface Meta {
   type: string;
   name: string;
   poster?: string;
+  posterShape?: 'poster' | 'square' | 'landscape'; // For variable aspect ratios
   background?: string;
   logo?: string;
   description?: string;

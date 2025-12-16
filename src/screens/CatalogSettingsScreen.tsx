@@ -177,17 +177,17 @@ const createStyles = (colors: any) => StyleSheet.create({
   optionChipTextSelected: {
     color: colors.white,
   },
-    hintRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-    },
-    hintText: {
-      fontSize: 12,
-      color: colors.mediumGray,
-    },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  hintText: {
+    fontSize: 12,
+    color: colors.mediumGray,
+  },
   enabledCount: {
     fontSize: 15,
     color: colors.mediumGray,
@@ -268,6 +268,7 @@ const CatalogSettingsScreen = () => {
   const [settings, setSettings] = useState<CatalogSetting[]>([]);
   const [groupedSettings, setGroupedSettings] = useState<GroupedCatalogs>({});
   const [mobileColumns, setMobileColumns] = useState<'auto' | 2 | 3>('auto');
+  const [showTitles, setShowTitles] = useState(true); // Default to showing titles
   const navigation = useNavigation();
   const { refreshCatalogs } = useCatalogContext();
   const { currentTheme } = useTheme();
@@ -288,11 +289,11 @@ const CatalogSettingsScreen = () => {
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       // Get installed addons and their catalogs
       const addons = await stremioService.getInstalledAddonsAsync();
       const availableCatalogs: CatalogSetting[] = [];
-      
+
       // Get saved enable/disable settings
       const savedSettingsJson = await mmkvStorage.getItem(CATALOG_SETTINGS_KEY);
       const savedEnabledSettings: { [key: string]: boolean } = savedSettingsJson ? JSON.parse(savedSettingsJson) : {};
@@ -300,12 +301,12 @@ const CatalogSettingsScreen = () => {
       // Get saved custom names
       const savedCustomNamesJson = await mmkvStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
       const savedCustomNames: { [key: string]: string } = savedCustomNamesJson ? JSON.parse(savedCustomNamesJson) : {};
-      
+
       // Process each addon's catalogs
       addons.forEach(addon => {
         if (addon.catalogs && addon.catalogs.length > 0) {
           const uniqueCatalogs = new Map<string, CatalogSetting>();
-          
+
           addon.catalogs.forEach(catalog => {
             const settingKey = `${addon.id}:${catalog.type}:${catalog.id}`;
             let displayName = catalog.name || catalog.id;
@@ -330,7 +331,7 @@ const CatalogSettingsScreen = () => {
             if (!displayName.toLowerCase().includes(catalogType.toLowerCase())) {
               displayName = `${displayName} ${catalogType}`.trim();
             }
-            
+
             uniqueCatalogs.set(settingKey, {
               addonId: addon.id,
               catalogId: catalog.id,
@@ -340,32 +341,32 @@ const CatalogSettingsScreen = () => {
               customName: savedCustomNames[settingKey]
             });
           });
-          
+
           availableCatalogs.push(...uniqueCatalogs.values());
         }
       });
-      
+
       // Group settings by addon name
       const grouped: GroupedCatalogs = {};
       availableCatalogs.forEach(setting => {
         const addon = addons.find(a => a.id === setting.addonId);
         if (!addon) return;
-        
+
         if (!grouped[setting.addonId]) {
           grouped[setting.addonId] = {
             name: addon.name,
             catalogs: [],
-            expanded: true, 
+            expanded: true,
             enabledCount: 0
           };
         }
-        
+
         grouped[setting.addonId].catalogs.push(setting);
         if (setting.enabled) {
           grouped[setting.addonId].enabledCount++;
         }
       });
-      
+
       setSettings(availableCatalogs);
       setGroupedSettings(grouped);
 
@@ -375,6 +376,10 @@ const CatalogSettingsScreen = () => {
         if (pref === '2') setMobileColumns(2);
         else if (pref === '3') setMobileColumns(3);
         else setMobileColumns('auto');
+
+        // Load show titles preference (default: true)
+        const titlesPref = await mmkvStorage.getItem('catalog_show_titles');
+        setShowTitles(titlesPref !== 'false'); // Default to true if not set
       } catch (e) {
         // ignore
       }
@@ -396,7 +401,7 @@ const CatalogSettingsScreen = () => {
         settingsObj[key] = setting.enabled;
       });
       await mmkvStorage.setItem(CATALOG_SETTINGS_KEY, JSON.stringify(settingsObj));
-      
+
       // Small delay to ensure AsyncStorage has fully persisted before triggering refresh
       setTimeout(() => {
         refreshCatalogs(); // Trigger catalog refresh after saving settings
@@ -411,26 +416,26 @@ const CatalogSettingsScreen = () => {
     const newSettings = [...settings];
     const catalogsForAddon = groupedSettings[addonId].catalogs;
     const setting = catalogsForAddon[index];
-    
+
     const updatedSetting = {
       ...setting,
       enabled: !setting.enabled
     };
-    
-    const flatIndex = newSettings.findIndex(s => 
-      s.addonId === setting.addonId && 
-      s.type === setting.type && 
+
+    const flatIndex = newSettings.findIndex(s =>
+      s.addonId === setting.addonId &&
+      s.type === setting.type &&
       s.catalogId === setting.catalogId
     );
-    
+
     if (flatIndex !== -1) {
       newSettings[flatIndex] = updatedSetting;
     }
-    
+
     const newGroupedSettings = { ...groupedSettings };
     newGroupedSettings[addonId].catalogs[index] = updatedSetting;
     newGroupedSettings[addonId].enabledCount += updatedSetting.enabled ? 1 : -1;
-    
+
     setSettings(newSettings);
     setGroupedSettings(newGroupedSettings);
     saveEnabledSettings(newSettings); // Use specific save function
@@ -459,11 +464,11 @@ const CatalogSettingsScreen = () => {
     if (!catalogToRename || !currentRenameValue) return;
 
     const settingKey = `${catalogToRename.addonId}:${catalogToRename.type}:${catalogToRename.catalogId}`;
-    
+
     try {
       const savedCustomNamesJson = await mmkvStorage.getItem(CATALOG_CUSTOM_NAMES_KEY);
       const customNames: { [key: string]: string } = savedCustomNamesJson ? JSON.parse(savedCustomNamesJson) : {};
-      
+
       const trimmedNewName = currentRenameValue.trim();
 
       if (trimmedNewName === catalogToRename.name || trimmedNewName === '') {
@@ -471,22 +476,22 @@ const CatalogSettingsScreen = () => {
       } else {
         customNames[settingKey] = trimmedNewName;
       }
-      
+
       await mmkvStorage.setItem(CATALOG_CUSTOM_NAMES_KEY, JSON.stringify(customNames));
       // Clear in-memory cache so new name is used immediately
-      try { clearCustomNameCache(); } catch {}
+      try { clearCustomNameCache(); } catch { }
 
       // --- Reload settings to reflect the change --- 
-      await loadSettings(); 
+      await loadSettings();
       // Also trigger home/catalog consumers to refresh
-      try { refreshCatalogs(); } catch {}
+      try { refreshCatalogs(); } catch { }
       // --- No need to manually update local state anymore --- 
 
     } catch (error) {
       logger.error('Failed to save custom catalog name:', error);
       setAlertTitle('Error');
       setAlertMessage('Could not save the custom name.');
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertActions([{ label: 'OK', onPress: () => { } }]);
       setAlertVisible(true);
     } finally {
       setIsRenameModalVisible(false);
@@ -533,7 +538,7 @@ const CatalogSettingsScreen = () => {
         </TouchableOpacity>
       </View>
       <Text style={styles.headerTitle}>Catalogs</Text>
-      
+
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Layout (Mobile only) */}
         {Platform.OS && (
@@ -552,7 +557,7 @@ const CatalogSettingsScreen = () => {
                     try {
                       await mmkvStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, 'auto');
                       setMobileColumns('auto');
-                    } catch {}
+                    } catch { }
                   }}
                   activeOpacity={0.7}
                 >
@@ -564,7 +569,7 @@ const CatalogSettingsScreen = () => {
                     try {
                       await mmkvStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '2');
                       setMobileColumns(2);
-                    } catch {}
+                    } catch { }
                   }}
                   activeOpacity={0.7}
                 >
@@ -576,7 +581,7 @@ const CatalogSettingsScreen = () => {
                     try {
                       await mmkvStorage.setItem(CATALOG_MOBILE_COLUMNS_KEY, '3');
                       setMobileColumns(3);
-                    } catch {}
+                    } catch { }
                   }}
                   activeOpacity={0.7}
                 >
@@ -596,9 +601,9 @@ const CatalogSettingsScreen = () => {
             <Text style={styles.addonTitle}>
               {group.name.toUpperCase()}
             </Text>
-            
+
             <View style={styles.card}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.groupHeader}
                 onPress={() => toggleExpansion(addonId)}
                 activeOpacity={0.7}
@@ -608,14 +613,14 @@ const CatalogSettingsScreen = () => {
                   <Text style={styles.enabledCount}>
                     {group.enabledCount} of {group.catalogs.length} enabled
                   </Text>
-                  <MaterialIcons 
-                    name={group.expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"} 
-                    size={24} 
-                    color={colors.mediumGray} 
+                  <MaterialIcons
+                    name={group.expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
+                    size={24}
+                    color={colors.mediumGray}
                   />
                 </View>
               </TouchableOpacity>
-              
+
               {group.expanded && (
                 <>
                   <View style={styles.hintRow}>
@@ -623,30 +628,30 @@ const CatalogSettingsScreen = () => {
                     <Text style={styles.hintText}>Long-press a catalog to rename</Text>
                   </View>
                   {group.catalogs.map((setting, index) => (
-                <Pressable 
-                  key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
-                  onLongPress={() => handleLongPress(setting)} // Added long press handler
-                  style={({ pressed }) => [
-                    styles.catalogItem,
-                    pressed && styles.catalogItemPressed, // Optional pressed style
-                  ]}
-                >
-                  <View style={styles.catalogInfo}>
-                    <Text style={styles.catalogName}>
-                      {setting.customName || setting.name} {/* Display custom or default name */}
-                    </Text>
-                    <Text style={styles.catalogType}>
-                      {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={setting.enabled}
-                    onValueChange={() => toggleCatalog(addonId, index)}
-                    trackColor={{ false: '#505050', true: colors.primary }}
-                    thumbColor={Platform.OS === 'android' ? colors.white : undefined}
-                    ios_backgroundColor="#505050"
-                  />
-                </Pressable>
+                    <Pressable
+                      key={`${setting.addonId}:${setting.type}:${setting.catalogId}`}
+                      onLongPress={() => handleLongPress(setting)} // Added long press handler
+                      style={({ pressed }) => [
+                        styles.catalogItem,
+                        pressed && styles.catalogItemPressed, // Optional pressed style
+                      ]}
+                    >
+                      <View style={styles.catalogInfo}>
+                        <Text style={styles.catalogName}>
+                          {setting.customName || setting.name} {/* Display custom or default name */}
+                        </Text>
+                        <Text style={styles.catalogType}>
+                          {setting.type.charAt(0).toUpperCase() + setting.type.slice(1)}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={setting.enabled}
+                        onValueChange={() => toggleCatalog(addonId, index)}
+                        trackColor={{ false: '#505050', true: colors.primary }}
+                        thumbColor={Platform.OS === 'android' ? colors.white : undefined}
+                        ios_backgroundColor="#505050"
+                      />
+                    </Pressable>
                   ))}
                 </>
               )}
@@ -706,8 +711,8 @@ const CatalogSettingsScreen = () => {
             )}
           </Pressable>
         ) : (
-          <Pressable style={styles.modalOverlay} onPress={() => setIsRenameModalVisible(false)}> 
-            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}> 
+          <Pressable style={styles.modalOverlay} onPress={() => setIsRenameModalVisible(false)}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
               <Text style={styles.modalTitle}>Rename Catalog</Text>
               <TextInput
                 style={styles.modalInput}

@@ -56,7 +56,7 @@ export interface StreamingContent {
   name: string;
   tmdbId?: number;
   poster: string;
-  posterShape?: string;
+  posterShape?: 'poster' | 'square' | 'landscape';
   banner?: string;
   logo?: string;
   imdbRating?: string;
@@ -835,7 +835,7 @@ class CatalogService {
       type: meta.type,
       name: meta.name,
       poster: posterUrl,
-      posterShape: 'poster',
+      posterShape: meta.posterShape || 'poster', // Use addon's shape or default to poster type
       banner: meta.background,
       logo: logoUrl,
       imdbRating: meta.imdbRating,
@@ -857,7 +857,7 @@ class CatalogService {
       type: meta.type,
       name: meta.name,
       poster: meta.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
-      posterShape: 'poster',
+      posterShape: meta.posterShape || 'poster',
       banner: meta.background,
       // Use addon's logo if available, otherwise undefined
       logo: (meta as any).logo || undefined,

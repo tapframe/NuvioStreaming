@@ -289,6 +289,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const [catalogExtras, setCatalogExtras] = useState<CatalogExtra[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string>>({});
   const [activeGenreFilter, setActiveGenreFilter] = useState<string | undefined>(genreFilter);
+  const [showTitles, setShowTitles] = useState(true); // Default to showing titles
   const { currentTheme } = useTheme();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
@@ -302,6 +303,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         if (pref === '2') setMobileColumnsPref(2);
         else if (pref === '3') setMobileColumnsPref(3);
         else setMobileColumnsPref('auto');
+
+        // Load show titles preference (default: true)
+        const titlesPref = await mmkvStorage.getItem('catalog_show_titles');
+        setShowTitles(titlesPref !== 'false'); // Default to true if not set
       } catch { }
     })();
   }, []);
@@ -556,11 +561,14 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             let nextHasMore = false;
             try {
               const svcHasMore = addonId ? stremioService.getCatalogHasMore(addonId, type, id) : undefined;
-              // If service explicitly provides hasMore, use it; otherwise assume there's more if we got any items
-              // This handles addons with different page sizes (not just 50 items per page)
-              nextHasMore = typeof svcHasMore === 'boolean' ? svcHasMore : (catalogItems.length > 0);
+              // If service explicitly provides hasMore, use it
+              // Otherwise, only assume there's more if we got a reasonable number of items (>= 5)
+              // This prevents infinite loops when addons return just 1-2 items per page
+              const MIN_ITEMS_FOR_MORE = 5;
+              nextHasMore = typeof svcHasMore === 'boolean' ? svcHasMore : (catalogItems.length >= MIN_ITEMS_FOR_MORE);
             } catch {
-              nextHasMore = catalogItems.length > 0;
+              // Fallback: only assume more if we got at least 5 items
+              nextHasMore = catalogItems.length >= 5;
             }
             setHasMore(nextHasMore);
             logger.log('[CatalogScreen] Updated items and hasMore', {
@@ -749,6 +757,10 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     // For proper spacing
     const rightMargin = isLastInRow ? 0 : ((screenData as any).itemSpacing ?? SPACING.sm);
 
+    // Calculate aspect ratio based on posterShape
+    const shape = item.posterShape || 'poster';
+    const aspectRatio = shape === 'landscape' ? 16 / 9 : (shape === 'square' ? 1 : 2 / 3);
+
     return (
       <TouchableOpacity
         style={[
@@ -763,7 +775,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
       >
         <FastImage
           source={{ uri: optimizePosterUrl(item.poster) }}
-          style={styles.poster}
+          style={[styles.poster, { aspectRatio }]}
           resizeMode={FastImage.resizeMode.cover}
         />
 
@@ -808,9 +820,26 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             </View>
           )
         )}
+
+        {/* Poster Title */}
+        {showTitles && (
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: '500',
+              color: colors.mediumGray,
+              marginTop: 6,
+              textAlign: 'center',
+              paddingHorizontal: 4,
+            }}
+            numberOfLines={2}
+          >
+            {item.name}
+          </Text>
+        )}
       </TouchableOpacity>
     );
-  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, type, nowPlayingMovies, colors.white, optimizePosterUrl]);
+  }, [navigation, styles, effectiveNumColumns, effectiveItemWidth, screenData, type, nowPlayingMovies, colors.white, colors.mediumGray, optimizePosterUrl, addonId, isDarkMode, showTitles]);
 
   const renderEmptyState = () => (
     <View style={styles.centered}>

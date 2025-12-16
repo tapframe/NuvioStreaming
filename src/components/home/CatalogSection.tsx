@@ -96,20 +96,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   // Memoize the keyExtractor to prevent re-creation
   const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
 
-  // Calculate item width for getItemLayout - use base POSTER_WIDTH for consistent spacing
-  // Note: ContentItem may apply size multipliers based on settings, but base width ensures consistent layout
-  const itemWidth = useMemo(() => POSTER_WIDTH, []);
 
-  // getItemLayout for consistent spacing and better performance
-  const getItemLayout = useCallback((data: any, index: number) => {
-    const length = itemWidth + separatorWidth;
-    const paddingHorizontal = isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 16;
-    return {
-      length,
-      offset: paddingHorizontal + (length * index),
-      index,
-    };
-  }, [itemWidth, separatorWidth, isTV, isLargeTablet, isTablet]);
 
   return (
     <View
@@ -194,7 +181,6 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
           }
         ])}
         ItemSeparatorComponent={ItemSeparator}
-        getItemLayout={getItemLayout}
         removeClippedSubviews={true}
         initialNumToRender={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
         maxToRenderPerBatch={isTV ? 4 : isLargeTablet ? 4 : 3}

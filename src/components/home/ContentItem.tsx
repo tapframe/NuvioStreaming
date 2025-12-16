@@ -41,7 +41,7 @@ const getDeviceType = (screenWidth: number) => {
 // Dynamic poster calculation based on screen width - show 1/4 of next poster
 const calculatePosterLayout = (screenWidth: number) => {
   const deviceType = getDeviceType(screenWidth);
-  
+
   // Responsive sizing based on device type
   const MIN_POSTER_WIDTH = deviceType === 'tv' ? 180 : deviceType === 'largeTablet' ? 160 : deviceType === 'tablet' ? 140 : 100;
   const MAX_POSTER_WIDTH = deviceType === 'tv' ? 220 : deviceType === 'largeTablet' ? 200 : deviceType === 'tablet' ? 180 : 130;
@@ -52,9 +52,9 @@ const calculatePosterLayout = (screenWidth: number) => {
   const availableWidth = screenWidth - LEFT_PADDING;
 
   // Try different numbers of full posters to find the best fit
-  let bestLayout = { 
-    numFullPosters: 3, 
-    posterWidth: deviceType === 'tv' ? 200 : deviceType === 'largeTablet' ? 180 : deviceType === 'tablet' ? 160 : 120 
+  let bestLayout = {
+    numFullPosters: 3,
+    posterWidth: deviceType === 'tv' ? 200 : deviceType === 'largeTablet' ? 180 : deviceType === 'tablet' ? 160 : 120
   };
 
   for (let n = 3; n <= 6; n++) {
@@ -96,7 +96,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     return () => unsubscribe();
   }, [item.id, item.type]);
 
-    // Load watched state from AsyncStorage when item changes
+  // Load watched state from AsyncStorage when item changes
   useEffect(() => {
     const updateWatched = () => {
       mmkvStorage.getItem(`watched:${item.type}:${item.id}`).then((val: string | null) => setIsWatched(val === 'true'));
@@ -126,7 +126,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
   const posterWidth = React.useMemo(() => {
     const deviceType = getDeviceType(width);
     const sizeMultiplier = deviceType === 'tv' ? 1.2 : deviceType === 'largeTablet' ? 1.1 : deviceType === 'tablet' ? 1.0 : 0.9;
-    
+
     switch (settings.posterSize) {
       case 'small':
         return Math.max(90, POSTER_WIDTH - 15) * sizeMultiplier;
@@ -138,6 +138,30 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         return POSTER_WIDTH * sizeMultiplier;
     }
   }, [settings.posterSize, width]);
+
+  // Determine dimensions based on poster shape
+  const { finalWidth, finalAspectRatio, borderRadius } = React.useMemo(() => {
+    const shape = item.posterShape || 'poster';
+    const baseHeight = posterWidth / (2 / 3); // Standard height derived from portrait width
+
+    let w = posterWidth;
+    let ratio = 2 / 3;
+
+    if (shape === 'landscape') {
+      ratio = 16 / 9;
+      // Maintain same height as portrait posters
+      w = baseHeight * ratio;
+    } else if (shape === 'square') {
+      ratio = 1;
+      w = baseHeight;
+    }
+
+    return {
+      finalWidth: w,
+      finalAspectRatio: ratio,
+      borderRadius: typeof settings.posterBorderRadius === 'number' ? settings.posterBorderRadius : 12
+    };
+  }, [posterWidth, item.posterShape, settings.posterBorderRadius]);
 
   // Intersection observer simulation for lazy loading
   const itemRef = useRef<View>(null);
@@ -169,7 +193,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         setIsWatched(targetWatched);
         try {
           await mmkvStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
-        } catch {}
+        } catch { }
         showInfo(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched', targetWatched ? 'Item marked as watched' : 'Item marked as unwatched');
         setTimeout(() => {
           DeviceEventEmitter.emit('watchedStatusChanged');
@@ -185,7 +209,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
               undefined,
               { forceNotify: true, forceWrite: true }
             );
-          } catch {}
+          } catch { }
 
           if (item.type === 'movie') {
             try {
@@ -194,9 +218,9 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
                 await trakt.addToWatchedMovies(item.id);
                 try {
                   await storageService.updateTraktSyncStatus(item.id, item.type, true, 100);
-                } catch {}
+                } catch { }
               }
-            } catch {}
+            } catch { }
           }
         }
         setMenuVisible(false);
@@ -242,44 +266,34 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
     setMenuVisible(false);
   }, []);
 
-
   // Memoize optimized poster URL to prevent recalculating
   const optimizedPosterUrl = React.useMemo(() => {
     if (!item.poster || item.poster.includes('placeholder')) {
       return 'https://via.placeholder.com/154x231/333/666?text=No+Image';
     }
-
-    // For TMDB images, use smaller sizes
     if (item.poster.includes('image.tmdb.org')) {
-      // Replace any size with w154 (fits 100-130px tiles perfectly)
       return item.poster.replace(/\/w\d+\//, '/w154/');
     }
-
-    // For metahub images, use smaller sizes
     if (item.poster.includes('placeholder')) {
       return item.poster.replace('/medium/', '/small/');
     }
-
-    // Return original URL for other sources to avoid breaking them
     return item.poster;
   }, [item.poster, item.id]);
 
-  // While settings load, render a placeholder with reserved space (poster aspect + title)
   if (!isLoaded) {
-    const placeholderRadius = 12;
     return (
-      <View style={[styles.itemContainer, { width: posterWidth }]}>
+      <View style={[styles.itemContainer, { width: finalWidth }]}>
         <View
           style={[
             styles.contentItem,
             {
-              width: posterWidth,
-              borderRadius: placeholderRadius,
+              width: finalWidth,
+              aspectRatio: finalAspectRatio,
+              borderRadius,
               backgroundColor: currentTheme.colors.elevation1,
             },
           ]}
         />
-        {/* Reserve space for title to keep section spacing stable */}
         <View style={{ height: 18, marginTop: 4 }} />
       </View>
     );
@@ -287,24 +301,24 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
 
   return (
     <>
-      <Animated.View style={[styles.itemContainer, { width: posterWidth }]} entering={FadeIn.duration(300)}> 
+      <Animated.View style={[styles.itemContainer, { width: finalWidth }]} entering={FadeIn.duration(300)}>
         <TouchableOpacity
-          style={[styles.contentItem, { width: posterWidth, borderRadius: posterRadius }]}
+          style={[styles.contentItem, { width: finalWidth, aspectRatio: finalAspectRatio, borderRadius }]}
           activeOpacity={0.7}
           onPress={handlePress}
           onLongPress={handleLongPress}
           delayLongPress={300}
         >
-          <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius: posterRadius }] }>
+          <View ref={itemRef} style={[styles.contentItemContainer, { borderRadius }]}>
             {/* Image with FastImage for aggressive caching */}
             {item.poster ? (
               <FastImage
-                source={{ 
+                source={{
                   uri: optimizedPosterUrl,
                   priority: FastImage.priority.normal,
                   cache: FastImage.cacheControl.immutable
                 }}
-                style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius: posterRadius }]}
+                style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius }]}
                 resizeMode={FastImage.resizeMode.cover}
                 onLoad={() => {
                   setImageError(false);
@@ -316,14 +330,14 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
               />
             ) : (
               // Show placeholder for items without posters
-              <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center', borderRadius: posterRadius }] }>
+              <View style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, justifyContent: 'center', alignItems: 'center', borderRadius: posterRadius }]}>
                 <Text style={{ color: currentTheme.colors.textMuted, fontSize: 10, textAlign: 'center' }}>
                   {item.name.substring(0, 20)}...
                 </Text>
               </View>
             )}
             {imageError && (
-              <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation1 }]}> 
+              <View style={[styles.loadingOverlay, { backgroundColor: currentTheme.colors.elevation1 }]}>
                 <MaterialIcons name="broken-image" size={24} color={currentTheme.colors.textMuted} />
               </View>
             )}
@@ -350,14 +364,14 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
           </View>
         </TouchableOpacity>
         {settings.showPosterTitles && (
-          <Text 
+          <Text
             style={[
-              styles.title, 
-              { 
+              styles.title,
+              {
                 color: currentTheme.colors.mediumEmphasis,
                 fontSize: getDeviceType(width) === 'tv' ? 16 : getDeviceType(width) === 'largeTablet' ? 15 : getDeviceType(width) === 'tablet' ? 14 : 13
               }
-            ]} 
+            ]}
             numberOfLines={2}
           >
             {item.name}
