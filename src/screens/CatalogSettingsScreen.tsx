@@ -592,6 +592,26 @@ const CatalogSettingsScreen = () => {
                 <MaterialIcons name="info-outline" size={14} color={colors.mediumGray} />
                 <Text style={styles.hintText}>Applies to phones only. Tablets keep adaptive layout.</Text>
               </View>
+
+              {/* Show Titles Toggle */}
+              <View style={[styles.catalogItem, { borderBottomWidth: 0 }]}>
+                <View style={styles.catalogInfo}>
+                  <Text style={styles.catalogName}>Show Poster Titles</Text>
+                  <Text style={styles.catalogType}>Display title text below each poster</Text>
+                </View>
+                <Switch
+                  value={showTitles}
+                  onValueChange={async (value) => {
+                    try {
+                      await mmkvStorage.setItem('catalog_show_titles', value ? 'true' : 'false');
+                      setShowTitles(value);
+                    } catch { }
+                  }}
+                  trackColor={{ false: '#505050', true: colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? colors.white : undefined}
+                  ios_backgroundColor="#505050"
+                />
+              </View>
             </View>
           </View>
         )}
