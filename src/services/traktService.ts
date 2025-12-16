@@ -52,6 +52,8 @@ export interface TraktWatchedItem {
   };
   plays: number;
   last_watched_at: string;
+  last_updated_at?: string; // Timestamp for syncing - only re-process if newer
+  reset_at?: string | null; // When user started re-watching - ignore episodes watched before this
   seasons?: {
     number: number;
     episodes: {
@@ -1637,7 +1639,14 @@ export class TraktService {
   }
 
   /**
-   * Pause watching content (scrobble pause)
+   * Pause watching content - saves playback progress
+   * 
+   * NOTE: Trakt API does NOT have a /scrobble/pause endpoint.
+   * Instead, /scrobble/stop handles both cases:
+   * - Progress 1-79%: Treated as "pause", saves playback progress to /sync/playback
+   * - Progress ≥80%: Treated as "scrobble", marks as watched
+   * 
+   * This method uses /scrobble/stop which automatically handles the pause/scrobble logic.
    */
   public async pauseWatching(contentData: TraktContentData, progress: number): Promise<TraktScrobbleResponse | null> {
     try {
@@ -1653,7 +1662,8 @@ export class TraktService {
         return null;
       }
 
-      return this.apiRequest<TraktScrobbleResponse>('/scrobble/pause', 'POST', payload);
+      // Use /scrobble/stop - Trakt automatically treats <80% as pause, ≥80% as scrobble
+      return this.apiRequest<TraktScrobbleResponse>('/scrobble/stop', 'POST', payload);
     } catch (error) {
       logger.error('[TraktService] Failed to pause watching:', error);
       return null;

@@ -1432,7 +1432,7 @@ const KSPlayerCore: React.FC = () => {
     const backgroundSync = async () => {
       try {
         logger.log('[VideoPlayer] Starting background Trakt sync');
-        // IMMEDIATE: Force immediate progress update (scrobble/pause) with the exact time
+        // IMMEDIATE: Force immediate progress update (uses scrobble/stop which handles pause/scrobble)
         await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
 
         // IMMEDIATE: Use user_close reason to trigger immediate scrobble stop
