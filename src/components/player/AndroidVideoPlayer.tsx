@@ -133,6 +133,20 @@ const AndroidVideoPlayer: React.FC = () => {
     } as any;
   };
 
+  // Helper to get dynamic volume icon
+  const getVolumeIcon = (value: number) => {
+      if (value === 0) return 'volume-off';
+      if (value < 0.3) return 'volume-mute';
+      if (value < 0.6) return 'volume-down';
+      return 'volume-up';
+  };
+
+  // Helper to get dynamic brightness icon
+  const getBrightnessIcon = (value: number) => {
+    if (value < 0.3) return 'brightness-low';
+    if (value < 0.7) return 'brightness-medium';
+    return 'brightness-high';
+  };
 
   // Get appropriate headers based on stream type
   const getStreamHeaders = () => {
@@ -2559,7 +2573,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
       logger.log('[AndroidVideoPlayer] Fetching streams for next episode:', nextEpisodeId);
 
-      // Import stremio service 
+      // Import stremio service
       const stremioService = require('../../services/stremioService').default;
 
       let bestStream: any = null;
@@ -3125,7 +3139,7 @@ const AndroidVideoPlayer: React.FC = () => {
           }
         ]}
       >
-        {/* Left side gesture handler - tap + long press (brightness gesture disabled) */}
+        {/* Left side gesture handler - brightness + tap + long press (Android and iOS) */}
         <LongPressGestureHandler
           onActivated={onLongPressActivated}
           onEnded={onLongPressEnd}
@@ -3134,20 +3148,29 @@ const AndroidVideoPlayer: React.FC = () => {
           shouldCancelWhenOutside={false}
           simultaneousHandlers={[]}
         >
-          <TapGestureHandler
-            onActivated={toggleControls}
+          <PanGestureHandler
+            onGestureEvent={gestureControls.onBrightnessGestureEvent}
+            activeOffsetY={[-10, 10]}
+            failOffsetX={[-30, 30]}
             shouldCancelWhenOutside={false}
             simultaneousHandlers={[]}
+            maxPointers={1}
           >
-            <View style={{
-              position: 'absolute',
-              top: screenDimensions.height * 0.15,
-              left: 0,
-              width: screenDimensions.width * 0.4,
-              height: screenDimensions.height * 0.7,
-              zIndex: 10,
-            }} />
-          </TapGestureHandler>
+            <TapGestureHandler
+              onActivated={toggleControls}
+              shouldCancelWhenOutside={false}
+              simultaneousHandlers={[]}
+            >
+              <View style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.15,
+                left: 0,
+                width: screenDimensions.width * 0.4,
+                height: screenDimensions.height * 0.7,
+                zIndex: 10,
+              }} />
+            </TapGestureHandler>
+          </PanGestureHandler>
         </LongPressGestureHandler>
 
         {/* Combined gesture handler for right side - volume + tap + long press */}
@@ -3398,7 +3421,56 @@ const AndroidVideoPlayer: React.FC = () => {
             buffered={buffered}
             formatTime={formatTime}
             playerBackend={useVLC ? 'VLC' : 'ExoPlayer'}
+            nextLoadingTitle={nextLoadingTitle}
+            controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
           />
+
+          {/* Combined Volume & Brightness Gesture Indicator - NEW PILL STYLE (No Bar) */}
+          {(gestureControls.showVolumeOverlay || gestureControls.showBrightnessOverlay) && (
+            <View style={localStyles.gestureIndicatorContainer}>
+              {/* Dynamic Icon */}
+              <View
+                  style={[
+                    localStyles.iconWrapper,
+                    {
+                      // Conditional Background Color Logic
+                      backgroundColor: gestureControls.showVolumeOverlay && volume === 0
+                        ? 'rgba(242, 184, 181)'
+                        : 'rgba(59, 59, 59)'
+                    }
+                  ]}
+                >
+                  <MaterialIcons
+                    name={
+                      gestureControls.showVolumeOverlay
+                        ? getVolumeIcon(volume)
+                        : getBrightnessIcon(brightness)
+                    }
+                    size={24} // Reduced size to fit inside a 32-40px circle better
+                    color={
+                      gestureControls.showVolumeOverlay && volume === 0
+                         ? 'rgba(96, 20, 16)' // Bright RED for MUTE icon itself
+                         : 'rgba(255, 255, 255)' // White for all other states
+                    }
+                  />
+              </View>
+
+              {/* Text Label: Shows "Muted" or percentage */}
+                 <Text
+                   style={[
+                     localStyles.gestureText,
+                     // Conditional Text Color Logic
+                     gestureControls.showVolumeOverlay && volume === 0 && { color: 'rgba(242, 184, 181)' } // Light RED for "Muted"
+                   ]}
+                 >
+                   {/* Conditional Text Content Logic */}
+                   {gestureControls.showVolumeOverlay && volume === 0
+                     ? "Muted" // Display "Muted" when volume is 0
+                     : `${Math.round((gestureControls.showVolumeOverlay ? volume : brightness) * 100)}%` // Display percentage otherwise
+                   }
+                 </Text>
+            </View>
+          )}
 
           {showPauseOverlay && (
             <TouchableOpacity
@@ -3742,214 +3814,20 @@ const AndroidVideoPlayer: React.FC = () => {
             controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
           />
 
-          {/* Volume Overlay */}
-          {gestureControls.showVolumeOverlay && (
-            <Animated.View
-              style={{
-                position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
-                opacity: gestureControls.volumeOverlayOpacity,
-                zIndex: 1000,
-              }}
-            >
-              <View style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                borderRadius: 12,
-                padding: 16,
-                alignItems: 'center',
-                width: 120,
-                height: 120,
-                justifyContent: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.5,
-                shadowRadius: 8,
-                elevation: 10,
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-              }}>
-                <MaterialIcons
-                  name={volume === 0 ? "volume-off" : volume < 0.3 ? "volume-mute" : volume < 0.7 ? "volume-down" : "volume-up"}
-                  size={24}
-                  color={volume === 0 ? "#FF6B6B" : "#FFFFFF"}
-                  style={{ marginBottom: 8 }}
-                />
-
-                {/* Horizontal Dotted Progress Bar */}
-                <View style={{
-                  width: 80,
-                  height: 6,
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: 3,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  marginBottom: 8,
-                }}>
-                  {/* Dotted background */}
-                  <View style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: 1,
-                  }}>
-                    {Array.from({ length: 16 }, (_, i) => (
-                      <View
-                        key={i}
-                        style={{
-                          width: 1.5,
-                          height: 1.5,
-                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                          borderRadius: 0.75,
-                        }}
-                      />
-                    ))}
-                  </View>
-
-                  {/* Progress fill */}
-                  <View style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: `${volume * 100}%`,
-                    height: 6,
-                    backgroundColor: volume === 0 ? '#FF6B6B' : '#E50914',
-                    borderRadius: 3,
-                    shadowColor: volume === 0 ? '#FF6B6B' : '#E50914',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.6,
-                    shadowRadius: 2,
-                  }} />
-                </View>
-
-                <Text style={{
-                  color: '#FFFFFF',
-                  fontSize: 12,
-                  fontWeight: '600',
-                  letterSpacing: 0.5,
-                }}>
-                  {Math.round(volume * 100)}%
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-
-          {/* Brightness Overlay */}
-          {gestureControls.showBrightnessOverlay && (
-            <Animated.View
-              style={{
-                position: 'absolute',
-                left: screenDimensions.width / 2 - 60,
-                top: screenDimensions.height / 2 - 60,
-                opacity: gestureControls.brightnessOverlayOpacity,
-                zIndex: 1000,
-              }}
-            >
-              <View style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                borderRadius: 12,
-                padding: 16,
-                alignItems: 'center',
-                width: 120,
-                height: 120,
-                justifyContent: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.5,
-                shadowRadius: 8,
-                elevation: 10,
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-              }}>
-                <MaterialIcons
-                  name={brightness < 0.2 ? "brightness-low" : brightness < 0.5 ? "brightness-medium" : brightness < 0.8 ? "brightness-high" : "brightness-auto"}
-                  size={24}
-                  color={brightness < 0.2 ? "#FFD700" : "#FFFFFF"}
-                  style={{ marginBottom: 8 }}
-                />
-
-                {/* Horizontal Dotted Progress Bar */}
-                <View style={{
-                  width: 80,
-                  height: 6,
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  borderRadius: 3,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  marginBottom: 8,
-                }}>
-                  {/* Dotted background */}
-                  <View style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: 1,
-                  }}>
-                    {Array.from({ length: 16 }, (_, i) => (
-                      <View
-                        key={i}
-                        style={{
-                          width: 1.5,
-                          height: 1.5,
-                          backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                          borderRadius: 0.75,
-                        }}
-                      />
-                    ))}
-                  </View>
-
-                  {/* Progress fill */}
-                  <View style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: `${brightness * 100}%`,
-                    height: 6,
-                    backgroundColor: brightness < 0.2 ? '#FFD700' : '#FFA500',
-                    borderRadius: 3,
-                    shadowColor: brightness < 0.2 ? '#FFD700' : '#FFA500',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.6,
-                    shadowRadius: 2,
-                  }} />
-                </View>
-
-                <Text style={{
-                  color: '#FFFFFF',
-                  fontSize: 12,
-                  fontWeight: '600',
-                  letterSpacing: 0.5,
-                }}>
-                  {Math.round(brightness * 100)}%
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-
           {/* Speed Activated Overlay */}
           {showSpeedActivatedOverlay && (
             <Animated.View
               style={{
                 position: 'absolute',
-                top: screenDimensions.height * 0.1,
+                top: screenDimensions.height * 0.06,
                 left: screenDimensions.width / 2 - 40,
                 opacity: speedActivatedOverlayOpacity,
                 zIndex: 1000,
               }}
             >
               <View style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                borderRadius: 8,
+                backgroundColor: 'rgba(25, 25, 25, 0.6)',
+                borderRadius: 35,
                 paddingHorizontal: 12,
                 paddingVertical: 6,
                 alignItems: 'center',
@@ -3966,7 +3844,7 @@ const AndroidVideoPlayer: React.FC = () => {
                   fontWeight: '600',
                   letterSpacing: 0.5,
                 }}>
-                  {holdToSpeedValue}x Speed Activated
+                  {holdToSpeedValue}x Speed
                 </Text>
               </View>
             </Animated.View>
@@ -4174,5 +4052,37 @@ const AndroidVideoPlayer: React.FC = () => {
     </View>
   );
 };
+
+// New styles for the gesture indicator
+const localStyles = StyleSheet.create({
+  gestureIndicatorContainer: {
+   position: 'absolute',
+   top: '4%', // Adjust this for vertical position
+   alignSelf: 'center', // Adjust this for horizontal position
+   flexDirection: 'row',
+   alignItems: 'center',
+   backgroundColor: 'rgba(25, 25, 25)', // Dark pill background
+   borderRadius: 70,
+   paddingHorizontal: 15,
+   paddingVertical: 15,
+   zIndex: 2000, // Very high z-index to ensure visibility
+   minWidth: 120, // Adjusted min width since bar is removed
+  },
+  iconWrapper: {
+   borderRadius: 50, // Makes it a perfect circle (set to a high number)
+   width: 40,        // Define the diameter of the circle
+   height: 40,       // Define the diameter of the circle
+   justifyContent: 'center',
+   alignItems: 'center',
+   marginRight: 12,  // Margin to separate icon circle from percentage text
+  },
+  gestureText: {
+   color: '#FFFFFF',
+   fontSize: 18,
+   fontWeight: 'normal',
+   minWidth: 35,
+   textAlign: 'right',
+  },
+});
 
 export default AndroidVideoPlayer;
