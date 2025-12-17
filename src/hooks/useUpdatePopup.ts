@@ -121,13 +121,23 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
   // Handle startup update check results
   useEffect(() => {
 
-    const handleStartupUpdateCheck = (updateInfo: UpdateInfo) => {
+    const handleStartupUpdateCheck = async (updateInfo: UpdateInfo) => {
       console.log('UpdatePopup: Received startup update check result', updateInfo);
       setUpdateInfo(updateInfo);
       setHasCheckedOnStartup(true);
 
       if (updateInfo.isAvailable) {
-        setShowUpdatePopup(true);
+        // Check setting before showing
+        try {
+          const otaAlertsEnabled = await mmkvStorage.getItem('@ota_updates_alerts_enabled');
+          if (otaAlertsEnabled === 'false') {
+            console.log('OTA alerts disabled, suppressing popup');
+            return;
+          }
+          setShowUpdatePopup(true);
+        } catch {
+          setShowUpdatePopup(true);
+        }
       }
     };
 
@@ -155,6 +165,9 @@ export const useUpdatePopup = (): UseUpdatePopupReturn => {
       // Check if user hasn't dismissed this version
       (async () => {
         try {
+          const otaAlertsEnabled = await mmkvStorage.getItem('@ota_updates_alerts_enabled');
+          if (otaAlertsEnabled === 'false') return;
+
           const dismissedVersion = await mmkvStorage.getItem(UPDATE_POPUP_STORAGE_KEY);
           const currentVersion = updateInfo.manifest?.id;
 

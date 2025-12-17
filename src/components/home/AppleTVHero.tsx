@@ -611,7 +611,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     // Stop any playing trailer
     try {
       setTrailerPlaying(false);
-    } catch {}
+    } catch { }
 
     // Check if we should resume based on watch progress
     const shouldResume = watchProgress &&
@@ -744,13 +744,32 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       const timeSinceInteraction = Date.now() - lastInteractionRef.current;
       // Only auto-advance if user hasn't interacted recently (5 seconds) and no trailer playing
       if (timeSinceInteraction >= 5000 && (!globalTrailerPlaying || !trailerReady)) {
-        setCurrentIndex((prev) => (prev + 1) % items.length);
+        // Set next index preview for crossfade
+        const nextIdx = (currentIndex + 1) % items.length;
+        setNextIndex(nextIdx);
+
+        // Set drag direction for slide animation (left/next)
+        dragDirection.value = -1;
+
+        // Animate crossfade before changing index
+        dragProgress.value = withTiming(
+          1,
+          {
+            duration: 500,
+            easing: Easing.out(Easing.cubic),
+          },
+          (finished) => {
+            if (finished) {
+              runOnJS(setCurrentIndex)(nextIdx);
+            }
+          }
+        );
       } else {
         // Retry after remaining time
         startAutoPlay();
       }
     }, 25000); // Auto-advance every 25 seconds
-  }, [items.length, globalTrailerPlaying, trailerReady]);
+  }, [items.length, globalTrailerPlaying, trailerReady, currentIndex, dragDirection, dragProgress]);
 
   useEffect(() => {
     startAutoPlay();
@@ -852,7 +871,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         .onEnd((event) => {
           const velocity = event.velocityX;
           const translationX = event.translationX;
-          const swipeThreshold = width * 0.05; // Very small threshold - minimal swipe needed
+          const swipeThreshold = width * 0.16; // 16% threshold for swipe detection
 
           if (Math.abs(translationX) > swipeThreshold || Math.abs(velocity) > 300) {
             // Complete the swipe - animate to full opacity before navigation
@@ -1159,61 +1178,61 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             style={logoAnimatedStyle}
           >
             {currentItem.logo && !logoError[currentIndex] ? (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    if (currentItem) {
-                      navigation.navigate('Metadata', {
-                        id: currentItem.id,
-                        type: currentItem.type,
-                      });
-                    }
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (currentItem) {
+                    navigation.navigate('Metadata', {
+                      id: currentItem.id,
+                      type: currentItem.type,
+                    });
+                  }
+                }}
+              >
+                <View
+                  style={[
+                    styles.logoContainer,
+                    logoHeights[currentIndex] && logoHeights[currentIndex] < 80
+                      ? { marginBottom: 4 } // Minimal spacing for small logos
+                      : { marginBottom: 8 } // Small spacing for normal logos
+                  ]}
+                  onLayout={(event) => {
+                    const { height } = event.nativeEvent.layout;
+                    setLogoHeights((prev) => ({ ...prev, [currentIndex]: height }));
                   }}
                 >
-                  <View
-                    style={[
-                      styles.logoContainer,
-                      logoHeights[currentIndex] && logoHeights[currentIndex] < 80
-                        ? { marginBottom: 4 } // Minimal spacing for small logos
-                        : { marginBottom: 8 } // Small spacing for normal logos
-                    ]}
-                    onLayout={(event) => {
-                      const { height } = event.nativeEvent.layout;
-                      setLogoHeights((prev) => ({ ...prev, [currentIndex]: height }));
+                  <Image
+                    source={{ uri: currentItem.logo }}
+                    style={styles.logo}
+                    resizeMode="contain"
+                    onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
+                    onError={() => {
+                      setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
+                      logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
                     }}
-                  >
-                    <Image
-                      source={{ uri: currentItem.logo }}
-                      style={styles.logo}
-                      resizeMode="contain"
-                      onLoad={() => setLogoLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
-                      onError={() => {
-                        setLogoError((prev) => ({ ...prev, [currentIndex]: true }));
-                        logger.warn('[AppleTVHero] Logo load failed:', currentItem.logo);
-                      }}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    if (currentItem) {
-                      navigation.navigate('Metadata', {
-                        id: currentItem.id,
-                        type: currentItem.type,
-                      });
-                    }
-                  }}
-                >
-                  <View style={styles.titleContainer}>
-                    <Text style={styles.title} numberOfLines={2}>
-                      {currentItem.name}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            </Animated.View>
+                  />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (currentItem) {
+                    navigation.navigate('Metadata', {
+                      id: currentItem.id,
+                      type: currentItem.type,
+                    });
+                  }
+                }}
+              >
+                <View style={styles.titleContainer}>
+                  <Text style={styles.title} numberOfLines={2}>
+                    {currentItem.name}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
 
           {/* Metadata Badge - Always Visible */}
           <View style={styles.metadataContainer}>
@@ -1231,7 +1250,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             </View>
           </View>
 
-         {/* Action Buttons - Play and Save buttons */}
+          {/* Action Buttons - Play and Save buttons */}
           <View style={styles.buttonsContainer}>
             {/* Play Button */}
             <TouchableOpacity

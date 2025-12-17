@@ -639,14 +639,14 @@ export class TraktService {
   /**
    * Get the current completion threshold (user-configured or default)
    */
-  private get completionThreshold(): number {
+  public get completionThreshold(): number {
     return this._completionThreshold || this.DEFAULT_COMPLETION_THRESHOLD;
   }
 
   /**
    * Set the completion threshold
    */
-  private set completionThreshold(value: number) {
+  public set completionThreshold(value: number) {
     this._completionThreshold = value;
   }
 

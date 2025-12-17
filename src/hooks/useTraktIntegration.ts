@@ -443,21 +443,49 @@ export function useTraktIntegration() {
         // Process batch items with individual error handling
         const batchPromises = batch.map(async (item) => {
           try {
+            const season = item.episodeId ? parseInt(item.episodeId.split('S')[1]?.split('E')[0] || '0') : undefined;
+            const episode = item.episodeId ? parseInt(item.episodeId.split('E')[1] || '0') : undefined;
+
             // Build content data from stored progress
             const contentData: TraktContentData = {
               type: item.type as 'movie' | 'episode',
               imdbId: item.id,
               title: 'Unknown', // We don't store title in progress, this would need metadata lookup
               year: 0,
-              season: item.episodeId ? parseInt(item.episodeId.split('S')[1]?.split('E')[0] || '0') : undefined,
-              episode: item.episodeId ? parseInt(item.episodeId.split('E')[1] || '0') : undefined
+              season: season,
+              episode: episode
             };
 
             const progressPercent = (item.progress.currentTime / item.progress.duration) * 100;
+            const isCompleted = progressPercent >= traktService.completionThreshold;
 
-            const success = await traktService.syncProgressToTrakt(contentData, progressPercent, true);
+            let success = false;
+
+            if (isCompleted) {
+              // Item is completed - add to history with original watched date
+              const watchedAt = new Date(item.progress.lastUpdated);
+              logger.log(`[useTraktIntegration] Syncing completed item to history with date ${watchedAt.toISOString()}: ${item.type}:${item.id}`);
+
+              if (item.type === 'movie') {
+                success = await traktService.addToWatchedMovies(item.id, watchedAt);
+              } else if (item.type === 'series' || item.type === 'episode') { // Handle both type strings for safety
+                if (season !== undefined && episode !== undefined) {
+                  success = await traktService.addToWatchedEpisodes(item.id, season, episode, watchedAt);
+                }
+              }
+            } else {
+              // Item is in progress - sync as paused (scrobble)
+              success = await traktService.syncProgressToTrakt(contentData, progressPercent, true);
+            }
+
             if (success) {
-              await storageService.updateTraktSyncStatus(item.id, item.type, true, progressPercent, item.episodeId);
+              await storageService.updateTraktSyncStatus(
+                item.id,
+                item.type,
+                true,
+                isCompleted ? 100 : progressPercent,
+                item.episodeId
+              );
               return true;
             }
             return false;
