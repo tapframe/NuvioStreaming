@@ -83,6 +83,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedLogoIds, setFailedLogoIds] = useState<Set<string>>(new Set());
   const scrollViewRef = useRef<any>(null);
+  const [isScrollReady, setIsScrollReady] = useState(false);
   const [flippedMap, setFlippedMap] = useState<Record<string, boolean>>({});
   const toggleFlipById = useCallback((id: string) => {
     setFlippedMap((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -97,7 +98,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const paginationProgress = useSharedValue(0);
 
   // Parallel image prefetch: start fetching banners and logos as soon as data arrives
-  const itemsToPreload = useMemo(() => data.slice(0, 12), [data]);
+  const itemsToPreload = useMemo(() => data.slice(0, 3), [data]);
   useEffect(() => {
     if (!itemsToPreload.length) return;
     try {
@@ -127,11 +128,13 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     // Start at the first real item for looping
     scrollX.value = loopingEnabled ? interval : 0;
     setActiveIndex(0);
+    setIsScrollReady(false);
 
-    // Scroll to position 0 after a brief delay to ensure ScrollView is ready
+    // Scroll to position and mark ready after layout
     const timer = setTimeout(() => {
       scrollViewRef.current?.scrollTo({ x: loopingEnabled ? interval : 0, y: 0, animated: false });
-    }, 50);
+      setIsScrollReady(true);
+    }, 100);
 
     return () => clearTimeout(timer);
   }, []);
@@ -141,10 +144,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     if (data.length > 0) {
       scrollX.value = loopingEnabled ? interval : 0;
       setActiveIndex(0);
+      setIsScrollReady(false);
 
       const timer = setTimeout(() => {
         scrollViewRef.current?.scrollTo({ x: loopingEnabled ? interval : 0, y: 0, animated: false });
-      }, 100);
+        setIsScrollReady(true);
+      }, 150);
 
       return () => clearTimeout(timer);
     }
@@ -263,22 +268,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                     height: cardHeight,
                   }
                 ] as StyleProp<ViewStyle>}>
-                  <View style={styles.bannerContainer as ViewStyle}>
-                    <View style={styles.skeletonBannerFull as ViewStyle} />
-                    <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.25)"]}
-                      locations={[0.6, 1]}
-                      style={styles.bannerOverlay as ViewStyle}
-                    />
-                  </View>
-                  <View style={styles.info as ViewStyle}>
-                    <View style={[styles.skeletonLine, { width: '62%' }] as StyleProp<ViewStyle>} />
-                    <View style={[styles.skeletonLine, { width: '44%', marginTop: 6 }] as StyleProp<ViewStyle>} />
-                    <View style={styles.skeletonActions as ViewStyle}>
-                      <View style={[styles.skeletonPill, { width: 96 }] as StyleProp<ViewStyle>} />
-                      <View style={[styles.skeletonPill, { width: 80 }] as StyleProp<ViewStyle>} />
-                    </View>
-                  </View>
+                  <View style={styles.skeletonBannerFull as ViewStyle} />
                 </View>
               </View>
             ))}
@@ -383,6 +373,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           pagingEnabled={false}
           bounces={false}
           overScrollMode="never"
+          style={{ opacity: isScrollReady ? 1 : 0 }}
+          contentOffset={{ x: loopingEnabled ? interval : 0, y: 0 }}
           onMomentumScrollEnd={(e) => {
             if (!loopingEnabled) return;
             // Determine current page index in cloned space
@@ -400,6 +392,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           }}
         >
           {(loopingEnabled ? loopData : data).map((item, index) => (
+            /* TEST 5: ORIGINAL CARD WITHOUT LINEAR GRADIENT */
             <CarouselCard
               key={`${item.id}-${index}-${loopingEnabled ? 'loop' : 'base'}`}
               item={item}
@@ -447,6 +440,158 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     </View>
   );
 };
+
+// MINIMAL ANIMATED CARD FOR PERFORMANCE TESTING
+interface AnimatedCardWrapperProps {
+  item: StreamingContent;
+  index: number;
+  scrollX: SharedValue<number>;
+  interval: number;
+  cardWidth: number;
+  cardHeight: number;
+  colors: any;
+  isTablet: boolean;
+}
+
+const AnimatedCardWrapper: React.FC<AnimatedCardWrapperProps> = memo(({
+  item, index, scrollX, interval, cardWidth, cardHeight, colors, isTablet
+}) => {
+  const cardAnimatedStyle = useAnimatedStyle(() => {
+    const translateX = scrollX.value;
+    const cardOffset = index * interval;
+    const distance = Math.abs(translateX - cardOffset);
+
+    if (distance > interval * 1.5) {
+      return {
+        transform: [{ scale: isTablet ? 0.95 : 0.9 }],
+        opacity: isTablet ? 0.85 : 0.7
+      };
+    }
+
+    const maxDistance = interval;
+    const scale = 1 - (distance / maxDistance) * 0.1;
+    const clampedScale = Math.max(isTablet ? 0.95 : 0.9, Math.min(1, scale));
+    const opacity = 1 - (distance / maxDistance) * 0.3;
+    const clampedOpacity = Math.max(isTablet ? 0.85 : 0.7, Math.min(1, opacity));
+
+    return {
+      transform: [{ scale: clampedScale }],
+      opacity: clampedOpacity,
+    };
+  });
+
+  const logoOpacity = useSharedValue(0);
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const isFlipped = useSharedValue(0);
+
+  useEffect(() => {
+    if (logoLoaded) {
+      logoOpacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.ease) });
+    }
+  }, [logoLoaded]);
+
+  const logoAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
+  }));
+
+  // TEST 4: FLIP STYLES
+  const frontFlipStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(isFlipped.value, [0, 1], [0, 180]);
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotate}deg` },
+      ],
+    } as any;
+  });
+
+  const backFlipStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(isFlipped.value, [0, 1], [-180, 0]);
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotate}deg` },
+      ],
+    } as any;
+  });
+
+  // TEST 4: OVERLAY ANIMATED STYLE (genres opacity on scroll)
+  const overlayAnimatedStyle = useAnimatedStyle(() => {
+    const translateX = scrollX.value;
+    const cardOffset = index * interval;
+    const distance = Math.abs(translateX - cardOffset);
+
+    if (distance > interval * 1.2) {
+      return { opacity: 0 };
+    }
+
+    const maxDistance = interval * 0.5;
+    const progress = Math.min(distance / maxDistance, 1);
+    const opacity = 1 - progress;
+    const clampedOpacity = Math.max(0, Math.min(1, opacity));
+
+    return {
+      opacity: clampedOpacity,
+    };
+  });
+
+  return (
+    <View style={{ width: cardWidth + 16 }}>
+      <Animated.View style={[
+        {
+          width: cardWidth,
+          height: cardHeight,
+          backgroundColor: colors.elevation1,
+          borderRadius: 16,
+          overflow: 'hidden',
+        },
+        cardAnimatedStyle
+      ]}>
+        <FastImage
+          source={{
+            uri: item.banner || item.poster,
+            priority: FastImage.priority.normal,
+            cache: FastImage.cacheControl.immutable
+          }}
+          style={{ width: '100%', height: '100%', position: 'absolute' }}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
+          locations={[0.4, 0.7, 1]}
+          style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+        />
+        {item.logo && (
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 40, alignItems: 'center' }}>
+            <Animated.View style={logoAnimatedStyle}>
+              <FastImage
+                source={{
+                  uri: item.logo,
+                  priority: FastImage.priority.high,
+                  cache: FastImage.cacheControl.immutable
+                }}
+                style={{ width: Math.round(cardWidth * 0.72), height: 64 }}
+                resizeMode={FastImage.resizeMode.contain}
+                onLoad={() => setLogoLoaded(true)}
+              />
+            </Animated.View>
+          </View>
+        )}
+        {/* TEST 4: GENRES with overlayAnimatedStyle */}
+        {item.genres && (
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center' }}>
+            <Animated.Text
+              style={[{ color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center' }, overlayAnimatedStyle]}
+              numberOfLines={1}
+            >
+              {item.genres.slice(0, 3).join(' • ')}
+            </Animated.Text>
+          </View>
+        )}
+      </Animated.View>
+    </View>
+  );
+});
 
 interface CarouselCardProps {
   item: StreamingContent;
@@ -669,11 +814,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     onLoad={() => setBannerLoaded(true)}
                   />
                 </Animated.View>
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.72)"]}
-                  locations={[0.3, 1]}
-                  style={styles.bannerGradient as ViewStyle}
-                />
+                {/* Overlay removed for performance - readability via text shadows */}
               </View>
               <View style={styles.backContent as ViewStyle}>
                 {item.logo && !logoFailed ? (
@@ -733,11 +874,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                         onLoad={() => setBannerLoaded(true)}
                       />
                     </Animated.View>
-                    <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
-                      locations={[0.4, 0.7, 1]}
-                      style={styles.bannerGradient as ViewStyle}
-                    />
+                    {/* Overlay removed for performance - readability via text shadows */}
                   </View>
                   {item.logo && !logoFailed ? (
                     <View style={styles.logoOverlay as ViewStyle} pointerEvents="none">
@@ -787,11 +924,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     style={styles.banner as any}
                     resizeMode={FastImage.resizeMode.cover}
                   />
-                  <LinearGradient
-                    colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.85)"]}
-                    locations={[0.3, 1]}
-                    style={styles.bannerGradient as ViewStyle}
-                  />
+                  {/* Overlay removed for performance - readability via text shadows */}
                 </View>
                 <View style={styles.backContent as ViewStyle}>
                   {item.logo && !logoFailed ? (
