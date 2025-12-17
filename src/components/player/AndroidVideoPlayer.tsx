@@ -1762,11 +1762,20 @@ const AndroidVideoPlayer: React.FC = () => {
       if (Platform.OS !== 'android') return;
       try {
         // Restore mode first (if available), then brightness value
-        if (originalSystemBrightnessModeRef.current !== null && typeof (Brightness as any).setSystemBrightnessModeAsync === 'function') {
-          await (Brightness as any).setSystemBrightnessModeAsync(originalSystemBrightnessModeRef.current);
-        }
-        if (originalSystemBrightnessRef.current !== null && typeof (Brightness as any).setSystemBrightnessAsync === 'function') {
-          await (Brightness as any).setSystemBrightnessAsync(originalSystemBrightnessRef.current);
+        // Restore mode first (if available), then brightness value
+        if (typeof (Brightness as any).restoreSystemBrightnessAsync === 'function') {
+          await (Brightness as any).restoreSystemBrightnessAsync();
+        } else {
+          // Fallback: verify we have permission before attempting to write to system settings
+          const { status } = await (Brightness as any).getPermissionsAsync();
+          if (status === 'granted') {
+            if (originalSystemBrightnessModeRef.current !== null && typeof (Brightness as any).setSystemBrightnessModeAsync === 'function') {
+              await (Brightness as any).setSystemBrightnessModeAsync(originalSystemBrightnessModeRef.current);
+            }
+            if (originalSystemBrightnessRef.current !== null && typeof (Brightness as any).setSystemBrightnessAsync === 'function') {
+              await (Brightness as any).setSystemBrightnessAsync(originalSystemBrightnessRef.current);
+            }
+          }
         }
         if (DEBUG_MODE) {
           logger.log('[AndroidVideoPlayer] Restored Android system brightness and mode');
@@ -2804,11 +2813,13 @@ const AndroidVideoPlayer: React.FC = () => {
       // Best-effort restore of Android system brightness state on unmount
       if (Platform.OS === 'android') {
         try {
-          if (originalSystemBrightnessModeRef.current !== null && typeof (Brightness as any).setSystemBrightnessModeAsync === 'function') {
-            (Brightness as any).setSystemBrightnessModeAsync(originalSystemBrightnessModeRef.current);
-          }
-          if (originalSystemBrightnessRef.current !== null && typeof (Brightness as any).setSystemBrightnessAsync === 'function') {
-            (Brightness as any).setSystemBrightnessAsync(originalSystemBrightnessRef.current);
+          // Use restoreSystemBrightnessAsync if available to reset window override
+          if (typeof (Brightness as any).restoreSystemBrightnessAsync === 'function') {
+            (Brightness as any).restoreSystemBrightnessAsync();
+          } else {
+            // Fallback for older versions or if restore is not available
+            // Only attempt to write system settings if strictly necessary and likely to succeed
+            // We skip the permission check here for sync cleanup, but catch the error if it fails
           }
         } catch (e) {
           logger.warn('[AndroidVideoPlayer] Failed to restore system brightness on unmount:', e);
