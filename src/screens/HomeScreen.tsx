@@ -373,7 +373,22 @@ const HomeScreen = () => {
 
   // Listen for catalog changes (addon additions/removals) and reload catalogs
   useEffect(() => {
-    loadCatalogsProgressively();
+    // Skip initial mount (handled by the loadCatalogsProgressively effect)
+    if (lastUpdate === 0) return;
+
+    // Force reset the fetch guard to ensure refresh happens
+    isFetchingRef.current = false;
+
+    // Invalidate catalog settings cache so fresh settings are loaded
+    cachedCatalogSettings = null;
+    catalogSettingsCacheTimestamp = 0;
+
+    // Small delay to ensure previous fetch is fully stopped
+    const timer = setTimeout(() => {
+      loadCatalogsProgressively();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [lastUpdate, loadCatalogsProgressively]);
 
   // One-time hint after skipping login in onboarding
