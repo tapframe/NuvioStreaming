@@ -293,10 +293,43 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     const mergeBatchIntoState = async (batch: ContinueWatchingItem[]) => {
       if (!batch || batch.length === 0) return;
 
+      // 1. Filter items first (async checks) - do this BEFORE any state updates
+      const validItems: ContinueWatchingItem[] = [];
+      for (const it of batch) {
+        const key = `${it.type}:${it.id}`;
+
+        // Skip recently removed items
+        if (recentlyRemovedRef.current.has(key)) {
+          continue;
+        }
+
+        // Skip persistently removed items
+        const isRemoved = await storageService.isContinueWatchingRemoved(it.id, it.type);
+        if (isRemoved) {
+          continue;
+        }
+
+        validItems.push(it);
+      }
+
+      if (validItems.length === 0) return;
+
+      // 2. Single state update for the entire batch
       setContinueWatchingItems((prev) => {
         const map = new Map<string, ContinueWatchingItem>();
+        // Add existing items
         for (const it of prev) {
           map.set(`${it.type}:${it.id}`, it);
+        }
+
+        // Merge new valid items
+        for (const it of validItems) {
+          const key = `${it.type}:${it.id}`;
+          const existing = map.get(key);
+          // Only update if newer or doesn't exist
+          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
+            map.set(key, it);
+          }
         }
 
         const merged = Array.from(map.values());
@@ -304,40 +337,6 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
         return merged;
       });
-
-      // Process batch items asynchronously to check removal status
-      for (const it of batch) {
-        const key = `${it.type}:${it.id}`;
-
-        // Skip recently removed items to prevent immediate re-addition
-        if (recentlyRemovedRef.current.has(key)) {
-          continue;
-        }
-
-        // Skip items that have been persistently marked as removed
-        const isRemoved = await storageService.isContinueWatchingRemoved(it.id, it.type);
-        if (isRemoved) {
-          continue;
-        }
-
-        // Add the item to state
-        setContinueWatchingItems((prev) => {
-          const map = new Map<string, ContinueWatchingItem>();
-          for (const existing of prev) {
-            map.set(`${existing.type}:${existing.id}`, existing);
-          }
-
-          const existing = map.get(key);
-          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
-            map.set(key, it);
-            const merged = Array.from(map.values());
-            merged.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
-            return merged;
-          }
-
-          return prev;
-        });
-      }
     };
 
     try {
