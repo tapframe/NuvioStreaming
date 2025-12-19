@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, Platform, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Animated, { 
-  FadeIn, 
+import Animated, {
+  FadeIn,
   FadeOut,
   SlideInRight,
   SlideOutRight,
@@ -23,43 +23,31 @@ const MENU_WIDTH = Math.min(width * 0.85, 400);
 
 const QualityBadge = ({ quality }: { quality: string | null }) => {
   if (!quality) return null;
-  
+
   const qualityNum = parseInt(quality);
-  let color = '#8B5CF6'; // Default purple
+  let color = '#8B5CF6';
   let label = `${quality}p`;
-  
+
   if (qualityNum >= 2160) {
-    color = '#F59E0B'; // Gold for 4K
+    color = '#F59E0B';
     label = '4K';
   } else if (qualityNum >= 1080) {
-    color = '#EF4444'; // Red for 1080p
-    label = 'FHD';
+    color = '#3B82F6';
+    label = '1080p';
   } else if (qualityNum >= 720) {
-    color = '#10B981'; // Green for 720p
-    label = 'HD';
+    color = '#10B981';
+    label = '720p';
   }
-  
+
   return (
-    <View 
-      style={{
-        backgroundColor: `${color}20`,
-        borderColor: `${color}60`,
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}
-    >
-      <Text style={{
-        color: color,
-        fontSize: 12,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-      }}>
-        {label}
-      </Text>
+    <View style={{
+      backgroundColor: color,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      marginLeft: 8,
+    }}>
+      <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{label}</Text>
     </View>
   );
 };
@@ -97,27 +85,19 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   };
 
   return (
-    <>
+    <View style={StyleSheet.absoluteFill} zIndex={10000}>
       {/* Backdrop */}
-      <Animated.View 
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(150)}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 9998,
-        }}
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onPress={handleClose}
       >
-        <TouchableOpacity 
-          style={{ flex: 1 }}
-          onPress={handleClose}
-          activeOpacity={1}
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}
         />
-      </Animated.View>
+      </TouchableOpacity>
 
       {/* Side Menu */}
       <Animated.View
@@ -129,72 +109,40 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
           right: 0,
           bottom: 0,
           width: MENU_WIDTH,
-          backgroundColor: '#1A1A1A',
-          zIndex: 9999,
-          elevation: 20,
-          shadowColor: '#000',
-          shadowOffset: { width: -5, height: 0 },
-          shadowOpacity: 0.3,
-          shadowRadius: 10,
-          borderTopLeftRadius: 20,
-          borderBottomLeftRadius: 20,
+          backgroundColor: '#0f0f0f',
+          borderLeftWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
         }}
       >
         {/* Header */}
         <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          paddingTop: Platform.OS === 'ios' ? 60 : 15,
           paddingHorizontal: 20,
-          paddingTop: 60,
           paddingBottom: 20,
-          borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          <Text style={{
-            color: '#FFFFFF',
-            fontSize: 22,
-            fontWeight: '700',
-          }}>
+          <Text style={{ color: 'white', fontSize: 20, fontWeight: '700' }}>
             Change Source
           </Text>
-          <TouchableOpacity 
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={handleClose}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="close" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        <ScrollView
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 15, paddingBottom: 40 }}
         >
           {isChangingSource && (
             <View style={{
               backgroundColor: 'rgba(34, 197, 94, 0.1)',
-              borderRadius: 16,
-              padding: 16,
-              marginBottom: 20,
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 15,
               flexDirection: 'row',
               alignItems: 'center',
             }}>
               <ActivityIndicator size="small" color="#22C55E" />
-              <Text style={{
-                color: '#22C55E',
-                fontSize: 14,
-                fontWeight: '600',
-                marginLeft: 12,
-              }}>
+              <Text style={{ color: '#22C55E', fontSize: 13, fontWeight: '600', marginLeft: 10 }}>
                 Switching source...
               </Text>
             </View>
@@ -202,33 +150,34 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
 
           {sortedProviders.length > 0 ? (
             sortedProviders.map(([providerId, providerData]) => (
-              <View key={providerId} style={{ marginBottom: 30 }}>
+              <View key={providerId} style={{ marginBottom: 20 }}>
                 <Text style={{
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: 14,
-                  fontWeight: '600',
-                  marginBottom: 15,
+                  color: 'rgba(255, 255, 255, 0.4)',
+                  fontSize: 12,
+                  fontWeight: '700',
+                  marginBottom: 10,
+                  marginLeft: 5,
                   textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  letterSpacing: 1,
                 }}>
                   {providerData.addonName} ({providerData.streams.length})
                 </Text>
-                
+
                 <View style={{ gap: 8 }}>
                   {providerData.streams.map((stream, index) => {
                     const isSelected = isStreamSelected(stream);
                     const quality = getQualityFromTitle(stream.title) || stream.quality;
-                    
+
                     return (
                       <TouchableOpacity
                         key={`${providerId}-${index}`}
                         style={{
-                          backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 16,
                           padding: 16,
+                          borderRadius: 12,
+                          backgroundColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)',
                           borderWidth: 1,
-                          borderColor: isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                          opacity: (isChangingSource && !isSelected) ? 0.6 : 1,
+                          borderColor: isSelected ? 'white' : 'rgba(255,255,255,0.05)',
+                          opacity: (isChangingSource && !isSelected) ? 0.5 : 1,
                         }}
                         onPress={() => handleStreamSelect(stream)}
                         activeOpacity={0.7}
@@ -236,63 +185,46 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                           <View style={{ flex: 1 }}>
-                            <View style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              marginBottom: 8,
-                              gap: 8,
-                            }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                               <Text style={{
-                                color: '#FFFFFF',
-                                fontSize: 15,
-                                fontWeight: '500',
+                                color: isSelected ? 'black' : 'white',
+                                fontWeight: isSelected ? '700' : '500',
+                                fontSize: 14,
                                 flex: 1,
-                              }}>
+                              }} numberOfLines={1}>
                                 {stream.title || stream.name || `Stream ${index + 1}`}
                               </Text>
-                              {quality && <QualityBadge quality={quality} />}
+                              <QualityBadge quality={quality} />
                             </View>
-                            
+
                             {(stream.size || stream.lang) && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                 {stream.size && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <MaterialIcons name="storage" size={14} color="rgba(107, 114, 128, 0.8)" />
-                                    <Text style={{
-                                      color: 'rgba(107, 114, 128, 0.8)',
-                                      fontSize: 12,
-                                      fontWeight: '600',
-                                      marginLeft: 4,
-                                    }}>
-                                      {(stream.size / (1024 * 1024 * 1024)).toFixed(1)} GB
-                                    </Text>
-                                  </View>
+                                  <Text style={{
+                                    color: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)',
+                                    fontSize: 11,
+                                  }}>
+                                    {(stream.size / (1024 * 1024 * 1024)).toFixed(1)} GB
+                                  </Text>
                                 )}
                                 {stream.lang && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <MaterialIcons name="language" size={14} color="rgba(59, 130, 246, 0.8)" />
-                                    <Text style={{
-                                      color: 'rgba(59, 130, 246, 0.8)',
-                                      fontSize: 12,
-                                      fontWeight: '600',
-                                      marginLeft: 4,
-                                    }}>
-                                      {stream.lang.toUpperCase()}
-                                    </Text>
-                                  </View>
+                                  <Text style={{
+                                    color: isSelected ? 'rgba(59, 130, 246, 1)' : 'rgba(59, 130, 246, 0.8)',
+                                    fontSize: 11,
+                                    fontWeight: '600',
+                                  }}>
+                                    {stream.lang.toUpperCase()}
+                                  </Text>
                                 )}
                               </View>
                             )}
                           </View>
-                          
-                          <View style={{
-                            marginLeft: 12,
-                            alignItems: 'center',
-                          }}>
+
+                          <View style={{ marginLeft: 12 }}>
                             {isSelected ? (
-                              <MaterialIcons name="check" size={20} color="#3B82F6" />
+                              <MaterialIcons name="check" size={20} color="black" />
                             ) : (
-                              <MaterialIcons name="play-arrow" size={20} color="rgba(255,255,255,0.4)" />
+                              <MaterialIcons name="play-arrow" size={20} color="rgba(255,255,255,0.3)" />
                             )}
                           </View>
                         </View>
@@ -303,33 +235,15 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
               </View>
             ))
           ) : (
-            <View style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: 16,
-              padding: 20,
-              alignItems: 'center',
-            }}>
-              <MaterialIcons name="error-outline" size={48} color="rgba(255,255,255,0.3)" />
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontSize: 16,
-                marginTop: 16,
-                textAlign: 'center',
-              }}>
-                No sources available
-              </Text>
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.4)',
-                fontSize: 14,
-                marginTop: 8,
-                textAlign: 'center',
-              }}>
-                Try searching for different content
+            <View style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
+              <MaterialIcons name="cloud-off" size={48} color="white" />
+              <Text style={{ color: 'white', marginTop: 16, textAlign: 'center', fontWeight: '600' }}>
+                No sources found
               </Text>
             </View>
           )}
         </ScrollView>
       </Animated.View>
-    </>
+    </View>
   );
 };
