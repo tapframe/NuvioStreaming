@@ -48,8 +48,8 @@ RCT_EXTERN_METHOD(showAirPlayPicker:(nonnull NSNumber *)node)
 
 @interface RCT_EXTERN_MODULE(KSPlayerModule, RCTEventEmitter)
 
-RCT_EXTERN_METHOD(getTracks:(nonnull NSNumber *)nodeTag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(getAirPlayState:(nonnull NSNumber *)nodeTag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(showAirPlayPicker:(nonnull NSNumber *)nodeTag)
+RCT_EXTERN_METHOD(getTracks:(NSNumber *)nodeTag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(getAirPlayState:(NSNumber *)nodeTag resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(showAirPlayPicker:(NSNumber *)nodeTag)
 
 @end

@@ -385,47 +385,49 @@ const LibraryScreen = () => {
     return folders.filter(folder => folder.itemCount > 0);
   }, [traktAuthenticated, watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
 
-  const renderItem = ({ item }: { item: LibraryItem }) => (
-    <TouchableOpacity
-      style={[styles.itemContainer, { width: itemWidth }]}
-      onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
-      onLongPress={() => {
-        setSelectedItem(item);
-        setMenuVisible(true);
-      }}
-      activeOpacity={0.7}
-    >
-      <View>
-        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
-          <FastImage
-            source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-            style={styles.poster}
-            resizeMode={FastImage.resizeMode.cover}
-          />
-          {item.watched && (
-            <View style={styles.watchedIndicator}>
-              <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
-            </View>
-          )}
-          {item.progress !== undefined && item.progress < 1 && (
-            <View style={styles.progressBarContainer}>
-              <View
-                style={[
-                  styles.progressBar,
-                  { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
-                ]}
-              />
-            </View>
-          )}
-        </View>
-        {settings.showPosterTitles && (
+  const renderItem = ({ item }: { item: LibraryItem }) => {
+    const aspectRatio = item.posterShape === 'landscape' ? 16 / 9 : (item.posterShape === 'square' ? 1 : 2 / 3);
+
+    return (
+      <TouchableOpacity
+        style={[styles.itemContainer, { width: itemWidth }]}
+        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+        onLongPress={() => {
+          setSelectedItem(item);
+          setMenuVisible(true);
+        }}
+        activeOpacity={0.7}
+      >
+        <View>
+          <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black, aspectRatio }]}>
+            <FastImage
+              source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+              style={styles.poster}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+            {item.watched && (
+              <View style={styles.watchedIndicator}>
+                <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
+              </View>
+            )}
+            {item.progress !== undefined && item.progress < 1 && (
+              <View style={styles.progressBarContainer}>
+                <View
+                  style={[
+                    styles.progressBar,
+                    { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
+                  ]}
+                />
+              </View>
+            )}
+          </View>
           <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
             {item.name}
           </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderTraktCollectionFolder = ({ folder }: { folder: TraktFolder }) => (
     <TouchableOpacity

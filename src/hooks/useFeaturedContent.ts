@@ -83,215 +83,225 @@ export function useFeaturedContent() {
     const signal = abortControllerRef.current.signal;
 
     try {
-      let formattedContent: StreamingContent[] = [];
+      // Load list of catalogs to fetch
+      const configs = await catalogService.resolveHomeCatalogsToFetch(selectedCatalogs);
 
-      {
-        // Load from installed catalogs with optimization
-        const tCats = Date.now();
-        // Pass selected catalogs to service for optimized fetching
-        const catalogs = await catalogService.getHomeCatalogs(selectedCatalogs);
+      if (signal.aborted) return;
 
-        if (signal.aborted) return;
+      // Prepare for incremental loading
+      const seenIds = new Set<string>();
+      let accumulatedContent: StreamingContent[] = [];
+      const TARGET_COUNT = 10;
+      let hasSetInitialContent = false;
 
-        // If no catalogs are installed, stop loading and return.
-        if (catalogs.length === 0) {
-          formattedContent = [];
-        } else {
-          // Use catalogs directly (filtering is now done in service)
-          const filteredCatalogs = catalogs;
+      // Helper function to enrich items
+      const enrichItems = async (items: any[]): Promise<StreamingContent[]> => {
+        const preferredLanguage = settings.tmdbLanguagePreference || 'en';
 
-          // Flatten all catalog items into a single array, filter out items without posters
-          const tFlat = Date.now();
-          const allItems = filteredCatalogs.flatMap(catalog => catalog.items)
-            .filter(item => item.poster)
-            .filter((item, index, self) =>
-              // Remove duplicates based on ID
-              index === self.findIndex(t => t.id === item.id)
-            );
-
-          // Sort by popular, newest, etc. (possibly enhanced later) and take first 10
-          const topItems = allItems.sort(() => Math.random() - 0.5).slice(0, 10);
-
-          // Optionally enrich with logos (TMDB only) for tmdb/imdb sourced IDs
-          const preferredLanguage = settings.tmdbLanguagePreference || 'en';
-
-          const enrichLogo = async (item: any): Promise<StreamingContent> => {
-            const base: StreamingContent = {
-              id: item.id,
-              type: item.type,
-              name: item.name,
-              poster: item.poster,
-              banner: (item as any).banner,
-              logo: (item as any).logo,
-              description: (item as any).description,
-              year: (item as any).year,
-              genres: (item as any).genres,
-              inLibrary: Boolean((item as any).inLibrary),
-            };
-
-            try {
-              if (!settings.enrichMetadataWithTMDB) {
-                // When enrichment is OFF, keep addon logo or undefined
-                return { ...base, logo: base.logo || undefined };
-              }
-
-              // When enrichment is ON, fetch from TMDB with language preference
-              const rawId = String(item.id);
-              const isTmdb = rawId.startsWith('tmdb:');
-              const isImdb = rawId.startsWith('tt');
-              let tmdbId: string | null = null;
-              let imdbId: string | null = null;
-
-              if (isTmdb) tmdbId = rawId.split(':')[1];
-              if (isImdb) imdbId = rawId.split(':')[0];
-              if (!tmdbId && imdbId) {
-                const found = await tmdbService.findTMDBIdByIMDB(imdbId);
-                tmdbId = found ? String(found) : null;
-              }
-
-              if (tmdbId) {
-                const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
-                return { ...base, logo: logoUrl || undefined }; // TMDB logo or undefined (no addon fallback)
-              }
-
-              return { ...base, logo: undefined }; // No TMDB ID means no logo
-            } catch (error) {
-              return { ...base, logo: undefined }; // Error means no logo
-            }
+        const enrichLogo = async (item: any): Promise<StreamingContent> => {
+          const base: StreamingContent = {
+            id: item.id,
+            type: item.type,
+            name: item.name,
+            poster: item.poster,
+            banner: (item as any).banner,
+            logo: (item as any).logo,
+            description: (item as any).description,
+            year: (item as any).year,
+            genres: (item as any).genres,
+            inLibrary: Boolean((item as any).inLibrary),
           };
 
-          // Only enrich with logos if enrichment is enabled
-          if (settings.enrichMetadataWithTMDB) {
-            formattedContent = await Promise.all(topItems.map(enrichLogo));
-            try {
-              const details = formattedContent.slice(0, 20).map((c) => ({
-                id: c.id,
-                name: c.name,
-                hasLogo: Boolean(c.logo),
-                logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
-                logo: c.logo || undefined,
-              }));
-            } catch { }
-          } else {
-            // When enrichment is disabled, prefer addon-provided logos; if missing, fetch basic meta to pull logo (like HeroSection)
-            const baseItems = topItems.map((item: any) => {
-              const base: StreamingContent = {
-                id: item.id,
-                type: item.type,
-                name: item.name,
-                poster: item.poster,
-                banner: (item as any).banner,
-                logo: (item as any).logo || undefined,
-                description: (item as any).description,
-                year: (item as any).year,
-                genres: (item as any).genres,
-                inLibrary: Boolean((item as any).inLibrary),
-              };
-              return base;
-            });
+          try {
+            if (!settings.enrichMetadataWithTMDB) {
+              return { ...base, logo: base.logo || undefined };
+            }
 
-            // Attempt to fill missing logos from addon meta details for a limited subset
-            const candidates = baseItems.filter(i => !i.logo).slice(0, 10);
+            const rawId = String(item.id);
+            const isTmdb = rawId.startsWith('tmdb:');
+            const isImdb = rawId.startsWith('tt');
+            let tmdbId: string | null = null;
+            let imdbId: string | null = null;
 
+            if (isTmdb) tmdbId = rawId.split(':')[1];
+            if (isImdb) imdbId = rawId.split(':')[0];
+            if (!tmdbId && imdbId) {
+              const found = await tmdbService.findTMDBIdByIMDB(imdbId);
+              tmdbId = found ? String(found) : null;
+            }
+
+            if (tmdbId) {
+              const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
+              return { ...base, logo: logoUrl || undefined };
+            }
+
+            return { ...base, logo: undefined };
+          } catch (error) {
+            return { ...base, logo: undefined };
+          }
+        };
+
+        if (settings.enrichMetadataWithTMDB) {
+          return Promise.all(items.map(enrichLogo));
+        } else {
+          // Fallback logic for when enrichment is disabled
+          const baseItems = items.map((item: any) => ({
+            id: item.id,
+            type: item.type,
+            name: item.name,
+            poster: item.poster,
+            banner: (item as any).banner,
+            logo: (item as any).logo || undefined,
+            description: (item as any).description,
+            year: (item as any).year,
+            genres: (item as any).genres,
+            inLibrary: Boolean((item as any).inLibrary),
+          }));
+
+          // Try to get logos for items missing them
+          const missingLogoCandidates = baseItems.filter((i: any) => !i.logo);
+          if (missingLogoCandidates.length > 0) {
             try {
-              const filled = await Promise.allSettled(candidates.map(async (item) => {
+              const filled = await Promise.allSettled(missingLogoCandidates.map(async (item: any) => {
                 try {
                   const meta = await catalogService.getBasicContentDetails(item.type, item.id);
-                  if (meta?.logo) {
-                    return { id: item.id, logo: meta.logo } as { id: string; logo: string };
-                  }
-                } catch (e) {
-                }
-                return { id: item.id, logo: undefined as any };
+                  if (meta?.logo) return { id: item.id, logo: meta.logo };
+                } catch { }
+                return { id: item.id, logo: undefined };
               }));
 
-              const idToLogo = new Map<string, string>();
-              filled.forEach(res => {
-                if (res.status === 'fulfilled' && res.value && res.value.logo) {
+              const idToLogo = new Map();
+              filled.forEach((res: any) => {
+                if (res.status === 'fulfilled' && res.value?.logo) {
                   idToLogo.set(res.value.id, res.value.logo);
                 }
               });
 
-              formattedContent = baseItems.map(i => (
-                idToLogo.has(i.id) ? { ...i, logo: idToLogo.get(i.id)! } : i
-              ));
+              return baseItems.map((i: any) => idToLogo.has(i.id) ? { ...i, logo: idToLogo.get(i.id) } : i);
             } catch {
-              formattedContent = baseItems;
+              return baseItems;
             }
-
-            try {
-              const details = formattedContent.slice(0, 20).map((c) => ({
-                id: c.id,
-                name: c.name,
-                hasLogo: Boolean(c.logo),
-                logoSource: c.logo ? (isTmdbUrl(String(c.logo)) ? 'tmdb' : 'addon') : 'none',
-                logo: c.logo || undefined,
-              }));
-            } catch { }
           }
+          return baseItems;
         }
+      };
+
+      // Process each catalog independently
+      const processCatalog = async (config: { addon: any, catalog: any }) => {
+        if (signal.aborted) return;
+        // Optimization: Stop fetching if we have enough items
+        // Note: We check length here but parallel requests might race. This is acceptable.
+        if (accumulatedContent.length >= TARGET_COUNT) return;
+
+        try {
+          const cat = await catalogService.fetchHomeCatalog(config.addon, config.catalog);
+          if (signal.aborted) return;
+          if (!cat || !cat.items || cat.items.length === 0) return;
+
+          // Deduplicate
+          const newItems = cat.items.filter(item => {
+            if (!item.poster) return false;
+            if (seenIds.has(item.id)) return false;
+            return true;
+          });
+
+          if (newItems.length === 0) return;
+
+          // Take only what we need (or a small batch)
+          const needed = TARGET_COUNT - accumulatedContent.length;
+          // Shuffle this batch locally just to mix it up a bit if the catalog returns strict order
+          const shuffledBatch = newItems.sort(() => Math.random() - 0.5).slice(0, needed);
+
+          if (shuffledBatch.length === 0) return;
+
+          shuffledBatch.forEach(item => seenIds.add(item.id));
+
+          // Enrich this batch
+          const enrichedBatch = await enrichItems(shuffledBatch);
+          if (signal.aborted) return;
+
+          // Update accumulated content
+          accumulatedContent = [...accumulatedContent, ...enrichedBatch];
+
+          // Update State
+          // Always update allFeaturedContent to show progress
+          setAllFeaturedContent([...accumulatedContent]);
+
+          // If this is the first batch, set initial state and UNBLOCK LOADING
+          if (!hasSetInitialContent && accumulatedContent.length > 0) {
+            hasSetInitialContent = true;
+            setFeaturedContent(accumulatedContent[0]);
+            persistentStore.featuredContent = accumulatedContent[0];
+            persistentStore.allFeaturedContent = accumulatedContent;
+            currentIndexRef.current = 0;
+            setLoading(false); // <--- Key improvement: Display content immediately
+          } else {
+            // Just update store for subsequent batches
+            persistentStore.allFeaturedContent = accumulatedContent;
+          }
+
+        } catch (e) {
+          logger.error('Error processing catalog in parallel', e);
+        }
+      };
+
+      // If no catalogs to fetch, fallback immediately
+      if (configs.length === 0) {
+        // Fallback logic
+      } else {
+        // Run fetches in parallel
+        await Promise.all(configs.map(processCatalog));
       }
 
       if (signal.aborted) return;
 
-      // Safety guard: if nothing came back within a reasonable time, stop loading
-      if (!formattedContent || formattedContent.length === 0) {
+      // Handle case where we finished all fetches but found NOTHING
+      if (accumulatedContent.length === 0) {
         // Fall back to any cached featured item so UI can render something
         const cachedJson = await mmkvStorage.getItem(STORAGE_KEY).catch(() => null);
         if (cachedJson) {
           try {
             const parsed = JSON.parse(cachedJson);
             if (parsed?.featuredContent) {
-              formattedContent = Array.isArray(parsed.allFeaturedContent) && parsed.allFeaturedContent.length > 0
+              const fallback = Array.isArray(parsed.allFeaturedContent) && parsed.allFeaturedContent.length > 0
                 ? parsed.allFeaturedContent
                 : [parsed.featuredContent];
+
+              setAllFeaturedContent(fallback);
+              setFeaturedContent(fallback[0]);
+              setLoading(false);
+              return; // Done
             }
           } catch { }
         }
-      }
 
-      // Update persistent store with the new data (no lastFetchTime when cache disabled)
-      persistentStore.allFeaturedContent = formattedContent;
-      if (!DISABLE_CACHE) {
-        persistentStore.lastFetchTime = now;
-      }
-      persistentStore.isFirstLoad = false;
-
-      setAllFeaturedContent(formattedContent);
-
-      if (formattedContent.length > 0) {
-        persistentStore.featuredContent = formattedContent[0];
-        setFeaturedContent(formattedContent[0]);
-        currentIndexRef.current = 0;
-        // Persist cache for fast startup (skipped when cache disabled)
-        if (!DISABLE_CACHE) {
-          try {
-            await mmkvStorage.setItem(
-              STORAGE_KEY,
-              JSON.stringify({
-                ts: now,
-                featuredContent: formattedContent[0],
-                allFeaturedContent: formattedContent,
-              })
-            );
-          } catch { }
-        }
-      } else {
-        persistentStore.featuredContent = null;
+        // If still nothing
         setFeaturedContent(null);
-        // Clear persisted cache on empty (skipped when cache disabled)
-        if (!DISABLE_CACHE) {
-          try { await mmkvStorage.removeItem(STORAGE_KEY); } catch { }
-        }
+        setAllFeaturedContent([]);
+        setLoading(false); // Ensure we don't hang in loading state
       }
+
+      // Final persistence
+      persistentStore.allFeaturedContent = accumulatedContent;
+      if (!DISABLE_CACHE && accumulatedContent.length > 0) {
+        persistentStore.lastFetchTime = now;
+        try {
+          await mmkvStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              ts: now,
+              featuredContent: accumulatedContent[0],
+              allFeaturedContent: accumulatedContent,
+            })
+          );
+        } catch { }
+      }
+
     } catch (error) {
-      if (signal.aborted) {
-      } else {
-      }
-      setFeaturedContent(null);
-      setAllFeaturedContent([]);
-    } finally {
       if (!signal.aborted) {
+        // Even on error, ensure we stop loading
+        setFeaturedContent(null);
+        setAllFeaturedContent([]);
         setLoading(false);
       }
     }

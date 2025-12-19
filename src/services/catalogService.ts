@@ -56,7 +56,7 @@ export interface StreamingContent {
   name: string;
   tmdbId?: number;
   poster: string;
-  posterShape?: string;
+  posterShape?: 'poster' | 'square' | 'landscape';
   banner?: string;
   logo?: string;
   imdbRating?: string;
@@ -323,7 +323,7 @@ class CatalogService {
     };
   }
 
-  async getHomeCatalogs(limitIds?: string[]): Promise<CatalogContent[]> {
+  async resolveHomeCatalogsToFetch(limitIds?: string[]): Promise<{ addon: StreamingAddon; catalog: any }[]> {
     const addons = await this.getAllAddons();
 
     // Load enabled/disabled settings
@@ -360,59 +360,70 @@ class CatalogService {
       catalogsToFetch = potentialCatalogs.sort(() => 0.5 - Math.random()).slice(0, 5);
     }
 
-    // Create promises for the selected catalogs
-    const catalogPromises = catalogsToFetch.map(async ({ addon, catalog }) => {
-      try {
-        // Hoist manifest list retrieval and find once
-        const addonManifests = await stremioService.getInstalledAddonsAsync();
-        const manifest = addonManifests.find(a => a.id === addon.id);
-        if (!manifest) return null;
+    return catalogsToFetch;
+  }
 
-        const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
-        if (metas && metas.length > 0) {
-          // Cap items per catalog to reduce memory and rendering load
-          const limited = metas.slice(0, 12);
-          const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
+  async fetchHomeCatalog(addon: StreamingAddon, catalog: any): Promise<CatalogContent | null> {
+    try {
+      // Hoist manifest list retrieval and find once
+      const addonManifests = await stremioService.getInstalledAddonsAsync();
+      const manifest = addonManifests.find(a => a.id === addon.id);
+      if (!manifest) return null;
 
-          // Get potentially custom display name; if customized, respect it as-is
-          const originalName = catalog.name || catalog.id;
-          let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
-          const isCustom = displayName !== originalName;
+      const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1);
+      if (metas && metas.length > 0) {
+        // Cap items per catalog to reduce memory and rendering load
+        const limited = metas.slice(0, 12);
+        const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
 
-          if (!isCustom) {
-            // Remove duplicate words and clean up the name (case-insensitive)
-            const words = displayName.split(' ');
-            const uniqueWords: string[] = [];
-            const seenWords = new Set<string>();
-            for (const word of words) {
-              const lowerWord = word.toLowerCase();
-              if (!seenWords.has(lowerWord)) {
-                uniqueWords.push(word);
-                seenWords.add(lowerWord);
-              }
-            }
-            displayName = uniqueWords.join(' ');
+        // Get potentially custom display name; if customized, respect it as-is
+        const originalName = catalog.name || catalog.id;
+        let displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, originalName);
+        const isCustom = displayName !== originalName;
 
-            // Add content type if not present
-            const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
-            if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
-              displayName = `${displayName} ${contentType}`;
+        if (!isCustom) {
+          // Remove duplicate words and clean up the name (case-insensitive)
+          const words = displayName.split(' ');
+          const uniqueWords: string[] = [];
+          const seenWords = new Set<string>();
+          for (const word of words) {
+            const lowerWord = word.toLowerCase();
+            if (!seenWords.has(lowerWord)) {
+              uniqueWords.push(word);
+              seenWords.add(lowerWord);
             }
           }
+          displayName = uniqueWords.join(' ');
 
-          return {
-            addon: addon.id,
-            type: catalog.type,
-            id: catalog.id,
-            name: displayName,
-            items
-          };
+          // Add content type if not present
+          const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+          if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
+            displayName = `${displayName} ${contentType}`;
+          }
         }
-        return null;
-      } catch (error) {
-        logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
-        return null;
+
+        return {
+          addon: addon.id,
+          type: catalog.type,
+          id: catalog.id,
+          name: displayName,
+          items
+        };
       }
+      return null;
+    } catch (error) {
+      logger.error(`Failed to load ${catalog.name} from ${addon.name}:`, error);
+      return null;
+    }
+  }
+
+  async getHomeCatalogs(limitIds?: string[]): Promise<CatalogContent[]> {
+    // Determine which catalogs to actually fetch
+    const catalogsToFetch = await this.resolveHomeCatalogsToFetch(limitIds);
+
+    // Create promises for the selected catalogs
+    const catalogPromises = catalogsToFetch.map(async ({ addon, catalog }) => {
+      return this.fetchHomeCatalog(addon, catalog);
     });
 
     // Wait for all selected catalog fetch promises to resolve in parallel
@@ -824,7 +835,7 @@ class CatalogService {
       type: meta.type,
       name: meta.name,
       poster: posterUrl,
-      posterShape: 'poster',
+      posterShape: meta.posterShape || 'poster', // Use addon's shape or default to poster type
       banner: meta.background,
       logo: logoUrl,
       imdbRating: meta.imdbRating,
@@ -846,7 +857,7 @@ class CatalogService {
       type: meta.type,
       name: meta.name,
       poster: meta.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
-      posterShape: 'poster',
+      posterShape: meta.posterShape || 'poster',
       banner: meta.background,
       // Use addon's logo if available, otherwise undefined
       logo: (meta as any).logo || undefined,

@@ -1064,10 +1064,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const groupedAddonEpisodes: GroupedEpisodes = {};
 
         addonVideos.forEach((video: any) => {
-          const seasonNumber = video.season;
-          if (!seasonNumber || seasonNumber < 1) {
-            return; // Skip season 0, which often contains extras
-          }
+          // Use season 0 for videos without season numbers (PPV-style content, specials, etc.)
+          const seasonNumber = video.season || 0;
           const episodeNumber = video.episode || video.number || 1;
 
           if (!groupedAddonEpisodes[seasonNumber]) {
@@ -1183,14 +1181,59 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Determine initial season only once per series
         const seasons = Object.keys(groupedAddonEpisodes).map(Number);
-        const firstSeason = Math.min(...seasons);
+        const nonZeroSeasons = seasons.filter(s => s !== 0);
+        const firstSeason = nonZeroSeasons.length > 0 ? Math.min(...nonZeroSeasons) : Math.min(...seasons);
         if (!initializedSeasonRef.current) {
-          const nextSeason = firstSeason;
-          if (selectedSeason !== nextSeason) {
-            logger.log(`📺 Setting season ${nextSeason} as selected (${groupedAddonEpisodes[nextSeason]?.length || 0} episodes)`);
-            setSelectedSeason(nextSeason);
+          // Check for watch progress to auto-select season
+          let selectedSeasonNumber = firstSeason;
+          try {
+            const allProgress = await storageService.getAllWatchProgress();
+            let mostRecentEpisodeId = '';
+            let mostRecentTimestamp = 0;
+            Object.entries(allProgress).forEach(([key, progress]) => {
+              if (key.includes(`series:${id}:`)) {
+                const episodeId = key.split(`series:${id}:`)[1];
+                if (progress.lastUpdated > mostRecentTimestamp && progress.currentTime > 0) {
+                  mostRecentTimestamp = progress.lastUpdated;
+                  mostRecentEpisodeId = episodeId;
+                }
+              }
+            });
+
+            if (mostRecentEpisodeId) {
+              // Try to parse season from ID or find matching episode
+              const parts = mostRecentEpisodeId.split(':');
+              if (parts.length === 3) {
+                // Format: showId:season:episode
+                const watchProgressSeason = parseInt(parts[1], 10);
+                if (groupedAddonEpisodes[watchProgressSeason]) {
+                  selectedSeasonNumber = watchProgressSeason;
+                  logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for ${mostRecentEpisodeId}`);
+                }
+              } else {
+                // Try to find by stremioId
+                const allEpisodesList = Object.values(groupedAddonEpisodes).flat();
+                const episode = allEpisodesList.find(ep => ep.stremioId === mostRecentEpisodeId);
+                if (episode) {
+                  selectedSeasonNumber = episode.season_number;
+                  logger.log(`[useMetadata] Auto-selected season ${selectedSeasonNumber} based on most recent watch progress for episode with stremioId ${mostRecentEpisodeId}`);
+                }
+              }
+            } else {
+              // No watch progress, try persistent storage
+              selectedSeasonNumber = getSeason(id, firstSeason);
+              logger.log(`[useMetadata] No watch progress found, using persistent season ${selectedSeasonNumber}`);
+            }
+          } catch (error) {
+            logger.error('[useMetadata] Error checking watch progress for season selection:', error);
+            selectedSeasonNumber = getSeason(id, firstSeason);
           }
-          setEpisodes(groupedAddonEpisodes[nextSeason] || []);
+
+          if (selectedSeason !== selectedSeasonNumber) {
+            logger.log(`📺 Setting season ${selectedSeasonNumber} as selected`);
+            setSelectedSeason(selectedSeasonNumber);
+          }
+          setEpisodes(groupedAddonEpisodes[selectedSeasonNumber] || []);
           initializedSeasonRef.current = true;
         } else {
           // Keep current selection; refresh episode list for selected season
@@ -1240,8 +1283,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         setGroupedEpisodes(transformedEpisodes);
 
-        // Get the first available season as fallback
-        const firstSeason = Math.min(...Object.keys(allEpisodes).map(Number));
+        // Get the first available season as fallback (preferring non-zero seasons)
+        const availableSeasons = Object.keys(allEpisodes).map(Number);
+        const nonZeroSeasons = availableSeasons.filter(s => s !== 0);
+        const firstSeason = nonZeroSeasons.length > 0 ? Math.min(...nonZeroSeasons) : Math.min(...availableSeasons);
 
         if (!initializedSeasonRef.current) {
           // Check for watch progress to auto-select season
@@ -1317,6 +1362,60 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     setEpisodeStreams({});
     setError(null);
   };
+
+  // Extract embedded streams from metadata videos (used by PPV-style addons)
+  const extractEmbeddedStreams = useCallback(() => {
+    if (!metadata?.videos) return;
+
+    // Check if any video has embedded streams
+    const videosWithStreams = (metadata.videos as any[]).filter(
+      (video: any) => video.streams && Array.isArray(video.streams) && video.streams.length > 0
+    );
+
+    if (videosWithStreams.length === 0) return;
+
+    // Get the addon info from metadata if available
+    const addonId = (metadata as any).addonId || 'embedded';
+    const addonName = (metadata as any).addonName || metadata.name || 'Embedded Streams';
+
+    // Extract all streams from videos
+    const embeddedStreams: Stream[] = [];
+    for (const video of videosWithStreams) {
+      for (const stream of video.streams) {
+        embeddedStreams.push({
+          ...stream,
+          name: stream.name || stream.title || video.title,
+          title: stream.title || video.title,
+          addonId,
+          addonName,
+        });
+      }
+    }
+
+    if (embeddedStreams.length > 0) {
+      if (__DEV__) console.log(`✅ [extractEmbeddedStreams] Found ${embeddedStreams.length} embedded streams from ${addonName}`);
+
+      // Add to grouped streams
+      setGroupedStreams(prevStreams => ({
+        ...prevStreams,
+        [addonId]: {
+          addonName,
+          streams: embeddedStreams,
+        },
+      }));
+
+      // Track addon response order
+      setAddonResponseOrder(prevOrder => {
+        if (!prevOrder.includes(addonId)) {
+          return [...prevOrder, addonId];
+        }
+        return prevOrder;
+      });
+
+      // Mark loading as complete since we have streams
+      setLoadingStreams(false);
+    }
+  }, [metadata]);
 
   const loadStreams = async () => {
     const startTime = Date.now();
@@ -1477,6 +1576,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       // Start Stremio request using the converted ID format
       if (__DEV__) console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
       processStremioSource(type, stremioId, false);
+
+      // Also extract any embedded streams from metadata (PPV-style addons)
+      extractEmbeddedStreams();
 
       // Monitor scraper completion status instead of using fixed timeout
       const checkScrapersCompletion = () => {
@@ -1814,8 +1916,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     if (metadata && metadata.videos && metadata.videos.length > 0) {
       logger.log(`🎬 Metadata updated with ${metadata.videos.length} episodes, reloading series data`);
       loadSeriesData().catch((error) => { if (__DEV__) console.error(error); });
+      // Also extract embedded streams from metadata videos (PPV-style addons)
+      extractEmbeddedStreams();
     }
-  }, [metadata?.videos, type]);
+  }, [metadata?.videos, type, extractEmbeddedStreams]);
 
   const loadRecommendations = useCallback(async () => {
     if (!settings.enrichMetadataWithTMDB) {

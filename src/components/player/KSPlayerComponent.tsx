@@ -130,7 +130,9 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
     getTracks: async () => {
       if (nativeRef.current) {
         const node = findNodeHandle(nativeRef.current);
-        return await KSPlayerModule.getTracks(node);
+        if (node) {
+          return await KSPlayerModule.getTracks(node);
+        }
       }
       return { audioTracks: [], textTracks: [] };
     },
@@ -153,15 +155,21 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
     getAirPlayState: async () => {
       if (nativeRef.current) {
         const node = findNodeHandle(nativeRef.current);
-        return await KSPlayerModule.getAirPlayState(node);
+        if (node) {
+          return await KSPlayerModule.getAirPlayState(node);
+        }
       }
       return { allowsExternalPlayback: false, usesExternalPlaybackWhileExternalScreenIsActive: false, isExternalPlaybackActive: false };
     },
     showAirPlayPicker: () => {
       if (nativeRef.current) {
         const node = findNodeHandle(nativeRef.current);
-        console.log('[KSPlayerComponent] Calling showAirPlayPicker with node:', node);
-        KSPlayerModule.showAirPlayPicker(node);
+        if (node) {
+          console.log('[KSPlayerComponent] Calling showAirPlayPicker with node:', node);
+          KSPlayerModule.showAirPlayPicker(node);
+        } else {
+          console.warn('[KSPlayerComponent] Cannot call showAirPlayPicker: node is null');
+        }
       } else {
         console.log('[KSPlayerComponent] nativeRef.current is null');
       }

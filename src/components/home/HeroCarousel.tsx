@@ -83,6 +83,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   const [activeIndex, setActiveIndex] = useState(0);
   const [failedLogoIds, setFailedLogoIds] = useState<Set<string>>(new Set());
   const scrollViewRef = useRef<any>(null);
+  const [isScrollReady, setIsScrollReady] = useState(false);
   const [flippedMap, setFlippedMap] = useState<Record<string, boolean>>({});
   const toggleFlipById = useCallback((id: string) => {
     setFlippedMap((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -95,9 +96,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   // Optimized: update background as soon as scroll starts, without waiting for momentum end
   const scrollX = useSharedValue(0);
   const paginationProgress = useSharedValue(0);
-  
+
   // Parallel image prefetch: start fetching banners and logos as soon as data arrives
-  const itemsToPreload = useMemo(() => data.slice(0, 12), [data]);
+  const itemsToPreload = useMemo(() => data.slice(0, 3), [data]);
   useEffect(() => {
     if (!itemsToPreload.length) return;
     try {
@@ -121,17 +122,19 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
       // no-op: prefetch is best-effort
     }
   }, [itemsToPreload]);
-  
+
   // Comprehensive reset when component mounts/remounts to prevent glitching
   useEffect(() => {
     // Start at the first real item for looping
     scrollX.value = loopingEnabled ? interval : 0;
     setActiveIndex(0);
+    setIsScrollReady(false);
 
-    // Scroll to position 0 after a brief delay to ensure ScrollView is ready
+    // Scroll to position and mark ready after layout
     const timer = setTimeout(() => {
       scrollViewRef.current?.scrollTo({ x: loopingEnabled ? interval : 0, y: 0, animated: false });
-    }, 50);
+      setIsScrollReady(true);
+    }, 100);
 
     return () => clearTimeout(timer);
   }, []);
@@ -141,10 +144,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     if (data.length > 0) {
       scrollX.value = loopingEnabled ? interval : 0;
       setActiveIndex(0);
+      setIsScrollReady(false);
 
       const timer = setTimeout(() => {
         scrollViewRef.current?.scrollTo({ x: loopingEnabled ? interval : 0, y: 0, animated: false });
-      }, 100);
+        setIsScrollReady(true);
+      }, 150);
 
       return () => clearTimeout(timer);
     }
@@ -158,7 +163,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     }, 50);
     return () => clearTimeout(timer);
   }, [windowWidth, windowHeight, interval, loopingEnabled]);
-  
+
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
@@ -192,12 +197,12 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
     },
     (idx, prevIdx) => {
       if (idx == null || idx === prevIdx) return;
-      
+
       // Debounce updates to reduce JS bridge crossings
       const now = Date.now();
       if (now - lastIndexUpdateRef.current < 100) return; // 100ms debounce
       lastIndexUpdateRef.current = now;
-      
+
       // Clamp to bounds to avoid out-of-range access
       const clamped = Math.max(0, Math.min(idx, data.length - 1));
       runOnJS(setActiveIndex)(clamped);
@@ -263,22 +268,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
                     height: cardHeight,
                   }
                 ] as StyleProp<ViewStyle>}>
-                  <View style={styles.bannerContainer as ViewStyle}>
-                    <View style={styles.skeletonBannerFull as ViewStyle} />
-                    <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.25)"]}
-                      locations={[0.6, 1]}
-                      style={styles.bannerOverlay as ViewStyle}
-                    />
-                  </View>
-                  <View style={styles.info as ViewStyle}>
-                    <View style={[styles.skeletonLine, { width: '62%' }] as StyleProp<ViewStyle>} />
-                    <View style={[styles.skeletonLine, { width: '44%', marginTop: 6 }] as StyleProp<ViewStyle>} />
-                    <View style={styles.skeletonActions as ViewStyle}>
-                      <View style={[styles.skeletonPill, { width: 96 }] as StyleProp<ViewStyle>} />
-                      <View style={[styles.skeletonPill, { width: 80 }] as StyleProp<ViewStyle>} />
-                    </View>
-                  </View>
+                  <View style={styles.skeletonBannerFull as ViewStyle} />
                 </View>
               </View>
             ))}
@@ -289,11 +279,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   }
 
   // Memoized background component with improved timing
-  const BackgroundImage = React.memo(({ 
-    item, 
+  const BackgroundImage = React.memo(({
+    item,
     insets
-  }: { 
-    item: StreamingContent; 
+  }: {
+    item: StreamingContent;
     insets: any;
   }) => {
     return (
@@ -317,7 +307,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           ) : (
             <>
               <FastImage
-                source={{ 
+                source={{
                   uri: item.banner || item.poster,
                   priority: FastImage.priority.low,
                   cache: FastImage.cacheControl.immutable
@@ -352,15 +342,15 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
   if (!hasData) return null;
 
   return (
-    <Animated.View entering={FadeIn.duration(150).easing(Easing.out(Easing.cubic))}>
+    <View>
       <Animated.View style={[styles.container as ViewStyle, { paddingTop: 12 + effectiveTopOffset }]}>
         {/* Removed preload images for performance - let FastImage cache handle it naturally */}
-          {settings.enableHomeHeroBackground && data[activeIndex] && (
-            <BackgroundImage
-              item={data[activeIndex]}
-              insets={insets}
-            />
-          )}
+        {settings.enableHomeHeroBackground && data[activeIndex] && (
+          <BackgroundImage
+            item={data[activeIndex]}
+            insets={insets}
+          />
+        )}
         {/* Bottom blend to HomeScreen background (not the card) */}
         {settings.enableHomeHeroBackground && (
           <LinearGradient
@@ -383,6 +373,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           pagingEnabled={false}
           bounces={false}
           overScrollMode="never"
+          style={{ opacity: isScrollReady ? 1 : 0 }}
+          contentOffset={{ x: loopingEnabled ? interval : 0, y: 0 }}
           onMomentumScrollEnd={(e) => {
             if (!loopingEnabled) return;
             // Determine current page index in cloned space
@@ -400,6 +392,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           }}
         >
           {(loopingEnabled ? loopData : data).map((item, index) => (
+            /* TEST 5: ORIGINAL CARD WITHOUT LINEAR GRADIENT */
             <CarouselCard
               key={`${item.id}-${index}-${loopingEnabled ? 'loop' : 'base'}`}
               item={item}
@@ -444,9 +437,161 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
           }}
         />
       </View>
-    </Animated.View>
+    </View>
   );
 };
+
+// MINIMAL ANIMATED CARD FOR PERFORMANCE TESTING
+interface AnimatedCardWrapperProps {
+  item: StreamingContent;
+  index: number;
+  scrollX: SharedValue<number>;
+  interval: number;
+  cardWidth: number;
+  cardHeight: number;
+  colors: any;
+  isTablet: boolean;
+}
+
+const AnimatedCardWrapper: React.FC<AnimatedCardWrapperProps> = memo(({
+  item, index, scrollX, interval, cardWidth, cardHeight, colors, isTablet
+}) => {
+  const cardAnimatedStyle = useAnimatedStyle(() => {
+    const translateX = scrollX.value;
+    const cardOffset = index * interval;
+    const distance = Math.abs(translateX - cardOffset);
+
+    if (distance > interval * 1.5) {
+      return {
+        transform: [{ scale: isTablet ? 0.95 : 0.9 }],
+        opacity: isTablet ? 0.85 : 0.7
+      };
+    }
+
+    const maxDistance = interval;
+    const scale = 1 - (distance / maxDistance) * 0.1;
+    const clampedScale = Math.max(isTablet ? 0.95 : 0.9, Math.min(1, scale));
+    const opacity = 1 - (distance / maxDistance) * 0.3;
+    const clampedOpacity = Math.max(isTablet ? 0.85 : 0.7, Math.min(1, opacity));
+
+    return {
+      transform: [{ scale: clampedScale }],
+      opacity: clampedOpacity,
+    };
+  });
+
+  const logoOpacity = useSharedValue(0);
+  const [logoLoaded, setLogoLoaded] = useState(false);
+  const isFlipped = useSharedValue(0);
+
+  useEffect(() => {
+    if (logoLoaded) {
+      logoOpacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.ease) });
+    }
+  }, [logoLoaded]);
+
+  const logoAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
+  }));
+
+  // TEST 4: FLIP STYLES
+  const frontFlipStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(isFlipped.value, [0, 1], [0, 180]);
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotate}deg` },
+      ],
+    } as any;
+  });
+
+  const backFlipStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(isFlipped.value, [0, 1], [-180, 0]);
+    return {
+      transform: [
+        { perspective: 1000 },
+        { rotateY: `${rotate}deg` },
+      ],
+    } as any;
+  });
+
+  // TEST 4: OVERLAY ANIMATED STYLE (genres opacity on scroll)
+  const overlayAnimatedStyle = useAnimatedStyle(() => {
+    const translateX = scrollX.value;
+    const cardOffset = index * interval;
+    const distance = Math.abs(translateX - cardOffset);
+
+    if (distance > interval * 1.2) {
+      return { opacity: 0 };
+    }
+
+    const maxDistance = interval * 0.5;
+    const progress = Math.min(distance / maxDistance, 1);
+    const opacity = 1 - progress;
+    const clampedOpacity = Math.max(0, Math.min(1, opacity));
+
+    return {
+      opacity: clampedOpacity,
+    };
+  });
+
+  return (
+    <View style={{ width: cardWidth + 16 }}>
+      <Animated.View style={[
+        {
+          width: cardWidth,
+          height: cardHeight,
+          backgroundColor: colors.elevation1,
+          borderRadius: 16,
+          overflow: 'hidden',
+        },
+        cardAnimatedStyle
+      ]}>
+        <FastImage
+          source={{
+            uri: item.banner || item.poster,
+            priority: FastImage.priority.normal,
+            cache: FastImage.cacheControl.immutable
+          }}
+          style={{ width: '100%', height: '100%', position: 'absolute' }}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+        <LinearGradient
+          colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
+          locations={[0.4, 0.7, 1]}
+          style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+        />
+        {item.logo && (
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 40, alignItems: 'center' }}>
+            <Animated.View style={logoAnimatedStyle}>
+              <FastImage
+                source={{
+                  uri: item.logo,
+                  priority: FastImage.priority.high,
+                  cache: FastImage.cacheControl.immutable
+                }}
+                style={{ width: Math.round(cardWidth * 0.72), height: 64 }}
+                resizeMode={FastImage.resizeMode.contain}
+                onLoad={() => setLogoLoaded(true)}
+              />
+            </Animated.View>
+          </View>
+        )}
+        {/* TEST 4: GENRES with overlayAnimatedStyle */}
+        {item.genres && (
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: 12, alignItems: 'center' }}>
+            <Animated.Text
+              style={[{ color: 'rgba(255,255,255,0.7)', fontSize: 13, textAlign: 'center' }, overlayAnimatedStyle]}
+              numberOfLines={1}
+            >
+              {item.genres.slice(0, 3).join(' • ')}
+            </Animated.Text>
+          </View>
+        )}
+      </Animated.View>
+    </View>
+  );
+});
 
 interface CarouselCardProps {
   item: StreamingContent;
@@ -467,13 +612,13 @@ interface CarouselCardProps {
 const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet }) => {
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
-  
+
   const bannerOpacity = useSharedValue(0);
   const logoOpacity = useSharedValue(0);
   const genresOpacity = useSharedValue(0);
   const actionsOpacity = useSharedValue(0);
   const isFlipped = useSharedValue(flipped ? 1 : 0);
-  
+
   // Reset animations when component mounts/remounts to prevent glitching
   useEffect(() => {
     bannerOpacity.value = 0;
@@ -484,17 +629,17 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     setBannerLoaded(false);
     setLogoLoaded(false);
   }, [item.id]);
-  
+
   const inputRange = [
     (index - 1) * interval,
     index * interval,
     (index + 1) * interval,
   ];
-  
+
   const bannerAnimatedStyle = useAnimatedStyle(() => ({
     opacity: bannerOpacity.value,
   }));
-  
+
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
   }));
@@ -538,52 +683,52 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
     const translateX = scrollX.value;
     const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);
-    
+
     // AGGRESSIVE early exit for cards far from center
     if (distance > interval * 1.2) {
       return { opacity: 0 };
     }
-    
+
     const maxDistance = interval * 0.5;
     const progress = Math.min(distance / maxDistance, 1);
     const opacity = 1 - progress;
     const clampedOpacity = Math.max(0, Math.min(1, opacity));
-    
+
     return {
       opacity: clampedOpacity,
     };
   });
-  
+
   // ULTRA-OPTIMIZED: Only animate center card and ±1 neighbors
   const cardAnimatedStyle = useAnimatedStyle(() => {
     const translateX = scrollX.value;
     const cardOffset = index * interval;
     const distance = Math.abs(translateX - cardOffset);
-    
+
     // AGGRESSIVE early exit for cards far from center
     if (distance > interval * 1.5) {
-      return { 
-        transform: [{ scale: isTablet ? 0.95 : 0.9 }], 
-        opacity: isTablet ? 0.85 : 0.7 
+      return {
+        transform: [{ scale: isTablet ? 0.95 : 0.9 }],
+        opacity: isTablet ? 0.85 : 0.7
       };
     }
-    
+
     const maxDistance = interval;
-    
+
     // Scale animation based on distance from center
     const scale = 1 - (distance / maxDistance) * 0.1;
     const clampedScale = Math.max(isTablet ? 0.95 : 0.9, Math.min(1, scale));
-    
+
     // Opacity animation for cards that are far from center
     const opacity = 1 - (distance / maxDistance) * 0.3;
     const clampedOpacity = Math.max(isTablet ? 0.85 : 0.7, Math.min(1, opacity));
-    
+
     return {
       transform: [{ scale: clampedScale }],
       opacity: clampedOpacity,
     };
   });
-  
+
   // TEMPORARILY DISABLED FOR PERFORMANCE TESTING
   // const bannerParallaxStyle = useAnimatedStyle(() => {
   //   const translateX = scrollX.value;
@@ -597,7 +742,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   //     transform: [{ translateX: parallaxOffset }],
   //   };
   // });
-  
+
   // TEMPORARILY DISABLED FOR PERFORMANCE TESTING
   // const infoParallaxStyle = useAnimatedStyle(() => {
   //   const translateX = scrollX.value;
@@ -618,21 +763,21 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
   //     opacity: clampedOpacity,
   //   };
   // });
-  
+
   useEffect(() => {
     if (bannerLoaded) {
-      bannerOpacity.value = withTiming(1, { 
-        duration: 250, 
-        easing: Easing.out(Easing.ease) 
+      bannerOpacity.value = withTiming(1, {
+        duration: 250,
+        easing: Easing.out(Easing.ease)
       });
     }
   }, [bannerLoaded]);
-  
+
   useEffect(() => {
     if (logoLoaded) {
-      logoOpacity.value = withTiming(1, { 
-        duration: 300, 
-        easing: Easing.out(Easing.ease) 
+      logoOpacity.value = withTiming(1, {
+        duration: 300,
+        easing: Easing.out(Easing.ease)
       });
     }
   }, [logoLoaded]);
@@ -669,11 +814,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     onLoad={() => setBannerLoaded(true)}
                   />
                 </Animated.View>
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.72)"]}
-                  locations={[0.3, 1]}
-                  style={styles.bannerGradient as ViewStyle}
-                />
+                {/* Overlay removed for performance - readability via text shadows */}
               </View>
               <View style={styles.backContent as ViewStyle}>
                 {item.logo && !logoFailed ? (
@@ -733,11 +874,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                         onLoad={() => setBannerLoaded(true)}
                       />
                     </Animated.View>
-                    <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
-                      locations={[0.4, 0.7, 1]}
-                      style={styles.bannerGradient as ViewStyle}
-                    />
+                    {/* Overlay removed for performance - readability via text shadows */}
                   </View>
                   {item.logo && !logoFailed ? (
                     <View style={styles.logoOverlay as ViewStyle} pointerEvents="none">
@@ -757,23 +894,23 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     </View>
                   ) : (
                     <View style={styles.titleOverlay as ViewStyle} pointerEvents="none">
-                      <Animated.View entering={FadeIn.duration(300)}>
+                      <View>
                         <Text style={[styles.title as TextStyle, { color: colors.highEmphasis, textAlign: 'center' }]} numberOfLines={1}>
                           {item.name}
                         </Text>
-                      </Animated.View>
+                      </View>
                     </View>
                   )}
                   {item.genres && (
                     <View style={styles.genresOverlay as ViewStyle} pointerEvents="none">
-                      <Animated.View entering={FadeIn.duration(400).delay(100)}>
+                      <View>
                         <Animated.Text
                           style={[styles.genres as TextStyle, { color: colors.mediumEmphasis, textAlign: 'center' }, overlayAnimatedStyle]}
                           numberOfLines={1}
                         >
                           {item.genres.slice(0, 3).join(' • ')}
                         </Animated.Text>
-                      </Animated.View>
+                      </View>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -787,11 +924,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                     style={styles.banner as any}
                     resizeMode={FastImage.resizeMode.cover}
                   />
-                  <LinearGradient
-                    colors={["rgba(0,0,0,0.25)", "rgba(0,0,0,0.85)"]}
-                    locations={[0.3, 1]}
-                    style={styles.bannerGradient as ViewStyle}
-                  />
+                  {/* Overlay removed for performance - readability via text shadows */}
                 </View>
                 <View style={styles.backContent as ViewStyle}>
                   {item.logo && !logoFailed ? (
@@ -980,7 +1113,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)'
   },
-  
+
   info: {
     position: 'absolute',
     left: 0,

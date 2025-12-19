@@ -589,20 +589,19 @@ const KSPlayerCore: React.FC = () => {
 
   // Force landscape orientation after opening animation completes
   useEffect(() => {
-    const lockOrientation = async () => {
-      try {
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-        if (__DEV__) logger.log('[VideoPlayer] Locked to landscape orientation');
-      } catch (error) {
-        logger.warn('[VideoPlayer] Failed to lock orientation:', error);
-      }
-    };
-
-    // Lock orientation after opening animation completes to prevent glitches
+    // Defer orientation lock until after navigation animation to prevent sluggishness
     if (isOpeningAnimationComplete) {
-      lockOrientation();
+      const task = InteractionManager.runAfterInteractions(() => {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+          .then(() => {
+            if (__DEV__) logger.log('[VideoPlayer] Locked to landscape orientation');
+          })
+          .catch((error) => {
+            logger.warn('[VideoPlayer] Failed to lock orientation:', error);
+          });
+      });
+      return () => task.cancel();
     }
-
     return () => {
       // Do not unlock orientation here; we unlock explicitly on close to avoid mid-transition flips
     };
@@ -616,21 +615,24 @@ const KSPlayerCore: React.FC = () => {
         enableImmersiveMode();
       }
     });
-    const initializePlayer = async () => {
-      StatusBar.setHidden(true, 'none');
-      // Enable immersive mode after opening animation to prevent glitches
-      if (isOpeningAnimationComplete) {
-        enableImmersiveMode();
-      }
-      startOpeningAnimation();
 
-      // Initialize current volume and brightness levels
-      // Volume starts at 100 (full volume) for KSPlayer
-      setVolume(100);
-      if (DEBUG_MODE) {
-        logger.log(`[VideoPlayer] Initial volume: 100 (KSPlayer native)`);
-      }
+    // Immediate player setup - UI critical
+    StatusBar.setHidden(true, 'none');
+    // Enable immersive mode after opening animation to prevent glitches
+    if (isOpeningAnimationComplete) {
+      enableImmersiveMode();
+    }
+    startOpeningAnimation();
 
+    // Initialize volume immediately (no async)
+    setVolume(100);
+    if (DEBUG_MODE) {
+      logger.log(`[VideoPlayer] Initial volume: 100 (KSPlayer native)`);
+    }
+
+    // Defer brightness initialization until after navigation animation completes
+    // This prevents sluggish player entry
+    const brightnessTask = InteractionManager.runAfterInteractions(async () => {
       try {
         const currentBrightness = await Brightness.getBrightnessAsync();
         setBrightness(currentBrightness);
@@ -642,10 +644,11 @@ const KSPlayerCore: React.FC = () => {
         // Fallback to 1.0 if brightness API fails
         setBrightness(1.0);
       }
-    };
-    initializePlayer();
+    });
+
     return () => {
       subscription?.remove();
+      brightnessTask.cancel();
       disableImmersiveMode();
     };
   }, [isOpeningAnimationComplete]);
@@ -1381,32 +1384,32 @@ const KSPlayerCore: React.FC = () => {
     logger.log(`[VideoPlayer] Current progress: ${actualCurrentTime}/${duration} (${progressPercent.toFixed(1)}%)`);
 
     // Cleanup and navigate back immediately without delay
-    const cleanup = async () => {
-      try {
-        // Unlock orientation first
-        await ScreenOrientation.unlockAsync();
-        logger.log('[VideoPlayer] Orientation unlocked');
-      } catch (orientationError) {
-        logger.warn('[VideoPlayer] Failed to unlock orientation:', orientationError);
-      }
-
-      // On iOS tablets, keep rotation unlocked; on phones, return to portrait
-      if (Platform.OS === 'ios') {
-        const { width: dw, height: dh } = Dimensions.get('window');
-        const isTablet = (Platform as any).isPad === true || Math.min(dw, dh) >= 768;
-        setTimeout(() => {
-          if (isTablet) {
-            ScreenOrientation.unlockAsync().catch(() => { });
-          } else {
-            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
+    const cleanup = () => {
+      // Fire orientation changes in background - don't await them
+      ScreenOrientation.unlockAsync()
+        .then(() => {
+          logger.log('[VideoPlayer] Orientation unlocked');
+          // On iOS tablets, keep rotation unlocked; on phones, return to portrait
+          if (Platform.OS === 'ios') {
+            const { width: dw, height: dh } = Dimensions.get('window');
+            const isTablet = (Platform as any).isPad === true || Math.min(dw, dh) >= 768;
+            setTimeout(() => {
+              if (isTablet) {
+                ScreenOrientation.unlockAsync().catch(() => { });
+              } else {
+                ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => { });
+              }
+            }, 50);
           }
-        }, 50);
-      }
+        })
+        .catch((orientationError: any) => {
+          logger.warn('[VideoPlayer] Failed to unlock orientation:', orientationError);
+        });
 
-      // Disable immersive mode
+      // Disable immersive mode (synchronous)
       disableImmersiveMode();
 
-      // Navigate back to previous screen (StreamsScreen expected to be below Player)
+      // Navigate back IMMEDIATELY - don't wait for orientation
       try {
         if (navigation.canGoBack()) {
           navigation.goBack();
@@ -1429,7 +1432,7 @@ const KSPlayerCore: React.FC = () => {
     const backgroundSync = async () => {
       try {
         logger.log('[VideoPlayer] Starting background Trakt sync');
-        // IMMEDIATE: Force immediate progress update (scrobble/pause) with the exact time
+        // IMMEDIATE: Force immediate progress update (uses scrobble/stop which handles pause/scrobble)
         await traktAutosync.handleProgressUpdate(actualCurrentTime, duration, true);
 
         // IMMEDIATE: Use user_close reason to trigger immediate scrobble stop

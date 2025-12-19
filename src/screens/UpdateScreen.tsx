@@ -9,7 +9,8 @@ import {
   StatusBar,
   Platform,
   Dimensions,
-  Linking
+  Linking,
+  Switch
 } from 'react-native';
 import { useToast } from '../contexts/ToastContext';
 import { useNavigation } from '@react-navigation/native';
@@ -37,9 +38,9 @@ interface SettingsCardProps {
 
 const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet = false }) => {
   const { currentTheme } = useTheme();
-  
+
   return (
-    <View 
+    <View
       style={[
         styles.cardContainer,
         isTablet && styles.tabletCardContainer
@@ -111,19 +112,84 @@ const UpdateScreen: React.FC = () => {
   const [updateProgress, setUpdateProgress] = useState<number>(0);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'downloading' | 'installing' | 'success' | 'error'>('idle');
 
+  // Update notification settings
+  const [otaAlertsEnabled, setOtaAlertsEnabled] = useState(true);
+  const [majorAlertsEnabled, setMajorAlertsEnabled] = useState(true);
+
+  // Load notification settings on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const otaSetting = await mmkvStorage.getItem('@ota_updates_alerts_enabled');
+        const majorSetting = await mmkvStorage.getItem('@major_updates_alerts_enabled');
+        // Default to true if not set
+        setOtaAlertsEnabled(otaSetting !== 'false');
+        setMajorAlertsEnabled(majorSetting !== 'false');
+      } catch { }
+    })();
+  }, []);
+
+  // Handle toggling OTA alerts with warning
+  const handleOtaAlertsToggle = async (value: boolean) => {
+    if (!value) {
+      openAlert(
+        'Disable OTA Update Alerts?',
+        'You will no longer receive automatic notifications for OTA updates.\n\n⚠️ Warning: Staying on the latest version is important for:\n• Bug fixes and stability improvements\n• New features and enhancements\n• Providing accurate feedback and crash reports\n\nYou can still manually check for updates in this screen.',
+        [
+          { label: 'Cancel', onPress: () => setAlertVisible(false) },
+          {
+            label: 'Disable',
+            onPress: async () => {
+              await mmkvStorage.setItem('@ota_updates_alerts_enabled', 'false');
+              setOtaAlertsEnabled(false);
+              setAlertVisible(false);
+            }
+          }
+        ]
+      );
+    } else {
+      await mmkvStorage.setItem('@ota_updates_alerts_enabled', 'true');
+      setOtaAlertsEnabled(true);
+    }
+  };
+
+  // Handle toggling Major update alerts with warning
+  const handleMajorAlertsToggle = async (value: boolean) => {
+    if (!value) {
+      openAlert(
+        'Disable Major Update Alerts?',
+        'You will no longer receive notifications for major app updates that require reinstallation.\n\n⚠️ Warning: Major updates often include:\n• Critical security patches\n• Breaking changes that require app reinstall\n• Important compatibility fixes\n\nYou can still check for updates manually.',
+        [
+          { label: 'Cancel', onPress: () => setAlertVisible(false) },
+          {
+            label: 'Disable',
+            onPress: async () => {
+              await mmkvStorage.setItem('@major_updates_alerts_enabled', 'false');
+              setMajorAlertsEnabled(false);
+              setAlertVisible(false);
+            }
+          }
+        ]
+      );
+    } else {
+      await mmkvStorage.setItem('@major_updates_alerts_enabled', 'true');
+      setMajorAlertsEnabled(true);
+    }
+  };
+
   const checkForUpdates = async () => {
     try {
       setIsChecking(true);
       setUpdateStatus('checking');
       setUpdateProgress(0);
       setLastOperation('Checking for updates...');
-      
+
       const info = await UpdateService.checkForUpdates();
       setUpdateInfo(info);
       setLastChecked(new Date());
-      
+
       // Logs disabled
-      
+
       if (info.isAvailable) {
         setUpdateStatus('available');
         setLastOperation(`Update available: ${info.manifest?.id || 'unknown'}`);
@@ -135,7 +201,7 @@ const UpdateScreen: React.FC = () => {
       if (__DEV__) console.error('Error checking for updates:', error);
       setUpdateStatus('error');
       setLastOperation(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  openAlert('Error', 'Failed to check for updates');
+      openAlert('Error', 'Failed to check for updates');
     } finally {
       setIsChecking(false);
     }
@@ -146,12 +212,12 @@ const UpdateScreen: React.FC = () => {
     if (Platform.OS === 'android') {
       // ensure badge clears when entering this screen
       (async () => {
-        try { await mmkvStorage.removeItem('@update_badge_pending'); } catch {}
+        try { await mmkvStorage.removeItem('@update_badge_pending'); } catch { }
       })();
     }
     checkForUpdates();
     // Also refresh GitHub section on mount (works in dev and prod)
-    try { github.refresh(); } catch {}
+    try { github.refresh(); } catch { }
     if (Platform.OS === 'android') {
       showInfo('Checking for Updates', 'Checking for updates…');
     }
@@ -163,7 +229,7 @@ const UpdateScreen: React.FC = () => {
       setUpdateStatus('downloading');
       setUpdateProgress(0);
       setLastOperation('Downloading update...');
-      
+
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setUpdateProgress(prev => {
@@ -171,30 +237,30 @@ const UpdateScreen: React.FC = () => {
           return prev + Math.random() * 10;
         });
       }, 500);
-      
+
       const success = await UpdateService.downloadAndInstallUpdate();
-      
+
       clearInterval(progressInterval);
       setUpdateProgress(100);
       setUpdateStatus('installing');
       setLastOperation('Installing update...');
-      
+
       // Logs disabled
-      
+
       if (success) {
         setUpdateStatus('success');
         setLastOperation('Update installed successfully');
-  openAlert('Success', 'Update will be applied on next app restart');
+        openAlert('Success', 'Update will be applied on next app restart');
       } else {
         setUpdateStatus('error');
         setLastOperation('No update available to install');
-  openAlert('No Update', 'No update available to install');
+        openAlert('No Update', 'No update available to install');
       }
     } catch (error) {
       if (__DEV__) console.error('Error installing update:', error);
       setUpdateStatus('error');
       setLastOperation(`Installation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  openAlert('Error', 'Failed to install update');
+      openAlert('Error', 'Failed to install update');
     } finally {
       setIsInstalling(false);
     }
@@ -236,7 +302,7 @@ const UpdateScreen: React.FC = () => {
     try {
       setLastOperation('Testing connectivity...');
       const isReachable = await UpdateService.testUpdateConnectivity();
-      
+
       if (isReachable) {
         setLastOperation('Update server is reachable');
       } else {
@@ -334,7 +400,7 @@ const UpdateScreen: React.FC = () => {
       { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -346,316 +412,367 @@ const UpdateScreen: React.FC = () => {
             Settings
           </Text>
         </TouchableOpacity>
-        
+
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
         </View>
       </View>
-      
+
       <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
         App Updates
       </Text>
 
-        <View style={styles.contentContainer}>
-          <ScrollView 
-            style={styles.scrollView}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            <SettingsCard title="APP UPDATES" isTablet={isTablet}>
-              {/* Main Update Card */}
-              <View style={styles.updateMainCard}>
-                {/* Status Section */}
-                <View style={styles.updateStatusSection}>
-                  <View style={[styles.statusIndicator, { backgroundColor: `${getStatusColor()}20` }]}>
-                    {getStatusIcon()}
-                  </View>
-                  <View style={styles.statusContent}>
-                    <Text style={[styles.statusMainText, { color: currentTheme.colors.highEmphasis }]}>
-                      {getStatusText()}
-                    </Text>
-                    <Text style={[styles.statusDetailText, { color: currentTheme.colors.mediumEmphasis }]}>
-                      {lastOperation || 'Ready to check for updates'}
-                    </Text>
-                  </View>
+      <View style={styles.contentContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          <SettingsCard title="APP UPDATES" isTablet={isTablet}>
+            {/* Main Update Card */}
+            <View style={styles.updateMainCard}>
+              {/* Status Section */}
+              <View style={styles.updateStatusSection}>
+                <View style={[styles.statusIndicator, { backgroundColor: `${getStatusColor()}20` }]}>
+                  {getStatusIcon()}
                 </View>
-
-                {/* Progress Section */}
-                {(updateStatus === 'downloading' || updateStatus === 'installing') && (
-                  <View style={styles.progressSection}>
-                    <View style={styles.progressHeader}>
-                      <Text style={[styles.progressLabel, { color: currentTheme.colors.mediumEmphasis }]}>
-                        {updateStatus === 'downloading' ? 'Downloading' : 'Installing'}
-                      </Text>
-                      <Text style={[styles.progressPercentage, { color: currentTheme.colors.primary }]}>
-                        {Math.round(updateProgress)}%
-                      </Text>
-                    </View>
-                    <View style={[styles.modernProgressBar, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                      <View 
-                        style={[
-                          styles.modernProgressFill, 
-                          { 
-                            backgroundColor: currentTheme.colors.primary,
-                            width: `${updateProgress}%`
-                          }
-                        ]} 
-                      />
-                    </View>
-                  </View>
-                )}
-
-                {/* Action Section */}
-                <View style={styles.actionSection}>
-                  <TouchableOpacity
-                    style={[
-                      styles.modernButton,
-                      styles.primaryAction,
-                      { backgroundColor: currentTheme.colors.primary },
-                      (isChecking || isInstalling) && styles.disabledAction
-                    ]}
-                    onPress={checkForUpdates}
-                    disabled={isChecking || isInstalling}
-                    activeOpacity={0.8}
-                  >
-                    {isChecking ? (
-                      <MaterialIcons name="refresh" size={18} color="white" />
-                    ) : (
-                      <MaterialIcons name="system-update" size={18} color="white" />
-                    )}
-                    <Text style={styles.modernButtonText}>
-                      {isChecking ? 'Checking...' : 'Check for Updates'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {updateInfo?.isAvailable && updateStatus !== 'success' && (
-                    <TouchableOpacity
-                      style={[
-                        styles.modernButton,
-                        styles.installAction,
-                        { backgroundColor: currentTheme.colors.success || '#34C759' },
-                        (isInstalling) && styles.disabledAction
-                      ]}
-                      onPress={installUpdate}
-                      disabled={isInstalling}
-                      activeOpacity={0.8}
-                    >
-                      {isInstalling ? (
-                        <MaterialIcons name="install-mobile" size={18} color="white" />
-                      ) : (
-                        <MaterialIcons name="download" size={18} color="white" />
-                      )}
-                      <Text style={styles.modernButtonText}>
-                        {isInstalling ? 'Installing...' : 'Install Update'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
+                <View style={styles.statusContent}>
+                  <Text style={[styles.statusMainText, { color: currentTheme.colors.highEmphasis }]}>
+                    {getStatusText()}
+                  </Text>
+                  <Text style={[styles.statusDetailText, { color: currentTheme.colors.mediumEmphasis }]}>
+                    {lastOperation || 'Ready to check for updates'}
+                  </Text>
                 </View>
               </View>
 
-              {/* Release Notes */}
-              {updateInfo?.isAvailable && !!getReleaseNotes() && (
-                <View style={styles.infoSection}>
-                  <View style={styles.infoItem}>
-                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                      <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
-                    </View>
-                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Release notes:</Text>
+              {/* Progress Section */}
+              {(updateStatus === 'downloading' || updateStatus === 'installing') && (
+                <View style={styles.progressSection}>
+                  <View style={styles.progressHeader}>
+                    <Text style={[styles.progressLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                      {updateStatus === 'downloading' ? 'Downloading' : 'Installing'}
+                    </Text>
+                    <Text style={[styles.progressPercentage, { color: currentTheme.colors.primary }]}>
+                      {Math.round(updateProgress)}%
+                    </Text>
                   </View>
-                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>{getReleaseNotes()}</Text>
+                  <View style={[styles.modernProgressBar, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                    <View
+                      style={[
+                        styles.modernProgressFill,
+                        {
+                          backgroundColor: currentTheme.colors.primary,
+                          width: `${updateProgress}%`
+                        }
+                      ]}
+                    />
+                  </View>
                 </View>
               )}
 
-              {/* Info Section */}
-              <View style={styles.infoSection}>
-                <View style={styles.infoItem}>
-                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                    <MaterialIcons name="info-outline" size={14} color={currentTheme.colors.primary} />
-                  </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Version:</Text>
-                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                    {updateInfo?.manifest?.id ? `${updateInfo.manifest.id.substring(0, 8)}...` : 'Unknown'}
+              {/* Action Section */}
+              <View style={styles.actionSection}>
+                <TouchableOpacity
+                  style={[
+                    styles.modernButton,
+                    styles.primaryAction,
+                    { backgroundColor: currentTheme.colors.primary },
+                    (isChecking || isInstalling) && styles.disabledAction
+                  ]}
+                  onPress={checkForUpdates}
+                  disabled={isChecking || isInstalling}
+                  activeOpacity={0.8}
+                >
+                  {isChecking ? (
+                    <MaterialIcons name="refresh" size={18} color="white" />
+                  ) : (
+                    <MaterialIcons name="system-update" size={18} color="white" />
+                  )}
+                  <Text style={styles.modernButtonText}>
+                    {isChecking ? 'Checking...' : 'Check for Updates'}
                   </Text>
-                </View>
-                
-                {lastChecked && (
-                  <View style={styles.infoItem}>
-                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                      <MaterialIcons name="schedule" size={14} color={currentTheme.colors.primary} />
-                    </View>
-                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Last checked:</Text>
-                    <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                      {formatDate(lastChecked)}
-                    </Text>
-                  </View>
-                )}
-              </View>
+                </TouchableOpacity>
 
-              {/* Current Version Section */}
-              <View style={styles.infoSection}>
-                <View style={styles.infoItem}>
-                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                    <MaterialIcons name="verified" size={14} color={currentTheme.colors.primary} />
-                  </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current version:</Text>
-                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
-                    selectable>
-                    {currentInfo?.manifest?.id || (currentInfo?.isEmbeddedLaunch === false ? 'Unknown' : 'Embedded')}
-                  </Text>
-                </View>
-
-                {!!getCurrentReleaseNotes() && (
-                  <View style={{ marginTop: 8 }}>
-                    <View style={[styles.infoItem, { alignItems: 'flex-start' }]}>
-                      <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                        <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
-                      </View>
-                      <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current release notes:</Text>
-                    </View>
-                    <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                      {getCurrentReleaseNotes()}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Developer Logs removed */}
-            </SettingsCard>
-
-            {/* GitHub Release (compact) – only show when update is available */}
-            {github.latestTag && isAnyUpgrade(getDisplayedAppVersion(), github.latestTag) ? (
-              <SettingsCard title="GITHUB RELEASE" isTablet={isTablet}>
-                <View style={styles.infoSection}>
-                  <View style={styles.infoItem}>
-                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                      <MaterialIcons name="new-releases" size={14} color={currentTheme.colors.primary} />
-                    </View>
-                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current:</Text>
-                    <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                      {getDisplayedAppVersion()}
-                    </Text>
-                  </View>
-
-                  <View style={styles.infoItem}>
-                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
-                      <MaterialIcons name="tag" size={14} color={currentTheme.colors.primary} />
-                    </View>
-                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Latest:</Text>
-                    <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                      {github.latestTag}
-                    </Text>
-                  </View>
-
-                  {github.releaseNotes ? (
-                    <View style={{ marginTop: 4 }}>
-                      <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Notes:</Text>
-                      <Text
-                        numberOfLines={3}
-                        style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
-                      >
-                        {github.releaseNotes}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  <View style={[styles.actionSection, { marginTop: 8 }]}> 
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                      <TouchableOpacity
-                        style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
-                        onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
-                        activeOpacity={0.8}
-                      >
-                        <MaterialIcons name="open-in-new" size={18} color="white" />
-                        <Text style={styles.modernButtonText}>View Release</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </SettingsCard>
-            ) : null}
-
-            {false && (
-              <SettingsCard title="UPDATE LOGS" isTablet={isTablet}>
-                <View style={styles.logsContainer}>
-                  <View style={styles.logsHeader}>
-                    <Text style={[styles.logsHeaderText, { color: currentTheme.colors.highEmphasis }]}>
-                      Update Service Logs
-                    </Text>
-                    <View style={styles.logsActions}>
-                      <TouchableOpacity
-                        style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-                        onPress={testConnectivity}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialIcons name="wifi" size={16} color={currentTheme.colors.primary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
-                        onPress={testAssetUrls}
-                        activeOpacity={0.7}
-                      >
-                        <MaterialIcons name="link" size={16} color={currentTheme.colors.primary} />
-                      </TouchableOpacity>
-                      {/* Test log removed */}
-                      {/* Copy all logs removed */}
-                      {/* Refresh logs removed */}
-                      {/* Clear logs removed */}
-                    </View>
-                  </View>
-                  
-                  <ScrollView 
-                    style={[styles.logsScrollView, { backgroundColor: currentTheme.colors.elevation2 }]}
-                    showsVerticalScrollIndicator={true}
-                    nestedScrollEnabled={true}
+                {updateInfo?.isAvailable && updateStatus !== 'success' && (
+                  <TouchableOpacity
+                    style={[
+                      styles.modernButton,
+                      styles.installAction,
+                      { backgroundColor: currentTheme.colors.success || '#34C759' },
+                      (isInstalling) && styles.disabledAction
+                    ]}
+                    onPress={installUpdate}
+                    disabled={isInstalling}
+                    activeOpacity={0.8}
                   >
-                    {false ? (
-                      <Text style={[styles.noLogsText, { color: currentTheme.colors.mediumEmphasis }]}>No logs available</Text>
+                    {isInstalling ? (
+                      <MaterialIcons name="install-mobile" size={18} color="white" />
                     ) : (
-                      ([] as string[]).map((log, index) => {
-                        const isError = log.indexOf('[ERROR]') !== -1;
-                        const isWarning = log.indexOf('[WARN]') !== -1;
-                        
-                        return (
-                          <TouchableOpacity 
-                            key={index} 
-                            style={[
-                              styles.logEntry,
-                              { backgroundColor: 'rgba(255,255,255,0.05)' }
-                            ]}
-                            onPress={() => {}}
-                            activeOpacity={0.7}
-                          >
-                            <View style={styles.logEntryContent}>
-                              <Text style={[
-                                styles.logText,
-                                { 
-                                  color: isError 
-                                    ? (currentTheme.colors.error || '#ff4444')
-                                    : isWarning 
-                                    ? (currentTheme.colors.warning || '#ffaa00')
-                                    : currentTheme.colors.mediumEmphasis 
-                                }
-                              ]}>
-                                {log}
-                              </Text>
-                              <MaterialIcons 
-                                name="content-copy" 
-                                size={14} 
-                                color={currentTheme.colors.mediumEmphasis}
-                                style={styles.logCopyIcon}
-                              />
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      })
+                      <MaterialIcons name="download" size={18} color="white" />
                     )}
-                  </ScrollView>
+                    <Text style={styles.modernButtonText}>
+                      {isInstalling ? 'Installing...' : 'Install Update'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+              </View>
+            </View>
+
+            {/* Release Notes */}
+            {updateInfo?.isAvailable && !!getReleaseNotes() && (
+              <View style={styles.infoSection}>
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                    <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
+                  </View>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Release notes:</Text>
                 </View>
-              </SettingsCard>
+                <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>{getReleaseNotes()}</Text>
+              </View>
             )}
-          </ScrollView>
-        </View>
+
+            {/* Info Section */}
+            <View style={styles.infoSection}>
+              <View style={styles.infoItem}>
+                <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                  <MaterialIcons name="info-outline" size={14} color={currentTheme.colors.primary} />
+                </View>
+                <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Version:</Text>
+                <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                  {updateInfo?.manifest?.id ? `${updateInfo.manifest.id.substring(0, 8)}...` : 'Unknown'}
+                </Text>
+              </View>
+
+              {lastChecked && (
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                    <MaterialIcons name="schedule" size={14} color={currentTheme.colors.primary} />
+                  </View>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Last checked:</Text>
+                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                    {formatDate(lastChecked)}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Current Version Section */}
+            <View style={styles.infoSection}>
+              <View style={styles.infoItem}>
+                <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                  <MaterialIcons name="verified" size={14} color={currentTheme.colors.primary} />
+                </View>
+                <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current version:</Text>
+                <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
+                  selectable>
+                  {currentInfo?.manifest?.id || (currentInfo?.isEmbeddedLaunch === false ? 'Unknown' : 'Embedded')}
+                </Text>
+              </View>
+
+              {!!getCurrentReleaseNotes() && (
+                <View style={{ marginTop: 8 }}>
+                  <View style={[styles.infoItem, { alignItems: 'flex-start' }]}>
+                    <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                      <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
+                    </View>
+                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current release notes:</Text>
+                  </View>
+                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                    {getCurrentReleaseNotes()}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Developer Logs removed */}
+          </SettingsCard>
+
+          {/* GitHub Release (compact) – only show when update is available */}
+          {github.latestTag && isAnyUpgrade(getDisplayedAppVersion(), github.latestTag) ? (
+            <SettingsCard title="GITHUB RELEASE" isTablet={isTablet}>
+              <View style={styles.infoSection}>
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                    <MaterialIcons name="new-releases" size={14} color={currentTheme.colors.primary} />
+                  </View>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current:</Text>
+                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                    {getDisplayedAppVersion()}
+                  </Text>
+                </View>
+
+                <View style={styles.infoItem}>
+                  <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
+                    <MaterialIcons name="tag" size={14} color={currentTheme.colors.primary} />
+                  </View>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Latest:</Text>
+                  <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
+                    {github.latestTag}
+                  </Text>
+                </View>
+
+                {github.releaseNotes ? (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Notes:</Text>
+                    <Text
+                      numberOfLines={3}
+                      style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
+                    >
+                      {github.releaseNotes}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <View style={[styles.actionSection, { marginTop: 8 }]}>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
+                      onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}
+                      activeOpacity={0.8}
+                    >
+                      <MaterialIcons name="open-in-new" size={18} color="white" />
+                      <Text style={styles.modernButtonText}>View Release</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </SettingsCard>
+          ) : null}
+
+          {/* Update Notification Settings */}
+          <SettingsCard title="NOTIFICATION SETTINGS" isTablet={isTablet}>
+            {/* OTA Updates Toggle */}
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                  OTA Update Alerts
+                </Text>
+                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Show notifications for over-the-air updates
+                </Text>
+              </View>
+              <Switch
+                value={otaAlertsEnabled}
+                onValueChange={handleOtaAlertsToggle}
+                trackColor={{ false: '#505050', true: currentTheme.colors.primary }}
+                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                ios_backgroundColor="#505050"
+              />
+            </View>
+
+            {/* Major Updates Toggle */}
+            <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.settingInfo}>
+                <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                  Major Update Alerts
+                </Text>
+                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Show notifications for new app versions on GitHub
+                </Text>
+              </View>
+              <Switch
+                value={majorAlertsEnabled}
+                onValueChange={handleMajorAlertsToggle}
+                trackColor={{ false: '#505050', true: currentTheme.colors.primary }}
+                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                ios_backgroundColor="#505050"
+              />
+            </View>
+
+            {/* Warning note */}
+            <View style={[styles.infoItem, { paddingHorizontal: 16, paddingBottom: 12 }]}>
+              <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.warning || '#FFA500'}20` }]}>
+                <MaterialIcons name="info-outline" size={14} color={currentTheme.colors.warning || '#FFA500'} />
+              </View>
+              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, flex: 1 }]}>
+                Keeping alerts enabled ensures you receive bug fixes and can provide accurate crash reports.
+              </Text>
+            </View>
+          </SettingsCard>
+
+          {false && (
+            <SettingsCard title="UPDATE LOGS" isTablet={isTablet}>
+              <View style={styles.logsContainer}>
+                <View style={styles.logsHeader}>
+                  <Text style={[styles.logsHeaderText, { color: currentTheme.colors.highEmphasis }]}>
+                    Update Service Logs
+                  </Text>
+                  <View style={styles.logsActions}>
+                    <TouchableOpacity
+                      style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                      onPress={testConnectivity}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialIcons name="wifi" size={16} color={currentTheme.colors.primary} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.logActionButton, { backgroundColor: currentTheme.colors.elevation2 }]}
+                      onPress={testAssetUrls}
+                      activeOpacity={0.7}
+                    >
+                      <MaterialIcons name="link" size={16} color={currentTheme.colors.primary} />
+                    </TouchableOpacity>
+                    {/* Test log removed */}
+                    {/* Copy all logs removed */}
+                    {/* Refresh logs removed */}
+                    {/* Clear logs removed */}
+                  </View>
+                </View>
+
+                <ScrollView
+                  style={[styles.logsScrollView, { backgroundColor: currentTheme.colors.elevation2 }]}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                >
+                  {false ? (
+                    <Text style={[styles.noLogsText, { color: currentTheme.colors.mediumEmphasis }]}>No logs available</Text>
+                  ) : (
+                    ([] as string[]).map((log, index) => {
+                      const isError = log.indexOf('[ERROR]') !== -1;
+                      const isWarning = log.indexOf('[WARN]') !== -1;
+
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={[
+                            styles.logEntry,
+                            { backgroundColor: 'rgba(255,255,255,0.05)' }
+                          ]}
+                          onPress={() => { }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.logEntryContent}>
+                            <Text style={[
+                              styles.logText,
+                              {
+                                color: isError
+                                  ? (currentTheme.colors.error || '#ff4444')
+                                  : isWarning
+                                    ? (currentTheme.colors.warning || '#ffaa00')
+                                    : currentTheme.colors.mediumEmphasis
+                              }
+                            ]}>
+                              {log}
+                            </Text>
+                            <MaterialIcons
+                              name="content-copy"
+                              size={14}
+                              color={currentTheme.colors.mediumEmphasis}
+                              style={styles.logCopyIcon}
+                            />
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            </SettingsCard>
+          )}
+        </ScrollView>
+      </View>
       <CustomAlert
         visible={alertVisible}
         title={alertTitle}
@@ -715,7 +832,7 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingBottom: 90,
   },
-  
+
   // Common card styles
   cardContainer: {
     width: '100%',
@@ -754,7 +871,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  
+
   // Update UI Styles
   updateMainCard: {
     padding: 20,
@@ -810,9 +927,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modernProgressFill: {
-     height: '100%',
-     borderRadius: 4,
-   },
+    height: '100%',
+    borderRadius: 4,
+  },
   actionSection: {
     gap: 12,
   },
@@ -905,7 +1022,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  
+
   // Logs styles
   logsContainer: {
     padding: 20,
@@ -961,6 +1078,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 20,
+  },
+
+  // Settings toggle styles
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  settingDescription: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
 

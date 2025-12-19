@@ -59,7 +59,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -67,13 +67,13 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced spacing and padding
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -89,8 +89,11 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   }, [deviceType]);
 
   // Animation values for smooth height transition
-  const animatedHeight = useSharedValue(0);
+  // Start with a reasonable default height (3 lines * 24px line height = 72px) to prevent layout shift
+  const defaultCollapsedHeight = isTV ? 84 : isLargeTablet ? 78 : isTablet ? 72 : 72;
+  const animatedHeight = useSharedValue(defaultCollapsedHeight);
   const [measuredHeights, setMeasuredHeights] = useState({ collapsed: 0, expanded: 0 });
+  const [hasInitialMeasurement, setHasInitialMeasurement] = useState(false);
 
   useEffect(() => {
     const checkMDBListEnabled = async () => {
@@ -101,7 +104,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
         setIsMDBEnabled(false); // Default to disabled if there's an error
       }
     };
-    
+
     checkMDBListEnabled();
   }, []);
 
@@ -114,6 +117,12 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
   const handleCollapsedTextLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
     setMeasuredHeights(prev => ({ ...prev, collapsed: height }));
+    // Only set initial measurement flag once we have a valid height
+    if (height > 0 && !hasInitialMeasurement) {
+      setHasInitialMeasurement(true);
+      // Update animated height immediately without animation for first measurement
+      animatedHeight.value = height;
+    }
   };
 
   const handleExpandedTextLayout = (event: any) => {
@@ -128,49 +137,53 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
     setIsFullDescriptionOpen(!isFullDescriptionOpen);
   };
 
-  // Initialize height when component mounts or text changes
+  // Update height when measurements change (only after initial measurement)
   useEffect(() => {
-    if (measuredHeights.collapsed > 0) {
-      animatedHeight.value = measuredHeights.collapsed;
+    if (measuredHeights.collapsed > 0 && hasInitialMeasurement && !isFullDescriptionOpen) {
+      // Only animate if the height actually changed significantly
+      const currentHeight = animatedHeight.value;
+      if (Math.abs(currentHeight - measuredHeights.collapsed) > 5) {
+        animatedHeight.value = measuredHeights.collapsed;
+      }
     }
-  }, [measuredHeights.collapsed]);
+  }, [measuredHeights.collapsed, hasInitialMeasurement, isFullDescriptionOpen]);
 
-  // Animated style for smooth height transition
+  // Animated style for smooth height transition - use minHeight to prevent collapse to 0
   const animatedDescriptionStyle = useAnimatedStyle(() => ({
-    height: animatedHeight.value,
+    height: animatedHeight.value > 0 ? animatedHeight.value : defaultCollapsedHeight,
     overflow: 'hidden',
   }));
 
-function formatRuntime(runtime: string): string {
-  // Try to match formats like "1h55min", "2h 7min", "125 min", etc.
-  const match = runtime.match(/(?:(\d+)\s*h\s*)?(\d+)\s*min/i);
-  if (match) {
-    const h = match[1] ? parseInt(match[1], 10) : 0;
-    const m = match[2] ? parseInt(match[2], 10) : 0;
-    if (h > 0) {
-      return `${h}H ${m}M`;
+  function formatRuntime(runtime: string): string {
+    // Try to match formats like "1h55min", "2h 7min", "125 min", etc.
+    const match = runtime.match(/(?:(\d+)\s*h\s*)?(\d+)\s*min/i);
+    if (match) {
+      const h = match[1] ? parseInt(match[1], 10) : 0;
+      const m = match[2] ? parseInt(match[2], 10) : 0;
+      if (h > 0) {
+        return `${h}H ${m}M`;
+      }
+      if (m < 60) {
+        return `${m} MIN`;
+      }
+      const hours = Math.floor(m / 60);
+      const mins = m % 60;
+      return hours > 0 ? `${hours}H ${mins}M` : `${mins} MIN`;
     }
-    if (m < 60) {
-      return `${m} MIN`;
+
+    // Fallback: treat as minutes if it's a number
+    const r = parseInt(runtime, 10);
+    if (!isNaN(r)) {
+      if (r < 60) return `${r} MIN`;
+      const h = Math.floor(r / 60);
+      const m = r % 60;
+      return h > 0 ? `${h}H ${m}M` : `${m} MIN`;
     }
-    const hours = Math.floor(m / 60);
-    const mins = m % 60;
-    return hours > 0 ? `${hours}H ${mins}M` : `${mins} MIN`;
-  }
 
-  // Fallback: treat as minutes if it's a number
-  const r = parseInt(runtime, 10);
-  if (!isNaN(r)) {
-    if (r < 60) return `${r} MIN`;
-    const h = Math.floor(r / 60);
-    const m = r % 60;
-    return h > 0 ? `${h}H ${m}M` : `${m} MIN`;
-  }
+    // If not matched, return as is
+    return runtime;
 
-  // If not matched, return as is
-  return runtime;
-  
-}
+  }
 
   return (
     <>
@@ -188,17 +201,17 @@ function formatRuntime(runtime: string): string {
 
       {/* Meta Info */}
       <View style={[
-        styles.metaInfo, 
+        styles.metaInfo,
         loadingMetadata && styles.dimmed,
-        { 
+        {
           paddingHorizontal: horizontalPadding,
           gap: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 18
         }
       ]}>
         {metadata.year && (
           <Text style={[
-            styles.metaText, 
-            { 
+            styles.metaText,
+            {
               color: currentTheme.colors.text,
               fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
             }
@@ -206,8 +219,8 @@ function formatRuntime(runtime: string): string {
         )}
         {metadata.runtime && (
           <Text style={[
-            styles.metaText, 
-            { 
+            styles.metaText,
+            {
               color: currentTheme.colors.text,
               fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
             }
@@ -232,8 +245,8 @@ function formatRuntime(runtime: string): string {
               resizeMode={FastImage.resizeMode.contain}
             />
             <Text style={[
-              styles.ratingText, 
-              { 
+              styles.ratingText,
+              {
                 color: currentTheme.colors.text,
                 fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
               }
@@ -249,7 +262,7 @@ function formatRuntime(runtime: string): string {
       <Animated.View
         entering={FadeIn.duration(300).delay(100)}
         style={[
-          styles.creatorContainer, 
+          styles.creatorContainer,
           loadingMetadata && styles.dimmed,
           { paddingHorizontal: horizontalPadding }
         ]}
@@ -263,16 +276,16 @@ function formatRuntime(runtime: string): string {
             }
           ]}>
             <Text style={[
-              styles.creatorLabel, 
-              { 
+              styles.creatorLabel,
+              {
                 color: currentTheme.colors.white,
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
                 lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
               }
             ]}>Director{metadata.directors.length > 1 ? 's' : ''}:</Text>
             <Text style={[
-              styles.creatorText, 
-              { 
+              styles.creatorText,
+              {
                 color: currentTheme.colors.mediumEmphasis,
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
                 lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
@@ -289,16 +302,16 @@ function formatRuntime(runtime: string): string {
             }
           ]}>
             <Text style={[
-              styles.creatorLabel, 
-              { 
+              styles.creatorLabel,
+              {
                 color: currentTheme.colors.white,
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
                 lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
               }
             ]}>Creator{metadata.creators.length > 1 ? 's' : ''}:</Text>
             <Text style={[
-              styles.creatorText, 
-              { 
+              styles.creatorText,
+              {
                 color: currentTheme.colors.mediumEmphasis,
                 fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
                 lineHeight: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20
@@ -308,11 +321,11 @@ function formatRuntime(runtime: string): string {
         )}
       </Animated.View>
 
-      {/* Description */}
-      {metadata.description && (
+      {/* Description - Show skeleton if no description yet to prevent layout shift */}
+      {metadata.description ? (
         <Animated.View
           style={[
-            styles.descriptionContainer, 
+            styles.descriptionContainer,
             loadingMetadata && styles.dimmed,
             { paddingHorizontal: horizontalPadding }
           ]}
@@ -321,10 +334,10 @@ function formatRuntime(runtime: string): string {
           {/* Hidden text elements to measure heights */}
           <Text
             style={[
-              styles.description, 
-              { 
-                color: currentTheme.colors.mediumEmphasis, 
-                position: 'absolute', 
+              styles.description,
+              {
+                color: currentTheme.colors.mediumEmphasis,
+                position: 'absolute',
                 opacity: 0,
                 fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
                 lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
@@ -337,10 +350,10 @@ function formatRuntime(runtime: string): string {
           </Text>
           <Text
             style={[
-              styles.description, 
-              { 
-                color: currentTheme.colors.mediumEmphasis, 
-                position: 'absolute', 
+              styles.description,
+              {
+                color: currentTheme.colors.mediumEmphasis,
+                position: 'absolute',
                 opacity: 0,
                 fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
                 lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
@@ -359,8 +372,8 @@ function formatRuntime(runtime: string): string {
             <Animated.View style={animatedDescriptionStyle}>
               <Text
                 style={[
-                  styles.description, 
-                  { 
+                  styles.description,
+                  {
                     color: currentTheme.colors.mediumEmphasis,
                     fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15,
                     lineHeight: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24
@@ -381,8 +394,8 @@ function formatRuntime(runtime: string): string {
                 }
               ]}>
                 <Text style={[
-                  styles.showMoreText, 
-                  { 
+                  styles.showMoreText,
+                  {
                     color: currentTheme.colors.textMuted,
                     fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
                   }
@@ -398,6 +411,20 @@ function formatRuntime(runtime: string): string {
             )}
           </TouchableOpacity>
         </Animated.View>
+      ) : (
+        /* Skeleton placeholder for description to prevent layout shift */
+        <View
+          style={[
+            styles.descriptionContainer,
+            { paddingHorizontal: horizontalPadding, minHeight: defaultCollapsedHeight }
+          ]}
+        >
+          <View style={[styles.descriptionSkeleton, { backgroundColor: currentTheme.colors.elevation1 }]}>
+            <View style={[styles.skeletonLine, { width: '100%', height: isTV ? 18 : 15, backgroundColor: currentTheme.colors.elevation1, marginBottom: 8 }]} />
+            <View style={[styles.skeletonLine, { width: '95%', height: isTV ? 18 : 15, backgroundColor: currentTheme.colors.elevation1, marginBottom: 8 }]} />
+            <View style={[styles.skeletonLine, { width: '80%', height: isTV ? 18 : 15, backgroundColor: currentTheme.colors.elevation1 }]} />
+          </View>
+        </View>
       )}
     </>
   );
@@ -490,6 +517,12 @@ const styles = StyleSheet.create({
   showMoreText: {
     fontSize: 14,
     marginRight: 4,
+  },
+  descriptionSkeleton: {
+    borderRadius: 4,
+  },
+  skeletonLine: {
+    borderRadius: 4,
   },
 });
 

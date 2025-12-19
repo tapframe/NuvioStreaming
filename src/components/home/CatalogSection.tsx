@@ -41,13 +41,13 @@ const calculatePosterLayout = (screenWidth: number) => {
   const MAX_POSTER_WIDTH = 130; // Reduced maximum for more posters
   const LEFT_PADDING = 16; // Left padding
   const SPACING = 8; // Space between posters
-  
+
   // Calculate available width for posters (reserve space for left padding)
   const availableWidth = screenWidth - LEFT_PADDING;
-  
+
   // Try different numbers of full posters to find the best fit
   let bestLayout = { numFullPosters: 3, posterWidth: 120 };
-  
+
   for (let n = 3; n <= 6; n++) {
     // Calculate poster width needed for N full posters + 0.25 partial poster
     // Formula: N * posterWidth + (N-1) * spacing + 0.25 * posterWidth = availableWidth - rightPadding
@@ -55,12 +55,12 @@ const calculatePosterLayout = (screenWidth: number) => {
     // We'll use minimal right padding (8px) to maximize space
     const usableWidth = availableWidth - 8;
     const posterWidth = (usableWidth - (n - 1) * SPACING) / (n + 0.25);
-    
+
     if (posterWidth >= MIN_POSTER_WIDTH && posterWidth <= MAX_POSTER_WIDTH) {
       bestLayout = { numFullPosters: n, posterWidth };
     }
   }
-  
+
   return {
     numFullPosters: bestLayout.numFullPosters,
     posterWidth: bestLayout.posterWidth,
@@ -82,8 +82,8 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
 
   const renderContentItem = useCallback(({ item }: { item: StreamingContent, index: number }) => {
     return (
-      <ContentItem 
-        item={item} 
+      <ContentItem
+        item={item}
         onPress={handleContentPress}
       />
     );
@@ -96,25 +96,11 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
   // Memoize the keyExtractor to prevent re-creation
   const keyExtractor = useCallback((item: StreamingContent) => `${item.id}-${item.type}`, []);
 
-  // Calculate item width for getItemLayout - use base POSTER_WIDTH for consistent spacing
-  // Note: ContentItem may apply size multipliers based on settings, but base width ensures consistent layout
-  const itemWidth = useMemo(() => POSTER_WIDTH, []);
 
-  // getItemLayout for consistent spacing and better performance
-  const getItemLayout = useCallback((data: any, index: number) => {
-    const length = itemWidth + separatorWidth;
-    const paddingHorizontal = isTV ? 32 : isLargeTablet ? 28 : isTablet ? 24 : 16;
-    return {
-      length,
-      offset: paddingHorizontal + (length * index),
-      index,
-    };
-  }, [itemWidth, separatorWidth, isTV, isLargeTablet, isTablet]);
 
   return (
-    <Animated.View
+    <View
       style={styles.catalogContainer}
-      entering={FadeIn.duration(400)}
     >
       <View style={[
         styles.catalogHeader,
@@ -145,7 +131,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
           />
         </View>
         <TouchableOpacity
-          onPress={() => 
+          onPress={() =>
             navigation.navigate('Catalog', {
               id: catalog.id,
               type: catalog.type,
@@ -176,7 +162,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
           />
         </TouchableOpacity>
       </View>
-      
+
       <FlatList
         data={catalog.items}
         renderItem={renderContentItem}
@@ -195,14 +181,13 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
           }
         ])}
         ItemSeparatorComponent={ItemSeparator}
-        getItemLayout={getItemLayout}
         removeClippedSubviews={true}
         initialNumToRender={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
         maxToRenderPerBatch={isTV ? 4 : isLargeTablet ? 4 : 3}
         windowSize={isTV ? 4 : isLargeTablet ? 4 : 3}
         updateCellsBatchingPeriod={50}
       />
-    </Animated.View>
+    </View>
   );
 };
 
@@ -262,8 +247,8 @@ export default React.memo(CatalogSection, (prevProps, nextProps) => {
     prevProps.catalog.name === nextProps.catalog.name &&
     prevProps.catalog.items.length === nextProps.catalog.items.length &&
     // Deep compare the first few items to detect changes
-    prevProps.catalog.items.slice(0, 3).every((item, index) => 
-      nextProps.catalog.items[index] && 
+    prevProps.catalog.items.slice(0, 3).every((item, index) =>
+      nextProps.catalog.items[index] &&
       item.id === nextProps.catalog.items[index].id &&
       item.poster === nextProps.catalog.items[index].poster
     )

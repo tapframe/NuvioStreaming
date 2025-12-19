@@ -293,10 +293,43 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     const mergeBatchIntoState = async (batch: ContinueWatchingItem[]) => {
       if (!batch || batch.length === 0) return;
 
+      // 1. Filter items first (async checks) - do this BEFORE any state updates
+      const validItems: ContinueWatchingItem[] = [];
+      for (const it of batch) {
+        const key = `${it.type}:${it.id}`;
+
+        // Skip recently removed items
+        if (recentlyRemovedRef.current.has(key)) {
+          continue;
+        }
+
+        // Skip persistently removed items
+        const isRemoved = await storageService.isContinueWatchingRemoved(it.id, it.type);
+        if (isRemoved) {
+          continue;
+        }
+
+        validItems.push(it);
+      }
+
+      if (validItems.length === 0) return;
+
+      // 2. Single state update for the entire batch
       setContinueWatchingItems((prev) => {
         const map = new Map<string, ContinueWatchingItem>();
+        // Add existing items
         for (const it of prev) {
           map.set(`${it.type}:${it.id}`, it);
+        }
+
+        // Merge new valid items
+        for (const it of validItems) {
+          const key = `${it.type}:${it.id}`;
+          const existing = map.get(key);
+          // Only update if newer or doesn't exist
+          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
+            map.set(key, it);
+          }
         }
 
         const merged = Array.from(map.values());
@@ -304,40 +337,6 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
         return merged;
       });
-
-      // Process batch items asynchronously to check removal status
-      for (const it of batch) {
-        const key = `${it.type}:${it.id}`;
-
-        // Skip recently removed items to prevent immediate re-addition
-        if (recentlyRemovedRef.current.has(key)) {
-          continue;
-        }
-
-        // Skip items that have been persistently marked as removed
-        const isRemoved = await storageService.isContinueWatchingRemoved(it.id, it.type);
-        if (isRemoved) {
-          continue;
-        }
-
-        // Add the item to state
-        setContinueWatchingItems((prev) => {
-          const map = new Map<string, ContinueWatchingItem>();
-          for (const existing of prev) {
-            map.set(`${existing.type}:${existing.id}`, existing);
-          }
-
-          const existing = map.get(key);
-          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
-            map.set(key, it);
-            const merged = Array.from(map.values());
-            merged.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
-            return merged;
-          }
-
-          return prev;
-        });
-      }
     };
 
     try {
@@ -604,7 +603,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }
       });
 
-      // TRÅKT: fetch history and merge incrementally as well
+      // TRAKT: fetch playback progress (in-progress items) and history, merge incrementally
       const traktMergePromise = (async () => {
         try {
           const traktService = TraktService.getInstance();
@@ -619,28 +618,132 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           }
 
           lastTraktSyncRef.current = now;
-          const historyItems = await traktService.getWatchedEpisodesHistory(1, 200);
+
+          // Fetch both playback progress (paused items) and watch history in parallel
+          const [playbackItems, historyItems, watchedShows] = await Promise.all([
+            traktService.getPlaybackProgress(), // Items with actual progress %
+            traktService.getWatchedEpisodesHistory(1, 200), // Completed episodes
+            traktService.getWatchedShows(), // For reset_at handling
+          ]);
+
+          // Build a map of shows with reset_at for re-watching support
+          const showResetMap: Record<string, number> = {};
+          for (const show of watchedShows) {
+            if (show.show?.ids?.imdb && show.reset_at) {
+              const imdbId = show.show.ids.imdb.startsWith('tt')
+                ? show.show.ids.imdb
+                : `tt${show.show.ids.imdb}`;
+              showResetMap[imdbId] = new Date(show.reset_at).getTime();
+            }
+          }
+
+          const traktBatch: ContinueWatchingItem[] = [];
+          const processedShows = new Set<string>(); // Track which shows we've added
+
+          // STEP 1: Process playback progress items (in-progress, paused)
+          // These have actual progress percentage from Trakt
+          for (const item of playbackItems) {
+            try {
+              // Skip items with very low or very high progress
+              if (item.progress <= 0 || item.progress >= 85) continue;
+
+              if (item.type === 'movie' && item.movie?.ids?.imdb) {
+                const imdbId = item.movie.ids.imdb.startsWith('tt')
+                  ? item.movie.ids.imdb
+                  : `tt${item.movie.ids.imdb}`;
+
+                // Check if recently removed
+                const movieKey = `movie:${imdbId}`;
+                if (recentlyRemovedRef.current.has(movieKey)) continue;
+
+                const cachedData = await getCachedMetadata('movie', imdbId);
+                if (!cachedData?.basicContent) continue;
+
+                const pausedAt = new Date(item.paused_at).getTime();
+                traktBatch.push({
+                  ...cachedData.basicContent,
+                  id: imdbId,
+                  type: 'movie',
+                  progress: item.progress,
+                  lastUpdated: pausedAt,
+                } as ContinueWatchingItem);
+
+                logger.log(`📺 [TraktPlayback] Adding movie ${item.movie.title} with ${item.progress.toFixed(1)}% progress`);
+
+              } else if (item.type === 'episode' && item.show?.ids?.imdb && item.episode) {
+                const showImdb = item.show.ids.imdb.startsWith('tt')
+                  ? item.show.ids.imdb
+                  : `tt${item.show.ids.imdb}`;
+
+                // Check if recently removed
+                const showKey = `series:${showImdb}`;
+                if (recentlyRemovedRef.current.has(showKey)) continue;
+
+                // Check reset_at - skip if this was paused before re-watch started
+                const resetTime = showResetMap[showImdb];
+                const pausedAt = new Date(item.paused_at).getTime();
+                if (resetTime && pausedAt < resetTime) {
+                  logger.log(`🔄 [TraktPlayback] Skipping ${showImdb} S${item.episode.season}E${item.episode.number} - paused before reset_at`);
+                  continue;
+                }
+
+                const cachedData = await getCachedMetadata('series', showImdb);
+                if (!cachedData?.basicContent) continue;
+
+                traktBatch.push({
+                  ...cachedData.basicContent,
+                  id: showImdb,
+                  type: 'series',
+                  progress: item.progress,
+                  lastUpdated: pausedAt,
+                  season: item.episode.season,
+                  episode: item.episode.number,
+                  episodeTitle: item.episode.title || `Episode ${item.episode.number}`,
+                } as ContinueWatchingItem);
+
+                processedShows.add(showImdb);
+                logger.log(`📺 [TraktPlayback] Adding ${item.show.title} S${item.episode.season}E${item.episode.number} with ${item.progress.toFixed(1)}% progress`);
+              }
+            } catch (err) {
+              // Continue with other items
+            }
+          }
+
+          // STEP 2: Process watch history for shows NOT in playback progress
+          // Find the next episode for completed shows
           const latestWatchedByShow: Record<string, { season: number; episode: number; watchedAt: number }> = {};
           for (const item of historyItems) {
             if (item.type !== 'episode') continue;
-            const showImdb = item.show?.ids?.imdb ? `tt${item.show.ids.imdb.replace(/^tt/, '')}` : null;
+            const showImdb = item.show?.ids?.imdb
+              ? (item.show.ids.imdb.startsWith('tt') ? item.show.ids.imdb : `tt${item.show.ids.imdb}`)
+              : null;
             if (!showImdb) continue;
+
+            // Skip if we already have an in-progress episode for this show
+            if (processedShows.has(showImdb)) continue;
+
             const season = item.episode?.season;
             const epNum = item.episode?.number;
             if (season === undefined || epNum === undefined) continue;
+
             const watchedAt = new Date(item.watched_at).getTime();
+
+            // Check reset_at - skip episodes watched before re-watch started
+            const resetTime = showResetMap[showImdb];
+            if (resetTime && watchedAt < resetTime) {
+              continue; // This was watched in a previous viewing
+            }
+
             const existing = latestWatchedByShow[showImdb];
             if (!existing || existing.watchedAt < watchedAt) {
               latestWatchedByShow[showImdb] = { season, episode: epNum, watchedAt };
             }
           }
 
-          // Collect all valid Trakt items first, then merge as a batch
-          const traktBatch: ContinueWatchingItem[] = [];
-
+          // Add next episodes for completed shows
           for (const [showId, info] of Object.entries(latestWatchedByShow)) {
             try {
-              // Check if this show was recently removed by the user
+              // Check if this show was recently removed
               const showKey = `series:${showId}`;
               if (recentlyRemovedRef.current.has(showKey)) {
                 logger.log(`🚫 [TraktSync] Skipping recently removed show: ${showKey}`);
@@ -659,7 +762,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                     ...basicContent,
                     id: showId,
                     type: 'series',
-                    progress: 0,
+                    progress: 0, // Next episode, not started
                     lastUpdated: info.watchedAt,
                     season: nextEpisodeVideo.season,
                     episode: nextEpisodeVideo.episode,
@@ -668,13 +771,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 }
               }
 
-              // Persist "watched" progress for the episode that Trakt reported (only if not recently removed)
+              // Persist "watched" progress for the episode that Trakt reported
               if (!recentlyRemovedRef.current.has(showKey)) {
                 const watchedEpisodeId = `${showId}:${info.season}:${info.episode}`;
                 const existingProgress = allProgress[`series:${showId}:${watchedEpisodeId}`];
                 const existingPercent = existingProgress ? (existingProgress.currentTime / existingProgress.duration) * 100 : 0;
                 if (!existingProgress || existingPercent < 85) {
-                  logger.log(`💾 [TraktSync] Adding local progress for ${showId}: S${info.season}E${info.episode}`);
                   await storageService.setWatchProgress(
                     showId,
                     'series',
@@ -688,20 +790,19 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                     `${info.season}:${info.episode}`
                   );
                 }
-              } else {
-                logger.log(`🚫 [TraktSync] Skipping local progress for recently removed show: ${showKey}`);
               }
             } catch (err) {
-              // Continue with other shows even if one fails
+              // Continue with other shows
             }
           }
 
           // Merge all Trakt items as a single batch to ensure proper sorting
           if (traktBatch.length > 0) {
+            logger.log(`📋 [TraktSync] Merging ${traktBatch.length} items from Trakt (playback + history)`);
             await mergeBatchIntoState(traktBatch);
           }
         } catch (err) {
-          // Continue even if Trakt history merge fails
+          logger.error('[TraktSync] Error in Trakt merge:', err);
         }
       })();
 
@@ -1157,9 +1258,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <Animated.View
+    <View
       style={styles.container}
-      entering={FadeIn.duration(350)}
     >
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
         <View style={styles.titleContainer}>
@@ -1207,7 +1307,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         actions={alertActions}
         onClose={() => setAlertVisible(false)}
       />
-    </Animated.View>
+    </View>
   );
 });
 

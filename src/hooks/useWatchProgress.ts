@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTraktContext } from '../contexts/TraktContext';
 import { logger } from '../utils/logger';
@@ -14,26 +14,31 @@ interface WatchProgressData {
 }
 
 export const useWatchProgress = (
-  id: string, 
-  type: 'movie' | 'series', 
+  id: string,
+  type: 'movie' | 'series',
   episodeId?: string,
   episodes: any[] = []
 ) => {
   const [watchProgress, setWatchProgress] = useState<WatchProgressData | null>(null);
   const { isAuthenticated: isTraktAuthenticated } = useTraktContext();
-  
+
+  // Use ref for episodes to avoid infinite loops - episodes array changes on every render
+  const episodesRef = useRef(episodes);
+  episodesRef.current = episodes;
+
   // Function to get episode details from episodeId
   const getEpisodeDetails = useCallback((episodeId: string): { seasonNumber: string; episodeNumber: string; episodeName: string } | null => {
+    const currentEpisodes = episodesRef.current;
     // Try to parse from format "seriesId:season:episode"
     const parts = episodeId.split(':');
     if (parts.length === 3) {
       const [, seasonNum, episodeNum] = parts;
       // Find episode in our local episodes array
-      const episode = episodes.find(
-        ep => ep.season_number === parseInt(seasonNum) && 
-              ep.episode_number === parseInt(episodeNum)
+      const episode = currentEpisodes.find(
+        ep => ep.season_number === parseInt(seasonNum) &&
+          ep.episode_number === parseInt(episodeNum)
       );
-      
+
       if (episode) {
         return {
           seasonNumber: seasonNum,
@@ -44,7 +49,7 @@ export const useWatchProgress = (
     }
 
     // If not found by season/episode, try stremioId
-    const episodeByStremioId = episodes.find(ep => ep.stremioId === episodeId);
+    const episodeByStremioId = currentEpisodes.find(ep => ep.stremioId === episodeId);
     if (episodeByStremioId) {
       return {
         seasonNumber: episodeByStremioId.season_number.toString(),
@@ -54,15 +59,15 @@ export const useWatchProgress = (
     }
 
     return null;
-  }, [episodes]);
-  
+  }, []); // Removed episodes dependency - using ref instead
+
   // Enhanced load watch progress with Trakt integration
   const loadWatchProgress = useCallback(async () => {
     try {
       if (id && type) {
         if (type === 'series') {
           const allProgress = await storageService.getAllWatchProgress();
-          
+
           // Function to get episode number from episodeId
           const getEpisodeNumber = (epId: string) => {
             const parts = epId.split(':');
@@ -93,8 +98,8 @@ export const useWatchProgress = (
             if (progress) {
               // Always show the current episode progress when viewing it specifically
               // This allows HeroSection to properly display watched state
-              setWatchProgress({ 
-                ...progress, 
+              setWatchProgress({
+                ...progress,
                 episodeId,
                 traktSynced: progress.traktSynced,
                 traktProgress: progress.traktProgress
@@ -105,17 +110,17 @@ export const useWatchProgress = (
           } else {
             // FIXED: Find the most recently watched episode instead of first unfinished
             // Sort by lastUpdated timestamp (most recent first)
-            const sortedProgresses = seriesProgresses.sort((a, b) => 
+            const sortedProgresses = seriesProgresses.sort((a, b) =>
               b.progress.lastUpdated - a.progress.lastUpdated
             );
-            
+
             if (sortedProgresses.length > 0) {
               // Use the most recently watched episode
               const mostRecentProgress = sortedProgresses[0];
               const progress = mostRecentProgress.progress;
-              
+
               // Removed excessive logging for most recent progress
-              
+
               setWatchProgress({
                 ...progress,
                 episodeId: mostRecentProgress.episodeId,
@@ -133,8 +138,8 @@ export const useWatchProgress = (
           if (progress && progress.currentTime > 0) {
             // Always show progress data, even if watched (≥95%)
             // The HeroSection will handle the "watched" state display
-            setWatchProgress({ 
-              ...progress, 
+            setWatchProgress({
+              ...progress,
               episodeId,
               traktSynced: progress.traktSynced,
               traktProgress: progress.traktProgress
@@ -148,7 +153,7 @@ export const useWatchProgress = (
       logger.error('[useWatchProgress] Error loading watch progress:', error);
       setWatchProgress(null);
     }
-  }, [id, type, episodeId, episodes]);
+  }, [id, type, episodeId]); // Removed episodes dependency - using ref instead
 
   // Enhanced function to get play button text with Trakt awareness
   const getPlayButtonText = useCallback(() => {
@@ -167,19 +172,33 @@ export const useWatchProgress = (
     return 'Resume';
   }, [watchProgress]);
 
-  // Subscribe to storage changes for real-time updates
+  // Subscribe to storage changes for real-time updates (with debounce to prevent loops)
   useEffect(() => {
+    let debounceTimeout: NodeJS.Timeout | null = null;
+
     const unsubscribe = storageService.subscribeToWatchProgressUpdates(() => {
-      loadWatchProgress();
+      // Debounce rapid updates to prevent infinite loops
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+      }
+      debounceTimeout = setTimeout(() => {
+        loadWatchProgress();
+      }, 100);
     });
-    
-    return unsubscribe;
+
+    return () => {
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+      }
+      unsubscribe();
+    };
   }, [loadWatchProgress]);
 
-  // Initial load
+  // Initial load - only once on mount
   useEffect(() => {
     loadWatchProgress();
-  }, [loadWatchProgress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, type, episodeId]); // Only re-run when core IDs change, not when loadWatchProgress ref changes
 
   // Refresh when screen comes into focus
   useFocusEffect(
@@ -188,15 +207,16 @@ export const useWatchProgress = (
     }, [loadWatchProgress])
   );
 
-  // Re-load when Trakt authentication status changes
+  // Re-load when Trakt authentication status changes (with guard)
   useEffect(() => {
-    if (isTraktAuthenticated !== undefined) {
-      // Small delay to ensure Trakt context is fully initialized
-      setTimeout(() => {
-        loadWatchProgress();
-      }, 100);
-    }
-  }, [isTraktAuthenticated, loadWatchProgress]);
+    // Skip on initial mount, only run when isTraktAuthenticated actually changes
+    const timeoutId = setTimeout(() => {
+      loadWatchProgress();
+    }, 200); // Slightly longer delay to avoid race conditions
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTraktAuthenticated]); // Intentionally exclude loadWatchProgress to prevent loops
 
   return {
     watchProgress,

@@ -772,7 +772,7 @@ const DebridIntegrationScreen = () => {
                         <Text style={styles.poweredBy}>Powered by</Text>
                         <View style={styles.logoRow}>
                             <Image
-                                source={{ uri: 'https://torbox.app/assets/logo-57adbf99.svg' }}
+                                source={{ uri: 'https://torbox.app/assets/logo-bb7a9579.svg' }}
                                 style={styles.logo}
                                 resizeMode="contain"
                             />

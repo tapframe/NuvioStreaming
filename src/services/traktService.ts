@@ -52,6 +52,8 @@ export interface TraktWatchedItem {
   };
   plays: number;
   last_watched_at: string;
+  last_updated_at?: string; // Timestamp for syncing - only re-process if newer
+  reset_at?: string | null; // When user started re-watching - ignore episodes watched before this
   seasons?: {
     number: number;
     episodes: {
@@ -251,11 +253,25 @@ export interface TraktScrobbleResponse {
   alreadyScrobbled?: boolean;
 }
 
+/**
+ * Content data for Trakt scrobbling.
+ * 
+ * Required fields:
+ * - type: 'movie' or 'episode'
+ * - imdbId: A valid IMDb ID (with or without 'tt' prefix)
+ * - title: Non-empty content title
+ * 
+ * Optional fields:
+ * - year: Release year (must be valid if provided, e.g., 1800-current year+10)
+ * - season/episode: Required for episode type
+ * - showTitle/showYear/showImdbId: Show metadata for episodes
+ */
 export interface TraktContentData {
   type: 'movie' | 'episode';
   imdbId: string;
   title: string;
-  year: number;
+  /** Release year - optional as Trakt can often resolve content via IMDb ID alone */
+  year?: number;
   season?: number;
   episode?: number;
   showTitle?: string;
@@ -623,14 +639,14 @@ export class TraktService {
   /**
    * Get the current completion threshold (user-configured or default)
    */
-  private get completionThreshold(): number {
+  public get completionThreshold(): number {
     return this._completionThreshold || this.DEFAULT_COMPLETION_THRESHOLD;
   }
 
   /**
    * Set the completion threshold
    */
-  private set completionThreshold(value: number) {
+  public set completionThreshold(value: number) {
     this._completionThreshold = value;
   }
 
@@ -1312,11 +1328,15 @@ export class TraktService {
     try {
       const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
       if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
         return false;
       }
 
+      logger.log(`[TraktService] Marking S${season}E${episode} as watched for show ${imdbId} (trakt: ${traktId})`);
+
+      // Use shows array with seasons/episodes structure per Trakt API docs
       await this.apiRequest('/sync/history', 'POST', {
-        episodes: [
+        shows: [
           {
             ids: {
               trakt: traktId
@@ -1335,9 +1355,198 @@ export class TraktService {
           }
         ]
       });
+      logger.log(`[TraktService] Successfully marked S${season}E${episode} as watched`);
       return true;
     } catch (error) {
       logger.error('[TraktService] Failed to mark episode as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark an entire season as watched on Trakt
+   * @param imdbId - The IMDb ID of the show
+   * @param season - The season number to mark as watched
+   * @param watchedAt - Optional date when watched (defaults to now)
+   */
+  public async markSeasonAsWatched(
+    imdbId: string,
+    season: number,
+    watchedAt: Date = new Date()
+  ): Promise<boolean> {
+    try {
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
+        return false;
+      }
+
+      logger.log(`[TraktService] Marking entire season ${season} as watched for show ${imdbId} (trakt: ${traktId})`);
+
+      // Mark entire season - Trakt will mark all episodes in the season
+      await this.apiRequest('/sync/history', 'POST', {
+        shows: [
+          {
+            ids: {
+              trakt: traktId
+            },
+            seasons: [
+              {
+                number: season,
+                watched_at: watchedAt.toISOString()
+              }
+            ]
+          }
+        ]
+      });
+      logger.log(`[TraktService] Successfully marked season ${season} as watched`);
+      return true;
+    } catch (error) {
+      logger.error('[TraktService] Failed to mark season as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark multiple episodes as watched on Trakt (batch operation)
+   * @param imdbId - The IMDb ID of the show
+   * @param episodes - Array of episodes to mark as watched
+   * @param watchedAt - Optional date when watched (defaults to now)
+   */
+  public async markEpisodesAsWatched(
+    imdbId: string,
+    episodes: Array<{ season: number; episode: number }>,
+    watchedAt: Date = new Date()
+  ): Promise<boolean> {
+    try {
+      if (episodes.length === 0) {
+        logger.warn('[TraktService] No episodes provided to mark as watched');
+        return false;
+      }
+
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
+        return false;
+      }
+
+      logger.log(`[TraktService] Marking ${episodes.length} episodes as watched for show ${imdbId}`);
+
+      // Group episodes by season for the API call
+      const seasonMap = new Map<number, Array<{ number: number; watched_at: string }>>();
+      for (const ep of episodes) {
+        if (!seasonMap.has(ep.season)) {
+          seasonMap.set(ep.season, []);
+        }
+        seasonMap.get(ep.season)!.push({
+          number: ep.episode,
+          watched_at: watchedAt.toISOString()
+        });
+      }
+
+      const seasons = Array.from(seasonMap.entries()).map(([seasonNum, eps]) => ({
+        number: seasonNum,
+        episodes: eps
+      }));
+
+      await this.apiRequest('/sync/history', 'POST', {
+        shows: [
+          {
+            ids: {
+              trakt: traktId
+            },
+            seasons
+          }
+        ]
+      });
+      logger.log(`[TraktService] Successfully marked ${episodes.length} episodes as watched`);
+      return true;
+    } catch (error) {
+      logger.error('[TraktService] Failed to mark episodes as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Mark entire show as watched on Trakt (all seasons and episodes)
+   * @param imdbId - The IMDb ID of the show
+   * @param watchedAt - Optional date when watched (defaults to now)
+   */
+  public async markShowAsWatched(
+    imdbId: string,
+    watchedAt: Date = new Date()
+  ): Promise<boolean> {
+    try {
+      const traktId = await this.getTraktIdFromImdbId(imdbId, 'show');
+      if (!traktId) {
+        logger.warn(`[TraktService] Could not find Trakt ID for show: ${imdbId}`);
+        return false;
+      }
+
+      logger.log(`[TraktService] Marking entire show as watched: ${imdbId} (trakt: ${traktId})`);
+
+      // Mark entire show - Trakt will mark all episodes
+      await this.apiRequest('/sync/history', 'POST', {
+        shows: [
+          {
+            ids: {
+              trakt: traktId
+            },
+            watched_at: watchedAt.toISOString()
+          }
+        ]
+      });
+      logger.log(`[TraktService] Successfully marked entire show as watched`);
+      return true;
+    } catch (error) {
+      logger.error('[TraktService] Failed to mark show as watched:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Remove an entire season from watched history on Trakt
+   * @param imdbId - The IMDb ID of the show
+   * @param season - The season number to remove from history
+   */
+  public async removeSeasonFromHistory(
+    imdbId: string,
+    season: number
+  ): Promise<boolean> {
+    try {
+      logger.log(`[TraktService] Removing season ${season} from history for show: ${imdbId}`);
+
+      const fullImdbId = imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`;
+
+      const payload: TraktHistoryRemovePayload = {
+        shows: [
+          {
+            ids: {
+              imdb: fullImdbId
+            },
+            seasons: [
+              {
+                number: season
+              }
+            ]
+          }
+        ]
+      };
+
+      logger.log(`[TraktService] Sending removeSeasonFromHistory payload:`, JSON.stringify(payload, null, 2));
+
+      const result = await this.removeFromHistory(payload);
+
+      if (result) {
+        const success = result.deleted.episodes > 0;
+        logger.log(`[TraktService] Season removal success: ${success} (${result.deleted.episodes} episodes deleted)`);
+        return success;
+      }
+
+      logger.log(`[TraktService] No result from removeSeasonFromHistory`);
+      return false;
+    } catch (error) {
+      logger.error('[TraktService] Failed to remove season from history:', error);
       return false;
     }
   }
@@ -1430,7 +1639,14 @@ export class TraktService {
   }
 
   /**
-   * Pause watching content (scrobble pause)
+   * Pause watching content - saves playback progress
+   * 
+   * NOTE: Trakt API does NOT have a /scrobble/pause endpoint.
+   * Instead, /scrobble/stop handles both cases:
+   * - Progress 1-79%: Treated as "pause", saves playback progress to /sync/playback
+   * - Progress ≥80%: Treated as "scrobble", marks as watched
+   * 
+   * This method uses /scrobble/stop which automatically handles the pause/scrobble logic.
    */
   public async pauseWatching(contentData: TraktContentData, progress: number): Promise<TraktScrobbleResponse | null> {
     try {
@@ -1446,7 +1662,8 @@ export class TraktService {
         return null;
       }
 
-      return this.apiRequest<TraktScrobbleResponse>('/scrobble/pause', 'POST', payload);
+      // Use /scrobble/stop - Trakt automatically treats <80% as pause, ≥80% as scrobble
+      return this.apiRequest<TraktScrobbleResponse>('/scrobble/stop', 'POST', payload);
     } catch (error) {
       logger.error('[TraktService] Failed to pause watching:', error);
       return null;
@@ -1527,11 +1744,26 @@ export class TraktService {
 
   /**
    * Build scrobble payload for API requests
+   * Returns null if required data is missing or invalid
    */
   private async buildScrobblePayload(contentData: TraktContentData, progress: number): Promise<any | null> {
     try {
       // Clamp progress between 0 and 100 and round to 2 decimals for API
       const clampedProgress = Math.min(100, Math.max(0, Math.round(progress * 100) / 100));
+
+      // Helper function to validate year
+      const isValidYear = (year: number | undefined): year is number => {
+        if (year === undefined || year === null) return false;
+        if (typeof year !== 'number' || isNaN(year)) return false;
+        // Year must be between 1800 and current year + 10
+        const currentYear = new Date().getFullYear();
+        return year > 0 && year >= 1800 && year <= currentYear + 10;
+      };
+
+      // Helper function to validate title
+      const isValidTitle = (title: string | undefined): title is string => {
+        return typeof title === 'string' && title.trim().length > 0;
+      };
 
       // Enhanced debug logging for payload building
       logger.log('[TraktService] Building scrobble payload:', {
@@ -1548,9 +1780,14 @@ export class TraktService {
       });
 
       if (contentData.type === 'movie') {
-        if (!contentData.imdbId || !contentData.title) {
-          logger.error('[TraktService] Missing movie data for scrobbling:', {
-            imdbId: contentData.imdbId,
+        // Validate required movie fields
+        if (!contentData.imdbId || contentData.imdbId.trim() === '') {
+          logger.error('[TraktService] Missing movie imdbId for scrobbling');
+          return null;
+        }
+
+        if (!isValidTitle(contentData.title)) {
+          logger.error('[TraktService] Missing or empty movie title for scrobbling:', {
             title: contentData.title
           });
           return null;
@@ -1561,36 +1798,70 @@ export class TraktService {
           ? contentData.imdbId
           : `tt${contentData.imdbId}`;
 
+        // Build movie payload - only include year if valid
+        const movieData: { title: string; year?: number; ids: { imdb: string } } = {
+          title: contentData.title.trim(),
+          ids: {
+            imdb: imdbIdWithPrefix
+          }
+        };
+
+        // Only add year if it's valid (prevents year: 0 or invalid years)
+        if (isValidYear(contentData.year)) {
+          movieData.year = contentData.year;
+        } else {
+          logger.warn('[TraktService] Movie year is missing or invalid, omitting from payload:', {
+            year: contentData.year
+          });
+        }
+
         const payload = {
-          movie: {
-            title: contentData.title,
-            year: contentData.year,
-            ids: {
-              imdb: imdbIdWithPrefix
-            }
-          },
+          movie: movieData,
           progress: clampedProgress
         };
 
         logger.log('[TraktService] Movie payload built:', payload);
         return payload;
       } else if (contentData.type === 'episode') {
-        if (!contentData.season || !contentData.episode || !contentData.showTitle || !contentData.showYear) {
-          logger.error('[TraktService] Missing episode data for scrobbling:', {
-            season: contentData.season,
-            episode: contentData.episode,
-            showTitle: contentData.showTitle,
-            showYear: contentData.showYear
+        // Validate season and episode numbers
+        if (contentData.season === undefined || contentData.season === null || contentData.season < 0) {
+          logger.error('[TraktService] Invalid season for episode scrobbling:', {
+            season: contentData.season
           });
           return null;
         }
 
+        if (contentData.episode === undefined || contentData.episode === null || contentData.episode <= 0) {
+          logger.error('[TraktService] Invalid episode number for scrobbling:', {
+            episode: contentData.episode
+          });
+          return null;
+        }
+
+        if (!isValidTitle(contentData.showTitle)) {
+          logger.error('[TraktService] Missing or empty show title for episode scrobbling:', {
+            showTitle: contentData.showTitle
+          });
+          return null;
+        }
+
+        // Build show data - only include year if valid
+        const showData: { title: string; year?: number; ids: { imdb?: string } } = {
+          title: contentData.showTitle.trim(),
+          ids: {}
+        };
+
+        // Only add year if it's valid
+        if (isValidYear(contentData.showYear)) {
+          showData.year = contentData.showYear;
+        } else {
+          logger.warn('[TraktService] Show year is missing or invalid, omitting from payload:', {
+            showYear: contentData.showYear
+          });
+        }
+
         const payload: any = {
-          show: {
-            title: contentData.showTitle,
-            year: contentData.showYear,
-            ids: {}
-          },
+          show: showData,
           episode: {
             season: contentData.season,
             number: contentData.episode
@@ -1599,7 +1870,7 @@ export class TraktService {
         };
 
         // Add show IMDB ID if available
-        if (contentData.showImdbId) {
+        if (contentData.showImdbId && contentData.showImdbId.trim() !== '') {
           const showImdbWithPrefix = contentData.showImdbId.startsWith('tt')
             ? contentData.showImdbId
             : `tt${contentData.showImdbId}`;
@@ -1607,7 +1878,7 @@ export class TraktService {
         }
 
         // Add episode IMDB ID if available (for specific episode IDs)
-        if (contentData.imdbId && contentData.imdbId !== contentData.showImdbId) {
+        if (contentData.imdbId && contentData.imdbId.trim() !== '' && contentData.imdbId !== contentData.showImdbId) {
           const episodeImdbWithPrefix = contentData.imdbId.startsWith('tt')
             ? contentData.imdbId
             : `tt${contentData.imdbId}`;

@@ -71,6 +71,16 @@ import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsS
 import ContributorsScreen from '../screens/ContributorsScreen';
 import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
 
+// Optional Android immersive mode module
+let RNImmersiveMode: any = null;
+if (Platform.OS === 'android') {
+  try {
+    RNImmersiveMode = require('react-native-immersive-mode').default;
+  } catch {
+    RNImmersiveMode = null;
+  }
+}
+
 // Stack navigator types
 export type RootStackParamList = {
   Onboarding: undefined;
@@ -91,9 +101,18 @@ export type RootStackParamList = {
   Streams: {
     id: string;
     type: string;
+    title?: string;
     episodeId?: string;
     episodeThumbnail?: string;
     fromPlayer?: boolean;
+    metadata?: {
+      poster?: string;
+      banner?: string;
+      releaseInfo?: string;
+      genres?: string[];
+    };
+    resumeTime?: number;
+    duration?: number;
   };
   PlayerIOS: {
     uri: string;
@@ -1066,8 +1085,10 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
     if (Platform.OS === 'android') {
       // Ensure system navigation bar is shown by default
       try {
-        RNImmersiveMode.setBarMode('Normal');
-        RNImmersiveMode.fullLayout(false);
+        if (RNImmersiveMode) {
+          RNImmersiveMode.setBarMode('Normal');
+          RNImmersiveMode.fullLayout(false);
+        }
       } catch (error) {
         console.log('Immersive mode error:', error);
       }
@@ -1174,8 +1195,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               component={MetadataScreen}
               options={{
                 headerShown: false,
-                animation: Platform.OS === 'android' ? 'none' : 'fade',
-                animationDuration: Platform.OS === 'android' ? 0 : 300,
+                animation: Platform.OS === 'android' ? 'fade' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 200 : 300,
                 ...(Platform.OS === 'ios' && {
                   cardStyleInterpolator: customFadeInterpolator,
                   animationTypeForReplace: 'push',
@@ -1192,8 +1213,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               component={StreamsScreen as any}
               options={{
                 headerShown: false,
-                animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'none',
-                animationDuration: Platform.OS === 'android' ? 0 : 300,
+                animation: Platform.OS === 'ios' ? 'slide_from_bottom' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 200 : 300,
                 gestureEnabled: true,
                 gestureDirection: Platform.OS === 'ios' ? 'vertical' : 'horizontal',
                 ...(Platform.OS === 'ios' && { presentation: 'modal' }),
@@ -1542,8 +1563,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="AIChat"
               component={AIChatScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
-                animationDuration: Platform.OS === 'android' ? 220 : 300,
+                animation: Platform.OS === 'android' ? 'fade' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 200 : 300,
                 presentation: Platform.OS === 'ios' ? 'fullScreenModal' : 'modal',
                 gestureEnabled: true,
                 gestureDirection: Platform.OS === 'ios' ? 'horizontal' : 'vertical',

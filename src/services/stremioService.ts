@@ -20,6 +20,7 @@ export interface Meta {
   type: string;
   name: string;
   poster?: string;
+  posterShape?: 'poster' | 'square' | 'landscape'; // For variable aspect ratios
   background?: string;
   logo?: string;
   description?: string;
@@ -61,33 +62,77 @@ export interface Meta {
 }
 
 export interface Subtitle {
-  id: string;
+  id: string;           // Required per protocol
   url: string;
   lang: string;
   fps?: number;
   addon?: string;
   addonName?: string;
-  format?: 'srt' | 'vtt' | 'ass' | 'ssa'; // Format hint
+  format?: 'srt' | 'vtt' | 'ass' | 'ssa';
+}
+
+// Source object for archive streams per protocol
+export interface SourceObject {
+  url: string;
+  bytes?: number;
 }
 
 export interface Stream {
-  name?: string;
-  title?: string;
-  url: string;
+  // Primary stream source - one of these must be provided
+  url?: string;                    // Direct HTTP(S)/FTP(S)/RTMP URL
+  ytId?: string;                   // YouTube video ID
+  infoHash?: string;               // BitTorrent info hash
+  externalUrl?: string;            // External URL to open in browser
+  nzbUrl?: string;                 // Usenet NZB file URL
+  rarUrls?: SourceObject[];        // RAR archive files
+  zipUrls?: SourceObject[];        // ZIP archive files
+  '7zipUrls'?: SourceObject[];     // 7z archive files
+  tgzUrls?: SourceObject[];        // TGZ archive files
+  tarUrls?: SourceObject[];        // TAR archive files
+
+  // Stream selection within archives/torrents
+  fileIdx?: number;                // File index in archive/torrent
+  fileMustInclude?: string;        // Regex for file matching in archives
+  servers?: string[];              // NNTP servers for nzbUrl
+
+  // Display information
+  name?: string;                   // Stream name (usually quality)
+  title?: string;                  // Stream title/description (deprecated for description)
+  description?: string;            // Stream description
+
+  // Addon identification
   addon?: string;
   addonId?: string;
   addonName?: string;
-  description?: string;
-  infoHash?: string;
-  fileIdx?: number;
-  behaviorHints?: {
-    bingeGroup?: string;
-    notWebReady?: boolean;
-    [key: string]: any;
-  };
+
+  // Stream properties
   size?: number;
   isFree?: boolean;
   isDebrid?: boolean;
+  quality?: string;
+  headers?: Record<string, string>;
+
+  // Embedded subtitles per protocol
+  subtitles?: Subtitle[];
+
+  // Additional tracker/DHT sources
+  sources?: string[];
+
+  // Complete behavior hints per protocol
+  behaviorHints?: {
+    bingeGroup?: string;           // Group for binge watching
+    notWebReady?: boolean;         // True if not HTTPS MP4
+    countryWhitelist?: string[];   // ISO 3166-1 alpha-3 codes (lowercase)
+    cached?: boolean;              // Debrid cached status
+    proxyHeaders?: {               // Custom headers for stream
+      request?: Record<string, string>;
+      response?: Record<string, string>;
+    };
+    videoHash?: string;            // OpenSubtitles hash
+    videoSize?: number;            // Video file size in bytes
+    filename?: string;             // Video filename
+    [key: string]: any;
+  };
 }
 
 export interface StreamResponse {
@@ -119,6 +164,16 @@ interface Catalog {
   extraSupported?: string[];
   extraRequired?: string[];
   itemCount?: number;
+  // Per Stremio protocol - extra properties for filtering
+  extra?: CatalogExtra[];
+}
+
+// Extra property definition per protocol
+export interface CatalogExtra {
+  name: string;           // Property name (e.g., 'genre', 'search', 'skip')
+  isRequired?: boolean;   // If true, must always be provided
+  options?: string[];     // Available options (e.g., genre list)
+  optionsLimit?: number;  // Max selections allowed (default 1)
 }
 
 interface ResourceObject {
@@ -143,7 +198,32 @@ export interface Manifest {
   queryParams?: string;
   behaviorHints?: {
     configurable?: boolean;
+    configurationRequired?: boolean;  // Per protocol
+    adult?: boolean;                   // Adult content flag
+    p2p?: boolean;                     // P2P content flag
   };
+  config?: ConfigObject[];             // User configuration
+  addonCatalogs?: Catalog[];           // Addon catalogs
+  background?: string;                 // Background image URL
+  logo?: string;                       // Logo URL
+  contactEmail?: string;               // Contact email
+}
+
+// Config object for addon configuration per protocol
+interface ConfigObject {
+  key: string;
+  type: 'text' | 'number' | 'password' | 'checkbox' | 'select';
+  default?: string;
+  title?: string;
+  options?: string[];
+  required?: boolean;
+}
+
+// Meta Link object per protocol
+export interface MetaLink {
+  name: string;
+  category: string;  // 'actor', 'director', 'writer', etc.
+  url: string;       // External URL or stremio:/// deep link
 }
 
 export interface MetaDetails extends Meta {
@@ -153,7 +233,13 @@ export interface MetaDetails extends Meta {
     released: string;
     season?: number;
     episode?: number;
+    thumbnail?: string;
+    streams?: Stream[];      // Embedded streams (used by PPV-style addons)
+    available?: boolean;     // Availability flag per protocol
+    overview?: string;       // Episode summary per protocol
+    trailers?: Stream[];     // Trailer streams per protocol
   }[];
+  links?: MetaLink[];        // Actor/Director/Genre links per protocol
 }
 
 export interface AddonCapabilities {
@@ -180,7 +266,7 @@ class StremioService {
   private readonly STORAGE_KEY = 'stremio-addons';
   private readonly ADDON_ORDER_KEY = 'stremio-addon-order';
   private readonly MAX_CONCURRENT_REQUESTS = 3;
-  private readonly DEFAULT_PAGE_SIZE = 50;
+  private readonly DEFAULT_PAGE_SIZE = 100; // Protocol standard page size
   private initialized: boolean = false;
   private initializationPromise: Promise<void> | null = null;
   private catalogHasMore: Map<string, boolean> = new Map();
@@ -194,26 +280,26 @@ class StremioService {
   public async isValidContentId(type: string, id: string | null | undefined): Promise<boolean> {
     // Ensure addons are initialized before checking types
     await this.ensureInitialized();
-    
+
     // Get all supported types from installed addons
     const supportedTypes = this.getAllSupportedTypes();
     const isValidType = supportedTypes.includes(type);
-    
+
     const lowerId = (id || '').toLowerCase();
     const isNullishId = !id || lowerId === 'null' || lowerId === 'undefined';
     const providerLikeIds = new Set<string>(['moviebox', 'torbox']);
     const isProviderSlug = providerLikeIds.has(lowerId);
 
     if (!isValidType || isNullishId || isProviderSlug) return false;
-    
+
     // Get all supported ID prefixes from installed addons
     const supportedPrefixes = this.getAllSupportedIdPrefixes(type);
-    
+
     // If no addons declare specific prefixes, allow any non-empty string
     if (supportedPrefixes.length === 0) {
       return true;
     }
-    
+
     // Check if the ID matches any supported prefix
     return supportedPrefixes.some(prefix => lowerId.startsWith(prefix.toLowerCase()));
   }
@@ -222,13 +308,13 @@ class StremioService {
   public getAllSupportedTypes(): string[] {
     const addons = this.getInstalledAddons();
     const types = new Set<string>();
-    
+
     for (const addon of addons) {
       // Check addon-level types
       if (addon.types && Array.isArray(addon.types)) {
         addon.types.forEach(type => types.add(type));
       }
-      
+
       // Check resource-level types
       if (addon.resources && Array.isArray(addon.resources)) {
         for (const resource of addon.resources) {
@@ -240,7 +326,7 @@ class StremioService {
           }
         }
       }
-      
+
       // Check catalog-level types
       if (addon.catalogs && Array.isArray(addon.catalogs)) {
         for (const catalog of addon.catalogs) {
@@ -250,7 +336,7 @@ class StremioService {
         }
       }
     }
-    
+
     return Array.from(types);
   }
 
@@ -258,13 +344,13 @@ class StremioService {
   public getAllSupportedIdPrefixes(type: string): string[] {
     const addons = this.getInstalledAddons();
     const prefixes = new Set<string>();
-    
+
     for (const addon of addons) {
       // Check addon-level idPrefixes
       if (addon.idPrefixes && Array.isArray(addon.idPrefixes)) {
         addon.idPrefixes.forEach(prefix => prefixes.add(prefix));
       }
-      
+
       // Check resource-level idPrefixes
       if (addon.resources && Array.isArray(addon.resources)) {
         for (const resource of addon.resources) {
@@ -280,34 +366,34 @@ class StremioService {
         }
       }
     }
-    
+
     return Array.from(prefixes);
   }
 
   // Check if a content ID belongs to a collection addon
   public isCollectionContent(id: string): { isCollection: boolean; addon?: Manifest } {
     const addons = this.getInstalledAddons();
-    
+
     for (const addon of addons) {
       // Check if this addon supports collections
-      const supportsCollections = addon.types?.includes('collections') || 
-                                 addon.catalogs?.some(catalog => catalog.type === 'collections');
-      
+      const supportsCollections = addon.types?.includes('collections') ||
+        addon.catalogs?.some(catalog => catalog.type === 'collections');
+
       if (!supportsCollections) continue;
-      
+
       // Check if our ID matches this addon's prefixes
       const addonPrefixes = addon.idPrefixes || [];
       const resourcePrefixes = addon.resources
         ?.filter(resource => typeof resource === 'object' && resource !== null && 'name' in resource)
         ?.filter(resource => (resource as any).name === 'meta' || (resource as any).name === 'catalog')
         ?.flatMap(resource => (resource as any).idPrefixes || []) || [];
-      
+
       const allPrefixes = [...addonPrefixes, ...resourcePrefixes];
       if (allPrefixes.some(prefix => id.startsWith(prefix))) {
         return { isCollection: true, addon };
       }
     }
-    
+
     return { isCollection: false };
   }
 
@@ -320,17 +406,17 @@ class StremioService {
 
   private async initialize(): Promise<void> {
     if (this.initialized) return;
-    
+
     try {
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
       // Prefer scoped storage, but fall back to legacy keys to preserve older installs
       let storedAddons = await mmkvStorage.getItem(`@user:${scope}:${this.STORAGE_KEY}`);
       if (!storedAddons) storedAddons = await mmkvStorage.getItem(this.STORAGE_KEY);
       if (!storedAddons) storedAddons = await mmkvStorage.getItem(`@user:local:${this.STORAGE_KEY}`);
-      
+
       if (storedAddons) {
         const parsed = JSON.parse(storedAddons);
-        
+
         // Convert to Map
         this.installedAddons = new Map();
         for (const addon of parsed) {
@@ -339,11 +425,11 @@ class StremioService {
           }
         }
       }
-      
+
       // Install Cinemeta for new users, but allow existing users to uninstall it
       const cinemetaId = 'com.linvo.cinemeta';
       const hasUserRemovedCinemeta = await this.hasUserRemovedAddon(cinemetaId);
-      
+
       if (!this.installedAddons.has(cinemetaId) && !hasUserRemovedCinemeta) {
         try {
           const cinemetaManifest = await this.getManifest('https://v3-cinemeta.strem.io/manifest.json');
@@ -395,7 +481,7 @@ class StremioService {
       // Install OpenSubtitles v3 by default unless user has explicitly removed it
       const opensubsId = 'org.stremio.opensubtitlesv3';
       const hasUserRemovedOpenSubtitles = await this.hasUserRemovedAddon(opensubsId);
-      
+
       if (!this.installedAddons.has(opensubsId) && !hasUserRemovedOpenSubtitles) {
         try {
           const opensubsManifest = await this.getManifest('https://opensubtitles-v3.strem.io/manifest.json');
@@ -424,7 +510,7 @@ class StremioService {
           this.installedAddons.set(opensubsId, fallbackManifest);
         }
       }
-      
+
       // Load addon order if exists (scoped first, then legacy, then @user:local for migration safety)
       let storedOrder = await mmkvStorage.getItem(`@user:${scope}:${this.ADDON_ORDER_KEY}`);
       if (!storedOrder) storedOrder = await mmkvStorage.getItem(this.ADDON_ORDER_KEY);
@@ -434,28 +520,28 @@ class StremioService {
         // Filter out any ids that aren't in installedAddons
         this.addonOrder = this.addonOrder.filter(id => this.installedAddons.has(id));
       }
-      
+
       // Add Cinemeta to order only if user hasn't removed it
       const hasUserRemovedCinemetaOrder = await this.hasUserRemovedAddon(cinemetaId);
       if (!this.addonOrder.includes(cinemetaId) && this.installedAddons.has(cinemetaId) && !hasUserRemovedCinemetaOrder) {
         this.addonOrder.push(cinemetaId);
       }
-      
+
       // Only add OpenSubtitles to order if user hasn't removed it
       const hasUserRemovedOpenSubtitlesOrder = await this.hasUserRemovedAddon(opensubsId);
       if (!this.addonOrder.includes(opensubsId) && this.installedAddons.has(opensubsId) && !hasUserRemovedOpenSubtitlesOrder) {
         this.addonOrder.push(opensubsId);
       }
-      
+
       // Add any missing addons to the order
       const installedIds = Array.from(this.installedAddons.keys());
       const missingIds = installedIds.filter(id => !this.addonOrder.includes(id));
       this.addonOrder = [...this.addonOrder, ...missingIds];
-      
+
       // Ensure order and addons are saved
       await this.saveAddonOrder();
       await this.saveInstalledAddons();
-      
+
       this.initialized = true;
     } catch (error) {
       // Initialize with empty state on error
@@ -479,12 +565,12 @@ class StremioService {
         return await request();
       } catch (error: any) {
         lastError = error;
-        
+
         // Don't retry on 404 errors (content not found) - these are expected for some content
         if (error.response?.status === 404) {
           throw error;
         }
-        
+
         // Only log warnings for non-404 errors to reduce noise
         if (error.response?.status !== 404) {
           logger.warn(`Request failed (attempt ${attempt + 1}/${retries + 1}):`, {
@@ -494,7 +580,7 @@ class StremioService {
             status: error.response?.status,
           });
         }
-        
+
         if (attempt < retries) {
           const backoffDelay = delay * Math.pow(2, attempt);
           logger.log(`Retrying in ${backoffDelay}ms...`);
@@ -535,25 +621,25 @@ class StremioService {
   async getManifest(url: string): Promise<Manifest> {
     try {
       // Clean up URL - ensure it ends with manifest.json
-      const manifestUrl = url.endsWith('manifest.json') 
-        ? url 
+      const manifestUrl = url.endsWith('manifest.json')
+        ? url
         : `${url.replace(/\/$/, '')}/manifest.json`;
-      
+
       const response = await this.retryRequest(async () => {
         return await axios.get(manifestUrl);
       });
-      
+
       const manifest = response.data;
-      
+
       // Add some extra fields for internal use
       manifest.originalUrl = url;
       manifest.url = url.replace(/manifest\.json$/, '');
-      
+
       // Ensure ID exists
       if (!manifest.id) {
         manifest.id = this.formatId(url);
       }
-      
+
       return manifest;
     } catch (error) {
       logger.error(`Failed to fetch manifest from ${url}:`, error);
@@ -565,16 +651,16 @@ class StremioService {
     const manifest = await this.getManifest(url);
     if (manifest && manifest.id) {
       this.installedAddons.set(manifest.id, manifest);
-      
+
       // If addon was previously removed by user, unmark it on reinstall and clean up
       await this.unmarkAddonAsRemovedByUser(manifest.id);
       await this.cleanupRemovedAddonFromStorage(manifest.id);
-      
+
       // Add to order if not already present (new addons go to the end)
       if (!this.addonOrder.includes(manifest.id)) {
         this.addonOrder.push(manifest.id);
       }
-      
+
       await this.saveInstalledAddons();
       await this.saveAddonOrder();
       // Emit an event that an addon was added
@@ -641,7 +727,7 @@ class StremioService {
       const removedAddons = await mmkvStorage.getItem('user_removed_addons');
       let removedList = removedAddons ? JSON.parse(removedAddons) : [];
       if (!Array.isArray(removedList)) removedList = [];
-      
+
       if (!removedList.includes(addonId)) {
         removedList.push(addonId);
         await mmkvStorage.setItem('user_removed_addons', JSON.stringify(removedList));
@@ -656,10 +742,10 @@ class StremioService {
     try {
       const removedAddons = await mmkvStorage.getItem('user_removed_addons');
       if (!removedAddons) return;
-      
+
       let removedList = JSON.parse(removedAddons);
       if (!Array.isArray(removedList)) return;
-      
+
       const updatedList = removedList.filter(id => id !== addonId);
       await mmkvStorage.setItem('user_removed_addons', JSON.stringify(updatedList));
     } catch (error) {
@@ -671,14 +757,14 @@ class StremioService {
   private async cleanupRemovedAddonFromStorage(addonId: string): Promise<void> {
     try {
       const scope = (await mmkvStorage.getItem('@user:current')) || 'local';
-      
+
       // Remove from all possible addon order storage keys
       const keys = [
         `@user:${scope}:${this.ADDON_ORDER_KEY}`,
         this.ADDON_ORDER_KEY,
         `@user:local:${this.ADDON_ORDER_KEY}`
       ];
-      
+
       for (const key of keys) {
         const storedOrder = await mmkvStorage.getItem(key);
         if (storedOrder) {
@@ -701,12 +787,12 @@ class StremioService {
   async getAllCatalogs(): Promise<{ [addonId: string]: Meta[] }> {
     const result: { [addonId: string]: Meta[] } = {};
     const addons = this.getInstalledAddons();
-    
+
     const promises = addons.map(async (addon) => {
       if (!addon.catalogs || addon.catalogs.length === 0) return;
-      
+
       const catalog = addon.catalogs[0]; // Just take the first catalog for now
-      
+
       try {
         const items = await this.getCatalog(addon, catalog.type, catalog.id);
         if (items.length > 0) {
@@ -716,7 +802,7 @@ class StremioService {
         logger.error(`Failed to fetch catalog from ${addon.name}:`, error);
       }
     });
-    
+
     await Promise.all(promises);
     return result;
   }
@@ -724,53 +810,100 @@ class StremioService {
   private getAddonBaseURL(url: string): { baseUrl: string; queryParams?: string } {
     // Extract query parameters if they exist
     const [baseUrl, queryString] = url.split('?');
-    
+
     // Remove trailing manifest.json and slashes
     let cleanBaseUrl = baseUrl.replace(/manifest\.json$/, '').replace(/\/$/, '');
-    
+
     // Ensure URL has protocol
     if (!cleanBaseUrl.startsWith('http')) {
       cleanBaseUrl = `https://${cleanBaseUrl}`;
     }
-    
+
     return { baseUrl: cleanBaseUrl, queryParams: queryString };
   }
 
   async getCatalog(manifest: Manifest, type: string, id: string, page = 1, filters: CatalogFilter[] = []): Promise<Meta[]> {
-    // Build URLs (path-style skip and query-style skip) and try both for broad addon support
+    // Build URLs per Stremio protocol: /{resource}/{type}/{id}/{extraArgs}.json
+    // Extra args (search, genre, skip) go in path segment, NOT query params
     const encodedId = encodeURIComponent(id);
     const pageSkip = (page - 1) * this.DEFAULT_PAGE_SIZE;
-    const filterQuery = (filters || [])
-      .filter(f => f && f.value)
-      .map(f => `&${encodeURIComponent(f.title)}=${encodeURIComponent(f.value!)}`)
-      .join('');
-    
+
     // For all addons
     if (!manifest.url) {
       throw new Error('Addon URL is missing');
     }
-    
-    try {
-      const { baseUrl, queryParams } = this.getAddonBaseURL(manifest.url);
-      // Candidate 1: Path-style skip URL: /catalog/{type}/{id}/skip={N}.json
-      const urlPathStyle = `${baseUrl}/catalog/${type}/${encodedId}/skip=${pageSkip}.json${queryParams ? `?${queryParams}` : ''}`;
-      // Add filters to path style (append with & or ? based on presence of queryParams)
-      const urlPathWithFilters = urlPathStyle + (urlPathStyle.includes('?') ? filterQuery : (filterQuery ? `?${filterQuery.slice(1)}` : ''));
 
-      // Candidate 2: Query-style skip URL: /catalog/{type}/{id}.json?skip={N}&limit={PAGE_SIZE}
+    try {
+      if (__DEV__) console.log(`🔍 [getCatalog] Manifest URL for ${manifest.name}: ${manifest.url}`);
+      const { baseUrl, queryParams } = this.getAddonBaseURL(manifest.url);
+
+      // Build extraArgs as combined path segment per protocol
+      // Format: /catalog/{type}/{id}/{extraArgs}.json where extraArgs is like "genre=Action&skip=100"
+      const extraParts: string[] = [];
+
+      // Add filters to extra args (genre, search, etc.)
+      if (filters && filters.length > 0) {
+        filters.filter(f => f && f.value).forEach(f => {
+          extraParts.push(`${encodeURIComponent(f.title)}=${encodeURIComponent(f.value)}`);
+        });
+      }
+
+      // Add skip for pagination (only if not page 1)
+      if (pageSkip > 0) {
+        extraParts.push(`skip=${pageSkip}`);
+      }
+
+      // Build the extraArgs path segment
+      const extraArgsPath = extraParts.length > 0 ? `/${extraParts.join('&')}` : '';
+
+      // Construct URLs per protocol
+      // Primary: Path-style with extra args in path segment
+      const urlPathStyle = `${baseUrl}/catalog/${type}/${encodedId}${extraArgsPath}.json${queryParams ? `?${queryParams}` : ''}`;
+
+      // Fallback for page 1 without filters: simple URL
+      const urlSimple = `${baseUrl}/catalog/${type}/${encodedId}.json${queryParams ? `?${queryParams}` : ''}`;
+
+      // Legacy fallback: Query-style URL (for older addons)
+      const legacyFilterQuery = (filters || [])
+        .filter(f => f && f.value)
+        .map(f => `&${encodeURIComponent(f.title)}=${encodeURIComponent(f.value!)}`)
+        .join('');
       let urlQueryStyle = `${baseUrl}/catalog/${type}/${encodedId}.json?skip=${pageSkip}&limit=${this.DEFAULT_PAGE_SIZE}`;
       if (queryParams) urlQueryStyle += `&${queryParams}`;
-      urlQueryStyle += filterQuery;
+      urlQueryStyle += legacyFilterQuery;
 
-      // Try path-style first, then fallback to query-style
+      // Try URLs in order of compatibility
       let response;
       try {
-        response = await this.retryRequest(async () => axios.get(urlPathWithFilters));
+        // For page 1 without filters, try simple URL first (best compatibility)
+        if (pageSkip === 0 && extraParts.length === 0) {
+          if (__DEV__) console.log(`🔍 [getCatalog] Trying simple URL for ${manifest.name}: ${urlSimple}`);
+          response = await this.retryRequest(async () => axios.get(urlSimple));
+          // Check if we got valid metas - if empty, try other styles
+          if (!response?.data?.metas || response.data.metas.length === 0) {
+            throw new Error('Empty response from simple URL');
+          }
+        } else {
+          throw new Error('Has extra args, use path-style');
+        }
       } catch (e) {
         try {
-          response = await this.retryRequest(async () => axios.get(urlQueryStyle));
+          // Try path-style URL (correct per protocol)
+          if (__DEV__) console.log(`🔍 [getCatalog] Trying path-style URL for ${manifest.name}: ${urlPathStyle}`);
+          response = await this.retryRequest(async () => axios.get(urlPathStyle));
+          // Check if we got valid metas - if empty, try query-style
+          if (!response?.data?.metas || response.data.metas.length === 0) {
+            throw new Error('Empty response from path-style URL');
+          }
         } catch (e2) {
-          throw e2;
+          try {
+            // Try legacy query-style URL as last resort
+            if (__DEV__) console.log(`🔍 [getCatalog] Trying query-style URL for ${manifest.name}: ${urlQueryStyle}`);
+            response = await this.retryRequest(async () => axios.get(urlQueryStyle));
+          } catch (e3) {
+            if (__DEV__) console.log(`❌ [getCatalog] All URL styles failed for ${manifest.name}`);
+            throw e3;
+          }
         }
       }
 
@@ -779,7 +912,7 @@ class StremioService {
         try {
           const key = `${manifest.id}|${type}|${id}`;
           if (typeof hasMore === 'boolean') this.catalogHasMore.set(key, hasMore);
-        } catch {}
+        } catch { }
         if (response.data.metas && Array.isArray(response.data.metas)) {
           return response.data.metas;
         }
@@ -800,13 +933,13 @@ class StremioService {
     try {
       // Validate content ID first
       const isValidId = await this.isValidContentId(type, id);
-      
+
       if (!isValidId) {
         return null;
       }
-      
+
       const addons = this.getInstalledAddons();
-      
+
       // If a preferred addon is specified, try it first
       if (preferredAddonId) {
         const preferredAddon = addons.find(addon => addon.id === preferredAddonId);
@@ -820,14 +953,14 @@ class StremioService {
           // Check if addon supports meta resource for this type
           let hasMetaSupport = false;
           let supportsIdPrefix = false;
-          
+
           for (const resource of preferredAddon.resources) {
             // Check if the current element is a ResourceObject
             if (typeof resource === 'object' && resource !== null && 'name' in resource) {
               const typedResource = resource as ResourceObject;
-              if (typedResource.name === 'meta' && 
-                  Array.isArray(typedResource.types) && 
-                  typedResource.types.includes(type)) {
+              if (typedResource.name === 'meta' &&
+                Array.isArray(typedResource.types) &&
+                typedResource.types.includes(type)) {
                 hasMetaSupport = true;
                 // Check idPrefix support
                 if (Array.isArray(typedResource.idPrefixes) && typedResource.idPrefixes.length > 0) {
@@ -837,7 +970,7 @@ class StremioService {
                 }
                 break;
               }
-            } 
+            }
             // Check if the element is the simple string "meta" AND the addon has a top-level types array
             else if (typeof resource === 'string' && resource === 'meta' && preferredAddon.types) {
               if (Array.isArray(preferredAddon.types) && preferredAddon.types.includes(type)) {
@@ -852,19 +985,19 @@ class StremioService {
               }
             }
           }
-          
-          
+
+
           // Only require ID prefix compatibility if the addon has declared specific prefixes
           const requiresIdPrefix = preferredAddon.idPrefixes && preferredAddon.idPrefixes.length > 0;
           const isSupported = hasMetaSupport && (!requiresIdPrefix || supportsIdPrefix);
-          
+
           if (isSupported) {
             try {
               const response = await this.retryRequest(async () => {
                 return await axios.get(url, { timeout: 10000 });
               });
-              
-              
+
+
               if (response.data && response.data.meta) {
                 return response.data.meta;
               } else {
@@ -876,25 +1009,25 @@ class StremioService {
           }
         }
       }
-      
+
       // Try Cinemeta with different base URLs
       const cinemetaUrls = [
         'https://v3-cinemeta.strem.io',
         'http://v3-cinemeta.strem.io'
       ];
-      
-      
+
+
       for (const baseUrl of cinemetaUrls) {
         try {
           const encodedId = encodeURIComponent(id);
           const url = `${baseUrl}/meta/${type}/${encodedId}.json`;
-          
+
 
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
-          
-          
+
+
           if (response.data && response.data.meta) {
             return response.data.meta;
           } else {
@@ -907,18 +1040,18 @@ class StremioService {
       // If Cinemeta fails, try other addons (excluding the preferred one already tried)
       for (const addon of addons) {
         if (!addon.resources || addon.id === 'com.linvo.cinemeta' || addon.id === preferredAddonId) continue;
-        
+
         // Check if addon supports meta resource for this type AND idPrefix (handles both string and object formats)
         let hasMetaSupport = false;
         let supportsIdPrefix = false;
-        
+
         for (const resource of addon.resources) {
           // Check if the current element is a ResourceObject
           if (typeof resource === 'object' && resource !== null && 'name' in resource) {
             const typedResource = resource as ResourceObject;
-            if (typedResource.name === 'meta' && 
-                Array.isArray(typedResource.types) && 
-                typedResource.types.includes(type)) {
+            if (typedResource.name === 'meta' &&
+              Array.isArray(typedResource.types) &&
+              typedResource.types.includes(type)) {
               hasMetaSupport = true;
               // Match idPrefixes if present; otherwise assume support
               if (Array.isArray(typedResource.idPrefixes) && typedResource.idPrefixes.length > 0) {
@@ -928,7 +1061,7 @@ class StremioService {
               }
               break;
             }
-          } 
+          }
           // Check if the element is the simple string "meta" AND the addon has a top-level types array
           else if (typeof resource === 'string' && resource === 'meta' && addon.types) {
             if (Array.isArray(addon.types) && addon.types.includes(type)) {
@@ -943,28 +1076,28 @@ class StremioService {
             }
           }
         }
-        
+
         // Require meta support, but allow any ID if addon doesn't declare specific prefixes
-        
+
         // Only require ID prefix compatibility if the addon has declared specific prefixes
         const requiresIdPrefix = addon.idPrefixes && addon.idPrefixes.length > 0;
         const isSupported = hasMetaSupport && (!requiresIdPrefix || supportsIdPrefix);
-        
+
         if (!isSupported) {
           continue;
         }
-        
+
         try {
           const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url || '');
           const encodedId = encodeURIComponent(id);
           const url = queryParams ? `${baseUrl}/meta/${type}/${encodedId}.json?${queryParams}` : `${baseUrl}/meta/${type}/${encodedId}.json`;
-          
+
 
           const response = await this.retryRequest(async () => {
             return await axios.get(url, { timeout: 10000 });
           });
-          
-          
+
+
           if (response.data && response.data.meta) {
             return response.data.meta;
           } else {
@@ -973,7 +1106,7 @@ class StremioService {
           continue; // Try next addon
         }
       }
-      
+
       return null;
     } catch (error) {
       logger.error('Error in getMetaDetails:', error);
@@ -986,8 +1119,8 @@ class StremioService {
    * This prevents over-fetching all episode data and reduces memory consumption
    */
   async getUpcomingEpisodes(
-    type: string, 
-    id: string, 
+    type: string,
+    id: string,
     options: {
       daysBack?: number;
       daysAhead?: number;
@@ -996,7 +1129,7 @@ class StremioService {
     } = {}
   ): Promise<{ seriesName: string; poster: string; episodes: any[] } | null> {
     const { daysBack = 14, daysAhead = 28, maxEpisodes = 50, preferredAddonId } = options;
-    
+
     try {
       // Get metadata first (this is lightweight compared to episodes)
       const metadata = await this.getMetaDetails(type, id, preferredAddonId);
@@ -1048,10 +1181,9 @@ class StremioService {
   // Modify getStreams to use this.getInstalledAddons() instead of getEnabledAddons
   async getStreams(type: string, id: string, callback?: StreamCallback): Promise<void> {
     await this.ensureInitialized();
-    
+
     const addons = this.getInstalledAddons();
-    logger.log('📌 [getStreams] Installed addons:', addons.map(a => ({ id: a.id, name: a.name, url: a.url })));
-    
+
     // Check if local scrapers are enabled and execute them first
     try {
       // Load settings from AsyncStorage directly (scoped with fallback)
@@ -1060,25 +1192,25 @@ class StremioService {
         || (await mmkvStorage.getItem('app_settings'));
       const rawSettings = settingsJson ? JSON.parse(settingsJson) : {};
       const settings: AppSettings = { ...DEFAULT_SETTINGS, ...rawSettings };
-      
+
       if (settings.enableLocalScrapers) {
         const hasScrapers = await localScraperService.hasScrapers();
         if (hasScrapers) {
           logger.log('🔧 [getStreams] Executing local scrapers for', type, id);
-          
+
           // Map Stremio types to local scraper types
           const scraperType = type === 'series' ? 'tv' : type;
-          
+
           // Parse the Stremio ID to extract ID and season/episode info
           let tmdbId: string | null = null;
           let season: number | undefined = undefined;
           let episode: number | undefined = undefined;
           let idType: 'imdb' | 'kitsu' | 'tmdb' = 'imdb';
-          
+
           try {
             const idParts = id.split(':');
             let baseId: string;
-            
+
             // Handle different episode ID formats
             if (idParts[0] === 'series') {
               // Format: series:imdbId:season:episode or series:kitsu:7442:season:episode
@@ -1128,7 +1260,7 @@ class StremioService {
                 episode = parseInt(idParts[2], 10);
               }
             }
-            
+
             // Handle ID conversion for local scrapers (they need TMDB ID)
             if (idType === 'imdb') {
               // Convert IMDb ID to TMDB ID
@@ -1154,7 +1286,7 @@ class StremioService {
           } catch (error) {
             logger.warn('🔧 [getStreams] Skipping local scrapers due to ID parsing error:', error);
           }
-          
+
           // Execute local scrapers asynchronously with TMDB ID (when available)
           if (tmdbId) {
             localScraperService.getStreams(scraperType, tmdbId, season, episode, (streams, scraperId, scraperName, error) => {
@@ -1191,13 +1323,13 @@ class StremioService {
     } catch (error) {
       // Continue even if local scrapers fail
     }
-    
+
     // Check specifically for TMDB Embed addon
     const tmdbEmbed = addons.find(addon => addon.id === 'org.tmdbembedapi');
     if (!tmdbEmbed) {
       // TMDB Embed addon not found
     }
-    
+
     // Find addons that provide streams and sort them by installation order
     const streamAddons = addons
       .filter(addon => {
@@ -1205,35 +1337,30 @@ class StremioService {
           logger.log(`⚠️ [getStreams] Addon ${addon.id} has no valid resources array`);
           return false;
         }
-        
-        // Log the detailed resources structure for debugging
-        logger.log(`📋 [getStreams] Checking addon ${addon.id} resources:`, JSON.stringify(addon.resources));
-        
+
         let hasStreamResource = false;
         let supportsIdPrefix = false;
-        
+
         // Iterate through the resources array, checking each element
         for (const resource of addon.resources) {
           // Check if the current element is a ResourceObject
           if (typeof resource === 'object' && resource !== null && 'name' in resource) {
             const typedResource = resource as ResourceObject;
-            if (typedResource.name === 'stream' && 
-                Array.isArray(typedResource.types) && 
-                typedResource.types.includes(type)) {
+            if (typedResource.name === 'stream' &&
+              Array.isArray(typedResource.types) &&
+              typedResource.types.includes(type)) {
               hasStreamResource = true;
-              
+
               // Check if this addon supports the ID prefix (generic: any prefix that matches start of id)
               if (Array.isArray(typedResource.idPrefixes) && typedResource.idPrefixes.length > 0) {
                 supportsIdPrefix = typedResource.idPrefixes.some(p => id.startsWith(p));
-                logger.log(`🔍 [getStreams] Addon ${addon.id} supports prefixes: ${typedResource.idPrefixes.join(', ')} → matches=${supportsIdPrefix}`);
               } else {
                 // If no idPrefixes specified, assume it supports all prefixes
                 supportsIdPrefix = true;
-                logger.log(`🔍 [getStreams] Addon ${addon.id} has no prefix restrictions, assuming support`);
               }
               break; // Found the stream resource object, no need to check further
             }
-          } 
+          }
           // Check if the element is the simple string "stream" AND the addon has a top-level types array
           else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
             if (Array.isArray(addon.types) && addon.types.includes(type)) {
@@ -1241,32 +1368,22 @@ class StremioService {
               // For simple string resources, check addon-level idPrefixes (generic)
               if (addon.idPrefixes && Array.isArray(addon.idPrefixes) && addon.idPrefixes.length > 0) {
                 supportsIdPrefix = addon.idPrefixes.some(p => id.startsWith(p));
-                logger.log(`🔍 [getStreams] Addon ${addon.id} supports prefixes: ${addon.idPrefixes.join(', ')} → matches=${supportsIdPrefix}`);
               } else {
                 // If no idPrefixes specified, assume it supports all prefixes
                 supportsIdPrefix = true;
-                logger.log(`🔍 [getStreams] Addon ${addon.id} has no prefix restrictions, assuming support`);
               }
               break; // Found the simple stream resource string and type support
             }
           }
         }
-        
+
         const canHandleRequest = hasStreamResource && supportsIdPrefix;
-        
-        if (!hasStreamResource) {
-          logger.log(`❌ [getStreams] Addon ${addon.id} does not support streaming ${type}`);
-        } else if (!supportsIdPrefix) {
-          logger.log(`❌ [getStreams] Addon ${addon.id} supports ${type} but its idPrefixes did not match id=${id}`);
-        } else {
-          logger.log(`✅ [getStreams] Addon ${addon.id} supports streaming ${type} for id=${id}`);
-        }
-        
+
         return canHandleRequest;
       });
-    
-    logger.log('📊 [getStreams] Stream capable addons:', streamAddons.map(a => a.id));
-    
+
+
+
     if (streamAddons.length === 0) {
       logger.warn('⚠️ [getStreams] No addons found that can provide streams');
       // Optionally call callback with an empty result or specific status?
@@ -1276,7 +1393,7 @@ class StremioService {
 
     // Process each addon and call the callback individually
     streamAddons.forEach(addon => {
-       // Use an IIFE to create scope for async operation inside forEach
+      // Use an IIFE to create scope for async operation inside forEach
       (async () => {
         try {
           if (!addon.url) {
@@ -1288,9 +1405,9 @@ class StremioService {
           const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url);
           const encodedId = encodeURIComponent(id);
           const url = queryParams ? `${baseUrl}/stream/${type}/${encodedId}.json?${queryParams}` : `${baseUrl}/stream/${type}/${encodedId}.json`;
-          
+
           logger.log(`🔗 [getStreams] Requesting streams from ${addon.name} (${addon.id}): ${url}`);
-          
+
           const response = await this.retryRequest(async () => {
             return await axios.get(url);
           });
@@ -1301,7 +1418,7 @@ class StremioService {
             processedStreams = this.processStreams(response.data.streams, addon);
             logger.log(`✅ [getStreams] Processed ${processedStreams.length} valid streams from ${addon.name} (${addon.id})`);
           } else {
-             logger.log(`⚠️ [getStreams] No streams found in response from ${addon.name} (${addon.id})`);
+            logger.log(`⚠️ [getStreams] No streams found in response from ${addon.name} (${addon.id})`);
           }
 
           if (callback) {
@@ -1328,21 +1445,21 @@ class StremioService {
       logger.warn(`Addon ${addon.id} has no URL defined`);
       return null;
     }
-    
+
     const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url);
     const encodedId = encodeURIComponent(id);
     const streamPath = `/stream/${type}/${encodedId}.json`;
     const url = queryParams ? `${baseUrl}${streamPath}?${queryParams}` : `${baseUrl}${streamPath}`;
-    
+
     logger.log(`Fetching streams from URL: ${url}`);
-    
+
     try {
       // Increase timeout for debrid services
       const timeout = addon.id.toLowerCase().includes('torrentio') ? 60000 : 10000;
-      
+
       const response = await this.retryRequest(async () => {
         logger.log(`Making request to ${url} with timeout ${timeout}ms`);
-        return await axios.get(url, { 
+        return await axios.get(url, {
           timeout,
           headers: {
             'Accept': 'application/json',
@@ -1350,11 +1467,11 @@ class StremioService {
           }
         });
       }, 5); // Increase retries for stream fetching
-      
+
       if (response.data && response.data.streams && Array.isArray(response.data.streams)) {
         const streams = this.processStreams(response.data.streams, addon);
         logger.log(`Successfully processed ${streams.length} streams from ${addon.id}`);
-        
+
         return {
           streams,
           addon: addon.id,
@@ -1377,7 +1494,7 @@ class StremioService {
       // Re-throw the error with more context
       throw new Error(`Failed to fetch streams from ${addon.name}: ${error.message}`);
     }
-    
+
     return null;
   }
 
@@ -1396,6 +1513,11 @@ class StremioService {
       return stream.url.url;
     }
 
+    // Handle YouTube video ID per protocol
+    if (stream.ytId) {
+      return `https://www.youtube.com/watch?v=${stream.ytId}`;
+    }
+
     if (stream.infoHash) {
       const trackers = [
         'udp://tracker.opentrackr.org:1337/announce',
@@ -1407,7 +1529,12 @@ class StremioService {
         'udp://tracker.coppersurfer.tk:6969/announce',
         'udp://tracker.internetwarriors.net:1337/announce'
       ];
-      const trackersString = trackers.map(t => `&tr=${encodeURIComponent(t)}`).join('');
+      // Add sources from stream if available per protocol
+      const additionalTrackers = (stream.sources || [])
+        .filter((s: string) => s.startsWith('tracker:'))
+        .map((s: string) => s.replace('tracker:', ''));
+      const allTrackers = [...trackers, ...additionalTrackers];
+      const trackersString = allTrackers.map(t => `&tr=${encodeURIComponent(t)}`).join('');
       const encodedTitle = encodeURIComponent(stream.title || stream.name || 'Unknown');
       return `magnet:?xt=urn:btih:${stream.infoHash}&dn=${encodedTitle}${trackersString}`;
     }
@@ -1418,8 +1545,20 @@ class StremioService {
   private processStreams(streams: any[], addon: Manifest): Stream[] {
     return streams
       .filter(stream => {
-        // Basic filtering - ensure there's a way to play (URL or infoHash) and identify (title/name)
-        const hasPlayableLink = !!(stream.url || stream.infoHash);
+        // Basic filtering - ensure there's a way to play per protocol
+        // One of: url, ytId, infoHash, externalUrl, nzbUrl, or archive arrays
+        const hasPlayableLink = !!(
+          stream.url ||
+          stream.infoHash ||
+          stream.ytId ||
+          stream.externalUrl ||
+          stream.nzbUrl ||
+          (stream.rarUrls && stream.rarUrls.length > 0) ||
+          (stream.zipUrls && stream.zipUrls.length > 0) ||
+          (stream['7zipUrls'] && stream['7zipUrls'].length > 0) ||
+          (stream.tgzUrls && stream.tgzUrls.length > 0) ||
+          (stream.tarUrls && stream.tarUrls.length > 0)
+        );
         const hasIdentifier = !!(stream.title || stream.name);
         return stream && hasPlayableLink && hasIdentifier;
       })
@@ -1427,6 +1566,8 @@ class StremioService {
         const streamUrl = this.getStreamUrl(stream);
         const isDirectStreamingUrl = this.isDirectStreamingUrl(streamUrl);
         const isMagnetStream = streamUrl?.startsWith('magnet:');
+        const isExternalUrl = !!stream.externalUrl;
+        const isYouTube = !!stream.ytId;
 
         // Prefer full, untruncated text to preserve complete addon details
         let displayTitle = stream.title || stream.name || 'Unnamed Stream';
@@ -1441,12 +1582,20 @@ class StremioService {
         // Extract size: Prefer behaviorHints.videoSize, fallback to top-level size
         const sizeInBytes = stream.behaviorHints?.videoSize || stream.size || undefined;
 
-        // Memory optimization: Minimize behaviorHints to essential data only
+        // Preserve complete behaviorHints per protocol
         const behaviorHints: Stream['behaviorHints'] = {
-          notWebReady: !isDirectStreamingUrl,
+          notWebReady: !isDirectStreamingUrl || isExternalUrl,
           cached: stream.behaviorHints?.cached || undefined,
           bingeGroup: stream.behaviorHints?.bingeGroup || undefined,
-          // Only include essential torrent data for magnet streams
+          // Per protocol: Country whitelist for geo-restrictions
+          countryWhitelist: stream.behaviorHints?.countryWhitelist || undefined,
+          // Per protocol: Proxy headers for custom stream headers
+          proxyHeaders: stream.behaviorHints?.proxyHeaders || undefined,
+          // Per protocol: Video metadata for subtitle matching
+          videoHash: stream.behaviorHints?.videoHash || undefined,
+          videoSize: stream.behaviorHints?.videoSize || undefined,
+          filename: stream.behaviorHints?.filename || undefined,
+          // Include essential torrent data for magnet streams
           ...(isMagnetStream ? {
             infoHash: stream.infoHash || streamUrl?.match(/btih:([a-zA-Z0-9]+)/)?.[1],
             fileIdx: stream.fileIdx,
@@ -1454,20 +1603,49 @@ class StremioService {
           } : {}),
         };
 
-        // Explicitly construct the final Stream object with minimal data
+        // Explicitly construct the final Stream object with all protocol fields
         const processedStream: Stream = {
-          url: streamUrl,
+          // Primary URL (may be empty for ytId/externalUrl streams)
+          url: streamUrl || undefined,
           name: name,
           title: displayTitle,
           addonName: addon.name,
           addonId: addon.id,
+
           // Include description as-is to preserve full details
           description: stream.description,
+
+          // Alternative source types per protocol
+          ytId: stream.ytId || undefined,
+          externalUrl: stream.externalUrl || undefined,
+          nzbUrl: stream.nzbUrl || undefined,
+          rarUrls: stream.rarUrls || undefined,
+          zipUrls: stream.zipUrls || undefined,
+          '7zipUrls': stream['7zipUrls'] || undefined,
+          tgzUrls: stream.tgzUrls || undefined,
+          tarUrls: stream.tarUrls || undefined,
+          servers: stream.servers || undefined,
+
+          // Torrent/archive file selection
           infoHash: stream.infoHash || undefined,
           fileIdx: stream.fileIdx,
+          fileMustInclude: stream.fileMustInclude || undefined,
+
+          // Stream metadata
           size: sizeInBytes,
           isFree: stream.isFree,
           isDebrid: !!(stream.behaviorHints?.cached),
+
+          // Embedded subtitles per protocol
+          subtitles: stream.subtitles?.map((sub: any, index: number) => ({
+            id: sub.id || `${addon.id}-${sub.lang || 'unknown'}-${index}`,
+            ...sub,
+          })) || undefined,
+
+          // Additional tracker/DHT sources per protocol
+          sources: stream.sources || undefined,
+
+          // Complete behavior hints
           behaviorHints: behaviorHints,
         };
 
@@ -1495,11 +1673,11 @@ class StremioService {
     items: Meta[];
   }> {
     const addon = this.getInstalledAddons().find(a => a.id === addonId);
-    
+
     if (!addon) {
       throw new Error(`Addon ${addonId} not found`);
     }
-    
+
     const items = await this.getCatalog(addon, type, id);
     return {
       addon: addonId,
@@ -1541,7 +1719,9 @@ class StremioService {
         logger.log(`Fetching subtitles from ${addon.name}: ${url}`);
         const response = await this.retryRequest(async () => axios.get(url, { timeout: 10000 }));
         if (response.data && Array.isArray(response.data.subtitles)) {
-          return response.data.subtitles.map((sub: any) => ({
+          return response.data.subtitles.map((sub: any, index: number) => ({
+            // Ensure ID is always present per protocol (required field)
+            id: sub.id || `${addon.id}-${sub.lang || 'unknown'}-${index}`,
             ...sub,
             addon: addon.id,
             addonName: addon.name,
@@ -1596,22 +1776,48 @@ class StremioService {
     return false;
   }
 
-  // Check if any installed addons can provide streams
-  async hasStreamProviders(): Promise<boolean> {
+  // Check if any installed addons can provide streams (including embedded streams in metadata)
+  async hasStreamProviders(type?: string): Promise<boolean> {
     await this.ensureInitialized();
     const addons = Array.from(this.installedAddons.values());
 
     for (const addon of addons) {
       if (addon.resources && Array.isArray(addon.resources)) {
-        // Check for 'stream' resource in the modern format
-        const hasStreamResource = addon.resources.some(resource => 
-          typeof resource === 'string' 
-            ? resource === 'stream' 
-            : resource.name === 'stream'
+        // Check for explicit 'stream' resource
+        const hasStreamResource = addon.resources.some(resource =>
+          typeof resource === 'string'
+            ? resource === 'stream'
+            : (resource as any).name === 'stream'
         );
 
         if (hasStreamResource) {
-          return true;
+          // If type specified, also check if addon supports this type
+          if (type) {
+            const supportsType = addon.types?.includes(type) ||
+              addon.resources.some(resource =>
+                typeof resource === 'object' &&
+                (resource as any).name === 'stream' &&
+                (resource as any).types?.includes(type)
+              );
+            if (supportsType) return true;
+          } else {
+            return true;
+          }
+        }
+
+        // Also check for addons with meta resource that support the type
+        // These addons might provide embedded streams within metadata
+        if (type) {
+          const hasMetaResource = addon.resources.some(resource =>
+            typeof resource === 'string'
+              ? resource === 'meta'
+              : (resource as any).name === 'meta'
+          );
+
+          if (hasMetaResource && addon.types?.includes(type)) {
+            // This addon provides meta for the type - might have embedded streams
+            return true;
+          }
         }
       }
     }
@@ -1619,6 +1825,54 @@ class StremioService {
     return false;
   }
 
+  /**
+   * Fetch addon catalogs from addons that provide the addon_catalog resource per protocol.
+   * Returns a list of other addon manifests that can be installed.
+   */
+  async getAddonCatalogs(type: string, id: string): Promise<AddonCatalogItem[]> {
+    await this.ensureInitialized();
+
+    // Find addons that provide addon_catalog resource
+    const addons = this.getInstalledAddons().filter(addon => {
+      if (!addon.resources) return false;
+      return addon.resources.some(r =>
+        typeof r === 'string' ? r === 'addon_catalog' : (r as any).name === 'addon_catalog'
+      );
+    });
+
+    if (addons.length === 0) {
+      logger.log('[getAddonCatalogs] No addons provide addon_catalog resource');
+      return [];
+    }
+
+    const results: AddonCatalogItem[] = [];
+
+    for (const addon of addons) {
+      try {
+        const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url || '');
+        const url = `${baseUrl}/addon_catalog/${type}/${encodeURIComponent(id)}.json${queryParams ? `?${queryParams}` : ''}`;
+
+        logger.log(`[getAddonCatalogs] Fetching from ${addon.name}: ${url}`);
+        const response = await this.retryRequest(() => axios.get(url, { timeout: 10000 }));
+
+        if (response.data?.addons && Array.isArray(response.data.addons)) {
+          results.push(...response.data.addons);
+        }
+      } catch (error) {
+        logger.warn(`[getAddonCatalogs] Failed to fetch from ${addon.name}:`, error);
+      }
+    }
+
+    return results;
+  }
+
+}
+
+// Addon catalog item per protocol
+export interface AddonCatalogItem {
+  transportName: string;  // 'http'
+  transportUrl: string;   // URL to manifest.json
+  manifest: Manifest;
 }
 
 export const stremioService = StremioService.getInstance();
