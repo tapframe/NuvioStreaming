@@ -1660,6 +1660,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         animationType="fade"
         onRequestClose={closeEpisodeActionMenu}
         statusBarTranslucent
+        supportedOrientations={['portrait', 'landscape']}
       >
         <Pressable
           style={{

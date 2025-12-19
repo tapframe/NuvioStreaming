@@ -685,6 +685,7 @@ const CatalogSettingsScreen = () => {
         animationType="fade"
         transparent={true}
         visible={isRenameModalVisible}
+        supportedOrientations={['portrait', 'landscape']}
         onRequestClose={() => {
           setIsRenameModalVisible(false);
           setCatalogToRename(null);

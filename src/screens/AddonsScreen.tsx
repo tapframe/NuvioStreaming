@@ -1413,6 +1413,7 @@ const AddonsScreen = () => {
         visible={showConfirmModal}
         transparent
         animationType="fade"
+        supportedOrientations={['portrait', 'landscape']}
         onRequestClose={() => {
           setShowConfirmModal(false);
           setAddonDetails(null);
