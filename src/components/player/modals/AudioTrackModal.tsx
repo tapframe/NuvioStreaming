@@ -27,9 +27,8 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
 }) => {
   const { width, height } = useWindowDimensions();
 
-  // Size constants matching SubtitleModal aesthetics
   const menuWidth = Math.min(width * 0.9, 420);
-  const menuMaxHeight = height * 0.8;
+  const menuMaxHeight = height * 0.9;
 
   const handleClose = () => setShowAudioModal(false);
 
