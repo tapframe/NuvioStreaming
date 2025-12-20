@@ -1,13 +1,13 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Platform, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Animated, { 
-  FadeIn, 
+import Animated, {
+  FadeIn,
   FadeOut,
   SlideInRight,
   SlideOutRight,
 } from 'react-native-reanimated';
-import { styles } from '../utils/playerStyles';
+import { StyleSheet } from 'react-native';
 import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +21,7 @@ interface SubtitleModalsProps {
   isLoadingSubtitles: boolean;
   customSubtitles: SubtitleCue[];
   availableSubtitles: WyzieSubtitle[];
-  ksTextTracks: Array<{id: number, name: string, language?: string}>;
+  ksTextTracks: Array<{ id: number, name: string, language?: string }>;
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   // When true, KSPlayer is active (iOS MKV path). Use to gate iOS-only limitations.
@@ -128,7 +128,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
     width * (isIos ? (isLandscape ? 0.6 : 0.8) : 0.85),
     isIos ? 420 : 400
   );
- 
+
   React.useEffect(() => {
     if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
       fetchAvailableSubtitles();
@@ -183,31 +183,13 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   // Main subtitle menu
   const renderSubtitleMenu = () => {
     if (!showSubtitleModal) return null;
-    
-    return (
-      <>
-        {/* Backdrop */}
-        <Animated.View 
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 9998,
-          }}
-        >
-          <TouchableOpacity 
-            style={{ flex: 1 }}
-            onPress={handleClose}
-            activeOpacity={1}
-          />
-        </Animated.View>
 
-        {/* Side Menu */}
+    return (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose}>
+          <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+        </TouchableOpacity>
+
         <Animated.View
           entering={SlideInRight.duration(300)}
           exiting={SlideOutRight.duration(250)}
@@ -217,51 +199,22 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             right: 0,
             bottom: 0,
             width: menuWidth,
-            backgroundColor: '#1A1A1A',
-            zIndex: 9999,
-            elevation: 20,
-            shadowColor: '#000',
-            shadowOffset: { width: -5, height: 0 },
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
-            borderTopLeftRadius: 20,
-            borderBottomLeftRadius: 20,
-            paddingRight: 0,
+            backgroundColor: '#0f0f0f',
+            borderLeftWidth: 1,
+            borderColor: 'rgba(255,255,255,0.1)',
           }}
         >
-          {/* Header */}
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 20,
-            paddingTop: insets.top + (isCompact ? 8 : 12),
-            paddingBottom: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-          }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '700' }}>Subtitles</Text>
-              <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: useCustomSubtitles ? 'rgba(34,197,94,0.2)' : 'rgba(59,130,246,0.2)' }}>
-                <Text style={{ color: useCustomSubtitles ? '#22C55E' : '#3B82F6', fontSize: 11, fontWeight: '700' }}>
-                  {useCustomSubtitles ? 'Addon in use' : 'Built‑in in use'}
-                </Text>
+          <View style={{ paddingTop: Platform.OS === 'ios' ? 60 : 15, paddingHorizontal: 20 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ color: 'white', fontSize: 22, fontWeight: '700' }}>Subtitles</Text>
+                <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, backgroundColor: useCustomSubtitles ? 'rgba(34,197,94,0.2)' : 'rgba(59,130,246,0.2)' }}>
+                  <Text style={{ color: useCustomSubtitles ? '#22C55E' : '#3B82F6', fontSize: 11, fontWeight: '700' }}>
+                    {useCustomSubtitles ? 'Addon in use' : 'Built‑in in use'}
+                  </Text>
+                </View>
               </View>
             </View>
-            <TouchableOpacity 
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}
-              onPress={handleClose}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons name="close" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
           </View>
 
           {/* Segmented Tabs */}
@@ -288,7 +241,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             ))}
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: 20, paddingBottom: (isCompact ? 24 : 40) + (isIos ? insets.bottom : 0) }}
             showsVerticalScrollIndicator={false}
@@ -413,171 +366,171 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
             )}
 
             {activeTab === 'addon' && (
-            <View style={{ marginBottom: 30 }}>
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 15,
-              }}>
-                <Text style={{
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: isCompact ? 13 : 14,
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+              <View style={{ marginBottom: 30 }}>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 15,
                 }}>
-                  Addon Subtitles
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  {useCustomSubtitles && (
+                  <Text style={{
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: isCompact ? 13 : 14,
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}>
+                    Addon Subtitles
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {useCustomSubtitles && (
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                          borderRadius: 12,
+                          paddingHorizontal: chipPadH,
+                          paddingVertical: chipPadV - 2,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                        }}
+                        onPress={() => {
+                          disableCustomSubtitles();
+                          setSelectedOnlineSubtitleId(null);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialIcons name="close" size={16} color="#EF4444" />
+                        <Text style={{
+                          color: '#EF4444',
+                          fontSize: isCompact ? 11 : 12,
+                          fontWeight: '600',
+                          marginLeft: 6,
+                        }}>
+                          Disable
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       style={{
-                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.15)',
                         borderRadius: 12,
                         paddingHorizontal: chipPadH,
-                        paddingVertical: chipPadV-2,
+                        paddingVertical: chipPadV - 2,
                         flexDirection: 'row',
                         alignItems: 'center',
                       }}
-                      onPress={() => {
-                        disableCustomSubtitles();
-                        setSelectedOnlineSubtitleId(null);
-                      }}
-                      activeOpacity={0.7}
+                      onPress={() => fetchAvailableSubtitles()}
+                      disabled={isLoadingSubtitleList}
                     >
-                      <MaterialIcons name="close" size={16} color="#EF4444" />
+                      {isLoadingSubtitleList ? (
+                        <ActivityIndicator size="small" color="#22C55E" />
+                      ) : (
+                        <MaterialIcons name="refresh" size={16} color="#22C55E" />
+                      )}
                       <Text style={{
-                        color: '#EF4444',
+                        color: '#22C55E',
                         fontSize: isCompact ? 11 : 12,
                         fontWeight: '600',
                         marginLeft: 6,
                       }}>
-                        Disable
+                        {isLoadingSubtitleList ? 'Searching' : 'Refresh'}
                       </Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
+                </View>
+
+                {(availableSubtitles.length === 0) && !isLoadingSubtitleList ? (
                   <TouchableOpacity
                     style={{
-                      backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                      borderRadius: 12,
-                      paddingHorizontal: chipPadH,
-                      paddingVertical: chipPadV-2,
-                      flexDirection: 'row',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: 16,
+                      padding: isCompact ? 14 : 20,
                       alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255, 255, 255, 0.1)',
+                      borderStyle: 'dashed',
                     }}
                     onPress={() => fetchAvailableSubtitles()}
-                    disabled={isLoadingSubtitleList}
+                    activeOpacity={0.7}
                   >
-                    {isLoadingSubtitleList ? (
-                      <ActivityIndicator size="small" color="#22C55E" />
-                    ) : (
-                      <MaterialIcons name="refresh" size={16} color="#22C55E" />
-                    )}
+                    <MaterialIcons name="cloud-download" size={24} color="rgba(255,255,255,0.4)" />
                     <Text style={{
-                      color: '#22C55E',
-                      fontSize: isCompact ? 11 : 12,
-                      fontWeight: '600',
-                      marginLeft: 6,
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      fontSize: isCompact ? 13 : 14,
+                      marginTop: 8,
+                      textAlign: 'center',
                     }}>
-                      {isLoadingSubtitleList ? 'Searching' : 'Refresh'}
+                      Tap to fetch from addons
                     </Text>
                   </TouchableOpacity>
-                </View>
-              </View>
-
-              {(availableSubtitles.length === 0) && !isLoadingSubtitleList ? (
-                <TouchableOpacity
-                  style={{
+                ) : isLoadingSubtitleList ? (
+                  <View style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                     borderRadius: 16,
                     padding: isCompact ? 14 : 20,
                     alignItems: 'center',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.1)',
-                    borderStyle: 'dashed',
-                  }}
-                  onPress={() => fetchAvailableSubtitles()}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons name="cloud-download" size={24} color="rgba(255,255,255,0.4)" />
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: isCompact ? 13 : 14,
-                    marginTop: 8,
-                    textAlign: 'center',
                   }}>
-                    Tap to fetch from addons
-                  </Text>
-                </TouchableOpacity>
-              ) : isLoadingSubtitleList ? (
-                <View style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: 16,
-                  padding: isCompact ? 14 : 20,
-                  alignItems: 'center',
-                }}>
-                  <ActivityIndicator size="large" color="#22C55E" />
-                  <Text style={{
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    fontSize: isCompact ? 13 : 14,
-                    marginTop: 12,
-                  }}>
-                    Searching...
-                  </Text>
-                </View>
-              ) : (
-                <View style={{ gap: 8 }}>
-                  {availableSubtitles.map((sub) => {
-                    const isSelected = useCustomSubtitles && selectedOnlineSubtitleId === sub.id;
-                    return (
-                      <TouchableOpacity
-                        key={sub.id}
-                        style={{
-                          backgroundColor: isSelected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 16,
-                          padding: sectionPad,
-                          borderWidth: 1,
-                          borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
-                        }}
-                        onPress={() => {
-                          handleLoadWyzieSubtitle(sub);
-                        }}
-                        activeOpacity={0.7}
-                        disabled={isLoadingSubtitles}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '500' }}>
-                              {sub.display}
-                            </Text>
-                            {(() => {
-                              const filename = getFileNameFromUrl(sub.url);
-                              if (!filename) return null;
-                              return (
-                                <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
-                                  {filename}
-                                </Text>
-                              );
-                            })()}
-                            <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 13, marginTop: 2 }}>
-                              {formatLanguage(sub.language)}{sub.source ? ` · ${sub.source}` : ''}
-                            </Text>
+                    <ActivityIndicator size="large" color="#22C55E" />
+                    <Text style={{
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      fontSize: isCompact ? 13 : 14,
+                      marginTop: 12,
+                    }}>
+                      Searching...
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {availableSubtitles.map((sub) => {
+                      const isSelected = useCustomSubtitles && selectedOnlineSubtitleId === sub.id;
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          style={{
+                            backgroundColor: isSelected ? 'rgba(34, 197, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: 16,
+                            padding: sectionPad,
+                            borderWidth: 1,
+                            borderColor: isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                          }}
+                          onPress={() => {
+                            handleLoadWyzieSubtitle(sub);
+                          }}
+                          activeOpacity={0.7}
+                          disabled={isLoadingSubtitles}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '500' }}>
+                                {sub.display}
+                              </Text>
+                              {(() => {
+                                const filename = getFileNameFromUrl(sub.url);
+                                if (!filename) return null;
+                                return (
+                                  <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                                    {filename}
+                                  </Text>
+                                );
+                              })()}
+                              <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 13, marginTop: 2 }}>
+                                {formatLanguage(sub.language)}{sub.source ? ` · ${sub.source}` : ''}
+                              </Text>
+                            </View>
+                            {(isLoadingSubtitles && loadingSubtitleId === sub.id) ? (
+                              <ActivityIndicator size="small" color="#22C55E" />
+                            ) : isSelected ? (
+                              <MaterialIcons name="check" size={20} color="#22C55E" />
+                            ) : (
+                              <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.4)" />
+                            )}
                           </View>
-                          {(isLoadingSubtitles && loadingSubtitleId === sub.id) ? (
-                            <ActivityIndicator size="small" color="#22C55E" />
-                          ) : isSelected ? (
-                            <MaterialIcons name="check" size={20} color="#22C55E" />
-                          ) : (
-                            <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.4)" />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
             )}
 
             {activeTab === 'appearance' && (
@@ -902,7 +855,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
 
           </ScrollView>
         </Animated.View>
-      </>
+      </View>
     );
   };
 

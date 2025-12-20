@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -19,9 +19,6 @@ interface EpisodeStreamsModalProps {
   onSelectStream: (stream: Stream) => void;
   metadata?: { id?: string; name?: string };
 }
-
-const { width } = Dimensions.get('window');
-const MENU_WIDTH = Math.min(width * 0.85, 400);
 
 const QualityBadge = ({ quality }: { quality: string | null }) => {
   if (!quality) return null;
@@ -61,6 +58,9 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
   onSelectStream,
   metadata,
 }) => {
+  const { width } = useWindowDimensions();
+  const MENU_WIDTH = Math.min(width * 0.85, 400);
+
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: Stream[]; addonName: string } }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [hasErrors, setHasErrors] = useState<string[]>([]);
@@ -94,6 +94,8 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
       );
 
       streamAddons.forEach((addon: any) => expectedProviders.add(addon.id));
+
+      logger.log(`[EpisodeStreamsModal] Fetching streams for ${episodeId}, expecting ${expectedProviders.size} providers`);
 
       await stremioService.getStreams('series', episodeId, (streams: any, addonId: any, addonName: any, error: any) => {
         completedProviders++;
@@ -152,7 +154,6 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
         />
       </TouchableOpacity>
 
-      {/* Side Menu */}
       <Animated.View
         entering={SlideInRight.duration(300)}
         exiting={SlideOutRight.duration(250)}
@@ -169,7 +170,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
       >
         {/* Header */}
         <View style={{
-          paddingTop: Platform.OS === 'ios' ? 60 : 40,
+          paddingTop: Platform.OS === 'ios' ? 60 : 10,
           paddingHorizontal: 20,
           paddingBottom: 20,
         }}>

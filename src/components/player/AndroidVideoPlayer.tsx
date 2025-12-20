@@ -135,10 +135,10 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Helper to get dynamic volume icon
   const getVolumeIcon = (value: number) => {
-      if (value === 0) return 'volume-off';
-      if (value < 0.3) return 'volume-mute';
-      if (value < 0.6) return 'volume-down';
-      return 'volume-up';
+    if (value === 0) return 'volume-off';
+    if (value < 0.3) return 'volume-mute';
+    if (value < 0.6) return 'volume-down';
+    return 'volume-up';
   };
 
   // Helper to get dynamic brightness icon
@@ -1160,15 +1160,29 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [id, type, paused, currentTime, duration]);
 
+  // Use refs to track latest values for unmount cleanup without causing effect re-runs
+  const currentTimeRef = useRef(currentTime);
+  const durationRef = useRef(duration);
+
+  // Keep refs updated with latest values
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  // Cleanup effect - only runs on actual component unmount
   useEffect(() => {
     return () => {
-      if (id && type && duration > 0) {
+      if (id && type && durationRef.current > 0) {
         saveWatchProgress();
         // Final Trakt sync on component unmount
-        traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
+        traktAutosync.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'unmount');
       }
     };
-  }, [id, type, currentTime, duration]);
+  }, [id, type]); // Only id and type - NOT currentTime or duration
 
   const seekToTime = (rawSeconds: number) => {
     // Clamp to just before the end of the media.
@@ -3432,8 +3446,6 @@ const AndroidVideoPlayer: React.FC = () => {
             buffered={buffered}
             formatTime={formatTime}
             playerBackend={useVLC ? 'VLC' : 'ExoPlayer'}
-            nextLoadingTitle={nextLoadingTitle}
-            controlsFixedOffset={Math.min(Dimensions.get('window').width, Dimensions.get('window').height) >= 768 ? 120 : 100}
           />
 
           {/* Combined Volume & Brightness Gesture Indicator - NEW PILL STYLE (No Bar) */}
@@ -3441,45 +3453,45 @@ const AndroidVideoPlayer: React.FC = () => {
             <View style={localStyles.gestureIndicatorContainer}>
               {/* Dynamic Icon */}
               <View
-                  style={[
-                    localStyles.iconWrapper,
-                    {
-                      // Conditional Background Color Logic
-                      backgroundColor: gestureControls.showVolumeOverlay && volume === 0
-                        ? 'rgba(242, 184, 181)'
-                        : 'rgba(59, 59, 59)'
-                    }
-                  ]}
-                >
-                  <MaterialIcons
-                    name={
-                      gestureControls.showVolumeOverlay
-                        ? getVolumeIcon(volume)
-                        : getBrightnessIcon(brightness)
-                    }
-                    size={24} // Reduced size to fit inside a 32-40px circle better
-                    color={
-                      gestureControls.showVolumeOverlay && volume === 0
-                         ? 'rgba(96, 20, 16)' // Bright RED for MUTE icon itself
-                         : 'rgba(255, 255, 255)' // White for all other states
-                    }
-                  />
+                style={[
+                  localStyles.iconWrapper,
+                  {
+                    // Conditional Background Color Logic
+                    backgroundColor: gestureControls.showVolumeOverlay && volume === 0
+                      ? 'rgba(242, 184, 181)'
+                      : 'rgba(59, 59, 59)'
+                  }
+                ]}
+              >
+                <MaterialIcons
+                  name={
+                    gestureControls.showVolumeOverlay
+                      ? getVolumeIcon(volume)
+                      : getBrightnessIcon(brightness)
+                  }
+                  size={24} // Reduced size to fit inside a 32-40px circle better
+                  color={
+                    gestureControls.showVolumeOverlay && volume === 0
+                      ? 'rgba(96, 20, 16)' // Bright RED for MUTE icon itself
+                      : 'rgba(255, 255, 255)' // White for all other states
+                  }
+                />
               </View>
 
               {/* Text Label: Shows "Muted" or percentage */}
-                 <Text
-                   style={[
-                     localStyles.gestureText,
-                     // Conditional Text Color Logic
-                     gestureControls.showVolumeOverlay && volume === 0 && { color: 'rgba(242, 184, 181)' } // Light RED for "Muted"
-                   ]}
-                 >
-                   {/* Conditional Text Content Logic */}
-                   {gestureControls.showVolumeOverlay && volume === 0
-                     ? "Muted" // Display "Muted" when volume is 0
-                     : `${Math.round((gestureControls.showVolumeOverlay ? volume : brightness) * 100)}%` // Display percentage otherwise
-                   }
-                 </Text>
+              <Text
+                style={[
+                  localStyles.gestureText,
+                  // Conditional Text Color Logic
+                  gestureControls.showVolumeOverlay && volume === 0 && { color: 'rgba(242, 184, 181)' } // Light RED for "Muted"
+                ]}
+              >
+                {/* Conditional Text Content Logic */}
+                {gestureControls.showVolumeOverlay && volume === 0
+                  ? "Muted" // Display "Muted" when volume is 0
+                  : `${Math.round((gestureControls.showVolumeOverlay ? volume : brightness) * 100)}%` // Display percentage otherwise
+                }
+              </Text>
             </View>
           )}
 
@@ -4067,32 +4079,32 @@ const AndroidVideoPlayer: React.FC = () => {
 // New styles for the gesture indicator
 const localStyles = StyleSheet.create({
   gestureIndicatorContainer: {
-   position: 'absolute',
-   top: '4%', // Adjust this for vertical position
-   alignSelf: 'center', // Adjust this for horizontal position
-   flexDirection: 'row',
-   alignItems: 'center',
-   backgroundColor: 'rgba(25, 25, 25)', // Dark pill background
-   borderRadius: 70,
-   paddingHorizontal: 15,
-   paddingVertical: 15,
-   zIndex: 2000, // Very high z-index to ensure visibility
-   minWidth: 120, // Adjusted min width since bar is removed
+    position: 'absolute',
+    top: '4%', // Adjust this for vertical position
+    alignSelf: 'center', // Adjust this for horizontal position
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(25, 25, 25)', // Dark pill background
+    borderRadius: 70,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    zIndex: 2000, // Very high z-index to ensure visibility
+    minWidth: 120, // Adjusted min width since bar is removed
   },
   iconWrapper: {
-   borderRadius: 50, // Makes it a perfect circle (set to a high number)
-   width: 40,        // Define the diameter of the circle
-   height: 40,       // Define the diameter of the circle
-   justifyContent: 'center',
-   alignItems: 'center',
-   marginRight: 12,  // Margin to separate icon circle from percentage text
+    borderRadius: 50, // Makes it a perfect circle (set to a high number)
+    width: 40,        // Define the diameter of the circle
+    height: 40,       // Define the diameter of the circle
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,  // Margin to separate icon circle from percentage text
   },
   gestureText: {
-   color: '#FFFFFF',
-   fontSize: 18,
-   fontWeight: 'normal',
-   minWidth: 35,
-   textAlign: 'right',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'normal',
+    minWidth: 35,
+    textAlign: 'right',
   },
 });
 

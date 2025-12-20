@@ -67,7 +67,7 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
           const { tmdbService } = require('../../../services/tmdbService');
           const url = tmdbService.getImageUrl(anyEpisode.still_path, 'w500');
           if (url) imageUri = url;
-        } catch {}
+        } catch { }
       }
     }
   }
@@ -81,33 +81,19 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
     return timeRemaining < 61 && timeRemaining > 10;
   }, [nextEpisode, duration, currentTime]);
 
-  // Debug log inputs and computed state on changes
-  useEffect(() => {
-    try {
-      const timeRemaining = duration - currentTime;
-      logger.log('[UpNextButton] state', {
-        hasNextEpisode: !!nextEpisode,
-        currentTime,
-        duration,
-        timeRemaining,
-        isLoading,
-        shouldShow,
-        controlsVisible,
-        controlsFixedOffset,
-      });
-    } catch {}
-  }, [nextEpisode, currentTime, duration, isLoading, shouldShow, controlsVisible, controlsFixedOffset]);
+  // Debug logging removed to reduce console noise
+  // The state is computed in shouldShow useMemo above
 
   useEffect(() => {
     if (shouldShow && !visible) {
-      try { logger.log('[UpNextButton] showing with animation'); } catch {}
+      try { logger.log('[UpNextButton] showing with animation'); } catch { }
       setVisible(true);
       Animated.parallel([
         Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.spring(scale, { toValue: 1, tension: 100, friction: 8, useNativeDriver: true }),
       ]).start();
     } else if (!shouldShow && visible) {
-      try { logger.log('[UpNextButton] hiding with animation'); } catch {}
+      try { logger.log('[UpNextButton] hiding with animation'); } catch { }
       Animated.parallel([
         Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
         Animated.timing(scale, { toValue: 0.8, duration: 200, useNativeDriver: true }),

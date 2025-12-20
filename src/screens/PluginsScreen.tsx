@@ -1946,6 +1946,7 @@ const PluginsScreen: React.FC = () => {
         visible={showHelpModal}
         transparent={true}
         animationType="fade"
+        supportedOrientations={['portrait', 'landscape']}
         onRequestClose={() => setShowHelpModal(false)}
       >
         <View style={styles.modalOverlay}>
@@ -1978,6 +1979,7 @@ const PluginsScreen: React.FC = () => {
         visible={showAddRepositoryModal}
         transparent={true}
         animationType="fade"
+        supportedOrientations={['portrait', 'landscape']}
         onRequestClose={() => setShowAddRepositoryModal(false)}
       >
         <View style={styles.modalOverlay}>

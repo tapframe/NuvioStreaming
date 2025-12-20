@@ -98,7 +98,7 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
   const isWatched = !!isWatchedProp;
   const inTraktWatchlist = isAuthenticated && isInWatchlist(item.id, item.type as 'movie' | 'show');
   const inTraktCollection = isAuthenticated && isInCollection(item.id, item.type as 'movie' | 'show');
-  
+
   let menuOptions = [
     {
       icon: 'bookmark',
@@ -152,6 +152,7 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
       visible={visible}
       transparent
       animationType="none"
+      supportedOrientations={['portrait', 'landscape']}
       onRequestClose={onClose}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -162,7 +163,7 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
               <View style={styles.dragHandle} />
               <View style={styles.menuHeader}>
                 <FastImage
-                  source={{ 
+                  source={{
                     uri: item.poster,
                     priority: FastImage.priority.high,
                     cache: FastImage.cacheControl.immutable
