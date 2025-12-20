@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import Animated, { 
-  FadeIn, 
+import Animated, {
+  FadeIn,
   FadeOut,
   SlideInRight,
   SlideOutRight,
@@ -20,16 +20,13 @@ interface EpisodeStreamsModalProps {
   metadata?: { id?: string; name?: string };
 }
 
-const { width } = Dimensions.get('window');
-const MENU_WIDTH = Math.min(width * 0.85, 400);
-
 const QualityBadge = ({ quality }: { quality: string | null }) => {
   if (!quality) return null;
-  
+
   const qualityNum = parseInt(quality);
   let color = '#8B5CF6';
   let label = `${quality}p`;
-  
+
   if (qualityNum >= 2160) {
     color = '#F59E0B';
     label = '4K';
@@ -40,9 +37,9 @@ const QualityBadge = ({ quality }: { quality: string | null }) => {
     color = '#10B981';
     label = 'HD';
   }
-  
+
   return (
-    <View 
+    <View
       style={{
         backgroundColor: `${color}20`,
         borderColor: `${color}60`,
@@ -73,6 +70,9 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
   onSelectStream,
   metadata,
 }) => {
+  const { width } = useWindowDimensions();
+  const MENU_WIDTH = Math.min(width * 0.85, 400);
+
   const [availableStreams, setAvailableStreams] = useState<{ [providerId: string]: { streams: Stream[]; addonName: string } }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [hasErrors, setHasErrors] = useState<string[]>([]);
@@ -89,35 +89,34 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
 
   const fetchStreams = async () => {
     if (!episode || !metadata?.id) return;
-    
+
     setIsLoading(true);
     setHasErrors([]);
     setAvailableStreams({});
-    
+
     try {
       const episodeId = episode.stremioId || `${metadata.id}:${episode.season_number}:${episode.episode_number}`;
       let completedProviders = 0;
       const expectedProviders = new Set<string>();
       const respondedProviders = new Set<string>();
-      
+
       const installedAddons = stremioService.getInstalledAddons();
-      const streamAddons = installedAddons.filter((addon: any) => 
+      const streamAddons = installedAddons.filter((addon: any) =>
         addon.resources && addon.resources.includes('stream')
       );
-      
+
       streamAddons.forEach((addon: any) => expectedProviders.add(addon.id));
-      
+
       logger.log(`[EpisodeStreamsModal] Fetching streams for ${episodeId}, expecting ${expectedProviders.size} providers`);
-      
+
       await stremioService.getStreams('series', episodeId, (streams: any, addonId: any, addonName: any, error: any) => {
         completedProviders++;
         respondedProviders.add(addonId);
-        
+
         if (error) {
           logger.warn(`[EpisodeStreamsModal] Error from ${addonName || addonId}:`, error);
           setHasErrors(prev => [...prev, `${addonName || addonId}: ${error.message || 'Unknown error'}`]);
         } else if (streams && streams.length > 0) {
-          // Update state incrementally for each provider
           setAvailableStreams(prev => ({
             ...prev,
             [addonId]: {
@@ -129,13 +128,13 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
         } else {
           logger.log(`[EpisodeStreamsModal] No streams from ${addonName || addonId}`);
         }
-        
+
         if (completedProviders >= expectedProviders.size) {
           logger.log(`[EpisodeStreamsModal] All providers completed. Total providers responded: ${respondedProviders.size}`);
           setIsLoading(false);
         }
       });
-      
+
       // Fallback timeout
       setTimeout(() => {
         if (respondedProviders.size === 0) {
@@ -144,7 +143,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           setIsLoading(false);
         }
       }, 8000);
-      
+
     } catch (error) {
       logger.error('[EpisodeStreamsModal] Error fetching streams:', error);
       setHasErrors(prev => [...prev, `Failed to fetch streams: ${error}`]);
@@ -158,38 +157,16 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
     return match ? match[1] : null;
   };
 
-  const handleClose = () => {
-    onClose();
-  };
-
   if (!visible) return null;
 
   const sortedProviders = Object.entries(availableStreams);
 
   return (
-    <>
-      {/* Backdrop */}
-      <Animated.View 
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(150)}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 9998,
-        }}
-      >
-        <TouchableOpacity 
-          style={{ flex: 1 }}
-          onPress={handleClose}
-          activeOpacity={1}
-        />
-      </Animated.View>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+      </TouchableOpacity>
 
-      {/* Side Menu */}
       <Animated.View
         entering={SlideInRight.duration(300)}
         exiting={SlideOutRight.duration(250)}
@@ -199,66 +176,29 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           right: 0,
           bottom: 0,
           width: MENU_WIDTH,
-          backgroundColor: '#1A1A1A',
-          zIndex: 9999,
-          elevation: 20,
-          shadowColor: '#000',
-          shadowOffset: { width: -5, height: 0 },
-          shadowOpacity: 0.3,
-          shadowRadius: 10,
-          borderTopLeftRadius: 20,
-          borderBottomLeftRadius: 20,
+          backgroundColor: '#0f0f0f',
+          borderLeftWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
         }}
       >
-        {/* Header */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          paddingTop: 60,
-          paddingBottom: 20,
-          borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-        }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{
-              color: '#FFFFFF',
-              fontSize: 18,
-              fontWeight: '700',
-            }}>
-              {episode?.name || 'Select Stream'}
-            </Text>
-            {episode && (
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontSize: 12,
-                marginTop: 4,
-              }}>
-                S{episode.season_number}E{episode.episode_number}
+        <View style={{ paddingTop: Platform.OS === 'ios' ? 60 : 15, paddingHorizontal: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: 'white', fontSize: 22, fontWeight: '700' }} numberOfLines={1}>
+                {episode?.name || 'Select Stream'}
               </Text>
-            )}
+              {episode && (
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 4 }}>
+                  S{episode.season_number}E{episode.episode_number}
+                </Text>
+              )}
+            </View>
           </View>
-          <TouchableOpacity 
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={handleClose}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="close" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
         </View>
 
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+        <ScrollView
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: 15, paddingBottom: 40 }}
         >
           {isLoading && (
             <View style={{
@@ -292,20 +232,20 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
                 }}>
                   {providerData.addonName} ({providerData.streams.length})
                 </Text>
-                
+
                 <View style={{ gap: 8 }}>
                   {providerData.streams.map((stream, index) => {
                     const quality = getQualityFromTitle(stream.title) || stream.quality;
-                    
+
                     return (
                       <TouchableOpacity
                         key={`${providerId}-${index}`}
                         style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                          borderRadius: 16,
-                          padding: 16,
+                          backgroundColor: 'rgba(255,255,255,0.06)',
+                          borderRadius: 12,
+                          padding: 12,
                           borderWidth: 1,
-                          borderColor: 'rgba(255, 255, 255, 0.1)',
+                          borderColor: 'rgba(255,255,255,0.1)',
                         }}
                         onPress={() => onSelectStream(stream)}
                         activeOpacity={0.7}
@@ -319,7 +259,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
                               gap: 8,
                             }}>
                               <Text style={{
-                                color: '#FFFFFF',
+                                color: 'white',
                                 fontSize: 15,
                                 fontWeight: '500',
                                 flex: 1,
@@ -328,14 +268,14 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
                               </Text>
                               {quality && <QualityBadge quality={quality} />}
                             </View>
-                            
+
                             {(stream.size || stream.lang) && (
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                                 {stream.size && (
                                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <MaterialIcons name="storage" size={14} color="rgba(107, 114, 128, 0.8)" />
+                                    <MaterialIcons name="storage" size={14} color="rgba(255,255,255,0.5)" />
                                     <Text style={{
-                                      color: 'rgba(107, 114, 128, 0.8)',
+                                      color: 'rgba(255,255,255,0.5)',
                                       fontSize: 12,
                                       fontWeight: '600',
                                       marginLeft: 4,
@@ -346,9 +286,9 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
                                 )}
                                 {stream.lang && (
                                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <MaterialIcons name="language" size={14} color="rgba(59, 130, 246, 0.8)" />
+                                    <MaterialIcons name="language" size={14} color="rgba(59,130,246,0.8)" />
                                     <Text style={{
-                                      color: 'rgba(59, 130, 246, 0.8)',
+                                      color: 'rgba(59,130,246,0.8)',
                                       fontSize: 12,
                                       fontWeight: '600',
                                       marginLeft: 4,
@@ -360,11 +300,8 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
                               </View>
                             )}
                           </View>
-                          
-                          <View style={{
-                            marginLeft: 12,
-                            alignItems: 'center',
-                          }}>
+
+                          <View style={{ marginLeft: 12, alignItems: 'center' }}>
                             <MaterialIcons name="play-arrow" size={20} color="rgba(255,255,255,0.4)" />
                           </View>
                         </View>
@@ -434,7 +371,6 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           )}
         </ScrollView>
       </Animated.View>
-    </>
+    </View>
   );
 };
-

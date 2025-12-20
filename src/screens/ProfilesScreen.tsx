@@ -33,7 +33,7 @@ const ProfilesScreen: React.FC = () => {
   const navigation = useNavigation();
   const { currentTheme } = useTheme();
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
-  
+
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newProfileName, setNewProfileName] = useState('');
@@ -52,7 +52,7 @@ const ProfilesScreen: React.FC = () => {
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
-    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => { } }]);
     setAlertVisible(true);
   };
 
@@ -92,7 +92,7 @@ const ProfilesScreen: React.FC = () => {
         }
       });
     });
-    
+
     return unsubscribe;
   }, [navigation, refreshAuthStatus, isAuthenticated, loadProfiles]);
 
@@ -112,7 +112,7 @@ const ProfilesScreen: React.FC = () => {
       navigation.goBack();
       return;
     }
-    
+
     loadProfiles();
   }, [isAuthenticated, loadProfiles, navigation]);
 
@@ -141,7 +141,7 @@ const ProfilesScreen: React.FC = () => {
       ...profile,
       isActive: profile.id === id
     }));
-    
+
     setProfiles(updatedProfiles);
     saveProfiles(updatedProfiles);
   }, [profiles, saveProfiles]);
@@ -164,14 +164,14 @@ const ProfilesScreen: React.FC = () => {
       'Delete Profile',
       'Are you sure you want to delete this profile? This action cannot be undone.',
       [
-        { label: 'Cancel', onPress: () => {} },
-        { 
-          label: 'Delete', 
+        { label: 'Cancel', onPress: () => { } },
+        {
+          label: 'Delete',
           onPress: () => {
             const updatedProfiles = profiles.filter(profile => profile.id !== id);
             setProfiles(updatedProfiles);
             saveProfiles(updatedProfiles);
-          } 
+          }
         }
       ]
     );
@@ -183,10 +183,10 @@ const ProfilesScreen: React.FC = () => {
 
   const renderItem = ({ item }: { item: Profile }) => (
     <View style={styles.profileItem}>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[
           styles.profileContent,
-          item.isActive && { 
+          item.isActive && {
             backgroundColor: `${currentTheme.colors.primary}30`,
             borderColor: currentTheme.colors.primary
           }
@@ -194,10 +194,10 @@ const ProfilesScreen: React.FC = () => {
         onPress={() => handleSelectProfile(item.id)}
       >
         <View style={styles.avatarContainer}>
-          <MaterialIcons 
-            name="account-circle" 
-            size={40} 
-            color={item.isActive ? currentTheme.colors.primary : currentTheme.colors.text} 
+          <MaterialIcons
+            name="account-circle"
+            size={40}
+            color={item.isActive ? currentTheme.colors.primary : currentTheme.colors.text}
           />
         </View>
         <View style={styles.profileInfo}>
@@ -211,7 +211,7 @@ const ProfilesScreen: React.FC = () => {
           )}
         </View>
         {!item.isActive && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => handleDeleteProfile(item.id)}
           >
@@ -225,7 +225,7 @@ const ProfilesScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+
       <View style={styles.header}>
         <TouchableOpacity
           onPress={handleBack}
@@ -281,6 +281,7 @@ const ProfilesScreen: React.FC = () => {
         visible={showAddModal}
         transparent
         animationType="fade"
+        supportedOrientations={['portrait', 'landscape']}
         onRequestClose={() => setShowAddModal(false)}
       >
         <View style={styles.modalOverlay}>
@@ -288,11 +289,11 @@ const ProfilesScreen: React.FC = () => {
             <Text style={[styles.modalTitle, { color: currentTheme.colors.text }]}>
               Create New Profile
             </Text>
-            
+
             <TextInput
               style={[
                 styles.input,
-                { 
+                {
                   backgroundColor: `${currentTheme.colors.textMuted}20`,
                   color: currentTheme.colors.text,
                   borderColor: currentTheme.colors.border
@@ -304,9 +305,9 @@ const ProfilesScreen: React.FC = () => {
               onChangeText={setNewProfileName}
               autoFocus
             />
-            
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setNewProfileName('');
@@ -315,9 +316,9 @@ const ProfilesScreen: React.FC = () => {
               >
                 <Text style={{ color: currentTheme.colors.textMuted }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[
-                  styles.modalButton, 
+                  styles.modalButton,
                   styles.createButton,
                   { backgroundColor: currentTheme.colors.primary }
                 ]}
