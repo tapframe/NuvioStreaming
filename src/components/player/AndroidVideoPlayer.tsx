@@ -1160,15 +1160,29 @@ const AndroidVideoPlayer: React.FC = () => {
     }
   }, [id, type, paused, currentTime, duration]);
 
+  // Use refs to track latest values for unmount cleanup without causing effect re-runs
+  const currentTimeRef = useRef(currentTime);
+  const durationRef = useRef(duration);
+
+  // Keep refs updated with latest values
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  // Cleanup effect - only runs on actual component unmount
   useEffect(() => {
     return () => {
-      if (id && type && duration > 0) {
+      if (id && type && durationRef.current > 0) {
         saveWatchProgress();
         // Final Trakt sync on component unmount
-        traktAutosync.handlePlaybackEnd(currentTime, duration, 'unmount');
+        traktAutosync.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'unmount');
       }
     };
-  }, [id, type, currentTime, duration]);
+  }, [id, type]); // Only id and type - NOT currentTime or duration
 
   const seekToTime = (rawSeconds: number) => {
     // Clamp to just before the end of the media.
