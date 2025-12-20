@@ -31,9 +31,9 @@ yarn-error.*
 *.pem
 
 # local env files
-.env
-.env*.local
 
+.env*.local
+.env
 # Sentry
 ios/sentry.properties
 android/sentry.properties
