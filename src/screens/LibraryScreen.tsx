@@ -37,8 +37,8 @@ import { useTraktContext } from '../contexts/TraktContext';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { traktService, TraktService, TraktImages } from '../services/traktService';
 import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
+import { useSettings } from '../hooks/useSettings';
 
-// Define interfaces for proper typing
 interface LibraryItem extends StreamingContent {
   progress?: number;
   lastWatched?: string;
@@ -72,10 +72,9 @@ interface TraktFolder {
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
-// Compute responsive grid layout (more columns on tablets)
 function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: number } {
-  const horizontalPadding = 16; // matches listContainer padding (approx)
-  const gutter = 12; // space between items (via space-between + marginBottom)
+  const horizontalPadding = 16;
+  const gutter = 12;
   let numColumns = 3;
   if (screenWidth >= 1200) numColumns = 5;
   else if (screenWidth >= 1000) numColumns = 4;
@@ -86,7 +85,19 @@ function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: nu
   return { numColumns, itemWidth };
 }
 
-const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item: TraktDisplayItem; width: number; navigation: any; currentTheme: any }) => {
+const TraktItem = React.memo(({
+  item,
+  width,
+  navigation,
+  currentTheme,
+  showTitles
+}: {
+  item: TraktDisplayItem;
+  width: number;
+  navigation: any;
+  currentTheme: any;
+  showTitles: boolean;
+}) => {
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -129,9 +140,11 @@ const TraktItem = React.memo(({ item, width, navigation, currentTheme }: { item:
             </View>
           )}
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-          {item.name}
-        </Text>
+        {showTitles && (
+          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+            {item.name}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -184,7 +197,6 @@ const SkeletonLoader = () => {
     </View>
   );
 
-  // Render enough skeletons for at least two rows
   const skeletonCount = numColumns * 2;
   return (
     <View style={styles.skeletonContainer}>
@@ -208,13 +220,12 @@ const LibraryScreen = () => {
   const [showTraktContent, setShowTraktContent] = useState(false);
   const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
   const { showInfo, showError } = useToast();
-  // DropUpMenu state
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
 
-  // Trakt integration
   const {
     isAuthenticated: traktAuthenticated,
     isLoading: traktLoading,
@@ -230,7 +241,6 @@ const LibraryScreen = () => {
     loadAllCollections
   } = useTraktContext();
 
-  // Force consistent status bar settings
   useEffect(() => {
     const applyStatusBarConfig = () => {
       StatusBar.setBarStyle('light-content');
@@ -241,30 +251,24 @@ const LibraryScreen = () => {
     };
 
     applyStatusBarConfig();
-
-    // Re-apply on focus
     const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
     return unsubscribe;
   }, [navigation]);
 
-  // Handle hardware back button and gesture navigation
   useEffect(() => {
     const backAction = () => {
       if (showTraktContent) {
         if (selectedTraktFolder) {
-          // If in a specific folder, go back to folder list
           setSelectedTraktFolder(null);
         } else {
-          // If in Trakt collections view, go back to main library
           setShowTraktContent(false);
         }
-        return true; // Prevent default back behavior
+        return true;
       }
-      return false; // Allow default back behavior (navigate back)
+      return false;
     };
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-
     return () => backHandler.remove();
   }, [showTraktContent, selectedTraktFolder]);
 
@@ -274,16 +278,13 @@ const LibraryScreen = () => {
       try {
         const items = await catalogService.getLibraryItems();
 
-        // Sort by date added (most recent first)
         const sortedItems = items.sort((a, b) => {
           const timeA = (a as any).addedToLibraryAt || 0;
           const timeB = (b as any).addedToLibraryAt || 0;
-          return timeB - timeA; // Descending order (newest first)
+          return timeB - timeA;
         });
 
-        // Load watched status for each item from AsyncStorage
         const updatedItems = await Promise.all(sortedItems.map(async (item) => {
-          // Map StreamingContent to LibraryItem shape
           const libraryItem: LibraryItem = {
             ...item,
             gradient: Array.isArray((item as any).gradient) ? (item as any).gradient : ['#222', '#444'],
@@ -306,18 +307,14 @@ const LibraryScreen = () => {
 
     loadLibrary();
 
-    // Subscribe to library updates
     const unsubscribe = catalogService.subscribeToLibraryUpdates(async (items) => {
-      // Sort by date added (most recent first)
       const sortedItems = items.sort((a, b) => {
         const timeA = (a as any).addedToLibraryAt || 0;
         const timeB = (b as any).addedToLibraryAt || 0;
-        return timeB - timeA; // Descending order (newest first)
+        return timeB - timeA;
       });
 
-      // Sync watched status on update
       const updatedItems = await Promise.all(sortedItems.map(async (item) => {
-        // Map StreamingContent to LibraryItem shape
         const libraryItem: LibraryItem = {
           ...item,
           gradient: Array.isArray((item as any).gradient) ? (item as any).gradient : ['#222', '#444'],
@@ -333,10 +330,7 @@ const LibraryScreen = () => {
       setLibraryItems(updatedItems);
     });
 
-    // Listen for watched status changes
     const watchedSub = DeviceEventEmitter.addListener('watchedStatusChanged', loadLibrary);
-
-    // Refresh when screen regains focus
     const focusSub = navigation.addListener('focus', loadLibrary);
 
     return () => {
@@ -352,7 +346,6 @@ const LibraryScreen = () => {
     return true;
   });
 
-  // Generate Trakt collection folders
   const traktFolders = useMemo((): TraktFolder[] => {
     if (!traktAuthenticated) return [];
 
@@ -389,61 +382,57 @@ const LibraryScreen = () => {
       }
     ];
 
-    // Only return folders that have content
     return folders.filter(folder => folder.itemCount > 0);
   }, [traktAuthenticated, watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
 
-  const renderItem = ({ item }: { item: LibraryItem }) => {
-    const aspectRatio = item.posterShape === 'landscape' ? 16 / 9 : (item.posterShape === 'square' ? 1 : 2 / 3);
-
-    return (
-      <TouchableOpacity
-        style={[styles.itemContainer, { width: itemWidth }]}
-        onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
-        onLongPress={() => {
-          setSelectedItem(item);
-          setMenuVisible(true);
-        }}
-        activeOpacity={0.7}
-      >
-        <View>
-          <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black, aspectRatio }]}>
-            <FastImage
-              source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-              style={styles.poster}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-            {item.watched && (
-              <View style={styles.watchedIndicator}>
-                <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
-              </View>
-            )}
-            {item.progress !== undefined && item.progress < 1 && (
-              <View style={styles.progressBarContainer}>
-                <View
-                  style={[
-                    styles.progressBar,
-                    { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
-                  ]}
-                />
-              </View>
-            )}
-          </View>
+  const renderItem = ({ item }: { item: LibraryItem }) => (
+    <TouchableOpacity
+      style={[styles.itemContainer, { width: itemWidth }]}
+      onPress={() => navigation.navigate('Metadata', { id: item.id, type: item.type })}
+      onLongPress={() => {
+        setSelectedItem(item);
+        setMenuVisible(true);
+      }}
+      activeOpacity={0.7}
+    >
+      <View>
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
+          <FastImage
+            source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
+            style={styles.poster}
+            resizeMode={FastImage.resizeMode.cover}
+          />
+          {item.watched && (
+            <View style={styles.watchedIndicator}>
+              <MaterialIcons name="check-circle" size={22} color={currentTheme.colors.success || '#4CAF50'} />
+            </View>
+          )}
+          {item.progress !== undefined && item.progress < 1 && (
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBar,
+                  { width: `${item.progress * 100}%`, backgroundColor: currentTheme.colors.primary }
+                ]}
+              />
+            </View>
+          )}
+        </View>
+        {settings.showPosterTitles && (
           <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
             {item.name}
           </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        )}
+      </View>
+    </TouchableOpacity>
+  );
 
-  // Render individual Trakt collection folder
   const renderTraktCollectionFolder = ({ folder }: { folder: TraktFolder }) => (
     <TouchableOpacity
       style={[styles.itemContainer, { width: itemWidth }]}
       onPress={() => {
         setSelectedTraktFolder(folder.id);
-        loadAllCollections(); // Load all collections when entering a specific folder
+        loadAllCollections();
       }}
       activeOpacity={0.7}
     >
@@ -474,8 +463,8 @@ const LibraryScreen = () => {
           navigation.navigate('TraktSettings');
         } else {
           setShowTraktContent(true);
-          setSelectedTraktFolder(null); // Reset to folder view
-          loadAllCollections(); // Load all collections when opening
+          setSelectedTraktFolder(null);
+          loadAllCollections();
         }
       }}
       activeOpacity={0.7}
@@ -494,24 +483,30 @@ const LibraryScreen = () => {
             )}
           </View>
         </View>
-        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-          Trakt collections
-        </Text>
+        {settings.showPosterTitles && (
+          <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+            Trakt collections
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
 
   const renderTraktItem = useCallback(({ item }: { item: TraktDisplayItem }) => {
-    return <TraktItem item={item} width={itemWidth} navigation={navigation} currentTheme={currentTheme} />;
-  }, [itemWidth, navigation, currentTheme]);
+    return <TraktItem
+      item={item}
+      width={itemWidth}
+      navigation={navigation}
+      currentTheme={currentTheme}
+      showTitles={settings.showPosterTitles}
+    />;
+  }, [itemWidth, navigation, currentTheme, settings.showPosterTitles]);
 
-  // Get items for a specific Trakt folder
   const getTraktFolderItems = useCallback((folderId: string): TraktDisplayItem[] => {
     const items: TraktDisplayItem[] = [];
 
     switch (folderId) {
       case 'watched':
-        // Add watched movies
         if (watchedMovies) {
           for (const watchedMovie of watchedMovies) {
             const movie = watchedMovie.movie;
@@ -522,7 +517,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: watchedMovie.last_watched_at, // Store raw timestamp for sorting
+                lastWatched: watchedMovie.last_watched_at,
                 plays: watchedMovie.plays,
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
@@ -531,7 +526,6 @@ const LibraryScreen = () => {
             }
           }
         }
-        // Add watched shows
         if (watchedShows) {
           for (const watchedShow of watchedShows) {
             const show = watchedShow.show;
@@ -542,7 +536,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: watchedShow.last_watched_at, // Store raw timestamp for sorting
+                lastWatched: watchedShow.last_watched_at,
                 plays: watchedShow.plays,
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
@@ -554,7 +548,6 @@ const LibraryScreen = () => {
         break;
 
       case 'continue-watching':
-        // Add continue watching items
         if (continueWatching) {
           for (const item of continueWatching) {
             if (item.type === 'movie' && item.movie) {
@@ -564,7 +557,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: item.movie.year,
-                lastWatched: item.paused_at, // Store raw timestamp for sorting
+                lastWatched: item.paused_at,
                 imdbId: item.movie.ids.imdb,
                 traktId: item.movie.ids.trakt,
                 images: item.movie.images,
@@ -576,7 +569,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: item.show.year,
-                lastWatched: item.paused_at, // Store raw timestamp for sorting
+                lastWatched: item.paused_at,
                 imdbId: item.show.ids.imdb,
                 traktId: item.show.ids.trakt,
                 images: item.show.images,
@@ -587,7 +580,6 @@ const LibraryScreen = () => {
         break;
 
       case 'watchlist':
-        // Add watchlist movies
         if (watchlistMovies) {
           for (const watchlistMovie of watchlistMovies) {
             const movie = watchlistMovie.movie;
@@ -598,7 +590,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: watchlistMovie.listed_at, // Store raw timestamp for sorting
+                lastWatched: watchlistMovie.listed_at,
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
                 images: movie.images,
@@ -606,7 +598,6 @@ const LibraryScreen = () => {
             }
           }
         }
-        // Add watchlist shows
         if (watchlistShows) {
           for (const watchlistShow of watchlistShows) {
             const show = watchlistShow.show;
@@ -617,7 +608,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: watchlistShow.listed_at, // Store raw timestamp for sorting
+                lastWatched: watchlistShow.listed_at,
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
                 images: show.images,
@@ -628,7 +619,6 @@ const LibraryScreen = () => {
         break;
 
       case 'collection':
-        // Add collection movies
         if (collectionMovies) {
           for (const collectionMovie of collectionMovies) {
             const movie = collectionMovie.movie;
@@ -639,7 +629,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: collectionMovie.collected_at, // Store raw timestamp for sorting
+                lastWatched: collectionMovie.collected_at,
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
                 images: movie.images,
@@ -647,7 +637,6 @@ const LibraryScreen = () => {
             }
           }
         }
-        // Add collection shows
         if (collectionShows) {
           for (const collectionShow of collectionShows) {
             const show = collectionShow.show;
@@ -658,7 +647,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: collectionShow.collected_at, // Store raw timestamp for sorting
+                lastWatched: collectionShow.collected_at,
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
                 images: show.images,
@@ -669,7 +658,6 @@ const LibraryScreen = () => {
         break;
 
       case 'ratings':
-        // Add rated content
         if (ratedContent) {
           for (const ratedItem of ratedContent) {
             if (ratedItem.movie) {
@@ -680,7 +668,7 @@ const LibraryScreen = () => {
                 type: 'movie',
                 poster: 'placeholder',
                 year: movie.year,
-                lastWatched: ratedItem.rated_at, // Store raw timestamp for sorting
+                lastWatched: ratedItem.rated_at,
                 rating: ratedItem.rating,
                 imdbId: movie.ids.imdb,
                 traktId: movie.ids.trakt,
@@ -694,7 +682,7 @@ const LibraryScreen = () => {
                 type: 'series',
                 poster: 'placeholder',
                 year: show.year,
-                lastWatched: ratedItem.rated_at, // Store raw timestamp for sorting
+                lastWatched: ratedItem.rated_at,
                 rating: ratedItem.rating,
                 imdbId: show.ids.imdb,
                 traktId: show.ids.trakt,
@@ -706,7 +694,6 @@ const LibraryScreen = () => {
         break;
     }
 
-    // Sort by last watched/added date (most recent first) using raw timestamps
     return items.sort((a, b) => {
       const dateA = a.lastWatched ? new Date(a.lastWatched).getTime() : 0;
       const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
@@ -719,7 +706,6 @@ const LibraryScreen = () => {
       return <TraktLoadingSpinner />;
     }
 
-    // If no specific folder is selected, show the folder structure
     if (!selectedTraktFolder) {
       if (traktFolders.length === 0) {
         return (
@@ -745,7 +731,6 @@ const LibraryScreen = () => {
         );
       }
 
-      // Show collection folders
       return (
         <FlashList
           data={traktFolders}
@@ -760,7 +745,6 @@ const LibraryScreen = () => {
       );
     }
 
-    // Show content for specific folder
     const folderItems = getTraktFolderItems(selectedTraktFolder);
 
     if (folderItems.length === 0) {
@@ -902,7 +886,6 @@ const LibraryScreen = () => {
     );
   };
 
-  // Tablet detection aligned with navigation tablet logic
   const isTablet = useMemo(() => {
     const smallestDimension = Math.min(width, height);
     return (Platform.OS === 'ios' ? (Platform as any).isPad === true : smallestDimension >= 768);
@@ -910,7 +893,6 @@ const LibraryScreen = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      {/* ScreenHeader Component */}
       <ScreenHeader
         title={showTraktContent
           ? (selectedTraktFolder
@@ -932,7 +914,6 @@ const LibraryScreen = () => {
         isTablet={isTablet}
       />
 
-      {/* Content Container */}
       <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
         {!showTraktContent && (
           <View style={styles.filtersContainer}>
@@ -945,14 +926,13 @@ const LibraryScreen = () => {
         {showTraktContent ? renderTraktContent() : renderContent()}
       </View>
 
-      {/* DropUpMenu integration */}
       {selectedItem && (
         <DropUpMenu
           visible={menuVisible}
           onClose={() => setMenuVisible(false)}
           item={selectedItem}
           isWatched={!!selectedItem.watched}
-          isSaved={true} // Since this is from library, it's always saved
+          isSaved={true}
           onOptionSelect={async (option) => {
             if (!selectedItem) return;
             switch (option) {
@@ -969,12 +949,10 @@ const LibraryScreen = () => {
               }
               case 'watched': {
                 try {
-                  // Use AsyncStorage to store watched status by key
                   const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                   const newWatched = !selectedItem.watched;
                   await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
                   showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
-                  // Instantly update local state
                   setLibraryItems(prev => prev.map(item =>
                     item.id === selectedItem.id && item.type === selectedItem.type
                       ? { ...item, watched: newWatched }
@@ -1273,7 +1251,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerSpacer: {
-    width: 44, // Match the back button width
+    width: 44,
   },
   traktContainer: {
     flex: 1,
@@ -1294,4 +1272,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LibraryScreen; 
+export default LibraryScreen;
