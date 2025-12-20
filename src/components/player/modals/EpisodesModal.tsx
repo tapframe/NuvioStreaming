@@ -55,12 +55,22 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
       if (showEpisodesModal && metadata?.id) {
         setIsLoadingProgress(true);
         try {
-          const progress = await storageService.getShowProgress(metadata.id);
-          setEpisodeProgress(progress || {});
+          const allProgress = await storageService.getAllWatchProgress();
+          const progress: { [key: string]: any } = {};
+
+          // Filter progress for current show's episodes
+          Object.entries(allProgress).forEach(([key, value]) => {
+            if (key.includes(metadata.id!)) {
+              progress[key] = value;
+            }
+          });
+
+          setEpisodeProgress(progress);
 
           // Trakt sync logic preserved
-          if (await TraktService.isAuthenticated()) {
-             // Optional: background sync logic
+          const traktService = TraktService.getInstance();
+          if (await traktService.isAuthenticated()) {
+            // Optional: background sync logic
           }
         } catch (err) {
           logger.error('Failed to fetch episode progress', err);
@@ -84,7 +94,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
   const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={9999}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowEpisodesModal(false)}>
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
       </TouchableOpacity>
