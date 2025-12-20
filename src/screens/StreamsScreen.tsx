@@ -132,17 +132,27 @@ export const StreamsScreen = () => {
   const { showSuccess, showInfo } = useToast();
 
   // Add dimension listener and tablet detection
+  // Use a ref to track previous dimensions to avoid unnecessary re-renders
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  const prevDimensionsRef = useRef({ width: dimensions.width, height: dimensions.height });
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setDimensions(window);
+      // Only update state if dimensions actually changed (with 1px tolerance)
+      const widthChanged = Math.abs(window.width - prevDimensionsRef.current.width) > 1;
+      const heightChanged = Math.abs(window.height - prevDimensionsRef.current.height) > 1;
+
+      if (widthChanged || heightChanged) {
+        prevDimensionsRef.current = { width: window.width, height: window.height };
+        setDimensions(window);
+      }
     });
     return () => subscription?.remove();
   }, []);
 
+  // Memoize tablet detection to prevent recalculation on every render
   const deviceWidth = dimensions.width;
-  const isTablet = deviceWidth >= 768;
+  const isTablet = useMemo(() => deviceWidth >= 768, [deviceWidth]);
 
   // Add refs to prevent excessive updates and duplicate loads
   const isMounted = useRef(true);
@@ -303,6 +313,9 @@ export const StreamsScreen = () => {
   }, []);
 
   // Monitor streams loading and update available providers immediately
+  // Use a ref to track the previous providers to avoid unnecessary state updates
+  const prevProvidersRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     // Skip processing if component is unmounting
     if (!isMounted.current) return;
@@ -317,14 +330,21 @@ export const StreamsScreen = () => {
 
     if (providersWithStreams.length > 0) {
       logger.log(`📊 Providers with streams: ${providersWithStreams.join(', ')}`);
-      const providersWithStreamsSet = new Set(providersWithStreams);
 
-      // Only update if we have new providers, don't remove existing ones during loading
-      setAvailableProviders(prevProviders => {
-        const newProviders = new Set([...prevProviders, ...providersWithStreamsSet]);
-        if (__DEV__) console.log('[StreamsScreen] availableProviders ->', Array.from(newProviders));
-        return newProviders;
-      });
+      // Check if we actually have new providers before triggering state update
+      const hasNewProviders = providersWithStreams.some(
+        provider => !prevProvidersRef.current.has(provider)
+      );
+
+      if (hasNewProviders) {
+        setAvailableProviders(prevProviders => {
+          const newProviders = new Set([...prevProviders, ...providersWithStreams]);
+          // Update ref to track current providers
+          prevProvidersRef.current = newProviders;
+          if (__DEV__) console.log('[StreamsScreen] availableProviders ->', Array.from(newProviders));
+          return newProviders;
+        });
+      }
     }
 
     // Update loading states for individual providers

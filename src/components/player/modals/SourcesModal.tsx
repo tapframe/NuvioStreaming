@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Dimensions, Platform, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -17,9 +17,6 @@ interface SourcesModalProps {
   onSelectStream: (stream: Stream) => void;
   isChangingSource?: boolean;
 }
-
-const { width } = Dimensions.get('window');
-const MENU_WIDTH = Math.min(width * 0.85, 400);
 
 const QualityBadge = ({ quality }: { quality: string | null }) => {
   if (!quality) return null;
@@ -60,6 +57,9 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   onSelectStream,
   isChangingSource = false,
 }) => {
+  const { width } = useWindowDimensions();
+  const MENU_WIDTH = Math.min(width * 0.85, 400);
+
   const handleClose = () => {
     setShowSourcesModal(false);
   };
@@ -99,7 +99,6 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
         />
       </TouchableOpacity>
 
-      {/* Side Menu */}
       <Animated.View
         entering={SlideInRight.duration(300)}
         exiting={SlideOutRight.duration(250)}

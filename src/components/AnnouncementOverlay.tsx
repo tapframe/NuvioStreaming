@@ -101,6 +101,7 @@ const AnnouncementOverlay: React.FC<AnnouncementOverlayProps> = ({
             transparent
             animationType="none"
             statusBarTranslucent
+            supportedOrientations={['portrait', 'landscape']}
             onRequestClose={handleClose}
         >
             <View style={styles.overlay}>
