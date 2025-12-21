@@ -170,7 +170,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
       >
         {/* Header */}
         <View style={{
-          paddingTop: Platform.OS === 'ios' ? 60 : 10,
+          paddingTop: Platform.OS === 'ios' ? 60 : 15,
           paddingHorizontal: 20,
           paddingBottom: 20,
         }}>
