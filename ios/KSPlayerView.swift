@@ -355,11 +355,11 @@ class KSPlayerView: UIView {
         // Disable native player remote control center integration; use RN controls
         options.registerRemoteControll = false
         
-        // PERFORMANCE OPTIMIZATION: Optimal buffer durations for high bitrate
-        // preferredForwardBufferDuration = 1.0s: Kept low to ensure instant start.
+        // PERFORMANCE OPTIMIZATION: Buffer durations for smooth high bitrate playback
+        // preferredForwardBufferDuration = 3.0s: Slightly increased to reduce rebuffering during playback
         options.preferredForwardBufferDuration = 1.0
-        // maxBufferDuration = 60.0s: Increased to allow the player to cache more content ahead of time
-        options.maxBufferDuration = 60.0
+        // maxBufferDuration = 120.0s: Increased to allow the player to cache more content ahead of time (2 minutes)
+        options.maxBufferDuration = 120.0
         
         // Enable "second open" to relax startup/seek buffering thresholds (already enabled)
         options.isSecondOpen = true

@@ -14,13 +14,14 @@ import {
     Image,
     Switch,
     ActivityIndicator,
-    RefreshControl
+    RefreshControl,
+    Dimensions
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { stremioService } from '../services/stremioService';
 import { logger } from '../utils/logger';
 import CustomAlert from '../components/CustomAlert';
@@ -30,6 +31,7 @@ import axios from 'axios';
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 const TORBOX_STORAGE_KEY = 'torbox_debrid_config';
 const TORBOX_API_BASE = 'https://api.torbox.app/v1';
+const TORRENTIO_CONFIG_KEY = 'torrentio_config';
 
 interface TorboxConfig {
     apiKey: string;
@@ -48,6 +50,116 @@ interface TorboxUserData {
     base_email: string;
 }
 
+// Torrentio Configuration Types
+interface TorrentioConfig {
+    providers: string[];
+    sort: string;
+    qualityFilter: string[];
+    priorityLanguages: string[];
+    maxResults: string;
+    debridService: string;
+    debridApiKey: string;
+    noDownloadLinks: boolean;
+    noCatalog: boolean;
+    isInstalled: boolean;
+    manifestUrl?: string;
+}
+
+// Torrentio Options Data
+const TORRENTIO_PROVIDERS = [
+    { id: 'yts', name: 'YTS' },
+    { id: 'eztv', name: 'EZTV' },
+    { id: 'rarbg', name: 'RARBG' },
+    { id: '1337x', name: '1337x' },
+    { id: 'thepiratebay', name: 'ThePirateBay' },
+    { id: 'kickasstorrents', name: 'KickassTorrents' },
+    { id: 'torrentgalaxy', name: 'TorrentGalaxy' },
+    { id: 'magnetdl', name: 'MagnetDL' },
+    { id: 'horriblesubs', name: 'HorribleSubs' },
+    { id: 'nyaasi', name: 'NyaaSi' },
+    { id: 'tokyotosho', name: 'TokyoTosho' },
+    { id: 'anidex', name: 'AniDex' },
+    { id: 'rutor', name: '🇷🇺 Rutor' },
+    { id: 'rutracker', name: '🇷🇺 Rutracker' },
+    { id: 'comando', name: '🇵🇹 Comando' },
+    { id: 'bludv', name: '🇧🇷 BluDV' },
+    { id: 'torrent9', name: '🇫🇷 Torrent9' },
+    { id: 'ilcorsaronero', name: '🇮🇹 ilCorSaRoNeRo' },
+    { id: 'mejortorrent', name: '🇪🇸 MejorTorrent' },
+    { id: 'wolfmax4k', name: '🇪🇸 Wolfmax4k' },
+    { id: 'cinecalidad', name: '🇲🇽 Cinecalidad' },
+];
+
+const TORRENTIO_SORT_OPTIONS = [
+    { id: 'quality', name: 'By quality then seeders' },
+    { id: 'qualitysize', name: 'By quality then size' },
+    { id: 'seeders', name: 'By seeders' },
+    { id: 'size', name: 'By size' },
+];
+
+const TORRENTIO_QUALITY_FILTERS = [
+    { id: 'brremux', name: 'BluRay REMUX' },
+    { id: 'hdrall', name: 'HDR/HDR10+/Dolby Vision' },
+    { id: 'dolbyvision', name: 'Dolby Vision' },
+    { id: '4k', name: '4K' },
+    { id: '1080p', name: '1080p' },
+    { id: '720p', name: '720p' },
+    { id: '480p', name: '480p' },
+    { id: 'scr', name: 'Screener' },
+    { id: 'cam', name: 'CAM' },
+    { id: 'unknown', name: 'Unknown' },
+];
+
+const TORRENTIO_LANGUAGES = [
+    { id: 'english', name: '🇬🇧 English' },
+    { id: 'russian', name: '🇷🇺 Russian' },
+    { id: 'italian', name: '🇮🇹 Italian' },
+    { id: 'portuguese', name: '🇵🇹 Portuguese' },
+    { id: 'spanish', name: '🇪🇸 Spanish' },
+    { id: 'latino', name: '🇲🇽 Latino' },
+    { id: 'korean', name: '🇰🇷 Korean' },
+    { id: 'chinese', name: '🇨🇳 Chinese' },
+    { id: 'french', name: '🇫🇷 French' },
+    { id: 'german', name: '🇩🇪 German' },
+    { id: 'dutch', name: '🇳🇱 Dutch' },
+    { id: 'hindi', name: '🇮🇳 Hindi' },
+    { id: 'japanese', name: '🇯🇵 Japanese' },
+    { id: 'polish', name: '🇵🇱 Polish' },
+    { id: 'arabic', name: '🇸🇦 Arabic' },
+    { id: 'turkish', name: '🇹🇷 Turkish' },
+];
+
+const TORRENTIO_DEBRID_SERVICES = [
+    { id: 'torbox', name: 'TorBox', keyParam: 'torbox' },
+    { id: 'realdebrid', name: 'RealDebrid', keyParam: 'realdebrid' },
+    { id: 'alldebrid', name: 'AllDebrid', keyParam: 'alldebrid' },
+    { id: 'premiumize', name: 'Premiumize', keyParam: 'premiumize' },
+    { id: 'debridlink', name: 'DebridLink', keyParam: 'debridlink' },
+    { id: 'offcloud', name: 'Offcloud', keyParam: 'offcloud' },
+];
+
+const TORRENTIO_MAX_RESULTS = [
+    { id: '', name: 'All results' },
+    { id: '1', name: '1 per quality' },
+    { id: '2', name: '2 per quality' },
+    { id: '3', name: '3 per quality' },
+    { id: '5', name: '5 per quality' },
+    { id: '10', name: '10 per quality' },
+];
+
+const DEFAULT_TORRENTIO_CONFIG: TorrentioConfig = {
+    providers: TORRENTIO_PROVIDERS.map(p => p.id), // All providers by default
+    sort: 'quality',
+    qualityFilter: ['scr', 'cam'],
+    priorityLanguages: [],
+    maxResults: '',
+    debridService: 'torbox', // Default to TorBox
+    debridApiKey: '',
+    noDownloadLinks: false,
+    noCatalog: false,
+    isInstalled: false,
+};
+
 const getPlanName = (plan: number): string => {
     switch (plan) {
         case 0: return 'Free';
@@ -57,6 +169,7 @@ const getPlanName = (plan: number): string => {
         default: return 'Unknown';
     }
 };
+
 const createStyles = (colors: any) => StyleSheet.create({
     container: {
         flex: 1,
@@ -79,6 +192,31 @@ const createStyles = (colors: any) => StyleSheet.create({
         color: colors.white,
         letterSpacing: 0.3,
     },
+    tabContainer: {
+        flexDirection: 'row',
+        marginHorizontal: 16,
+        marginBottom: 16,
+        backgroundColor: colors.elevation1,
+        borderRadius: 12,
+        padding: 4,
+    },
+    tab: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 10,
+    },
+    activeTab: {
+        backgroundColor: colors.primary,
+    },
+    tabText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.mediumEmphasis,
+    },
+    activeTabText: {
+        color: colors.white,
+    },
     content: {
         flex: 1,
         paddingHorizontal: 16,
@@ -86,9 +224,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     description: {
         fontSize: 14,
         color: colors.mediumEmphasis,
-        marginBottom: 16,
+        marginBottom: 12,
         lineHeight: 20,
-        opacity: 0.9,
     },
     statusCard: {
         backgroundColor: colors.elevation2,
@@ -348,7 +485,205 @@ const createStyles = (colors: any) => StyleSheet.create({
         textAlign: 'center',
         marginTop: 8,
         opacity: 0.6,
-    }
+    },
+    // Torrentio specific styles
+    configSection: {
+        backgroundColor: colors.elevation2,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    configSectionTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: colors.white,
+        marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    chipContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    chip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: colors.elevation3,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    chipSelected: {
+        backgroundColor: colors.primary + '30',
+        borderColor: colors.primary,
+    },
+    chipText: {
+        fontSize: 13,
+        color: colors.mediumEmphasis,
+    },
+    chipTextSelected: {
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    pickerContainer: {
+        backgroundColor: colors.elevation3,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    pickerItem: {
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.elevation2,
+    },
+    pickerItemSelected: {
+        backgroundColor: colors.primary + '20',
+    },
+    pickerItemText: {
+        fontSize: 14,
+        color: colors.white,
+    },
+    pickerItemTextSelected: {
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    switchRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    switchLabel: {
+        fontSize: 14,
+        color: colors.white,
+        flex: 1,
+    },
+    warningCard: {
+        backgroundColor: colors.warning + '20',
+        borderRadius: 10,
+        padding: 16,
+        marginBottom: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    warningText: {
+        fontSize: 13,
+        color: colors.warning || '#FFC107',
+        marginLeft: 12,
+        flex: 1,
+        lineHeight: 18,
+    },
+    manifestPreview: {
+        backgroundColor: colors.elevation3,
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 12,
+    },
+    manifestUrl: {
+        fontSize: 11,
+        color: colors.mediumEmphasis,
+        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    },
+    installedBadge: {
+        backgroundColor: colors.success + '20',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+        marginBottom: 12,
+    },
+    installedBadgeText: {
+        color: colors.success || '#4CAF50',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    selectAllButton: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: colors.elevation3,
+        borderRadius: 6,
+        marginBottom: 8,
+        alignSelf: 'flex-start',
+    },
+    selectAllText: {
+        fontSize: 12,
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    // Accordion styles
+    accordionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: colors.elevation2,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    accordionHeaderText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.white,
+    },
+    accordionSubtext: {
+        fontSize: 12,
+        color: colors.mediumEmphasis,
+        marginTop: 2,
+    },
+    accordionContent: {
+        backgroundColor: colors.elevation2,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        marginTop: -16,
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+    },
+    promoCard: {
+        backgroundColor: colors.primary + '15',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: colors.primary + '30',
+    },
+    promoTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: colors.white,
+        marginBottom: 6,
+    },
+    promoText: {
+        fontSize: 13,
+        color: colors.mediumEmphasis,
+        lineHeight: 18,
+        marginBottom: 12,
+    },
+    promoButton: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+    },
+    promoButtonText: {
+        color: colors.white,
+        fontWeight: '700',
+        fontSize: 13,
+    },
+    recommendedBadge: {
+        backgroundColor: colors.primary,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginLeft: 8,
+    },
+    recommendedText: {
+        fontSize: 10,
+        color: colors.white,
+        fontWeight: '700',
+    },
 });
 
 const DebridIntegrationScreen = () => {
@@ -357,6 +692,10 @@ const DebridIntegrationScreen = () => {
     const colors = currentTheme.colors;
     const styles = createStyles(colors);
 
+    // Tab state
+    const [activeTab, setActiveTab] = useState<'torbox' | 'torrentio'>('torbox');
+
+    // Torbox state
     const [apiKey, setApiKey] = useState('');
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
@@ -365,12 +704,26 @@ const DebridIntegrationScreen = () => {
     const [userDataLoading, setUserDataLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
 
+    // Torrentio state
+    const [torrentioConfig, setTorrentioConfig] = useState<TorrentioConfig>(DEFAULT_TORRENTIO_CONFIG);
+    const [torrentioLoading, setTorrentioLoading] = useState(false);
+
+    // Accordion states for collapsible sections
+    const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+        sorting: false,
+        qualityFilter: false,
+        languages: false,
+        maxResults: false,
+        options: false,
+    });
+
     // Alert state
     const [alertVisible, setAlertVisible] = useState(false);
     const [alertTitle, setAlertTitle] = useState('');
     const [alertMessage, setAlertMessage] = useState('');
     const [alertActions, setAlertActions] = useState<any[]>([]);
 
+    // Load Torbox config
     const loadConfig = useCallback(async () => {
         try {
             const storedConfig = await mmkvStorage.getItem(TORBOX_STORAGE_KEY);
@@ -387,12 +740,10 @@ const DebridIntegrationScreen = () => {
                 );
 
                 if (torboxAddon && !parsedConfig.isConnected) {
-                    // Update config if addon exists but config says not connected
                     const updatedConfig = { ...parsedConfig, isConnected: true, addonId: torboxAddon.id };
                     setConfig(updatedConfig);
                     await mmkvStorage.setItem(TORBOX_STORAGE_KEY, JSON.stringify(updatedConfig));
                 } else if (!torboxAddon && parsedConfig.isConnected) {
-                    // Update config if addon doesn't exist but config says connected
                     const updatedConfig = { ...parsedConfig, isConnected: false, addonId: undefined };
                     setConfig(updatedConfig);
                     await mmkvStorage.setItem(TORBOX_STORAGE_KEY, JSON.stringify(updatedConfig));
@@ -402,6 +753,35 @@ const DebridIntegrationScreen = () => {
             logger.error('Failed to load Torbox config:', error);
         } finally {
             setInitialLoading(false);
+        }
+    }, []);
+
+    // Load Torrentio config
+    const loadTorrentioConfig = useCallback(async () => {
+        try {
+            const storedConfig = await mmkvStorage.getItem(TORRENTIO_CONFIG_KEY);
+            if (storedConfig) {
+                const parsedConfig = JSON.parse(storedConfig);
+                setTorrentioConfig(parsedConfig);
+            }
+
+            // Check if Torrentio addon is installed
+            const addons = await stremioService.getInstalledAddonsAsync();
+            const torrentioAddon = addons.find(addon =>
+                addon.id?.includes('torrentio') ||
+                addon.url?.includes('torrentio.strem.fun') ||
+                (addon as any).transport?.includes('torrentio.strem.fun')
+            );
+
+            if (torrentioAddon) {
+                setTorrentioConfig(prev => ({
+                    ...prev,
+                    isInstalled: true,
+                    manifestUrl: (torrentioAddon as any).transport || torrentioAddon.url
+                }));
+            }
+        } catch (error) {
+            logger.error('Failed to load Torrentio config:', error);
         }
     }, []);
 
@@ -424,7 +804,6 @@ const DebridIntegrationScreen = () => {
             }
         } catch (error) {
             logger.error('Failed to fetch Torbox user data:', error);
-            // Don't show error to user, just log it
         } finally {
             setUserDataLoading(false);
         }
@@ -433,7 +812,8 @@ const DebridIntegrationScreen = () => {
     useFocusEffect(
         useCallback(() => {
             loadConfig();
-        }, [loadConfig])
+            loadTorrentioConfig();
+        }, [loadConfig, loadTorrentioConfig])
     );
 
     useEffect(() => {
@@ -444,10 +824,11 @@ const DebridIntegrationScreen = () => {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await Promise.all([loadConfig(), fetchUserData()]);
+        await Promise.all([loadConfig(), loadTorrentioConfig(), fetchUserData()]);
         setRefreshing(false);
-    }, [loadConfig, fetchUserData]);
+    }, [loadConfig, loadTorrentioConfig, fetchUserData]);
 
+    // Torbox handlers
     const handleConnect = async () => {
         if (!apiKey.trim()) {
             setAlertTitle('Error');
@@ -460,11 +841,8 @@ const DebridIntegrationScreen = () => {
         setLoading(true);
         try {
             const manifestUrl = `https://stremio.torbox.app/${apiKey.trim()}/manifest.json`;
-
-            // Install the addon using stremioService
             await stremioService.installAddon(manifestUrl);
 
-            // Get the installed addon ID
             const addons = await stremioService.getInstalledAddonsAsync();
             const torboxAddon = addons.find(addon =>
                 addon.id?.includes('torbox') ||
@@ -472,7 +850,6 @@ const DebridIntegrationScreen = () => {
                 (addon as any).transport?.includes('torbox')
             );
 
-            // Save config
             const newConfig: TorboxConfig = {
                 apiKey: apiKey.trim(),
                 isConnected: true,
@@ -485,10 +862,7 @@ const DebridIntegrationScreen = () => {
 
             setAlertTitle('Success');
             setAlertMessage('Torbox addon connected successfully!');
-            setAlertActions([{
-                label: 'OK',
-                onPress: () => setAlertVisible(false)
-            }]);
+            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } catch (error) {
             logger.error('Failed to install Torbox addon:', error);
@@ -508,9 +882,6 @@ const DebridIntegrationScreen = () => {
             const updatedConfig = { ...config, isEnabled: enabled };
             await mmkvStorage.setItem(TORBOX_STORAGE_KEY, JSON.stringify(updatedConfig));
             setConfig(updatedConfig);
-
-            // Note: Since we can't disable/enable addons in the current stremioService,
-            // we'll just track the state. The addon filtering will happen in AddonsScreen
         } catch (error) {
             logger.error('Failed to toggle Torbox addon:', error);
         }
@@ -527,7 +898,6 @@ const DebridIntegrationScreen = () => {
                     setAlertVisible(false);
                     setLoading(true);
                     try {
-                        // Find and remove the torbox addon
                         const addons = await stremioService.getInstalledAddonsAsync();
                         const torboxAddon = addons.find(addon =>
                             addon.id?.includes('torbox') ||
@@ -539,9 +909,9 @@ const DebridIntegrationScreen = () => {
                             await stremioService.removeAddon(torboxAddon.id);
                         }
 
-                        // Clear config
                         await mmkvStorage.removeItem(TORBOX_STORAGE_KEY);
                         setConfig(null);
+                        setUserData(null);
 
                         setAlertTitle('Success');
                         setAlertMessage('Torbox disconnected successfully');
@@ -566,6 +936,631 @@ const DebridIntegrationScreen = () => {
     const openSubscription = () => {
         Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7');
     };
+
+    // Torrentio handlers
+    const generateTorrentioManifestUrl = useCallback((): string => {
+        const parts: string[] = [];
+
+        // Providers (only if not all selected)
+        if (torrentioConfig.providers.length > 0 && torrentioConfig.providers.length < TORRENTIO_PROVIDERS.length) {
+            parts.push(`providers=${torrentioConfig.providers.join(',')}`);
+        }
+
+        // Sort (only if not default)
+        if (torrentioConfig.sort && torrentioConfig.sort !== 'quality') {
+            parts.push(`sort=${torrentioConfig.sort}`);
+        }
+
+        // Quality filter
+        if (torrentioConfig.qualityFilter.length > 0) {
+            parts.push(`qualityfilter=${torrentioConfig.qualityFilter.join(',')}`);
+        }
+
+        // Priority languages
+        if (torrentioConfig.priorityLanguages.length > 0) {
+            parts.push(`language=${torrentioConfig.priorityLanguages.join(',')}`);
+        }
+
+        // Max results
+        if (torrentioConfig.maxResults) {
+            parts.push(`limit=${torrentioConfig.maxResults}`);
+        }
+
+        // Debrid service and API key
+        if (torrentioConfig.debridService !== 'none' && torrentioConfig.debridApiKey) {
+            const debridInfo = TORRENTIO_DEBRID_SERVICES.find(d => d.id === torrentioConfig.debridService);
+            if (debridInfo) {
+                parts.push(`${debridInfo.keyParam}=${torrentioConfig.debridApiKey}`);
+            }
+        }
+
+        // Options
+        if (torrentioConfig.noDownloadLinks) {
+            parts.push('nodownloadlinks=true');
+        }
+        if (torrentioConfig.noCatalog) {
+            parts.push('nocatalog=true');
+        }
+
+        const configString = parts.length > 0 ? parts.join('|') + '/' : '';
+        return `https://torrentio.strem.fun/${configString}manifest.json`;
+    }, [torrentioConfig]);
+
+    const toggleQualityFilter = (qualityId: string) => {
+        setTorrentioConfig(prev => {
+            const newFilters = prev.qualityFilter.includes(qualityId)
+                ? prev.qualityFilter.filter(q => q !== qualityId)
+                : [...prev.qualityFilter, qualityId];
+            return { ...prev, qualityFilter: newFilters };
+        });
+    };
+
+    const toggleLanguage = (langId: string) => {
+        setTorrentioConfig(prev => {
+            const newLangs = prev.priorityLanguages.includes(langId)
+                ? prev.priorityLanguages.filter(l => l !== langId)
+                : [...prev.priorityLanguages, langId];
+            return { ...prev, priorityLanguages: newLangs };
+        });
+    };
+
+    const handleInstallTorrentio = async () => {
+        // Check if API key is provided
+        if (!torrentioConfig.debridApiKey.trim()) {
+            setAlertTitle('API Key Required');
+            setAlertMessage('Please enter your debrid service API key to install Torrentio.');
+            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertVisible(true);
+            return;
+        }
+
+        setTorrentioLoading(true);
+        try {
+            const manifestUrl = generateTorrentioManifestUrl();
+
+            // Check if already installed
+            const addons = await stremioService.getInstalledAddonsAsync();
+            const existingTorrentio = addons.find(addon =>
+                addon.id?.includes('torrentio') ||
+                addon.url?.includes('torrentio.strem.fun') ||
+                (addon as any).transport?.includes('torrentio.strem.fun')
+            );
+
+            if (existingTorrentio) {
+                // Remove existing and reinstall with new config
+                await stremioService.removeAddon(existingTorrentio.id);
+            }
+
+            await stremioService.installAddon(manifestUrl);
+
+            // Save config
+            const newConfig = {
+                ...torrentioConfig,
+                isInstalled: true,
+                manifestUrl
+            };
+            await mmkvStorage.setItem(TORRENTIO_CONFIG_KEY, JSON.stringify(newConfig));
+            setTorrentioConfig(newConfig);
+
+            setAlertTitle('Success');
+            setAlertMessage('Torrentio addon installed successfully!');
+            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertVisible(true);
+        } catch (error) {
+            logger.error('Failed to install Torrentio addon:', error);
+            setAlertTitle('Error');
+            setAlertMessage('Failed to install Torrentio addon. Please try again.');
+            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertVisible(true);
+        } finally {
+            setTorrentioLoading(false);
+        }
+    };
+
+    const handleRemoveTorrentio = async () => {
+        setAlertTitle('Remove Torrentio');
+        setAlertMessage('Are you sure you want to remove the Torrentio addon?');
+        setAlertActions([
+            { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
+            {
+                label: 'Remove',
+                onPress: async () => {
+                    setAlertVisible(false);
+                    setTorrentioLoading(true);
+                    try {
+                        const addons = await stremioService.getInstalledAddonsAsync();
+                        const torrentioAddon = addons.find(addon =>
+                            addon.id?.includes('torrentio') ||
+                            addon.url?.includes('torrentio.strem.fun') ||
+                            (addon as any).transport?.includes('torrentio.strem.fun')
+                        );
+
+                        if (torrentioAddon) {
+                            await stremioService.removeAddon(torrentioAddon.id);
+                        }
+
+                        const newConfig = {
+                            ...torrentioConfig,
+                            isInstalled: false,
+                            manifestUrl: undefined
+                        };
+                        await mmkvStorage.setItem(TORRENTIO_CONFIG_KEY, JSON.stringify(newConfig));
+                        setTorrentioConfig(newConfig);
+
+                        setAlertTitle('Success');
+                        setAlertMessage('Torrentio addon removed successfully');
+                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertVisible(true);
+                    } catch (error) {
+                        logger.error('Failed to remove Torrentio:', error);
+                        setAlertTitle('Error');
+                        setAlertMessage('Failed to remove Torrentio addon');
+                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertVisible(true);
+                    } finally {
+                        setTorrentioLoading(false);
+                    }
+                },
+                style: { color: colors.error || '#F44336' }
+            }
+        ]);
+        setAlertVisible(true);
+    };
+
+    // Render Torbox Tab
+    const renderTorboxTab = () => (
+        <>
+            {config?.isConnected ? (
+                <>
+                    <View style={styles.statusCard}>
+                        <View style={styles.statusRow}>
+                            <Text style={styles.statusLabel}>Status</Text>
+                            <Text style={[styles.statusValue, styles.statusConnected]}>Connected</Text>
+                        </View>
+
+                        <View style={styles.divider} />
+
+                        <View style={styles.statusRow}>
+                            <Text style={styles.statusLabel}>Enable Addon</Text>
+                            <Switch
+                                value={config.isEnabled}
+                                onValueChange={handleToggleEnabled}
+                                trackColor={{ false: colors.elevation2, true: colors.primary }}
+                                thumbColor={config.isEnabled ? colors.white : colors.mediumEmphasis}
+                                ios_backgroundColor={colors.elevation2}
+                            />
+                        </View>
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.dangerButton, loading && styles.disabledButton]}
+                        onPress={handleDisconnect}
+                        disabled={loading}
+                    >
+                        <Text style={styles.buttonText}>
+                            {loading ? 'Disconnecting...' : 'Disconnect & Remove'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {userData && (
+                        <View style={styles.userDataCard}>
+                            <View style={styles.userDataHeader}>
+                                <Text style={styles.userDataTitle}>Account Information</Text>
+                                {userDataLoading && (
+                                    <ActivityIndicator size="small" color={colors.primary} />
+                                )}
+                            </View>
+
+                            <View style={styles.userDataRow}>
+                                <Text style={styles.userDataLabel}>Email</Text>
+                                <Text style={styles.userDataValue} numberOfLines={1}>
+                                    {userData.base_email || userData.email}
+                                </Text>
+                            </View>
+
+                            <View style={styles.userDataRow}>
+                                <Text style={styles.userDataLabel}>Plan</Text>
+                                <View style={[
+                                    styles.planBadge,
+                                    userData.plan === 0 ? styles.planBadgeFree : styles.planBadgePaid
+                                ]}>
+                                    <Text style={[
+                                        styles.planBadgeText,
+                                        userData.plan === 0 ? styles.planBadgeTextFree : styles.planBadgeTextPaid
+                                    ]}>
+                                        {getPlanName(userData.plan)}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.userDataRow}>
+                                <Text style={styles.userDataLabel}>Status</Text>
+                                <Text style={[
+                                    styles.userDataValue,
+                                    { color: userData.is_subscribed ? (colors.success || '#4CAF50') : colors.mediumEmphasis }
+                                ]}>
+                                    {userData.is_subscribed ? 'Active' : 'Free'}
+                                </Text>
+                            </View>
+
+                            {userData.premium_expires_at && (
+                                <View style={styles.userDataRow}>
+                                    <Text style={styles.userDataLabel}>Expires</Text>
+                                    <Text style={styles.userDataValue}>
+                                        {new Date(userData.premium_expires_at).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                            )}
+
+                            <View style={styles.userDataRow}>
+                                <Text style={styles.userDataLabel}>Downloaded</Text>
+                                <Text style={styles.userDataValue}>
+                                    {(userData.total_downloaded / (1024 * 1024 * 1024)).toFixed(2)} GB
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>✓ Connected to TorBox</Text>
+                        <Text style={styles.sectionText}>
+                            Your TorBox addon is active and providing premium streams.{config.isEnabled ? '' : ' (Currently disabled)'}
+                        </Text>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Configure Addon</Text>
+                        <Text style={styles.sectionText}>
+                            Customize your streaming experience. Sort by quality, filter file sizes, and manage other integration settings.
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.subscribeButton}
+                            onPress={() => Linking.openURL('https://torbox.app/settings?section=integration-settings')}
+                        >
+                            <Text style={styles.subscribeButtonText}>Open Settings</Text>
+                        </TouchableOpacity>
+                    </View>
+                </>
+            ) : (
+                <>
+                    <Text style={styles.description}>
+                        Unlock 4K high-quality streams and lightning-fast speeds by integrating Torbox. Enter your API Key below to instantly upgrade your streaming experience.
+                    </Text>
+
+                    <TouchableOpacity onPress={() => Linking.openURL('https://guides.viren070.me/stremio/technical-details#debrid-services')} style={styles.guideLink}>
+                        <Text style={styles.guideLinkText}>What is a Debrid Service?</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Torbox API Key</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter your API Key"
+                            placeholderTextColor={colors.mediumGray}
+                            value={apiKey}
+                            onChangeText={setApiKey}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            secureTextEntry
+                        />
+                    </View>
+
+                    <TouchableOpacity
+                        style={[styles.connectButton, loading && styles.disabledButton]}
+                        onPress={handleConnect}
+                        disabled={loading}
+                    >
+                        <Text style={styles.connectButtonText}>
+                            {loading ? 'Connecting...' : 'Connect & Install'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Unlock Premium Speeds</Text>
+                        <Text style={styles.sectionText}>
+                            Get a Torbox subscription to access cached high-quality streams with zero buffering.
+                        </Text>
+                        <TouchableOpacity style={styles.subscribeButton} onPress={openSubscription}>
+                            <Text style={styles.subscribeButtonText}>Get Subscription</Text>
+                        </TouchableOpacity>
+                    </View>
+                </>
+            )}
+
+            <View style={[styles.logoContainer, { marginTop: 60 }]}>
+                <Text style={styles.poweredBy}>Powered by</Text>
+                <View style={styles.logoRow}>
+                    <Image
+                        source={{ uri: 'https://torbox.app/assets/logo-bb7a9579.svg' }}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
+                    <Text style={styles.logoText}>TorBox</Text>
+                </View>
+                <Text style={styles.disclaimer}>Nuvio is not affiliated with Torbox in any way.</Text>
+            </View>
+        </>
+    );
+
+    // Render Torrentio Tab
+    const toggleSection = (section: string) => {
+        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    };
+
+    const renderTorrentioTab = () => (
+        <>
+            <Text style={styles.description}>
+                Configure Torrentio to get torrent streams for movies and TV shows. A debrid service is required to stream content.
+            </Text>
+
+            {torrentioConfig.isInstalled && (
+                <View style={styles.installedBadge}>
+                    <Text style={styles.installedBadgeText}>✓ INSTALLED</Text>
+                </View>
+            )}
+
+            {/* TorBox Promotion Card */}
+            {!torrentioConfig.debridApiKey && (
+                <View style={styles.promoCard}>
+                    <Text style={styles.promoTitle}>⚡ Need a Debrid Service?</Text>
+                    <Text style={styles.promoText}>
+                        Get TorBox for lightning-fast 4K streaming with zero buffering. Premium cached torrents and instant downloads.
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.promoButton}
+                        onPress={() => Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7')}
+                    >
+                        <Text style={styles.promoButtonText}>Get TorBox Subscription</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            {/* Debrid Service Selection */}
+            <View style={styles.configSection}>
+                <Text style={styles.configSectionTitle}>Debrid Service *</Text>
+                <View style={styles.pickerContainer}>
+                    {TORRENTIO_DEBRID_SERVICES.map((service: any) => (
+                        <TouchableOpacity
+                            key={service.id}
+                            style={[
+                                styles.pickerItem,
+                                torrentioConfig.debridService === service.id && styles.pickerItemSelected
+                            ]}
+                            onPress={() => setTorrentioConfig(prev => ({ ...prev, debridService: service.id }))}
+                        >
+                            <Text style={[
+                                styles.pickerItemText,
+                                torrentioConfig.debridService === service.id && styles.pickerItemTextSelected
+                            ]}>
+                                {service.name}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {/* Debrid API Key */}
+            <View style={styles.configSection}>
+                <Text style={styles.configSectionTitle}>API Key *</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder={`Enter your ${TORRENTIO_DEBRID_SERVICES.find((d: any) => d.id === torrentioConfig.debridService)?.name || 'Debrid'} API Key`}
+                    placeholderTextColor={colors.mediumGray}
+                    value={torrentioConfig.debridApiKey}
+                    onChangeText={(text) => setTorrentioConfig(prev => ({ ...prev, debridApiKey: text }))}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    secureTextEntry
+                />
+            </View>
+
+            {/* Sorting - Accordion */}
+            <TouchableOpacity
+                style={[styles.accordionHeader, expandedSections.sorting && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                onPress={() => toggleSection('sorting')}
+            >
+                <View>
+                    <Text style={styles.accordionHeaderText}>Sorting</Text>
+                    <Text style={styles.accordionSubtext}>
+                        {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || 'By quality'}
+                    </Text>
+                </View>
+                <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+            </TouchableOpacity>
+            {expandedSections.sorting && (
+                <View style={styles.accordionContent}>
+                    <View style={styles.pickerContainer}>
+                        {TORRENTIO_SORT_OPTIONS.map(option => (
+                            <TouchableOpacity
+                                key={option.id}
+                                style={[styles.pickerItem, torrentioConfig.sort === option.id && styles.pickerItemSelected]}
+                                onPress={() => setTorrentioConfig(prev => ({ ...prev, sort: option.id }))}
+                            >
+                                <Text style={[styles.pickerItemText, torrentioConfig.sort === option.id && styles.pickerItemTextSelected]}>
+                                    {option.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {/* Quality Filter - Accordion */}
+            <TouchableOpacity
+                style={[styles.accordionHeader, expandedSections.qualityFilter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                onPress={() => toggleSection('qualityFilter')}
+            >
+                <View>
+                    <Text style={styles.accordionHeaderText}>Exclude Qualities</Text>
+                    <Text style={styles.accordionSubtext}>
+                        {torrentioConfig.qualityFilter.length > 0 ? `${torrentioConfig.qualityFilter.length} excluded` : 'None excluded'}
+                    </Text>
+                </View>
+                <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+            </TouchableOpacity>
+            {expandedSections.qualityFilter && (
+                <View style={styles.accordionContent}>
+                    <View style={styles.chipContainer}>
+                        {TORRENTIO_QUALITY_FILTERS.map(quality => (
+                            <TouchableOpacity
+                                key={quality.id}
+                                style={[styles.chip, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipSelected]}
+                                onPress={() => toggleQualityFilter(quality.id)}
+                            >
+                                <Text style={[styles.chipText, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipTextSelected]}>
+                                    {quality.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {/* Priority Languages - Accordion */}
+            <TouchableOpacity
+                style={[styles.accordionHeader, expandedSections.languages && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                onPress={() => toggleSection('languages')}
+            >
+                <View>
+                    <Text style={styles.accordionHeaderText}>Priority Languages</Text>
+                    <Text style={styles.accordionSubtext}>
+                        {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} selected` : 'No preference'}
+                    </Text>
+                </View>
+                <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+            </TouchableOpacity>
+            {expandedSections.languages && (
+                <View style={styles.accordionContent}>
+                    <View style={styles.chipContainer}>
+                        {TORRENTIO_LANGUAGES.map(lang => (
+                            <TouchableOpacity
+                                key={lang.id}
+                                style={[styles.chip, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipSelected]}
+                                onPress={() => toggleLanguage(lang.id)}
+                            >
+                                <Text style={[styles.chipText, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipTextSelected]}>
+                                    {lang.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {/* Max Results - Accordion */}
+            <TouchableOpacity
+                style={[styles.accordionHeader, expandedSections.maxResults && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                onPress={() => toggleSection('maxResults')}
+            >
+                <View>
+                    <Text style={styles.accordionHeaderText}>Max Results</Text>
+                    <Text style={styles.accordionSubtext}>
+                        {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || 'All results'}
+                    </Text>
+                </View>
+                <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+            </TouchableOpacity>
+            {expandedSections.maxResults && (
+                <View style={styles.accordionContent}>
+                    <View style={styles.pickerContainer}>
+                        {TORRENTIO_MAX_RESULTS.map(option => (
+                            <TouchableOpacity
+                                key={option.id || 'all'}
+                                style={[styles.pickerItem, torrentioConfig.maxResults === option.id && styles.pickerItemSelected]}
+                                onPress={() => setTorrentioConfig(prev => ({ ...prev, maxResults: option.id }))}
+                            >
+                                <Text style={[styles.pickerItemText, torrentioConfig.maxResults === option.id && styles.pickerItemTextSelected]}>
+                                    {option.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {/* Additional Options - Accordion */}
+            <TouchableOpacity
+                style={[styles.accordionHeader, expandedSections.options && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
+                onPress={() => toggleSection('options')}
+            >
+                <View>
+                    <Text style={styles.accordionHeaderText}>Additional Options</Text>
+                    <Text style={styles.accordionSubtext}>Catalog & download settings</Text>
+                </View>
+                <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
+            </TouchableOpacity>
+            {expandedSections.options && (
+                <View style={styles.accordionContent}>
+                    <View style={styles.switchRow}>
+                        <Text style={styles.switchLabel}>Don't show download links</Text>
+                        <Switch
+                            value={torrentioConfig.noDownloadLinks}
+                            onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noDownloadLinks: val }))}
+                            trackColor={{ false: colors.elevation3, true: colors.primary }}
+                            thumbColor={colors.white}
+                        />
+                    </View>
+                    <View style={styles.switchRow}>
+                        <Text style={styles.switchLabel}>Don't show debrid catalog</Text>
+                        <Switch
+                            value={torrentioConfig.noCatalog}
+                            onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noCatalog: val }))}
+                            trackColor={{ false: colors.elevation3, true: colors.primary }}
+                            thumbColor={colors.white}
+                        />
+                    </View>
+                </View>
+            )}
+
+            {/* Manifest URL Preview */}
+            <View style={styles.configSection}>
+                <Text style={styles.configSectionTitle}>Manifest URL</Text>
+                <View style={styles.manifestPreview}>
+                    <Text style={styles.manifestUrl} numberOfLines={3}>
+                        {generateTorrentioManifestUrl()}
+                    </Text>
+                </View>
+            </View>
+
+            {/* Install/Update/Remove Buttons */}
+            <View style={{ marginTop: 8 }}>
+                {torrentioConfig.isInstalled ? (
+                    <>
+                        <TouchableOpacity
+                            style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
+                            onPress={handleInstallTorrentio}
+                            disabled={torrentioLoading}
+                        >
+                            <Text style={styles.connectButtonText}>
+                                {torrentioLoading ? 'Updating...' : 'Update Configuration'}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.dangerButton, torrentioLoading && styles.disabledButton]}
+                            onPress={handleRemoveTorrentio}
+                            disabled={torrentioLoading}
+                        >
+                            <Text style={styles.buttonText}>Remove Torrentio</Text>
+                        </TouchableOpacity>
+                    </>
+                ) : (
+                    <TouchableOpacity
+                        style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
+                        onPress={handleInstallTorrentio}
+                        disabled={torrentioLoading}
+                    >
+                        <Text style={styles.connectButtonText}>
+                            {torrentioLoading ? 'Installing...' : 'Install Torrentio'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            <Text style={[styles.disclaimer, { marginTop: 24, marginBottom: 40 }]}>
+                Nuvio is not affiliated with Torrentio in any way.
+            </Text>
+        </>
+    );
 
     if (initialLoading) {
         return (
@@ -592,6 +1587,26 @@ const DebridIntegrationScreen = () => {
                 <Text style={styles.headerTitle}>Debrid Integration</Text>
             </View>
 
+            {/* Tab Selector */}
+            <View style={styles.tabContainer}>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'torbox' && styles.activeTab]}
+                    onPress={() => setActiveTab('torbox')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText]}>
+                        TorBox
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.tab, activeTab === 'torrentio' && styles.activeTab]}
+                    onPress={() => setActiveTab('torrentio')}
+                >
+                    <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText]}>
+                        Torrentio
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
@@ -608,178 +1623,7 @@ const DebridIntegrationScreen = () => {
                         />
                     }
                 >
-                    {config?.isConnected ? (
-                        // Connected state
-                        <>
-                            <View style={styles.statusCard}>
-                                <View style={styles.statusRow}>
-                                    <Text style={styles.statusLabel}>Status</Text>
-                                    <Text style={[styles.statusValue, styles.statusConnected]}>Connected</Text>
-                                </View>
-
-                                <View style={styles.divider} />
-
-                                <View style={styles.statusRow}>
-                                    <Text style={styles.statusLabel}>Enable Addon</Text>
-                                    <Switch
-                                        value={config.isEnabled}
-                                        onValueChange={handleToggleEnabled}
-                                        trackColor={{ false: colors.elevation2, true: colors.primary }}
-                                        thumbColor={config.isEnabled ? colors.white : colors.mediumEmphasis}
-                                        ios_backgroundColor={colors.elevation2}
-                                    />
-                                </View>
-                            </View>
-
-                            <TouchableOpacity
-                                style={[styles.actionButton, styles.dangerButton, loading && styles.disabledButton]}
-                                onPress={handleDisconnect}
-                                disabled={loading}
-                            >
-                                <Text style={styles.buttonText}>
-                                    {loading ? 'Disconnecting...' : 'Disconnect & Remove'}
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* User Data Card */}
-                            {userData && (
-                                <View style={styles.userDataCard}>
-                                    <View style={styles.userDataHeader}>
-                                        <Text style={styles.userDataTitle}>Account Information</Text>
-                                        {userDataLoading && (
-                                            <ActivityIndicator size="small" color={colors.primary} />
-                                        )}
-                                    </View>
-
-                                    <View style={styles.userDataRow}>
-                                        <Text style={styles.userDataLabel}>Email</Text>
-                                        <Text style={styles.userDataValue} numberOfLines={1}>
-                                            {userData.base_email || userData.email}
-                                        </Text>
-                                    </View>
-
-                                    <View style={styles.userDataRow}>
-                                        <Text style={styles.userDataLabel}>Plan</Text>
-                                        <View style={[
-                                            styles.planBadge,
-                                            userData.plan === 0 ? styles.planBadgeFree : styles.planBadgePaid
-                                        ]}>
-                                            <Text style={[
-                                                styles.planBadgeText,
-                                                userData.plan === 0 ? styles.planBadgeTextFree : styles.planBadgeTextPaid
-                                            ]}>
-                                                {getPlanName(userData.plan)}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.userDataRow}>
-                                        <Text style={styles.userDataLabel}>Status</Text>
-                                        <Text style={[
-                                            styles.userDataValue,
-                                            { color: userData.is_subscribed ? (colors.success || '#4CAF50') : colors.mediumEmphasis }
-                                        ]}>
-                                            {userData.is_subscribed ? 'Active' : 'Free'}
-                                        </Text>
-                                    </View>
-
-                                    {userData.premium_expires_at && (
-                                        <View style={styles.userDataRow}>
-                                            <Text style={styles.userDataLabel}>Expires</Text>
-                                            <Text style={styles.userDataValue}>
-                                                {new Date(userData.premium_expires_at).toLocaleDateString()}
-                                            </Text>
-                                        </View>
-                                    )}
-
-                                    <View style={styles.userDataRow}>
-                                        <Text style={styles.userDataLabel}>Downloaded</Text>
-                                        <Text style={styles.userDataValue}>
-                                            {(userData.total_downloaded / (1024 * 1024 * 1024)).toFixed(2)} GB
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
-
-                            <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>✓ Connected to TorBox</Text>
-                                <Text style={styles.sectionText}>
-                                    Your TorBox addon is active and providing premium streams.{config.isEnabled ? '' : ' (Currently disabled)'}
-                                </Text>
-                            </View>
-
-                            <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>Configure Addon</Text>
-                                <Text style={styles.sectionText}>
-                                    Customize your streaming experience. Sort by quality, filter file sizes, and manage other integration settings.
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.subscribeButton}
-                                    onPress={() => Linking.openURL('https://torbox.app/settings?section=integration-settings')}
-                                >
-                                    <Text style={styles.subscribeButtonText}>Open Settings</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </>
-                    ) : (
-                        // Not connected state
-                        <>
-                            <Text style={styles.description}>
-                                Unlock 4K high-quality streams and lightning-fast speeds by integrating Torbox. Enter your API Key below to instantly upgrade your streaming experience.
-                            </Text>
-
-                            <TouchableOpacity onPress={() => Linking.openURL('https://guides.viren070.me/stremio/technical-details#debrid-services')} style={styles.guideLink}>
-                                <Text style={styles.guideLinkText}>What is a Debrid Service?</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Torbox API Key</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter your API Key"
-                                    placeholderTextColor={colors.mediumGray}
-                                    value={apiKey}
-                                    onChangeText={setApiKey}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                    secureTextEntry
-                                />
-                            </View>
-
-                            <TouchableOpacity
-                                style={[styles.connectButton, loading && styles.disabledButton]}
-                                onPress={handleConnect}
-                                disabled={loading}
-                            >
-                                <Text style={styles.connectButtonText}>
-                                    {loading ? 'Connecting...' : 'Connect & Install'}
-                                </Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>Unlock Premium Speeds</Text>
-                                <Text style={styles.sectionText}>
-                                    Get a Torbox subscription to access cached high-quality streams with zero buffering.
-                                </Text>
-                                <TouchableOpacity style={styles.subscribeButton} onPress={openSubscription}>
-                                    <Text style={styles.subscribeButtonText}>Get Subscription</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </>
-                    )}
-
-                    <View style={[styles.logoContainer, { marginTop: 60 }]}>
-                        <Text style={styles.poweredBy}>Powered by</Text>
-                        <View style={styles.logoRow}>
-                            <Image
-                                source={{ uri: 'https://torbox.app/assets/logo-bb7a9579.svg' }}
-                                style={styles.logo}
-                                resizeMode="contain"
-                            />
-                            <Text style={styles.logoText}>TorBox</Text>
-                        </View>
-                        <Text style={styles.disclaimer}>Nuvio is not affiliated with Torbox in any way.</Text>
-                    </View>
+                    {activeTab === 'torbox' ? renderTorboxTab() : renderTorrentioTab()}
                 </ScrollView>
             </KeyboardAvoidingView>
 
