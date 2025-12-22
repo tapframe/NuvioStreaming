@@ -18,6 +18,7 @@ import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
+import LottieView from 'lottie-react-native';
 import { Feather } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
@@ -929,11 +930,6 @@ const SettingsScreen: React.FC = () => {
                     </View>
                   )}
 
-                  <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
-                      Made with ❤️ by Tapframe and Friends
-                    </Text>
-                  </View>
                   <View style={styles.discordContainer}>
                     <TouchableOpacity
                       style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0, marginBottom: 8 }]}
@@ -984,6 +980,23 @@ const SettingsScreen: React.FC = () => {
                         </View>
                       </TouchableOpacity>
                     </View>
+                  </View>
+
+                  {/* Monkey Animation */}
+                  <View style={styles.monkeyContainer}>
+                    <LottieView
+                      source={require('../assets/lottie/monito.json')}
+                      autoPlay
+                      loop
+                      style={styles.monkeyAnimation}
+                      resizeMode="contain"
+                    />
+                  </View>
+
+                  <View style={styles.footer}>
+                    <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
+                      Made with ❤️ by Tapframe and Friends
+                    </Text>
                   </View>
                 </>
               )}
@@ -1042,12 +1055,6 @@ const SettingsScreen: React.FC = () => {
               </View>
             )}
 
-            <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
-                Made with ❤️ by Tapframe and friends
-              </Text>
-            </View>
-
             {/* Support & Community Buttons */}
             <View style={styles.discordContainer}>
               <TouchableOpacity
@@ -1099,6 +1106,23 @@ const SettingsScreen: React.FC = () => {
                   </View>
                 </TouchableOpacity>
               </View>
+            </View>
+
+            {/* Monkey Animation */}
+            <View style={styles.monkeyContainer}>
+              <LottieView
+                source={require('../assets/lottie/monito.json')}
+                autoPlay
+                loop
+                style={styles.monkeyAnimation}
+                resizeMode="contain"
+              />
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
+                Made with ❤️ by Tapframe and friends
+              </Text>
             </View>
           </ScrollView>
         </View>
@@ -1331,7 +1355,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 0,
     marginBottom: 12,
   },
   footerText: {
@@ -1396,6 +1420,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderTopColor: 'transparent',
     marginRight: 8,
+  },
+  monkeyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 0,
+    marginBottom: 32,
+  },
+  monkeyAnimation: {
+    width: 180,
+    height: 180,
   },
 });
 

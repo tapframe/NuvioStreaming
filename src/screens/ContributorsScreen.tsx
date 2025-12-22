@@ -69,6 +69,11 @@ const SPECIAL_MENTIONS_CONFIG: SpecialMentionConfig[] = [
     role: 'Server Sponsor',
     description: 'Sponsored the server infrastructure for Nuvio',
   },
+  {
+    discordId: '1395843374241546362',
+    role: 'Discord Mod',
+    description: 'Helps moderate the Nuvio Discord community',
+  },
 ];
 
 type TabType = 'contributors' | 'special';
