@@ -84,9 +84,12 @@ class MpvPlayerViewManager(
     }
 
     override fun receiveCommand(view: MPVView, commandId: String?, args: ReadableArray?) {
+        android.util.Log.d("MpvPlayerViewManager", "receiveCommand: $commandId, args: $args")
         when (commandId) {
             "seek" -> {
-                args?.getDouble(0)?.let { view.seekTo(it) }
+                val position = args?.getDouble(0)
+                android.util.Log.d("MpvPlayerViewManager", "Seek command received: position=$position")
+                position?.let { view.seekTo(it) }
             }
             "setAudioTrack" -> {
                 args?.getInt(0)?.let { view.setAudioTrack(it) }

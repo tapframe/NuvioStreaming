@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useCallback, memo } from 'react';
 import { View, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { PinchGestureHandler } from 'react-native-gesture-handler';
 import MpvPlayer, { MpvPlayerRef } from '../MpvPlayer';
 import { styles } from '../../utils/playerStyles';
 import { ResizeModeType } from '../../utils/playerTypes';
-import { logger } from '../../../../utils/logger';
 
 interface VideoSurfaceProps {
     processedStreamUrl: string;
@@ -77,13 +76,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
 
-    console.log('[VideoSurface] Rendering with:', {
-        streamUrl: streamUrl?.substring(0, 50) + '...',
-        paused,
-        volume,
-        playbackSpeed,
-        screenDimensions,
-    });
+    // Debug logging removed to prevent console spam
 
     const handleLoad = (data: { duration: number; width: number; height: number }) => {
         console.log('[VideoSurface] onLoad received:', data);
@@ -97,10 +90,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     };
 
     const handleProgress = (data: { currentTime: number; duration: number }) => {
-        // Log every 5 seconds to avoid spam
-        if (Math.floor(data.currentTime) % 5 === 0) {
-            console.log('[VideoSurface] onProgress:', data);
-        }
         onProgress({
             currentTime: data.currentTime,
             playableDuration: data.currentTime,

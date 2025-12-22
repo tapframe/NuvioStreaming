@@ -145,7 +145,9 @@ class MPVView @JvmOverloads constructor(
     }
 
     fun seekTo(positionSeconds: Double) {
+        Log.d(TAG, "seekTo called: positionSeconds=$positionSeconds, isMpvInitialized=$isMpvInitialized")
         if (isMpvInitialized) {
+            Log.d(TAG, "Executing MPV seek command: seek $positionSeconds absolute")
             MPVLib.command(arrayOf("seek", positionSeconds.toString(), "absolute"))
         }
     }

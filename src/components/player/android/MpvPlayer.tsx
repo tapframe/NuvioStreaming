@@ -59,12 +59,7 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
         );
     }
 
-    console.log('[MpvPlayer] Rendering native component with:', {
-        source: props.source?.substring(0, 50) + '...',
-        paused: props.paused ?? true,
-        volume: props.volume ?? 1.0,
-        rate: props.rate ?? 1.0,
-    });
+    // Debug logging removed to prevent console spam
 
     const handleLoad = (event: any) => {
         console.log('[MpvPlayer] Native onLoad event:', event?.nativeEvent);
@@ -72,11 +67,7 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
     };
 
     const handleProgress = (event: any) => {
-        const data = event?.nativeEvent;
-        if (data && Math.floor(data.currentTime) % 5 === 0) {
-            console.log('[MpvPlayer] Native onProgress event:', data);
-        }
-        props.onProgress?.(data);
+        props.onProgress?.(event?.nativeEvent);
     };
 
     const handleEnd = (event: any) => {

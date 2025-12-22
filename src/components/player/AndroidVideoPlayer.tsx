@@ -40,6 +40,7 @@ import { ErrorModal } from './modals/ErrorModal';
 
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
+import { MpvPlayerRef } from './android/MpvPlayer';
 
 // Utils
 import { logger } from '../../utils/logger';
@@ -75,6 +76,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const useVLC = (Platform.OS === 'android' && forceVlc);
 
   const videoRef = useRef<any>(null);
+  const mpvPlayerRef = useRef<MpvPlayerRef>(null);
   const vlcHook = useVlcPlayer(useVLC, playerState.paused, playerState.currentTime);
   const tracksHook = usePlayerTracks(
     useVLC,
@@ -103,7 +105,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const setupHook = usePlayerSetup(playerState.setScreenDimensions, setVolume, setBrightness, playerState.paused);
 
   const controlsHook = usePlayerControls(
-    videoRef,
+    mpvPlayerRef, // Use mpvPlayerRef for MPV player
     vlcHook.vlcPlayerRef,
     useVLC,
     playerState.paused,
@@ -168,6 +170,13 @@ const AndroidVideoPlayer: React.FC = () => {
     if (!playerState.isMounted.current) return;
 
     const videoDuration = data.duration;
+    console.log('[AndroidVideoPlayer] handleLoad called:', {
+      duration: videoDuration,
+      initialPosition: watchProgress.initialPosition,
+      showResumeOverlay: watchProgress.showResumeOverlay,
+      initialSeekTarget: watchProgress.initialSeekTargetRef?.current
+    });
+
     if (videoDuration > 0) {
       playerState.setDuration(videoDuration);
       if (id && type) {
@@ -204,9 +213,17 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.setIsVideoLoaded(true);
     openingAnimation.completeOpeningAnimation();
 
-    // Handle Resume
-    if (watchProgress.initialPosition && !watchProgress.showResumeOverlay) {
-      controlsHook.seekToTime(watchProgress.initialPosition);
+    // Handle Resume - check both initialPosition and initialSeekTargetRef
+    const resumeTarget = watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
+    if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && videoDuration > 0) {
+      console.log('[AndroidVideoPlayer] Seeking to resume position:', resumeTarget, 'duration:', videoDuration);
+      // Use a small delay to ensure the player is ready, then seek directly
+      setTimeout(() => {
+        if (mpvPlayerRef.current) {
+          console.log('[AndroidVideoPlayer] Calling mpvPlayerRef.current.seek directly');
+          mpvPlayerRef.current.seek(Math.min(resumeTarget, videoDuration - 0.5));
+        }
+      }, 200);
     }
   }, [id, type, episodeId, useVLC, playerState.isMounted, watchProgress.initialPosition]);
 
@@ -385,6 +402,7 @@ const AndroidVideoPlayer: React.FC = () => {
           onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
           onTracksUpdate={vlcHook.handleVlcTracksUpdate}
           vlcPlayerRef={vlcHook.vlcPlayerRef}
+          mpvPlayerRef={mpvPlayerRef}
           videoRef={videoRef}
           pinchRef={useRef(null)}
           onPinchGestureEvent={() => { }}

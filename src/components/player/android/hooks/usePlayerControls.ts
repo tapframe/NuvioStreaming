@@ -2,11 +2,11 @@ import { useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
 import { logger } from '../../../../utils/logger';
 
-const DEBUG_MODE = false;
+const DEBUG_MODE = true; // Temporarily enable for debugging seek
 const END_EPSILON = 0.3;
 
 export const usePlayerControls = (
-    videoRef: any,
+    mpvPlayerRef: any,
     vlcPlayerRef: any,
     useVLC: boolean,
     paused: boolean,
@@ -26,39 +26,46 @@ export const usePlayerControls = (
     const seekToTime = useCallback((rawSeconds: number) => {
         const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
 
+        console.log('[usePlayerControls] seekToTime called:', {
+            rawSeconds,
+            timeInSeconds,
+            useVLC,
+            hasMpvRef: !!mpvPlayerRef?.current,
+            hasVlcRef: !!vlcPlayerRef?.current,
+            duration,
+            isSeeking: isSeeking.current
+        });
+
         if (useVLC) {
             if (vlcPlayerRef.current && duration > 0) {
-                if (DEBUG_MODE) logger.log(`[usePlayerControls][VLC] Seeking to ${timeInSeconds}`);
+                logger.log(`[usePlayerControls][VLC] Seeking to ${timeInSeconds}`);
                 vlcPlayerRef.current.seek(timeInSeconds);
             }
         } else {
-            if (videoRef.current && duration > 0 && !isSeeking.current) {
-                if (DEBUG_MODE) logger.log(`[usePlayerControls] Seeking to ${timeInSeconds}`);
+            // MPV Player
+            if (mpvPlayerRef.current && duration > 0) {
+                console.log(`[usePlayerControls][MPV] Seeking to ${timeInSeconds}`);
 
                 isSeeking.current = true;
+                mpvPlayerRef.current.seek(timeInSeconds);
 
-                if (Platform.OS === 'ios') {
-                    iosWasPausedDuringSeekRef.current = paused;
-                    if (!paused) setPaused(true);
-                }
-
-                // Actually perform the seek
-                videoRef.current.seek(timeInSeconds);
-
+                // Reset seeking flag after a delay
                 setTimeout(() => {
-                    if (isMounted.current && isSeeking.current) {
+                    if (isMounted.current) {
                         isSeeking.current = false;
-                        if (Platform.OS === 'ios' && iosWasPausedDuringSeekRef.current === false) {
-                            setPaused(false);
-                            iosWasPausedDuringSeekRef.current = null;
-                        }
                     }
                 }, 500);
+            } else {
+                console.log('[usePlayerControls][MPV] Cannot seek - ref or duration invalid:', {
+                    hasRef: !!mpvPlayerRef?.current,
+                    duration
+                });
             }
         }
-    }, [useVLC, duration, paused, setPaused, videoRef, vlcPlayerRef, isSeeking, isMounted]);
+    }, [useVLC, duration, paused, setPaused, mpvPlayerRef, vlcPlayerRef, isSeeking, isMounted]);
 
     const skip = useCallback((seconds: number) => {
+        console.log('[usePlayerControls] skip called:', { seconds, currentTime, newTime: currentTime + seconds });
         seekToTime(currentTime + seconds);
     }, [currentTime, seekToTime]);
 

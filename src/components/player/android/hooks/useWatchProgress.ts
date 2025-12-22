@@ -40,17 +40,22 @@ export const useWatchProgress = (
             if (id && type) {
                 try {
                     const savedProgress = await storageService.getWatchProgress(id, type, episodeId);
+                    console.log('[useWatchProgress] Loaded saved progress:', savedProgress);
+
                     if (savedProgress) {
                         const progressPercent = (savedProgress.currentTime / savedProgress.duration) * 100;
+                        console.log('[useWatchProgress] Progress percent:', progressPercent);
 
                         if (progressPercent < 85) {
                             setResumePosition(savedProgress.currentTime);
                             setSavedDuration(savedProgress.duration);
 
                             if (appSettings.alwaysResume) {
+                                console.log('[useWatchProgress] Always resume enabled, setting initial position:', savedProgress.currentTime);
                                 setInitialPosition(savedProgress.currentTime);
                                 initialSeekTargetRef.current = savedProgress.currentTime;
-                                seekToTime(savedProgress.currentTime);
+                                // Don't call seekToTime here - duration is 0
+                                // The seek will be handled in handleLoad callback
                             } else {
                                 setShowResumeOverlay(true);
                             }
