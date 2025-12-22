@@ -1,52 +1,18 @@
-import React, { forwardRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import Video, { ViewType, VideoRef, ResizeMode } from 'react-native-video';
-import VlcVideoPlayer, { VlcPlayerRef } from '../../VlcVideoPlayer';
+import React from 'react';
+import { View, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { PinchGestureHandler } from 'react-native-gesture-handler';
+import MpvPlayer, { MpvPlayerRef } from '../MpvPlayer';
 import { styles } from '../../utils/playerStyles';
+import { ResizeModeType } from '../../utils/playerTypes';
 import { logger } from '../../../../utils/logger';
-import { ResizeModeType, SelectedTrack } from '../../utils/playerTypes';
-
-const getVideoResizeMode = (resizeMode: ResizeModeType) => {
-    switch (resizeMode) {
-        case 'contain': return 'contain';
-        case 'cover': return 'cover';
-        case 'stretch': return 'contain';
-        case 'none': return 'contain';
-        default: return 'contain';
-    }
-};
-
-// VLC only supports 'contain' | 'cover' | 'none'
-const getVlcResizeMode = (resizeMode: ResizeModeType): 'contain' | 'cover' | 'none' => {
-    switch (resizeMode) {
-        case 'contain': return 'contain';
-        case 'cover': return 'cover';
-        case 'stretch': return 'cover'; // stretch is not supported, use cover
-        case 'none': return 'none';
-        default: return 'contain';
-    }
-};
 
 interface VideoSurfaceProps {
-    useVLC: boolean;
-    forceVlcRemount: boolean;
     processedStreamUrl: string;
     volume: number;
     playbackSpeed: number;
-    zoomScale: number;
     resizeMode: ResizeModeType;
     paused: boolean;
     currentStreamUrl: string;
-    headers: any;
-    videoType: any;
-    vlcSelectedAudioTrack?: number;
-    vlcSelectedSubtitleTrack?: number;
-    vlcRestoreTime?: number;
-    vlcKey: string;
-    selectedAudioTrack: any;
-    selectedTextTrack: any;
-    useCustomSubtitles: boolean;
 
     // Callbacks
     toggleControls: () => void;
@@ -56,44 +22,45 @@ interface VideoSurfaceProps {
     onEnd: () => void;
     onError: (err: any) => void;
     onBuffer: (buf: any) => void;
-    onTracksUpdate: (tracks: any) => void;
 
     // Refs
-    vlcPlayerRef: React.RefObject<VlcPlayerRef>;
-    videoRef: React.RefObject<VideoRef>;
+    mpvPlayerRef?: React.RefObject<MpvPlayerRef>;
     pinchRef: any;
 
     // Handlers
     onPinchGestureEvent: any;
     onPinchHandlerStateChange: any;
-    vlcLoadedRef: React.MutableRefObject<boolean>;
     screenDimensions: { width: number, height: number };
-    customVideoStyles: any;
 
-    // Debugging
-    loadStartAtRef: React.MutableRefObject<number | null>;
-    firstFrameAtRef: React.MutableRefObject<number | null>;
+    // Legacy props (kept for compatibility but unused with MPV)
+    useVLC?: boolean;
+    forceVlcRemount?: boolean;
+    headers?: any;
+    videoType?: any;
+    vlcSelectedAudioTrack?: number;
+    vlcSelectedSubtitleTrack?: number;
+    vlcRestoreTime?: number;
+    vlcKey?: string;
+    selectedAudioTrack?: any;
+    selectedTextTrack?: any;
+    useCustomSubtitles?: boolean;
+    onTracksUpdate?: (tracks: any) => void;
+    vlcPlayerRef?: any;
+    videoRef?: any;
+    vlcLoadedRef?: any;
+    customVideoStyles?: any;
+    loadStartAtRef?: any;
+    firstFrameAtRef?: any;
+    zoomScale?: number;
 }
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = ({
-    useVLC,
-    forceVlcRemount,
     processedStreamUrl,
     volume,
     playbackSpeed,
-    zoomScale,
     resizeMode,
     paused,
     currentStreamUrl,
-    headers,
-    videoType,
-    vlcSelectedAudioTrack,
-    vlcSelectedSubtitleTrack,
-    vlcRestoreTime,
-    vlcKey,
-    selectedAudioTrack,
-    selectedTextTrack,
-    useCustomSubtitles,
     toggleControls,
     onLoad,
     onProgress,
@@ -101,23 +68,57 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     onEnd,
     onError,
     onBuffer,
-    onTracksUpdate,
-    vlcPlayerRef,
-    videoRef,
+    mpvPlayerRef,
     pinchRef,
     onPinchGestureEvent,
     onPinchHandlerStateChange,
-    vlcLoadedRef,
     screenDimensions,
-    customVideoStyles,
-    loadStartAtRef,
-    firstFrameAtRef
 }) => {
+    // Use the actual stream URL
+    const streamUrl = currentStreamUrl || processedStreamUrl;
 
-    const isHlsStream = (url: string) => {
-        return url.includes('.m3u8') || url.includes('m3u8') ||
-            url.includes('hls') || url.includes('playlist') ||
-            (videoType && videoType.toLowerCase() === 'm3u8');
+    console.log('[VideoSurface] Rendering with:', {
+        streamUrl: streamUrl?.substring(0, 50) + '...',
+        paused,
+        volume,
+        playbackSpeed,
+        screenDimensions,
+    });
+
+    const handleLoad = (data: { duration: number; width: number; height: number }) => {
+        console.log('[VideoSurface] onLoad received:', data);
+        onLoad({
+            duration: data.duration,
+            naturalSize: {
+                width: data.width,
+                height: data.height,
+            },
+        });
+    };
+
+    const handleProgress = (data: { currentTime: number; duration: number }) => {
+        // Log every 5 seconds to avoid spam
+        if (Math.floor(data.currentTime) % 5 === 0) {
+            console.log('[VideoSurface] onProgress:', data);
+        }
+        onProgress({
+            currentTime: data.currentTime,
+            playableDuration: data.currentTime,
+        });
+    };
+
+    const handleError = (error: { error: string }) => {
+        console.log('[VideoSurface] onError received:', error);
+        onError({
+            error: {
+                errorString: error.error,
+            },
+        });
+    };
+
+    const handleEnd = () => {
+        console.log('[VideoSurface] onEnd received');
+        onEnd();
     };
 
     return (
@@ -125,96 +126,53 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
             width: screenDimensions.width,
             height: screenDimensions.height,
         }]}>
+            {/* MPV Player - rendered at the bottom of the z-order */}
+            <MpvPlayer
+                ref={mpvPlayerRef}
+                source={streamUrl}
+                paused={paused}
+                volume={volume}
+                rate={playbackSpeed}
+                style={localStyles.player}
+                onLoad={handleLoad}
+                onProgress={handleProgress}
+                onEnd={handleEnd}
+                onError={handleError}
+            />
+
+            {/* Gesture overlay - transparent, on top of the player */}
             <PinchGestureHandler
                 ref={pinchRef}
                 onGestureEvent={onPinchGestureEvent}
                 onHandlerStateChange={onPinchHandlerStateChange}
             >
-                <View style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: screenDimensions.width,
-                    height: screenDimensions.height,
-                }}>
-                    <TouchableOpacity
-                        style={{ flex: 1 }}
-                        activeOpacity={1}
-                        onPress={toggleControls}
-                    >
-                        {useVLC && !forceVlcRemount ? (
-                            <VlcVideoPlayer
-                                ref={vlcPlayerRef}
-                                source={processedStreamUrl}
-                                volume={volume}
-                                playbackSpeed={playbackSpeed}
-                                zoomScale={zoomScale}
-                                resizeMode={getVlcResizeMode(resizeMode)}
-                                onLoad={(data) => {
-                                    vlcLoadedRef.current = true;
-                                    onLoad(data);
-                                    if (!paused && vlcPlayerRef.current) {
-                                        setTimeout(() => {
-                                            if (vlcPlayerRef.current) {
-                                                vlcPlayerRef.current.play();
-                                            }
-                                        }, 100);
-                                    }
-                                }}
-                                onProgress={onProgress}
-                                onSeek={onSeek}
-                                onEnd={onEnd}
-                                onError={onError}
-                                onTracksUpdate={onTracksUpdate}
-                                selectedAudioTrack={vlcSelectedAudioTrack}
-                                selectedSubtitleTrack={vlcSelectedSubtitleTrack}
-                                restoreTime={vlcRestoreTime}
-                                forceRemount={forceVlcRemount}
-                                key={vlcKey}
-                            />
-                        ) : (
-                            <Video
-                                ref={videoRef}
-                                style={[styles.video, customVideoStyles]}
-                                source={{
-                                    uri: currentStreamUrl,
-                                    headers: headers,
-                                    type: isHlsStream(currentStreamUrl) ? 'm3u8' : videoType
-                                }}
-                                paused={paused}
-                                onLoadStart={() => {
-                                    loadStartAtRef.current = Date.now();
-                                }}
-                                onProgress={onProgress}
-                                onLoad={onLoad}
-                                onReadyForDisplay={() => {
-                                    firstFrameAtRef.current = Date.now();
-                                }}
-                                onSeek={onSeek}
-                                onEnd={onEnd}
-                                onError={onError}
-                                onBuffer={onBuffer}
-                                resizeMode={getVideoResizeMode(resizeMode)}
-                                selectedAudioTrack={selectedAudioTrack || undefined}
-                                selectedTextTrack={useCustomSubtitles ? { type: 'disabled' } as any : (selectedTextTrack >= 0 ? { type: 'index', value: selectedTextTrack } as any : undefined)}
-                                rate={playbackSpeed}
-                                volume={volume}
-                                muted={false}
-                                repeat={false}
-                                playInBackground={false}
-                                playWhenInactive={false}
-                                ignoreSilentSwitch="ignore"
-                                mixWithOthers="inherit"
-                                progressUpdateInterval={500}
-                                disableFocus={true}
-                                allowsExternalPlayback={false}
-                                preventsDisplaySleepDuringVideoPlayback={true}
-                                viewType={Platform.OS === 'android' ? ViewType.SURFACE : undefined}
-                            />
-                        )}
-                    </TouchableOpacity>
+                <View style={localStyles.gestureOverlay} pointerEvents="box-only">
+                    <TouchableWithoutFeedback onPress={toggleControls}>
+                        <View style={localStyles.touchArea} />
+                    </TouchableWithoutFeedback>
                 </View>
             </PinchGestureHandler>
         </View>
     );
 };
+
+const localStyles = StyleSheet.create({
+    player: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    gestureOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+    },
+    touchArea: {
+        flex: 1,
+        backgroundColor: 'transparent',
+    },
+});

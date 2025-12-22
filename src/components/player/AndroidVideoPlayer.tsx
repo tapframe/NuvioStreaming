@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import { View, StyleSheet, Platform, Animated } from 'react-native';
+import { toast } from '@backpackapp-io/react-native-toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -349,8 +350,35 @@ const AndroidVideoPlayer: React.FC = () => {
             if (modals.showEpisodeStreamsModal) return;
             playerState.setPaused(true);
           }}
-          onError={(err) => {
+          onError={(err: any) => {
             logger.error('Video Error', err);
+
+            // Check for decoding errors to switch to VLC
+            const errorString = err?.errorString || err?.error?.errorString;
+            const errorCode = err?.errorCode || err?.error?.errorCode;
+            const causeMessage = err?.error?.cause?.message;
+
+            const isDecodingError =
+              (errorString && errorString.includes('ERROR_CODE_DECODING_FAILED')) ||
+              errorCode === '24003' ||
+              (causeMessage && causeMessage.includes('MediaCodecVideoRenderer error'));
+
+            if (!useVLC && isDecodingError) {
+              const toastId = toast.loading('Decoding error. Switching to VLC Player...');
+              setTimeout(() => toast.dismiss(toastId), 3000);
+
+              // We can just show a normal toast or use the existing modal system if we want, 
+              // but checking the file imports, I don't see Toast imported.
+              // Let's implement the navigation replace.
+
+              // Using a simple navigation replace to force VLC
+              (navigation as any).replace('PlayerAndroid', {
+                ...route.params,
+                forceVlc: true
+              });
+              return;
+            }
+
             modals.setErrorDetails(JSON.stringify(err));
             modals.setShowErrorModal(true);
           }}

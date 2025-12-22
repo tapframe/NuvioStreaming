@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { StatusBar, Platform, Dimensions, AppState } from 'react-native';
 import RNImmersiveMode from 'react-native-immersive-mode';
+import * as NavigationBar from 'expo-navigation-bar';
 import * as Brightness from 'expo-brightness';
 import { logger } from '../../../../utils/logger';
 import { useFocusEffect } from '@react-navigation/native';
@@ -18,19 +19,34 @@ export const usePlayerSetup = (
     const originalSystemBrightnessModeRef = useRef<number | null>(null);
     const isAppBackgrounded = useRef(false);
 
-    const enableImmersiveMode = () => {
+    const enableImmersiveMode = async () => {
         if (Platform.OS === 'android') {
+            // Standard immersive mode
             RNImmersiveMode.setBarTranslucent(true);
             RNImmersiveMode.fullLayout(true);
             StatusBar.setHidden(true, 'none');
+
+            // Explicitly hide bottom navigation bar using Expo
+            try {
+                await NavigationBar.setVisibilityAsync("hidden");
+                await NavigationBar.setBehaviorAsync("overlay-swipe");
+            } catch (e) {
+                // Ignore errors on non-supported devices
+            }
         }
     };
 
-    const disableImmersiveMode = () => {
+    const disableImmersiveMode = async () => {
         if (Platform.OS === 'android') {
             RNImmersiveMode.setBarTranslucent(false);
             RNImmersiveMode.fullLayout(false);
             StatusBar.setHidden(false, 'fade');
+
+            try {
+                await NavigationBar.setVisibilityAsync("visible");
+            } catch (e) {
+                // Ignore
+            }
         }
     };
 
