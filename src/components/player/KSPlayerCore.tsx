@@ -14,6 +14,7 @@ import SubtitleModals from './modals/SubtitleModals';
 import SourcesModal from './modals/SourcesModal';
 import EpisodesModal from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
+import { ErrorModal } from './modals/ErrorModal';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './components';
 
@@ -325,7 +326,25 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const handleError = (error: any) => {
-    modals.setErrorDetails(typeof error === 'string' ? error : error?.message || 'Unknown Error');
+    let msg = 'Unknown Error';
+    try {
+      if (typeof error === 'string') {
+        msg = error;
+      } else if (error?.error?.localizedDescription) {
+        msg = error.error.localizedDescription;
+      } else if (error?.error?.message) {
+        msg = error.error.message;
+      } else if (error?.message) {
+        msg = error.message;
+      } else if (error?.error) {
+        msg = typeof error.error === 'string' ? error.error : JSON.stringify(error.error);
+      } else {
+        msg = JSON.stringify(error);
+      }
+    } catch (e) {
+      msg = 'Error parsing error details';
+    }
+    modals.setErrorDetails(msg);
     modals.setShowErrorModal(true);
   };
 
@@ -603,6 +622,13 @@ const KSPlayerCore: React.FC = () => {
         ksAudioTracks={tracks.ksAudioTracks}
         selectedAudioTrack={tracks.selectedAudioTrack}
         selectAudioTrack={tracks.selectAudioTrack}
+      />
+
+      <ErrorModal
+        showErrorModal={modals.showErrorModal}
+        setShowErrorModal={modals.setShowErrorModal}
+        errorDetails={modals.errorDetails}
+        onDismiss={handleClose}
       />
 
       <SpeedModal

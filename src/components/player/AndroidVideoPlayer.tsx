@@ -35,6 +35,7 @@ import SpeedModal from './modals/SpeedModal';
 import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
+import { ErrorModal } from './modals/ErrorModal';
 
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
@@ -541,6 +542,15 @@ const AndroidVideoPlayer: React.FC = () => {
           modals.setShowEpisodesModal(false);
           modals.setShowEpisodeStreamsModal(true);
         }}
+      />
+
+
+
+      <ErrorModal
+        showErrorModal={modals.showErrorModal}
+        setShowErrorModal={modals.setShowErrorModal}
+        errorDetails={modals.errorDetails}
+        onDismiss={handleClose}
       />
 
       <EpisodeStreamsModal
