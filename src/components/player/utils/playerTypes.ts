@@ -71,8 +71,8 @@ export interface VlcMediaEvent {
   duration: number;
   bufferTime?: number;
   isBuffering?: boolean;
-  audioTracks?: Array<{id: number, name: string, language?: string}>;
-  textTracks?: Array<{id: number, name: string, language?: string}>;
+  audioTracks?: Array<{ id: number, name: string, language?: string }>;
+  textTracks?: Array<{ id: number, name: string, language?: string }>;
   selectedAudioTrack?: number;
   selectedTextTrack?: number;
 }

@@ -140,8 +140,8 @@ export const styles = StyleSheet.create({
   topButton: {
     padding: 8,
   },
-  
-  
+
+
   /* CloudStream Style - Center Controls */
   controls: {
     position: 'absolute',
@@ -156,7 +156,7 @@ export const styles = StyleSheet.create({
     gap: controlsGap,
     zIndex: 1000,
   },
-  
+
   /* CloudStream Style - Seek Buttons */
   seekButtonContainer: {
     alignItems: 'center',
@@ -187,7 +187,7 @@ export const styles = StyleSheet.create({
     textAlign: 'center',
     marginLeft: -7,
   },
-  
+
   /* CloudStream Style - Play Button */
   playButton: {
     alignItems: 'center',
@@ -202,7 +202,7 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     opacity: 1,
   },
-  
+
   /* CloudStream Style - Arc Animations */
   arcContainer: {
     position: 'absolute',
@@ -233,9 +233,60 @@ export const styles = StyleSheet.create({
     position: 'absolute',
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
-
-
-
+  speedActivatedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1500,
+    pointerEvents: 'none',
+  },
+  speedActivatedContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  speedActivatedText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  gestureIndicatorContainer: {
+    position: 'absolute',
+    top: '40%',
+    left: '50%',
+    transform: [{ translateX: -75 }, { translateY: -40 }],
+    width: 150,
+    height: 80,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    zIndex: 2000,
+  },
+  iconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  gestureText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '600',
+  },
 
   bottomControls: {
     gap: 12,
@@ -1162,4 +1213,4 @@ export const styles = StyleSheet.create({
     fontSize: skipTextFont,
     marginTop: 2,
   },
-}); 
+});
