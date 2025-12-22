@@ -1296,6 +1296,11 @@ class LocalScraperService {
         stream.headers = result.headers;
       }
       
+      // Pass subtitles from scraper result if available
+      if (result.subtitles && Array.isArray(result.subtitles)) {
+        stream.subtitles = result.subtitles;
+      }
+      
       return stream;
     }).filter(stream => stream.url); // Filter out streams without URLs
   }
