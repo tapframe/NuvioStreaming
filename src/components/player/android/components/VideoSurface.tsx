@@ -11,7 +11,19 @@ const getVideoResizeMode = (resizeMode: ResizeModeType) => {
     switch (resizeMode) {
         case 'contain': return 'contain';
         case 'cover': return 'cover';
+        case 'stretch': return 'contain';
         case 'none': return 'contain';
+        default: return 'contain';
+    }
+};
+
+// VLC only supports 'contain' | 'cover' | 'none'
+const getVlcResizeMode = (resizeMode: ResizeModeType): 'contain' | 'cover' | 'none' => {
+    switch (resizeMode) {
+        case 'contain': return 'contain';
+        case 'cover': return 'cover';
+        case 'stretch': return 'cover'; // stretch is not supported, use cover
+        case 'none': return 'none';
         default: return 'contain';
     }
 };
@@ -137,7 +149,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                                 volume={volume}
                                 playbackSpeed={playbackSpeed}
                                 zoomScale={zoomScale}
-                                resizeMode={resizeMode}
+                                resizeMode={getVlcResizeMode(resizeMode)}
                                 onLoad={(data) => {
                                     vlcLoadedRef.current = true;
                                     onLoad(data);

@@ -110,3 +110,5 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
     </View>
   );
 };
+
+export default AudioTrackModal;

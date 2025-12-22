@@ -4,26 +4,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
-// Hooks
-import { usePlayerState } from './android/hooks/usePlayerState';
+// Shared Hooks (cross-platform)
+import {
+  usePlayerState,
+  usePlayerModals,
+  useSpeedControl,
+  useOpeningAnimation
+} from './hooks';
+
+// Android-specific hooks (VLC integration, dual player support)
 import { usePlayerSetup } from './android/hooks/usePlayerSetup';
 import { useVlcPlayer } from './android/hooks/useVlcPlayer';
 import { usePlayerTracks } from './android/hooks/usePlayerTracks';
 import { useWatchProgress } from './android/hooks/useWatchProgress';
 import { usePlayerControls } from './android/hooks/usePlayerControls';
-import { useSpeedControl } from './android/hooks/useSpeedControl';
 import { useNextEpisode } from './android/hooks/useNextEpisode';
-import { useOpeningAnimation } from './android/hooks/useOpeningAnimation';
-import { usePlayerModals } from './android/hooks/usePlayerModals';
+
+// App-level Hooks
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useMetadata } from '../../hooks/useMetadata';
 import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
 
-// Components
-import { VideoSurface } from './android/components/VideoSurface';
-import { GestureControls } from './android/components/GestureControls';
-import { PauseOverlay } from './android/components/PauseOverlay';
-import { SpeedActivatedOverlay } from './android/components/SpeedActivatedOverlay';
+// Shared Components
+import { GestureControls, PauseOverlay, SpeedActivatedOverlay } from './components';
 import LoadingOverlay from './modals/LoadingOverlay';
 import PlayerControls from './controls/PlayerControls';
 import { AudioTrackModal } from './modals/AudioTrackModal';
@@ -33,12 +36,14 @@ import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 
+// Android-specific components
+import { VideoSurface } from './android/components/VideoSurface';
+
 // Utils
 import { logger } from '../../utils/logger';
 import { styles } from './utils/playerStyles';
 import { formatTime, isHlsStream, processUrlForVLC, getHlsHeaders, defaultAndroidHeaders } from './utils/playerUtils';
 import { storageService } from '../../services/storageService';
-// SelectedTrackType removed - using string literals instead
 
 const DEBUG_MODE = false;
 
@@ -543,6 +548,7 @@ const AndroidVideoPlayer: React.FC = () => {
         onClose={() => modals.setShowEpisodeStreamsModal(false)}
         episode={modals.selectedEpisodeForStreams}
         onSelectStream={handleEpisodeStreamSelect}
+        metadata={{ id: id, name: title }}
       />
 
     </View>
