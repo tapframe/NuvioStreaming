@@ -487,6 +487,7 @@ const AndroidVideoPlayer: React.FC = () => {
       <View style={{ flex: 1, backgroundColor: 'black' }}>
         <VideoSurface
           processedStreamUrl={currentStreamUrl}
+          headers={headers}
           volume={volume}
           playbackSpeed={speedControl.playbackSpeed}
           resizeMode={playerState.resizeMode}

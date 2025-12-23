@@ -163,4 +163,21 @@ class MpvPlayerViewManager(
     fun setResizeMode(view: MPVView, resizeMode: String?) {
         view.setResizeMode(resizeMode ?: "contain")
     }
+
+    @ReactProp(name = "headers")
+    fun setHeaders(view: MPVView, headers: com.facebook.react.bridge.ReadableMap?) {
+        if (headers != null) {
+            val headerMap = mutableMapOf<String, String>()
+            val iterator = headers.keySetIterator()
+            while (iterator.hasNextKey()) {
+                val key = iterator.nextKey()
+                headers.getString(key)?.let { value ->
+                    headerMap[key] = value
+                }
+            }
+            view.setHeaders(headerMap)
+        } else {
+            view.setHeaders(null)
+        }
+    }
 }

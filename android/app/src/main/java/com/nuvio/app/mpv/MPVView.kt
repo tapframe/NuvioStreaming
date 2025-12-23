@@ -22,6 +22,7 @@ class MPVView @JvmOverloads constructor(
     private var pendingDataSource: String? = null
     private var isPaused: Boolean = true
     private var surface: Surface? = null
+    private var httpHeaders: Map<String, String>? = null
 
     // Event listener for React Native
     var onLoadCallback: ((duration: Double, width: Int, height: Int) -> Unit)? = null
@@ -51,6 +52,7 @@ class MPVView @JvmOverloads constructor(
             
             // If a data source was set before surface was ready, load it now
             pendingDataSource?.let { url ->
+                applyHttpHeaders()
                 loadFile(url)
                 pendingDataSource = null
             }
@@ -93,7 +95,7 @@ class MPVView @JvmOverloads constructor(
         
         // Hardware decoding - use mediacodec-copy to allow subtitle overlay
         // 'mediacodec-copy' copies frames to CPU memory which enables subtitle blending
-        MPVLib.setOptionString("hwdec", "mediacodec-copy")
+        MPVLib.setOptionString("hwdec", "auto")
         MPVLib.setOptionString("hwdec-codecs", "all")
         
         // Audio output
@@ -104,6 +106,9 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("demuxer-max-back-bytes", "33554432") // 32MB
         MPVLib.setOptionString("cache", "yes")
         MPVLib.setOptionString("cache-secs", "30")
+        
+        // Network options
+        MPVLib.setOptionString("network-timeout", "60") // 60 second timeout
         
         // Subtitle configuration - CRITICAL for Android
         MPVLib.setOptionString("sub-auto", "fuzzy") // Auto-load subtitles
@@ -155,7 +160,7 @@ class MPVView @JvmOverloads constructor(
         val MPV_FORMAT_DOUBLE = 5
         
         MPVLib.observeProperty("time-pos", MPV_FORMAT_DOUBLE)
-        MPVLib.observeProperty("duration", MPV_FORMAT_DOUBLE)
+        MPVLib.observeProperty("duration/full", MPV_FORMAT_DOUBLE) // Use /full for complete HLS duration
         MPVLib.observeProperty("pause", MPV_FORMAT_FLAG)
         MPVLib.observeProperty("paused-for-cache", MPV_FORMAT_FLAG)
         MPVLib.observeProperty("eof-reached", MPV_FORMAT_FLAG)
@@ -179,9 +184,28 @@ class MPVView @JvmOverloads constructor(
 
     fun setDataSource(url: String) {
         if (isMpvInitialized) {
+            // Apply headers before loading the file
+            applyHttpHeaders()
             loadFile(url)
         } else {
             pendingDataSource = url
+        }
+    }
+
+    fun setHeaders(headers: Map<String, String>?) {
+        httpHeaders = headers
+        Log.d(TAG, "Headers set: $headers")
+    }
+
+    private fun applyHttpHeaders() {
+        httpHeaders?.let { headers ->
+            if (headers.isNotEmpty()) {
+                // Format headers for MPV: comma-separated "Key: Value" pairs
+                val headerList = headers.map { (key, value) -> "$key: $value" }
+                val headerString = headerList.joinToString(",")
+                Log.d(TAG, "Applying HTTP headers: $headerString")
+                MPVLib.setOptionString("http-header-fields", headerString)
+            }
         }
     }
 
@@ -341,10 +365,10 @@ class MPVView @JvmOverloads constructor(
         Log.d(TAG, "Property $property = $value (Double)")
         when (property) {
             "time-pos" -> {
-                val duration = MPVLib.getPropertyDouble("duration") ?: 0.0
+                val duration = MPVLib.getPropertyDouble("duration/full") ?: MPVLib.getPropertyDouble("duration") ?: 0.0
                 onProgressCallback?.invoke(value, duration)
             }
-            "duration" -> {
+            "duration/full", "duration" -> {
                 val width = MPVLib.getPropertyInt("width") ?: 0
                 val height = MPVLib.getPropertyInt("height") ?: 0
                 onLoadCallback?.invoke(value, width, height)
@@ -384,7 +408,7 @@ class MPVView @JvmOverloads constructor(
                 Log.d(TAG, "MPV_EVENT_END_FILE")
                 
                 // Heuristic: If duration is effectively 0 at end of file, it's a load error
-                val duration = MPVLib.getPropertyDouble("duration") ?: 0.0
+                val duration = MPVLib.getPropertyDouble("duration/full") ?: MPVLib.getPropertyDouble("duration") ?: 0.0
                 val timePos = MPVLib.getPropertyDouble("time-pos") ?: 0.0
                 val eofReached = MPVLib.getPropertyBoolean("eof-reached") ?: false
                 

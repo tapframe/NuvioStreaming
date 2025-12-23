@@ -7,6 +7,7 @@ import { ResizeModeType } from '../../utils/playerTypes';
 
 interface VideoSurfaceProps {
     processedStreamUrl: string;
+    headers?: { [key: string]: string };
     volume: number;
     playbackSpeed: number;
     resizeMode: ResizeModeType;
@@ -35,6 +36,7 @@ interface VideoSurfaceProps {
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     processedStreamUrl,
+    headers,
     volume,
     playbackSpeed,
     resizeMode,
@@ -100,6 +102,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
             <MpvPlayer
                 ref={mpvPlayerRef}
                 source={streamUrl}
+                headers={headers}
                 paused={paused}
                 volume={volume}
                 rate={playbackSpeed}

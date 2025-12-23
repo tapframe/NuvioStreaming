@@ -14,6 +14,7 @@ export interface MpvPlayerRef {
 
 export interface MpvPlayerProps {
     source: string;
+    headers?: { [key: string]: string };
     paused?: boolean;
     volume?: number;
     rate?: number;
@@ -92,6 +93,7 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
             ref={nativeRef}
             style={[styles.container, props.style]}
             source={props.source}
+            headers={props.headers}
             paused={props.paused ?? true}
             volume={props.volume ?? 1.0}
             rate={props.rate ?? 1.0}
