@@ -51,8 +51,8 @@ class MPVView @JvmOverloads constructor(
             isMpvInitialized = true
             
             // If a data source was set before surface was ready, load it now
+            // Headers are already applied in initOptions() before init()
             pendingDataSource?.let { url ->
-                applyHttpHeaders()
                 loadFile(url)
                 pendingDataSource = null
             }
@@ -93,9 +93,11 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
         
-        // Hardware decoding - use mediacodec-copy to allow subtitle overlay
-        // 'mediacodec-copy' copies frames to CPU memory which enables subtitle blending
-        MPVLib.setOptionString("hwdec", "auto")
+        // Hardware decoding configuration
+        // NOTE: On emulator, mediacodec can cause freezes due to slow GPU translation
+        // Using 'no' for software decoding which is more reliable on emulator
+        // For real devices, use 'mediacodec-copy' for hardware acceleration
+        MPVLib.setOptionString("hwdec", "no")
         MPVLib.setOptionString("hwdec-codecs", "all")
         
         // Audio output
@@ -109,6 +111,20 @@ class MPVView @JvmOverloads constructor(
         
         // Network options
         MPVLib.setOptionString("network-timeout", "60") // 60 second timeout
+        
+        // CRITICAL: Disable youtube-dl/yt-dlp hook
+        // The ytdl_hook incorrectly tries to parse HLS/direct URLs through youtube-dl
+        // which fails on Android since yt-dlp is not available, causing playback failure
+        MPVLib.setOptionString("ytdl", "no")
+        
+        // CRITICAL: HTTP headers MUST be set as options before init()
+        // Apply headers if they were set before surface initialization
+        applyHttpHeadersAsOptions()
+        
+        // FFmpeg HTTP protocol options for better compatibility
+        MPVLib.setOptionString("tls-verify", "no") // Disable TLS cert verification
+        MPVLib.setOptionString("http-reconnect", "yes") // Auto-reconnect on network issues  
+        MPVLib.setOptionString("stream-reconnect", "yes") // Reconnect if stream drops
         
         // Subtitle configuration - CRITICAL for Android
         MPVLib.setOptionString("sub-auto", "fuzzy") // Auto-load subtitles
@@ -184,8 +200,7 @@ class MPVView @JvmOverloads constructor(
 
     fun setDataSource(url: String) {
         if (isMpvInitialized) {
-            // Apply headers before loading the file
-            applyHttpHeaders()
+            // Headers were already set during initialization in initOptions()
             loadFile(url)
         } else {
             pendingDataSource = url
@@ -197,13 +212,22 @@ class MPVView @JvmOverloads constructor(
         Log.d(TAG, "Headers set: $headers")
     }
 
-    private fun applyHttpHeaders() {
+    private fun applyHttpHeadersAsOptions() {
+        // Always set user-agent (this works reliably)
+        val userAgent = httpHeaders?.get("User-Agent") 
+            ?: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        
+        Log.d(TAG, "Setting User-Agent: $userAgent")
+        MPVLib.setOptionString("user-agent", userAgent)
+        
+        // Additionally, set other headers via http-header-fields if present
+        // This is needed for streams that require Referer, Origin, Cookie, etc.
         httpHeaders?.let { headers ->
-            if (headers.isNotEmpty()) {
-                // Format headers for MPV: comma-separated "Key: Value" pairs
-                val headerList = headers.map { (key, value) -> "$key: $value" }
-                val headerString = headerList.joinToString(",")
-                Log.d(TAG, "Applying HTTP headers: $headerString")
+            val otherHeaders = headers.filterKeys { it != "User-Agent" }
+            if (otherHeaders.isNotEmpty()) {
+                // Format as comma-separated "Key: Value" pairs
+                val headerString = otherHeaders.map { (key, value) -> "$key: $value" }.joinToString(",")
+                Log.d(TAG, "Setting additional headers: $headerString")
                 MPVLib.setOptionString("http-header-fields", headerString)
             }
         }

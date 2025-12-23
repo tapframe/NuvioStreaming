@@ -15,6 +15,7 @@ import com.facebook.react.defaults.DefaultReactNativeHost
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
+import com.nuvio.app.mpv.MpvPackage
 
 class MainApplication : Application(), ReactApplication {
 
