@@ -51,7 +51,6 @@
     "expo-glass-effect": "~0.1.4",
     "expo-haptics": "~15.0.7",
     "expo-intent-launcher": "~13.0.7",
-    "expo-libvlc-player": "^2.2.3",
     "expo-linear-gradient": "~15.0.7",
     "expo-localization": "~17.0.7",
     "expo-navigation-bar": "~5.0.10",

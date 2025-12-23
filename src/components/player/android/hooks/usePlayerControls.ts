@@ -7,8 +7,6 @@ const END_EPSILON = 0.3;
 
 export const usePlayerControls = (
     mpvPlayerRef: any,
-    vlcPlayerRef: any,
-    useVLC: boolean,
     paused: boolean,
     setPaused: (paused: boolean) => void,
     currentTime: number,
@@ -29,40 +27,31 @@ export const usePlayerControls = (
         console.log('[usePlayerControls] seekToTime called:', {
             rawSeconds,
             timeInSeconds,
-            useVLC,
             hasMpvRef: !!mpvPlayerRef?.current,
-            hasVlcRef: !!vlcPlayerRef?.current,
             duration,
             isSeeking: isSeeking.current
         });
 
-        if (useVLC) {
-            if (vlcPlayerRef.current && duration > 0) {
-                logger.log(`[usePlayerControls][VLC] Seeking to ${timeInSeconds}`);
-                vlcPlayerRef.current.seek(timeInSeconds);
-            }
+        // MPV Player
+        if (mpvPlayerRef.current && duration > 0) {
+            console.log(`[usePlayerControls][MPV] Seeking to ${timeInSeconds}`);
+
+            isSeeking.current = true;
+            mpvPlayerRef.current.seek(timeInSeconds);
+
+            // Reset seeking flag after a delay
+            setTimeout(() => {
+                if (isMounted.current) {
+                    isSeeking.current = false;
+                }
+            }, 500);
         } else {
-            // MPV Player
-            if (mpvPlayerRef.current && duration > 0) {
-                console.log(`[usePlayerControls][MPV] Seeking to ${timeInSeconds}`);
-
-                isSeeking.current = true;
-                mpvPlayerRef.current.seek(timeInSeconds);
-
-                // Reset seeking flag after a delay
-                setTimeout(() => {
-                    if (isMounted.current) {
-                        isSeeking.current = false;
-                    }
-                }, 500);
-            } else {
-                console.log('[usePlayerControls][MPV] Cannot seek - ref or duration invalid:', {
-                    hasRef: !!mpvPlayerRef?.current,
-                    duration
-                });
-            }
+            console.log('[usePlayerControls][MPV] Cannot seek - ref or duration invalid:', {
+                hasRef: !!mpvPlayerRef?.current,
+                duration
+            });
         }
-    }, [useVLC, duration, paused, setPaused, mpvPlayerRef, vlcPlayerRef, isSeeking, isMounted]);
+    }, [duration, paused, setPaused, mpvPlayerRef, isSeeking, isMounted]);
 
     const skip = useCallback((seconds: number) => {
         console.log('[usePlayerControls] skip called:', { seconds, currentTime, newTime: currentTime + seconds });

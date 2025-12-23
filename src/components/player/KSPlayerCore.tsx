@@ -302,6 +302,17 @@ const KSPlayerCore: React.FC = () => {
     }
   }, [imdbId]);
 
+  // Sync custom subtitle text with current playback time
+  useEffect(() => {
+    if (!customSubs.useCustomSubtitles || customSubs.customSubtitles.length === 0) return;
+
+    const adjustedTime = currentTime + (customSubs.subtitleOffsetSec || 0);
+    const cueNow = customSubs.customSubtitles.find(
+      cue => adjustedTime >= cue.start && adjustedTime <= cue.end
+    );
+    customSubs.setCurrentSubtitle(cueNow ? cueNow.text : '');
+  }, [currentTime, customSubs.useCustomSubtitles, customSubs.customSubtitles, customSubs.subtitleOffsetSec]);
+
   // Handlers
   const onLoad = (data: any) => {
     setDuration(data.duration);
@@ -416,7 +427,7 @@ const KSPlayerCore: React.FC = () => {
         headers: stream.headers || undefined,
         id,
         type: 'series',
-        episodeId: ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`,
+        episodeId: ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number} `,
         imdbId: imdbId ?? undefined,
         backdrop: backdrop || undefined,
       });

@@ -7,14 +7,8 @@ interface Track {
     language?: string;
 }
 
-export const usePlayerTracks = (
-    useVLC: boolean,
-    vlcAudioTracks: Track[],
-    vlcSubtitleTracks: Track[],
-    vlcSelectedAudioTrack: number | undefined,
-    vlcSelectedSubtitleTrack: number | undefined
-) => {
-    // React Native Video Tracks
+export const usePlayerTracks = () => {
+    // Tracks from native player (MPV/RN-Video)
     const [rnVideoAudioTracks, setRnVideoAudioTracks] = useState<Track[]>([]);
     const [rnVideoTextTracks, setRnVideoTextTracks] = useState<Track[]>([]);
 
@@ -22,31 +16,19 @@ export const usePlayerTracks = (
     const [selectedAudioTrack, setSelectedAudioTrack] = useState<SelectedTrack | null>({ type: 'system' });
     const [selectedTextTrack, setSelectedTextTrack] = useState<number>(-1);
 
-    // Unified Tracks
-    const ksAudioTracks = useMemo(() =>
-        useVLC ? vlcAudioTracks : rnVideoAudioTracks,
-        [useVLC, vlcAudioTracks, rnVideoAudioTracks]
-    );
-
-    const ksTextTracks = useMemo(() =>
-        useVLC ? vlcSubtitleTracks : rnVideoTextTracks,
-        [useVLC, vlcSubtitleTracks, rnVideoTextTracks]
-    );
+    // Unified Tracks (now just returns native tracks)
+    const ksAudioTracks = useMemo(() => rnVideoAudioTracks, [rnVideoAudioTracks]);
+    const ksTextTracks = useMemo(() => rnVideoTextTracks, [rnVideoTextTracks]);
 
     // Unified Selection
     const computedSelectedAudioTrack = useMemo(() =>
-        useVLC
-            ? (vlcSelectedAudioTrack ?? null)
-            : (selectedAudioTrack?.type === 'index' && selectedAudioTrack?.value !== undefined
-                ? Number(selectedAudioTrack?.value)
-                : null),
-        [useVLC, vlcSelectedAudioTrack, selectedAudioTrack]
+        selectedAudioTrack?.type === 'index' && selectedAudioTrack?.value !== undefined
+            ? Number(selectedAudioTrack?.value)
+            : null,
+        [selectedAudioTrack]
     );
 
-    const computedSelectedTextTrack = useMemo(() =>
-        useVLC ? (vlcSelectedSubtitleTrack ?? -1) : selectedTextTrack,
-        [useVLC, vlcSelectedSubtitleTrack, selectedTextTrack]
-    );
+    const computedSelectedTextTrack = useMemo(() => selectedTextTrack, [selectedTextTrack]);
 
     return {
         rnVideoAudioTracks, setRnVideoAudioTracks,

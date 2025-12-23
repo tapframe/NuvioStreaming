@@ -30,27 +30,6 @@ interface VideoSurfaceProps {
     onPinchGestureEvent: any;
     onPinchHandlerStateChange: any;
     screenDimensions: { width: number, height: number };
-
-    // Legacy props (kept for compatibility but unused with MPV)
-    useVLC?: boolean;
-    forceVlcRemount?: boolean;
-    headers?: any;
-    videoType?: any;
-    vlcSelectedAudioTrack?: number;
-    vlcSelectedSubtitleTrack?: number;
-    vlcRestoreTime?: number;
-    vlcKey?: string;
-    selectedAudioTrack?: any;
-    selectedTextTrack?: any;
-    useCustomSubtitles?: boolean;
-    onTracksUpdate?: (tracks: any) => void;
-    vlcPlayerRef?: any;
-    videoRef?: any;
-    vlcLoadedRef?: any;
-    customVideoStyles?: any;
-    loadStartAtRef?: any;
-    firstFrameAtRef?: any;
-    zoomScale?: number;
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
 }
 

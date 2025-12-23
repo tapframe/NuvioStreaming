@@ -821,7 +821,7 @@ export const StreamsScreen = () => {
     fetchIMDbRatings();
   }, [type, id, currentEpisode?.season_number, currentEpisode?.episode_number]);
 
-  const navigateToPlayer = useCallback(async (stream: Stream, options?: { forceVlc?: boolean; headers?: Record<string, string> }) => {
+  const navigateToPlayer = useCallback(async (stream: Stream, options?: { headers?: Record<string, string> }) => {
     // Filter headers for Vidrock - only send essential headers
     // Filter headers for Vidrock - only send essential headers
     // Filter headers for Vidrock - only send essential headers
@@ -858,9 +858,6 @@ export const StreamsScreen = () => {
     // Determine the stream name using the same logic as StreamCard
     const streamName = stream.name || stream.title || 'Unnamed Stream';
     const streamProvider = stream.addonId || stream.addonName || stream.name;
-
-    // Do NOT pre-force VLC. Let ExoPlayer try first; fallback occurs on decoder error in the player.
-    let forceVlc = !!options?.forceVlc;
 
     // Save stream to cache for future use
     try {
@@ -922,8 +919,6 @@ export const StreamsScreen = () => {
       streamName: streamName,
       // Use filtered headers for Vidrock compatibility
       headers: finalHeaders,
-      // Android will use this to choose VLC path; iOS ignores
-      forceVlc,
       id,
       type,
       episodeId: (type === 'series' || type === 'other') && selectedEpisode ? selectedEpisode : undefined,

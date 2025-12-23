@@ -13,9 +13,8 @@ import {
   useOpeningAnimation
 } from './hooks';
 
-// Android-specific hooks (VLC integration, dual player support)
+// Android-specific hooks
 import { usePlayerSetup } from './android/hooks/usePlayerSetup';
-import { useVlcPlayer } from './android/hooks/useVlcPlayer';
 import { usePlayerTracks } from './android/hooks/usePlayerTracks';
 import { useWatchProgress } from './android/hooks/useWatchProgress';
 import { usePlayerControls } from './android/hooks/usePlayerControls';
@@ -46,7 +45,7 @@ import { MpvPlayerRef } from './android/MpvPlayer';
 // Utils
 import { logger } from '../../utils/logger';
 import { styles } from './utils/playerStyles';
-import { formatTime, isHlsStream, processUrlForVLC, getHlsHeaders, defaultAndroidHeaders, parseSRT } from './utils/playerUtils';
+import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSRT } from './utils/playerUtils';
 import { storageService } from '../../services/storageService';
 import stremioService from '../../services/stremioService';
 import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
@@ -71,28 +70,12 @@ const AndroidVideoPlayer: React.FC = () => {
   const modals = usePlayerModals();
   const speedControl = useSpeedControl();
 
-  const forceVlc = useMemo(() => {
-    const rp: any = route.params || {};
-    const v = rp.forceVlc !== undefined ? rp.forceVlc : rp.forceVLC;
-    return typeof v === 'string' ? v.toLowerCase() === 'true' : Boolean(v);
-  }, [route.params]);
-
-  const useVLC = (Platform.OS === 'android' && forceVlc);
-
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
-  const vlcHook = useVlcPlayer(useVLC, playerState.paused, playerState.currentTime);
-  const tracksHook = usePlayerTracks(
-    useVLC,
-    vlcHook.vlcAudioTracks,
-    vlcHook.vlcSubtitleTracks,
-    vlcHook.vlcSelectedAudioTrack,
-    vlcHook.vlcSelectedSubtitleTrack
-  );
+  const tracksHook = usePlayerTracks();
 
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>((route.params as any).videoType);
-  const processedStreamUrl = useMemo(() => useVLC ? processUrlForVLC(currentStreamUrl) : currentStreamUrl, [currentStreamUrl, useVLC]);
 
   const [availableStreams, setAvailableStreams] = useState<any>(passedAvailableStreams || {});
   const [currentQuality, setCurrentQuality] = useState(quality);
@@ -132,9 +115,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const setupHook = usePlayerSetup(playerState.setScreenDimensions, setVolume, setBrightness, playerState.paused);
 
   const controlsHook = usePlayerControls(
-    mpvPlayerRef, // Use mpvPlayerRef for MPV player
-    vlcHook.vlcPlayerRef,
-    useVLC,
+    mpvPlayerRef,
     playerState.paused,
     playerState.setPaused,
     playerState.currentTime,
@@ -265,23 +246,21 @@ const AndroidVideoPlayer: React.FC = () => {
       playerState.setVideoAspectRatio(16 / 9);
     }
 
-    if (!useVLC) {
-      if (data.audioTracks) {
-        const formatted = data.audioTracks.map((t: any, i: number) => ({
-          id: t.index !== undefined ? t.index : i,
-          name: t.title || t.name || `Track ${i + 1}`,
-          language: t.language
-        }));
-        tracksHook.setRnVideoAudioTracks(formatted);
-      }
-      if (data.textTracks) {
-        const formatted = data.textTracks.map((t: any, i: number) => ({
-          id: t.index !== undefined ? t.index : i,
-          name: t.title || t.name || `Track ${i + 1}`,
-          language: t.language
-        }));
-        tracksHook.setRnVideoTextTracks(formatted);
-      }
+    if (data.audioTracks) {
+      const formatted = data.audioTracks.map((t: any, i: number) => ({
+        id: t.index !== undefined ? t.index : i,
+        name: t.title || t.name || `Track ${i + 1}`,
+        language: t.language
+      }));
+      tracksHook.setRnVideoAudioTracks(formatted);
+    }
+    if (data.textTracks) {
+      const formatted = data.textTracks.map((t: any, i: number) => ({
+        id: t.index !== undefined ? t.index : i,
+        name: t.title || t.name || `Track ${i + 1}`,
+        language: t.language
+      }));
+      tracksHook.setRnVideoTextTracks(formatted);
     }
 
     playerState.setIsVideoLoaded(true);
@@ -299,7 +278,7 @@ const AndroidVideoPlayer: React.FC = () => {
         }
       }, 200);
     }
-  }, [id, type, episodeId, useVLC, playerState.isMounted, watchProgress.initialPosition]);
+  }, [id, type, episodeId, playerState.isMounted, watchProgress.initialPosition]);
 
   const handleProgress = useCallback((data: any) => {
     if (playerState.isDragging.current || playerState.isSeeking.current || !playerState.isMounted.current || setupHook.isAppBackgrounded.current) return;
@@ -385,7 +364,6 @@ const AndroidVideoPlayer: React.FC = () => {
         streamProvider: newProvider,
         streamName: newStreamName,
         headers: stream.headers || undefined,
-        forceVlc: false,
         id,
         type: 'series',
         episodeId: ep.stremioId || `${id}:${ep.season_number}:${ep.episode_number}`,
@@ -508,24 +486,12 @@ const AndroidVideoPlayer: React.FC = () => {
 
       <View style={{ flex: 1, backgroundColor: 'black' }}>
         <VideoSurface
-          useVLC={!!useVLC}
-          forceVlcRemount={vlcHook.forceVlcRemount}
-          processedStreamUrl={processedStreamUrl}
+          processedStreamUrl={currentStreamUrl}
           volume={volume}
           playbackSpeed={speedControl.playbackSpeed}
-          zoomScale={1.0}
           resizeMode={playerState.resizeMode}
           paused={playerState.paused}
           currentStreamUrl={currentStreamUrl}
-          headers={headers || (isHlsStream(currentStreamUrl) ? getHlsHeaders() : defaultAndroidHeaders)}
-          videoType={currentVideoType}
-          vlcSelectedAudioTrack={vlcHook.vlcSelectedAudioTrack}
-          vlcSelectedSubtitleTrack={vlcHook.vlcSelectedSubtitleTrack}
-          vlcRestoreTime={vlcHook.vlcRestoreTime}
-          vlcKey={vlcHook.vlcKey}
-          selectedAudioTrack={tracksHook.selectedAudioTrack}
-          selectedTextTrack={tracksHook.selectedTextTrack}
-          useCustomSubtitles={false}
           toggleControls={toggleControls}
           onLoad={handleLoad}
           onProgress={handleProgress}
@@ -539,32 +505,6 @@ const AndroidVideoPlayer: React.FC = () => {
           }}
           onError={(err: any) => {
             logger.error('Video Error', err);
-
-            // Check for decoding errors to switch to VLC
-            const errorString = err?.errorString || err?.error?.errorString;
-            const errorCode = err?.errorCode || err?.error?.errorCode;
-            const causeMessage = err?.error?.cause?.message;
-
-            const isDecodingError =
-              (errorString && errorString.includes('ERROR_CODE_DECODING_FAILED')) ||
-              errorCode === '24003' ||
-              (causeMessage && causeMessage.includes('MediaCodecVideoRenderer error'));
-
-            if (!useVLC && isDecodingError) {
-              const toastId = toast.loading('Decoding error. Switching to VLC Player...');
-              setTimeout(() => toast.dismiss(toastId), 3000);
-
-              // We can just show a normal toast or use the existing modal system if we want, 
-              // but checking the file imports, I don't see Toast imported.
-              // Let's implement the navigation replace.
-
-              // Using a simple navigation replace to force VLC
-              (navigation as any).replace('PlayerAndroid', {
-                ...route.params,
-                forceVlc: true
-              });
-              return;
-            }
 
             // Determine the actual error message
             let displayError = 'An unknown error occurred';
@@ -585,7 +525,6 @@ const AndroidVideoPlayer: React.FC = () => {
             modals.setShowErrorModal(true);
           }}
           onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
-          onTracksUpdate={vlcHook.handleVlcTracksUpdate}
           onTracksChanged={(data) => {
             console.log('[AndroidVideoPlayer] onTracksChanged:', data);
             if (data?.audioTracks) {
@@ -605,17 +544,11 @@ const AndroidVideoPlayer: React.FC = () => {
               tracksHook.setRnVideoTextTracks(formatted);
             }
           }}
-          vlcPlayerRef={vlcHook.vlcPlayerRef}
           mpvPlayerRef={mpvPlayerRef}
-          videoRef={videoRef}
           pinchRef={useRef(null)}
           onPinchGestureEvent={() => { }}
           onPinchHandlerStateChange={() => { }}
-          vlcLoadedRef={vlcHook.vlcLoadedRef}
           screenDimensions={playerState.screenDimensions}
-          customVideoStyles={{}}
-          loadStartAtRef={loadStartAtRef}
-          firstFrameAtRef={firstFrameAtRef}
         />
 
         {/* Custom Subtitles for addon subtitles */}
@@ -698,7 +631,7 @@ const AndroidVideoPlayer: React.FC = () => {
           }}
           buffered={playerState.buffered}
           formatTime={formatTime}
-          playerBackend={useVLC ? 'VLC' : 'ExoPlayer'}
+          playerBackend={'MPV'}
         />
 
         <SpeedActivatedOverlay
@@ -728,14 +661,10 @@ const AndroidVideoPlayer: React.FC = () => {
         ksAudioTracks={tracksHook.ksAudioTracks}
         selectedAudioTrack={tracksHook.computedSelectedAudioTrack}
         selectAudioTrack={(trackId) => {
-          if (useVLC) {
-            vlcHook.selectVlcAudioTrack(trackId);
-          } else {
-            tracksHook.setSelectedAudioTrack(trackId === null ? null : { type: 'index', value: trackId });
-            // Actually tell MPV to switch the audio track
-            if (trackId !== null && mpvPlayerRef.current) {
-              mpvPlayerRef.current.setAudioTrack(trackId);
-            }
+          tracksHook.setSelectedAudioTrack(trackId === null ? null : { type: 'index', value: trackId });
+          // Actually tell MPV to switch the audio track
+          if (trackId !== null && mpvPlayerRef.current) {
+            mpvPlayerRef.current.setAudioTrack(trackId);
           }
         }}
       />
@@ -752,20 +681,16 @@ const AndroidVideoPlayer: React.FC = () => {
         ksTextTracks={tracksHook.ksTextTracks}
         selectedTextTrack={tracksHook.computedSelectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
-        isKsPlayerActive={!useVLC}
+        isKsPlayerActive={true}
         subtitleSize={subtitleSize}
         subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={(trackId) => {
-          if (useVLC) {
-            vlcHook.selectVlcSubtitleTrack(trackId);
-          } else {
-            tracksHook.setSelectedTextTrack(trackId);
-            // Actually tell MPV to switch the subtitle track
-            if (mpvPlayerRef.current) {
-              mpvPlayerRef.current.setSubtitleTrack(trackId);
-            }
+          tracksHook.setSelectedTextTrack(trackId);
+          // Actually tell MPV to switch the subtitle track
+          if (mpvPlayerRef.current) {
+            mpvPlayerRef.current.setSubtitleTrack(trackId);
           }
           // Disable custom subtitles when selecting built-in track
           setUseCustomSubtitles(false);

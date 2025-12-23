@@ -525,7 +525,6 @@ const DownloadsScreen: React.FC = () => {
         streamProvider: 'Downloads',
         streamName: item.providerName || 'Offline',
         headers: undefined,
-        forceVlc: Platform.OS === 'android' ? isMkv : false,
         id: item.contentId, // Use contentId (base ID) instead of compound id for progress tracking
         type: item.type,
         episodeId: episodeId, // Pass episodeId for series progress tracking
