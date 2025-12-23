@@ -26,6 +26,9 @@ class MPVView @JvmOverloads constructor(
     
     // Hardware decoding setting (default: false = software decoding)
     var useHardwareDecoding: Boolean = false
+    
+    // Flag to track if onLoad has been fired (prevents multiple fires for HLS streams)
+    private var hasLoadEventFired: Boolean = false
 
     // Event listener for React Native
     var onLoadCallback: ((duration: Double, width: Int, height: Int) -> Unit)? = null
@@ -130,6 +133,17 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("http-reconnect", "yes") // Auto-reconnect on network issues  
         MPVLib.setOptionString("stream-reconnect", "yes") // Reconnect if stream drops
         
+        // CRITICAL: HLS demuxer options for proper VOD stream handling
+        // Without these, HLS streams may be treated as live and start from the end
+        // Note: Multiple lavf options separated by comma
+        MPVLib.setOptionString("demuxer-lavf-o", "live_start_index=0,prefer_x_start=1,http_persistent=0")
+        MPVLib.setOptionString("demuxer-seekable-cache", "yes") // Allow seeking in cached content
+        MPVLib.setOptionString("force-seekable", "yes") // Force stream to be seekable
+        
+        // Increase probe/analyze duration to help detect full HLS duration
+        MPVLib.setOptionString("demuxer-lavf-probesize", "10000000") // 10MB probe size
+        MPVLib.setOptionString("demuxer-lavf-analyzeduration", "10") // 10 seconds analyze
+        
         // Subtitle configuration - CRITICAL for Android
         MPVLib.setOptionString("sub-auto", "fuzzy") // Auto-load subtitles
         MPVLib.setOptionString("sub-visibility", "yes") // Make subtitles visible by default
@@ -197,6 +211,8 @@ class MPVView @JvmOverloads constructor(
 
     private fun loadFile(url: String) {
         Log.d(TAG, "Loading file: $url")
+        // Reset load event flag for new file
+        hasLoadEventFired = false
         MPVLib.command(arrayOf("loadfile", url))
     }
 
@@ -397,9 +413,18 @@ class MPVView @JvmOverloads constructor(
                 onProgressCallback?.invoke(value, duration)
             }
             "duration/full", "duration" -> {
-                val width = MPVLib.getPropertyInt("width") ?: 0
-                val height = MPVLib.getPropertyInt("height") ?: 0
-                onLoadCallback?.invoke(value, width, height)
+                // Only fire onLoad once when video dimensions are available
+                // For HLS streams, duration updates incrementally as segments are fetched
+                if (!hasLoadEventFired) {
+                    val width = MPVLib.getPropertyInt("width") ?: 0
+                    val height = MPVLib.getPropertyInt("height") ?: 0
+                    // Wait until we have valid dimensions before firing onLoad
+                    if (width > 0 && height > 0 && value > 0) {
+                        hasLoadEventFired = true
+                        Log.d(TAG, "Firing onLoad event: duration=$value, width=$width, height=$height")
+                        onLoadCallback?.invoke(value, width, height)
+                    }
+                }
             }
         }
     }
