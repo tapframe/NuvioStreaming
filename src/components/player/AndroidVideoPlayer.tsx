@@ -37,6 +37,7 @@ import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { ErrorModal } from './modals/ErrorModal';
+import { CustomSubtitles } from './subtitles/CustomSubtitles';
 
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
@@ -45,8 +46,11 @@ import { MpvPlayerRef } from './android/MpvPlayer';
 // Utils
 import { logger } from '../../utils/logger';
 import { styles } from './utils/playerStyles';
-import { formatTime, isHlsStream, processUrlForVLC, getHlsHeaders, defaultAndroidHeaders } from './utils/playerUtils';
+import { formatTime, isHlsStream, processUrlForVLC, getHlsHeaders, defaultAndroidHeaders, parseSRT } from './utils/playerUtils';
 import { storageService } from '../../services/storageService';
+import stremioService from '../../services/stremioService';
+import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
+import axios from 'axios';
 
 const DEBUG_MODE = false;
 
@@ -94,6 +98,29 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentQuality, setCurrentQuality] = useState(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState(streamName);
+
+  // Subtitle addon state
+  const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
+  const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState(false);
+  const [isLoadingSubtitles, setIsLoadingSubtitles] = useState(false);
+  const [useCustomSubtitles, setUseCustomSubtitles] = useState(false);
+  const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
+  const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+
+  // Subtitle customization state
+  const [subtitleSize, setSubtitleSize] = useState(28);
+  const [subtitleBackground, setSubtitleBackground] = useState(false);
+  const [subtitleTextColor, setSubtitleTextColor] = useState('#FFFFFF');
+  const [subtitleBgOpacity, setSubtitleBgOpacity] = useState(0.7);
+  const [subtitleTextShadow, setSubtitleTextShadow] = useState(true);
+  const [subtitleOutline, setSubtitleOutline] = useState(true);
+  const [subtitleOutlineColor, setSubtitleOutlineColor] = useState('#000000');
+  const [subtitleOutlineWidth, setSubtitleOutlineWidth] = useState(3);
+  const [subtitleAlign, setSubtitleAlign] = useState<'center' | 'left' | 'right'>('center');
+  const [subtitleBottomOffset, setSubtitleBottomOffset] = useState(20);
+  const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState(0);
+  const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState(1.2);
+  const [subtitleOffsetSec, setSubtitleOffsetSec] = useState(0);
 
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
   const { metadata, cast } = Boolean(id && type) ? (metadataResult as any) : { metadata: null, cast: [] };
@@ -166,6 +193,53 @@ const AndroidVideoPlayer: React.FC = () => {
     openingAnimation.startOpeningAnimation();
   }, []);
 
+  // Load subtitle settings on mount
+  useEffect(() => {
+    const loadSubtitleSettings = async () => {
+      const settings = await storageService.getSubtitleSettings();
+      if (settings) {
+        if (settings.subtitleSize !== undefined) setSubtitleSize(settings.subtitleSize);
+        if (settings.subtitleBackground !== undefined) setSubtitleBackground(settings.subtitleBackground);
+        if (settings.subtitleTextColor !== undefined) setSubtitleTextColor(settings.subtitleTextColor);
+        if (settings.subtitleBgOpacity !== undefined) setSubtitleBgOpacity(settings.subtitleBgOpacity);
+        if (settings.subtitleTextShadow !== undefined) setSubtitleTextShadow(settings.subtitleTextShadow);
+        if (settings.subtitleOutline !== undefined) setSubtitleOutline(settings.subtitleOutline);
+        if (settings.subtitleOutlineColor !== undefined) setSubtitleOutlineColor(settings.subtitleOutlineColor);
+        if (settings.subtitleOutlineWidth !== undefined) setSubtitleOutlineWidth(settings.subtitleOutlineWidth);
+        if (settings.subtitleAlign !== undefined) setSubtitleAlign(settings.subtitleAlign);
+        if (settings.subtitleBottomOffset !== undefined) setSubtitleBottomOffset(settings.subtitleBottomOffset);
+        if (settings.subtitleLetterSpacing !== undefined) setSubtitleLetterSpacing(settings.subtitleLetterSpacing);
+        if (settings.subtitleLineHeightMultiplier !== undefined) setSubtitleLineHeightMultiplier(settings.subtitleLineHeightMultiplier);
+      }
+    };
+    loadSubtitleSettings();
+  }, []);
+
+  // Save subtitle settings when they change
+  useEffect(() => {
+    const saveSettings = async () => {
+      await storageService.saveSubtitleSettings({
+        subtitleSize,
+        subtitleBackground,
+        subtitleTextColor,
+        subtitleBgOpacity,
+        subtitleTextShadow,
+        subtitleOutline,
+        subtitleOutlineColor,
+        subtitleOutlineWidth,
+        subtitleAlign,
+        subtitleBottomOffset,
+        subtitleLetterSpacing,
+        subtitleLineHeightMultiplier,
+      });
+    };
+    saveSettings();
+  }, [
+    subtitleSize, subtitleBackground, subtitleTextColor, subtitleBgOpacity,
+    subtitleTextShadow, subtitleOutline, subtitleOutlineColor, subtitleOutlineWidth,
+    subtitleAlign, subtitleBottomOffset, subtitleLetterSpacing, subtitleLineHeightMultiplier
+  ]);
+
   const handleLoad = useCallback((data: any) => {
     if (!playerState.isMounted.current) return;
 
@@ -235,6 +309,16 @@ const AndroidVideoPlayer: React.FC = () => {
       playerState.setBuffered(data.playableDuration || currentTimeInSeconds);
     }
   }, [playerState.currentTime, playerState.isDragging, playerState.isSeeking, setupHook.isAppBackgrounded]);
+
+  // Sync custom subtitle text with current playback time
+  useEffect(() => {
+    if (!useCustomSubtitles || customSubtitles.length === 0) return;
+
+    const cueNow = customSubtitles.find(
+      cue => playerState.currentTime >= cue.start && playerState.currentTime <= cue.end
+    );
+    setCurrentSubtitle(cueNow ? cueNow.text : '');
+  }, [playerState.currentTime, useCustomSubtitles, customSubtitles]);
 
   const toggleControls = useCallback(() => {
     playerState.setShowControls(prev => !prev);
@@ -312,6 +396,92 @@ const AndroidVideoPlayer: React.FC = () => {
       });
     }, 100);
   };
+
+  // Subtitle addon fetching
+  const fetchAvailableSubtitles = useCallback(async () => {
+    const targetImdbId = imdbId;
+    if (!targetImdbId) {
+      logger.warn('[AndroidVideoPlayer] No IMDB ID for subtitle fetch');
+      return;
+    }
+
+    setIsLoadingSubtitleList(true);
+    try {
+      const stremioType = type === 'series' ? 'series' : 'movie';
+      const stremioVideoId = stremioType === 'series' && season && episode
+        ? `series:${targetImdbId}:${season}:${episode}`
+        : undefined;
+      const results = await stremioService.getSubtitles(stremioType, targetImdbId, stremioVideoId);
+
+      const subs: WyzieSubtitle[] = (results || []).map((sub: any) => ({
+        id: sub.id || `${sub.lang}-${sub.url}`,
+        url: sub.url,
+        flagUrl: '',
+        format: 'srt',
+        encoding: 'utf-8',
+        media: sub.addonName || sub.addon || '',
+        display: sub.lang || 'Unknown',
+        language: (sub.lang || '').toLowerCase(),
+        isHearingImpaired: false,
+        source: sub.addonName || sub.addon || 'Addon',
+      }));
+
+      setAvailableSubtitles(subs);
+      logger.info(`[AndroidVideoPlayer] Fetched ${subs.length} addon subtitles`);
+    } catch (e) {
+      logger.error('[AndroidVideoPlayer] Error fetching addon subtitles', e);
+    } finally {
+      setIsLoadingSubtitleList(false);
+    }
+  }, [imdbId, type, season, episode]);
+
+  const loadWyzieSubtitle = useCallback(async (subtitle: WyzieSubtitle) => {
+    if (!subtitle.url) return;
+
+    modals.setShowSubtitleModal(false);
+    setIsLoadingSubtitles(true);
+    try {
+      // Download subtitle file
+      let srtContent = '';
+      try {
+        const resp = await axios.get(subtitle.url, { timeout: 10000 });
+        srtContent = typeof resp.data === 'string' ? resp.data : String(resp.data);
+      } catch {
+        const resp = await fetch(subtitle.url);
+        srtContent = await resp.text();
+      }
+
+      // Parse subtitle file
+      const parsedCues = parseSRT(srtContent);
+      setCustomSubtitles(parsedCues);
+      setUseCustomSubtitles(true);
+
+      // Disable MPV's built-in subtitle track when using custom subtitles
+      tracksHook.setSelectedTextTrack(-1);
+      if (mpvPlayerRef.current) {
+        mpvPlayerRef.current.setSubtitleTrack(-1);
+      }
+
+      // Set initial subtitle based on current time
+      const adjustedTime = playerState.currentTime;
+      const cueNow = parsedCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end);
+      setCurrentSubtitle(cueNow ? cueNow.text : '');
+
+      logger.info(`[AndroidVideoPlayer] Loaded addon subtitle: ${subtitle.display} (${parsedCues.length} cues)`);
+      toast.success(`Subtitle loaded: ${subtitle.display}`);
+    } catch (e) {
+      logger.error('[AndroidVideoPlayer] Error loading subtitle', e);
+      toast.error('Failed to load subtitle');
+    } finally {
+      setIsLoadingSubtitles(false);
+    }
+  }, [modals, playerState.currentTime, tracksHook]);
+
+  const disableCustomSubtitles = useCallback(() => {
+    setUseCustomSubtitles(false);
+    setCustomSubtitles([]);
+    setCurrentSubtitle('');
+  }, []);
 
   const cycleResizeMode = useCallback(() => {
     if (playerState.resizeMode === 'contain') playerState.setResizeMode('cover');
@@ -448,6 +618,26 @@ const AndroidVideoPlayer: React.FC = () => {
           firstFrameAtRef={firstFrameAtRef}
         />
 
+        {/* Custom Subtitles for addon subtitles */}
+        <CustomSubtitles
+          useCustomSubtitles={useCustomSubtitles}
+          currentSubtitle={currentSubtitle}
+          subtitleSize={subtitleSize}
+          subtitleBackground={subtitleBackground}
+          zoomScale={1.0}
+          textColor={subtitleTextColor}
+          backgroundOpacity={subtitleBgOpacity}
+          textShadow={subtitleTextShadow}
+          outline={subtitleOutline}
+          outlineColor={subtitleOutlineColor}
+          outlineWidth={subtitleOutlineWidth}
+          align={subtitleAlign}
+          bottomOffset={subtitleBottomOffset}
+          letterSpacing={subtitleLetterSpacing}
+          lineHeightMultiplier={subtitleLineHeightMultiplier}
+          controlsVisible={playerState.showControls}
+          controlsExtraOffset={100}
+        />
         <GestureControls
           screenDimensions={playerState.screenDimensions}
           gestureControls={gestureControls}
@@ -553,20 +743,20 @@ const AndroidVideoPlayer: React.FC = () => {
       <SubtitleModals
         showSubtitleModal={modals.showSubtitleModal}
         setShowSubtitleModal={modals.setShowSubtitleModal}
-        showSubtitleLanguageModal={false} // Placeholder
-        setShowSubtitleLanguageModal={() => { }} // Placeholder
-        isLoadingSubtitleList={false} // Placeholder
-        isLoadingSubtitles={false} // Placeholder
-        customSubtitles={[]} // Placeholder
-        availableSubtitles={[]} // Placeholder
+        showSubtitleLanguageModal={false}
+        setShowSubtitleLanguageModal={() => { }}
+        isLoadingSubtitleList={isLoadingSubtitleList}
+        isLoadingSubtitles={isLoadingSubtitles}
+        customSubtitles={[]}
+        availableSubtitles={availableSubtitles}
         ksTextTracks={tracksHook.ksTextTracks}
         selectedTextTrack={tracksHook.computedSelectedTextTrack}
-        useCustomSubtitles={false}
+        useCustomSubtitles={useCustomSubtitles}
         isKsPlayerActive={!useVLC}
-        subtitleSize={30} // Placeholder
-        subtitleBackground={false} // Placeholder
-        fetchAvailableSubtitles={() => { }} // Placeholder
-        loadWyzieSubtitle={() => { }} // Placeholder
+        subtitleSize={subtitleSize}
+        subtitleBackground={subtitleBackground}
+        fetchAvailableSubtitles={fetchAvailableSubtitles}
+        loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={(trackId) => {
           if (useVLC) {
             vlcHook.selectVlcSubtitleTrack(trackId);
@@ -577,34 +767,36 @@ const AndroidVideoPlayer: React.FC = () => {
               mpvPlayerRef.current.setSubtitleTrack(trackId);
             }
           }
+          // Disable custom subtitles when selecting built-in track
+          setUseCustomSubtitles(false);
           modals.setShowSubtitleModal(false);
         }}
-        disableCustomSubtitles={() => { }} // Placeholder
-        increaseSubtitleSize={() => { }} // Placeholder
-        decreaseSubtitleSize={() => { }} // Placeholder
-        toggleSubtitleBackground={() => { }} // Placeholder
-        subtitleTextColor="#FFF" // Placeholder
-        setSubtitleTextColor={() => { }} // Placeholder
-        subtitleBgOpacity={0.5} // Placeholder
-        setSubtitleBgOpacity={() => { }} // Placeholder
-        subtitleTextShadow={false} // Placeholder
-        setSubtitleTextShadow={() => { }} // Placeholder
-        subtitleOutline={false} // Placeholder
-        setSubtitleOutline={() => { }} // Placeholder
-        subtitleOutlineColor="#000" // Placeholder
-        setSubtitleOutlineColor={() => { }} // Placeholder
-        subtitleOutlineWidth={1} // Placeholder
-        setSubtitleOutlineWidth={() => { }} // Placeholder
-        subtitleAlign="center" // Placeholder
-        setSubtitleAlign={() => { }} // Placeholder
-        subtitleBottomOffset={10} // Placeholder
-        setSubtitleBottomOffset={() => { }} // Placeholder
-        subtitleLetterSpacing={0} // Placeholder
-        setSubtitleLetterSpacing={() => { }} // Placeholder
-        subtitleLineHeightMultiplier={1} // Placeholder
-        setSubtitleLineHeightMultiplier={() => { }} // Placeholder
-        subtitleOffsetSec={0} // Placeholder
-        setSubtitleOffsetSec={() => { }} // Placeholder
+        disableCustomSubtitles={disableCustomSubtitles}
+        increaseSubtitleSize={() => setSubtitleSize(prev => Math.min(prev + 2, 60))}
+        decreaseSubtitleSize={() => setSubtitleSize(prev => Math.max(prev - 2, 12))}
+        toggleSubtitleBackground={() => setSubtitleBackground(prev => !prev)}
+        subtitleTextColor={subtitleTextColor}
+        setSubtitleTextColor={setSubtitleTextColor}
+        subtitleBgOpacity={subtitleBgOpacity}
+        setSubtitleBgOpacity={setSubtitleBgOpacity}
+        subtitleTextShadow={subtitleTextShadow}
+        setSubtitleTextShadow={setSubtitleTextShadow}
+        subtitleOutline={subtitleOutline}
+        setSubtitleOutline={setSubtitleOutline}
+        subtitleOutlineColor={subtitleOutlineColor}
+        setSubtitleOutlineColor={setSubtitleOutlineColor}
+        subtitleOutlineWidth={subtitleOutlineWidth}
+        setSubtitleOutlineWidth={setSubtitleOutlineWidth}
+        subtitleAlign={subtitleAlign}
+        setSubtitleAlign={setSubtitleAlign}
+        subtitleBottomOffset={subtitleBottomOffset}
+        setSubtitleBottomOffset={setSubtitleBottomOffset}
+        subtitleLetterSpacing={subtitleLetterSpacing}
+        setSubtitleLetterSpacing={setSubtitleLetterSpacing}
+        subtitleLineHeightMultiplier={subtitleLineHeightMultiplier}
+        setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
+        subtitleOffsetSec={subtitleOffsetSec}
+        setSubtitleOffsetSec={setSubtitleOffsetSec}
       />
 
       <SourcesModal
