@@ -97,7 +97,8 @@
           "receiverAppId": "CC1AD845",
           "iosStartDiscoveryAfterFirstTapOnCastButton": true
         }
-      ]
+      ],
+      "./plugins/mpv-bridge/withMpvBridge"
     ],
     "updates": {
       "enabled": true,
