@@ -51,6 +51,7 @@ interface VideoSurfaceProps {
     loadStartAtRef?: any;
     firstFrameAtRef?: any;
     zoomScale?: number;
+    onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
 }
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = ({
@@ -72,6 +73,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     onPinchGestureEvent,
     onPinchHandlerStateChange,
     screenDimensions,
+    onTracksChanged,
 }) => {
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
@@ -122,11 +124,13 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                 paused={paused}
                 volume={volume}
                 rate={playbackSpeed}
+                resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
                 style={localStyles.player}
                 onLoad={handleLoad}
                 onProgress={handleProgress}
                 onEnd={handleEnd}
                 onError={handleError}
+                onTracksChanged={onTracksChanged}
             />
 
             {/* Gesture overlay - transparent, on top of the player */}

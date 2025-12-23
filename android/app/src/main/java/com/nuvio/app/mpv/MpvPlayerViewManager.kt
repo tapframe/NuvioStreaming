@@ -58,6 +58,35 @@ class MpvPlayerViewManager(
             sendEvent(context, view.id, "onError", event)
         }
         
+        view.onTracksChangedCallback = { audioTracks, subtitleTracks ->
+            val event = Arguments.createMap().apply {
+                val audioArray = Arguments.createArray()
+                audioTracks.forEach { track ->
+                    val trackMap = Arguments.createMap().apply {
+                        putInt("id", track["id"] as Int)
+                        putString("name", track["name"] as String)
+                        putString("language", track["language"] as String)
+                        putString("codec", track["codec"] as String)
+                    }
+                    audioArray.pushMap(trackMap)
+                }
+                putArray("audioTracks", audioArray)
+                
+                val subtitleArray = Arguments.createArray()
+                subtitleTracks.forEach { track ->
+                    val trackMap = Arguments.createMap().apply {
+                        putInt("id", track["id"] as Int)
+                        putString("name", track["name"] as String)
+                        putString("language", track["language"] as String)
+                        putString("codec", track["codec"] as String)
+                    }
+                    subtitleArray.pushMap(trackMap)
+                }
+                putArray("subtitleTracks", subtitleArray)
+            }
+            sendEvent(context, view.id, "onTracksChanged", event)
+        }
+        
         return view
     }
 
@@ -72,6 +101,7 @@ class MpvPlayerViewManager(
             .put("onProgress", MapBuilder.of("phasedRegistrationNames", MapBuilder.of("bubbled", "onProgress")))
             .put("onEnd", MapBuilder.of("phasedRegistrationNames", MapBuilder.of("bubbled", "onEnd")))
             .put("onError", MapBuilder.of("phasedRegistrationNames", MapBuilder.of("bubbled", "onError")))
+            .put("onTracksChanged", MapBuilder.of("phasedRegistrationNames", MapBuilder.of("bubbled", "onTracksChanged")))
             .build()
     }
 
@@ -127,5 +157,10 @@ class MpvPlayerViewManager(
     fun setBackgroundColor(view: MPVView, color: Int?) {
         // Intentionally ignoring - background color would block the TextureView content
         // Leave the view transparent
+    }
+
+    @ReactProp(name = "resizeMode")
+    fun setResizeMode(view: MPVView, resizeMode: String?) {
+        view.setResizeMode(resizeMode ?: "contain")
     }
 }

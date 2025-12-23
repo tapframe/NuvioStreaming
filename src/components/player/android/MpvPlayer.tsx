@@ -17,11 +17,13 @@ export interface MpvPlayerProps {
     paused?: boolean;
     volume?: number;
     rate?: number;
+    resizeMode?: 'contain' | 'cover' | 'stretch';
     style?: any;
     onLoad?: (data: { duration: number; width: number; height: number }) => void;
     onProgress?: (data: { currentTime: number; duration: number }) => void;
     onEnd?: () => void;
     onError?: (error: { error: string }) => void;
+    onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
 }
 
 const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
@@ -80,6 +82,11 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
         props.onError?.(event?.nativeEvent);
     };
 
+    const handleTracksChanged = (event: any) => {
+        console.log('[MpvPlayer] Native onTracksChanged event:', event?.nativeEvent);
+        props.onTracksChanged?.(event?.nativeEvent);
+    };
+
     return (
         <MpvPlayerNative
             ref={nativeRef}
@@ -88,10 +95,12 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
             paused={props.paused ?? true}
             volume={props.volume ?? 1.0}
             rate={props.rate ?? 1.0}
+            resizeMode={props.resizeMode ?? 'contain'}
             onLoad={handleLoad}
             onProgress={handleProgress}
             onEnd={handleEnd}
             onError={handleError}
+            onTracksChanged={handleTracksChanged}
         />
     );
 });

@@ -28,6 +28,7 @@ class MPVView @JvmOverloads constructor(
     var onProgressCallback: ((position: Double, duration: Double) -> Unit)? = null
     var onEndCallback: (() -> Unit)? = null
     var onErrorCallback: ((message: String) -> Unit)? = null
+    var onTracksChangedCallback: ((audioTracks: List<Map<String, Any>>, subtitleTracks: List<Map<String, Any>>) -> Unit)? = null
 
     init {
         surfaceTextureListener = this
@@ -89,8 +90,13 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("vo", "gpu")
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
-        MPVLib.setOptionString("hwdec", "mediacodec,mediacodec-copy")
-        MPVLib.setOptionString("hwdec-codecs", "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1")
+        
+        // Hardware decoding - use mediacodec-copy to allow subtitle overlay
+        // 'mediacodec-copy' copies frames to CPU memory which enables subtitle blending
+        MPVLib.setOptionString("hwdec", "mediacodec-copy")
+        MPVLib.setOptionString("hwdec-codecs", "all")
+        
+        // Audio output
         MPVLib.setOptionString("ao", "audiotrack,opensles")
         
         // Network caching for streaming
@@ -98,6 +104,43 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("demuxer-max-back-bytes", "33554432") // 32MB
         MPVLib.setOptionString("cache", "yes")
         MPVLib.setOptionString("cache-secs", "30")
+        
+        // Subtitle configuration - CRITICAL for Android
+        MPVLib.setOptionString("sub-auto", "fuzzy") // Auto-load subtitles
+        MPVLib.setOptionString("sub-visibility", "yes") // Make subtitles visible by default
+        MPVLib.setOptionString("sub-font-size", "48") // Larger font size for mobile readability
+        MPVLib.setOptionString("sub-pos", "95") // Position at bottom (0-100, 100 = very bottom)
+        MPVLib.setOptionString("sub-color", "#FFFFFFFF") // White color
+        MPVLib.setOptionString("sub-border-size", "3") // Thicker border for readability
+        MPVLib.setOptionString("sub-border-color", "#FF000000") // Black border
+        MPVLib.setOptionString("sub-shadow-offset", "2") // Add shadow for better visibility
+        MPVLib.setOptionString("sub-shadow-color", "#80000000") // Semi-transparent black shadow
+        
+        // Font configuration - point to Android system fonts for all language support
+        MPVLib.setOptionString("osd-fonts-dir", "/system/fonts")
+        MPVLib.setOptionString("sub-fonts-dir", "/system/fonts")
+        MPVLib.setOptionString("sub-font", "Roboto") // Default fallback font
+        // Allow embedded fonts in ASS/SSA but fallback to system fonts
+        MPVLib.setOptionString("embeddedfonts", "yes")
+        
+        // Language/encoding support for various subtitle formats
+        MPVLib.setOptionString("sub-codepage", "auto") // Auto-detect encoding (supports UTF-8, Latin, CJK, etc.)
+        
+        MPVLib.setOptionString("osc", "no") // Disable on screen controller
+        MPVLib.setOptionString("osd-level", "1")
+    
+        // Critical for subtitle rendering on Android GPU
+        // blend-subtitles=no lets the GPU renderer handle subtitle overlay properly
+        MPVLib.setOptionString("blend-subtitles", "no")
+        MPVLib.setOptionString("sub-use-margins", "no")
+        // Use 'scale' to allow ASS styling but with our scale and font overrides
+        // This preserves styled subtitles while having font fallbacks
+        MPVLib.setOptionString("sub-ass-override", "scale")
+        MPVLib.setOptionString("sub-scale", "1.0")
+        MPVLib.setOptionString("sub-fix-timing", "yes") // Fix timing for SRT subtitles
+        
+        // Force subtitle rendering
+        MPVLib.setOptionString("sid", "auto") // Auto-select subtitle track
         
         // Disable terminal/input
         MPVLib.setOptionString("terminal", "no")
@@ -120,6 +163,11 @@ class MPVView @JvmOverloads constructor(
         MPVLib.observeProperty("width", MPV_FORMAT_INT64)
         MPVLib.observeProperty("height", MPV_FORMAT_INT64)
         MPVLib.observeProperty("track-list", MPV_FORMAT_NONE)
+        
+        // Observe subtitle properties for debugging
+        MPVLib.observeProperty("sid", MPV_FORMAT_INT64)
+        MPVLib.observeProperty("sub-visibility", MPV_FORMAT_FLAG)
+        MPVLib.observeProperty("sub-text", MPV_FORMAT_NONE)
     }
 
     private fun loadFile(url: String) {
@@ -176,11 +224,52 @@ class MPVView @JvmOverloads constructor(
     }
 
     fun setSubtitleTrack(trackId: Int) {
+        Log.d(TAG, "setSubtitleTrack called: trackId=$trackId, isMpvInitialized=$isMpvInitialized")
         if (isMpvInitialized) {
             if (trackId == -1) {
+                Log.d(TAG, "Disabling subtitles (sid=no)")
                 MPVLib.setPropertyString("sid", "no")
+                MPVLib.setPropertyString("sub-visibility", "no")
             } else {
+                Log.d(TAG, "Setting subtitle track to: $trackId")
                 MPVLib.setPropertyInt("sid", trackId)
+                // Ensure subtitles are visible
+                MPVLib.setPropertyString("sub-visibility", "yes")
+                
+                // Debug: Verify the subtitle was set correctly
+                val currentSid = MPVLib.getPropertyInt("sid")
+                val subVisibility = MPVLib.getPropertyString("sub-visibility")
+                val subDelay = MPVLib.getPropertyDouble("sub-delay")
+                val subScale = MPVLib.getPropertyDouble("sub-scale")
+                Log.d(TAG, "After setting - sid=$currentSid, sub-visibility=$subVisibility, sub-delay=$subDelay, sub-scale=$subScale")
+            }
+        }
+    }
+
+    fun setResizeMode(mode: String) {
+        Log.d(TAG, "setResizeMode called: mode=$mode, isMpvInitialized=$isMpvInitialized")
+        if (isMpvInitialized) {
+            when (mode) {
+                "contain" -> {
+                    // Letterbox - show entire video with black bars
+                    MPVLib.setPropertyDouble("panscan", 0.0)
+                    MPVLib.setPropertyString("keepaspect", "yes")
+                }
+                "cover" -> {
+                    // Fill/crop - zoom to fill, cropping edges
+                    MPVLib.setPropertyDouble("panscan", 1.0)
+                    MPVLib.setPropertyString("keepaspect", "yes")
+                }
+                "stretch" -> {
+                    // Stretch - disable aspect ratio
+                    MPVLib.setPropertyDouble("panscan", 0.0)
+                    MPVLib.setPropertyString("keepaspect", "no")
+                }
+                else -> {
+                    // Default to contain
+                    MPVLib.setPropertyDouble("panscan", 0.0)
+                    MPVLib.setPropertyString("keepaspect", "yes")
+                }
             }
         }
     }
@@ -191,8 +280,56 @@ class MPVView @JvmOverloads constructor(
         Log.d(TAG, "Property changed: $property")
         when (property) {
             "track-list" -> {
-                // Track list updated, could notify JS about available tracks
+                // Parse track list and notify React Native
+                parseAndSendTracks()
             }
+        }
+    }
+    
+    private fun parseAndSendTracks() {
+        try {
+            val trackCount = MPVLib.getPropertyInt("track-list/count") ?: 0
+            Log.d(TAG, "Track count: $trackCount")
+            
+            val audioTracks = mutableListOf<Map<String, Any>>()
+            val subtitleTracks = mutableListOf<Map<String, Any>>()
+            
+            for (i in 0 until trackCount) {
+                val type = MPVLib.getPropertyString("track-list/$i/type") ?: continue
+                val id = MPVLib.getPropertyInt("track-list/$i/id") ?: continue
+                val title = MPVLib.getPropertyString("track-list/$i/title") ?: ""
+                val lang = MPVLib.getPropertyString("track-list/$i/lang") ?: ""
+                val codec = MPVLib.getPropertyString("track-list/$i/codec") ?: ""
+                
+                val trackName = when {
+                    title.isNotEmpty() -> title
+                    lang.isNotEmpty() -> lang.uppercase()
+                    else -> "Track $id"
+                }
+                
+                val track = mapOf(
+                    "id" to id,
+                    "name" to trackName,
+                    "language" to lang,
+                    "codec" to codec
+                )
+                
+                when (type) {
+                    "audio" -> {
+                        Log.d(TAG, "Found audio track: $track")
+                        audioTracks.add(track)
+                    }
+                    "sub" -> {
+                        Log.d(TAG, "Found subtitle track: $track")
+                        subtitleTracks.add(track)
+                    }
+                }
+            }
+            
+            Log.d(TAG, "Sending tracks - Audio: ${audioTracks.size}, Subtitles: ${subtitleTracks.size}")
+            onTracksChangedCallback?.invoke(audioTracks, subtitleTracks)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing tracks", e)
         }
     }
 
@@ -244,7 +381,22 @@ class MPVView @JvmOverloads constructor(
                 }
             }
             MPV_EVENT_END_FILE -> {
-                onEndCallback?.invoke()
+                Log.d(TAG, "MPV_EVENT_END_FILE")
+                
+                // Heuristic: If duration is effectively 0 at end of file, it's a load error
+                val duration = MPVLib.getPropertyDouble("duration") ?: 0.0
+                val timePos = MPVLib.getPropertyDouble("time-pos") ?: 0.0
+                val eofReached = MPVLib.getPropertyBoolean("eof-reached") ?: false
+                
+                Log.d(TAG, "End stats - Duration: $duration, Time: $timePos, EOF: $eofReached")
+                
+                if (duration < 1.0 && !eofReached) {
+                     val customError = "Unable to play media. Source may be unreachable."
+                     Log.e(TAG, "Playback error detected (heuristic): $customError")
+                     onErrorCallback?.invoke(customError)
+                } else {
+                    onEndCallback?.invoke()
+                }
             }
         }
     }

@@ -396,11 +396,45 @@ const AndroidVideoPlayer: React.FC = () => {
               return;
             }
 
-            modals.setErrorDetails(JSON.stringify(err));
+            // Determine the actual error message
+            let displayError = 'An unknown error occurred';
+
+            if (typeof err?.error === 'string') {
+              displayError = err.error;
+            } else if (err?.error?.errorString) {
+              displayError = err.error.errorString;
+            } else if (err?.errorString) {
+              displayError = err.errorString;
+            } else if (typeof err === 'string') {
+              displayError = err;
+            } else {
+              displayError = JSON.stringify(err);
+            }
+
+            modals.setErrorDetails(displayError);
             modals.setShowErrorModal(true);
           }}
           onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
           onTracksUpdate={vlcHook.handleVlcTracksUpdate}
+          onTracksChanged={(data) => {
+            console.log('[AndroidVideoPlayer] onTracksChanged:', data);
+            if (data?.audioTracks) {
+              const formatted = data.audioTracks.map((t: any) => ({
+                id: t.id,
+                name: t.name || `Track ${t.id}`,
+                language: t.language
+              }));
+              tracksHook.setRnVideoAudioTracks(formatted);
+            }
+            if (data?.subtitleTracks) {
+              const formatted = data.subtitleTracks.map((t: any) => ({
+                id: t.id,
+                name: t.name || `Track ${t.id}`,
+                language: t.language
+              }));
+              tracksHook.setRnVideoTextTracks(formatted);
+            }
+          }}
           vlcPlayerRef={vlcHook.vlcPlayerRef}
           mpvPlayerRef={mpvPlayerRef}
           videoRef={videoRef}
@@ -504,8 +538,15 @@ const AndroidVideoPlayer: React.FC = () => {
         ksAudioTracks={tracksHook.ksAudioTracks}
         selectedAudioTrack={tracksHook.computedSelectedAudioTrack}
         selectAudioTrack={(trackId) => {
-          useVLC ? vlcHook.selectVlcAudioTrack(trackId) :
+          if (useVLC) {
+            vlcHook.selectVlcAudioTrack(trackId);
+          } else {
             tracksHook.setSelectedAudioTrack(trackId === null ? null : { type: 'index', value: trackId });
+            // Actually tell MPV to switch the audio track
+            if (trackId !== null && mpvPlayerRef.current) {
+              mpvPlayerRef.current.setAudioTrack(trackId);
+            }
+          }
         }}
       />
 
@@ -527,7 +568,15 @@ const AndroidVideoPlayer: React.FC = () => {
         fetchAvailableSubtitles={() => { }} // Placeholder
         loadWyzieSubtitle={() => { }} // Placeholder
         selectTextTrack={(trackId) => {
-          useVLC ? vlcHook.selectVlcSubtitleTrack(trackId) : tracksHook.setSelectedTextTrack(trackId);
+          if (useVLC) {
+            vlcHook.selectVlcSubtitleTrack(trackId);
+          } else {
+            tracksHook.setSelectedTextTrack(trackId);
+            // Actually tell MPV to switch the subtitle track
+            if (mpvPlayerRef.current) {
+              mpvPlayerRef.current.setSubtitleTrack(trackId);
+            }
+          }
           modals.setShowSubtitleModal(false);
         }}
         disableCustomSubtitles={() => { }} // Placeholder
