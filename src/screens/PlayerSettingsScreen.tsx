@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSettings, AppSettings } from '../hooks/useSettings';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../contexts/ThemeContext';
+import CustomAlert from '../components/CustomAlert';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -94,6 +95,17 @@ const PlayerSettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
   const navigation = useNavigation();
+
+  // CustomAlert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+
+  const openAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const playerOptions = [
     {
@@ -323,6 +335,53 @@ const PlayerSettingsScreen: React.FC = () => {
               </View>
             </View>
 
+            {/* Hardware Decoding for Android Internal Player */}
+            {Platform.OS === 'android' && !settings.useExternalPlayer && (
+              <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+                <View style={styles.settingContent}>
+                  <View style={[
+                    styles.settingIconContainer,
+                    { backgroundColor: 'rgba(255,255,255,0.1)' }
+                  ]}>
+                    <MaterialIcons
+                      name="memory"
+                      size={20}
+                      color={currentTheme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingText}>
+                    <Text
+                      style={[
+                        styles.settingTitle,
+                        { color: currentTheme.colors.text },
+                      ]}
+                    >
+                      Hardware Decoding
+                    </Text>
+                    <Text
+                      style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.textMuted },
+                      ]}
+                    >
+                      Use GPU for video decoding. May improve performance but can cause issues on some devices.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={settings.useHardwareDecoding}
+                    onValueChange={(value) => {
+                      updateSetting('useHardwareDecoding', value);
+                      openAlert(
+                        'Restart Required',
+                        'Please restart the app for the decoding change to take effect.'
+                      );
+                    }}
+                    thumbColor={settings.useHardwareDecoding ? currentTheme.colors.primary : undefined}
+                  />
+                </View>
+              </View>
+            )}
+
             {/* External Player for Downloads */}
             {((Platform.OS === 'android' && settings.useExternalPlayer) ||
               (Platform.OS === 'ios' && settings.preferredPlayer !== 'internal')) && (
@@ -367,6 +426,13 @@ const PlayerSettingsScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 };

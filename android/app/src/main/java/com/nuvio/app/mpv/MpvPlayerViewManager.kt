@@ -180,4 +180,9 @@ class MpvPlayerViewManager(
             view.setHeaders(null)
         }
     }
+
+    @ReactProp(name = "useHardwareDecoding")
+    fun setUseHardwareDecoding(view: MPVView, useHardwareDecoding: Boolean) {
+        view.useHardwareDecoding = useHardwareDecoding
+    }
 }

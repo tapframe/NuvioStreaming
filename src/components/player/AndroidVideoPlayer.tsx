@@ -24,6 +24,7 @@ import { useNextEpisode } from './android/hooks/useNextEpisode';
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
 import { useMetadata } from '../../hooks/useMetadata';
 import { usePlayerGestureControls } from '../../hooks/usePlayerGestureControls';
+import { useSettings } from '../../hooks/useSettings';
 
 // Shared Components
 import { GestureControls, PauseOverlay, SpeedActivatedOverlay } from './components';
@@ -69,6 +70,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const playerState = usePlayerState();
   const modals = usePlayerModals();
   const speedControl = useSpeedControl();
+  const { settings } = useSettings();
 
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
@@ -550,6 +552,7 @@ const AndroidVideoPlayer: React.FC = () => {
           onPinchGestureEvent={() => { }}
           onPinchHandlerStateChange={() => { }}
           screenDimensions={playerState.screenDimensions}
+          useHardwareDecoding={settings.useHardwareDecoding}
         />
 
         {/* Custom Subtitles for addon subtitles */}

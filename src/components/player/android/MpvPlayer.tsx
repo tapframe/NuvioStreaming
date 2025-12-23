@@ -25,6 +25,7 @@ export interface MpvPlayerProps {
     onEnd?: () => void;
     onError?: (error: { error: string }) => void;
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
+    useHardwareDecoding?: boolean;
 }
 
 const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
@@ -103,6 +104,7 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
             onEnd={handleEnd}
             onError={handleError}
             onTracksChanged={handleTracksChanged}
+            useHardwareDecoding={props.useHardwareDecoding ?? false}
         />
     );
 });

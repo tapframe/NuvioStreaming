@@ -23,6 +23,9 @@ class MPVView @JvmOverloads constructor(
     private var isPaused: Boolean = true
     private var surface: Surface? = null
     private var httpHeaders: Map<String, String>? = null
+    
+    // Hardware decoding setting (default: false = software decoding)
+    var useHardwareDecoding: Boolean = false
 
     // Event listener for React Native
     var onLoadCallback: ((duration: Double, width: Int, height: Int) -> Unit)? = null
@@ -94,10 +97,11 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("opengl-es", "yes")
         
         // Hardware decoding configuration
-        // NOTE: On emulator, mediacodec can cause freezes due to slow GPU translation
-        // Using 'no' for software decoding which is more reliable on emulator
-        // For real devices, use 'mediacodec-copy' for hardware acceleration
-        MPVLib.setOptionString("hwdec", "no")
+        // 'mediacodec-copy' for hardware acceleration (GPU decoding, copies frames to CPU)
+        // 'no' for software decoding (more compatible, especially on emulators)
+        val hwdecValue = if (useHardwareDecoding) "mediacodec-copy" else "no"
+        Log.d(TAG, "Hardware decoding: $useHardwareDecoding, hwdec value: $hwdecValue")
+        MPVLib.setOptionString("hwdec", hwdecValue)
         MPVLib.setOptionString("hwdec-codecs", "all")
         
         // Audio output
