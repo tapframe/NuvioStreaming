@@ -43,7 +43,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
       text: '#FFFFFF',
       textMuted: 'rgba(255,255,255,0.6)',
       mediumEmphasis: 'rgba(255,255,255,0.7)',
-      primary: '#3B82F6',
+      primary: 'rgba(255,255,255,0.9)',
       white: '#FFFFFF',
       elevation2: 'rgba(255,255,255,0.05)'
     }
