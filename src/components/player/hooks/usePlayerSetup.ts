@@ -81,21 +81,28 @@ export const usePlayerSetup = (config: PlayerSetupConfig) => {
         };
     }, [isOpeningAnimationComplete]);
 
-    // Handle Orientation (Lock to Landscape after opening)
+    const orientationLocked = useRef(false);
+
     useEffect(() => {
-        if (isOpeningAnimationComplete) {
+        if (isOpeningAnimationComplete && !orientationLocked.current) {
             const task = InteractionManager.runAfterInteractions(() => {
                 ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
                     .then(() => {
-                        if (__DEV__) logger.log('[VideoPlayer] Locked to landscape orientation');
+                        orientationLocked.current = true;
                     })
-                    .catch((error) => {
-                        logger.warn('[VideoPlayer] Failed to lock orientation:', error);
-                    });
+                    .catch(() => { });
             });
             return () => task.cancel();
         }
     }, [isOpeningAnimationComplete]);
+
+    useEffect(() => {
+        return () => {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.DEFAULT)
+                .then(() => ScreenOrientation.unlockAsync())
+                .catch(() => { });
+        };
+    }, []);
 
     // Handle App State
     useEffect(() => {
