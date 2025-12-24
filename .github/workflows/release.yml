@@ -29,6 +29,8 @@ jobs:
         run: npm ci
         
       - name: Build Android App
+        env:
+          SENTRY_DISABLE_AUTO_UPLOAD: true
         run: |
           cd android
           chmod +x gradlew
