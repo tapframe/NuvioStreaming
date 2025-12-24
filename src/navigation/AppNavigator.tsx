@@ -125,7 +125,6 @@ export type RootStackParamList = {
     streamProvider?: string;
     streamName?: string;
     headers?: { [key: string]: string };
-    forceVlc?: boolean;
     id?: string;
     type?: string;
     episodeId?: string;
@@ -146,7 +145,6 @@ export type RootStackParamList = {
     streamProvider?: string;
     streamName?: string;
     headers?: { [key: string]: string };
-    forceVlc?: boolean;
     id?: string;
     type?: string;
     episodeId?: string;

@@ -649,7 +649,6 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
           streamProvider: cachedStream.stream.addonId || cachedStream.stream.addonName || cachedStream.stream.name,
           streamName: cachedStream.stream.name || cachedStream.stream.title || 'Unnamed Stream',
           headers: cachedStream.stream.headers || undefined,
-          forceVlc: false,
           id: currentItem.id,
           type: currentItem.type,
           episodeId: episodeId,

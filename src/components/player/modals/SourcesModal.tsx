@@ -246,3 +246,5 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
     </View>
   );
 };
+
+export default SourcesModal;

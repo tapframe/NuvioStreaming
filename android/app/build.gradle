@@ -246,6 +246,9 @@ dependencies {
 
     // Include only FFmpeg decoder AAR to avoid duplicates with Maven Media3
     implementation files("libs/lib-decoder-ffmpeg-release.aar")
+    
+    // MPV Player library
+    implementation files("libs/libmpv-release.aar")
 
     // Google Cast Framework
     implementation "com.google.android.gms:play-services-cast-framework:${safeExtGet('castFrameworkVersion', '+')}"

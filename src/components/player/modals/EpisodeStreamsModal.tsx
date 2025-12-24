@@ -272,3 +272,5 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
     </View>
   );
 };
+
+export default EpisodeStreamsModal;
