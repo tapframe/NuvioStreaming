@@ -26,6 +26,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
+import { useMalContext } from '../contexts/MalContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { catalogService } from '../services/catalogService';
 import { fetchTotalDownloads } from '../services/githubReleaseService';
@@ -37,6 +38,7 @@ import CustomAlert from '../components/CustomAlert';
 import ScreenHeader from '../components/common/ScreenHeader';
 import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
+import MalIcon from '../components/icons/MalIcon';
 import TMDBIcon from '../components/icons/TMDBIcon';
 import MDBListIcon from '../components/icons/MDBListIcon';
 
@@ -303,6 +305,7 @@ const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
+  const { isAuthenticated: isMalAuthenticated, userProfile: malUserProfile, refreshAuthStatus: refreshMalAuthStatus } = useMalContext();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -331,10 +334,11 @@ const SettingsScreen: React.FC = () => {
         if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
       }
       refreshAuthStatus();
+      refreshMalAuthStatus();
     });
 
     return unsubscribe;
-  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
+  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus, refreshMalAuthStatus]);
 
   const loadData = useCallback(async () => {
     try {
@@ -532,6 +536,15 @@ const SettingsScreen: React.FC = () => {
               customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
               renderControl={ChevronRight}
               onPress={() => navigation.navigate('TraktSettings')}
+              isLast={false}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="MyAnimeList"
+              description={isMalAuthenticated ? `@${malUserProfile?.name || 'User'}` : "Sign in to sync"}
+              customIcon={<MalIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+              renderControl={ChevronRight}
+              onPress={() => navigation.navigate('MalSettings')}
               isLast={true}
               isTablet={isTablet}
             />

@@ -26,6 +26,7 @@ import 'react-native-reanimated';
 import { CatalogProvider } from './src/contexts/CatalogContext';
 import { GenreProvider } from './src/contexts/GenreContext';
 import { TraktProvider } from './src/contexts/TraktContext';
+import { MalProvider } from './src/contexts/MalContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { TrailerProvider } from './src/contexts/TrailerContext';
 import { DownloadsProvider } from './src/contexts/DownloadsContext';
@@ -246,13 +247,15 @@ function App(): React.JSX.Element {
       <GenreProvider>
         <CatalogProvider>
           <TraktProvider>
-            <ThemeProvider>
-              <TrailerProvider>
-                <ToastProvider>
-                  <ThemedApp />
-                </ToastProvider>
-              </TrailerProvider>
-            </ThemeProvider>
+            <MalProvider>
+              <ThemeProvider>
+                <TrailerProvider>
+                  <ToastProvider>
+                    <ThemedApp />
+                  </ToastProvider>
+                </TrailerProvider>
+              </ThemeProvider>
+            </MalProvider>
           </TraktProvider>
         </CatalogProvider>
       </GenreProvider>
