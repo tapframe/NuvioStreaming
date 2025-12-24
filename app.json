@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nuvio",
     "slug": "nuvio",
-    "version": "1.2.11",
+    "version": "1.3.0",
     "orientation": "default",
     "backgroundColor": "#020404",
     "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
@@ -18,7 +18,7 @@
       "supportsTablet": true,
       "requireFullScreen": true,
       "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
-      "buildNumber": "26",
+      "buildNumber": "28",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
@@ -52,7 +52,7 @@
         "android.permission.WRITE_SETTINGS"
       ],
       "package": "com.nuvio.app",
-      "versionCode": 26,
+      "versionCode": 28,
       "architectures": [
         "arm64-v8a",
         "armeabi-v7a",
@@ -99,6 +99,6 @@
       "fallbackToCacheTimeout": 30000,
       "url": "https://grim-reyna-tapframe-69970143.koyeb.app/api/manifest"
     },
-    "runtimeVersion": "1.2.11"
+    "runtimeVersion": "1.3.0"
   }
 }
