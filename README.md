@@ -177,6 +177,16 @@ Distributed under the GNU GPLv3 License. See `LICENSE` for more information.
   React Native • Expo • TypeScript
   </p>
 
+  ## Star History
+
+<a href="https://www.star-history.com/#tapframe/NuvioStreaming&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tapframe/NuvioStreaming&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tapframe/NuvioStreaming&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=tapframe/NuvioStreaming&type=date&legend=top-left" />
+ </picture>
+</a>
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- MARKDOWN LINKS & IMAGES -->
