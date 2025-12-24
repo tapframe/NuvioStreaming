@@ -4,14 +4,11 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    Dimensions,
     Image,
     Linking,
+    useWindowDimensions,
 } from 'react-native';
-import Animated, {
-    FadeIn,
-    FadeOut,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,16 +20,26 @@ interface PosterModalProps {
     onAction: (action: any) => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 export const PosterModal: React.FC<PosterModalProps> = ({
     campaign,
     onDismiss,
     onAction,
 }) => {
     const insets = useSafeAreaInsets();
+    const { width, height } = useWindowDimensions();
     const { content } = campaign;
     const isPosterOnly = !content.title && !content.message;
+
+    const isTablet = width >= 768;
+    const isLandscape = width > height;
+
+    const modalWidth = isTablet
+        ? Math.min(width * 0.5, 420)
+        : isLandscape
+            ? Math.min(width * 0.45, 360)
+            : Math.min(width * 0.85, 340);
+
+    const maxImageHeight = isLandscape ? height * 0.6 : height * 0.5;
 
     const handleAction = () => {
         if (content.primaryAction) {
@@ -50,17 +57,12 @@ export const PosterModal: React.FC<PosterModalProps> = ({
 
     return (
         <View style={StyleSheet.absoluteFill}>
-            {/* Backdrop */}
             <Animated.View
                 entering={FadeIn.duration(200)}
                 exiting={FadeOut.duration(200)}
                 style={styles.backdrop}
             >
-                <BlurView
-                    intensity={30}
-                    tint="dark"
-                    style={StyleSheet.absoluteFill}
-                />
+                <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
                 <TouchableOpacity
                     style={StyleSheet.absoluteFill}
                     activeOpacity={1}
@@ -68,7 +70,6 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                 />
             </Animated.View>
 
-            {/* Modal Container */}
             <Animated.View
                 entering={FadeIn.duration(250)}
                 exiting={FadeOut.duration(200)}
@@ -78,8 +79,7 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                 ]}
                 pointerEvents="box-none"
             >
-                <View style={styles.contentWrapper}>
-                    {/* Close Button */}
+                <View style={[styles.contentWrapper, { width: modalWidth }]}>
                     <TouchableOpacity
                         style={styles.closeButton}
                         onPress={onDismiss}
@@ -88,17 +88,19 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                         <View style={styles.closeButtonBg}>
                             <Ionicons
                                 name="close"
-                                size={20}
+                                size={isTablet ? 24 : 20}
                                 color={content.closeButtonColor || '#fff'}
                             />
                         </View>
                     </TouchableOpacity>
 
-                    {/* Main Image */}
                     {content.imageUrl && (
                         <View style={[
                             styles.imageContainer,
-                            { aspectRatio: content.aspectRatio || 0.7 }
+                            {
+                                aspectRatio: content.aspectRatio || 0.7,
+                                maxHeight: maxImageHeight,
+                            }
                         ]}>
                             <Image
                                 source={{ uri: content.imageUrl }}
@@ -108,26 +110,39 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                         </View>
                     )}
 
-                    {/* Text Content */}
                     {!isPosterOnly && (
                         <View style={[
                             styles.textContainer,
-                            { backgroundColor: content.backgroundColor || '#1a1a1a' }
+                            {
+                                backgroundColor: content.backgroundColor || '#1a1a1a',
+                                padding: isTablet ? 24 : 20,
+                            }
                         ]}>
                             {content.title && (
-                                <Text style={[styles.title, { color: content.textColor || '#fff' }]}>
+                                <Text style={[
+                                    styles.title,
+                                    {
+                                        color: content.textColor || '#fff',
+                                        fontSize: isTablet ? 24 : 20,
+                                    }
+                                ]}>
                                     {content.title}
                                 </Text>
                             )}
                             {content.message && (
-                                <Text style={[styles.message, { color: content.textColor || '#fff' }]}>
+                                <Text style={[
+                                    styles.message,
+                                    {
+                                        color: content.textColor || '#fff',
+                                        fontSize: isTablet ? 16 : 14,
+                                    }
+                                ]}>
                                     {content.message}
                                 </Text>
                             )}
                         </View>
                     )}
 
-                    {/* Primary Action Button */}
                     {content.primaryAction && (
                         <TouchableOpacity
                             style={[
@@ -135,6 +150,8 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                                 {
                                     backgroundColor: content.textColor || '#fff',
                                     marginTop: isPosterOnly ? 16 : 0,
+                                    paddingVertical: isTablet ? 16 : 14,
+                                    minWidth: isTablet ? 220 : 180,
                                 }
                             ]}
                             onPress={handleAction}
@@ -142,7 +159,10 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                         >
                             <Text style={[
                                 styles.actionButtonText,
-                                { color: content.backgroundColor || '#1a1a1a' }
+                                {
+                                    color: content.backgroundColor || '#1a1a1a',
+                                    fontSize: isTablet ? 17 : 15,
+                                }
                             ]}>
                                 {content.primaryAction.label}
                             </Text>
@@ -167,7 +187,6 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     contentWrapper: {
-        width: Math.min(SCREEN_WIDTH * 0.85, 340),
         alignItems: 'center',
     },
     closeButton: {
@@ -177,16 +196,16 @@ const styles = StyleSheet.create({
         zIndex: 1000,
     },
     closeButtonBg: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: 'rgba(0,0,0,0.5)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     imageContainer: {
         width: '100%',
-        borderRadius: 12,
+        borderRadius: 14,
         overflow: 'hidden',
         backgroundColor: '#222',
     },
@@ -196,33 +215,27 @@ const styles = StyleSheet.create({
     },
     textContainer: {
         width: '100%',
-        padding: 20,
-        borderBottomLeftRadius: 12,
-        borderBottomRightRadius: 12,
+        borderBottomLeftRadius: 14,
+        borderBottomRightRadius: 14,
         marginTop: -2,
     },
     title: {
-        fontSize: 20,
         fontWeight: '600',
         marginBottom: 6,
         textAlign: 'center',
     },
     message: {
-        fontSize: 14,
-        lineHeight: 20,
+        lineHeight: 22,
         textAlign: 'center',
         opacity: 0.85,
     },
     actionButton: {
-        paddingVertical: 14,
         paddingHorizontal: 32,
         borderRadius: 24,
         marginTop: 16,
-        minWidth: 180,
         alignItems: 'center',
     },
     actionButtonText: {
-        fontSize: 15,
         fontWeight: '600',
     },
 });

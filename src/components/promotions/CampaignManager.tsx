@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Image, Linking, Dimensions } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Image, Linking, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, SlideInUp, SlideOutUp } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,9 +9,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useAccount } from '../../contexts/AccountContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// --- Banner Component ---
 interface BannerProps {
     campaign: Campaign;
     onDismiss: () => void;
@@ -20,7 +17,10 @@ interface BannerProps {
 
 const BannerCampaign: React.FC<BannerProps> = ({ campaign, onDismiss, onAction }) => {
     const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
     const { content } = campaign;
+    const isTablet = width >= 768;
+    const bannerMaxWidth = isTablet ? 600 : width - 24;
 
     const handlePress = () => {
         if (content.primaryAction) {
@@ -41,41 +41,51 @@ const BannerCampaign: React.FC<BannerProps> = ({ campaign, onDismiss, onAction }
             style={[styles.bannerContainer, { paddingTop: insets.top + 8 }]}
         >
             <TouchableOpacity
-                style={[styles.banner, { backgroundColor: content.backgroundColor || '#1a1a1a' }]}
+                style={[
+                    styles.banner,
+                    {
+                        backgroundColor: content.backgroundColor || '#1a1a1a',
+                        maxWidth: bannerMaxWidth,
+                        alignSelf: 'center',
+                        width: '100%',
+                    }
+                ]}
                 onPress={handlePress}
                 activeOpacity={0.9}
             >
                 {content.imageUrl && (
-                    <Image source={{ uri: content.imageUrl }} style={styles.bannerImage} />
+                    <Image
+                        source={{ uri: content.imageUrl }}
+                        style={[styles.bannerImage, { width: isTablet ? 52 : 44, height: isTablet ? 52 : 44 }]}
+                    />
                 )}
                 <View style={styles.bannerContent}>
                     {content.title && (
-                        <Text style={[styles.bannerTitle, { color: content.textColor || '#fff' }]}>
+                        <Text style={[styles.bannerTitle, { color: content.textColor || '#fff', fontSize: isTablet ? 16 : 14 }]}>
                             {content.title}
                         </Text>
                     )}
                     {content.message && (
-                        <Text style={[styles.bannerMessage, { color: content.textColor || '#fff' }]} numberOfLines={2}>
+                        <Text style={[styles.bannerMessage, { color: content.textColor || '#fff', fontSize: isTablet ? 14 : 12 }]} numberOfLines={2}>
                             {content.message}
                         </Text>
                     )}
                 </View>
                 {content.primaryAction?.label && (
-                    <View style={[styles.bannerCta, { backgroundColor: content.textColor || '#fff' }]}>
-                        <Text style={[styles.bannerCtaText, { color: content.backgroundColor || '#1a1a1a' }]}>
+                    <View style={[styles.bannerCta, { backgroundColor: content.textColor || '#fff', paddingHorizontal: isTablet ? 16 : 12 }]}>
+                        <Text style={[styles.bannerCtaText, { color: content.backgroundColor || '#1a1a1a', fontSize: isTablet ? 14 : 12 }]}>
                             {content.primaryAction.label}
                         </Text>
                     </View>
                 )}
                 <TouchableOpacity style={styles.bannerClose} onPress={onDismiss}>
-                    <Ionicons name="close" size={18} color={content.closeButtonColor || '#fff'} />
+                    <Ionicons name="close" size={isTablet ? 22 : 18} color={content.closeButtonColor || '#fff'} />
                 </TouchableOpacity>
             </TouchableOpacity>
         </Animated.View>
     );
 };
 
-// --- Bottom Sheet Component ---
 interface BottomSheetProps {
     campaign: Campaign;
     onDismiss: () => void;
@@ -84,7 +94,13 @@ interface BottomSheetProps {
 
 const BottomSheetCampaign: React.FC<BottomSheetProps> = ({ campaign, onDismiss, onAction }) => {
     const insets = useSafeAreaInsets();
+    const { width, height } = useWindowDimensions();
     const { content } = campaign;
+    const isTablet = width >= 768;
+    const isLandscape = width > height;
+
+    const sheetMaxWidth = isTablet ? 500 : width;
+    const imageMaxHeight = isLandscape ? height * 0.35 : height * 0.3;
 
     const handlePrimaryAction = () => {
         if (content.primaryAction) {
@@ -113,30 +129,47 @@ const BottomSheetCampaign: React.FC<BottomSheetProps> = ({ campaign, onDismiss, 
             <Animated.View
                 entering={SlideInDown.duration(300)}
                 exiting={SlideOutDown.duration(250)}
-                style={[styles.bottomSheet, { paddingBottom: insets.bottom + 24 }]}
+                style={[
+                    styles.bottomSheet,
+                    {
+                        paddingBottom: insets.bottom + 24,
+                        ...(isTablet && {
+                            left: (width - sheetMaxWidth) / 2,
+                            right: (width - sheetMaxWidth) / 2,
+                            borderRadius: 20,
+                            marginBottom: 20,
+                        }),
+                    }
+                ]}
             >
                 <View style={styles.bottomSheetHandle} />
 
                 <TouchableOpacity style={styles.bottomSheetClose} onPress={onDismiss}>
-                    <Ionicons name="close" size={22} color={content.closeButtonColor || '#fff'} />
+                    <Ionicons name="close" size={isTablet ? 26 : 22} color={content.closeButtonColor || '#fff'} />
                 </TouchableOpacity>
 
                 {content.imageUrl && (
                     <Image
                         source={{ uri: content.imageUrl }}
-                        style={[styles.bottomSheetImage, { aspectRatio: content.aspectRatio || 1.5 }]}
+                        style={[
+                            styles.bottomSheetImage,
+                            {
+                                aspectRatio: content.aspectRatio || 1.5,
+                                maxHeight: imageMaxHeight,
+                            }
+                        ]}
                         resizeMode="cover"
                     />
                 )}
 
                 <View style={styles.bottomSheetContent}>
                     {content.title && (
-                        <Text style={[styles.bottomSheetTitle, { color: content.textColor || '#fff' }]}>
+                        <Text style={[styles.bottomSheetTitle, { color: content.textColor || '#fff', fontSize: isTablet ? 24 : 20 }]}>
                             {content.title}
                         </Text>
                     )}
                     {content.message && (
-                        <Text style={[styles.bottomSheetMessage, { color: content.textColor || '#fff' }]}>
+                        <Text style={[styles.bottomSheetMessage, { color: content.textColor || '#fff', fontSize: isTablet ? 16 : 14 }]}>
                             {content.message}
                         </Text>
                     )}
@@ -144,11 +177,11 @@ const BottomSheetCampaign: React.FC<BottomSheetProps> = ({ campaign, onDismiss, 
 
                 {content.primaryAction && (
                     <TouchableOpacity
-                        style={[styles.bottomSheetButton, { backgroundColor: content.textColor || '#fff' }]}
+                        style={[styles.bottomSheetButton, { backgroundColor: content.textColor || '#fff', paddingVertical: isTablet ? 16 : 14 }]}
                         onPress={handlePrimaryAction}
                         activeOpacity={0.8}
                     >
-                        <Text style={[styles.bottomSheetButtonText, { color: content.backgroundColor || '#1a1a1a' }]}>
+                        <Text style={[styles.bottomSheetButtonText, { color: content.backgroundColor || '#1a1a1a', fontSize: isTablet ? 17 : 15 }]}>
                             {content.primaryAction.label}
                         </Text>
                     </TouchableOpacity>
@@ -158,7 +191,6 @@ const BottomSheetCampaign: React.FC<BottomSheetProps> = ({ campaign, onDismiss, 
     );
 };
 
-// --- Campaign Manager ---
 export const CampaignManager: React.FC = () => {
     const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -190,7 +222,6 @@ export const CampaignManager: React.FC = () => {
     const handleDismiss = useCallback(() => {
         setIsVisible(false);
 
-        // After animation completes, check for next campaign
         setTimeout(() => {
             const nextCampaign = campaignService.getNextCampaign();
             console.log('[CampaignManager] Next campaign:', nextCampaign?.id, nextCampaign?.type);
@@ -202,7 +233,7 @@ export const CampaignManager: React.FC = () => {
             } else {
                 setActiveCampaign(null);
             }
-        }, 350); // Wait for exit animation
+        }, 350);
     }, []);
 
     const handleAction = useCallback((action: CampaignAction) => {
@@ -252,7 +283,6 @@ export const CampaignManager: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-    // Banner styles
     bannerContainer: {
         position: 'absolute',
         top: 0,
@@ -264,48 +294,40 @@ const styles = StyleSheet.create({
     banner: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 12,
-        borderRadius: 12,
+        padding: 14,
+        borderRadius: 14,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 8,
     },
     bannerImage: {
-        width: 44,
-        height: 44,
-        borderRadius: 8,
+        borderRadius: 10,
         marginRight: 12,
     },
     bannerContent: {
         flex: 1,
     },
     bannerTitle: {
-        fontSize: 14,
         fontWeight: '600',
         marginBottom: 2,
     },
     bannerMessage: {
-        fontSize: 12,
         opacity: 0.8,
     },
     bannerCta: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 14,
-        marginLeft: 8,
+        paddingVertical: 8,
+        borderRadius: 16,
+        marginLeft: 10,
     },
     bannerCtaText: {
-        fontSize: 12,
         fontWeight: '600',
     },
     bannerClose: {
-        padding: 4,
+        padding: 6,
         marginLeft: 8,
     },
-
-    // Bottom sheet styles
     backdrop: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -316,53 +338,49 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: '#1a1a1a',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingHorizontal: 20,
-        paddingTop: 12,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 24,
+        paddingTop: 14,
     },
     bottomSheetHandle: {
-        width: 36,
+        width: 40,
         height: 4,
         backgroundColor: 'rgba(255,255,255,0.2)',
         borderRadius: 2,
         alignSelf: 'center',
-        marginBottom: 16,
+        marginBottom: 18,
     },
     bottomSheetClose: {
         position: 'absolute',
-        top: 16,
-        right: 16,
+        top: 18,
+        right: 18,
         zIndex: 10,
         padding: 4,
     },
     bottomSheetImage: {
         width: '100%',
-        borderRadius: 10,
-        marginBottom: 16,
+        borderRadius: 12,
+        marginBottom: 18,
     },
     bottomSheetContent: {
-        marginBottom: 20,
+        marginBottom: 22,
     },
     bottomSheetTitle: {
-        fontSize: 20,
         fontWeight: '600',
-        marginBottom: 8,
+        marginBottom: 10,
         textAlign: 'center',
     },
     bottomSheetMessage: {
-        fontSize: 14,
         opacity: 0.8,
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 22,
     },
     bottomSheetButton: {
-        paddingVertical: 14,
-        borderRadius: 24,
+        borderRadius: 26,
         alignItems: 'center',
     },
     bottomSheetButtonText: {
-        fontSize: 15,
         fontWeight: '600',
     },
 });
