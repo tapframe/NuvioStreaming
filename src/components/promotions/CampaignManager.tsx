@@ -205,9 +205,22 @@ export const CampaignManager: React.FC = () => {
         }, 350); // Wait for exit animation
     }, []);
 
-    const handleAction = (action: CampaignAction) => {
+    const handleAction = useCallback((action: CampaignAction) => {
         console.log('[CampaignManager] Action:', action);
-    };
+
+        if (action.type === 'navigate' && action.value) {
+            handleDismiss();
+            setTimeout(() => {
+                try {
+                    (navigation as any).navigate(action.value);
+                } catch (error) {
+                    console.warn('[CampaignManager] Navigation failed:', error);
+                }
+            }, 400);
+        } else if (action.type === 'link' && action.value) {
+            Linking.openURL(action.value);
+        }
+    }, [navigation, handleDismiss]);
 
     if (!activeCampaign || !isVisible) return null;
 
