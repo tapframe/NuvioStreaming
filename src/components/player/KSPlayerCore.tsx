@@ -310,8 +310,12 @@ const KSPlayerCore: React.FC = () => {
     const cueNow = customSubs.customSubtitles.find(
       cue => adjustedTime >= cue.start && adjustedTime <= cue.end
     );
-    customSubs.setCurrentSubtitle(cueNow ? cueNow.text : '');
-  }, [currentTime, customSubs.useCustomSubtitles, customSubs.customSubtitles, customSubs.subtitleOffsetSec]);
+    const newText = cueNow ? cueNow.text : '';
+    // Only update state if the text has changed to avoid unnecessary re-renders
+    if (newText !== customSubs.currentSubtitle) {
+      customSubs.setCurrentSubtitle(newText);
+    }
+  }, [currentTime, customSubs.useCustomSubtitles, customSubs.customSubtitles, customSubs.subtitleOffsetSec, customSubs.currentSubtitle]);
 
   // Handlers
   const onLoad = (data: any) => {
@@ -487,7 +491,11 @@ const KSPlayerCore: React.FC = () => {
           if (!isSliderDragging) {
             setCurrentTime(d.currentTime);
           }
-          setBuffered(d.buffered || 0);
+          // Only update buffered if it changed by more than 0.5s to reduce re-renders
+          const newBuffered = d.buffered || 0;
+          if (Math.abs(newBuffered - buffered) > 0.5) {
+            setBuffered(newBuffered);
+          }
         }}
         onEnd={async () => {
           setCurrentTime(duration);
