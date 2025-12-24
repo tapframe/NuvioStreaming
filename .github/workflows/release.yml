@@ -27,17 +27,7 @@ jobs:
           
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
-
-      - name: Fix react-native-bottom-tabs plugin
-        run: |
-          # Patch app.plugin.js to require the CommonJS module instead of the ESM one
-          if [ -f node_modules/react-native-bottom-tabs/app.plugin.js ]; then
-            sed -i "s|require('./lib/module/expo')|require('./lib/commonjs/expo')|g" node_modules/react-native-bottom-tabs/app.plugin.js
-            echo "Patched react-native-bottom-tabs/app.plugin.js"
-          else
-            echo "File node_modules/react-native-bottom-tabs/app.plugin.js not found, skipping patch."
-          fi
-
+        
       - name: Build Android App
         env:
           SENTRY_DISABLE_AUTO_UPLOAD: true
