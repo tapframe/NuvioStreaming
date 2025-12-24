@@ -9,7 +9,6 @@ import { isMkvStream } from './mkvDetection';
 export interface PlayerSelectionOptions {
   uri: string;
   headers?: Record<string, string>;
-  forceVlc?: boolean;
   platform?: typeof Platform.OS;
 }
 
@@ -19,10 +18,9 @@ export interface PlayerSelectionOptions {
 export const shouldUseKSPlayer = ({
   uri,
   headers,
-  forceVlc = false,
   platform = Platform.OS
 }: PlayerSelectionOptions): boolean => {
-  // Android always uses AndroidVideoPlayer (react-native-video)
+  // Android always uses AndroidVideoPlayer (MPV)
   if (platform === 'android') {
     return false;
   }

@@ -39,6 +39,7 @@ import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
 import TMDBIcon from '../components/icons/TMDBIcon';
 import MDBListIcon from '../components/icons/MDBListIcon';
+import { campaignService } from '../services/campaignService';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -797,6 +798,17 @@ const SettingsScreen: React.FC = () => {
                 } catch (error) {
                   openAlert('Error', 'Failed to reset announcement.');
                 }
+              }}
+              renderControl={ChevronRight}
+              isTablet={isTablet}
+            />
+            <SettingItem
+              title="Reset Campaigns"
+              description="Clear campaign impressions"
+              icon="refresh-cw"
+              onPress={async () => {
+                await campaignService.resetCampaigns();
+                openAlert('Success', 'Campaign history reset. Restart app to see posters again.');
               }}
               renderControl={ChevronRight}
               isTablet={isTablet}

@@ -977,7 +977,6 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           streamProvider: cachedStream.stream.addonId || cachedStream.stream.addonName || cachedStream.stream.name,
           streamName: cachedStream.stream.name || cachedStream.stream.title || 'Unnamed Stream',
           headers: cachedStream.stream.headers || undefined,
-          forceVlc: false,
           id: item.id,
           type: item.type,
           episodeId: episodeId,

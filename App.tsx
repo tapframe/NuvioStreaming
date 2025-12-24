@@ -42,6 +42,7 @@ import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { mmkvStorage } from './src/services/mmkvStorage';
 import AnnouncementOverlay from './src/components/AnnouncementOverlay';
+import { CampaignManager } from './src/components/promotions/CampaignManager';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -232,6 +233,7 @@ const ThemedApp = () => {
                 onActionPress={handleNavigateToDebrid}
                 actionButtonText="Connect Now"
               />
+              <CampaignManager />
             </View>
           </DownloadsProvider>
         </NavigationContainer>

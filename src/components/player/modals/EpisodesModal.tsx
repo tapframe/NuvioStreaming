@@ -170,3 +170,5 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
     </View>
   );
 };
+
+export default EpisodesModal;

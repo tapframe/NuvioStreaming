@@ -200,4 +200,35 @@ export const detectRTL = (text: string): boolean => {
   // Consider RTL if at least 30% of non-whitespace characters are RTL
   // This handles mixed-language subtitles (e.g., Arabic with English numbers)
   return rtlCount / nonWhitespace.length >= 0.3;
+};
+
+// Check if a URL is an HLS stream
+export const isHlsStream = (url: string | undefined): boolean => {
+  if (!url) return false;
+  return url.includes('.m3u8') || url.includes('.m3u');
+};
+
+// Process URL for VLC to handle specific protocol requirements
+export const processUrlForVLC = (url: string | undefined): string => {
+  if (!url) return '';
+  // Some HLS streams need to be passed with specific protocols for VLC
+  if (url.startsWith('https://') && isHlsStream(url)) {
+    // Standard HTTPS is usually fine, but some implementations might prefer http
+    return url;
+  }
+  return url;
+};
+
+// Default headers for Android requests
+export const defaultAndroidHeaders = {
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 10; Mobile; rv:89.0) Gecko/89.0 Firefox/89.0',
+  'Accept': '*/*'
+};
+
+// Get specific headers for HLS streams
+export const getHlsHeaders = () => {
+  return {
+    ...defaultAndroidHeaders,
+    'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, application/json, text/plain',
+  };
 }; 

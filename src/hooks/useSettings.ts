@@ -88,6 +88,8 @@ export interface AppSettings {
   streamCacheTTL: number; // Stream cache duration in milliseconds (default: 1 hour)
   enableStreamsBackdrop: boolean; // Enable blurred backdrop background on StreamsScreen mobile
   useExternalPlayerForDownloads: boolean; // Enable/disable external player for downloaded content
+  // Android MPV player settings
+  useHardwareDecoding: boolean; // Enable hardware decoding for MPV player on Android (default: false for software decoding)
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -149,6 +151,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   openMetadataScreenWhenCacheDisabled: true, // Default to StreamsScreen when cache disabled
   streamCacheTTL: 60 * 60 * 1000, // Default: 1 hour in milliseconds
   enableStreamsBackdrop: true, // Enable by default (new behavior)
+  // Android MPV player settings
+  useHardwareDecoding: false, // Default to software decoding (more compatible)
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
