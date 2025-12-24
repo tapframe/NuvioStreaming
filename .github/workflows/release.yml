@@ -13,6 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -22,16 +28,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Build app
+      - name: Build Android App
         run: |
-          npm run build
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
           
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             android/app/build/outputs/apk/release/*.apk
-          body_path: ALPHA_BUILD_2_ANNOUNCEMENT.md
           draft: true
           prerelease: true
           generate_release_notes: true 
