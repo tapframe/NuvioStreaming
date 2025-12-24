@@ -1,19 +1,13 @@
 import { mmkvStorage } from './mmkvStorage';
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 
-// --- Configuration ---
-// Dev: Uses Mac's LAN IP for physical device testing (run: ipconfig getifaddr en0)
-// Prod: Uses EXPO_PUBLIC_CAMPAIGN_API_URL from .env
-const CAMPAIGN_API_URL = __DEV__
-    ? 'http://192.168.1.5:3000'
-    : Constants.expoConfig?.extra?.CAMPAIGN_API_URL || process.env.EXPO_PUBLIC_CAMPAIGN_API_URL || '';
-
-// --- Types ---
+const DEV_URL = 'http://192.168.1.5:3000';
+const PROD_URL = process.env.EXPO_PUBLIC_CAMPAIGN_API_URL || '';
+const CAMPAIGN_API_URL = __DEV__ ? DEV_URL : PROD_URL;
 
 export type CampaignAction = {
     type: 'link' | 'navigate' | 'dismiss';
-    value?: string; // URL or Route Name
+    value?: string;
     label: string;
     style?: 'primary' | 'secondary' | 'outline';
 };
@@ -49,32 +43,25 @@ export type Campaign = {
     rules: CampaignRules;
 };
 
-// --- Service ---
-
 class CampaignService {
     private sessionImpressions: Set<string>;
     private campaignQueue: Campaign[] = [];
     private currentIndex: number = 0;
     private lastFetch: number = 0;
-    private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    private readonly CACHE_TTL = 5 * 60 * 1000;
 
     constructor() {
         this.sessionImpressions = new Set();
     }
 
-    /**
-     * Fetches all active campaigns and returns the next valid one in the queue.
-     */
     async getActiveCampaign(): Promise<Campaign | null> {
         try {
             const now = Date.now();
 
-            // If we have campaigns in queue and cache is still valid, get next valid one
             if (this.campaignQueue.length > 0 && (now - this.lastFetch) < this.CACHE_TTL) {
                 return this.getNextValidCampaign();
             }
 
-            // Fetch all campaigns from server
             const platform = Platform.OS;
             const response = await fetch(
                 `${CAMPAIGN_API_URL}/api/campaigns/queue?platform=${platform}`,
@@ -98,7 +85,6 @@ class CampaignService {
                 return null;
             }
 
-            // Resolve relative image URLs
             campaigns.forEach((campaign: Campaign) => {
                 if (campaign.content?.imageUrl && campaign.content.imageUrl.startsWith('/')) {
                     campaign.content.imageUrl = `${CAMPAIGN_API_URL}${campaign.content.imageUrl}`;
@@ -116,9 +102,6 @@ class CampaignService {
         }
     }
 
-    /**
-     * Gets the next valid campaign from the queue.
-     */
     private getNextValidCampaign(): Campaign | null {
         while (this.currentIndex < this.campaignQueue.length) {
             const campaign = this.campaignQueue[this.currentIndex];
@@ -130,26 +113,18 @@ class CampaignService {
         return null;
     }
 
-    /**
-     * Moves to the next campaign in the queue and returns it.
-     */
     getNextCampaign(): Campaign | null {
         this.currentIndex++;
         return this.getNextValidCampaign();
     }
 
-    /**
-     * Validates campaign against local-only rules.
-     */
     private isLocallyValid(campaign: Campaign): boolean {
         const { rules } = campaign;
 
-        // Show once per user (persisted forever)
         if (rules.showOncePerUser && this.hasSeenCampaign(campaign.id)) {
             return false;
         }
 
-        // Impression limit check
         if (rules.maxImpressions) {
             const impressionCount = this.getImpressionCount(campaign.id);
             if (impressionCount >= rules.maxImpressions) {
@@ -157,7 +132,6 @@ class CampaignService {
             }
         }
 
-        // Session check
         if (rules.showOncePerSession && this.sessionImpressions.has(campaign.id)) {
             return false;
         }
@@ -200,9 +174,6 @@ class CampaignService {
         this.lastFetch = 0;
     }
 
-    /**
-     * Returns remaining campaigns in queue count.
-     */
     getRemainingCount(): number {
         let count = 0;
         for (let i = this.currentIndex; i < this.campaignQueue.length; i++) {
