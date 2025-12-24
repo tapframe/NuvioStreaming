@@ -1,7 +1,7 @@
 import { mmkvStorage } from './mmkvStorage';
 import { Platform } from 'react-native';
 
-const DEV_URL = 'https://campaign.nuvioapp.space/';
+const DEV_URL = 'http://192.168.1.5:3000';
 const PROD_URL = process.env.EXPO_PUBLIC_CAMPAIGN_API_URL || '';
 const CAMPAIGN_API_URL = __DEV__ ? DEV_URL : PROD_URL;
 
