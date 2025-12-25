@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { parentalGuideService } from '../../../services/parentalGuideService';
 import { logger } from '../../../utils/logger';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 interface ParentalGuideOverlayProps {
     imdbId: string | undefined;
@@ -42,16 +43,17 @@ const ROW_HEIGHT = 18;
 const WarningItemView: React.FC<{
     item: WarningItem;
     opacity: SharedValue<number>;
-}> = ({ item, opacity }) => {
+    fontSize: number;
+}> = ({ item, opacity, fontSize }) => {
     const animatedStyle = useAnimatedStyle(() => ({
         opacity: opacity.value,
     }));
 
     return (
         <Animated.View style={[styles.warningItem, animatedStyle]}>
-            <Text style={styles.label}>{item.label}</Text>
-            <Text style={styles.separator}>·</Text>
-            <Text style={styles.severity}>{item.severity}</Text>
+            <Text style={[styles.label, { fontSize }]}>{item.label}</Text>
+            <Text style={[styles.separator, { fontSize }]}>·</Text>
+            <Text style={[styles.severity, { fontSize }]}>{item.severity}</Text>
         </Animated.View>
     );
 };
@@ -63,6 +65,8 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
     episode,
     shouldShow,
 }) => {
+    const { currentTheme } = useTheme();
+    const screenWidth = Dimensions.get('window').width;
     const [warnings, setWarnings] = useState<WarningItem[]>([]);
     const [isVisible, setIsVisible] = useState(false);
     const hasShownRef = useRef(false);
@@ -222,10 +226,15 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
         return null;
     }
 
+    // Responsive sizing
+    const fontSize = Math.min(11, screenWidth * 0.014);
+    const lineWidth = Math.min(3, screenWidth * 0.0038);
+    const containerPadding = Math.min(20, screenWidth * 0.025);
+
     return (
-        <Animated.View style={[styles.container, containerStyle]} pointerEvents="none">
+        <Animated.View style={[styles.container, { left: containerPadding, top: containerPadding + 30 }]} pointerEvents="none">
             {/* Vertical line - animates height */}
-            <Animated.View style={[styles.line, lineStyle]} />
+            <Animated.View style={[styles.line, lineStyle, { backgroundColor: currentTheme.colors.primary, width: lineWidth }]} />
 
             {/* Warning items */}
             <View style={styles.itemsContainer}>
@@ -234,6 +243,7 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
                         key={item.label}
                         item={item}
                         opacity={itemOpacities[index]}
+                        fontSize={fontSize}
                     />
                 ))}
             </View>
@@ -244,15 +254,11 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
 const styles = StyleSheet.create({
     container: {
         position: 'absolute',
-        top: 50,
-        left: 16,
         flexDirection: 'row',
         alignItems: 'flex-start',
         zIndex: 100,
     },
     line: {
-        width: 2,
-        backgroundColor: 'rgba(255, 255, 255, 0.5)',
         borderRadius: 1,
         marginRight: 10,
     },
