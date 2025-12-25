@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { storageService } from '../../../../services/storageService';
-import { logger } from '../../../../utils/logger';
-import { useSettings } from '../../../../hooks/useSettings';
+import { storageService } from '../../../services/storageService';
+import { logger } from '../../../utils/logger';
+import { useSettings } from '../../../hooks/useSettings';
 
 export const useWatchProgress = (
     id: string | undefined,

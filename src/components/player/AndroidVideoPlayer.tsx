@@ -10,13 +10,14 @@ import {
   usePlayerState,
   usePlayerModals,
   useSpeedControl,
-  useOpeningAnimation
+  useOpeningAnimation,
+  useWatchProgress
 } from './hooks';
 
 // Android-specific hooks
 import { usePlayerSetup } from './android/hooks/usePlayerSetup';
 import { usePlayerTracks } from './android/hooks/usePlayerTracks';
-import { useWatchProgress } from './android/hooks/useWatchProgress';
+
 import { usePlayerControls } from './android/hooks/usePlayerControls';
 import { useNextEpisode } from './android/hooks/useNextEpisode';
 

@@ -46,10 +46,7 @@ export const usePlayerControls = (config: PlayerControlsConfig) => {
             isSeeking.current = true;
 
             // iOS optimization: pause while seeking for smoother experience
-            if (Platform.OS === 'ios') {
-                iosWasPausedDuringSeekRef.current = paused;
-                if (!paused) setPaused(true);
-            }
+
 
             // Actually perform the seek
             playerRef.current.seek(timeInSeconds);
@@ -59,10 +56,7 @@ export const usePlayerControls = (config: PlayerControlsConfig) => {
                 if (isMounted.current && isSeeking.current) {
                     isSeeking.current = false;
                     // Resume if it was playing (iOS specific)
-                    if (Platform.OS === 'ios' && iosWasPausedDuringSeekRef.current === false) {
-                        setPaused(false);
-                        iosWasPausedDuringSeekRef.current = null;
-                    }
+
                 }
             }, 500);
         }

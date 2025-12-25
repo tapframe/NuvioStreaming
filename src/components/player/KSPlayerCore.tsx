@@ -16,6 +16,7 @@ import EpisodesModal from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { ErrorModal } from './modals/ErrorModal';
 import CustomSubtitles from './subtitles/CustomSubtitles';
+import ResumeOverlay from './modals/ResumeOverlay';
 import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './components';
 
 // Platform-specific components
@@ -30,7 +31,8 @@ import {
   usePlayerTracks,
   useCustomSubtitles,
   usePlayerControls,
-  usePlayerSetup
+  usePlayerSetup,
+  useWatchProgress
 } from './hooks';
 
 // Platform-specific hooks
@@ -137,6 +139,15 @@ const KSPlayerCore: React.FC = () => {
     isMounted
   });
 
+  const watchProgress = useWatchProgress(
+    id, type, episodeId,
+    currentTime,
+    duration,
+    paused,
+    traktAutosync,
+    controls.seekToTime
+  );
+
   // Gestures
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -157,9 +168,6 @@ const KSPlayerCore: React.FC = () => {
   const [brightness, setBrightnessState] = useState(0.5);
   const [isSliderDragging, setIsSliderDragging] = useState(false);
 
-  // Watch Progress State
-  const [initialPosition, setInitialPosition] = useState<number | null>(routeInitialPosition || null);
-
   // Shared Gesture Hook
   const gestureControls = usePlayerGestureControls({
     volume: volume,
@@ -173,7 +181,8 @@ const KSPlayerCore: React.FC = () => {
     setScreenDimensions,
     setVolume: setVolumeState,
     setBrightness: setBrightnessState,
-    isOpeningAnimationComplete: openingAnim.isOpeningAnimationComplete
+    isOpeningAnimationComplete: openingAnim.isOpeningAnimationComplete,
+    paused: paused
   });
 
   // Refs for Logic
@@ -328,9 +337,10 @@ const KSPlayerCore: React.FC = () => {
     openingAnim.completeOpeningAnimation();
 
     // Initial Seek
-    if (initialPosition && initialPosition > 0) {
+    const resumeTarget = routeInitialPosition || watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
+    if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && data.duration > 0) {
       setTimeout(() => {
-        controls.seekToTime(initialPosition);
+        controls.seekToTime(resumeTarget);
       }, 500);
     }
 
@@ -600,6 +610,23 @@ const KSPlayerCore: React.FC = () => {
         visible={speedControl.showSpeedActivatedOverlay}
         opacity={speedControl.speedActivatedOverlayOpacity}
         speed={speedControl.holdToSpeedValue}
+      />
+
+      <ResumeOverlay
+        showResumeOverlay={watchProgress.showResumeOverlay}
+        resumePosition={watchProgress.resumePosition}
+        duration={watchProgress.savedDuration || duration}
+        title={title}
+        season={season}
+        episode={episode}
+        handleResume={() => {
+          watchProgress.setShowResumeOverlay(false);
+          if (watchProgress.resumePosition) controls.seekToTime(watchProgress.resumePosition);
+        }}
+        handleStartFromBeginning={() => {
+          watchProgress.setShowResumeOverlay(false);
+          controls.seekToTime(0);
+        }}
       />
 
       {/* Pause Overlay */}

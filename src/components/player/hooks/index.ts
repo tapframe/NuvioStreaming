@@ -19,3 +19,4 @@ export { usePlayerSetup } from './usePlayerSetup';
 
 // Content
 export { useNextEpisode } from './useNextEpisode';
+export { useWatchProgress } from './useWatchProgress';

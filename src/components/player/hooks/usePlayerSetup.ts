@@ -1,12 +1,8 @@
-/**
- * Shared Player Setup Hook
- * Used by both Android (VLC) and iOS (KSPlayer) players
- * Handles StatusBar, orientation, brightness, and app state
- */
 import { useEffect, useRef, useCallback } from 'react';
 import { StatusBar, Dimensions, AppState, InteractionManager, Platform } from 'react-native';
 import * as Brightness from 'expo-brightness';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { logger } from '../../../utils/logger';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -15,6 +11,7 @@ interface PlayerSetupConfig {
     setVolume: (vol: number) => void;
     setBrightness: (bri: number) => void;
     isOpeningAnimationComplete: boolean;
+    paused: boolean;
 }
 
 export const usePlayerSetup = (config: PlayerSetupConfig) => {
@@ -22,8 +19,22 @@ export const usePlayerSetup = (config: PlayerSetupConfig) => {
         setScreenDimensions,
         setVolume,
         setBrightness,
-        isOpeningAnimationComplete
+        isOpeningAnimationComplete,
+        paused
     } = config;
+
+    // Prevent screen sleep while playing
+    // Prevent screen sleep while playing
+    useEffect(() => {
+        if (!paused) {
+            activateKeepAwakeAsync();
+        } else {
+            deactivateKeepAwake();
+        }
+        return () => {
+            deactivateKeepAwake();
+        };
+    }, [paused]);
 
     const isAppBackgrounded = useRef(false);
 

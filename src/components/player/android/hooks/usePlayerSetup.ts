@@ -3,6 +3,7 @@ import { StatusBar, Platform, Dimensions, AppState } from 'react-native';
 import RNImmersiveMode from 'react-native-immersive-mode';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Brightness from 'expo-brightness';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { logger } from '../../../../utils/logger';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
@@ -18,6 +19,19 @@ export const usePlayerSetup = (
     const originalSystemBrightnessRef = useRef<number | null>(null);
     const originalSystemBrightnessModeRef = useRef<number | null>(null);
     const isAppBackgrounded = useRef(false);
+
+    // Prevent screen sleep while playing
+    // Prevent screen sleep while playing
+    useEffect(() => {
+        if (!paused) {
+            activateKeepAwakeAsync();
+        } else {
+            deactivateKeepAwake();
+        }
+        return () => {
+            deactivateKeepAwake();
+        };
+    }, [paused]);
 
     const enableImmersiveMode = async () => {
         if (Platform.OS === 'android') {
