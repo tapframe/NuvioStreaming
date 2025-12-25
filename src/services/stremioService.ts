@@ -1691,34 +1691,85 @@ class StremioService {
     await this.ensureInitialized();
     // Collect from all installed addons that expose a subtitles resource
     const addons = this.getInstalledAddons();
+
+    // The ID to check for prefix matching - use videoId for series (e.g., tt1234567:1:1), otherwise use id
+    const idForChecking = type === 'series' && videoId
+      ? videoId.replace('series:', '')
+      : id;
+
     const subtitleAddons = addons.filter(addon => {
       if (!addon.resources) return false;
-      return addon.resources.some((resource: any) => {
+
+      // Check if addon has subtitles resource
+      const subtitlesResource = addon.resources.find((resource: any) => {
         if (typeof resource === 'string') return resource === 'subtitles';
         return resource && resource.name === 'subtitles';
       });
+
+      if (!subtitlesResource) return false;
+
+      // Check type support - either from the resource object or addon-level types
+      let supportsType = true;
+      if (typeof subtitlesResource === 'object' && subtitlesResource.types) {
+        supportsType = subtitlesResource.types.includes(type);
+      } else if (addon.types) {
+        supportsType = addon.types.includes(type);
+      }
+
+      if (!supportsType) {
+        logger.log(`[getSubtitles] Addon ${addon.name} does not support type ${type}`);
+        return false;
+      }
+
+      // Check idPrefixes - either from the resource object or addon-level
+      let supportsIdPrefix = true;
+      let idPrefixes: string[] | undefined;
+
+      if (typeof subtitlesResource === 'object' && subtitlesResource.idPrefixes) {
+        idPrefixes = subtitlesResource.idPrefixes;
+      } else if (addon.idPrefixes) {
+        idPrefixes = addon.idPrefixes;
+      }
+
+      if (idPrefixes && idPrefixes.length > 0) {
+        supportsIdPrefix = idPrefixes.some(prefix => idForChecking.startsWith(prefix));
+      }
+
+      if (!supportsIdPrefix) {
+        logger.log(`[getSubtitles] Addon ${addon.name} does not support ID prefix for ${idForChecking} (requires: ${idPrefixes?.join(', ')})`);
+        return false;
+      }
+
+      return true;
     });
 
     if (subtitleAddons.length === 0) {
-      logger.warn('No subtitle-capable addons installed');
+      logger.warn('No subtitle-capable addons installed that support the requested type/id');
       return [];
     }
+
+    logger.log(`[getSubtitles] Found ${subtitleAddons.length} subtitle addons for ${type}/${id}: ${subtitleAddons.map(a => a.name).join(', ')}`);
 
     const requests = subtitleAddons.map(async (addon) => {
       if (!addon.url) return [] as Subtitle[];
       try {
-        const { baseUrl } = this.getAddonBaseURL(addon.url || '');
+        const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url || '');
         let url = '';
         if (type === 'series' && videoId) {
           const episodeInfo = encodeURIComponent(videoId.replace('series:', ''));
-          url = `${baseUrl}/subtitles/series/${episodeInfo}.json`;
+          url = queryParams
+            ? `${baseUrl}/subtitles/series/${episodeInfo}.json?${queryParams}`
+            : `${baseUrl}/subtitles/series/${episodeInfo}.json`;
         } else {
           const encodedId = encodeURIComponent(id);
-          url = `${baseUrl}/subtitles/${type}/${encodedId}.json`;
+          url = queryParams
+            ? `${baseUrl}/subtitles/${type}/${encodedId}.json?${queryParams}`
+            : `${baseUrl}/subtitles/${type}/${encodedId}.json`;
         }
-        logger.log(`Fetching subtitles from ${addon.name}: ${url}`);
+        logger.log(`[getSubtitles] Fetching subtitles from ${addon.name}: ${url}`);
         const response = await this.retryRequest(async () => axios.get(url, { timeout: 10000 }));
         if (response.data && Array.isArray(response.data.subtitles)) {
+          logger.log(`[getSubtitles] Got ${response.data.subtitles.length} subtitles from ${addon.name}`);
           return response.data.subtitles.map((sub: any, index: number) => ({
             // Ensure ID is always present per protocol (required field)
             id: sub.id || `${addon.id}-${sub.lang || 'unknown'}-${index}`,
@@ -1726,9 +1777,11 @@ class StremioService {
             addon: addon.id,
             addonName: addon.name,
           })) as Subtitle[];
+        } else {
+          logger.log(`[getSubtitles] No subtitles array in response from ${addon.name}`);
         }
-      } catch (error) {
-        logger.error(`Failed to fetch subtitles from ${addon.name}:`, error);
+      } catch (error: any) {
+        logger.error(`[getSubtitles] Failed to fetch subtitles from ${addon.name}:`, error?.message || error);
       }
       return [] as Subtitle[];
     });
@@ -1744,6 +1797,7 @@ class StremioService {
       seen.add(key);
       return true;
     });
+    logger.log(`[getSubtitles] Total: ${deduped.length} unique subtitles from all addons`);
     return deduped;
   }
 

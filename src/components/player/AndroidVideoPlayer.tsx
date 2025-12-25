@@ -39,6 +39,7 @@ import { EpisodesModal } from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { ErrorModal } from './modals/ErrorModal';
 import { CustomSubtitles } from './subtitles/CustomSubtitles';
+import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
@@ -657,6 +658,15 @@ const AndroidVideoPlayer: React.FC = () => {
           description={nextEpisodeHook.currentEpisodeDescription || ''}
           cast={cast}
           screenDimensions={playerState.screenDimensions}
+        />
+
+        {/* Parental Guide Overlay - Shows after controls first hide */}
+        <ParentalGuideOverlay
+          imdbId={imdbId || (id?.startsWith('tt') ? id : undefined)}
+          type={type as 'movie' | 'series'}
+          season={season}
+          episode={episode}
+          shouldShow={playerState.isVideoLoaded && !playerState.showControls && !playerState.paused}
         />
       </View>
 

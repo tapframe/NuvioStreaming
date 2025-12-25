@@ -1,0 +1,284 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    withDelay,
+    Easing,
+    SharedValue,
+} from 'react-native-reanimated';
+import { parentalGuideService } from '../../../services/parentalGuideService';
+import { logger } from '../../../utils/logger';
+
+interface ParentalGuideOverlayProps {
+    imdbId: string | undefined;
+    type: 'movie' | 'series';
+    season?: number;
+    episode?: number;
+    shouldShow: boolean;
+}
+
+interface WarningItem {
+    label: string;
+    severity: string;
+}
+
+const formatLabel = (key: string): string => {
+    const labels: Record<string, string> = {
+        nudity: 'Nudity',
+        violence: 'Violence',
+        profanity: 'Profanity',
+        alcohol: 'Alcohol/Drugs',
+        frightening: 'Frightening',
+    };
+    return labels[key] || key;
+};
+
+// Row height for calculating line animation
+const ROW_HEIGHT = 18;
+
+// Separate component for each warning item
+const WarningItemView: React.FC<{
+    item: WarningItem;
+    opacity: SharedValue<number>;
+}> = ({ item, opacity }) => {
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
+
+    return (
+        <Animated.View style={[styles.warningItem, animatedStyle]}>
+            <Text style={styles.label}>{item.label}</Text>
+            <Text style={styles.separator}>·</Text>
+            <Text style={styles.severity}>{item.severity}</Text>
+        </Animated.View>
+    );
+};
+
+export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
+    imdbId,
+    type,
+    season,
+    episode,
+    shouldShow,
+}) => {
+    const [warnings, setWarnings] = useState<WarningItem[]>([]);
+    const [isVisible, setIsVisible] = useState(false);
+    const hasShownRef = useRef(false);
+    const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Animation values
+    const lineHeight = useSharedValue(0);
+    const containerOpacity = useSharedValue(0);
+    const itemOpacity0 = useSharedValue(0);
+    const itemOpacity1 = useSharedValue(0);
+    const itemOpacity2 = useSharedValue(0);
+    const itemOpacity3 = useSharedValue(0);
+    const itemOpacity4 = useSharedValue(0);
+
+    const itemOpacities = [itemOpacity0, itemOpacity1, itemOpacity2, itemOpacity3, itemOpacity4];
+
+    // Fetch parental guide data
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!imdbId) return;
+
+            try {
+                let data;
+                if (type === 'movie') {
+                    data = await parentalGuideService.getMovieGuide(imdbId);
+                } else if (type === 'series' && season && episode) {
+                    data = await parentalGuideService.getTVGuide(imdbId, season, episode);
+                }
+
+                if (data && data.parentalGuide) {
+                    const guide = data.parentalGuide;
+                    const items: WarningItem[] = [];
+
+                    Object.entries(guide).forEach(([key, severity]) => {
+                        if (severity && severity.toLowerCase() !== 'none') {
+                            items.push({
+                                label: formatLabel(key),
+                                severity: severity,
+                            });
+                        }
+                    });
+
+                    const severityOrder = { severe: 0, moderate: 1, mild: 2, none: 3 };
+                    items.sort((a, b) => {
+                        const orderA = severityOrder[a.severity.toLowerCase() as keyof typeof severityOrder] ?? 3;
+                        const orderB = severityOrder[b.severity.toLowerCase() as keyof typeof severityOrder] ?? 3;
+                        return orderA - orderB;
+                    });
+
+                    setWarnings(items.slice(0, 5));
+                    logger.log('[ParentalGuideOverlay] Loaded warnings:', items.length);
+                }
+            } catch (error) {
+                logger.error('[ParentalGuideOverlay] Error fetching guide:', error);
+            }
+        };
+
+        fetchData();
+    }, [imdbId, type, season, episode]);
+
+    // Trigger animation when shouldShow becomes true
+    useEffect(() => {
+        if (shouldShow && warnings.length > 0 && !hasShownRef.current) {
+            hasShownRef.current = true;
+            setIsVisible(true);
+
+            const count = warnings.length;
+            // Line height = (row height * count) + (gap * (count - 1))
+            const gap = 2; // matches styles.itemsContainer gap
+            const totalLineHeight = (count * ROW_HEIGHT) + ((count - 1) * gap);
+
+            // Container fade in
+            containerOpacity.value = withTiming(1, { duration: 300 });
+
+            // FADE IN: Line grows from top to bottom first
+            lineHeight.value = withTiming(totalLineHeight, {
+                duration: 400,
+                easing: Easing.out(Easing.cubic),
+            });
+
+            // Then each item fades in one by one (after line animation)
+            for (let i = 0; i < count; i++) {
+                itemOpacities[i].value = withDelay(
+                    400 + i * 80, // Start after line, stagger each
+                    withTiming(1, { duration: 200 })
+                );
+            }
+
+            // Auto-hide after 5 seconds
+            hideTimeoutRef.current = setTimeout(() => {
+                // FADE OUT: Items fade out in reverse order (bottom to top)
+                for (let i = count - 1; i >= 0; i--) {
+                    const reverseDelay = (count - 1 - i) * 60;
+                    itemOpacities[i].value = withDelay(
+                        reverseDelay,
+                        withTiming(0, { duration: 150 })
+                    );
+                }
+
+                // Line shrinks after items are gone
+                const lineDelay = count * 60 + 100;
+                lineHeight.value = withDelay(lineDelay, withTiming(0, {
+                    duration: 300,
+                    easing: Easing.in(Easing.cubic),
+                }));
+
+                // Container fades out last
+                containerOpacity.value = withDelay(lineDelay + 200, withTiming(0, { duration: 200 }));
+
+                // Set invisible after all animations complete
+                fadeTimeoutRef.current = setTimeout(() => {
+                    setIsVisible(false);
+                }, lineDelay + 500);
+            }, 5000);
+        }
+    }, [shouldShow, warnings.length]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+            if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+        };
+    }, []);
+
+    // Reset when content changes
+    useEffect(() => {
+        hasShownRef.current = false;
+        setWarnings([]);
+        setIsVisible(false);
+        lineHeight.value = 0;
+        containerOpacity.value = 0;
+        for (let i = 0; i < 5; i++) {
+            itemOpacities[i].value = 0;
+        }
+
+        if (hideTimeoutRef.current) {
+            clearTimeout(hideTimeoutRef.current);
+            hideTimeoutRef.current = null;
+        }
+        if (fadeTimeoutRef.current) {
+            clearTimeout(fadeTimeoutRef.current);
+            fadeTimeoutRef.current = null;
+        }
+    }, [imdbId, season, episode]);
+
+    const containerStyle = useAnimatedStyle(() => ({
+        opacity: containerOpacity.value,
+    }));
+
+    const lineStyle = useAnimatedStyle(() => ({
+        height: lineHeight.value,
+    }));
+
+    if (!isVisible || warnings.length === 0) {
+        return null;
+    }
+
+    return (
+        <Animated.View style={[styles.container, containerStyle]} pointerEvents="none">
+            {/* Vertical line - animates height */}
+            <Animated.View style={[styles.line, lineStyle]} />
+
+            {/* Warning items */}
+            <View style={styles.itemsContainer}>
+                {warnings.map((item, index) => (
+                    <WarningItemView
+                        key={item.label}
+                        item={item}
+                        opacity={itemOpacities[index]}
+                    />
+                ))}
+            </View>
+        </Animated.View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        position: 'absolute',
+        top: 50,
+        left: 16,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        zIndex: 100,
+    },
+    line: {
+        width: 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+        borderRadius: 1,
+        marginRight: 10,
+    },
+    itemsContainer: {
+        gap: 2,
+    },
+    warningItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        height: ROW_HEIGHT,
+    },
+    label: {
+        color: 'rgba(255, 255, 255, 0.85)',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    separator: {
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 11,
+        marginHorizontal: 5,
+    },
+    severity: {
+        color: 'rgba(255, 255, 255, 0.5)',
+        fontSize: 11,
+        fontWeight: '400',
+    },
+});
+
+export default ParentalGuideOverlay;

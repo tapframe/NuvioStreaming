@@ -17,6 +17,7 @@ import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { ErrorModal } from './modals/ErrorModal';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import ResumeOverlay from './modals/ResumeOverlay';
+import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './components';
 
 // Platform-specific components
@@ -647,6 +648,15 @@ const KSPlayerCore: React.FC = () => {
         description={metadata?.description || ''}
         cast={cast || []}
         screenDimensions={screenDimensions}
+      />
+
+      {/* Parental Guide Overlay - Shows after controls first hide */}
+      <ParentalGuideOverlay
+        imdbId={imdbId || (id?.startsWith('tt') ? id : undefined)}
+        type={type as 'movie' | 'series'}
+        season={season}
+        episode={episode}
+        shouldShow={isVideoLoaded && !showControls && !paused}
       />
 
       {/* Up Next Button */}
