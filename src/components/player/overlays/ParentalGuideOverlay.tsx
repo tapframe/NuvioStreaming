@@ -8,6 +8,7 @@ import Animated, {
     Easing,
     SharedValue,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { parentalGuideService } from '../../../services/parentalGuideService';
 import { logger } from '../../../utils/logger';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -66,6 +67,7 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
     shouldShow,
 }) => {
     const { currentTheme } = useTheme();
+    const insets = useSafeAreaInsets();
     const screenWidth = Dimensions.get('window').width;
     const [warnings, setWarnings] = useState<WarningItem[]>([]);
     const [isVisible, setIsVisible] = useState(false);
@@ -231,8 +233,12 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
     const lineWidth = Math.min(3, screenWidth * 0.0038);
     const containerPadding = Math.min(20, screenWidth * 0.025);
 
+    // Use left inset for landscape notches, top inset for portrait
+    const safeLeftOffset = insets.left + containerPadding;
+    const safeTopOffset = containerPadding;
+
     return (
-        <Animated.View style={[styles.container, { left: containerPadding, top: containerPadding + 30 }]} pointerEvents="none">
+        <Animated.View style={[styles.container, { left: safeLeftOffset, top: safeTopOffset }]} pointerEvents="none">
             {/* Vertical line - animates height */}
             <Animated.View style={[styles.line, lineStyle, { backgroundColor: currentTheme.colors.primary, width: lineWidth }]} />
 

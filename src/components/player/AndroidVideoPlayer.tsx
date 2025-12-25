@@ -76,6 +76,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
+  const pinchRef = useRef(null);
   const tracksHook = usePlayerTracks();
 
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
@@ -85,6 +86,9 @@ const AndroidVideoPlayer: React.FC = () => {
   const [currentQuality, setCurrentQuality] = useState(quality);
   const [currentStreamProvider, setCurrentStreamProvider] = useState(streamProvider);
   const [currentStreamName, setCurrentStreamName] = useState(streamName);
+
+  // State to force unmount VideoSurface during stream transitions
+  const [isTransitioningStream, setIsTransitioningStream] = useState(false);
 
   // Subtitle addon state
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -329,10 +333,14 @@ const AndroidVideoPlayer: React.FC = () => {
     modals.setShowSourcesModal(false);
     playerState.setPaused(true);
 
+    // Unmount VideoSurface first to ensure MPV is fully destroyed
+    setIsTransitioningStream(true);
+
     const newQuality = newStream.quality || newStream.title?.match(/(\d+)p/)?.[0];
     const newProvider = newStream.addonName || newStream.name || newStream.addon || 'Unknown';
     const newStreamName = newStream.name || newStream.title || 'Unknown';
 
+    // Wait for unmount to complete, then navigate
     setTimeout(() => {
       (navigation as any).replace('PlayerAndroid', {
         ...route.params,
@@ -343,19 +351,24 @@ const AndroidVideoPlayer: React.FC = () => {
         headers: newStream.headers,
         availableStreams: availableStreams
       });
-    }, 100);
+    }, 300);
   };
 
   const handleEpisodeStreamSelect = async (stream: any) => {
     if (!modals.selectedEpisodeForStreams) return;
     modals.setShowEpisodeStreamsModal(false);
     playerState.setPaused(true);
+
+    // Unmount VideoSurface first to ensure MPV is fully destroyed
+    setIsTransitioningStream(true);
+
     const ep = modals.selectedEpisodeForStreams;
 
     const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
     const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';
     const newStreamName = stream.name || stream.title || 'Unknown Stream';
 
+    // Wait for unmount to complete, then navigate
     setTimeout(() => {
       (navigation as any).replace('PlayerAndroid', {
         uri: stream.url,
@@ -376,7 +389,7 @@ const AndroidVideoPlayer: React.FC = () => {
         availableStreams: {},
         groupedEpisodes: groupedEpisodes,
       });
-    }, 100);
+    }, 300);
   };
 
   // Subtitle addon fetching
@@ -489,73 +502,75 @@ const AndroidVideoPlayer: React.FC = () => {
       />
 
       <View style={{ flex: 1, backgroundColor: 'black' }}>
-        <VideoSurface
-          processedStreamUrl={currentStreamUrl}
-          headers={headers}
-          volume={volume}
-          playbackSpeed={speedControl.playbackSpeed}
-          resizeMode={playerState.resizeMode}
-          paused={playerState.paused}
-          currentStreamUrl={currentStreamUrl}
-          toggleControls={toggleControls}
-          onLoad={handleLoad}
-          onProgress={handleProgress}
-          onSeek={(data) => {
-            playerState.isSeeking.current = false;
-            if (data.currentTime) traktAutosync.handleProgressUpdate(data.currentTime, playerState.duration, true);
-          }}
-          onEnd={() => {
-            if (modals.showEpisodeStreamsModal) return;
-            playerState.setPaused(true);
-          }}
-          onError={(err: any) => {
-            logger.error('Video Error', err);
+        {!isTransitioningStream && (
+          <VideoSurface
+            processedStreamUrl={currentStreamUrl}
+            headers={headers}
+            volume={volume}
+            playbackSpeed={speedControl.playbackSpeed}
+            resizeMode={playerState.resizeMode}
+            paused={playerState.paused}
+            currentStreamUrl={currentStreamUrl}
+            toggleControls={toggleControls}
+            onLoad={handleLoad}
+            onProgress={handleProgress}
+            onSeek={(data) => {
+              playerState.isSeeking.current = false;
+              if (data.currentTime) traktAutosync.handleProgressUpdate(data.currentTime, playerState.duration, true);
+            }}
+            onEnd={() => {
+              if (modals.showEpisodeStreamsModal) return;
+              playerState.setPaused(true);
+            }}
+            onError={(err: any) => {
+              logger.error('Video Error', err);
 
-            // Determine the actual error message
-            let displayError = 'An unknown error occurred';
+              // Determine the actual error message
+              let displayError = 'An unknown error occurred';
 
-            if (typeof err?.error === 'string') {
-              displayError = err.error;
-            } else if (err?.error?.errorString) {
-              displayError = err.error.errorString;
-            } else if (err?.errorString) {
-              displayError = err.errorString;
-            } else if (typeof err === 'string') {
-              displayError = err;
-            } else {
-              displayError = JSON.stringify(err);
-            }
+              if (typeof err?.error === 'string') {
+                displayError = err.error;
+              } else if (err?.error?.errorString) {
+                displayError = err.error.errorString;
+              } else if (err?.errorString) {
+                displayError = err.errorString;
+              } else if (typeof err === 'string') {
+                displayError = err;
+              } else {
+                displayError = JSON.stringify(err);
+              }
 
-            modals.setErrorDetails(displayError);
-            modals.setShowErrorModal(true);
-          }}
-          onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
-          onTracksChanged={(data) => {
-            console.log('[AndroidVideoPlayer] onTracksChanged:', data);
-            if (data?.audioTracks) {
-              const formatted = data.audioTracks.map((t: any) => ({
-                id: t.id,
-                name: t.name || `Track ${t.id}`,
-                language: t.language
-              }));
-              tracksHook.setRnVideoAudioTracks(formatted);
-            }
-            if (data?.subtitleTracks) {
-              const formatted = data.subtitleTracks.map((t: any) => ({
-                id: t.id,
-                name: t.name || `Track ${t.id}`,
-                language: t.language
-              }));
-              tracksHook.setRnVideoTextTracks(formatted);
-            }
-          }}
-          mpvPlayerRef={mpvPlayerRef}
-          pinchRef={useRef(null)}
-          onPinchGestureEvent={() => { }}
-          onPinchHandlerStateChange={() => { }}
-          screenDimensions={playerState.screenDimensions}
-          useHardwareDecoding={settings.useHardwareDecoding}
-        />
+              modals.setErrorDetails(displayError);
+              modals.setShowErrorModal(true);
+            }}
+            onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
+            onTracksChanged={(data) => {
+              console.log('[AndroidVideoPlayer] onTracksChanged:', data);
+              if (data?.audioTracks) {
+                const formatted = data.audioTracks.map((t: any) => ({
+                  id: t.id,
+                  name: t.name || `Track ${t.id}`,
+                  language: t.language
+                }));
+                tracksHook.setRnVideoAudioTracks(formatted);
+              }
+              if (data?.subtitleTracks) {
+                const formatted = data.subtitleTracks.map((t: any) => ({
+                  id: t.id,
+                  name: t.name || `Track ${t.id}`,
+                  language: t.language
+                }));
+                tracksHook.setRnVideoTextTracks(formatted);
+              }
+            }}
+            mpvPlayerRef={mpvPlayerRef}
+            pinchRef={pinchRef}
+            onPinchGestureEvent={() => { }}
+            onPinchHandlerStateChange={() => { }}
+            screenDimensions={playerState.screenDimensions}
+            useHardwareDecoding={settings.useHardwareDecoding}
+          />
+        )}
 
         {/* Custom Subtitles for addon subtitles */}
         <CustomSubtitles

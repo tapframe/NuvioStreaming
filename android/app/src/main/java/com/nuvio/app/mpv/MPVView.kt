@@ -93,95 +93,70 @@ class MPVView @JvmOverloads constructor(
     }
 
     private fun initOptions() {
-        // Mobile-optimized profile
         MPVLib.setOptionString("profile", "fast")
         MPVLib.setOptionString("vo", "gpu")
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
         
-        // Hardware decoding configuration
-        // 'mediacodec-copy' for hardware acceleration (GPU decoding, copies frames to CPU)
-        // 'no' for software decoding (more compatible, especially on emulators)
-        val hwdecValue = if (useHardwareDecoding) "mediacodec-copy" else "no"
+        val hwdecValue = if (useHardwareDecoding) "mediacodec,mediacodec-copy" else "no"
         Log.d(TAG, "Hardware decoding: $useHardwareDecoding, hwdec value: $hwdecValue")
         MPVLib.setOptionString("hwdec", hwdecValue)
-        MPVLib.setOptionString("hwdec-codecs", "all")
+        MPVLib.setOptionString("hwdec-codecs", "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1")
         
-        // Audio output
+        MPVLib.setOptionString("target-colorspace-hint", "yes")
+        MPVLib.setOptionString("vd-lavc-film-grain", "cpu")
+        
         MPVLib.setOptionString("ao", "audiotrack,opensles")
         
-        // Network caching for streaming
-        MPVLib.setOptionString("demuxer-max-bytes", "67108864") // 64MB
-        MPVLib.setOptionString("demuxer-max-back-bytes", "33554432") // 32MB
+        MPVLib.setOptionString("demuxer-max-bytes", "67108864")
+        MPVLib.setOptionString("demuxer-max-back-bytes", "33554432")
         MPVLib.setOptionString("cache", "yes")
         MPVLib.setOptionString("cache-secs", "30")
         
-        // Network options
-        MPVLib.setOptionString("network-timeout", "60") // 60 second timeout
-        
-        // CRITICAL: Disable youtube-dl/yt-dlp hook
-        // The ytdl_hook incorrectly tries to parse HLS/direct URLs through youtube-dl
-        // which fails on Android since yt-dlp is not available, causing playback failure
+        MPVLib.setOptionString("network-timeout", "60")
         MPVLib.setOptionString("ytdl", "no")
         
-        // CRITICAL: HTTP headers MUST be set as options before init()
-        // Apply headers if they were set before surface initialization
         applyHttpHeadersAsOptions()
         
-        // FFmpeg HTTP protocol options for better compatibility
-        MPVLib.setOptionString("tls-verify", "no") // Disable TLS cert verification
-        MPVLib.setOptionString("http-reconnect", "yes") // Auto-reconnect on network issues  
-        MPVLib.setOptionString("stream-reconnect", "yes") // Reconnect if stream drops
+        MPVLib.setOptionString("tls-verify", "no")
+        MPVLib.setOptionString("http-reconnect", "yes")
+        MPVLib.setOptionString("stream-reconnect", "yes")
         
-        // CRITICAL: HLS demuxer options for proper VOD stream handling
-        // Without these, HLS streams may be treated as live and start from the end
-        // Note: Multiple lavf options separated by comma
         MPVLib.setOptionString("demuxer-lavf-o", "live_start_index=0,prefer_x_start=1,http_persistent=0")
-        MPVLib.setOptionString("demuxer-seekable-cache", "yes") // Allow seeking in cached content
-        MPVLib.setOptionString("force-seekable", "yes") // Force stream to be seekable
+        MPVLib.setOptionString("demuxer-seekable-cache", "yes")
+        MPVLib.setOptionString("force-seekable", "yes")
         
-        // Increase probe/analyze duration to help detect full HLS duration
-        MPVLib.setOptionString("demuxer-lavf-probesize", "10000000") // 10MB probe size
-        MPVLib.setOptionString("demuxer-lavf-analyzeduration", "10") // 10 seconds analyze
+        MPVLib.setOptionString("demuxer-lavf-probesize", "10000000")
+        MPVLib.setOptionString("demuxer-lavf-analyzeduration", "10")
         
-        // Subtitle configuration - CRITICAL for Android
-        MPVLib.setOptionString("sub-auto", "fuzzy") // Auto-load subtitles
-        MPVLib.setOptionString("sub-visibility", "yes") // Make subtitles visible by default
-        MPVLib.setOptionString("sub-font-size", "48") // Larger font size for mobile readability
-        MPVLib.setOptionString("sub-pos", "95") // Position at bottom (0-100, 100 = very bottom)
-        MPVLib.setOptionString("sub-color", "#FFFFFFFF") // White color
-        MPVLib.setOptionString("sub-border-size", "3") // Thicker border for readability
-        MPVLib.setOptionString("sub-border-color", "#FF000000") // Black border
-        MPVLib.setOptionString("sub-shadow-offset", "2") // Add shadow for better visibility
-        MPVLib.setOptionString("sub-shadow-color", "#80000000") // Semi-transparent black shadow
+        MPVLib.setOptionString("sub-auto", "fuzzy")
+        MPVLib.setOptionString("sub-visibility", "yes")
+        MPVLib.setOptionString("sub-font-size", "48")
+        MPVLib.setOptionString("sub-pos", "95")
+        MPVLib.setOptionString("sub-color", "#FFFFFFFF")
+        MPVLib.setOptionString("sub-border-size", "3")
+        MPVLib.setOptionString("sub-border-color", "#FF000000")
+        MPVLib.setOptionString("sub-shadow-offset", "2")
+        MPVLib.setOptionString("sub-shadow-color", "#80000000")
         
-        // Font configuration - point to Android system fonts for all language support
         MPVLib.setOptionString("osd-fonts-dir", "/system/fonts")
         MPVLib.setOptionString("sub-fonts-dir", "/system/fonts")
-        MPVLib.setOptionString("sub-font", "Roboto") // Default fallback font
-        // Allow embedded fonts in ASS/SSA but fallback to system fonts
+        MPVLib.setOptionString("sub-font", "Roboto")
         MPVLib.setOptionString("embeddedfonts", "yes")
         
-        // Language/encoding support for various subtitle formats
-        MPVLib.setOptionString("sub-codepage", "auto") // Auto-detect encoding (supports UTF-8, Latin, CJK, etc.)
+        MPVLib.setOptionString("sub-codepage", "auto")
         
-        MPVLib.setOptionString("osc", "no") // Disable on screen controller
+        MPVLib.setOptionString("osc", "no")
         MPVLib.setOptionString("osd-level", "1")
     
-        // Critical for subtitle rendering on Android GPU
-        // blend-subtitles=no lets the GPU renderer handle subtitle overlay properly
         MPVLib.setOptionString("blend-subtitles", "no")
         MPVLib.setOptionString("sub-use-margins", "no")
-        // Use 'scale' to allow ASS styling but with our scale and font overrides
-        // This preserves styled subtitles while having font fallbacks
         MPVLib.setOptionString("sub-ass-override", "scale")
         MPVLib.setOptionString("sub-scale", "1.0")
-        MPVLib.setOptionString("sub-fix-timing", "yes") // Fix timing for SRT subtitles
+        MPVLib.setOptionString("sub-fix-timing", "yes")
         
-        // Force subtitle rendering
-        MPVLib.setOptionString("sid", "auto") // Auto-select subtitle track
+        MPVLib.setOptionString("sid", "auto")
         
-        // Disable terminal/input
         MPVLib.setOptionString("terminal", "no")
         MPVLib.setOptionString("input-default-bindings", "no")
     }
