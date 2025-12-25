@@ -31,34 +31,22 @@ const QualityBadge = ({ quality }: { quality: string | null }) => {
     color = '#F59E0B';
     label = '4K';
   } else if (qualityNum >= 1080) {
-    color = '#EF4444';
-    label = 'FHD';
+    color = '#3B82F6';
+    label = '1080p';
   } else if (qualityNum >= 720) {
     color = '#10B981';
-    label = 'HD';
+    label = '720p';
   }
 
   return (
-    <View
-      style={{
-        backgroundColor: `${color}20`,
-        borderColor: `${color}60`,
-        borderWidth: 1,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}
-    >
-      <Text style={{
-        color: color,
-        fontSize: 12,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-      }}>
-        {label}
-      </Text>
+    <View style={{
+      backgroundColor: color,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      marginLeft: 8,
+    }}>
+      <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{label}</Text>
     </View>
   );
 };
@@ -114,7 +102,6 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
         respondedProviders.add(addonId);
 
         if (error) {
-          logger.warn(`[EpisodeStreamsModal] Error from ${addonName || addonId}:`, error);
           setHasErrors(prev => [...prev, `${addonName || addonId}: ${error.message || 'Unknown error'}`]);
         } else if (streams && streams.length > 0) {
           setAvailableStreams(prev => ({
@@ -124,29 +111,20 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
               addonName: addonName || addonId
             }
           }));
-          logger.log(`[EpisodeStreamsModal] Added ${streams.length} streams from ${addonName || addonId}`);
-        } else {
-          logger.log(`[EpisodeStreamsModal] No streams from ${addonName || addonId}`);
         }
 
         if (completedProviders >= expectedProviders.size) {
-          logger.log(`[EpisodeStreamsModal] All providers completed. Total providers responded: ${respondedProviders.size}`);
           setIsLoading(false);
         }
       });
 
-      // Fallback timeout
       setTimeout(() => {
         if (respondedProviders.size === 0) {
-          logger.warn(`[EpisodeStreamsModal] Timeout: No providers responded`);
-          setHasErrors(prev => [...prev, 'Timeout: No providers responded']);
           setIsLoading(false);
         }
       }, 8000);
 
     } catch (error) {
-      logger.error('[EpisodeStreamsModal] Error fetching streams:', error);
-      setHasErrors(prev => [...prev, `Failed to fetch streams: ${error}`]);
       setIsLoading(false);
     }
   };
@@ -162,9 +140,18 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
   const sortedProviders = Object.entries(availableStreams);
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
-      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose}>
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+    <View style={StyleSheet.absoluteFill} zIndex={10000}>
+      {/* Backdrop */}
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}
+        />
       </TouchableOpacity>
 
       <Animated.View
@@ -181,15 +168,20 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           borderColor: 'rgba(255,255,255,0.1)',
         }}
       >
-        <View style={{ paddingTop: Platform.OS === 'ios' ? 60 : 15, paddingHorizontal: 20 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: 'white', fontSize: 22, fontWeight: '700' }} numberOfLines={1}>
-                {episode?.name || 'Select Stream'}
+        {/* Header */}
+        <View style={{
+          paddingTop: Platform.OS === 'ios' ? 60 : 20,
+          paddingHorizontal: 20,
+          paddingBottom: 20,
+        }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={{ color: 'white', fontSize: 20, fontWeight: '700' }} numberOfLines={1}>
+                {episode?.name || 'Sources'}
               </Text>
               {episode && (
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, marginTop: 4 }}>
-                  S{episode.season_number}E{episode.episode_number}
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 4 }}>
+                  S{episode.season_number} • E{episode.episode_number}
                 </Text>
               )}
             </View>
@@ -198,176 +190,82 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ padding: 15, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 15, paddingBottom: 40 }}
         >
-          {isLoading && (
-            <View style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: 16,
-              padding: 20,
-              alignItems: 'center',
-            }}>
-              <ActivityIndicator size="large" color="#3B82F6" />
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontSize: 14,
-                marginTop: 12,
-                textAlign: 'center',
-              }}>
-                Finding available streams...
-              </Text>
+          {isLoading && sortedProviders.length === 0 && (
+            <View style={{ padding: 40, alignItems: 'center' }}>
+              <ActivityIndicator color="white" />
+              <Text style={{ color: 'white', marginTop: 15, opacity: 0.6 }}>Finding sources...</Text>
             </View>
           )}
 
-          {!isLoading && sortedProviders.length > 0 && (
-            sortedProviders.map(([providerId, providerData]) => (
-              <View key={providerId} style={{ marginBottom: 30 }}>
-                <Text style={{
-                  color: 'rgba(255, 255, 255, 0.7)',
-                  fontSize: 14,
-                  fontWeight: '600',
-                  marginBottom: 15,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}>
-                  {providerData.addonName} ({providerData.streams.length})
-                </Text>
-
-                <View style={{ gap: 8 }}>
-                  {providerData.streams.map((stream, index) => {
-                    const quality = getQualityFromTitle(stream.title) || stream.quality;
-
-                    return (
-                      <TouchableOpacity
-                        key={`${providerId}-${index}`}
-                        style={{
-                          backgroundColor: 'rgba(255,255,255,0.06)',
-                          borderRadius: 12,
-                          padding: 12,
-                          borderWidth: 1,
-                          borderColor: 'rgba(255,255,255,0.1)',
-                        }}
-                        onPress={() => onSelectStream(stream)}
-                        activeOpacity={0.7}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <View style={{ flex: 1 }}>
-                            <View style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              marginBottom: 8,
-                              gap: 8,
-                            }}>
-                              <Text style={{
-                                color: 'white',
-                                fontSize: 15,
-                                fontWeight: '500',
-                                flex: 1,
-                              }}>
-                                {stream.title || stream.name || `Stream ${index + 1}`}
-                              </Text>
-                              {quality && <QualityBadge quality={quality} />}
-                            </View>
-
-                            {(stream.size || stream.lang) && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                {stream.size && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <MaterialIcons name="storage" size={14} color="rgba(255,255,255,0.5)" />
-                                    <Text style={{
-                                      color: 'rgba(255,255,255,0.5)',
-                                      fontSize: 12,
-                                      fontWeight: '600',
-                                      marginLeft: 4,
-                                    }}>
-                                      {(stream.size / (1024 * 1024 * 1024)).toFixed(1)} GB
-                                    </Text>
-                                  </View>
-                                )}
-                                {stream.lang && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <MaterialIcons name="language" size={14} color="rgba(59,130,246,0.8)" />
-                                    <Text style={{
-                                      color: 'rgba(59,130,246,0.8)',
-                                      fontSize: 12,
-                                      fontWeight: '600',
-                                      marginLeft: 4,
-                                    }}>
-                                      {stream.lang.toUpperCase()}
-                                    </Text>
-                                  </View>
-                                )}
-                              </View>
-                            )}
-                          </View>
-
-                          <View style={{ marginLeft: 12, alignItems: 'center' }}>
-                            <MaterialIcons name="play-arrow" size={20} color="rgba(255,255,255,0.4)" />
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            ))
-          )}
-
-          {!isLoading && sortedProviders.length === 0 && hasErrors.length === 0 && (
-            <View style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: 16,
-              padding: 20,
-              alignItems: 'center',
-            }}>
-              <MaterialIcons name="error-outline" size={48} color="rgba(255,255,255,0.3)" />
-              <Text style={{
-                color: 'rgba(255, 255, 255, 0.6)',
-                fontSize: 16,
-                marginTop: 16,
-                textAlign: 'center',
-              }}>
-                No sources available
-              </Text>
+          {sortedProviders.map(([providerId, providerData]) => (
+            <View key={providerId} style={{ marginBottom: 20 }}>
               <Text style={{
                 color: 'rgba(255, 255, 255, 0.4)',
-                fontSize: 14,
-                marginTop: 8,
-                textAlign: 'center',
+                fontSize: 12,
+                fontWeight: '700',
+                marginBottom: 10,
+                marginLeft: 5,
+                textTransform: 'uppercase',
+                letterSpacing: 1,
               }}>
-                Try searching for different content
+                {providerData.addonName}
               </Text>
+
+              <View style={{ gap: 8 }}>
+                {providerData.streams.map((stream, index) => {
+                  const quality = getQualityFromTitle(stream.title) || stream.quality;
+
+                  return (
+                    <TouchableOpacity
+                      key={`${providerId}-${index}`}
+                      style={{
+                        padding: 8,
+                        borderRadius: 12,
+                        backgroundColor: 'rgba(255,255,255,0.05)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.05)'
+                      }}
+                      onPress={() => {
+                        onSelectStream(stream);
+                        onClose();
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <Text style={{ color: 'white', fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
+                              {stream.name || 'Unknown Source'}
+                            </Text>
+                            <QualityBadge quality={quality} />
+                          </View>
+                          {stream.title && (
+                            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }} numberOfLines={2}>
+                              {stream.title}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+
+          {!isLoading && sortedProviders.length === 0 && (
+            <View style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
+              <MaterialIcons name="cloud-off" size={48} color="white" />
+              <Text style={{ color: 'white', marginTop: 16, textAlign: 'center', fontWeight: '600' }}>No sources found</Text>
             </View>
           )}
 
-          {!isLoading && hasErrors.length > 0 && (
-            <View style={{
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              borderRadius: 16,
-              padding: 16,
-              marginBottom: 20,
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                <MaterialIcons name="error" size={20} color="#EF4444" />
-                <Text style={{
-                  color: '#EF4444',
-                  fontSize: 14,
-                  fontWeight: '600',
-                  marginLeft: 8,
-                }}>
-                  Errors occurred
-                </Text>
-              </View>
-              {hasErrors.map((error, index) => (
-                <Text key={index} style={{
-                  color: '#EF4444',
-                  fontSize: 12,
-                  marginTop: 4,
-                }}>
-                  {error}
-                </Text>
-              ))}
-            </View>
+          {hasErrors.length > 0 && (
+             <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 12, padding: 12, marginTop: 10 }}>
+                <Text style={{ color: '#EF4444', fontSize: 11 }}>Sources might be limited due to provider errors.</Text>
+             </View>
           )}
         </ScrollView>
       </Animated.View>

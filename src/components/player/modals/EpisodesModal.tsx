@@ -43,7 +43,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
       text: '#FFFFFF',
       textMuted: 'rgba(255,255,255,0.6)',
       mediumEmphasis: 'rgba(255,255,255,0.7)',
-      primary: '#3B82F6',
+      primary: 'rgba(255,255,255,0.9)',
       white: '#FFFFFF',
       elevation2: 'rgba(255,255,255,0.05)'
     }
@@ -55,22 +55,12 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
       if (showEpisodesModal && metadata?.id) {
         setIsLoadingProgress(true);
         try {
-          const allProgress = await storageService.getAllWatchProgress();
-          const progress: { [key: string]: any } = {};
-
-          // Filter progress for current show's episodes
-          Object.entries(allProgress).forEach(([key, value]) => {
-            if (key.includes(metadata.id!)) {
-              progress[key] = value;
-            }
-          });
-
-          setEpisodeProgress(progress);
+          const progress = await storageService.getShowProgress(metadata.id);
+          setEpisodeProgress(progress || {});
 
           // Trakt sync logic preserved
-          const traktService = TraktService.getInstance();
-          if (await traktService.isAuthenticated()) {
-            // Optional: background sync logic
+          if (await TraktService.isAuthenticated()) {
+             // Optional: background sync logic
           }
         } catch (err) {
           logger.error('Failed to fetch episode progress', err);
@@ -94,7 +84,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
   const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
+    <View style={StyleSheet.absoluteFill} zIndex={9999}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowEpisodesModal(false)}>
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
       </TouchableOpacity>
@@ -113,13 +103,18 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
           borderColor: 'rgba(255,255,255,0.1)',
         }}
       >
-        <View style={{ paddingTop: Platform.OS === 'ios' ? 60 : 15, paddingHorizontal: 20 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <View style={{ paddingTop: Platform.OS === 'ios' ? 60 : 20, paddingHorizontal: 20 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <Text style={{ color: 'white', fontSize: 22, fontWeight: '700' }}>Episodes</Text>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 15, gap: 8 }}>
-            {seasons.map((season) => (
+            {[...seasons]
+                .sort((a, b) => {
+                  if (a === 0) return 1;
+                  if (b === 0) return -1;
+                  return a - b;
+                }).map((season) => (
               <TouchableOpacity
                 key={season}
                 onPress={() => setSelectedSeason(season)}
@@ -136,14 +131,14 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
                   color: selectedSeason === season ? 'black' : 'white',
                   fontWeight: selectedSeason === season ? '700' : '500'
                 }}>
-                  Season {season}
+                  {season === 0 ? 'Specials' : `Season ${season}`}
                 </Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 15, paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
           {isLoadingProgress ? (
             <ActivityIndicator color="white" style={{ marginTop: 20 }} />
           ) : (
