@@ -55,12 +55,24 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
       if (showEpisodesModal && metadata?.id) {
         setIsLoadingProgress(true);
         try {
-          const progress = await storageService.getShowProgress(metadata.id);
-          setEpisodeProgress(progress || {});
+          // Get all watch progress and filter for this show's episodes
+          const allProgress = await storageService.getAllWatchProgress();
+          const showPrefix = `series:${metadata.id}:`;
+          const progress: { [key: string]: any } = {};
+
+          for (const [key, value] of Object.entries(allProgress)) {
+            if (key.startsWith(showPrefix)) {
+              // Extract episode id from key (format: series:showId:episodeId)
+              const episodeId = key.replace(showPrefix, '');
+              progress[episodeId] = value;
+            }
+          }
+
+          setEpisodeProgress(progress);
 
           // Trakt sync logic preserved
-          if (await TraktService.isAuthenticated()) {
-             // Optional: background sync logic
+          if (await TraktService.getInstance().isAuthenticated()) {
+            // Optional: background sync logic
           }
         } catch (err) {
           logger.error('Failed to fetch episode progress', err);
@@ -84,7 +96,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
   const currentSeasonEpisodes = groupedEpisodes[selectedSeason] || [];
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={9999}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowEpisodesModal(false)}>
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
       </TouchableOpacity>
@@ -110,31 +122,31 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 15, gap: 8 }}>
             {[...seasons]
-                .sort((a, b) => {
-                  if (a === 0) return 1;
-                  if (b === 0) return -1;
-                  return a - b;
-                }).map((season) => (
-              <TouchableOpacity
-                key={season}
-                onPress={() => setSelectedSeason(season)}
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  backgroundColor: selectedSeason === season ? 'white' : 'rgba(255,255,255,0.06)',
-                  borderWidth: 1,
-                  borderColor: selectedSeason === season ? 'white' : 'rgba(255,255,255,0.1)',
-                }}
-              >
-                <Text style={{
-                  color: selectedSeason === season ? 'black' : 'white',
-                  fontWeight: selectedSeason === season ? '700' : '500'
-                }}>
-                  {season === 0 ? 'Specials' : `Season ${season}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
+              .sort((a, b) => {
+                if (a === 0) return 1;
+                if (b === 0) return -1;
+                return a - b;
+              }).map((season) => (
+                <TouchableOpacity
+                  key={season}
+                  onPress={() => setSelectedSeason(season)}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    backgroundColor: selectedSeason === season ? 'white' : 'rgba(255,255,255,0.06)',
+                    borderWidth: 1,
+                    borderColor: selectedSeason === season ? 'white' : 'rgba(255,255,255,0.1)',
+                  }}
+                >
+                  <Text style={{
+                    color: selectedSeason === season ? 'black' : 'white',
+                    fontWeight: selectedSeason === season ? '700' : '500'
+                  }}>
+                    {season === 0 ? 'Specials' : `Season ${season}`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
           </ScrollView>
         </View>
 

@@ -340,7 +340,10 @@ const KSPlayerCore: React.FC = () => {
     const resumeTarget = routeInitialPosition || watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
     if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && data.duration > 0) {
       setTimeout(() => {
-        controls.seekToTime(resumeTarget);
+        if (ksPlayerRef.current) {
+          logger.debug(`[KSPlayerCore] Auto-resuming to ${resumeTarget}`);
+          ksPlayerRef.current.seek(resumeTarget);
+        }
       }, 500);
     }
 
@@ -373,15 +376,17 @@ const KSPlayerCore: React.FC = () => {
     modals.setShowErrorModal(true);
   };
 
-  const handleClose = async () => {
+  const handleClose = useCallback(() => {
     if (isSyncingBeforeClose.current) return;
     isSyncingBeforeClose.current = true;
 
-    await traktAutosync.handleProgressUpdate(currentTime, duration, true);
-    await traktAutosync.handlePlaybackEnd(currentTime, duration, 'user_close');
+    // Fire and forget - don't block navigation on async operations
+    // The useWatchProgress and useTraktAutosync hooks handle cleanup on unmount
+    traktAutosync.handleProgressUpdate(currentTime, duration, true);
+    traktAutosync.handlePlaybackEnd(currentTime, duration, 'user_close');
 
     navigation.goBack();
-  };
+  }, [navigation, currentTime, duration, traktAutosync]);
 
   // Stream selection handler
   const handleSelectStream = async (newStream: any) => {

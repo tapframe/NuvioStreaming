@@ -102,13 +102,17 @@ export const useWatchProgress = (
         }
     }, [id, type, paused, currentTime, duration]);
 
-    // Unmount Save
+    // Unmount Save - deferred to allow navigation to complete first
     useEffect(() => {
         return () => {
-            if (id && type && durationRef.current > 0) {
-                saveWatchProgress();
-                traktAutosync.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'unmount');
-            }
+            // Use setTimeout(0) to defer save operations to next event loop tick
+            // This allows navigation animations to complete smoothly
+            setTimeout(() => {
+                if (id && type && durationRef.current > 0) {
+                    saveWatchProgress();
+                    traktAutosync.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'unmount');
+                }
+            }, 0);
         };
     }, [id, type]);
 
