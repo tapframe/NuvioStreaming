@@ -73,12 +73,19 @@
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>SplashScreenBackground</string>
+		<key>UIImageName</key>
+		<string>SplashScreenLegacy</string>
+	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
 	</array>
 	<key>UIRequiresFullScreen</key>
-	<true/>
+	<false/>
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleDefault</string>
 	<key>UISupportedInterfaceOrientations</key>
