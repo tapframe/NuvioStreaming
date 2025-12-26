@@ -44,7 +44,7 @@
     "expo-brightness": "~14.0.7",
     "expo-clipboard": "~8.0.8",
     "expo-crypto": "~15.0.7",
-    "expo-dev-client": "~6.0.15",
+    "expo-dev-client": "~6.0.20",
     "expo-device": "~8.0.9",
     "expo-document-picker": "~14.0.7",
     "expo-file-system": "~19.0.17",

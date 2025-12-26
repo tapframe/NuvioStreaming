@@ -246,20 +246,15 @@ class KSPlayerView: UIView {
     }
 
     private func setupPlayerCallbacks() {
-        // Configure KSOptions (use static defaults where required)
+        // Configure KSOptions
         KSOptions.isAutoPlay = false
-        #if targetEnvironment(simulator)
-        // Simulator: disable hardware decode and MEPlayer to avoid VT/Vulkan issues
-        KSOptions.hardwareDecode = false
-        KSOptions.asynchronousDecompression = false
-        KSOptions.secondPlayerType = nil
-        #else
-        // PERFORMANCE OPTIMIZATION: Enable asynchronous decompression globally
-        // This ensures the global default is correct for all player instances
         KSOptions.asynchronousDecompression = true
-        // Ensure hardware decode is enabled globally
         KSOptions.hardwareDecode = true
-        #endif
+        
+        // Set default subtitle font size - use standard size for readability
+        SubtitleModel.textFontSize = 20.0  // Moderate size that works on most devices
+        SubtitleModel.textBold = false
+        
         print("KSPlayerView: [PERF] Global settings: asyncDecomp=\(KSOptions.asynchronousDecompression), hwDecode=\(KSOptions.hardwareDecode)")
     }
 
@@ -298,21 +293,14 @@ class KSPlayerView: UIView {
 
         // Choose player pipeline based on format
         let isMKV = uri.lowercased().contains(".mkv")
-        #if targetEnvironment(simulator)
         if isMKV {
-            // MKV not supported on AVPlayer in Simulator and MEPlayer is disabled
-            sendEvent("onError", ["error": "MKV playback is not supported in the iOS Simulator. Test on a real device."])
-        }
-        #else
-        if isMKV {
-            // Prefer MEPlayer (FFmpeg) for MKV on device
+            // Prefer MEPlayer (FFmpeg) for MKV
             KSOptions.firstPlayerType = KSMEPlayer.self
             KSOptions.secondPlayerType = nil
         } else {
             KSOptions.firstPlayerType = KSAVPlayer.self
             KSOptions.secondPlayerType = KSMEPlayer.self
         }
-        #endif
 
         // Create KSPlayerResource with validated URL
         let resource = KSPlayerResource(url: url, options: createOptions(with: headers), name: "Video")
@@ -376,15 +364,9 @@ class KSPlayerView: UIView {
         
         // PERFORMANCE OPTIMIZATION: Hardware decode explicitly enabled
         // Ensure VideoToolbox hardware acceleration is always preferred for non-simulator
-        #if targetEnvironment(simulator)
-        options.hardwareDecode = false
-        options.asynchronousDecompression = false
-        #else
-        options.hardwareDecode = true  // Explicitly enable hardware decode
-        // PERFORMANCE OPTIMIZATION: Asynchronous decompression (CRITICAL)
-        // Offloads VideoToolbox decompression to background threads, preventing main thread stalls
+        // Hardware decode and async decompression
+        options.hardwareDecode = true
         options.asynchronousDecompression = true
-        #endif
         
         // HDR handling: Let KSPlayer automatically detect content's native dynamic range
         // Setting destinationDynamicRange to nil allows KSPlayer to use the content's actual HDR/SDR mode
@@ -557,22 +539,21 @@ class KSPlayerView: UIView {
     }
 
     func setTextTrack(_ trackId: Int) {
-        print("KSPlayerView: [SET TEXT TRACK] Starting setTextTrack with trackId: \(trackId)")
+        NSLog("KSPlayerView: [SET TEXT TRACK] Starting setTextTrack with trackId: %d", trackId)
         
-        // Wait slightly longer than the 1-second delay for subtitle data source connection
-        // This ensures srtControl.addSubtitle(dataSouce:) has been called in VideoPlayerView
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+        // Small delay to ensure player is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self = self else { 
-                print("KSPlayerView: [SET TEXT TRACK] self is nil, aborting")
+                NSLog("KSPlayerView: [SET TEXT TRACK] self is nil, aborting")
                 return 
             }
             
-            print("KSPlayerView: [SET TEXT TRACK] Executing delayed track selection")
+            NSLog("KSPlayerView: [SET TEXT TRACK] Executing track selection")
             
             if let player = self.playerView.playerLayer?.player {
                 let textTracks = player.tracks(mediaType: .subtitle)
-                print("KSPlayerView: Available text tracks count: \(textTracks.count)")
-                print("KSPlayerView: Requested text track ID: \(trackId)")
+                NSLog("KSPlayerView: Available text tracks count: %d", textTracks.count)
+                NSLog("KSPlayerView: Requested text track ID: %d", trackId)
 
                 // First try to find track by trackID (proper way)
                 var selectedTrack: MediaPlayerTrack? = nil
@@ -582,84 +563,57 @@ class KSPlayerView: UIView {
                 if let track = textTracks.first(where: { Int($0.trackID) == trackId }) {
                     selectedTrack = track
                     trackIndex = textTracks.firstIndex(where: { $0.trackID == track.trackID }) ?? -1
-                    print("KSPlayerView: Found text track by trackID \(trackId) at index \(trackIndex)")
+                    NSLog("KSPlayerView: Found text track by trackID %d at index %d", trackId, trackIndex)
                 }
                 // Fallback: treat trackId as array index
                 else if trackId >= 0 && trackId < textTracks.count {
                     selectedTrack = textTracks[trackId]
                     trackIndex = trackId
-                    print("KSPlayerView: Found text track by array index \(trackId) (fallback)")
+                    NSLog("KSPlayerView: Found text track by array index %d (fallback)", trackId)
                 }
 
                 if let track = selectedTrack {
-                    print("KSPlayerView: Selecting text track \(trackId) (index: \(trackIndex)): '\(track.name)' (ID: \(track.trackID))")
+                    NSLog("KSPlayerView: Selecting text track %d (index: %d): '%@' (ID: %d)", trackId, trackIndex, track.name, track.trackID)
 
-                    // First disable all tracks to ensure only one is active
+                    // Disable all tracks first
                     for t in textTracks {
                         t.isEnabled = false
                     }
                     
-                    // Use KSPlayer's select method which properly handles track selection
+                    // Enable the selected track
+                    track.isEnabled = true
+                    
+                    // Use KSPlayer's select method to update player state
                     player.select(track: track)
                     
-                    // Sync srtControl with player track selection
-                    // Find the corresponding SubtitleInfo in srtControl and select it
-                    if let matchingSubtitleInfo = self.playerView.srtControl.subtitleInfos.first(where: { subtitleInfo in
-                        // Try to match by name or track ID
-                        subtitleInfo.name.lowercased() == track.name.lowercased() ||
-                        subtitleInfo.subtitleID == String(track.trackID)
-                    }) {
-                        print("KSPlayerView: Found matching SubtitleInfo: \(matchingSubtitleInfo.name) (ID: \(matchingSubtitleInfo.subtitleID))")
-                        self.playerView.srtControl.selectedSubtitleInfo = matchingSubtitleInfo
-                        print("KSPlayerView: Set srtControl.selectedSubtitleInfo to: \(matchingSubtitleInfo.name)")
+                    // CRITICAL: Cast MediaPlayerTrack to SubtitleInfo and set on srtControl
+                    // FFmpegAssetTrack conforms to SubtitleInfo via extension
+                    if let subtitleInfo = track as? SubtitleInfo {
+                        self.playerView.srtControl.selectedSubtitleInfo = subtitleInfo
+                        NSLog("KSPlayerView: Set srtControl.selectedSubtitleInfo to track '%@'", track.name)
                     } else {
-                        print("KSPlayerView: No matching SubtitleInfo found for track '\(track.name)' (ID: \(track.trackID))")
-                        print("KSPlayerView: Available SubtitleInfos:")
-                        for (index, info) in self.playerView.srtControl.subtitleInfos.enumerated() {
-                            print("KSPlayerView:   [\(index)] name='\(info.name)', subtitleID='\(info.subtitleID)'")
-                        }
+                        NSLog("KSPlayerView: Warning - track could not be cast to SubtitleInfo")
                     }
                     
-                    // Ensure subtitle views are visible after selection
+                    // Ensure subtitle views are visible
                     self.playerView.subtitleLabel.isHidden = false
                     self.playerView.subtitleBackView.isHidden = false
 
-                    // Debug: Check the enabled state of all tracks after selection
-                    print("KSPlayerView: Track states after selection:")
-                    for (index, t) in textTracks.enumerated() {
-                        print("KSPlayerView:   Track \(index): ID=\(t.trackID), Name='\(t.name)', Enabled=\(t.isEnabled)")
-                    }
-
-                    // Verify the selection worked after a delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        let tracksAfter = player.tracks(mediaType: .subtitle)
-                        print("KSPlayerView: Verification after subtitle selection:")
-                        for (index, track) in tracksAfter.enumerated() {
-                            print("KSPlayerView:   Track \(index) (ID: \(track.trackID)) isEnabled: \(track.isEnabled)")
-                        }
-                        
-                        // Also verify srtControl selection
-                        if let selectedInfo = self.playerView.srtControl.selectedSubtitleInfo {
-                            print("KSPlayerView: srtControl.selectedSubtitleInfo: \(selectedInfo.name) (ID: \(selectedInfo.subtitleID))")
-                        } else {
-                            print("KSPlayerView: srtControl.selectedSubtitleInfo is nil")
-                        }
-                    }
-
-                    print("KSPlayerView: Successfully selected text track \(trackId)")
+                    NSLog("KSPlayerView: Successfully selected and enabled text track %d", trackId)
                 } else if trackId == -1 {
                     // Disable all subtitles
-                    for track in textTracks { track.isEnabled = false }
-                    // Clear srtControl selection and hide subtitle views
+                    for track in textTracks { 
+                        track.isEnabled = false 
+                    }
                     self.playerView.srtControl.selectedSubtitleInfo = nil
                     self.playerView.subtitleLabel.isHidden = true
                     self.playerView.subtitleBackView.isHidden = true
-                    print("KSPlayerView: Disabled all text tracks and cleared srtControl selection")
+                    NSLog("KSPlayerView: Disabled all text tracks")
                 } else {
-                    print("KSPlayerView: Text track \(trackId) not found. Available track IDs: \(textTracks.map { Int($0.trackID) }), array indices: 0..\(textTracks.count - 1)")
+                    NSLog("KSPlayerView: Text track %d not found. Available count: %d", trackId, textTracks.count)
                 }
             } else {
-                print("KSPlayerView: No player available for text track selection")
+                NSLog("KSPlayerView: No player available for text track selection")
             }
         }
     }
@@ -1015,7 +969,18 @@ extension KSPlayerView: KSPlayerLayerDelegate {
             if let part = playerView.srtControl.parts.first {
                 print("KSPlayerView: [SUBTITLE RENDER] time=\(currentTime), text='\(part.text?.string ?? "nil")', hasImage=\(part.image != nil)")
                 playerView.subtitleBackView.image = part.image
-                playerView.subtitleLabel.attributedText = part.text
+                
+                // Normalize font size for all subtitles to ensure consistent display
+                if let originalText = part.text {
+                    let mutableText = NSMutableAttributedString(attributedString: originalText)
+                    // Apply consistent font across the entire text
+                    let font = UIFont.systemFont(ofSize: 20.0)
+                    mutableText.addAttributes([.font: font], range: NSRange(location: 0, length: mutableText.length))
+                    playerView.subtitleLabel.attributedText = mutableText
+                } else {
+                    playerView.subtitleLabel.attributedText = nil
+                }
+                
                 playerView.subtitleBackView.isHidden = false
                 playerView.subtitleLabel.isHidden = false
                 print("KSPlayerView: [SUBTITLE RENDER] Set subtitle text and made views visible")

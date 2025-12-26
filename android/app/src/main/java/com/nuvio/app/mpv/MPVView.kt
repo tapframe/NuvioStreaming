@@ -132,7 +132,7 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("sub-auto", "fuzzy")
         MPVLib.setOptionString("sub-visibility", "yes")
         MPVLib.setOptionString("sub-font-size", "48")
-        MPVLib.setOptionString("sub-pos", "95")
+        MPVLib.setOptionString("sub-pos", "100")
         MPVLib.setOptionString("sub-color", "#FFFFFFFF")
         MPVLib.setOptionString("sub-border-size", "3")
         MPVLib.setOptionString("sub-border-color", "#FF000000")
@@ -146,14 +146,14 @@ class MPVView @JvmOverloads constructor(
         
         MPVLib.setOptionString("sub-codepage", "auto")
         
-        MPVLib.setOptionString("osc", "no")
-        MPVLib.setOptionString("osd-level", "1")
-    
         MPVLib.setOptionString("blend-subtitles", "no")
-        MPVLib.setOptionString("sub-use-margins", "no")
-        MPVLib.setOptionString("sub-ass-override", "scale")
+        MPVLib.setOptionString("sub-use-margins", "yes")
+        MPVLib.setOptionString("sub-ass-override", "force")
         MPVLib.setOptionString("sub-scale", "1.0")
         MPVLib.setOptionString("sub-fix-timing", "yes")
+        
+        MPVLib.setOptionString("osc", "no")
+        MPVLib.setOptionString("osd-level", "1")
         
         MPVLib.setOptionString("sid", "auto")
         

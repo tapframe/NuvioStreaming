@@ -87,9 +87,14 @@ class KSPlayerViewManager: RCTViewManager {
     }
 
     @objc func setTextTrack(_ node: NSNumber, trackId: NSNumber) {
+        NSLog("[KSPlayerViewManager] setTextTrack called - node: %@, trackId: %@", node, trackId)
         DispatchQueue.main.async {
+            NSLog("[KSPlayerViewManager] setTextTrack on main queue - looking for view with tag: %@", node)
             if let view = self.bridge.uiManager.view(forReactTag: node) as? KSPlayerView {
+                NSLog("[KSPlayerViewManager] Found view, calling setTextTrack(%d)", Int(truncating: trackId))
                 view.setTextTrack(Int(truncating: trackId))
+            } else {
+                NSLog("[KSPlayerViewManager] ERROR - Could not find KSPlayerView for tag: %@", node)
             }
         }
     }

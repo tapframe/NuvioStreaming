@@ -120,11 +120,16 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       }
     },
     setTextTrack: (trackId: number) => {
+      console.log('[KSPlayerComponent] setTextTrack called with trackId:', trackId);
       if (nativeRef.current) {
         const node = findNodeHandle(nativeRef.current);
+        console.log('[KSPlayerComponent] setTextTrack dispatching command to node:', node);
         // @ts-ignore legacy UIManager commands path for Paper
         const commandId = UIManager.getViewManagerConfig('KSPlayerView').Commands.setTextTrack;
+        console.log('[KSPlayerComponent] setTextTrack commandId:', commandId);
         UIManager.dispatchViewManagerCommand(node, commandId, [trackId]);
+      } else {
+        console.warn('[KSPlayerComponent] setTextTrack: nativeRef.current is null');
       }
     },
     getTracks: async () => {

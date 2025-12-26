@@ -389,6 +389,27 @@ const KSPlayerCore: React.FC = () => {
     navigation.goBack();
   }, [navigation, currentTime, duration, traktAutosync]);
 
+  // Track selection handlers - update state, prop change triggers native update
+  const handleSelectTextTrack = useCallback((trackId: number) => {
+    console.log('[KSPlayerCore] handleSelectTextTrack called with trackId:', trackId);
+
+    // Disable custom subtitles when selecting a built-in track
+    // This ensures the textTrack prop is actually passed to the native player
+    if (trackId !== -1) {
+      customSubs.setUseCustomSubtitles(false);
+    }
+
+    // Just update state - the textTrack prop change will trigger native update
+    tracks.selectTextTrack(trackId);
+  }, [tracks, customSubs]);
+
+  const handleSelectAudioTrack = useCallback((trackId: number) => {
+    tracks.selectAudioTrack(trackId);
+    if (ksPlayerRef.current) {
+      ksPlayerRef.current.setAudioTrack(trackId);
+    }
+  }, [tracks, ksPlayerRef]);
+
   // Stream selection handler
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === uri) {
@@ -498,8 +519,8 @@ const KSPlayerCore: React.FC = () => {
         setZoomScale={setZoomScale}
         lastZoomScale={lastZoomScale}
         setLastZoomScale={setLastZoomScale}
-        audioTrack={tracks.selectedAudioTrack !== null ? tracks.selectedAudioTrack : undefined}
-        textTrack={customSubs.useCustomSubtitles ? undefined : (tracks.selectedTextTrack !== -1 ? tracks.selectedTextTrack : undefined)}
+        audioTrack={tracks.selectedAudioTrack ?? undefined}
+        textTrack={customSubs.useCustomSubtitles ? -1 : tracks.selectedTextTrack}
         onAudioTracks={(d) => tracks.setKsAudioTracks(d.audioTracks || [])}
         onTextTracks={(d) => tracks.setKsTextTracks(d.textTracks || [])}
         onLoad={onLoad}
@@ -682,7 +703,7 @@ const KSPlayerCore: React.FC = () => {
         setShowAudioModal={modals.setShowAudioModal}
         ksAudioTracks={tracks.ksAudioTracks}
         selectedAudioTrack={tracks.selectedAudioTrack}
-        selectAudioTrack={tracks.selectAudioTrack}
+        selectAudioTrack={handleSelectAudioTrack}
       />
 
       <ErrorModal
@@ -744,10 +765,10 @@ const KSPlayerCore: React.FC = () => {
         ksTextTracks={tracks.ksTextTracks}
         selectedTextTrack={tracks.selectedTextTrack !== null ? tracks.selectedTextTrack : -1}
         useCustomSubtitles={customSubs.useCustomSubtitles}
-        selectTextTrack={tracks.selectTextTrack}
+        selectTextTrack={handleSelectTextTrack}
         disableCustomSubtitles={() => {
           customSubs.setUseCustomSubtitles(false);
-          tracks.selectTextTrack(-1);
+          handleSelectTextTrack(-1);
         }}
       />
 
