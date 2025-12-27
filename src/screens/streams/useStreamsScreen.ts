@@ -799,12 +799,28 @@ export const useStreamsScreen = () => {
       return addonId === selectedProvider;
     });
 
+    // Sort entries: installed addons first (in their installation order), then plugins
     const sortedEntries = filteredEntries.sort(([addonIdA], [addonIdB]) => {
-      const indexA = addonResponseOrder.indexOf(addonIdA);
-      const indexB = addonResponseOrder.indexOf(addonIdB);
-      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
+      const isAddonA = installedAddons.some(addon => addon.id === addonIdA);
+      const isAddonB = installedAddons.some(addon => addon.id === addonIdB);
+      
+      // Addons always come before plugins
+      if (isAddonA && !isAddonB) return -1;
+      if (!isAddonA && isAddonB) return 1;
+      
+      // Both are addons - sort by installation order
+      if (isAddonA && isAddonB) {
+        const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
+        const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
+        return indexA - indexB;
+      }
+      
+      // Both are plugins - sort by response order
+      const responseIndexA = addonResponseOrder.indexOf(addonIdA);
+      const responseIndexB = addonResponseOrder.indexOf(addonIdB);
+      if (responseIndexA !== -1 && responseIndexB !== -1) return responseIndexA - responseIndexB;
+      if (responseIndexA !== -1) return -1;
+      if (responseIndexB !== -1) return 1;
       return 0;
     });
 
