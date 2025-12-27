@@ -7,6 +7,7 @@ buildscript {
     compileSdkVersion = 35
     targetSdkVersion = 35
     castFrameworkVersion = "22.1.0"
+    ndkVersion = "29.0.14206865" // Required for libmpv AAR built with NDK r29
   }
   repositories {
     google()

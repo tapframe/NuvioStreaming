@@ -89,7 +89,8 @@ export interface AppSettings {
   enableStreamsBackdrop: boolean; // Enable blurred backdrop background on StreamsScreen mobile
   useExternalPlayerForDownloads: boolean; // Enable/disable external player for downloaded content
   // Android MPV player settings
-  useHardwareDecoding: boolean; // Enable hardware decoding for MPV player on Android (default: false for software decoding)
+  decoderMode: 'auto' | 'sw' | 'hw' | 'hw+'; // Decoder mode: auto (auto-copy), sw (software), hw (mediacodec-copy), hw+ (mediacodec)
+  gpuMode: 'gpu' | 'gpu-next'; // GPU rendering mode: gpu (standard) or gpu-next (advanced HDR/color)
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -152,7 +153,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   streamCacheTTL: 60 * 60 * 1000, // Default: 1 hour in milliseconds
   enableStreamsBackdrop: true, // Enable by default (new behavior)
   // Android MPV player settings
-  useHardwareDecoding: false, // Default to software decoding (more compatible)
+  decoderMode: 'auto', // Default to auto (best compatibility and performance)
+  gpuMode: 'gpu', // Default to gpu (gpu-next for advanced HDR)
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';

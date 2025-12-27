@@ -568,7 +568,8 @@ const AndroidVideoPlayer: React.FC = () => {
             onPinchGestureEvent={() => { }}
             onPinchHandlerStateChange={() => { }}
             screenDimensions={playerState.screenDimensions}
-            useHardwareDecoding={settings.useHardwareDecoding}
+            decoderMode={settings.decoderMode}
+            gpuMode={settings.gpuMode}
           />
         )}
 

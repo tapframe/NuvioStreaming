@@ -32,7 +32,8 @@ interface VideoSurfaceProps {
     onPinchHandlerStateChange: any;
     screenDimensions: { width: number, height: number };
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
-    useHardwareDecoding?: boolean;
+    decoderMode?: 'auto' | 'sw' | 'hw' | 'hw+';
+    gpuMode?: 'gpu' | 'gpu-next';
 }
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = ({
@@ -56,7 +57,8 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     onPinchHandlerStateChange,
     screenDimensions,
     onTracksChanged,
-    useHardwareDecoding,
+    decoderMode,
+    gpuMode,
 }) => {
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
@@ -115,7 +117,8 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                 onEnd={handleEnd}
                 onError={handleError}
                 onTracksChanged={onTracksChanged}
-                useHardwareDecoding={useHardwareDecoding}
+                decoderMode={decoderMode}
+                gpuMode={gpuMode}
             />
 
             {/* Gesture overlay - transparent, on top of the player */}

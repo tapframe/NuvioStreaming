@@ -335,51 +335,139 @@ const PlayerSettingsScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Hardware Decoding for Android Internal Player */}
+            {/* Decoder Mode for Android Internal Player */}
             {Platform.OS === 'android' && !settings.useExternalPlayer && (
-              <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)' }]}>
-                <View style={styles.settingContent}>
-                  <View style={[
-                    styles.settingIconContainer,
-                    { backgroundColor: 'rgba(255,255,255,0.1)' }
-                  ]}>
-                    <MaterialIcons
-                      name="memory"
-                      size={20}
-                      color={currentTheme.colors.primary}
-                    />
+              <>
+                <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 }]}>
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="memory"
+                        size={20}
+                        color={currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: currentTheme.colors.text },
+                        ]}
+                      >
+                        Decoder Mode
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        How video is decoded. Auto is recommended for best balance.
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.settingText}>
-                    <Text
-                      style={[
-                        styles.settingTitle,
-                        { color: currentTheme.colors.text },
-                      ]}
-                    >
-                      Hardware Decoding
-                    </Text>
-                    <Text
-                      style={[
-                        styles.settingDescription,
-                        { color: currentTheme.colors.textMuted },
-                      ]}
-                    >
-                      Use GPU for video decoding. May improve performance but can cause issues on some devices.
-                    </Text>
+                  <View style={styles.optionButtonsRow}>
+                    {([
+                      { id: 'auto', label: 'Auto', desc: 'Best balance' },
+                      { id: 'sw', label: 'SW', desc: 'Software' },
+                      { id: 'hw', label: 'HW', desc: 'Hardware' },
+                      { id: 'hw+', label: 'HW+', desc: 'Full HW' },
+                    ] as const).map((option) => (
+                      <TouchableOpacity
+                        key={option.id}
+                        onPress={() => {
+                          updateSetting('decoderMode', option.id);
+                          openAlert(
+                            'Restart Required',
+                            'Please restart the app for the decoder change to take effect.'
+                          );
+                        }}
+                        style={[
+                          styles.optionButton,
+                          settings.decoderMode === option.id && { backgroundColor: currentTheme.colors.primary },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionButtonText,
+                            { color: settings.decoderMode === option.id ? '#fff' : currentTheme.colors.text },
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                  <Switch
-                    value={settings.useHardwareDecoding}
-                    onValueChange={(value) => {
-                      updateSetting('useHardwareDecoding', value);
-                      openAlert(
-                        'Restart Required',
-                        'Please restart the app for the decoding change to take effect.'
-                      );
-                    }}
-                    thumbColor={settings.useHardwareDecoding ? currentTheme.colors.primary : undefined}
-                  />
                 </View>
-              </View>
+
+                {/* GPU Mode for Android Internal Player */}
+                <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 }]}>
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="videocam"
+                        size={20}
+                        color={currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: currentTheme.colors.text },
+                        ]}
+                      >
+                        GPU Rendering
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        GPU-Next offers better HDR and color management.
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.optionButtonsRow}>
+                    {([
+                      { id: 'gpu', label: 'GPU', desc: 'Standard' },
+                      { id: 'gpu-next', label: 'GPU-Next', desc: 'Advanced' },
+                    ] as const).map((option) => (
+                      <TouchableOpacity
+                        key={option.id}
+                        onPress={() => {
+                          updateSetting('gpuMode', option.id);
+                          openAlert(
+                            'Restart Required',
+                            'Please restart the app for the GPU mode change to take effect.'
+                          );
+                        }}
+                        style={[
+                          styles.optionButton,
+                          styles.optionButtonWide,
+                          settings.gpuMode === option.id && { backgroundColor: currentTheme.colors.primary },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionButtonText,
+                            { color: settings.gpuMode === option.id ? '#fff' : currentTheme.colors.text },
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </>
             )}
 
             {/* External Player for Downloads */}
@@ -531,6 +619,28 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginLeft: 16,
+  },
+  optionButtonsRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    paddingHorizontal: 52,
+    gap: 8,
+  },
+  optionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionButtonWide: {
+    flex: 1.5,
+  },
+  optionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 

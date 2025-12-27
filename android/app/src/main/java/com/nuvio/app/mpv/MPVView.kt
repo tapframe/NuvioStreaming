@@ -24,8 +24,11 @@ class MPVView @JvmOverloads constructor(
     private var surface: Surface? = null
     private var httpHeaders: Map<String, String>? = null
     
-    // Hardware decoding setting (default: false = software decoding)
-    var useHardwareDecoding: Boolean = false
+    // Decoder mode setting: 'auto', 'sw', 'hw', 'hw+' (default: auto)
+    var decoderMode: String = "auto"
+    
+    // GPU mode setting: 'gpu', 'gpu-next' (default: gpu)
+    var gpuMode: String = "gpu"
     
     // Flag to track if onLoad has been fired (prevents multiple fires for HLS streams)
     private var hasLoadEventFired: Boolean = false
@@ -94,22 +97,47 @@ class MPVView @JvmOverloads constructor(
 
     private fun initOptions() {
         MPVLib.setOptionString("profile", "fast")
-        MPVLib.setOptionString("vo", "gpu")
+        
+        // GPU rendering mode (gpu or gpu-next)
+        MPVLib.setOptionString("vo", gpuMode)
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
         
-        val hwdecValue = if (useHardwareDecoding) "mediacodec,mediacodec-copy" else "no"
-        Log.d(TAG, "Hardware decoding: $useHardwareDecoding, hwdec value: $hwdecValue")
+        // Decoder mode mapping (same as mpvKt)
+        val hwdecValue = when (decoderMode) {
+            "auto" -> "auto-copy"      // Best balance: HW decode, copy to CPU for filters
+            "sw" -> "no"               // Software decoding only
+            "hw" -> "mediacodec-copy"  // HW decode with copy (safer)
+            "hw+" -> "mediacodec"      // Full HW decode (fastest, may have issues)
+            else -> "auto-copy"
+        }
+        Log.d(TAG, "Decoder mode: $decoderMode, hwdec value: $hwdecValue, GPU mode: $gpuMode")
         MPVLib.setOptionString("hwdec", hwdecValue)
-        MPVLib.setOptionString("hwdec-codecs", "h264,hevc,mpeg4,mpeg2video,vp8,vp9,av1")
+        // Note: Not setting hwdec-codecs explicitly - let mpv use defaults
         
         MPVLib.setOptionString("target-colorspace-hint", "yes")
+        
+        // HDR and Dolby Vision support
+        // target-prim: Signal target display primaries (auto = passthrough when display supports)
+        MPVLib.setOptionString("target-prim", "auto")
+        // target-trc: Signal target transfer characteristics (auto = passthrough when display supports)  
+        MPVLib.setOptionString("target-trc", "auto")
+        // tone-mapping: How to handle HDR/DV content on SDR displays (auto = best automatic choice)
+        MPVLib.setOptionString("tone-mapping", "auto")
+        // hdr-compute-peak: Compute peak brightness for better tone mapping
+        MPVLib.setOptionString("hdr-compute-peak", "auto")
+        // Allow DV Profile 5 (HEVC with RPU) to be decoded by hardware decoder
+        MPVLib.setOptionString("vd-lavc-o", "strict=-2")
+        
+        // Workaround for https://github.com/mpv-player/mpv/issues/14651
         MPVLib.setOptionString("vd-lavc-film-grain", "cpu")
         
         MPVLib.setOptionString("ao", "audiotrack,opensles")
         
-        MPVLib.setOptionString("demuxer-max-bytes", "67108864")
-        MPVLib.setOptionString("demuxer-max-back-bytes", "33554432")
+        // Limit demuxer cache based on Android version (like mpvKt)
+        val cacheMegs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) 64 else 32
+        MPVLib.setOptionString("demuxer-max-bytes", "${cacheMegs * 1024 * 1024}")
+        MPVLib.setOptionString("demuxer-max-back-bytes", "${cacheMegs * 1024 * 1024}")
         MPVLib.setOptionString("cache", "yes")
         MPVLib.setOptionString("cache-secs", "30")
         
@@ -125,9 +153,6 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("demuxer-lavf-o", "live_start_index=0,prefer_x_start=1,http_persistent=0")
         MPVLib.setOptionString("demuxer-seekable-cache", "yes")
         MPVLib.setOptionString("force-seekable", "yes")
-        
-        MPVLib.setOptionString("demuxer-lavf-probesize", "10000000")
-        MPVLib.setOptionString("demuxer-lavf-analyzeduration", "10")
         
         MPVLib.setOptionString("sub-auto", "fuzzy")
         MPVLib.setOptionString("sub-visibility", "yes")
