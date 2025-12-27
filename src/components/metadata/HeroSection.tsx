@@ -107,13 +107,13 @@ interface HeroSectionProps {
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
-const ActionButtons = memo(({ 
-  handleShowStreams, 
-  toggleLibrary, 
-  inLibrary, 
-  type, 
-  id, 
-  navigation, 
+const ActionButtons = memo(({
+  handleShowStreams,
+  toggleLibrary,
+  inLibrary,
+  type,
+  id,
+  navigation,
   playButtonText,
   animatedStyle,
   isWatched,
@@ -150,21 +150,21 @@ const ActionButtons = memo(({
 }) => {
   const { currentTheme } = useTheme();
   const { showSaved, showTraktSaved, showRemoved, showTraktRemoved, showSuccess, showInfo } = useToast();
-  
+
   // Performance optimization: Cache theme colors
   const themeColors = useMemo(() => ({
     white: currentTheme.colors.white,
     black: '#000',
     primary: currentTheme.colors.primary
   }), [currentTheme.colors.white, currentTheme.colors.primary]);
-  
+
   // Optimized navigation handler with useCallback
   const handleRatingsPress = useCallback(async () => {
     // Early return if no ID
     if (!id) return;
-    
+
     let finalTmdbId: number | null = null;
-    
+
     if (id.startsWith('tmdb:')) {
       const numericPart = id.split(':')[1];
       const parsedId = parseInt(numericPart, 10);
@@ -187,7 +187,7 @@ const ActionButtons = memo(({
         finalTmdbId = parsedId;
       }
     }
-    
+
     if (finalTmdbId !== null) {
       // Use requestAnimationFrame for smoother navigation
       requestAnimationFrame(() => {
@@ -199,15 +199,15 @@ const ActionButtons = memo(({
   // Enhanced save handler that combines local library + Trakt watchlist
   const handleSaveAction = useCallback(async () => {
     const wasInLibrary = inLibrary;
-    
+
     // Always toggle local library first
     toggleLibrary();
-    
+
     // If authenticated, also toggle Trakt watchlist
     if (isAuthenticated && onToggleWatchlist) {
       await onToggleWatchlist();
     }
-    
+
     // Show appropriate toast
     if (isAuthenticated) {
       if (wasInLibrary) {
@@ -227,12 +227,12 @@ const ActionButtons = memo(({
   // Enhanced collection handler with toast notifications
   const handleCollectionAction = useCallback(async () => {
     const wasInCollection = isInCollection;
-    
+
     // Toggle collection
     if (onToggleCollection) {
       await onToggleCollection();
     }
-    
+
     // Show appropriate toast
     if (wasInCollection) {
       showInfo('Removed from Collection', 'Removed from your Trakt collection');
@@ -295,10 +295,10 @@ const ActionButtons = memo(({
           // For watched episodes, check if next episode exists
           const nextEpisode = episodeNum + 1;
           const currentSeasonEpisodes = groupedEpisodes[seasonNum] || [];
-          const nextEpisodeExists = currentSeasonEpisodes.some(ep => 
+          const nextEpisodeExists = currentSeasonEpisodes.some(ep =>
             ep.episode_number === nextEpisode
           );
-          
+
           if (nextEpisodeExists) {
             // Show the NEXT episode number only if it exists
             const seasonStr = seasonNum.toString().padStart(2, '0');
@@ -311,10 +311,10 @@ const ActionButtons = memo(({
         } else {
           // For non-watched episodes, check if current episode exists
           const currentSeasonEpisodes = groupedEpisodes[seasonNum] || [];
-          const currentEpisodeExists = currentSeasonEpisodes.some(ep => 
+          const currentEpisodeExists = currentSeasonEpisodes.some(ep =>
             ep.episode_number === episodeNum
           );
-          
+
           if (currentEpisodeExists) {
             // Current episode exists, use original button text
             return playButtonText;
@@ -336,141 +336,141 @@ const ActionButtons = memo(({
   // Count additional buttons (excluding Play and Save) - AI Chat no longer counted
   const hasTraktCollection = isAuthenticated;
   const hasRatings = type === 'series';
-  
+
   // Count additional buttons (AI Chat removed - now in top right corner)
   const additionalButtonCount = (hasTraktCollection ? 1 : 0) + (hasRatings ? 1 : 0);
-  
+
   return (
     <Animated.View style={[isTablet ? styles.tabletActionButtons : styles.actionButtons, animatedStyle]}>
       {/* Single Row Layout - Play, Save, and optionally Collection/Ratings */}
       <View style={styles.singleRowLayout}>
-          <TouchableOpacity
-            style={[
-              playButtonStyle, 
-              isTablet && styles.tabletPlayButton, 
-              additionalButtonCount === 0 ? styles.singleRowPlayButtonFullWidth : styles.primaryActionButton
-            ]}
-            onPress={handleShowStreams}
-            activeOpacity={0.85}
-          >
-            <MaterialIcons 
-              name={(() => {
-                if (isWatched) {
-                  return type === 'movie' ? 'replay' : 'play-arrow';
-                }
-                return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
-              })()} 
-              size={isTablet ? 28 : 24} 
-              color={isWatched && type === 'movie' ? "#fff" : "#000"} 
-            />
-            <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            playButtonStyle,
+            isTablet && styles.tabletPlayButton,
+            additionalButtonCount === 0 ? styles.singleRowPlayButtonFullWidth : styles.primaryActionButton
+          ]}
+          onPress={handleShowStreams}
+          activeOpacity={0.85}
+        >
+          <MaterialIcons
+            name={(() => {
+              if (isWatched) {
+                return type === 'movie' ? 'replay' : 'play-arrow';
+              }
+              return playButtonText === 'Resume' ? 'play-circle-outline' : 'play-arrow';
+            })()}
+            size={isTablet ? 28 : 24}
+            color={isWatched && type === 'movie' ? "#fff" : "#000"}
+          />
+          <Text style={[playButtonTextStyle, isTablet && styles.tabletPlayButtonText]}>{finalPlayButtonText}</Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.infoButton,
+            isTablet && styles.tabletInfoButton,
+            additionalButtonCount === 0 ? styles.singleRowSaveButtonFullWidth : styles.primaryActionButton
+          ]}
+          onPress={handleSaveAction}
+          activeOpacity={0.85}
+        >
+          {Platform.OS === 'ios' ? (
+            GlassViewComp && liquidGlassAvailable ? (
+              <GlassViewComp
+                style={styles.blurBackground}
+                glassEffectStyle="regular"
+              />
+            ) : (
+              <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+            )
+          ) : (
+            <View style={styles.androidFallbackBlur} />
+          )}
+          <MaterialIcons
+            name={inLibrary ? "bookmark" : "bookmark-outline"}
+            size={isTablet ? 28 : 24}
+            color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
+          />
+          <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
+            {inLibrary ? 'Saved' : 'Save'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Trakt Collection Button */}
+        {hasTraktCollection && (
           <TouchableOpacity
-            style={[
-              styles.actionButton, 
-              styles.infoButton, 
-              isTablet && styles.tabletInfoButton,
-              additionalButtonCount === 0 ? styles.singleRowSaveButtonFullWidth : styles.primaryActionButton
-            ]}
-            onPress={handleSaveAction}
+            style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
+            onPress={handleCollectionAction}
             activeOpacity={0.85}
           >
             {Platform.OS === 'ios' ? (
               GlassViewComp && liquidGlassAvailable ? (
                 <GlassViewComp
-                  style={styles.blurBackground}
+                  style={styles.blurBackgroundRound}
                   glassEffectStyle="regular"
                 />
               ) : (
-                <ExpoBlurView intensity={80} style={styles.blurBackground} tint="dark" />
+                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
               )
             ) : (
-              <View style={styles.androidFallbackBlur} />
+              <View style={styles.androidFallbackBlurRound} />
             )}
             <MaterialIcons
-              name={inLibrary ? "bookmark" : "bookmark-outline"}
+              name={isInCollection ? "video-library" : "video-library"}
               size={isTablet ? 28 : 24}
-              color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
+              color={isInCollection ? "#3498DB" : currentTheme.colors.white}
             />
-            <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
-              {inLibrary ? 'Saved' : 'Save'}
-            </Text>
           </TouchableOpacity>
+        )}
 
-          {/* Trakt Collection Button */}
-          {hasTraktCollection && (
-            <TouchableOpacity
-              style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
-              onPress={handleCollectionAction}
-              activeOpacity={0.85}
-            >
-              {Platform.OS === 'ios' ? (
-                GlassViewComp && liquidGlassAvailable ? (
-                  <GlassViewComp
-                    style={styles.blurBackgroundRound}
-                    glassEffectStyle="regular"
-                  />
-                ) : (
-                  <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-                )
+        {/* Ratings Button (for series) */}
+        {hasRatings && (
+          <TouchableOpacity
+            style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
+            onPress={handleRatingsPress}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'ios' ? (
+              GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={styles.blurBackgroundRound}
+                  glassEffectStyle="regular"
+                />
               ) : (
-                <View style={styles.androidFallbackBlurRound} />
-              )}
-              <MaterialIcons 
-                name={isInCollection ? "video-library" : "video-library"} 
-                size={isTablet ? 28 : 24} 
-                color={isInCollection ? "#3498DB" : currentTheme.colors.white}
-              />
-            </TouchableOpacity>
-          )}
-
-          {/* Ratings Button (for series) */}
-          {hasRatings && (
-            <TouchableOpacity
-              style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
-              onPress={handleRatingsPress}
-              activeOpacity={0.85}
-            >
-              {Platform.OS === 'ios' ? (
-                GlassViewComp && liquidGlassAvailable ? (
-                  <GlassViewComp
-                    style={styles.blurBackgroundRound}
-                    glassEffectStyle="regular"
-                  />
-                ) : (
-                  <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
-                )
-              ) : (
-                <View style={styles.androidFallbackBlurRound} />
-              )}
-              <MaterialIcons 
-                name="assessment" 
-                size={isTablet ? 28 : 24} 
-                color={currentTheme.colors.white}
-              />
-            </TouchableOpacity>
-          )}
+                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+              )
+            ) : (
+              <View style={styles.androidFallbackBlurRound} />
+            )}
+            <MaterialIcons
+              name="assessment"
+              size={isTablet ? 28 : 24}
+              color={currentTheme.colors.white}
+            />
+          </TouchableOpacity>
+        )}
       </View>
     </Animated.View>
   );
 });
 
 // Enhanced WatchProgress Component with Trakt integration and watched status
-const WatchProgressDisplay = memo(({ 
-  watchProgress, 
-  type, 
-  getEpisodeDetails, 
+const WatchProgressDisplay = memo(({
+  watchProgress,
+  type,
+  getEpisodeDetails,
   animatedStyle,
   isWatched,
   isTrailerPlaying,
   trailerMuted,
   trailerReady
 }: {
-  watchProgress: { 
-    currentTime: number; 
-    duration: number; 
-    lastUpdated: number; 
+  watchProgress: {
+    currentTime: number;
+    duration: number;
+    lastUpdated: number;
     episodeId?: string;
     traktSynced?: boolean;
     traktProgress?: number;
@@ -485,11 +485,11 @@ const WatchProgressDisplay = memo(({
 }) => {
   const { currentTheme } = useTheme();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
-  
+
   // State to trigger refresh after manual sync
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  
+
   // Animated values for enhanced effects
   const completionGlow = useSharedValue(0);
   const celebrationScale = useSharedValue(1);
@@ -498,7 +498,7 @@ const WatchProgressDisplay = memo(({
   const progressBoxScale = useSharedValue(0.8);
   const progressBoxTranslateY = useSharedValue(20);
   const syncRotation = useSharedValue(0);
-  
+
   // Animate the sync icon when syncing
   useEffect(() => {
     if (isSyncing) {
@@ -511,7 +511,7 @@ const WatchProgressDisplay = memo(({
       syncRotation.value = 0;
     }
   }, [isSyncing, syncRotation]);
-  
+
   // Handle manual Trakt sync
   const handleTraktSync = useMemo(() => async () => {
     if (isTraktAuthenticated && forceSyncTraktProgress) {
@@ -520,7 +520,7 @@ const WatchProgressDisplay = memo(({
       try {
         const success = await forceSyncTraktProgress();
         logger.log(`[HeroSection] Manual Trakt sync ${success ? 'successful' : 'failed'}`);
-        
+
         // Force component to re-render after a short delay to update sync status
         if (success) {
           setTimeout(() => {
@@ -541,7 +541,7 @@ const WatchProgressDisplay = memo(({
   const syncIconStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${syncRotation.value}deg` }],
   }));
-  
+
   // Memoized progress calculation with Trakt integration
   const progressData = useMemo(() => {
     // If content is fully watched, show watched status instead of progress
@@ -553,16 +553,16 @@ const WatchProgressDisplay = memo(({
           episodeInfo = ` • S${details.seasonNumber}:E${details.episodeNumber}${details.episodeName ? ` - ${details.episodeName}` : ''}`;
         }
       }
-      
-      const watchedDate = watchProgress?.lastUpdated 
+
+      const watchedDate = watchProgress?.lastUpdated
         ? new Date(watchProgress.lastUpdated).toLocaleDateString('en-US')
         : new Date().toLocaleDateString('en-US');
-      
+
       // Determine if watched via Trakt or local
-      const watchedViaTrakt = isTraktAuthenticated && 
-        watchProgress?.traktProgress !== undefined && 
+      const watchedViaTrakt = isTraktAuthenticated &&
+        watchProgress?.traktProgress !== undefined &&
         watchProgress.traktProgress >= 95;
-      
+
       return {
         progressPercent: 100,
         formattedTime: watchedDate,
@@ -579,7 +579,7 @@ const WatchProgressDisplay = memo(({
     // Determine which progress to show - prioritize Trakt if available and authenticated
     let progressPercent;
     let isUsingTraktProgress = false;
-    
+
     if (isTraktAuthenticated && watchProgress.traktProgress !== undefined) {
       progressPercent = watchProgress.traktProgress;
       isUsingTraktProgress = true;
@@ -599,7 +599,7 @@ const WatchProgressDisplay = memo(({
     // Enhanced display text with Trakt integration
     let displayText = progressPercent >= 85 ? 'Watched' : `${Math.round(progressPercent)}% watched`;
     let syncStatus = '';
-    
+
     // Show Trakt sync status if user is authenticated
     if (isTraktAuthenticated) {
       if (isUsingTraktProgress) {
@@ -610,8 +610,8 @@ const WatchProgressDisplay = memo(({
       } else if (watchProgress.traktSynced) {
         syncStatus = ' • Synced with Trakt';
         // If we have specific Trakt progress that differs from local, mention it
-        if (watchProgress.traktProgress !== undefined && 
-            Math.abs(progressPercent - watchProgress.traktProgress) > 5) {
+        if (watchProgress.traktProgress !== undefined &&
+          Math.abs(progressPercent - watchProgress.traktProgress) > 5) {
           displayText = `${Math.round(progressPercent)}% watched (${Math.round(watchProgress.traktProgress)}% on Trakt)`;
         }
       } else {
@@ -638,7 +638,7 @@ const WatchProgressDisplay = memo(({
       progressBoxOpacity.value = withTiming(1, { duration: 400 });
       progressBoxScale.value = withTiming(1, { duration: 400 });
       progressBoxTranslateY.value = withTiming(0, { duration: 400 });
-      
+
       if (progressData.isWatched || (progressData.progressPercent && progressData.progressPercent >= 85)) {
         // Celebration animation sequence
         celebrationScale.value = withRepeat(
@@ -646,7 +646,7 @@ const WatchProgressDisplay = memo(({
           2,
           true
         );
-        
+
         // Glow effect
         completionGlow.value = withRepeat(
           withTiming(1, { duration: 1500 }),
@@ -712,34 +712,34 @@ const WatchProgressDisplay = memo(({
         ) : (
           <View style={styles.androidProgressBlur} />
         )}
-        
+
         {/* Enhanced progress bar with glow effects */}
         <Animated.View style={[styles.watchProgressBarContainer, celebrationAnimatedStyle]}>
-      <View style={styles.watchProgressBar}>
+          <View style={styles.watchProgressBar}>
             {/* Background glow for completed content */}
             {isCompleted && (
               <Animated.View style={[styles.completionGlow, glowAnimatedStyle]} />
             )}
-            
-            <Animated.View 
-          style={[
-            styles.watchProgressFill,
+
+            <Animated.View
+              style={[
+                styles.watchProgressFill,
                 !isCompleted && progressPulseStyle,
-            { 
-              width: `${progressData.progressPercent}%`,
+                {
+                  width: `${progressData.progressPercent}%`,
                   backgroundColor: isCompleted
                     ? '#00ff88' // Bright green for completed
-                : progressData.isTraktSynced 
-                  ? '#E50914' // Netflix red for Trakt synced content
+                    : progressData.isTraktSynced
+                      ? '#E50914' // Netflix red for Trakt synced content
                       : currentTheme.colors.primary,
                   // Add gradient effect for completed content
                   ...(isCompleted && {
                     background: 'linear-gradient(90deg, #00ff88, #00cc6a)',
                   })
-            }
-          ]} 
-        />
-            
+                }
+              ]}
+            />
+
             {/* Shimmer effect for active progress */}
             {!isCompleted && progressData.progressPercent > 0 && (
               <View style={styles.progressShimmer} />
@@ -768,46 +768,46 @@ const WatchProgressDisplay = memo(({
               {progressData.episodeInfo}
             </Text>
           )}
-          
+
           {/* Trakt sync status with enhanced styling */}
           {progressData.syncStatus && (
             <View style={styles.syncStatusContainer}>
-              <MaterialIcons 
-                name={progressData.isTraktSynced ? "sync" : "sync-problem"} 
-                size={12} 
-                color={progressData.isTraktSynced ? "#E50914" : "rgba(255,255,255,0.6)"} 
+              <MaterialIcons
+                name={progressData.isTraktSynced ? "sync" : "sync-problem"}
+                size={12}
+                color={progressData.isTraktSynced ? "#E50914" : "rgba(255,255,255,0.6)"}
               />
               <Text style={[styles.syncStatusText, {
                 color: progressData.isTraktSynced ? "#E50914" : "rgba(255,255,255,0.6)"
               }]}>
-          {progressData.syncStatus}
-        </Text>
-        
+                {progressData.syncStatus}
+              </Text>
+
               {/* Enhanced manual Trakt sync button - moved inline */}
-        {isTraktAuthenticated && forceSyncTraktProgress && (
-          <TouchableOpacity 
+              {isTraktAuthenticated && forceSyncTraktProgress && (
+                <TouchableOpacity
                   style={styles.traktSyncButtonInline}
-            onPress={handleTraktSync}
-            activeOpacity={0.7}
-            disabled={isSyncing}
+                  onPress={handleTraktSync}
+                  activeOpacity={0.7}
+                  disabled={isSyncing}
                 >
                   <LinearGradient
                     colors={['#E50914', '#B8070F']}
                     style={styles.syncButtonGradientInline}
-          >
-            <Animated.View style={syncIconStyle}>
-              <MaterialIcons 
-                name={isSyncing ? "sync" : "refresh"} 
-                      size={12} 
-                      color="#fff" 
-              />
-            </Animated.View>
+                  >
+                    <Animated.View style={syncIconStyle}>
+                      <MaterialIcons
+                        name={isSyncing ? "sync" : "refresh"}
+                        size={12}
+                        color="#fff"
+                      />
+                    </Animated.View>
                   </LinearGradient>
-          </TouchableOpacity>
+                </TouchableOpacity>
               )}
             </View>
-        )}
-      </View>
+          )}
+        </View>
       </Animated.View>
     </Animated.View>
   );
@@ -896,12 +896,12 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Guards to avoid repeated auto-starts
   const startedOnFocusRef = useRef(false);
   const startedOnReadyRef = useRef(false);
-  
+
   // Animation values for trailer unmute effects
   const actionButtonsOpacity = useSharedValue(1);
   const titleCardTranslateY = useSharedValue(0);
   const genreOpacity = useSharedValue(1);
-  
+
   // Ultra-optimized theme colors with stable references
   const themeColors = useMemo(() => ({
     black: currentTheme.colors.black,
@@ -932,7 +932,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       setTrailerPreloaded(true);
     }
     setTrailerReady(true);
-    
+
     // Smooth transition: fade out thumbnail, fade in trailer
     thumbnailOpacity.value = withTiming(0, { duration: 500 });
     trailerOpacity.value = withTiming(1, { duration: 500 });
@@ -948,7 +948,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       try {
         const y = (scrollY as any).value || 0;
         const pauseThreshold = heroHeight.value * 0.7;
-        
+
         if (y < pauseThreshold) {
           startedOnReadyRef.current = true;
           logger.info('HeroSection', 'Trailer ready - auto-starting playback');
@@ -987,7 +987,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     setTrailerError(true);
     setTrailerReady(false);
     setTrailerPlaying(false);
-    
+
     // Fade back to thumbnail
     trailerOpacity.value = withTiming(0, { duration: 300 });
     thumbnailOpacity.value = withTiming(1, { duration: 300 });
@@ -997,11 +997,11 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const handleTrailerEnd = useCallback(async () => {
     logger.info('HeroSection', 'Trailer ended - transitioning back to thumbnail');
     setTrailerPlaying(false);
-    
+
     // Reset trailer state to prevent auto-restart
     setTrailerReady(false);
     setTrailerPreloaded(false);
-    
+
     // If trailer is in fullscreen, dismiss it first
     try {
       if (trailerVideoRef.current) {
@@ -1011,22 +1011,22 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     } catch (error) {
       logger.warn('HeroSection', 'Error dismissing fullscreen player:', error);
     }
-    
+
     // Smooth fade transition: trailer out, thumbnail in
     trailerOpacity.value = withTiming(0, { duration: 500 });
     thumbnailOpacity.value = withTiming(1, { duration: 500 });
-    
+
     // Show UI elements again
     actionButtonsOpacity.value = withTiming(1, { duration: 500 });
     genreOpacity.value = withTiming(1, { duration: 500 });
     titleCardTranslateY.value = withTiming(0, { duration: 500 });
     watchProgressOpacity.value = withTiming(1, { duration: 500 });
   }, [trailerOpacity, thumbnailOpacity, actionButtonsOpacity, genreOpacity, titleCardTranslateY, watchProgressOpacity, setTrailerPlaying]);
-  
+
   // Memoized image source
-  const imageSource = useMemo(() => 
+  const imageSource = useMemo(() =>
     bannerImage || metadata.banner || metadata.poster
-  , [bannerImage, metadata.banner, metadata.poster]);
+    , [bannerImage, metadata.banner, metadata.poster]);
 
   // Use the logo provided by metadata (already enriched by useMetadataAssets based on settings)
   const logoUri = useMemo(() => {
@@ -1048,13 +1048,13 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   useEffect(() => {
     // Check if metadata logo has actually changed from what we last processed
     const currentMetadataLogo = metadata?.logo;
-    
+
     if (currentMetadataLogo !== lastSyncedLogoRef.current) {
       lastSyncedLogoRef.current = currentMetadataLogo;
 
       // Reset text fallback and timers on logo updates
       if (logoWaitTimerRef.current) {
-        try { clearTimeout(logoWaitTimerRef.current); } catch (_e) {}
+        try { clearTimeout(logoWaitTimerRef.current); } catch (_e) { }
         logoWaitTimerRef.current = null;
       }
 
@@ -1076,10 +1076,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         }, 600);
       }
     }
-    
+
     return () => {
       if (logoWaitTimerRef.current) {
-        try { clearTimeout(logoWaitTimerRef.current); } catch (_e) {}
+        try { clearTimeout(logoWaitTimerRef.current); } catch (_e) { }
         logoWaitTimerRef.current = null;
       }
     };
@@ -1109,7 +1109,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     }
     // If logo loaded successfully before, keep showing it even if it fails later
   }, [logoHasLoadedSuccessfully, stableLogoUri, metadata, logoLoadOpacity]);
-  
+
   // Performance optimization: Lazy loading setup
   useEffect(() => {
     const timer = InteractionManager.runAfterInteractions(() => {
@@ -1118,7 +1118,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         setShouldLoadSecondaryData(true);
       }
     });
-    
+
     return () => timer.cancel();
   }, []);
 
@@ -1128,25 +1128,25 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     let timerId: any = null;
     const fetchTrailer = async () => {
       if (!metadata?.name || !metadata?.year || !settings?.showTrailers || !isFocused) return;
-      
+
       // If we expect TMDB ID but don't have it yet, wait a bit more
       if (!metadata?.tmdbId && metadata?.id?.startsWith('tmdb:')) {
         logger.info('HeroSection', `Waiting for TMDB ID for ${metadata.name}`);
         return;
       }
-      
+
       setTrailerLoading(true);
       setTrailerError(false);
       setTrailerReady(false);
       setTrailerPreloaded(false);
-      
+
       try {
         // Use requestIdleCallback or setTimeout to prevent blocking main thread
         const fetchWithDelay = () => {
           // Extract TMDB ID if available
           const tmdbIdString = tmdbId ? String(tmdbId) : undefined;
           const contentType = type === 'series' ? 'tv' : 'movie';
-          
+
           // Debug logging to see what we have
           logger.info('HeroSection', `Trailer request for ${metadata.name}:`, {
             hasTmdbId: !!tmdbId,
@@ -1155,7 +1155,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             metadataKeys: Object.keys(metadata || {}),
             metadataId: metadata?.id
           });
-          
+
           TrailerService.getTrailerUrl(metadata.name, metadata.year, tmdbIdString, contentType)
             .then(url => {
               if (url) {
@@ -1190,12 +1190,12 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     fetchTrailer();
     return () => {
       alive = false;
-      try { if (timerId) clearTimeout(timerId); } catch (_e) {}
+      try { if (timerId) clearTimeout(timerId); } catch (_e) { }
     };
   }, [metadata?.name, metadata?.year, tmdbId, settings?.showTrailers, isFocused]);
 
   // Shimmer animation removed
-  
+
   // Optimized loading state reset when image source changes
   useEffect(() => {
     if (imageSource) {
@@ -1203,19 +1203,19 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       imageLoadOpacity.value = 0;
     }
   }, [imageSource]);
-  
+
   // Optimized image handlers with useCallback
   const handleImageError = useCallback(() => {
     if (!shouldLoadSecondaryData) return;
-    
+
     runOnUI(() => {
       imageOpacity.value = withTiming(0.6, { duration: 150 });
       imageLoadOpacity.value = withTiming(0, { duration: 150 });
     })();
-    
+
     setImageError(true);
     setImageLoaded(false);
-    
+
     // Three-level fallback: TMDB → addon banner → poster
     if (bannerImage !== metadata.banner && metadata.banner) {
       // Try addon banner if not already on it and it exists
@@ -1231,7 +1231,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       imageOpacity.value = withTiming(1, { duration: 150 });
       imageLoadOpacity.value = withTiming(1, { duration: 400 });
     })();
-    
+
     setImageError(false);
     setImageLoaded(true);
   }, []);
@@ -1245,10 +1245,10 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const logoAnimatedStyle = useAnimatedStyle(() => {
     // Determine if progress bar should be shown
     const hasProgress = watchProgress && watchProgress.duration > 0;
-    
+
     // Scale down logo when progress bar is present
     const logoScale = hasProgress ? 0.85 : 1;
-    
+
     return {
       opacity: logoOpacity.value,
       transform: [
@@ -1271,22 +1271,22 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const backdropImageStyle = useAnimatedStyle(() => {
     'worklet';
     const scrollYValue = scrollY.value;
-    
+
     // Pre-calculated constants for better performance
     const DEFAULT_ZOOM = 1.1;
     const SCROLL_UP_MULTIPLIER = 0.002;
     const SCROLL_DOWN_MULTIPLIER = 0.0001;
     const MAX_SCALE = 1.4;
     const PARALLAX_FACTOR = 0.3;
-    
+
     // Optimized scale calculation with minimal branching
     const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
     const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
     const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
-    
+
     // Single parallax calculation
     const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
-    
+
     return {
       opacity: imageOpacity.value * imageLoadOpacity.value,
       transform: [
@@ -1299,7 +1299,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Simplified buttons animation
   const buttonsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: buttonsOpacity.value * actionButtonsOpacity.value,
-    transform: [{ 
+    transform: [{
       translateY: interpolate(
         buttonsTranslateY.value,
         [0, 20],
@@ -1323,22 +1323,22 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   const trailerParallaxStyle = useAnimatedStyle(() => {
     'worklet';
     const scrollYValue = scrollY.value;
-    
+
     // Pre-calculated constants for better performance
     const DEFAULT_ZOOM = 1.0;
     const SCROLL_UP_MULTIPLIER = 0.0015;
     const SCROLL_DOWN_MULTIPLIER = 0.0001;
     const MAX_SCALE = 1.25;
     const PARALLAX_FACTOR = 0.2;
-    
+
     // Optimized scale calculation with minimal branching
     const scrollUpScale = DEFAULT_ZOOM + Math.abs(scrollYValue) * SCROLL_UP_MULTIPLIER;
     const scrollDownScale = DEFAULT_ZOOM + scrollYValue * SCROLL_DOWN_MULTIPLIER;
     const scale = Math.min(scrollYValue < 0 ? scrollUpScale : scrollDownScale, MAX_SCALE);
-    
+
     // Single parallax calculation
     const parallaxOffset = scrollYValue * PARALLAX_FACTOR;
-    
+
     return {
       transform: [
         { scale },
@@ -1394,14 +1394,14 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Calculate if content is watched (>=85% progress) - check both local and Trakt progress
   const isWatched = useMemo(() => {
     if (!watchProgress) return false;
-    
+
     // Check Trakt progress first if available and user is authenticated
     if (isTraktAuthenticated && watchProgress.traktProgress !== undefined) {
       const traktWatched = watchProgress.traktProgress >= 95;
       // Removed excessive logging for Trakt progress
       return traktWatched;
     }
-    
+
     // Fall back to local progress
     if (watchProgress.duration === 0) return false;
     const progressPercent = (watchProgress.currentTime / watchProgress.duration) * 100;
@@ -1457,7 +1457,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
           }
         }, 50);
       }
-      
+
       return () => {
         // Stop trailer when leaving this screen to prevent background playback/heat
         logger.info('HeroSection', 'Screen unfocused - stopping trailer playback');
@@ -1490,7 +1490,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
         setTrailerUrl(null);
         trailerOpacity.value = 0;
         thumbnailOpacity.value = 1;
-      } catch (_e) {}
+      } catch (_e) { }
     }
   }, [isFocused, setTrailerPlaying]);
 
@@ -1499,7 +1499,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
     'worklet';
     try {
       if (!scrollGuardEnabledSV.value || isFocusedSV.value === 0) return;
-      
+
       // Pre-calculate thresholds for better performance
       const pauseThreshold = heroHeight.value * 0.7;
       const resumeThreshold = heroHeight.value * 0.4;
@@ -1528,7 +1528,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       // Don't stop trailer playback when component unmounts
       // Let the new hero section (if any) take control of trailer state
       // This prevents the trailer from stopping when navigating between screens
-      
+
       // Reset animation values on unmount to prevent memory leaks
       try {
         imageOpacity.value = 1;
@@ -1548,7 +1548,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       } catch (error) {
         logger.error('HeroSection', 'Error cleaning up animation values:', error);
       }
-      
+
       interactionComplete.current = false;
     };
   }, [imageOpacity, imageLoadOpacity, trailerOpacity, thumbnailOpacity, actionButtonsOpacity, titleCardTranslateY, genreOpacity, watchProgressOpacity, buttonsOpacity, buttonsTranslateY, logoOpacity, heroOpacity, heroHeight]);
@@ -1574,46 +1574,46 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
       <Animated.View style={[staticStyles.heroSection, heroAnimatedStyle]}>
         {/* Optimized Background */}
         <View style={[staticStyles.absoluteFill, { backgroundColor: themeColors.black }]} />
-      
-      {/* Shimmer loading effect removed */}
-      
-      {/* Background thumbnail image - always rendered when available with parallax */}
-      {shouldLoadSecondaryData && imageSource && !loadingBanner && (
-        <Animated.View style={[staticStyles.thumbnailContainer, {
-          opacity: thumbnailOpacity
-        }]}>
-          <Animated.Image 
-            source={{ uri: imageSource }}
-            style={[staticStyles.thumbnailImage, backdropImageStyle]}
-            resizeMode="cover"
-            onError={handleImageError}
-            onLoad={handleImageLoad}
-          />
-        </Animated.View>
-      )}
-      
-      {/* Hidden preload trailer player - loads in background */}
-      {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
-        <View style={[staticStyles.absoluteFill, { opacity: 0, pointerEvents: 'none' }]}>
-          <TrailerPlayer
-            key={`preload-${trailerUrl}`}
-            trailerUrl={trailerUrl}
-            autoPlay={false}
-            muted={true}
-            style={staticStyles.absoluteFill}
-            hideLoadingSpinner={true}
-            onLoad={handleTrailerPreloaded}
-            onError={handleTrailerError}
-          />
-        </View>
-      )}
-      
-      {/* Visible trailer player - rendered on top with fade transition and parallax */}
-      {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
-        <Animated.View style={[staticStyles.absoluteFill, {
-          opacity: trailerOpacity
-        }, trailerParallaxStyle]}>
-          <TrailerPlayer
+
+        {/* Shimmer loading effect removed */}
+
+        {/* Background thumbnail image - always rendered when available with parallax */}
+        {shouldLoadSecondaryData && imageSource && !loadingBanner && (
+          <Animated.View style={[staticStyles.thumbnailContainer, {
+            opacity: thumbnailOpacity
+          }]}>
+            <Animated.Image
+              source={{ uri: imageSource }}
+              style={[staticStyles.thumbnailImage, backdropImageStyle]}
+              resizeMode="cover"
+              onError={handleImageError}
+              onLoad={handleImageLoad}
+            />
+          </Animated.View>
+        )}
+
+        {/* Hidden preload trailer player - loads in background */}
+        {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && !trailerPreloaded && (
+          <View style={[staticStyles.absoluteFill, { opacity: 0, pointerEvents: 'none' }]}>
+            <TrailerPlayer
+              key={`preload-${trailerUrl}`}
+              trailerUrl={trailerUrl}
+              autoPlay={false}
+              muted={true}
+              style={staticStyles.absoluteFill}
+              hideLoadingSpinner={true}
+              onLoad={handleTrailerPreloaded}
+              onError={handleTrailerError}
+            />
+          </View>
+        )}
+
+        {/* Visible trailer player - rendered on top with fade transition and parallax */}
+        {shouldLoadSecondaryData && settings?.showTrailers && trailerUrl && !trailerLoading && !trailerError && trailerPreloaded && (
+          <Animated.View style={[staticStyles.absoluteFill, {
+            opacity: trailerOpacity
+          }, trailerParallaxStyle]}>
+            <TrailerPlayer
               key={`visible-${trailerUrl}`}
               ref={trailerVideoRef}
               trailerUrl={trailerUrl}
@@ -1632,76 +1632,126 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
                 }
               }}
             />
-        </Animated.View>
-      )}
+          </Animated.View>
+        )}
 
-      {/* Trailer control buttons (unmute and fullscreen) */}
-      {settings?.showTrailers && trailerReady && trailerUrl && (
-        <Animated.View style={{
-          position: 'absolute',
-          top: Platform.OS === 'android' ? 40 : 50,
-          right: width >= 768 ? 32 : 16,
-          zIndex: 1000,
-          opacity: trailerOpacity,
-          flexDirection: 'row',
-          gap: 8,
-        }}>
-          {/* Fullscreen button */}
-          <TouchableOpacity
-            onPress={handleFullscreenToggle}
-            activeOpacity={0.7}
-            onPressIn={(e) => e.stopPropagation()}
-            onPressOut={(e) => e.stopPropagation()}
-            style={{
-              padding: 8,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
-            }}
-          >
-            <MaterialIcons
-              name="fullscreen"
-              size={24}
-              color="white"
-            />
-          </TouchableOpacity>
+        {/* Trailer control buttons (unmute and fullscreen) */}
+        {settings?.showTrailers && trailerReady && trailerUrl && (
+          <Animated.View style={{
+            position: 'absolute',
+            top: Platform.OS === 'android' ? 40 : 50,
+            right: width >= 768 ? 32 : 16,
+            zIndex: 1000,
+            opacity: trailerOpacity,
+            flexDirection: 'row',
+            gap: 8,
+          }}>
+            {/* Fullscreen button */}
+            <TouchableOpacity
+              onPress={handleFullscreenToggle}
+              activeOpacity={0.7}
+              onPressIn={(e) => e.stopPropagation()}
+              onPressOut={(e) => e.stopPropagation()}
+              style={{
+                padding: 8,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                borderRadius: 20,
+              }}
+            >
+              <MaterialIcons
+                name="fullscreen"
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
 
-          {/* Unmute button */}
-          <TouchableOpacity
-            onPress={() => {
-              logger.info('HeroSection', 'Mute toggle button pressed, current muted state:', trailerMuted);
-              updateSetting('trailerMuted', !trailerMuted);
-              if (trailerMuted) {
-                // When unmuting, hide action buttons, genre, title card, and watch progress
-                actionButtonsOpacity.value = withTiming(0, { duration: 300 });
-                genreOpacity.value = withTiming(0, { duration: 300 });
-                titleCardTranslateY.value = withTiming(100, { duration: 300 }); // Increased from 60 to 120 for further down movement
-                watchProgressOpacity.value = withTiming(0, { duration: 300 });
-              } else {
-                // When muting, show action buttons, genre, title card, and watch progress
-                actionButtonsOpacity.value = withTiming(1, { duration: 300 });
-                genreOpacity.value = withTiming(1, { duration: 300 });
-                titleCardTranslateY.value = withTiming(0, { duration: 300 });
-                watchProgressOpacity.value = withTiming(1, { duration: 300 });
-              }
-            }}
-            activeOpacity={0.7}
-            onPressIn={(e) => e.stopPropagation()}
-            onPressOut={(e) => e.stopPropagation()}
-            style={{
-              padding: 8,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
-            }}
-          >
-            <Entypo
-              name={trailerMuted ? 'sound-mute' : 'sound'}
-              size={24}
-              color="white"
-            />
-          </TouchableOpacity>
+            {/* Unmute button */}
+            <TouchableOpacity
+              onPress={() => {
+                logger.info('HeroSection', 'Mute toggle button pressed, current muted state:', trailerMuted);
+                updateSetting('trailerMuted', !trailerMuted);
+                if (trailerMuted) {
+                  // When unmuting, hide action buttons, genre, title card, and watch progress
+                  actionButtonsOpacity.value = withTiming(0, { duration: 300 });
+                  genreOpacity.value = withTiming(0, { duration: 300 });
+                  titleCardTranslateY.value = withTiming(100, { duration: 300 }); // Increased from 60 to 120 for further down movement
+                  watchProgressOpacity.value = withTiming(0, { duration: 300 });
+                } else {
+                  // When muting, show action buttons, genre, title card, and watch progress
+                  actionButtonsOpacity.value = withTiming(1, { duration: 300 });
+                  genreOpacity.value = withTiming(1, { duration: 300 });
+                  titleCardTranslateY.value = withTiming(0, { duration: 300 });
+                  watchProgressOpacity.value = withTiming(1, { duration: 300 });
+                }
+              }}
+              activeOpacity={0.7}
+              onPressIn={(e) => e.stopPropagation()}
+              onPressOut={(e) => e.stopPropagation()}
+              style={{
+                padding: 8,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                borderRadius: 20,
+              }}
+            >
+              <Entypo
+                name={trailerMuted ? 'sound-mute' : 'sound'}
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
 
-          {/* AI Chat button */}
-          {settings?.aiChatEnabled && (
+            {/* AI Chat button */}
+            {settings?.aiChatEnabled && (
+              <TouchableOpacity
+                onPress={() => {
+                  // Extract episode info if it's a series
+                  let episodeData = null;
+                  if (type === 'series' && watchProgress && watchProgress.episodeId) {
+                    const parts = watchProgress.episodeId.split(':');
+                    if (parts.length >= 3) {
+                      episodeData = {
+                        seasonNumber: parseInt(parts[1], 10),
+                        episodeNumber: parseInt(parts[2], 10)
+                      };
+                    }
+                  }
+
+                  navigation.navigate('AIChat', {
+                    contentId: id,
+                    contentType: type,
+                    episodeId: episodeData && watchProgress ? watchProgress.episodeId : undefined,
+                    seasonNumber: episodeData?.seasonNumber,
+                    episodeNumber: episodeData?.episodeNumber,
+                    title: metadata?.name || metadata?.title || 'Unknown'
+                  });
+                }}
+                activeOpacity={0.7}
+                onPressIn={(e) => e.stopPropagation()}
+                onPressOut={(e) => e.stopPropagation()}
+                style={{
+                  padding: 8,
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  borderRadius: 20,
+                }}
+              >
+                <MaterialIcons
+                  name="smart-toy"
+                  size={24}
+                  color="white"
+                />
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        )}
+
+        {/* AI Chat button (when trailers are disabled) */}
+        {settings?.aiChatEnabled && !(settings?.showTrailers && trailerReady && trailerUrl) && (
+          <Animated.View style={{
+            position: 'absolute',
+            top: Platform.OS === 'android' ? 40 : 50,
+            right: width >= 768 ? 32 : 16,
+            zIndex: 1000,
+          }}>
             <TouchableOpacity
               onPress={() => {
                 // Extract episode info if it's a series
@@ -1726,8 +1776,6 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
                 });
               }}
               activeOpacity={0.7}
-              onPressIn={(e) => e.stopPropagation()}
-              onPressOut={(e) => e.stopPropagation()}
               style={{
                 padding: 8,
                 backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1740,164 +1788,116 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
                 color="white"
               />
             </TouchableOpacity>
-          )}
-        </Animated.View>
-      )}
+          </Animated.View>
+        )}
 
-      {/* AI Chat button (when trailers are disabled) */}
-      {settings?.aiChatEnabled && !(settings?.showTrailers && trailerReady && trailerUrl) && (
-        <Animated.View style={{
-          position: 'absolute',
-          top: Platform.OS === 'android' ? 40 : 50,
-          right: width >= 768 ? 32 : 16,
-          zIndex: 1000,
-        }}>
-          <TouchableOpacity
-            onPress={() => {
-              // Extract episode info if it's a series
-              let episodeData = null;
-              if (type === 'series' && watchProgress && watchProgress.episodeId) {
-                const parts = watchProgress.episodeId.split(':');
-                if (parts.length >= 3) {
-                  episodeData = {
-                    seasonNumber: parseInt(parts[1], 10),
-                    episodeNumber: parseInt(parts[2], 10)
-                  };
-                }
-              }
-
-              navigation.navigate('AIChat', {
-                contentId: id,
-                contentType: type,
-                episodeId: episodeData && watchProgress ? watchProgress.episodeId : undefined,
-                seasonNumber: episodeData?.seasonNumber,
-                episodeNumber: episodeData?.episodeNumber,
-                title: metadata?.name || metadata?.title || 'Unknown'
-              });
-            }}
-            activeOpacity={0.7}
-            style={{
-              padding: 8,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              borderRadius: 20,
-            }}
-          >
+        <Animated.View style={styles.backButtonContainer}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <MaterialIcons
-              name="smart-toy"
-              size={24}
-              color="white"
+              name="arrow-back"
+              size={28}
+              color="#fff"
+              style={styles.backButtonIcon}
             />
           </TouchableOpacity>
         </Animated.View>
-      )}
 
-      <Animated.View style={styles.backButtonContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <MaterialIcons 
-            name="arrow-back" 
-            size={28} 
-            color="#fff" 
-            style={styles.backButtonIcon}
-          />
-        </TouchableOpacity>
-      </Animated.View>
-
-      {/* Ultra-light Gradient with subtle dynamic background blend */}
-      <LinearGradient
-        colors={[
-          'rgba(0,0,0,0)',
-          'rgba(0,0,0,0.05)',
-          'rgba(0,0,0,0.15)',
-          'rgba(0,0,0,0.35)',
-          'rgba(0,0,0,0.65)',
-          dynamicBackgroundColor || themeColors.darkBackground
-        ]}
-        locations={[0, 0.3, 0.55, 0.75, 0.9, 1]}
-        style={styles.heroGradient}
-      >
-        {/* Enhanced bottom fade with stronger gradient */}
+        {/* Ultra-light Gradient with subtle dynamic background blend */}
         <LinearGradient
           colors={[
-            'transparent',
-            `${dynamicBackgroundColor || themeColors.darkBackground}10`,
-            `${dynamicBackgroundColor || themeColors.darkBackground}25`,
-            `${dynamicBackgroundColor || themeColors.darkBackground}45`,
-            `${dynamicBackgroundColor || themeColors.darkBackground}65`,
-            `${dynamicBackgroundColor || themeColors.darkBackground}85`,
-            `${dynamicBackgroundColor || themeColors.darkBackground}95`,
+            'rgba(0,0,0,0)',
+            'rgba(0,0,0,0.05)',
+            'rgba(0,0,0,0.15)',
+            'rgba(0,0,0,0.35)',
+            'rgba(0,0,0,0.65)',
             dynamicBackgroundColor || themeColors.darkBackground
           ]}
-          locations={[0, 0.1, 0.25, 0.4, 0.6, 0.75, 0.9, 1]}
-          style={styles.bottomFadeGradient}
-          pointerEvents="none"
-        />
-        <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }]}>
-          {/* Optimized Title/Logo - Show logo immediately when available */}
-          <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
-            <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
-              {metadata?.logo ? (
-                <Animated.Image
-                  source={{ uri: stableLogoUri || (metadata?.logo as string) }}
-                  style={[isTablet ? styles.tabletTitleLogo : styles.titleLogo, logoFadeStyle]}
-                  resizeMode={'contain'}
-                  onLoad={handleLogoLoad}
-                  onError={handleLogoError}
-                />
-              ) : shouldShowTextFallback ? (
-                <Text style={[isTablet ? styles.tabletHeroTitle : styles.heroTitle, { color: themeColors.highEmphasis }]}> 
-                  {metadata.name}
-                </Text>
-              ) : (
-                // Reserve space to prevent layout jump while waiting briefly for logo
-                <View style={isTablet ? styles.tabletTitleLogo : styles.titleLogo} />
-              )}
-            </Animated.View>
-          </Animated.View>
-
-          {/* Enhanced Watch Progress with Trakt integration */}
-          <WatchProgressDisplay 
-            watchProgress={watchProgress}
-            type={type}
-            getEpisodeDetails={getEpisodeDetails}
-            animatedStyle={watchProgressAnimatedStyle}
-            isWatched={isWatched}
-            isTrailerPlaying={globalTrailerPlaying}
-            trailerMuted={trailerMuted}
-            trailerReady={trailerReady}
+          locations={[0, 0.3, 0.55, 0.75, 0.9, 1]}
+          style={styles.heroGradient}
+        >
+          {/* Enhanced bottom fade with stronger gradient */}
+          <LinearGradient
+            colors={[
+              'transparent',
+              `${dynamicBackgroundColor || themeColors.darkBackground}10`,
+              `${dynamicBackgroundColor || themeColors.darkBackground}25`,
+              `${dynamicBackgroundColor || themeColors.darkBackground}45`,
+              `${dynamicBackgroundColor || themeColors.darkBackground}65`,
+              `${dynamicBackgroundColor || themeColors.darkBackground}85`,
+              `${dynamicBackgroundColor || themeColors.darkBackground}95`,
+              dynamicBackgroundColor || themeColors.darkBackground
+            ]}
+            locations={[0, 0.1, 0.25, 0.4, 0.6, 0.75, 0.9, 1]}
+            style={styles.bottomFadeGradient}
+            pointerEvents="none"
           />
-
-          {/* Optimized genre display with lazy loading; no fixed blank space */}
-          {shouldLoadSecondaryData && genreElements && (
-            <Animated.View style={[isTablet ? styles.tabletGenreContainer : styles.genreContainer, genreAnimatedStyle]}>
-              {genreElements}
+          <View style={[styles.heroContent, isTablet && { maxWidth: 800, alignSelf: 'center' }]}>
+            {/* Optimized Title/Logo - Show logo immediately when available */}
+            <Animated.View style={[styles.logoContainer, titleCardAnimatedStyle]}>
+              <Animated.View style={[styles.titleLogoContainer, logoAnimatedStyle]}>
+                {metadata?.logo ? (
+                  <Animated.Image
+                    source={{ uri: stableLogoUri || (metadata?.logo as string) }}
+                    style={[isTablet ? styles.tabletTitleLogo : styles.titleLogo, logoFadeStyle]}
+                    resizeMode={'contain'}
+                    onLoad={handleLogoLoad}
+                    onError={handleLogoError}
+                  />
+                ) : shouldShowTextFallback ? (
+                  <Text style={[isTablet ? styles.tabletHeroTitle : styles.heroTitle, { color: themeColors.highEmphasis }]}>
+                    {metadata.name}
+                  </Text>
+                ) : (
+                  // Reserve space to prevent layout jump while waiting briefly for logo
+                  <View style={isTablet ? styles.tabletTitleLogo : styles.titleLogo} />
+                )}
+              </Animated.View>
             </Animated.View>
-          )}
+
+            {/* Enhanced Watch Progress with Trakt integration */}
+            <WatchProgressDisplay
+              watchProgress={watchProgress}
+              type={type}
+              getEpisodeDetails={getEpisodeDetails}
+              animatedStyle={watchProgressAnimatedStyle}
+              isWatched={isWatched}
+              isTrailerPlaying={globalTrailerPlaying}
+              trailerMuted={trailerMuted}
+              trailerReady={trailerReady}
+            />
+
+            {/* Optimized genre display with lazy loading; no fixed blank space */}
+            {shouldLoadSecondaryData && genreElements && (
+              <Animated.View style={[isTablet ? styles.tabletGenreContainer : styles.genreContainer, genreAnimatedStyle]}>
+                {genreElements}
+              </Animated.View>
+            )}
 
 
-          {/* Optimized Action Buttons */}
-          <ActionButtons 
-            handleShowStreams={handleShowStreams}
-            toggleLibrary={handleToggleLibrary}
-            inLibrary={inLibrary}
-            type={type}
-            id={id}
-            navigation={navigation}
-            playButtonText={playButtonText}
-            animatedStyle={buttonsAnimatedStyle}
-            isWatched={isWatched}
-            watchProgress={watchProgress}
-            groupedEpisodes={groupedEpisodes}
-            metadata={metadata}
-            settings={settings}
-            // Trakt integration props
-            isAuthenticated={isAuthenticated}
-            isInWatchlist={isInWatchlist}
-            isInCollection={isInCollection}
-            onToggleWatchlist={onToggleWatchlist}
-            onToggleCollection={onToggleCollection}
-          />
-        </View>
-      </LinearGradient>
+            {/* Optimized Action Buttons */}
+            <ActionButtons
+              handleShowStreams={handleShowStreams}
+              toggleLibrary={handleToggleLibrary}
+              inLibrary={inLibrary}
+              type={type}
+              id={id}
+              navigation={navigation}
+              playButtonText={playButtonText}
+              animatedStyle={buttonsAnimatedStyle}
+              isWatched={isWatched}
+              watchProgress={watchProgress}
+              groupedEpisodes={groupedEpisodes}
+              metadata={metadata}
+              settings={settings}
+              // Trakt integration props
+              isAuthenticated={isAuthenticated}
+              isInWatchlist={isInWatchlist}
+              isInCollection={isInCollection}
+              onToggleWatchlist={onToggleWatchlist}
+              onToggleCollection={onToggleCollection}
+            />
+          </View>
+        </LinearGradient>
       </Animated.View>
     </View>
   );
@@ -2429,7 +2429,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   // Tablet-specific styles
   tabletActionButtons: {
     flexDirection: 'column',
@@ -2531,27 +2531,27 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   tabletProgressGlassBackground: {
-     width: width * 0.7,
-     maxWidth: 700,
-     backgroundColor: 'rgba(255,255,255,0.08)',
-     borderRadius: 16,
-     padding: 12,
-     borderWidth: 1,
-     borderColor: 'rgba(255,255,255,0.1)',
-     overflow: 'hidden',
-     alignSelf: 'center',
-   },
-   tabletWatchProgressMainText: {
-     fontSize: 14,
-     fontWeight: '600',
-     textAlign: 'center',
-   },
-   tabletWatchProgressSubText: {
-     fontSize: 12,
-     textAlign: 'center',
-     opacity: 0.8,
-     marginBottom: 1,
-   },
+    width: width * 0.7,
+    maxWidth: 700,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+    alignSelf: 'center',
+  },
+  tabletWatchProgressMainText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  tabletWatchProgressSubText: {
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.8,
+    marginBottom: 1,
+  },
 });
 
 export default HeroSection;

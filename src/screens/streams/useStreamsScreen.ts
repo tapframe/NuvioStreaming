@@ -57,7 +57,7 @@ export const useStreamsScreen = () => {
   // Dimension tracking
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   const prevDimensionsRef = useRef({ width: dimensions.width, height: dimensions.height });
-  
+
   const deviceWidth = dimensions.width;
   const isTablet = useMemo(() => deviceWidth >= TABLET_BREAKPOINT, [deviceWidth]);
 
@@ -119,7 +119,7 @@ export const useStreamsScreen = () => {
   } = useMetadata({ id, type });
 
   // Get banner image
-  const setMetadataStub = useCallback(() => {}, []);
+  const setMetadataStub = useCallback(() => { }, []);
   const memoizedSettings = useMemo(
     () => settings,
     [settings.logoSourcePreference, settings.tmdbLanguagePreference, settings.enrichMetadataWithTMDB]
@@ -183,7 +183,7 @@ export const useStreamsScreen = () => {
       try {
         setAlertTitle(title);
         setAlertMessage(message);
-        setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+        setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => { } }]);
         setAlertVisible(true);
       } catch (error) {
         console.warn('[StreamsScreen] Error showing alert:', error);
@@ -390,7 +390,7 @@ export const useStreamsScreen = () => {
         if (!videoType && /xprime/i.test(providerId)) {
           videoType = 'm3u8';
         }
-      } catch {}
+      } catch { }
 
       const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
 
@@ -438,7 +438,7 @@ export const useStreamsScreen = () => {
             /format=mkv\b/i.test(lowerUrl) ||
             /container=mkv\b/i.test(lowerUrl);
           const isHttp = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
-          
+
           if (!isMkvByPath && isHttp) {
             try {
               const mkvDetected = await Promise.race<boolean>([
@@ -609,14 +609,14 @@ export const useStreamsScreen = () => {
   useEffect(() => {
     // Build a unique key for the current content
     const currentKey = `${id}:${type}:${episodeId || ''}`;
-    
+
     // Reset refs if content changed
     if (lastLoadedIdRef.current !== currentKey) {
       hasDoneInitialLoadRef.current = false;
       isLoadingStreamsRef.current = false;
       lastLoadedIdRef.current = currentKey;
     }
-    
+
     // Only proceed if we haven't done the initial load for this content
     if (hasDoneInitialLoadRef.current) return;
 
@@ -803,18 +803,18 @@ export const useStreamsScreen = () => {
     const sortedEntries = filteredEntries.sort(([addonIdA], [addonIdB]) => {
       const isAddonA = installedAddons.some(addon => addon.id === addonIdA);
       const isAddonB = installedAddons.some(addon => addon.id === addonIdB);
-      
+
       // Addons always come before plugins
       if (isAddonA && !isAddonB) return -1;
       if (!isAddonA && isAddonB) return 1;
-      
+
       // Both are addons - sort by installation order
       if (isAddonA && isAddonB) {
         const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
         const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
         return indexA - indexB;
       }
-      
+
       // Both are plugins - sort by response order
       const responseIndexA = addonResponseOrder.indexOf(addonIdA);
       const responseIndexB = addonResponseOrder.indexOf(addonIdB);
@@ -1021,8 +1021,9 @@ export const useStreamsScreen = () => {
     Object.keys(streams).length === 0 ||
     Object.values(streams).every(provider => !provider.streams || provider.streams.length === 0);
   const loadElapsed = streamsLoadStart ? Date.now() - streamsLoadStart : 0;
-  const showInitialLoading = streamsEmpty && (streamsLoadStart === null || loadElapsed < 10000);
-  const showStillFetching = streamsEmpty && loadElapsed >= 10000;
+  const isActuallyLoading = isLoading || activeFetchingScrapers.length > 0;
+  const showInitialLoading = streamsEmpty && isActuallyLoading && (streamsLoadStart === null || loadElapsed < 10000);
+  const showStillFetching = streamsEmpty && isActuallyLoading && loadElapsed >= 10000;
 
   return {
     // Route params
@@ -1031,19 +1032,19 @@ export const useStreamsScreen = () => {
     episodeId,
     episodeThumbnail,
     fromPlayer,
-    
+
     // Theme
     currentTheme,
     colors,
     settings,
-    
+
     // Navigation
     navigation,
     handleBack,
-    
+
     // Tablet
     isTablet,
-    
+
     // Alert
     alertVisible,
     alertTitle,
@@ -1051,14 +1052,14 @@ export const useStreamsScreen = () => {
     alertActions,
     openAlert,
     closeAlert,
-    
+
     // Metadata
     metadata,
     imdbId,
     bannerImage,
     currentEpisode,
     groupedEpisodes,
-    
+
     // Streams
     streams,
     groupedStreams,
@@ -1068,7 +1069,7 @@ export const useStreamsScreen = () => {
     selectedProvider,
     handleProviderChange,
     handleStreamPress,
-    
+
     // Loading states
     isLoading,
     loadingStreams,
@@ -1079,19 +1080,19 @@ export const useStreamsScreen = () => {
     showStillFetching,
     showNoSourcesError,
     hasStremioStreamProviders,
-    
+
     // Autoplay
     isAutoplayWaiting,
     autoplayTriggered,
-    
+
     // Scrapers
     activeFetchingScrapers,
     scraperLogos,
-    
+
     // Movie
     movieLogoError,
     setMovieLogoError,
-    
+
     // Episode
     episodeImage,
     effectiveEpisodeVote,
@@ -1099,7 +1100,7 @@ export const useStreamsScreen = () => {
     hasIMDbRating,
     tmdbEpisodeOverride,
     selectedEpisode,
-    
+
     // Backdrop
     mobileBackdropSource,
     gradientColors,

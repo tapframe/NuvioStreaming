@@ -1569,6 +1569,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         setScraperStatuses(initialStatuses);
         setActiveFetchingScrapers(initialActiveFetching);
         console.log('🔍 [loadStreams] Initialized activeFetchingScrapers:', initialActiveFetching);
+
+        // If no scrapers are available, stop loading immediately
+        if (initialStatuses.length === 0) {
+          setLoadingStreams(false);
+        }
       } catch (error) {
         if (__DEV__) console.error('Failed to initialize scraper tracking:', error);
       }
@@ -1701,6 +1706,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         setScraperStatuses(initialStatuses);
         setActiveFetchingScrapers(initialActiveFetching);
         console.log('🔍 [loadEpisodeStreams] Initialized activeFetchingScrapers:', initialActiveFetching);
+
+        // If no scrapers are available, stop loading immediately
+        if (initialStatuses.length === 0) {
+          setLoadingEpisodeStreams(false);
+        }
       } catch (error) {
         if (__DEV__) console.error('Failed to initialize episode scraper tracking:', error);
       }
@@ -1715,6 +1725,37 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       const { isCollection: detectedCollection, addon: collectionAddon } = stremioService.isCollectionContent(id);
       isCollection = detectedCollection;
 
+
+      // Parse season and episode numbers robustly
+      let showIdStr = id;
+      let seasonNum = '';
+      let episodeNum = '';
+
+      try {
+        // Handle various episode ID formats
+        // 1. Internal format: "series:showId:season:episode"
+        // 2. Stremio/IMDb format: "tt12345:1:1"
+        // 3. TMDB format: "tmdb:123:1:1"
+
+        const cleanEpisodeId = episodeId.replace(/^series:/, '');
+        const parts = cleanEpisodeId.split(':');
+
+        if (parts.length >= 3) {
+          episodeNum = parts.pop() || '';
+          seasonNum = parts.pop() || '';
+          showIdStr = parts.join(':');
+        } else if (parts.length === 2) {
+          // Edge case: maybe just id:episode? unlikely but safe fallback
+          episodeNum = parts[1];
+          seasonNum = '1'; // Default
+          showIdStr = parts[0];
+        }
+
+        if (__DEV__) console.log(`🔍 [loadEpisodeStreams] Parsed ID: show=${showIdStr}, s=${seasonNum}, e=${episodeNum}`);
+      } catch (e) {
+        if (__DEV__) console.warn('⚠️ [loadEpisodeStreams] Failed to parse episode ID:', episodeId);
+      }
+
       if (isCollection && collectionAddon) {
         if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Detected collection from addon: ${collectionAddon.name}, treating episodes as individual movies`);
 
@@ -1728,9 +1769,15 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           stremioEpisodeId = episodeId; // Use the IMDb ID directly for Stremio addons
           if (__DEV__) console.log('✅ [loadEpisodeStreams] Collection movie - using IMDb ID:', episodeId, 'TMDB ID:', tmdbId);
         } else {
-          // Fallback: try to parse as TMDB ID
-          tmdbId = episodeId;
-          stremioEpisodeId = episodeId;
+          // Fallback: try to verify if it's a tmdb id
+          const isTmdb = episodeId.startsWith('tmdb:') || !isNaN(Number(episodeId));
+          if (isTmdb) {
+            const cleanId = episodeId.replace('tmdb:', '');
+            tmdbId = cleanId;
+            stremioEpisodeId = episodeId;
+          } else {
+            stremioEpisodeId = episodeId;
+          }
           if (__DEV__) console.log('⚠️ [loadEpisodeStreams] Collection movie - using episodeId as-is:', episodeId);
         }
       } else if (id.startsWith('tmdb:')) {
@@ -1739,13 +1786,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Try to get IMDb ID from metadata first, then convert if needed
         if (metadata?.imdb_id) {
-          // Replace the series ID in episodeId with the IMDb ID
-          const [, season, episode] = episodeId.split(':');
-          stremioEpisodeId = `${metadata.imdb_id}:${season}:${episode}`;
+          // Use format: imdb_id:season:episode
+          stremioEpisodeId = `${metadata.imdb_id}:${seasonNum}:${episodeNum}`;
           if (__DEV__) console.log('✅ [loadEpisodeStreams] Using IMDb ID from metadata for Stremio episode:', stremioEpisodeId);
         } else if (imdbId) {
-          const [, season, episode] = episodeId.split(':');
-          stremioEpisodeId = `${imdbId}:${season}:${episode}`;
+          stremioEpisodeId = `${imdbId}:${seasonNum}:${episodeNum}`;
           if (__DEV__) console.log('✅ [loadEpisodeStreams] Using stored IMDb ID for Stremio episode:', stremioEpisodeId);
         } else {
           // Convert TMDB ID to IMDb ID for Stremio addons
@@ -1753,14 +1798,17 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             const externalIds = await withTimeout(tmdbService.getShowExternalIds(parseInt(tmdbId)), API_TIMEOUT);
 
             if (externalIds?.imdb_id) {
-              const [, season, episode] = episodeId.split(':');
-              stremioEpisodeId = `${externalIds.imdb_id}:${season}:${episode}`;
+              stremioEpisodeId = `${externalIds.imdb_id}:${seasonNum}:${episodeNum}`;
               if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted TMDB to IMDb ID for Stremio episode:', stremioEpisodeId);
             } else {
-              if (__DEV__) console.log('⚠️ [loadEpisodeStreams] No IMDb ID found for TMDB ID, using original episode ID:', stremioEpisodeId);
+              // Fallback to TMDB format if conversions fail
+              // e.g. tmdb:123:1:1
+              stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
+              if (__DEV__) console.log('⚠️ [loadEpisodeStreams] No IMDb ID found for TMDB ID, using TMDB episode ID:', stremioEpisodeId);
             }
           } catch (error) {
-            if (__DEV__) console.log('⚠️ [loadEpisodeStreams] Failed to convert TMDB to IMDb, using original episode ID:', error);
+            stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
+            if (__DEV__) console.log('⚠️ [loadEpisodeStreams] Failed to convert TMDB to IMDb, using TMDB episode ID:', error);
           }
         }
       } else if (id.startsWith('tt')) {
@@ -1772,20 +1820,18 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           if (__DEV__) console.log('📝 [loadEpisodeStreams] TMDB enrichment disabled, skipping IMDB to TMDB conversion');
         }
         if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
-        // Normalize episode id to 'tt:season:episode' format for addons that expect tt prefix
-        const parts = episodeId.split(':');
-        if (parts.length === 3 && parts[0] === 'series') {
-          stremioEpisodeId = `${id}:${parts[1]}:${parts[2]}`;
-          if (__DEV__) console.log('🔧 [loadEpisodeStreams] Normalized episode ID for addons:', stremioEpisodeId);
-        }
+
+        // Ensure consistent format
+        stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
+        if (__DEV__) console.log('🔧 [loadEpisodeStreams] Normalized episode ID for addons:', stremioEpisodeId);
       } else {
         tmdbId = id;
+        stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
         if (__DEV__) console.log('ℹ️ [loadEpisodeStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
 
       // Extract episode info from the episodeId for logging
-      const [, season, episode] = episodeId.split(':');
-      const episodeQuery = `?s=${season}&e=${episode}`;
+      const episodeQuery = `?s=${seasonNum}&e=${episodeNum}`;
       if (__DEV__) console.log(`ℹ️ [loadEpisodeStreams] Episode query: ${episodeQuery}`);
 
       if (__DEV__) console.log('🔄 [loadEpisodeStreams] Starting stream requests');
