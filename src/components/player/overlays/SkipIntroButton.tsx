@@ -40,8 +40,10 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     const [introData, setIntroData] = useState<IntroTimestamps | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [hasSkipped, setHasSkipped] = useState(false);
+    const [autoHidden, setAutoHidden] = useState(false);
     const fetchedRef = useRef(false);
     const lastEpisodeRef = useRef<string>('');
+    const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Animation values
     const opacity = useSharedValue(0);
@@ -68,6 +70,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         lastEpisodeRef.current = episodeKey;
         fetchedRef.current = true;
         setHasSkipped(false);
+        setAutoHidden(false);
 
         const fetchIntroData = async () => {
             logger.log(`[SkipIntroButton] Fetching intro data for ${imdbId} S${season}E${episode}...`);
@@ -93,8 +96,11 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     const shouldShowButton = useCallback(() => {
         if (!introData || hasSkipped) return false;
         // Show when within intro range, with a small buffer at the end
-        return currentTime >= introData.start_sec && currentTime < (introData.end_sec - 0.5);
-    }, [introData, currentTime, hasSkipped]);
+        const inIntroRange = currentTime >= introData.start_sec && currentTime < (introData.end_sec - 0.5);
+        // If auto-hidden, only show when controls are visible
+        if (autoHidden && !controlsVisible) return false;
+        return inIntroRange;
+    }, [introData, currentTime, hasSkipped, autoHidden, controlsVisible]);
 
     // Handle visibility animations
     useEffect(() => {
@@ -105,8 +111,21 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
             setIsVisible(true);
             opacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
             scale.value = withSpring(1, { damping: 15, stiffness: 150 });
+
+            // Start 15-second auto-hide timer
+            if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+            autoHideTimerRef.current = setTimeout(() => {
+                if (!hasSkipped) {
+                    logger.log('[SkipIntroButton] Auto-hiding after 15 seconds');
+                    setAutoHidden(true);
+                    opacity.value = withTiming(0, { duration: 200 });
+                    scale.value = withTiming(0.8, { duration: 200 });
+                    setTimeout(() => setIsVisible(false), 250);
+                }
+            }, 15000);
         } else if (!shouldShow && isVisible) {
             logger.log(`[SkipIntroButton] Hiding button - currentTime: ${currentTime.toFixed(1)}s, hasSkipped: ${hasSkipped}`);
+            if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
             opacity.value = withTiming(0, { duration: 200 });
             scale.value = withTiming(0.8, { duration: 200 });
             // Delay hiding to allow animation to complete
@@ -114,9 +133,30 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         }
     }, [shouldShowButton, isVisible]);
 
+    // Re-show when controls become visible (if still in intro range and was auto-hidden)
+    useEffect(() => {
+        if (controlsVisible && autoHidden && introData && !hasSkipped) {
+            const inIntroRange = currentTime >= introData.start_sec && currentTime < (introData.end_sec - 0.5);
+            if (inIntroRange) {
+                logger.log('[SkipIntroButton] Re-showing button because controls became visible');
+                setAutoHidden(false);
+            }
+        }
+    }, [controlsVisible, autoHidden, introData, hasSkipped, currentTime]);
+
+    // Cleanup timer on unmount
+    useEffect(() => {
+        return () => {
+            if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+        };
+    }, []);
+
     // Animate position based on controls visibility
     useEffect(() => {
-        const target = controlsVisible ? -(controlsFixedOffset / 2) : 0;
+        // Android needs more offset to clear the slider
+        const androidOffset = controlsFixedOffset - 8;
+        const iosOffset = controlsFixedOffset / 2;
+        const target = controlsVisible ? -(Platform.OS === 'android' ? androidOffset : iosOffset) : 0;
         translateY.value = withTiming(target, { duration: 220, easing: Easing.out(Easing.cubic) });
     }, [controlsVisible, controlsFixedOffset]);
 

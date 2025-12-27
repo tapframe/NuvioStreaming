@@ -105,7 +105,10 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
 
   // Animate vertical offset based on controls visibility
   useEffect(() => {
-    const target = controlsVisible ? -(controlsFixedOffset / 2) : 0;
+    // Android needs more offset to clear the slider
+    const androidOffset = controlsFixedOffset - 8;
+    const iosOffset = controlsFixedOffset / 2;
+    const target = controlsVisible ? -(Platform.OS === 'android' ? androidOffset : iosOffset) : 0;
     Animated.timing(translateY, {
       toValue: target,
       duration: 220,
