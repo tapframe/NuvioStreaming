@@ -94,8 +94,17 @@ const AndroidVideoPlayer: React.FC = () => {
   const [isTransitioningStream, setIsTransitioningStream] = useState(false);
 
   // Dual video engine state: ExoPlayer primary, MPV fallback
-  const [useExoPlayer, setUseExoPlayer] = useState(true);
+  // If videoPlayerEngine is 'mpv', always use MPV; otherwise use auto behavior
+  const [useExoPlayer, setUseExoPlayer] = useState(settings.videoPlayerEngine !== 'mpv');
   const hasExoPlayerFailed = useRef(false);
+
+  // Sync useExoPlayer with settings when videoPlayerEngine changes
+  useEffect(() => {
+    if (settings.videoPlayerEngine === 'mpv') {
+      setUseExoPlayer(false);
+    }
+    // Note: We don't reset to true when 'auto' because ExoPlayer might have failed
+  }, [settings.videoPlayerEngine]);
 
   // Subtitle addon state
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);

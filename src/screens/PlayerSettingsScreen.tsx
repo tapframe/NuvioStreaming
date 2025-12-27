@@ -335,9 +335,68 @@ const PlayerSettingsScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Decoder Mode for Android Internal Player */}
+            {/* Video Player Engine for Android */}
             {Platform.OS === 'android' && !settings.useExternalPlayer && (
               <>
+                <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 }]}>
+                  <View style={styles.settingContent}>
+                    <View style={[
+                      styles.settingIconContainer,
+                      { backgroundColor: 'rgba(255,255,255,0.1)' }
+                    ]}>
+                      <MaterialIcons
+                        name="play-circle-filled"
+                        size={20}
+                        color={currentTheme.colors.primary}
+                      />
+                    </View>
+                    <View style={styles.settingText}>
+                      <Text
+                        style={[
+                          styles.settingTitle,
+                          { color: currentTheme.colors.text },
+                        ]}
+                      >
+                        Video Player Engine
+                      </Text>
+                      <Text
+                        style={[
+                          styles.settingDescription,
+                          { color: currentTheme.colors.textMuted },
+                        ]}
+                      >
+                        Auto uses ExoPlayer with MPV fallback. MPV uses MPV exclusively.
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.optionButtonsRow}>
+                    {([
+                      { id: 'auto', label: 'Auto', desc: 'ExoPlayer + MPV fallback' },
+                      { id: 'mpv', label: 'MPV', desc: 'MPV only' },
+                    ] as const).map((option) => (
+                      <TouchableOpacity
+                        key={option.id}
+                        onPress={() => updateSetting('videoPlayerEngine', option.id)}
+                        style={[
+                          styles.optionButton,
+                          styles.optionButtonWide,
+                          settings.videoPlayerEngine === option.id && { backgroundColor: currentTheme.colors.primary },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.optionButtonText,
+                            { color: settings.videoPlayerEngine === option.id ? '#fff' : currentTheme.colors.text },
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Decoder Mode for Android Internal Player */}
                 <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 }]}>
                   <View style={styles.settingContent}>
                     <View style={[
