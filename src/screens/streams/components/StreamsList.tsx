@@ -1,10 +1,9 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  FlatList,
+  SectionList,
   ActivityIndicator,
   Platform,
 } from 'react-native';
@@ -86,107 +85,116 @@ const StreamsList = memo(
       [loadingProviders, styles, colors.primary]
     );
 
+    // Convert sections to SectionList format
+    const sectionListData = useMemo(() => {
+      return sections
+        .filter(Boolean)
+        .filter(section => section!.data && section!.data.length > 0)
+        .map(section => ({
+          title: section!.title,
+          addonId: section!.addonId,
+          data: section!.data,
+        }));
+    }, [sections]);
+
+    const renderItem = useCallback(
+      ({ item, index }: { item: Stream; index: number }) => (
+        <StreamCard
+          stream={item}
+          onPress={() => handleStreamPress(item)}
+          index={index}
+          isLoading={false}
+          statusMessage={undefined}
+          theme={currentTheme}
+          showLogos={settings.showScraperLogos}
+          scraperLogo={
+            (item.addonId && scraperLogos[item.addonId]) ||
+            ((item as any).addon ? scraperLogos[(item.addonId || (item as any).addon) as string] || null : null)
+          }
+          showAlert={(t: string, m: string) => openAlert(t, m)}
+          parentTitle={metadata?.name}
+          parentType={type as 'movie' | 'series'}
+          parentSeason={
+            (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined
+          }
+          parentEpisode={
+            (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined
+          }
+          parentEpisodeTitle={
+            (type === 'series' || type === 'other') ? currentEpisode?.name : undefined
+          }
+          parentPosterUrl={episodeImage || metadata?.poster || undefined}
+          providerName={
+            streams &&
+            Object.keys(streams).find(pid =>
+              (streams as any)[pid]?.streams?.includes?.(item)
+            )
+          }
+          parentId={id}
+          parentImdbId={imdbId}
+        />
+      ),
+      [handleStreamPress, currentTheme, settings.showScraperLogos, scraperLogos, openAlert, metadata, type, currentEpisode, episodeImage, streams, id, imdbId]
+    );
+
+    const keyExtractor = useCallback((item: Stream, index: number) => {
+      if (item && item.url) {
+        return `${item.url}-${index}`;
+      }
+      return `empty-${index}`;
+    }, []);
+
+    const ListHeaderComponent = useMemo(() => {
+      if (!isAutoplayWaiting || autoplayTriggered) return null;
+      return (
+        <View style={styles.autoplayOverlay}>
+          <View style={styles.autoplayIndicator}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={styles.autoplayText}>Starting best stream...</Text>
+          </View>
+        </View>
+      );
+    }, [isAutoplayWaiting, autoplayTriggered, styles, colors.primary]);
+
+    const ListFooterComponent = useMemo(() => {
+      if (!(loadingStreams || loadingEpisodeStreams) || !hasStremioStreamProviders) return null;
+      return (
+        <View style={styles.footerLoading}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+        </View>
+      );
+    }, [loadingStreams, loadingEpisodeStreams, hasStremioStreamProviders, styles, colors.primary]);
+
+    const getItemLayout = useCallback((data: any, index: number) => ({
+      length: 78,
+      offset: 78 * index,
+      index,
+    }), []);
+
     return (
       <View collapsable={false} style={{ flex: 1 }}>
-        {/* Autoplay overlay */}
-        {isAutoplayWaiting && !autoplayTriggered && (
-          <View style={styles.autoplayOverlay}>
-            <View style={styles.autoplayIndicator}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={styles.autoplayText}>Starting best stream...</Text>
-            </View>
-          </View>
-        )}
-
-        <ScrollView
-          style={styles.streamsContent}
+        <SectionList
+          sections={sectionListData}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          renderSectionHeader={renderSectionHeader}
+          ListHeaderComponent={ListHeaderComponent}
+          ListFooterComponent={ListFooterComponent}
+          stickySectionHeadersEnabled={false}
           contentContainerStyle={[
             styles.streamsContainer,
             { paddingBottom: insets.bottom + 100 },
           ]}
+          style={styles.streamsContent}
           showsVerticalScrollIndicator={false}
-          bounces={true}
-          overScrollMode="never"
-          {...(Platform.OS === 'ios' && {
-            removeClippedSubviews: false,
-            scrollEventThrottle: 16,
-          })}
-        >
-          {sections.filter(Boolean).map((section, sectionIndex) => (
-            <View key={section!.addonId || sectionIndex}>
-              {renderSectionHeader({ section: section! })}
-
-              {section!.data && section!.data.length > 0 ? (
-                <FlatList
-                  data={section!.data}
-                  keyExtractor={(item, index) => {
-                    if (item && item.url) {
-                      return `${item.url}-${sectionIndex}-${index}`;
-                    }
-                    return `empty-${sectionIndex}-${index}`;
-                  }}
-                  renderItem={({ item, index }) => (
-                    <View>
-                      <StreamCard
-                        stream={item}
-                        onPress={() => handleStreamPress(item)}
-                        index={index}
-                        isLoading={false}
-                        statusMessage={undefined}
-                        theme={currentTheme}
-                        showLogos={settings.showScraperLogos}
-                        scraperLogo={
-                          (item.addonId && scraperLogos[item.addonId]) ||
-                          ((item as any).addon ? scraperLogos[(item.addonId || (item as any).addon) as string] || null : null)
-                        }
-                        showAlert={(t: string, m: string) => openAlert(t, m)}
-                        parentTitle={metadata?.name}
-                        parentType={type as 'movie' | 'series'}
-                        parentSeason={
-                          (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined
-                        }
-                        parentEpisode={
-                          (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined
-                        }
-                        parentEpisodeTitle={
-                          (type === 'series' || type === 'other') ? currentEpisode?.name : undefined
-                        }
-                        parentPosterUrl={episodeImage || metadata?.poster || undefined}
-                        providerName={
-                          streams &&
-                          Object.keys(streams).find(pid =>
-                            (streams as any)[pid]?.streams?.includes?.(item)
-                          )
-                        }
-                        parentId={id}
-                        parentImdbId={imdbId}
-                      />
-                    </View>
-                  )}
-                  scrollEnabled={false}
-                  initialNumToRender={6}
-                  maxToRenderPerBatch={2}
-                  windowSize={3}
-                  removeClippedSubviews={true}
-                  showsVerticalScrollIndicator={false}
-                  getItemLayout={(data, index) => ({
-                    length: 78,
-                    offset: 78 * index,
-                    index,
-                  })}
-                />
-              ) : null}
-            </View>
-          ))}
-
-          {/* Footer Loading */}
-          {(loadingStreams || loadingEpisodeStreams) && hasStremioStreamProviders && (
-            <View style={styles.footerLoading}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={styles.footerLoadingText}>Loading more sources...</Text>
-            </View>
-          )}
-        </ScrollView>
+          initialNumToRender={5}
+          maxToRenderPerBatch={3}
+          updateCellsBatchingPeriod={100}
+          windowSize={3}
+          removeClippedSubviews={true}
+          getItemLayout={getItemLayout}
+        />
       </View>
     );
   }
