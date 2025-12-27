@@ -365,7 +365,7 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.textMuted },
                         ]}
                       >
-                        Auto uses ExoPlayer with MPV fallback. MPV uses MPV exclusively.
+                        Auto uses ExoPlayer with MPV fallback. Some formats like Dolby Vision and HDR may not be supported by MPV, so Auto is recommended for best compatibility.
                       </Text>
                     </View>
                   </View>

@@ -351,7 +351,7 @@ const AndroidVideoPlayer: React.FC = () => {
     if (!hasExoPlayerFailed.current) {
       hasExoPlayerFailed.current = true;
       logger.warn('[AndroidVideoPlayer] ExoPlayer codec error detected, switching to MPV silently');
-      ToastAndroid.show('Switching to MPV due to unsupported codec', ToastAndroid.SHORT);
+      ToastAndroid.show('Switching to MPV due to playback issue', ToastAndroid.SHORT);
       setUseExoPlayer(false);
     }
   }, []);

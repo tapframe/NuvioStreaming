@@ -6,7 +6,7 @@ import { logger } from '../utils/logger';
  * API Documentation: https://api.introdb.app
  */
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_INTRODB_API_URL || 'https://api.introdb.app';
+const API_BASE_URL = process.env.EXPO_PUBLIC_INTRODB_API_URL;
 
 export interface IntroTimestamps {
     imdb_id: string;
