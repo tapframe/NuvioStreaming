@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
+import { VideoRef } from 'react-native-video';
 import { logger } from '../../../../utils/logger';
 
 const DEBUG_MODE = true; // Temporarily enable for debugging seek
@@ -12,7 +13,10 @@ export const usePlayerControls = (
     currentTime: number,
     duration: number,
     isSeeking: React.MutableRefObject<boolean>,
-    isMounted: React.MutableRefObject<boolean>
+    isMounted: React.MutableRefObject<boolean>,
+    // Dual engine support
+    exoPlayerRef?: React.RefObject<VideoRef>,
+    useExoPlayer?: boolean
 ) => {
     // iOS seeking helpers
     const iosWasPausedDuringSeekRef = useRef<boolean | null>(null);
@@ -28,12 +32,30 @@ export const usePlayerControls = (
             rawSeconds,
             timeInSeconds,
             hasMpvRef: !!mpvPlayerRef?.current,
+            hasExoRef: !!exoPlayerRef?.current,
+            useExoPlayer,
             duration,
             isSeeking: isSeeking.current
         });
 
-        // MPV Player
-        if (mpvPlayerRef.current && duration > 0) {
+        // ExoPlayer
+        if (useExoPlayer && exoPlayerRef?.current && duration > 0) {
+            console.log(`[usePlayerControls][ExoPlayer] Seeking to ${timeInSeconds}`);
+
+            isSeeking.current = true;
+            exoPlayerRef.current.seek(timeInSeconds);
+
+            // Reset seeking flag after a delay
+            setTimeout(() => {
+                if (isMounted.current) {
+                    isSeeking.current = false;
+                }
+            }, 500);
+            return;
+        }
+
+        // MPV Player (fallback or when useExoPlayer is false)
+        if (mpvPlayerRef?.current && duration > 0) {
             console.log(`[usePlayerControls][MPV] Seeking to ${timeInSeconds}`);
 
             isSeeking.current = true;
@@ -45,13 +67,16 @@ export const usePlayerControls = (
                     isSeeking.current = false;
                 }
             }, 500);
-        } else {
-            console.log('[usePlayerControls][MPV] Cannot seek - ref or duration invalid:', {
-                hasRef: !!mpvPlayerRef?.current,
-                duration
-            });
+            return;
         }
-    }, [duration, paused, setPaused, mpvPlayerRef, isSeeking, isMounted]);
+
+        console.log('[usePlayerControls] Cannot seek - no valid ref:', {
+            hasExoRef: !!exoPlayerRef?.current,
+            hasMpvRef: !!mpvPlayerRef?.current,
+            useExoPlayer,
+            duration
+        });
+    }, [duration, paused, setPaused, mpvPlayerRef, exoPlayerRef, useExoPlayer, isSeeking, isMounted]);
 
     const skip = useCallback((seconds: number) => {
         console.log('[usePlayerControls] skip called:', { seconds, currentTime, newTime: currentTime + seconds });

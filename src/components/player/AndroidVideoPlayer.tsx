@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { View, StyleSheet, Platform, Animated } from 'react-native';
+import { View, StyleSheet, Platform, Animated, ToastAndroid } from 'react-native';
 import { toast } from '@backpackapp-io/react-native-toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -78,6 +78,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
+  const exoPlayerRef = useRef<any>(null);
   const pinchRef = useRef(null);
   const tracksHook = usePlayerTracks();
 
@@ -91,6 +92,10 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // State to force unmount VideoSurface during stream transitions
   const [isTransitioningStream, setIsTransitioningStream] = useState(false);
+
+  // Dual video engine state: ExoPlayer primary, MPV fallback
+  const [useExoPlayer, setUseExoPlayer] = useState(true);
+  const hasExoPlayerFailed = useRef(false);
 
   // Subtitle addon state
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
@@ -131,7 +136,9 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.currentTime,
     playerState.duration,
     playerState.isSeeking,
-    playerState.isMounted
+    playerState.isMounted,
+    exoPlayerRef,
+    useExoPlayer
   );
 
   const traktAutosync = useTraktAutosync({
@@ -327,6 +334,16 @@ const AndroidVideoPlayer: React.FC = () => {
     else navigation.reset({ index: 0, routes: [{ name: 'Home' }] } as any);
   }, [navigation]);
 
+  // Handle codec errors from ExoPlayer - silently switch to MPV
+  const handleCodecError = useCallback(() => {
+    if (!hasExoPlayerFailed.current) {
+      hasExoPlayerFailed.current = true;
+      logger.warn('[AndroidVideoPlayer] ExoPlayer codec error detected, switching to MPV silently');
+      ToastAndroid.show('Switching to MPV due to unsupported codec', ToastAndroid.SHORT);
+      setUseExoPlayer(false);
+    }
+  }, []);
+
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
       modals.setShowSourcesModal(false);
@@ -485,6 +502,13 @@ const AndroidVideoPlayer: React.FC = () => {
     else playerState.setResizeMode('contain');
   }, [playerState.resizeMode]);
 
+  // Memoize selectedTextTrack to prevent unnecessary re-renders
+  const memoizedSelectedTextTrack = useMemo(() => {
+    return tracksHook.selectedTextTrack === -1
+      ? { type: 'disabled' as const }
+      : { type: 'index' as const, value: tracksHook.selectedTextTrack };
+  }, [tracksHook.selectedTextTrack]);
+
   return (
     <View style={[styles.container, {
       width: playerState.screenDimensions.width,
@@ -566,12 +590,18 @@ const AndroidVideoPlayer: React.FC = () => {
               }
             }}
             mpvPlayerRef={mpvPlayerRef}
+            exoPlayerRef={exoPlayerRef}
             pinchRef={pinchRef}
             onPinchGestureEvent={() => { }}
             onPinchHandlerStateChange={() => { }}
             screenDimensions={playerState.screenDimensions}
             decoderMode={settings.decoderMode}
             gpuMode={settings.gpuMode}
+            // Dual video engine props
+            useExoPlayer={useExoPlayer}
+            onCodecError={handleCodecError}
+            selectedAudioTrack={tracksHook.selectedAudioTrack as any || undefined}
+            selectedTextTrack={memoizedSelectedTextTrack as any}
             // Subtitle Styling - pass to MPV for built-in subtitle customization
             // MPV uses different scaling than React Native, so we apply conversion factors:
             // - Font size: MPV needs ~1.5x larger values (MPV's sub-font-size vs RN fontSize)
@@ -669,7 +699,7 @@ const AndroidVideoPlayer: React.FC = () => {
           }}
           buffered={playerState.buffered}
           formatTime={formatTime}
-          playerBackend={'MPV'}
+          playerBackend={useExoPlayer ? 'ExoPlayer' : 'MPV'}
         />
 
         <SpeedActivatedOverlay
@@ -764,16 +794,19 @@ const AndroidVideoPlayer: React.FC = () => {
         selectedTextTrack={tracksHook.computedSelectedTextTrack}
         useCustomSubtitles={useCustomSubtitles}
         isKsPlayerActive={true}
+        useExoPlayer={useExoPlayer}
         subtitleSize={subtitleSize}
         subtitleBackground={subtitleBackground}
         fetchAvailableSubtitles={fetchAvailableSubtitles}
         loadWyzieSubtitle={loadWyzieSubtitle}
         selectTextTrack={(trackId) => {
           tracksHook.setSelectedTextTrack(trackId);
-          // Actually tell MPV to switch the subtitle track
-          if (mpvPlayerRef.current) {
+          // For MPV, manually switch the subtitle track
+          if (!useExoPlayer && mpvPlayerRef.current) {
             mpvPlayerRef.current.setSubtitleTrack(trackId);
           }
+          // For ExoPlayer, the selectedTextTrack prop will be updated via memoizedSelectedTextTrack
+          // which triggers a re-render with the new track selection
           // Disable custom subtitles when selecting built-in track
           setUseCustomSubtitles(false);
           modals.setShowSubtitleModal(false);

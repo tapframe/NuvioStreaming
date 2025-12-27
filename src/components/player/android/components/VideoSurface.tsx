@@ -1,9 +1,35 @@
-import React, { useCallback, memo } from 'react';
+import React, { useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { PinchGestureHandler } from 'react-native-gesture-handler';
+import Video, { VideoRef, SelectedTrack, SelectedVideoTrack, ResizeMode } from 'react-native-video';
 import MpvPlayer, { MpvPlayerRef } from '../MpvPlayer';
 import { styles } from '../../utils/playerStyles';
 import { ResizeModeType } from '../../utils/playerTypes';
+import { logger } from '../../../../utils/logger';
+
+// Codec error patterns that indicate we should fallback to MPV
+const CODEC_ERROR_PATTERNS = [
+    'exceeds_capabilities',
+    'no_exceeds_capabilities',
+    'decoder_exception',
+    'decoder.*error',
+    'codec.*error',
+    'unsupported.*codec',
+    'mediacodec.*exception',
+    'omx.*error',
+    'dolby.*vision',
+    'hevc.*error',
+    'no suitable decoder',
+    'decoder initialization failed',
+    'format.no_decoder',
+    'no_decoder',
+    'decoding_failed',
+    'error_code_decoding',
+    'exoplaybackexception',
+    'mediacodecvideodecoder',
+    'mediacodecvideodecoderexception',
+    'decoder failed',
+];
 
 interface VideoSurfaceProps {
     processedStreamUrl: string;
@@ -25,6 +51,7 @@ interface VideoSurfaceProps {
 
     // Refs
     mpvPlayerRef?: React.RefObject<MpvPlayerRef>;
+    exoPlayerRef?: React.RefObject<VideoRef>;
     pinchRef: any;
 
     // Handlers
@@ -32,8 +59,16 @@ interface VideoSurfaceProps {
     onPinchHandlerStateChange: any;
     screenDimensions: { width: number, height: number };
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
+    selectedAudioTrack?: SelectedTrack;
+    selectedTextTrack?: SelectedTrack;
     decoderMode?: 'auto' | 'sw' | 'hw' | 'hw+';
     gpuMode?: 'gpu' | 'gpu-next';
+
+    // Dual Engine Props
+    useExoPlayer?: boolean;
+    onCodecError?: () => void;
+    onEngineChange?: (engine: 'exoplayer' | 'mpv') => void;
+
     // Subtitle Styling
     subtitleSize?: number;
     subtitleColor?: string;
@@ -45,6 +80,15 @@ interface VideoSurfaceProps {
     subtitleDelay?: number;
     subtitleAlignment?: 'left' | 'center' | 'right';
 }
+
+// Helper function to check if error is a codec error
+const isCodecError = (errorString: string): boolean => {
+    const lowerError = errorString.toLowerCase();
+    return CODEC_ERROR_PATTERNS.some(pattern => {
+        const regex = new RegExp(pattern, 'i');
+        return regex.test(lowerError);
+    });
+};
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     processedStreamUrl,
@@ -62,13 +106,20 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     onError,
     onBuffer,
     mpvPlayerRef,
+    exoPlayerRef,
     pinchRef,
     onPinchGestureEvent,
     onPinchHandlerStateChange,
     screenDimensions,
     onTracksChanged,
+    selectedAudioTrack,
+    selectedTextTrack,
     decoderMode,
     gpuMode,
+    // Dual Engine
+    useExoPlayer = true,
+    onCodecError,
+    onEngineChange,
     // Subtitle Styling
     subtitleSize,
     subtitleColor,
@@ -83,10 +134,9 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
 
-    // Debug logging removed to prevent console spam
-
-    const handleLoad = (data: { duration: number; width: number; height: number }) => {
-        console.log('[VideoSurface] onLoad received:', data);
+    // ========== MPV Handlers ==========
+    const handleMpvLoad = (data: { duration: number; width: number; height: number }) => {
+        console.log('[VideoSurface] MPV onLoad received:', data);
         onLoad({
             duration: data.duration,
             naturalSize: {
@@ -96,15 +146,15 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
         });
     };
 
-    const handleProgress = (data: { currentTime: number; duration: number }) => {
+    const handleMpvProgress = (data: { currentTime: number; duration: number }) => {
         onProgress({
             currentTime: data.currentTime,
             playableDuration: data.currentTime,
         });
     };
 
-    const handleError = (error: { error: string }) => {
-        console.log('[VideoSurface] onError received:', error);
+    const handleMpvError = (error: { error: string }) => {
+        console.log('[VideoSurface] MPV onError received:', error);
         onError({
             error: {
                 errorString: error.error,
@@ -112,9 +162,123 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
         });
     };
 
-    const handleEnd = () => {
-        console.log('[VideoSurface] onEnd received');
+    const handleMpvEnd = () => {
+        console.log('[VideoSurface] MPV onEnd received');
         onEnd();
+    };
+
+    // ========== ExoPlayer Handlers ==========
+    const handleExoLoad = (data: any) => {
+        console.log('[VideoSurface] ExoPlayer onLoad received:', data);
+        console.log('[VideoSurface] ExoPlayer textTracks raw:', JSON.stringify(data.textTracks, null, 2));
+
+        // Extract track information
+        const audioTracks = data.audioTracks?.map((t: any, i: number) => ({
+            id: t.index ?? i,
+            name: t.title || t.language || `Track ${i + 1}`,
+            language: t.language,
+        })) ?? [];
+
+        const subtitleTracks = data.textTracks?.map((t: any, i: number) => {
+            const track = {
+                id: t.index ?? i,
+                name: t.title || t.language || `Track ${i + 1}`,
+                language: t.language,
+            };
+            console.log('[VideoSurface] Mapped subtitle track:', track, 'original:', t);
+            return track;
+        }) ?? [];
+
+        if (onTracksChanged && (audioTracks.length > 0 || subtitleTracks.length > 0)) {
+            onTracksChanged({ audioTracks, subtitleTracks });
+        }
+
+        onLoad({
+            duration: data.duration,
+            naturalSize: data.naturalSize || { width: 1920, height: 1080 },
+            audioTracks: data.audioTracks,
+            textTracks: data.textTracks,
+        });
+    };
+
+    const handleExoProgress = (data: any) => {
+        onProgress({
+            currentTime: data.currentTime,
+            playableDuration: data.playableDuration || data.currentTime,
+        });
+    };
+
+    const handleExoError = (error: any) => {
+        console.log('[VideoSurface] ExoPlayer onError received:', JSON.stringify(error, null, 2));
+
+        // Extract error string - try multiple paths
+        let errorString = 'Unknown error';
+        const errorParts: string[] = [];
+
+        if (typeof error?.error === 'string') {
+            errorParts.push(error.error);
+        }
+        if (error?.error?.errorString) {
+            errorParts.push(error.error.errorString);
+        }
+        if (error?.error?.errorCode) {
+            errorParts.push(String(error.error.errorCode));
+        }
+        if (typeof error === 'string') {
+            errorParts.push(error);
+        }
+        if (error?.nativeStackAndroid) {
+            errorParts.push(error.nativeStackAndroid.join(' '));
+        }
+        if (error?.message) {
+            errorParts.push(error.message);
+        }
+
+        // Combine all error parts for comprehensive checking
+        errorString = errorParts.length > 0 ? errorParts.join(' ') : JSON.stringify(error);
+
+        console.log('[VideoSurface] Extracted error string:', errorString);
+        console.log('[VideoSurface] isCodecError result:', isCodecError(errorString));
+
+        // Check if this is a codec error that should trigger fallback
+        if (isCodecError(errorString)) {
+            logger.warn('[VideoSurface] ExoPlayer codec error detected, triggering MPV fallback:', errorString);
+            onCodecError?.();
+            return; // Don't propagate codec errors - we're falling back silently
+        }
+
+        // Non-codec errors should be propagated
+        onError({
+            error: {
+                errorString: errorString,
+            },
+        });
+    };
+
+    const handleExoBuffer = (data: any) => {
+        onBuffer({ isBuffering: data.isBuffering });
+    };
+
+    const handleExoEnd = () => {
+        console.log('[VideoSurface] ExoPlayer onEnd received');
+        onEnd();
+    };
+
+    const handleExoSeek = (data: any) => {
+        onSeek({ currentTime: data.currentTime });
+    };
+
+    // Map ResizeModeType to react-native-video ResizeMode
+    const getExoResizeMode = (): ResizeMode => {
+        switch (resizeMode) {
+            case 'cover':
+                return ResizeMode.COVER;
+            case 'stretch':
+                return ResizeMode.STRETCH;
+            case 'contain':
+            default:
+                return ResizeMode.CONTAIN;
+        }
     };
 
     return (
@@ -122,34 +286,80 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
             width: screenDimensions.width,
             height: screenDimensions.height,
         }]}>
-            {/* MPV Player - rendered at the bottom of the z-order */}
-            <MpvPlayer
-                ref={mpvPlayerRef}
-                source={streamUrl}
-                headers={headers}
-                paused={paused}
-                volume={volume}
-                rate={playbackSpeed}
-                resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
-                style={localStyles.player}
-                onLoad={handleLoad}
-                onProgress={handleProgress}
-                onEnd={handleEnd}
-                onError={handleError}
-                onTracksChanged={onTracksChanged}
-                decoderMode={decoderMode}
-                gpuMode={gpuMode}
-                // Subtitle Styling
-                subtitleSize={subtitleSize}
-                subtitleColor={subtitleColor}
-                subtitleBackgroundOpacity={subtitleBackgroundOpacity}
-                subtitleBorderSize={subtitleBorderSize}
-                subtitleBorderColor={subtitleBorderColor}
-                subtitleShadowEnabled={subtitleShadowEnabled}
-                subtitlePosition={subtitlePosition}
-                subtitleDelay={subtitleDelay}
-                subtitleAlignment={subtitleAlignment}
-            />
+            {useExoPlayer ? (
+                /* ExoPlayer via react-native-video */
+                <Video
+                    ref={exoPlayerRef}
+                    source={{
+                        uri: streamUrl,
+                        headers: headers,
+                    }}
+                    paused={paused}
+                    volume={volume}
+                    rate={playbackSpeed}
+                    resizeMode={getExoResizeMode()}
+                    selectedAudioTrack={selectedAudioTrack}
+                    selectedTextTrack={selectedTextTrack}
+                    style={localStyles.player}
+                    onLoad={handleExoLoad}
+                    onProgress={handleExoProgress}
+                    onEnd={handleExoEnd}
+                    onError={handleExoError}
+                    onBuffer={handleExoBuffer}
+                    onSeek={handleExoSeek}
+                    progressUpdateInterval={500}
+                    playInBackground={false}
+                    playWhenInactive={false}
+                    ignoreSilentSwitch="ignore"
+                    automaticallyWaitsToMinimizeStalling={true}
+                    useTextureView={true}
+                    // Subtitle Styling for ExoPlayer
+                    // ExoPlayer supports: fontSize, paddingTop/Bottom/Left/Right, opacity, subtitlesFollowVideo
+                    subtitleStyle={{
+                        // Convert MPV-scaled size back to ExoPlayer scale (~1.5x conversion was applied)
+                        fontSize: subtitleSize ? Math.round(subtitleSize / 1.5) : 18,
+                        paddingTop: 0,
+                        // Convert MPV position (0=top, 100=bottom) to paddingBottom
+                        // Higher MPV position = less padding from bottom
+                        paddingBottom: subtitlePosition ? Math.max(20, Math.round((100 - subtitlePosition) * 2)) : 60,
+                        paddingLeft: 16,
+                        paddingRight: 16,
+                        // Opacity controls entire subtitle view visibility
+                        // Always keep text visible (opacity 1), background control is limited in ExoPlayer
+                        opacity: 1,
+                        subtitlesFollowVideo: false,
+                    }}
+                />
+            ) : (
+                /* MPV Player fallback */
+                <MpvPlayer
+                    ref={mpvPlayerRef}
+                    source={streamUrl}
+                    headers={headers}
+                    paused={paused}
+                    volume={volume}
+                    rate={playbackSpeed}
+                    resizeMode={resizeMode === 'none' ? 'contain' : resizeMode}
+                    style={localStyles.player}
+                    onLoad={handleMpvLoad}
+                    onProgress={handleMpvProgress}
+                    onEnd={handleMpvEnd}
+                    onError={handleMpvError}
+                    onTracksChanged={onTracksChanged}
+                    decoderMode={decoderMode}
+                    gpuMode={gpuMode}
+                    // Subtitle Styling
+                    subtitleSize={subtitleSize}
+                    subtitleColor={subtitleColor}
+                    subtitleBackgroundOpacity={subtitleBackgroundOpacity}
+                    subtitleBorderSize={subtitleBorderSize}
+                    subtitleBorderColor={subtitleBorderColor}
+                    subtitleShadowEnabled={subtitleShadowEnabled}
+                    subtitlePosition={subtitlePosition}
+                    subtitleDelay={subtitleDelay}
+                    subtitleAlignment={subtitleAlignment}
+                />
+            )}
 
             {/* Gesture overlay - transparent, on top of the player */}
             <PinchGestureHandler

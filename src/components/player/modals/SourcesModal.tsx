@@ -18,7 +18,7 @@ interface SourcesModalProps {
   isChangingSource?: boolean;
 }
 
-const QualityBadge = ({ quality }: { quality: string | null }) => {
+const QualityBadge = ({ quality }: { quality: string | null | undefined }) => {
   if (!quality) return null;
 
   const qualityNum = parseInt(quality);
@@ -85,7 +85,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   };
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={10000}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 10000 }]}>
       {/* Backdrop */}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}

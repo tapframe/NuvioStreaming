@@ -25,6 +25,8 @@ interface SubtitleModalsProps {
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   isKsPlayerActive?: boolean;
+  // Whether ExoPlayer is being used (limits subtitle styling options)
+  useExoPlayer?: boolean;
   subtitleSize: number;
   subtitleBackground: boolean;
   fetchAvailableSubtitles: () => void;
@@ -81,6 +83,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleSize, subtitleBackground, fetchAvailableSubtitles,
   loadWyzieSubtitle, selectTextTrack, increaseSubtitleSize,
   decreaseSubtitleSize, toggleSubtitleBackground, subtitleTextColor, setSubtitleTextColor,
+  useExoPlayer = false,
   subtitleBgOpacity, setSubtitleBgOpacity, subtitleTextShadow, setSubtitleTextShadow,
   subtitleOutline, setSubtitleOutline, subtitleOutlineColor, setSubtitleOutlineColor,
   subtitleOutlineWidth, setSubtitleOutlineWidth, subtitleAlign, setSubtitleAlign,
@@ -96,6 +99,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   const isCompact = width < 360 || height < 640;
   // Internal subtitle is active when a built-in track is selected AND not using custom/addon subtitles
   const isUsingInternalSubtitle = selectedTextTrack >= 0 && !useCustomSubtitles;
+  // ExoPlayer has limited styling support - hide unsupported options when using ExoPlayer with internal subs
+  const isExoPlayerInternal = useExoPlayer && isUsingInternalSubtitle;
   const sectionPad = isCompact ? 12 : 16;
   const chipPadH = isCompact ? 8 : 12;
   const chipPadV = isCompact ? 6 : 8;
@@ -114,7 +119,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   if (!showSubtitleModal) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={9999}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
       {/* Backdrop */}
       <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={handleClose}>
         <Animated.View entering={FadeIn} exiting={FadeOut} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} />
@@ -182,7 +187,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       <TouchableOpacity
                         key={sub.id}
                         onPress={() => { setSelectedOnlineSubtitleId(sub.id); loadWyzieSubtitle(sub); }}
-                        style={{ padding: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 12, backgroundColor: selectedOnlineSubtitleId === sub.id ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', textAlignVertical: 'center' }}
+                        style={{ padding: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 12, backgroundColor: selectedOnlineSubtitleId === sub.id ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                       >
                         <View>
                           <Text style={{ marginLeft: 5, color: selectedOnlineSubtitleId === sub.id ? 'black' : 'white', fontWeight: '600' }}>{sub.display}</Text>
@@ -228,7 +233,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     </View>
                   </View>
 
-                  {/* Quick Presets */}
+                  {/* Quick Presets - Hidden for ExoPlayer internal subtitles */}
+                  {!isExoPlayerInternal && (
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                       <MaterialIcons name="star" size={16} color="rgba(255,255,255,0.7)" />
@@ -272,6 +278,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       </TouchableOpacity>
                     </View>
                   </View>
+                  )}
 
                   {/* Core controls */}
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad, gap: isCompact ? 10 : 14 }}>
@@ -296,6 +303,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     </View>
+                    {/* Show Background - Not supported on ExoPlayer internal subtitles */}
+                    {!isExoPlayerInternal && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <MaterialIcons name="layers" size={16} color="rgba(255,255,255,0.7)" />
@@ -308,14 +317,17 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         <View style={{ width: 24, height: 24, backgroundColor: subtitleBackground ? 'black' : 'white', borderRadius: 12 }} />
                       </TouchableOpacity>
                     </View>
+                    )}
                   </View>
 
-                  {/* Advanced controls */}
+                  {/* Advanced controls - Limited for ExoPlayer */}
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad, gap: isCompact ? 10 : 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <MaterialIcons name="build" size={16} color="rgba(255,255,255,0.7)" />
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>Advanced</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{isExoPlayerInternal ? 'Position' : 'Advanced'}</Text>
                     </View>
+                    {/* Text Color - Not supported on ExoPlayer internal subtitles */}
+                    {!isExoPlayerInternal && (
                     <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <MaterialIcons name="palette" size={16} color="rgba(255,255,255,0.7)" />
@@ -327,6 +339,9 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         ))}
                       </View>
                     </View>
+                    )}
+                    {/* Align - Not supported on ExoPlayer internal subtitles */}
+                    {!isExoPlayerInternal && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ color: 'white', fontWeight: '600' }}>Align</Text>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -337,6 +352,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         ))}
                       </View>
                     </View>
+                    )}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ color: 'white', fontWeight: '600' }}>Bottom Offset</Text>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -351,6 +367,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     </View>
+                    {/* Background Opacity - Not supported on ExoPlayer internal subtitles */}
+                    {!isExoPlayerInternal && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ color: 'white', fontWeight: '600' }}>Background Opacity</Text>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -365,6 +383,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     </View>
+                    )}
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={{ color: 'white', fontWeight: '600' }}>Text Shadow</Text>
@@ -431,6 +450,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </View>
                       </View>
                     )}
+                    {/* Timing Offset - Not supported on ExoPlayer internal subtitles */}
+                    {!isExoPlayerInternal && (
                     <View style={{ marginTop: 4 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={{ color: 'white', fontWeight: '600' }}>Timing Offset (s)</Text>
@@ -448,6 +469,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       </View>
                       <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 6 }}>Nudge subtitles earlier (-) or later (+) to sync if needed.</Text>
                     </View>
+                    )}
                     <View style={{ alignItems: 'flex-end', marginTop: 8 }}>
                       <TouchableOpacity
                         onPress={() => {

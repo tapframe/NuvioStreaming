@@ -13,7 +13,7 @@ import { logger } from '../../../utils/logger';
 interface AudioTrackModalProps {
   showAudioModal: boolean;
   setShowAudioModal: (show: boolean) => void;
-  ksAudioTracks: Array<{id: number, name: string, language?: string}>;
+  ksAudioTracks: Array<{ id: number, name: string, language?: string }>;
   selectedAudioTrack: number | null;
   selectAudioTrack: (trackId: number) => void;
 }
@@ -36,7 +36,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   if (!showAudioModal) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={9999}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
       {/* Backdrop matching SubtitleModal */}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}

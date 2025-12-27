@@ -62,7 +62,7 @@ const SpeedModal: React.FC<SpeedModalProps> = ({
   if (!showSpeedModal) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={9999}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}>
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
         activeOpacity={1}
@@ -85,7 +85,7 @@ const SpeedModal: React.FC<SpeedModalProps> = ({
           }}
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600'}}>Playback Speed</Text>
+            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Playback Speed</Text>
           </View>
 
           {/* Speed Selection Row */}

@@ -20,7 +20,7 @@ interface EpisodeStreamsModalProps {
   metadata?: { id?: string; name?: string };
 }
 
-const QualityBadge = ({ quality }: { quality: string | null }) => {
+const QualityBadge = ({ quality }: { quality: string | null | undefined }) => {
   if (!quality) return null;
 
   const qualityNum = parseInt(quality);
@@ -140,7 +140,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
   const sortedProviders = Object.entries(availableStreams);
 
   return (
-    <View style={StyleSheet.absoluteFill} zIndex={10000}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 10000 }]}>
       {/* Backdrop */}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
@@ -263,9 +263,9 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           )}
 
           {hasErrors.length > 0 && (
-             <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 12, padding: 12, marginTop: 10 }}>
-                <Text style={{ color: '#EF4444', fontSize: 11 }}>Sources might be limited due to provider errors.</Text>
-             </View>
+            <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 12, padding: 12, marginTop: 10 }}>
+              <Text style={{ color: '#EF4444', fontSize: 11 }}>Sources might be limited due to provider errors.</Text>
+            </View>
           )}
         </ScrollView>
       </Animated.View>
