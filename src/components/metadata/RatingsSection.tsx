@@ -204,15 +204,15 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   // Priority: IMDB, TMDB, Tomatoes, Metacritic 
   const priorityOrder = ['imdb', 'tmdb', 'tomatoes', 'metacritic', 'trakt', 'letterboxd', 'audience'];
   const displayRatings = priorityOrder
-    .filter(source => 
-      source in ratings && 
+    .filter(source =>
+      source in ratings &&
       ratings[source as keyof typeof ratings] !== undefined &&
       (enabledProviders[source] ?? true) // Show by default if setting not found
     )
     .map(source => [source, ratings[source as keyof typeof ratings]!]);
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.container,
         {
@@ -231,11 +231,11 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
         {displayRatings.map(([source, value]) => {
           const config = ratingConfig[source as keyof typeof ratingConfig];
           const displayValue = config.transform(parseFloat(value as string));
-          
+
           return (
             <View key={source} style={[styles.compactRatingItem, { marginRight: itemSpacing }]}>
               {config.isImage ? (
-                <Image 
+                <Image
                   source={config.icon as any}
                   style={[styles.compactRatingIcon, { width: iconSize, height: iconSize, marginRight: iconTextGap }]}
                   resizeMode="contain"

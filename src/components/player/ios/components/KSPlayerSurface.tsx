@@ -36,6 +36,12 @@ interface KSPlayerSurfaceProps {
     screenWidth: number;
     screenHeight: number;
     customVideoStyles: any;
+
+    // Subtitle styling
+    subtitleTextColor?: string;
+    subtitleBackgroundColor?: string;
+    subtitleFontSize?: number;
+    subtitleBottomOffset?: number;
 }
 
 export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
@@ -64,7 +70,11 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
     onPlaybackResume,
     screenWidth,
     screenHeight,
-    customVideoStyles
+    customVideoStyles,
+    subtitleTextColor,
+    subtitleBackgroundColor,
+    subtitleFontSize,
+    subtitleBottomOffset
 }) => {
     const pinchRef = useRef<PinchGestureHandler>(null);
 
@@ -132,6 +142,10 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
                     resizeMode={resizeMode}
                     audioTrack={audioTrack}
                     textTrack={textTrack}
+                    subtitleTextColor={subtitleTextColor}
+                    subtitleBackgroundColor={subtitleBackgroundColor}
+                    subtitleFontSize={subtitleFontSize}
+                    subtitleBottomOffset={subtitleBottomOffset}
                     onLoad={handleLoad}
                     onProgress={onProgress}
                     onBuffering={handleBuffering}

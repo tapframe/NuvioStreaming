@@ -546,6 +546,10 @@ const KSPlayerCore: React.FC = () => {
         screenWidth={screenDimensions.width}
         screenHeight={screenDimensions.height}
         customVideoStyles={{ width: '100%', height: '100%' }}
+        subtitleTextColor={customSubs.subtitleTextColor}
+        subtitleBackgroundColor={customSubs.subtitleBackground ? `rgba(0,0,0,${customSubs.subtitleBgOpacity})` : 'transparent'}
+        subtitleFontSize={customSubs.subtitleSize}
+        subtitleBottomOffset={customSubs.subtitleBottomOffset}
       />
 
       {/* Custom Subtitles Overlay */}

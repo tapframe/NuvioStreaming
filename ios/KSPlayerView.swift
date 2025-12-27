@@ -9,6 +9,7 @@ import Foundation
 import KSPlayer
 import React
 import AVKit
+import SwiftUI
 
 @objc(KSPlayerView)
 class KSPlayerView: UIView {
@@ -95,6 +96,20 @@ class KSPlayerView: UIView {
             let size = CGFloat(truncating: subtitleFontSize)
             print("KSPlayerView: [PROP SETTER] subtitleFontSize setter called with value: \(size)")
             updateSubtitleFont(size: size)
+        }
+    }
+    
+    @objc var subtitleTextColor: NSString = "#FFFFFF" {
+        didSet {
+            print("KSPlayerView: [PROP SETTER] subtitleTextColor setter called with value: \(subtitleTextColor)")
+            updateSubtitleColors()
+        }
+    }
+    
+    @objc var subtitleBackgroundColor: NSString = "rgba(0,0,0,0.7)" {
+        didSet {
+            print("KSPlayerView: [PROP SETTER] subtitleBackgroundColor setter called with value: \(subtitleBackgroundColor)")
+            updateSubtitleColors()
         }
     }
     
@@ -268,6 +283,99 @@ class KSPlayerView: UIView {
             _ = playerView.srtControl.subtitle(currentTime: currentTime)
         }
         print("KSPlayerView: [FONT UPDATE] Applied subtitle font size: \(size)")
+    }
+    
+    private func updateSubtitleColors() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Parse and apply text color
+            let textColor = self.parseColor(self.subtitleTextColor as String) ?? .white
+            self.playerView.subtitleLabel.textColor = textColor
+            SubtitleModel.textColor = SwiftUI.Color(textColor)
+            
+            // Parse and apply background color
+            let bgColor = self.parseColor(self.subtitleBackgroundColor as String) ?? UIColor.black.withAlphaComponent(0.7)
+            self.playerView.subtitleBackView.backgroundColor = bgColor
+            SubtitleModel.textBackgroundColor = SwiftUI.Color(bgColor)
+            
+            print("KSPlayerView: [COLOR UPDATE] Applied textColor: \(self.subtitleTextColor), bgColor: \(self.subtitleBackgroundColor)")
+        }
+    }
+    
+    private func parseColor(_ colorString: String) -> UIColor? {
+        let trimmed = colorString.trimmingCharacters(in: .whitespaces)
+        
+        // Handle hex colors (#RGB, #RRGGBB, #RRGGBBAA)
+        if trimmed.hasPrefix("#") {
+            return parseHexColor(trimmed)
+        }
+        
+        // Handle rgba(r, g, b, a) format
+        if trimmed.lowercased().hasPrefix("rgba") {
+            return parseRgbaColor(trimmed)
+        }
+        
+        // Handle rgb(r, g, b) format
+        if trimmed.lowercased().hasPrefix("rgb") {
+            return parseRgbColor(trimmed)
+        }
+        
+        return nil
+    }
+    
+    private func parseHexColor(_ hex: String) -> UIColor? {
+        var hexString = hex.trimmingCharacters(in: .whitespaces).uppercased()
+        if hexString.hasPrefix("#") {
+            hexString.remove(at: hexString.startIndex)
+        }
+        
+        var rgbValue: UInt64 = 0
+        Scanner(string: hexString).scanHexInt64(&rgbValue)
+        
+        switch hexString.count {
+        case 3: // RGB (12-bit)
+            let r = CGFloat((rgbValue & 0xF00) >> 8) / 15.0
+            let g = CGFloat((rgbValue & 0x0F0) >> 4) / 15.0
+            let b = CGFloat(rgbValue & 0x00F) / 15.0
+            return UIColor(red: r, green: g, blue: b, alpha: 1.0)
+        case 6: // RRGGBB (24-bit)
+            let r = CGFloat((rgbValue & 0xFF0000) >> 16) / 255.0
+            let g = CGFloat((rgbValue & 0x00FF00) >> 8) / 255.0
+            let b = CGFloat(rgbValue & 0x0000FF) / 255.0
+            return UIColor(red: r, green: g, blue: b, alpha: 1.0)
+        case 8: // RRGGBBAA (32-bit)
+            let r = CGFloat((rgbValue & 0xFF000000) >> 24) / 255.0
+            let g = CGFloat((rgbValue & 0x00FF0000) >> 16) / 255.0
+            let b = CGFloat((rgbValue & 0x0000FF00) >> 8) / 255.0
+            let a = CGFloat(rgbValue & 0x000000FF) / 255.0
+            return UIColor(red: r, green: g, blue: b, alpha: a)
+        default:
+            return nil
+        }
+    }
+    
+    private func parseRgbaColor(_ rgba: String) -> UIColor? {
+        let pattern = "rgba?\\s*\\(\\s*([0-9.]+)\\s*,\\s*([0-9.]+)\\s*,\\s*([0-9.]+)\\s*(?:,\\s*([0-9.]+))?\\s*\\)"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let match = regex.firstMatch(in: rgba, range: NSRange(rgba.startIndex..., in: rgba)),
+              match.numberOfRanges >= 4 else {
+            return nil
+        }
+        
+        let r = CGFloat((Double((rgba as NSString).substring(with: match.range(at: 1))) ?? 0) / 255.0)
+        let g = CGFloat((Double((rgba as NSString).substring(with: match.range(at: 2))) ?? 0) / 255.0)
+        let b = CGFloat((Double((rgba as NSString).substring(with: match.range(at: 3))) ?? 0) / 255.0)
+        var a: CGFloat = 1.0
+        if match.numberOfRanges >= 5, match.range(at: 4).location != NSNotFound {
+            a = CGFloat(Double((rgba as NSString).substring(with: match.range(at: 4))) ?? 1.0)
+        }
+        
+        return UIColor(red: r, green: g, blue: b, alpha: a)
+    }
+    
+    private func parseRgbColor(_ rgb: String) -> UIColor? {
+        return parseRgbaColor(rgb) // Same parsing works for rgb
     }
 
     func setSource(_ source: NSDictionary) {
@@ -883,10 +991,13 @@ extension KSPlayerView: KSPlayerLayerDelegate {
                 print("KSPlayerView: [READY TO PLAY] ERROR: No subtitle data source available")
             }
 
-            // Determine player backend type
-            let uriString = currentSource?["uri"] as? String
-            let isMKV = uriString?.lowercased().contains(".mkv") ?? false
-            let playerBackend = isMKV ? "KSMEPlayer" : "KSAVPlayer"
+            // Determine player backend type from actual player instance
+            let playerBackend: String
+            if let _ = layer.player as? KSMEPlayer {
+                playerBackend = "KSMEPlayer"
+            } else {
+                playerBackend = "KSAVPlayer"
+            }
 
             // Send onLoad event to React Native with track information
             let p = layer.player
