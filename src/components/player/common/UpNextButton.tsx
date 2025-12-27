@@ -105,7 +105,7 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
 
   // Animate vertical offset based on controls visibility
   useEffect(() => {
-    const target = controlsVisible ? -Math.max(0, controlsFixedOffset - 8) : 0;
+    const target = controlsVisible ? -(controlsFixedOffset / 2) : 0;
     Animated.timing(translateY, {
       toValue: target,
       duration: 220,

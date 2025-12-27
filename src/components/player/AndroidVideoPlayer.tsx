@@ -40,6 +40,8 @@ import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { ErrorModal } from './modals/ErrorModal';
 import { CustomSubtitles } from './subtitles/CustomSubtitles';
 import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
+import SkipIntroButton from './overlays/SkipIntroButton';
+import UpNextButton from './common/UpNextButton';
 
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
@@ -697,6 +699,41 @@ const AndroidVideoPlayer: React.FC = () => {
           season={season}
           episode={episode}
           shouldShow={playerState.isVideoLoaded && !playerState.showControls && !playerState.paused}
+        />
+
+        {/* Skip Intro Button - Shows during intro section of TV episodes */}
+        <SkipIntroButton
+          imdbId={imdbId || (id?.startsWith('tt') ? id : undefined)}
+          type={type || 'movie'}
+          season={season}
+          episode={episode}
+          currentTime={playerState.currentTime}
+          onSkip={(endTime) => controlsHook.seekToTime(endTime)}
+          controlsVisible={playerState.showControls}
+          controlsFixedOffset={100}
+        />
+
+        {/* Up Next Button - Shows near end of episodes */}
+        <UpNextButton
+          type={type || 'movie'}
+          nextEpisode={nextEpisodeHook.nextEpisode}
+          currentTime={playerState.currentTime}
+          duration={playerState.duration}
+          insets={insets}
+          isLoading={false}
+          nextLoadingProvider={null}
+          nextLoadingQuality={null}
+          nextLoadingTitle={null}
+          onPress={() => {
+            if (nextEpisodeHook.nextEpisode) {
+              logger.log(`[AndroidVideoPlayer] Opening streams for next episode: S${nextEpisodeHook.nextEpisode.season_number}E${nextEpisodeHook.nextEpisode.episode_number}`);
+              modals.setSelectedEpisodeForStreams(nextEpisodeHook.nextEpisode);
+              modals.setShowEpisodeStreamsModal(true);
+            }
+          }}
+          metadata={metadataResult?.metadata ? { poster: metadataResult.metadata.poster, id: metadataResult.metadata.id } : undefined}
+          controlsVisible={playerState.showControls}
+          controlsFixedOffset={100}
         />
       </View>
 

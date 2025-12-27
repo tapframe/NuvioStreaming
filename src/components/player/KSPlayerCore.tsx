@@ -18,12 +18,12 @@ import { ErrorModal } from './modals/ErrorModal';
 import CustomSubtitles from './subtitles/CustomSubtitles';
 import ResumeOverlay from './modals/ResumeOverlay';
 import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
+import SkipIntroButton from './overlays/SkipIntroButton';
 import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './components';
 
 // Platform-specific components
 import { KSPlayerSurface } from './ios/components/KSPlayerSurface';
 
-// Shared Hooks
 import {
   usePlayerState,
   usePlayerModals,
@@ -33,7 +33,8 @@ import {
   useCustomSubtitles,
   usePlayerControls,
   usePlayerSetup,
-  useWatchProgress
+  useWatchProgress,
+  useNextEpisode
 } from './hooks';
 
 // Platform-specific hooks
@@ -129,6 +130,15 @@ const KSPlayerCore: React.FC = () => {
   const tracks = usePlayerTracks();
   const { ksPlayerRef, seek } = useKSPlayer();
   const customSubs = useCustomSubtitles();
+
+  // Next Episode Hook
+  const { nextEpisode, currentEpisodeDescription } = useNextEpisode({
+    type,
+    season,
+    episode,
+    groupedEpisodes: groupedEpisodes as any,
+    episodeId
+  });
 
   const controls = usePlayerControls({
     playerRef: ksPlayerRef,
@@ -684,10 +694,22 @@ const KSPlayerCore: React.FC = () => {
         shouldShow={isVideoLoaded && !showControls && !paused}
       />
 
+      {/* Skip Intro Button - Shows during intro section of TV episodes */}
+      <SkipIntroButton
+        imdbId={imdbId || (id?.startsWith('tt') ? id : undefined)}
+        type={type}
+        season={season}
+        episode={episode}
+        currentTime={currentTime}
+        onSkip={(endTime) => controls.seekToTime(endTime)}
+        controlsVisible={showControls}
+        controlsFixedOffset={126}
+      />
+
       {/* Up Next Button */}
       <UpNextButton
         type={type}
-        nextEpisode={null}
+        nextEpisode={nextEpisode}
         currentTime={currentTime}
         duration={duration}
         insets={insets}
@@ -695,7 +717,13 @@ const KSPlayerCore: React.FC = () => {
         nextLoadingProvider={null}
         nextLoadingQuality={null}
         nextLoadingTitle={null}
-        onPress={() => { }}
+        onPress={() => {
+          if (nextEpisode) {
+            logger.log(`[KSPlayerCore] Opening streams for next episode: S${nextEpisode.season_number}E${nextEpisode.episode_number}`);
+            modals.setSelectedEpisodeForStreams(nextEpisode);
+            modals.setShowEpisodeStreamsModal(true);
+          }
+        }}
         metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
         controlsVisible={showControls}
         controlsFixedOffset={126}
