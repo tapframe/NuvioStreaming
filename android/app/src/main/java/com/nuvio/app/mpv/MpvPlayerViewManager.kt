@@ -190,4 +190,52 @@ class MpvPlayerViewManager(
     fun setGpuMode(view: MPVView, gpuMode: String?) {
         view.gpuMode = gpuMode ?: "gpu"
     }
+
+    // Subtitle Styling Props
+
+    @ReactProp(name = "subtitleSize", defaultInt = 48)
+    fun setSubtitleSize(view: MPVView, size: Int) {
+        view.setSubtitleSize(size)
+    }
+
+    @ReactProp(name = "subtitleColor")
+    fun setSubtitleColor(view: MPVView, color: String?) {
+        view.setSubtitleColor(color ?: "#FFFFFF")
+    }
+
+    @ReactProp(name = "subtitleBackgroundOpacity", defaultFloat = 0.0f)
+    fun setSubtitleBackgroundOpacity(view: MPVView, opacity: Float) {
+        // Black background with user-specified opacity
+        view.setSubtitleBackgroundColor("#000000", opacity)
+    }
+
+    @ReactProp(name = "subtitleBorderSize", defaultInt = 3)
+    fun setSubtitleBorderSize(view: MPVView, size: Int) {
+        view.setSubtitleBorderSize(size)
+    }
+
+    @ReactProp(name = "subtitleBorderColor")
+    fun setSubtitleBorderColor(view: MPVView, color: String?) {
+        view.setSubtitleBorderColor(color ?: "#000000")
+    }
+
+    @ReactProp(name = "subtitleShadowEnabled", defaultBoolean = true)
+    fun setSubtitleShadowEnabled(view: MPVView, enabled: Boolean) {
+        view.setSubtitleShadow(enabled, if (enabled) 2 else 0)
+    }
+
+    @ReactProp(name = "subtitlePosition", defaultInt = 100)
+    fun setSubtitlePosition(view: MPVView, pos: Int) {
+        view.setSubtitlePosition(pos)
+    }
+
+    @ReactProp(name = "subtitleDelay", defaultFloat = 0.0f)
+    fun setSubtitleDelay(view: MPVView, delay: Float) {
+        view.setSubtitleDelay(delay.toDouble())
+    }
+
+    @ReactProp(name = "subtitleAlignment")
+    fun setSubtitleAlignment(view: MPVView, align: String?) {
+        view.setSubtitleAlignment(align ?: "center")
+    }
 }

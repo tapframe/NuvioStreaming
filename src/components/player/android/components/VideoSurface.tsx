@@ -34,6 +34,16 @@ interface VideoSurfaceProps {
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
     decoderMode?: 'auto' | 'sw' | 'hw' | 'hw+';
     gpuMode?: 'gpu' | 'gpu-next';
+    // Subtitle Styling
+    subtitleSize?: number;
+    subtitleColor?: string;
+    subtitleBackgroundOpacity?: number;
+    subtitleBorderSize?: number;
+    subtitleBorderColor?: string;
+    subtitleShadowEnabled?: boolean;
+    subtitlePosition?: number;
+    subtitleDelay?: number;
+    subtitleAlignment?: 'left' | 'center' | 'right';
 }
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = ({
@@ -59,6 +69,16 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     onTracksChanged,
     decoderMode,
     gpuMode,
+    // Subtitle Styling
+    subtitleSize,
+    subtitleColor,
+    subtitleBackgroundOpacity,
+    subtitleBorderSize,
+    subtitleBorderColor,
+    subtitleShadowEnabled,
+    subtitlePosition,
+    subtitleDelay,
+    subtitleAlignment,
 }) => {
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
@@ -119,6 +139,16 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                 onTracksChanged={onTracksChanged}
                 decoderMode={decoderMode}
                 gpuMode={gpuMode}
+                // Subtitle Styling
+                subtitleSize={subtitleSize}
+                subtitleColor={subtitleColor}
+                subtitleBackgroundOpacity={subtitleBackgroundOpacity}
+                subtitleBorderSize={subtitleBorderSize}
+                subtitleBorderColor={subtitleBorderColor}
+                subtitleShadowEnabled={subtitleShadowEnabled}
+                subtitlePosition={subtitlePosition}
+                subtitleDelay={subtitleDelay}
+                subtitleAlignment={subtitleAlignment}
             />
 
             {/* Gesture overlay - transparent, on top of the player */}

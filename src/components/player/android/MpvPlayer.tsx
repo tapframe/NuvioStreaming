@@ -27,6 +27,16 @@ export interface MpvPlayerProps {
     onTracksChanged?: (data: { audioTracks: any[]; subtitleTracks: any[] }) => void;
     decoderMode?: 'auto' | 'sw' | 'hw' | 'hw+';
     gpuMode?: 'gpu' | 'gpu-next';
+    // Subtitle Styling
+    subtitleSize?: number;
+    subtitleColor?: string;
+    subtitleBackgroundOpacity?: number;
+    subtitleBorderSize?: number;
+    subtitleBorderColor?: string;
+    subtitleShadowEnabled?: boolean;
+    subtitlePosition?: number;
+    subtitleDelay?: number;
+    subtitleAlignment?: 'left' | 'center' | 'right';
 }
 
 const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
@@ -107,6 +117,16 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
             onTracksChanged={handleTracksChanged}
             decoderMode={props.decoderMode ?? 'auto'}
             gpuMode={props.gpuMode ?? 'gpu'}
+            // Subtitle Styling
+            subtitleSize={props.subtitleSize ?? 48}
+            subtitleColor={props.subtitleColor ?? '#FFFFFF'}
+            subtitleBackgroundOpacity={props.subtitleBackgroundOpacity ?? 0}
+            subtitleBorderSize={props.subtitleBorderSize ?? 3}
+            subtitleBorderColor={props.subtitleBorderColor ?? '#000000'}
+            subtitleShadowEnabled={props.subtitleShadowEnabled ?? true}
+            subtitlePosition={props.subtitlePosition ?? 100}
+            subtitleDelay={props.subtitleDelay ?? 0}
+            subtitleAlignment={props.subtitleAlignment ?? 'center'}
         />
     );
 });

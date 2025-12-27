@@ -342,6 +342,119 @@ class MPVView @JvmOverloads constructor(
         }
     }
 
+    // Subtitle Styling Methods
+    
+    fun setSubtitleSize(size: Int) {
+        if (isMpvInitialized) {
+            Log.d(TAG, "Setting subtitle size: $size")
+            MPVLib.setPropertyInt("sub-font-size", size)
+        }
+    }
+
+    fun setSubtitleColor(color: String) {
+        if (isMpvInitialized) {
+            // MPV expects color in #AARRGGBB format, but we receive #RRGGBB
+            // Convert to MPV format with full opacity
+            val mpvColor = if (color.length == 7) "#FF${color.substring(1)}" else color
+            Log.d(TAG, "Setting subtitle color: $mpvColor")
+            MPVLib.setPropertyString("sub-color", mpvColor)
+        }
+    }
+
+    fun setSubtitleBackgroundColor(color: String, opacity: Float) {
+        if (isMpvInitialized) {
+            // Convert opacity (0-1) to hex (00-FF)
+            val alphaHex = (opacity * 255).toInt().coerceIn(0, 255).let { 
+                String.format("%02X", it) 
+            }
+            // MPV format: #AARRGGBB
+            val baseColor = if (color.startsWith("#")) color.substring(1) else color
+            val mpvColor = "#${alphaHex}${baseColor.takeLast(6)}"
+            Log.d(TAG, "Setting subtitle background: $mpvColor (opacity: $opacity)")
+            MPVLib.setPropertyString("sub-back-color", mpvColor)
+        }
+    }
+
+    fun setSubtitleBorderSize(size: Int) {
+        if (isMpvInitialized) {
+            Log.d(TAG, "Setting subtitle border size: $size")
+            MPVLib.setPropertyInt("sub-border-size", size)
+        }
+    }
+
+    fun setSubtitleBorderColor(color: String) {
+        if (isMpvInitialized) {
+            val mpvColor = if (color.length == 7) "#FF${color.substring(1)}" else color
+            Log.d(TAG, "Setting subtitle border color: $mpvColor")
+            MPVLib.setPropertyString("sub-border-color", mpvColor)
+        }
+    }
+
+    fun setSubtitleShadow(enabled: Boolean, offset: Int) {
+        if (isMpvInitialized) {
+            Log.d(TAG, "Setting subtitle shadow: enabled=$enabled, offset=$offset")
+            if (enabled) {
+                MPVLib.setPropertyInt("sub-shadow-offset", offset)
+                MPVLib.setPropertyString("sub-shadow-color", "#80000000")
+            } else {
+                MPVLib.setPropertyInt("sub-shadow-offset", 0)
+            }
+        }
+    }
+
+    fun setSubtitlePosition(pos: Int) {
+        if (isMpvInitialized) {
+            // sub-pos: 0=top, 100=bottom, can go beyond 100 for more offset
+            // UI sends bottomOffset (0=at bottom, higher=more up from bottom)
+            // Convert: MPV pos = 100 - (bottomOffset / screenHeightFactor)
+            // Simplified: just pass pos directly, UI should convert
+            Log.d(TAG, "Setting subtitle position: $pos")
+            MPVLib.setPropertyInt("sub-pos", pos)
+        }
+    }
+
+    fun setSubtitleDelay(delaySec: Double) {
+        if (isMpvInitialized) {
+            Log.d(TAG, "Setting subtitle delay: $delaySec seconds")
+            MPVLib.setPropertyDouble("sub-delay", delaySec)
+        }
+    }
+
+    fun setSubtitleScale(scale: Double) {
+        if (isMpvInitialized) {
+            Log.d(TAG, "Setting subtitle scale: $scale")
+            MPVLib.setPropertyDouble("sub-scale", scale)
+        }
+    }
+
+    fun setSubtitleAlignment(align: String) {
+        if (isMpvInitialized) {
+            // MPV sub-justify values: left, center, right, auto
+            val mpvAlign = when (align) {
+                "left" -> "left"
+                "right" -> "right"
+                "center" -> "center"
+                else -> "center"
+            }
+            Log.d(TAG, "Setting subtitle alignment: $mpvAlign")
+            MPVLib.setPropertyString("sub-justify", mpvAlign)
+        }
+    }
+
+    fun setSubtitleBold(bold: Boolean) {
+        if (isMpvInitialized) {
+            Log.d(TAG, "Setting subtitle bold: $bold")
+            MPVLib.setPropertyString("sub-bold", if (bold) "yes" else "no")
+        }
+    }
+
+    fun setSubtitleItalic(italic: Boolean) {
+        if (isMpvInitialized) {
+            Log.d(TAG, "Setting subtitle italic: $italic")
+            MPVLib.setPropertyString("sub-italic", if (italic) "yes" else "no")
+        }
+    }
+
     // MPVLib.EventObserver implementation
 
     override fun eventProperty(property: String) {

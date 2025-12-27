@@ -21,7 +21,7 @@ interface SubtitleModalsProps {
   isLoadingSubtitles: boolean;
   customSubtitles: SubtitleCue[];
   availableSubtitles: WyzieSubtitle[];
-  ksTextTracks: Array<{id: number, name: string, language?: string}>;
+  ksTextTracks: Array<{ id: number, name: string, language?: string }>;
   selectedTextTrack: number;
   useCustomSubtitles: boolean;
   isKsPlayerActive?: boolean;
@@ -180,7 +180,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       <TouchableOpacity
                         key={sub.id}
                         onPress={() => { setSelectedOnlineSubtitleId(sub.id); loadWyzieSubtitle(sub); }}
-                        style={{ padding: 5,paddingLeft: 8, paddingRight: 10, borderRadius: 12, backgroundColor: selectedOnlineSubtitleId === sub.id ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', textAlignVertical: 'center' }}
+                        style={{ padding: 5, paddingLeft: 8, paddingRight: 10, borderRadius: 12, backgroundColor: selectedOnlineSubtitleId === sub.id ? 'white' : 'rgba(255,255,255,0.05)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', textAlignVertical: 'center' }}
                       >
                         <View>
                           <Text style={{ marginLeft: 5, color: selectedOnlineSubtitleId === sub.id ? 'black' : 'white', fontWeight: '600' }}>{sub.display}</Text>
@@ -328,7 +328,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ color: 'white', fontWeight: '600' }}>Align</Text>
                       <View style={{ flexDirection: 'row', gap: 8 }}>
-                        {([ { key: 'left', icon: 'format-align-left' }, { key: 'center', icon: 'format-align-center' }, { key: 'right', icon: 'format-align-right' } ] as const).map(a => (
+                        {([{ key: 'left', icon: 'format-align-left' }, { key: 'center', icon: 'format-align-center' }, { key: 'right', icon: 'format-align-right' }] as const).map(a => (
                           <TouchableOpacity key={a.key} onPress={() => setSubtitleAlign(a.key)} style={{ paddingHorizontal: isCompact ? 8 : 10, paddingVertical: isCompact ? 4 : 6, borderRadius: 8, backgroundColor: subtitleAlign === a.key ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
                             <MaterialIcons name={a.icon as any} size={18} color="#FFFFFF" />
                           </TouchableOpacity>

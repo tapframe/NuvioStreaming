@@ -570,6 +570,16 @@ const AndroidVideoPlayer: React.FC = () => {
             screenDimensions={playerState.screenDimensions}
             decoderMode={settings.decoderMode}
             gpuMode={settings.gpuMode}
+            // Subtitle Styling - pass to MPV for built-in subtitle customization
+            subtitleSize={subtitleSize}
+            subtitleColor={subtitleTextColor}
+            subtitleBackgroundOpacity={subtitleBackground ? subtitleBgOpacity : 0}
+            subtitleBorderSize={subtitleOutline ? subtitleOutlineWidth : 0}
+            subtitleBorderColor={subtitleOutlineColor}
+            subtitleShadowEnabled={subtitleTextShadow}
+            subtitlePosition={100 - Math.floor(subtitleBottomOffset / 2)} // Convert bottomOffset to MPV position
+            subtitleDelay={subtitleOffsetSec}
+            subtitleAlignment={subtitleAlign}
           />
         )}
 
