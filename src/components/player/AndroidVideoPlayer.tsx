@@ -571,13 +571,17 @@ const AndroidVideoPlayer: React.FC = () => {
             decoderMode={settings.decoderMode}
             gpuMode={settings.gpuMode}
             // Subtitle Styling - pass to MPV for built-in subtitle customization
-            subtitleSize={subtitleSize}
+            // MPV uses different scaling than React Native, so we apply conversion factors:
+            // - Font size: MPV needs ~1.5x larger values (MPV's sub-font-size vs RN fontSize)
+            // - Border: MPV needs ~1.5x larger values
+            // - Position: MPV sub-pos uses 0=top, 100=bottom, >100=below screen
+            subtitleSize={Math.round(subtitleSize * 1.5)}
             subtitleColor={subtitleTextColor}
             subtitleBackgroundOpacity={subtitleBackground ? subtitleBgOpacity : 0}
-            subtitleBorderSize={subtitleOutline ? subtitleOutlineWidth : 0}
+            subtitleBorderSize={subtitleOutline ? Math.round(subtitleOutlineWidth * 1.5) : 0}
             subtitleBorderColor={subtitleOutlineColor}
             subtitleShadowEnabled={subtitleTextShadow}
-            subtitlePosition={100 - Math.floor(subtitleBottomOffset / 2)} // Convert bottomOffset to MPV position
+            subtitlePosition={Math.max(50, 100 - Math.floor(subtitleBottomOffset * 0.3))} // Scale offset to MPV range
             subtitleDelay={subtitleOffsetSec}
             subtitleAlignment={subtitleAlign}
           />
