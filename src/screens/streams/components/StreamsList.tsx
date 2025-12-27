@@ -3,10 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  SectionList,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { LegendList } from '@legendapp/list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import StreamCard from '../../../components/StreamCard';
@@ -62,84 +62,91 @@ const StreamsList = memo(
     const insets = useSafeAreaInsets();
     const styles = React.useMemo(() => createStyles(colors), [colors]);
 
-    const renderSectionHeader = useCallback(
-      ({ section }: { section: StreamSection }) => {
-        const isProviderLoading = loadingProviders[section.addonId];
-
-        return (
-          <View style={styles.sectionHeaderContainer}>
-            <View style={styles.sectionHeaderContent}>
-              <Text style={styles.streamGroupTitle}>{section.title}</Text>
-              {isProviderLoading && (
-                <View style={styles.sectionLoadingIndicator}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={[styles.sectionLoadingText, { color: colors.primary }]}>
-                    Loading...
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        );
-      },
-      [loadingProviders, styles, colors.primary]
-    );
-
-    // Convert sections to SectionList format
-    const sectionListData = useMemo(() => {
-      return sections
+    // Flatten sections into a single list with header items
+    type ListItem = { type: 'header'; title: string; addonId: string } | { type: 'stream'; stream: Stream; index: number };
+    
+    const flatListData = useMemo(() => {
+      const items: ListItem[] = [];
+      sections
         .filter(Boolean)
         .filter(section => section!.data && section!.data.length > 0)
-        .map(section => ({
-          title: section!.title,
-          addonId: section!.addonId,
-          data: section!.data,
-        }));
+        .forEach(section => {
+          items.push({ type: 'header', title: section!.title, addonId: section!.addonId });
+          section!.data.forEach((stream, index) => {
+            items.push({ type: 'stream', stream, index });
+          });
+        });
+      return items;
     }, [sections]);
 
     const renderItem = useCallback(
-      ({ item, index }: { item: Stream; index: number }) => (
-        <StreamCard
-          stream={item}
-          onPress={() => handleStreamPress(item)}
-          index={index}
-          isLoading={false}
-          statusMessage={undefined}
-          theme={currentTheme}
-          showLogos={settings.showScraperLogos}
-          scraperLogo={
-            (item.addonId && scraperLogos[item.addonId]) ||
-            ((item as any).addon ? scraperLogos[(item.addonId || (item as any).addon) as string] || null : null)
-          }
-          showAlert={(t: string, m: string) => openAlert(t, m)}
-          parentTitle={metadata?.name}
-          parentType={type as 'movie' | 'series'}
-          parentSeason={
-            (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined
-          }
-          parentEpisode={
-            (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined
-          }
-          parentEpisodeTitle={
-            (type === 'series' || type === 'other') ? currentEpisode?.name : undefined
-          }
-          parentPosterUrl={episodeImage || metadata?.poster || undefined}
-          providerName={
-            streams &&
-            Object.keys(streams).find(pid =>
-              (streams as any)[pid]?.streams?.includes?.(item)
-            )
-          }
-          parentId={id}
-          parentImdbId={imdbId}
-        />
-      ),
-      [handleStreamPress, currentTheme, settings.showScraperLogos, scraperLogos, openAlert, metadata, type, currentEpisode, episodeImage, streams, id, imdbId]
+      ({ item }: { item: ListItem }) => {
+        if (item.type === 'header') {
+          const isProviderLoading = loadingProviders[item.addonId];
+          return (
+            <View style={styles.sectionHeaderContainer}>
+              <View style={styles.sectionHeaderContent}>
+                <Text style={styles.streamGroupTitle}>{item.title}</Text>
+                {isProviderLoading && (
+                  <View style={styles.sectionLoadingIndicator}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.sectionLoadingText, { color: colors.primary }]}>
+                      Loading...
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        }
+        
+        const stream = item.stream;
+        return (
+          <StreamCard
+            stream={stream}
+            onPress={() => handleStreamPress(stream)}
+            index={item.index}
+            isLoading={false}
+            statusMessage={undefined}
+            theme={currentTheme}
+            showLogos={settings.showScraperLogos}
+            scraperLogo={
+              (stream.addonId && scraperLogos[stream.addonId]) ||
+              ((stream as any).addon ? scraperLogos[(stream.addonId || (stream as any).addon) as string] || null : null)
+            }
+            showAlert={(t: string, m: string) => openAlert(t, m)}
+            parentTitle={metadata?.name}
+            parentType={type as 'movie' | 'series'}
+            parentSeason={
+              (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined
+            }
+            parentEpisode={
+              (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined
+            }
+            parentEpisodeTitle={
+              (type === 'series' || type === 'other') ? currentEpisode?.name : undefined
+            }
+            parentPosterUrl={episodeImage || metadata?.poster || undefined}
+            providerName={
+              streams &&
+              Object.keys(streams).find(pid =>
+                (streams as any)[pid]?.streams?.includes?.(item.stream)
+              )
+            }
+            parentId={id}
+            parentImdbId={imdbId}
+          />
+        );
+      },
+      [handleStreamPress, currentTheme, settings.showScraperLogos, scraperLogos, openAlert, metadata, type, currentEpisode, episodeImage, streams, id, imdbId, loadingProviders, styles, colors.primary]
     );
 
-    const keyExtractor = useCallback((item: Stream, index: number) => {
-      if (item && item.url) {
-        return `${item.url}-${index}`;
+    const keyExtractor = useCallback((item: ListItem, index: number) => {
+      if (item.type === 'header') {
+        return `header-${item.addonId}-${index}`;
+      }
+      if (item.stream && item.stream.url) {
+        return `stream-${item.stream.url}-${index}`;
       }
       return `empty-${index}`;
     }, []);
@@ -166,34 +173,22 @@ const StreamsList = memo(
       );
     }, [loadingStreams, loadingEpisodeStreams, hasStremioStreamProviders, styles, colors.primary]);
 
-    const getItemLayout = useCallback((data: any, index: number) => ({
-      length: 78,
-      offset: 78 * index,
-      index,
-    }), []);
-
     return (
       <View collapsable={false} style={{ flex: 1 }}>
-        <SectionList
-          sections={sectionListData}
+        {ListHeaderComponent}
+        <LegendList
+          data={flatListData}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
-          renderSectionHeader={renderSectionHeader}
-          ListHeaderComponent={ListHeaderComponent}
           ListFooterComponent={ListFooterComponent}
-          stickySectionHeadersEnabled={false}
           contentContainerStyle={[
             styles.streamsContainer,
             { paddingBottom: insets.bottom + 100 },
           ]}
           style={styles.streamsContent}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={5}
-          maxToRenderPerBatch={3}
-          updateCellsBatchingPeriod={100}
-          windowSize={3}
-          removeClippedSubviews={true}
-          getItemLayout={getItemLayout}
+          recycleItems={true}
+          estimatedItemSize={78}
         />
       </View>
     );

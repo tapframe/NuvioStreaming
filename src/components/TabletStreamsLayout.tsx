@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  SectionList,
   Platform,
   TouchableOpacity,
 } from 'react-native';
+import { LegendList } from '@legendapp/list';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -309,42 +309,56 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
       }
     }
 
-    // Convert sections to SectionList format
-    const sectionListData = sections
+    // Flatten sections into a single list with header items
+    type ListItem = { type: 'header'; title: string; addonId: string } | { type: 'stream'; stream: Stream; index: number };
+    
+    const flatListData: ListItem[] = [];
+    sections
       .filter(Boolean)
       .filter(section => section!.data && section!.data.length > 0)
-      .map(section => ({
-        title: section!.title,
-        addonId: section!.addonId,
-        data: section!.data,
-      }));
+      .forEach(section => {
+        flatListData.push({ type: 'header', title: section!.title, addonId: section!.addonId });
+        section!.data.forEach((stream, index) => {
+          flatListData.push({ type: 'stream', stream, index });
+        });
+      });
 
-    const renderItem = ({ item, index }: { item: Stream; index: number }) => (
-      <StreamCard
-        stream={item}
-        onPress={() => handleStreamPress(item)}
-        index={index}
-        isLoading={false}
-        statusMessage={undefined}
-        theme={currentTheme}
-        showLogos={settings.showScraperLogos}
-        scraperLogo={(item.addonId && scraperLogos[item.addonId]) || (item as any).addon ? scraperLogos[(item.addonId || (item as any).addon) as string] || null : null}
-        showAlert={(t: string, m: string) => openAlert(t, m)}
-        parentTitle={metadata?.name}
-        parentType={type as 'movie' | 'series'}
-        parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
-        parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
-        parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
-        parentPosterUrl={episodeImage || metadata?.poster || undefined}
-        providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(item))}
-        parentId={id}
-        parentImdbId={imdbId || undefined}
-      />
-    );
+    const renderItem = ({ item }: { item: ListItem }) => {
+      if (item.type === 'header') {
+        return renderSectionHeader({ section: { title: item.title, addonId: item.addonId } });
+      }
+      
+      const stream = item.stream;
+      return (
+        <StreamCard
+          stream={stream}
+          onPress={() => handleStreamPress(stream)}
+          index={item.index}
+          isLoading={false}
+          statusMessage={undefined}
+          theme={currentTheme}
+          showLogos={settings.showScraperLogos}
+          scraperLogo={(stream.addonId && scraperLogos[stream.addonId]) || (stream as any).addon ? scraperLogos[(stream.addonId || (stream as any).addon) as string] || null : null}
+          showAlert={(t: string, m: string) => openAlert(t, m)}
+          parentTitle={metadata?.name}
+          parentType={type as 'movie' | 'series'}
+          parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
+          parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
+          parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}
+          parentPosterUrl={episodeImage || metadata?.poster || undefined}
+          providerName={streams && Object.keys(streams).find(pid => (streams as any)[pid]?.streams?.includes?.(stream))}
+          parentId={id}
+          parentImdbId={imdbId || undefined}
+        />
+      );
+    };
 
-    const keyExtractor = (item: Stream, index: number) => {
-      if (item && item.url) {
-        return `${item.url}-${index}`;
+    const keyExtractor = (item: ListItem, index: number) => {
+      if (item.type === 'header') {
+        return `header-${item.addonId}-${index}`;
+      }
+      if (item.stream && item.stream.url) {
+        return `stream-${item.stream.url}-${index}`;
       }
       return `empty-${index}`;
     };
@@ -359,32 +373,20 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
       );
     };
 
-    const getItemLayout = (data: any, index: number) => ({
-      length: 78,
-      offset: 78 * index,
-      index,
-    });
-
     return (
-      <SectionList
-        sections={sectionListData}
+      <LegendList
+        data={flatListData}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        renderSectionHeader={({ section }) => renderSectionHeader({ section })}
         ListFooterComponent={ListFooterComponent}
-        stickySectionHeadersEnabled={false}
         contentContainerStyle={[
           styles.streamsContainer,
           { paddingBottom: insets.bottom + 100 }
         ]}
         style={styles.streamsContent}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={5}
-        maxToRenderPerBatch={3}
-        updateCellsBatchingPeriod={100}
-        windowSize={3}
-        removeClippedSubviews={true}
-        getItemLayout={getItemLayout}
+        recycleItems={true}
+        estimatedItemSize={78}
       />
     );
   };
