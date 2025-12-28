@@ -1014,16 +1014,14 @@ const SearchScreen = () => {
       >
         <View style={[styles.horizontalItemPosterContainer, {
           width: itemWidth,
-          height: undefined, // Let aspect ratio control height or keep fixed height with width? 
-          // Actually, since we derived width from fixed height, we can keep height fixed or use aspect.
-          // Using aspect ratio is safer if baseHeight changes.
+          height: undefined, // Let aspect ratio control height
           aspectRatio: aspectRatio,
           backgroundColor: currentTheme.colors.darkBackground,
-          borderColor: 'rgba(255,255,255,0.05)'
+          borderRadius: settings.posterBorderRadius ?? 12,
         }]}>
           <FastImage
             source={{ uri: item.poster || PLACEHOLDER_POSTER }}
-            style={styles.horizontalItemPoster}
+            style={[styles.horizontalItemPoster, { borderRadius: settings.posterBorderRadius ?? 12 }]}
             resizeMode={FastImage.resizeMode.cover}
           />
           {/* Bookmark and watched icons top right, bookmark to the left of watched */}
@@ -1723,10 +1721,17 @@ const styles = StyleSheet.create({
   horizontalItemPosterContainer: {
     width: HORIZONTAL_ITEM_WIDTH,
     height: HORIZONTAL_POSTER_HEIGHT,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 8,
-    borderWidth: 1,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    // Consistent shadow/elevation matching ContentItem
+    elevation: Platform.OS === 'android' ? 1 : 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
   horizontalItemPoster: {
     width: '100%',

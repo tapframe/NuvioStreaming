@@ -1089,7 +1089,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           borderColor: currentTheme.colors.border,
           shadowColor: currentTheme.colors.black,
           width: computedItemWidth,
-          height: computedItemHeight
+          height: computedItemHeight,
+          borderRadius: settings.posterBorderRadius ?? 12,
         }
       ]}
       activeOpacity={0.8}
@@ -1110,7 +1111,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             priority: FastImage.priority.high,
             cache: FastImage.cacheControl.immutable
           }}
-          style={styles.continueWatchingPoster}
+          style={[styles.continueWatchingPoster, { borderTopLeftRadius: settings.posterBorderRadius ?? 12, borderBottomLeftRadius: settings.posterBorderRadius ?? 12 }]}
           resizeMode={FastImage.resizeMode.cover}
         />
 
@@ -1348,13 +1349,15 @@ const styles = StyleSheet.create({
     width: 280,
     height: 120,
     flexDirection: 'row',
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
-    elevation: 6,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    borderWidth: 1,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   posterContainer: {
     width: 80,
@@ -1364,8 +1367,8 @@ const styles = StyleSheet.create({
   continueWatchingPoster: {
     width: '100%',
     height: '100%',
-    borderTopLeftRadius: 14,
-    borderBottomLeftRadius: 14,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
   },
   deletingOverlay: {
     position: 'absolute',
@@ -1451,26 +1454,28 @@ const styles = StyleSheet.create({
     width: POSTER_WIDTH,
     aspectRatio: 2 / 3,
     margin: 0,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
-    elevation: 8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    borderWidth: 1,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   contentItemContainer: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 12,
   },
   episodeInfoContainer: {
     position: 'absolute',

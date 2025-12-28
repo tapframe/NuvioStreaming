@@ -103,8 +103,10 @@ const DownloadItemComponent: React.FC<{
   onRequestRemove: (item: DownloadItem) => void;
 }> = React.memo(({ item, onPress, onAction, onRequestRemove }) => {
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
   const { showSuccess, showInfo } = useToast();
   const [posterUrl, setPosterUrl] = useState<string | null>(item.posterUrl || null);
+  const borderRadius = settings.posterBorderRadius ?? 12;
 
   // Try to fetch poster if not available
   useEffect(() => {
@@ -212,10 +214,10 @@ const DownloadItemComponent: React.FC<{
       activeOpacity={0.8}
     >
       {/* Poster */}
-      <View style={styles.posterContainer}>
+      <View style={[styles.posterContainer, { borderRadius }]}>
         <FastImage
           source={{ uri: optimizePosterUrl(posterUrl) }}
-          style={styles.poster}
+          style={[styles.poster, { borderRadius }]}
           resizeMode={FastImage.resizeMode.cover}
         />
         {/* Status indicator overlay */}
@@ -790,16 +792,25 @@ const styles = StyleSheet.create({
   posterContainer: {
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
-    borderRadius: 8,
+    borderRadius: 12,
     marginRight: isTablet ? 20 : 16,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#333',
+    // Consistent border styling matching ContentItem
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    // Consistent shadow/elevation
+    elevation: Platform.OS === 'android' ? 1 : 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
   poster: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    borderRadius: 12,
   },
   statusOverlay: {
     position: 'absolute',

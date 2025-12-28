@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
@@ -14,6 +15,7 @@ import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { StreamingContent } from '../../services/catalogService';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useSettings } from '../../hooks/useSettings';
 import { TMDBService } from '../../services/tmdbService';
 import { catalogService } from '../../services/catalogService';
 import CustomAlert from '../../components/CustomAlert';
@@ -33,12 +35,14 @@ interface MoreLikeThisSectionProps {
   loadingRecommendations: boolean;
 }
 
-export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({ 
-  recommendations, 
-  loadingRecommendations 
+export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
+  recommendations,
+  loadingRecommendations
 }) => {
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const borderRadius = settings.posterBorderRadius ?? 12;
 
   // Determine device type
   const deviceWidth = Dimensions.get('window').width;
@@ -91,16 +95,16 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
     try {
       // Extract TMDB ID from the tmdb:123456 format
       const tmdbId = item.id.replace('tmdb:', '');
-      
+
       // Get Stremio ID directly using catalogService
       // The catalogService.getStremioId method already handles the conversion internally
       const stremioId = await catalogService.getStremioId(item.type, tmdbId);
-      
+
       if (stremioId) {
         navigation.dispatch(
-          StackActions.push('Metadata', { 
-            id: stremioId, 
-            type: item.type 
+          StackActions.push('Metadata', {
+            id: stremioId,
+            type: item.type
           })
         );
       } else {
@@ -110,19 +114,19 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       if (__DEV__) console.error('Error navigating to recommendation:', error);
       setAlertTitle('Error');
       setAlertMessage('Unable to load this content. Please try again later.');
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertActions([{ label: 'OK', onPress: () => { } }]);
       setAlertVisible(true);
     }
   };
 
   const renderItem = ({ item }: { item: StreamingContent }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }]}
       onPress={() => handleItemPress(item)}
     >
       <FastImage
         source={{ uri: item.poster }}
-        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8 }]}
+        style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius }]}
         resizeMode={FastImage.resizeMode.cover}
       />
       <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis, fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13, lineHeight: isTV ? 20 : 18 }]} numberOfLines={2}>
@@ -144,7 +148,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   }
 
   return (
-    <View style={[styles.container, { paddingLeft: 0 }] }>
+    <View style={[styles.container, { paddingLeft: 0 }]}>
       <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis, fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20, paddingHorizontal: horizontalPadding }]}>More Like This</Text>
       <FlatList
         data={recommendations}
@@ -183,10 +187,17 @@ const styles = StyleSheet.create({
     marginRight: 12, // will be overridden responsively
   },
   poster: {
-    borderRadius: 8, // overridden responsively
+    borderRadius: 12,
     marginBottom: 8,
-    borderWidth: 1,
+    // Consistent border styling matching ContentItem
+    borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.15)',
+    // Consistent shadow/elevation
+    elevation: Platform.OS === 'android' ? 1 : 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
   },
   title: {
     fontSize: 13, // overridden responsively

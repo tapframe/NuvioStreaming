@@ -405,10 +405,10 @@ const LibraryScreen = () => {
       activeOpacity={0.7}
     >
       <View>
-        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black }]}>
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black, borderRadius: settings.posterBorderRadius ?? 12 }]}>
           <FastImage
             source={{ uri: item.poster || 'https://via.placeholder.com/300x450' }}
-            style={styles.poster}
+            style={[styles.poster, { borderRadius: settings.posterBorderRadius ?? 12 }]}
             resizeMode={FastImage.resizeMode.cover}
           />
           {item.watched && (
@@ -1063,11 +1063,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
     aspectRatio: 2 / 3,
-    elevation: 5,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    borderWidth: 1,
+    // Consistent shadow/elevation matching ContentItem
+    elevation: Platform.OS === 'android' ? 1 : 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    // Consistent border styling
+    borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.15)',
   },
   poster: {
