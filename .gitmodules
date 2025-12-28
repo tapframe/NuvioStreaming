@@ -4,3 +4,7 @@
 [submodule "xavia-ota"]
 	path = xavia-ota
 	url = https://github.com/tapframe/NuvioOTA.git
+
+[submodule "libmpv-android"]
+	path = libmpv-android
+	url = https://github.com/jarnedemeulemeester/libmpv-android.git

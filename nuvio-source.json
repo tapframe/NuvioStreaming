@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.3.2",
+          "buildVersion": "30",
+          "date": "2025-12-28",
+          "localizedDescription": "# Nuvio Media Hub – v1.3.2\n\n### New Features\n- Added **Skip Intro** feature powered by **IntroDB**  \n- Added support for **Internal Subtitle customization** for both **MPV** and **ExoPlayer**  \n  - ExoPlayer customization is currently limited  \n\n### Stability & Fixes\n- Improved **StreamScreen error handling** to prevent crashes  \n- Minor bug fixes and internal improvements",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.3.2/Stable_1-3-2.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.3.0",
           "buildVersion": "28",
           "date": "2025-12-24",
