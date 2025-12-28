@@ -973,7 +973,7 @@ const SettingsScreen: React.FC = () => {
                     <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
                       <TouchableOpacity
                         style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
-                        onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
+                        onPress={() => Linking.openURL('https://discord.gg/KVgDTjhA4H')}
                         activeOpacity={0.7}
                       >
                         <View style={styles.discordButtonContent}>
@@ -1108,7 +1108,7 @@ const SettingsScreen: React.FC = () => {
               <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
                 <TouchableOpacity
                   style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
-                  onPress={() => Linking.openURL('https://discord.gg/6w8dr3TSDN')}
+                  onPress={() => Linking.openURL('https://discord.gg/KVgDTjhA4H')}
                   activeOpacity={0.7}
                 >
                   <View style={styles.discordButtonContent}>
