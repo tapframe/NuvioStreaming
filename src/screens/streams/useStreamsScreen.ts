@@ -357,7 +357,7 @@ export const useStreamsScreen = () => {
     async (stream: Stream, options?: { headers?: Record<string, string> }) => {
       const finalHeaders = filterHeadersForVidrock(options?.headers || (stream.headers as any));
 
-      const streamsToPass = type === 'series' || (type === 'other' && selectedEpisode) ? episodeStreams : groupedStreams;
+      const streamsToPass = selectedEpisode ? episodeStreams : groupedStreams;
       const streamName = stream.name || stream.title || 'Unnamed Stream';
       const streamProvider = stream.addonId || stream.addonName || stream.name;
 
@@ -545,8 +545,7 @@ export const useStreamsScreen = () => {
   useEffect(() => {
     if (!isMounted.current) return;
 
-    const currentStreamsData =
-      metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
+    const currentStreamsData = selectedEpisode ? episodeStreams : groupedStreams;
 
     const providersWithStreams = Object.entries(currentStreamsData)
       .filter(([_, data]) => data.streams && data.streams.length > 0)
@@ -592,8 +591,7 @@ export const useStreamsScreen = () => {
     const isSpecialFilter = selectedProvider === 'all' || selectedProvider === 'grouped-plugins';
     if (isSpecialFilter) return;
 
-    const currentStreamsData =
-      metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
+    const currentStreamsData = selectedEpisode ? episodeStreams : groupedStreams;
     const hasStreamsForProvider =
       currentStreamsData[selectedProvider] &&
       currentStreamsData[selectedProvider].streams &&
@@ -675,8 +673,7 @@ export const useStreamsScreen = () => {
   // Autoplay effect
   useEffect(() => {
     if (settings.autoplayBestStream && !autoplayTriggered && isAutoplayWaiting) {
-      const streams =
-        metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
+      const streams = selectedEpisode ? episodeStreams : groupedStreams;
 
       if (Object.keys(streams).length > 0) {
         const bestStream = getBestStream(streams);
@@ -716,7 +713,7 @@ export const useStreamsScreen = () => {
   // Filter items for provider selector
   const filterItems = useMemo((): FilterItem[] => {
     const installedAddons = stremioService.getInstalledAddons();
-    const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
+    const streams = selectedEpisode ? episodeStreams : groupedStreams;
 
     const providersWithStreams = Object.keys(streams).filter(key => {
       const providerData = streams[key];
@@ -787,7 +784,7 @@ export const useStreamsScreen = () => {
 
   // Sections for stream list
   const sections = useMemo((): StreamSection[] => {
-    const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
+    const streams = selectedEpisode ? episodeStreams : groupedStreams;
     const installedAddons = stremioService.getInstalledAddons();
 
     const filteredEntries = Object.entries(streams).filter(([addonId]) => {
@@ -1014,8 +1011,9 @@ export const useStreamsScreen = () => {
   const gradientColors = useMemo(() => createGradientColors(dominantColor), [dominantColor, createGradientColors]);
 
   // Loading states
-  const isLoading = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? loadingEpisodeStreams : loadingStreams;
-  const streams = metadata?.videos && metadata.videos.length > 1 && selectedEpisode ? episodeStreams : groupedStreams;
+  // Loading states
+  const isLoading = selectedEpisode ? loadingEpisodeStreams : loadingStreams;
+  const streams = selectedEpisode ? episodeStreams : groupedStreams;
 
   const streamsEmpty =
     Object.keys(streams).length === 0 ||

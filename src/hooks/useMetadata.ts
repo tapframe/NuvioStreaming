@@ -1364,7 +1364,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   };
 
   // Extract embedded streams from metadata videos (used by PPV-style addons)
-  const extractEmbeddedStreams = useCallback(() => {
+  const extractEmbeddedStreams = useCallback((episodeIdOverride?: string) => {
     if (!metadata?.videos) return;
 
     // Check if any video has embedded streams
@@ -1378,11 +1378,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     const addonId = (metadata as any).addonId || 'embedded';
     const addonName = (metadata as any).addonName || metadata.name || 'Embedded Streams';
 
-    // Extract all streams from videos
-    const embeddedStreams: Stream[] = [];
+    // 1. Extract all streams for groupedStreams (legacy/movies behavior, or flat list)
+    const allEmbeddedStreams: Stream[] = [];
     for (const video of videosWithStreams) {
       for (const stream of video.streams) {
-        embeddedStreams.push({
+        allEmbeddedStreams.push({
           ...stream,
           name: stream.name || stream.title || video.title,
           title: stream.title || video.title,
@@ -1392,15 +1392,15 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       }
     }
 
-    if (embeddedStreams.length > 0) {
-      if (__DEV__) console.log(`✅ [extractEmbeddedStreams] Found ${embeddedStreams.length} embedded streams from ${addonName}`);
+    if (allEmbeddedStreams.length > 0) {
+      if (__DEV__) console.log(`✅ [extractEmbeddedStreams] Found ${allEmbeddedStreams.length} embedded streams from ${addonName}`);
 
       // Add to grouped streams
       setGroupedStreams(prevStreams => ({
         ...prevStreams,
         [addonId]: {
           addonName,
-          streams: embeddedStreams,
+          streams: allEmbeddedStreams,
         },
       }));
 
@@ -1412,10 +1412,44 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         return prevOrder;
       });
 
-      // Mark loading as complete since we have streams
-      setLoadingStreams(false);
+      // If we are not waiting for episode streams, we can stop loading
+      if (!loadingEpisodeStreams) {
+        setLoadingStreams(false);
+      }
     }
-  }, [metadata]);
+
+    // 2. Extract streams specifically for the selected episode
+    const episodeToUse = episodeIdOverride || selectedEpisode;
+    if (episodeToUse) {
+      const episodeVideo = videosWithStreams.find(
+        v => v.id === episodeToUse ||
+          v.id === episodeToUse.split(':').pop() || // Handle cases where ID might have prefix
+          (v.season === 0 && v.episode === 1 && videosWithStreams.length === 1) // Single item PPV edge case
+      );
+
+      if (episodeVideo && episodeVideo.streams && episodeVideo.streams.length > 0) {
+        if (__DEV__) console.log(`✅ [extractEmbeddedStreams] Found embedded streams for episode ${episodeToUse}`);
+
+        const episodeStreamsList: Stream[] = episodeVideo.streams.map((stream: any) => ({
+          ...stream,
+          name: stream.name || stream.title || episodeVideo.title,
+          title: stream.title || episodeVideo.title,
+          addonId,
+          addonName,
+        }));
+
+        setEpisodeStreams(prevStreams => ({
+          ...prevStreams,
+          [addonId]: {
+            addonName,
+            streams: episodeStreamsList,
+          },
+        }));
+
+        setLoadingEpisodeStreams(false);
+      }
+    }
+  }, [metadata, selectedEpisode, loadingEpisodeStreams]);
 
   const loadStreams = async () => {
     const startTime = Date.now();
@@ -1822,11 +1856,24 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         if (__DEV__) console.log('✅ [loadEpisodeStreams] Converted to TMDB ID:', tmdbId);
 
         // Ensure consistent format
-        stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
+        // Ensure consistent format or fallback to episodeId if parsing failed
+        // This handles cases where 'tt' is used for a unique episode ID directly
+        if (!seasonNum && !episodeNum) {
+          stremioEpisodeId = episodeId;
+        } else {
+          stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
+        }
         if (__DEV__) console.log('🔧 [loadEpisodeStreams] Normalized episode ID for addons:', stremioEpisodeId);
       } else {
         tmdbId = id;
-        stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
+        // If season/episode parsing failed (empty strings), use the raw episode ID
+        // This handles custom IDs like "ppv-event-name" that don't follow "id:s:e" format
+        if (!seasonNum && !episodeNum) {
+          // Remove 'series:' prefix if present to be safe, though parsing logic above usually handles it
+          stremioEpisodeId = episodeId.replace(/^series:/, '');
+        } else {
+          stremioEpisodeId = `${id}:${seasonNum}:${episodeNum}`;
+        }
         if (__DEV__) console.log('ℹ️ [loadEpisodeStreams] Using ID as both TMDB and Stremio ID:', tmdbId);
       }
 
@@ -1840,10 +1887,15 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       if (__DEV__) console.log('🎬 [loadEpisodeStreams] Using episode ID for Stremio addons:', stremioEpisodeId);
 
       // For collections, treat episodes as individual movies, not series
-      const contentType = isCollection ? 'movie' : 'series';
-      if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Using content type: ${contentType} for ${isCollection ? 'collection' : 'series'}`);
+      // For other types (e.g. StreamsPPV), preserve the original type unless it's explicitly 'series' logic we want
+      const contentType = isCollection ? 'movie' : type;
+      if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Using content type: ${contentType} for ${isCollection ? 'collection' : type}`);
 
       processStremioSource(contentType, stremioEpisodeId, true);
+
+      // Also extract any embedded streams from metadata for this episode
+      // Also extract any embedded streams from metadata for this episode
+      extractEmbeddedStreams(episodeId);
 
       // Monitor scraper completion status instead of using fixed timeout
       const checkEpisodeScrapersCompletion = () => {
