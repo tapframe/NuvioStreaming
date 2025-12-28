@@ -595,6 +595,18 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
+              title="Show Discover Section"
+              description="Display discover content in Search"
+              icon="compass"
+              renderControl={() => (
+                <CustomSwitch
+                  value={settings?.showDiscover ?? true}
+                  onValueChange={(value) => updateSetting('showDiscover', value)}
+                />
+              )}
+              isTablet={isTablet}
+            />
+            <SettingItem
               title="Continue Watching"
               description="Cache and playback behavior"
               icon="play-circle"

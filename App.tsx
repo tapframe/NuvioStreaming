@@ -22,6 +22,7 @@ import AppNavigator, {
   CustomNavigationDarkTheme,
   CustomDarkTheme
 } from './src/navigation/AppNavigator';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import 'react-native-reanimated';
 import { CatalogProvider } from './src/contexts/CatalogContext';
 import { GenreProvider } from './src/contexts/GenreContext';
@@ -245,19 +246,21 @@ const ThemedApp = () => {
 function App(): React.JSX.Element {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <GenreProvider>
-        <CatalogProvider>
-          <TraktProvider>
-            <ThemeProvider>
-              <TrailerProvider>
-                <ToastProvider>
-                  <ThemedApp />
-                </ToastProvider>
-              </TrailerProvider>
-            </ThemeProvider>
-          </TraktProvider>
-        </CatalogProvider>
-      </GenreProvider>
+      <BottomSheetModalProvider>
+        <GenreProvider>
+          <CatalogProvider>
+            <TraktProvider>
+              <ThemeProvider>
+                <TrailerProvider>
+                  <ToastProvider>
+                    <ThemedApp />
+                  </ToastProvider>
+                </TrailerProvider>
+              </ThemeProvider>
+            </TraktProvider>
+          </CatalogProvider>
+        </GenreProvider>
+      </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
 }
