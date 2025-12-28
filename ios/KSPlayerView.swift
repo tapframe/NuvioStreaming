@@ -9,7 +9,6 @@ import Foundation
 import KSPlayer
 import React
 import AVKit
-import SwiftUI
 
 @objc(KSPlayerView)
 class KSPlayerView: UIView {
@@ -18,12 +17,7 @@ class KSPlayerView: UIView {
     private var isPaused = false
     private var currentVolume: Float = 1.0
     weak var viewManager: KSPlayerViewManager?
-    
-    // Store constraint references for dynamic updates
-    private var subtitleBottomConstraint: NSLayoutConstraint?
 
-    // AirPlay properties (removed duplicate declarations)
-    
     // Event blocks for Fabric
     @objc var onLoad: RCTDirectEventBlock?
     @objc var onProgress: RCTDirectEventBlock?
@@ -84,34 +78,11 @@ class KSPlayerView: UIView {
         }
     }
     
-    @objc var subtitleBottomOffset: NSNumber = 60 {
-        didSet {
-            print("KSPlayerView: [PROP SETTER] subtitleBottomOffset setter called with value: \(subtitleBottomOffset.floatValue)")
-            updateSubtitlePositioning()
-        }
-    }
-
-    @objc var subtitleFontSize: NSNumber = 16 {
-        didSet {
-            let size = CGFloat(truncating: subtitleFontSize)
-            print("KSPlayerView: [PROP SETTER] subtitleFontSize setter called with value: \(size)")
-            updateSubtitleFont(size: size)
-        }
-    }
-    
-    @objc var subtitleTextColor: NSString = "#FFFFFF" {
-        didSet {
-            print("KSPlayerView: [PROP SETTER] subtitleTextColor setter called with value: \(subtitleTextColor)")
-            updateSubtitleColors()
-        }
-    }
-    
-    @objc var subtitleBackgroundColor: NSString = "rgba(0,0,0,0.7)" {
-        didSet {
-            print("KSPlayerView: [PROP SETTER] subtitleBackgroundColor setter called with value: \(subtitleBackgroundColor)")
-            updateSubtitleColors()
-        }
-    }
+    // Subtitle customization props removed - using native KSPlayer styling
+    @objc var subtitleBottomOffset: NSNumber = 60
+    @objc var subtitleFontSize: NSNumber = 16
+    @objc var subtitleTextColor: NSString = "#FFFFFF"
+    @objc var subtitleBackgroundColor: NSString = "rgba(0,0,0,0.7)"
     
     @objc var resizeMode: NSString = "contain" {
         didSet {
@@ -123,13 +94,11 @@ class KSPlayerView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupPlayerView()
-        setupCustomSubtitlePositioning()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupPlayerView()
-        setupCustomSubtitlePositioning()
     }
 
     private func setupPlayerView() {
@@ -152,88 +121,9 @@ class KSPlayerView: UIView {
             playerView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
 
-        // Ensure subtitle views are visible and on top
-        // KSPlayer's subtitleLabel renders internal subtitles
-        playerView.subtitleLabel.isHidden = false
-        playerView.subtitleBackView.isHidden = false
-        // Move subtitle view to main container for independence from video transformations
-        playerView.subtitleBackView.removeFromSuperview()
-        self.addSubview(playerView.subtitleBackView)
-        self.bringSubviewToFront(playerView.subtitleBackView)
-        print("KSPlayerView: [SETUP] Subtitle views made visible")
-        print("KSPlayerView: [SETUP] subtitleLabel.isHidden: \(playerView.subtitleLabel.isHidden)")
-        print("KSPlayerView: [SETUP] subtitleBackView.isHidden: \(playerView.subtitleBackView.isHidden)")
-        print("KSPlayerView: [SETUP] subtitleLabel.frame: \(playerView.subtitleLabel.frame)")
-        print("KSPlayerView: [SETUP] subtitleBackView.frame: \(playerView.subtitleBackView.frame)")
-
-        // Set up player delegates and callbacks
+        // Let KSPlayer handle subtitles natively - no custom positioning
+        // Just set up player delegates and callbacks
         setupPlayerCallbacks()
-    }
-    
-    private func setupCustomSubtitlePositioning() {
-        // Wait for the player view to be fully set up before modifying subtitle positioning
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.adjustSubtitlePositioning()
-        }
-    }
-    
-    private func adjustSubtitlePositioning() {
-        // Remove existing constraints for subtitle positioning
-        playerView.subtitleBackView.removeFromSuperview()
-        // Add subtitle view to main container (self) instead of playerView to make it independent of video transformations
-        self.addSubview(playerView.subtitleBackView)
-        // Ensure subtitles are always on top of video
-        self.bringSubviewToFront(playerView.subtitleBackView)
-        
-        // Re-add subtitle label to subtitle back view
-        playerView.subtitleBackView.addSubview(playerView.subtitleLabel)
-        
-        // Set up new constraints for better mobile visibility
-        playerView.subtitleBackView.translatesAutoresizingMaskIntoConstraints = false
-        playerView.subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Store the bottom constraint reference for dynamic updates
-        // Constrain to main container (self) instead of playerView to make subtitles independent of video transformations
-        subtitleBottomConstraint = playerView.subtitleBackView.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -CGFloat(subtitleBottomOffset.floatValue))
-        
-        NSLayoutConstraint.activate([
-            // Position subtitles using dynamic offset from React Native
-            subtitleBottomConstraint!,
-            playerView.subtitleBackView.centerXAnchor.constraint(equalTo: self.centerXAnchor),
-            playerView.subtitleBackView.widthAnchor.constraint(lessThanOrEqualTo: self.widthAnchor, constant: -20),
-            playerView.subtitleBackView.heightAnchor.constraint(lessThanOrEqualToConstant: 100),
-            
-            // Subtitle label constraints within the back view
-            playerView.subtitleLabel.leadingAnchor.constraint(equalTo: playerView.subtitleBackView.leadingAnchor, constant: 10),
-            playerView.subtitleLabel.trailingAnchor.constraint(equalTo: playerView.subtitleBackView.trailingAnchor, constant: -10),
-            playerView.subtitleLabel.topAnchor.constraint(equalTo: playerView.subtitleBackView.topAnchor, constant: 5),
-            playerView.subtitleLabel.bottomAnchor.constraint(equalTo: playerView.subtitleBackView.bottomAnchor, constant: -5),
-        ])
-        
-        // Ensure subtitle views are initially hidden
-        playerView.subtitleBackView.isHidden = true
-        playerView.subtitleLabel.isHidden = true
-        
-        print("KSPlayerView: Custom subtitle positioning applied - positioned \(subtitleBottomOffset.floatValue)pts from bottom for mobile visibility")
-    }
-    
-    private func updateSubtitlePositioning() {
-        // Update subtitle positioning when offset changes
-        print("KSPlayerView: [OFFSET UPDATE] subtitleBottomOffset changed to: \(subtitleBottomOffset.floatValue)")
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            print("KSPlayerView: [OFFSET UPDATE] Applying new positioning with offset: \(self.subtitleBottomOffset.floatValue)")
-            
-            // Update the existing constraint instead of recreating everything
-            if let bottomConstraint = self.subtitleBottomConstraint {
-                bottomConstraint.constant = -CGFloat(self.subtitleBottomOffset.floatValue)
-                print("KSPlayerView: [OFFSET UPDATE] Updated constraint constant to: \(bottomConstraint.constant)")
-            } else {
-                // Fallback: recreate positioning if constraint reference is missing
-                print("KSPlayerView: [OFFSET UPDATE] No constraint reference found, recreating positioning")
-                self.adjustSubtitlePositioning()
-            }
-        }
     }
     
     private func applyVideoGravity() {
@@ -266,116 +156,11 @@ class KSPlayerView: UIView {
         KSOptions.asynchronousDecompression = true
         KSOptions.hardwareDecode = true
         
-        // Set default subtitle font size - use standard size for readability
-        SubtitleModel.textFontSize = 20.0  // Moderate size that works on most devices
+        // Set default subtitle font size - use smaller size for mobile
+        SubtitleModel.textFontSize = 16.0
         SubtitleModel.textBold = false
         
         print("KSPlayerView: [PERF] Global settings: asyncDecomp=\(KSOptions.asynchronousDecompression), hwDecode=\(KSOptions.hardwareDecode)")
-    }
-
-    private func updateSubtitleFont(size: CGFloat) {
-        // Update KSPlayer subtitle font size via SubtitleModel
-        SubtitleModel.textFontSize = size
-        // Also directly apply to current label for immediate effect
-        playerView.subtitleLabel.font = SubtitleModel.textFont
-        // Re-render current subtitle parts to apply font
-        if let currentTime = playerView.playerLayer?.player.currentPlaybackTime {
-            _ = playerView.srtControl.subtitle(currentTime: currentTime)
-        }
-        print("KSPlayerView: [FONT UPDATE] Applied subtitle font size: \(size)")
-    }
-    
-    private func updateSubtitleColors() {
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Parse and apply text color
-            let textColor = self.parseColor(self.subtitleTextColor as String) ?? .white
-            self.playerView.subtitleLabel.textColor = textColor
-            SubtitleModel.textColor = SwiftUI.Color(textColor)
-            
-            // Parse and apply background color
-            let bgColor = self.parseColor(self.subtitleBackgroundColor as String) ?? UIColor.black.withAlphaComponent(0.7)
-            self.playerView.subtitleBackView.backgroundColor = bgColor
-            SubtitleModel.textBackgroundColor = SwiftUI.Color(bgColor)
-            
-            print("KSPlayerView: [COLOR UPDATE] Applied textColor: \(self.subtitleTextColor), bgColor: \(self.subtitleBackgroundColor)")
-        }
-    }
-    
-    private func parseColor(_ colorString: String) -> UIColor? {
-        let trimmed = colorString.trimmingCharacters(in: .whitespaces)
-        
-        // Handle hex colors (#RGB, #RRGGBB, #RRGGBBAA)
-        if trimmed.hasPrefix("#") {
-            return parseHexColor(trimmed)
-        }
-        
-        // Handle rgba(r, g, b, a) format
-        if trimmed.lowercased().hasPrefix("rgba") {
-            return parseRgbaColor(trimmed)
-        }
-        
-        // Handle rgb(r, g, b) format
-        if trimmed.lowercased().hasPrefix("rgb") {
-            return parseRgbColor(trimmed)
-        }
-        
-        return nil
-    }
-    
-    private func parseHexColor(_ hex: String) -> UIColor? {
-        var hexString = hex.trimmingCharacters(in: .whitespaces).uppercased()
-        if hexString.hasPrefix("#") {
-            hexString.remove(at: hexString.startIndex)
-        }
-        
-        var rgbValue: UInt64 = 0
-        Scanner(string: hexString).scanHexInt64(&rgbValue)
-        
-        switch hexString.count {
-        case 3: // RGB (12-bit)
-            let r = CGFloat((rgbValue & 0xF00) >> 8) / 15.0
-            let g = CGFloat((rgbValue & 0x0F0) >> 4) / 15.0
-            let b = CGFloat(rgbValue & 0x00F) / 15.0
-            return UIColor(red: r, green: g, blue: b, alpha: 1.0)
-        case 6: // RRGGBB (24-bit)
-            let r = CGFloat((rgbValue & 0xFF0000) >> 16) / 255.0
-            let g = CGFloat((rgbValue & 0x00FF00) >> 8) / 255.0
-            let b = CGFloat(rgbValue & 0x0000FF) / 255.0
-            return UIColor(red: r, green: g, blue: b, alpha: 1.0)
-        case 8: // RRGGBBAA (32-bit)
-            let r = CGFloat((rgbValue & 0xFF000000) >> 24) / 255.0
-            let g = CGFloat((rgbValue & 0x00FF0000) >> 16) / 255.0
-            let b = CGFloat((rgbValue & 0x0000FF00) >> 8) / 255.0
-            let a = CGFloat(rgbValue & 0x000000FF) / 255.0
-            return UIColor(red: r, green: g, blue: b, alpha: a)
-        default:
-            return nil
-        }
-    }
-    
-    private func parseRgbaColor(_ rgba: String) -> UIColor? {
-        let pattern = "rgba?\\s*\\(\\s*([0-9.]+)\\s*,\\s*([0-9.]+)\\s*,\\s*([0-9.]+)\\s*(?:,\\s*([0-9.]+))?\\s*\\)"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(in: rgba, range: NSRange(rgba.startIndex..., in: rgba)),
-              match.numberOfRanges >= 4 else {
-            return nil
-        }
-        
-        let r = CGFloat((Double((rgba as NSString).substring(with: match.range(at: 1))) ?? 0) / 255.0)
-        let g = CGFloat((Double((rgba as NSString).substring(with: match.range(at: 2))) ?? 0) / 255.0)
-        let b = CGFloat((Double((rgba as NSString).substring(with: match.range(at: 3))) ?? 0) / 255.0)
-        var a: CGFloat = 1.0
-        if match.numberOfRanges >= 5, match.range(at: 4).location != NSNotFound {
-            a = CGFloat(Double((rgba as NSString).substring(with: match.range(at: 4))) ?? 1.0)
-        }
-        
-        return UIColor(red: r, green: g, blue: b, alpha: a)
-    }
-    
-    private func parseRgbColor(_ rgb: String) -> UIColor? {
-        return parseRgbaColor(rgb) // Same parsing works for rgb
     }
 
     func setSource(_ source: NSDictionary) {
@@ -929,14 +714,11 @@ extension KSPlayerView: KSPlayerLayerDelegate {
             let hasSubtitleDataSource = layer.player.subtitleDataSouce != nil
             print("KSPlayerView: [READY TO PLAY] subtitle data source available: \(hasSubtitleDataSource)")
             
-            // Ensure subtitle views are visible
-            playerView.subtitleLabel.isHidden = false
-            playerView.subtitleBackView.isHidden = false
-            print("KSPlayerView: [READY TO PLAY] Verified subtitle views are visible")
-            print("KSPlayerView: [READY TO PLAY] subtitleLabel.isHidden: \(playerView.subtitleLabel.isHidden)")
-            print("KSPlayerView: [READY TO PLAY] subtitleBackView.isHidden: \(playerView.subtitleBackView.isHidden)")
-            print("KSPlayerView: [READY TO PLAY] subtitleLabel.frame: \(playerView.subtitleLabel.frame)")
-            print("KSPlayerView: [READY TO PLAY] subtitleBackView.frame: \(playerView.subtitleBackView.frame)")
+            // Keep subtitle views hidden until actual content is displayed
+            // They will be shown in the subtitle rendering callback when there's text to display
+            playerView.subtitleLabel.isHidden = true
+            playerView.subtitleBackView.isHidden = true
+            print("KSPlayerView: [READY TO PLAY] Subtitle views kept hidden until content available")
             
             // Manually connect subtitle data source to srtControl (this is the missing piece!)
             if let subtitleDataSouce = layer.player.subtitleDataSouce {
