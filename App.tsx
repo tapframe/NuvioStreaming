@@ -44,8 +44,9 @@ import { mmkvStorage } from './src/services/mmkvStorage';
 import AnnouncementOverlay from './src/components/AnnouncementOverlay';
 import { CampaignManager } from './src/components/promotions/CampaignManager';
 
-// Only initialize Sentry on native platforms
-if (Platform.OS !== 'web') {
+// Only initialize Sentry on mobile native platforms (not web or Windows)
+const isMobileNative = Platform.OS === 'ios' || Platform.OS === 'android';
+if (isMobileNative) {
   Sentry.init({
     dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
 
@@ -65,6 +66,7 @@ if (Platform.OS !== 'web') {
     // spotlight: __DEV__,
   });
 }
+
 
 // Force LTR layout to prevent RTL issues when Arabic is set as system language
 // This ensures posters and UI elements remain visible and properly positioned
@@ -274,5 +276,5 @@ const styles = StyleSheet.create({
   },
 });
 
-// Only wrap with Sentry on native platforms
-export default Platform.OS !== 'web' ? Sentry.wrap(App) : App;
+// Only wrap with Sentry on mobile native platforms (iOS/Android)
+export default isMobileNative ? Sentry.wrap(App) : App;

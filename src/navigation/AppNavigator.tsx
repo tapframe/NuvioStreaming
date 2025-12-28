@@ -49,6 +49,15 @@ import DownloadsScreen from '../screens/DownloadsScreen';
 import MetadataScreen from '../screens/MetadataScreen';
 import KSPlayerCore from '../components/player/KSPlayerCore';
 import AndroidVideoPlayer from '../components/player/AndroidVideoPlayer';
+// Windows video player - conditionally imported
+let WindowsVideoPlayer: any = null;
+if (Platform.OS === 'windows') {
+  try {
+    WindowsVideoPlayer = require('../components/player/windows/WindowsVideoPlayer').default;
+  } catch {
+    WindowsVideoPlayer = null;
+  }
+}
 import CatalogScreen from '../screens/CatalogScreen';
 import AddonsScreen from '../screens/AddonsScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -144,6 +153,26 @@ export type RootStackParamList = {
     groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
   PlayerAndroid: {
+    uri: string;
+    title?: string;
+    season?: number;
+    episode?: number;
+    episodeTitle?: string;
+    quality?: string;
+    year?: number;
+    streamProvider?: string;
+    streamName?: string;
+    headers?: { [key: string]: string };
+    id?: string;
+    type?: string;
+    episodeId?: string;
+    imdbId?: string;
+    availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
+    backdrop?: string;
+    videoType?: string;
+    groupedEpisodes?: { [seasonNumber: number]: any[] };
+  };
+  PlayerWindows: {
     uri: string;
     title?: string;
     season?: number;
@@ -1315,6 +1344,23 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 freezeOnBlur: true,
               }}
             />
+            {/* Windows Video Player */}
+            {Platform.OS === 'windows' && WindowsVideoPlayer && (
+              <Stack.Screen
+                name="PlayerWindows"
+                component={WindowsVideoPlayer as any}
+                options={{
+                  animation: 'none',
+                  animationDuration: 0,
+                  presentation: 'card',
+                  gestureEnabled: false,
+                  contentStyle: {
+                    backgroundColor: '#000000',
+                  },
+                  freezeOnBlur: true,
+                }}
+              />
+            )}
             <Stack.Screen
               name="Catalog"
               component={CatalogScreen as any}

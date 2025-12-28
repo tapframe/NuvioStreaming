@@ -12,6 +12,20 @@ export interface PlayerSelectionOptions {
   platform?: typeof Platform.OS;
 }
 
+// Player component types based on platform
+export type PlayerComponentName =
+  | 'AndroidVideoPlayer'
+  | 'KSPlayerCore'
+  | 'WindowsVideoPlayer'
+  | 'WebVideoPlayer';
+
+/**
+ * Check if current platform is a desktop platform
+ */
+export const isDesktopPlatform = (platform = Platform.OS): boolean => {
+  return platform === 'windows' || platform === 'macos';
+};
+
 /**
  * Determines which player should be used for a given stream
  */
@@ -31,6 +45,11 @@ export const shouldUseKSPlayer = ({
     return true;
   }
 
+  // Windows uses WindowsVideoPlayer (placeholder for now)
+  if (platform === 'windows') {
+    return false;
+  }
+
   // Default fallback
   return false;
 };
@@ -38,6 +57,16 @@ export const shouldUseKSPlayer = ({
 /**
  * Get the appropriate player component name
  */
-export const getPlayerComponent = (options: PlayerSelectionOptions): 'AndroidVideoPlayer' | 'KSPlayerCore' => {
+export const getPlayerComponent = (options: PlayerSelectionOptions): PlayerComponentName => {
+  const platform = options.platform ?? Platform.OS;
+
+  if (platform === 'windows') {
+    return 'WindowsVideoPlayer';
+  }
+
+  if (platform === 'web') {
+    return 'WebVideoPlayer';
+  }
+
   return shouldUseKSPlayer(options) ? 'KSPlayerCore' : 'AndroidVideoPlayer';
 };
