@@ -298,16 +298,26 @@ const AndroidVideoPlayer: React.FC = () => {
     // Handle Resume - check both initialPosition and initialSeekTargetRef
     const resumeTarget = watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
     if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && videoDuration > 0) {
-      console.log('[AndroidVideoPlayer] Seeking to resume position:', resumeTarget, 'duration:', videoDuration);
-      // Use a small delay to ensure the player is ready, then seek directly
+      const seekPosition = Math.min(resumeTarget, videoDuration - 0.5);
+      console.log('[AndroidVideoPlayer] Seeking to resume position:', seekPosition, 'duration:', videoDuration, 'useExoPlayer:', useExoPlayer);
+
+      // Use a small delay to ensure the player is ready
+      // Directly use refs to avoid stale closure issues
       setTimeout(() => {
-        if (mpvPlayerRef.current) {
-          console.log('[AndroidVideoPlayer] Calling mpvPlayerRef.current.seek directly');
-          mpvPlayerRef.current.seek(Math.min(resumeTarget, videoDuration - 0.5));
+        console.log('[AndroidVideoPlayer] Executing resume seek to:', seekPosition, 'ExoPlayer available:', !!exoPlayerRef.current, 'MPV available:', !!mpvPlayerRef.current);
+
+        if (useExoPlayer && exoPlayerRef.current) {
+          console.log('[AndroidVideoPlayer] Seeking ExoPlayer to resume position:', seekPosition);
+          exoPlayerRef.current.seek(seekPosition);
+        } else if (mpvPlayerRef.current) {
+          console.log('[AndroidVideoPlayer] Seeking MPV to resume position:', seekPosition);
+          mpvPlayerRef.current.seek(seekPosition);
+        } else {
+          console.warn('[AndroidVideoPlayer] No player ref available for resume seek');
         }
-      }, 200);
+      }, 300);
     }
-  }, [id, type, episodeId, playerState.isMounted, watchProgress.initialPosition]);
+  }, [id, type, episodeId, playerState.isMounted, watchProgress.initialPosition, useExoPlayer]);
 
   const handleProgress = useCallback((data: any) => {
     if (playerState.isDragging.current || playerState.isSeeking.current || !playerState.isMounted.current || setupHook.isAppBackgrounded.current) return;
