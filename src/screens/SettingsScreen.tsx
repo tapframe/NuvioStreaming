@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ import TraktIcon from '../components/icons/TraktIcon';
 import TMDBIcon from '../components/icons/TMDBIcon';
 import MDBListIcon from '../components/icons/MDBListIcon';
 import { campaignService } from '../services/campaignService';
+import { useScrollToTop } from '../contexts/ScrollToTopContext';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -319,6 +320,17 @@ const SettingsScreen: React.FC = () => {
   const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
   const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
   const [isCountingUp, setIsCountingUp] = useState<boolean>(false);
+
+  // Scroll to top ref and handler
+  const mobileScrollViewRef = useRef<ScrollView>(null);
+  const tabletScrollViewRef = useRef<ScrollView>(null);
+
+  const scrollToTop = useCallback(() => {
+    mobileScrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    tabletScrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  useScrollToTop('Settings', scrollToTop);
 
   // Add a useEffect to check Trakt authentication status on focus
   useEffect(() => {
@@ -923,6 +935,7 @@ const SettingsScreen: React.FC = () => {
             }
           ]}>
             <ScrollView
+              ref={tabletScrollViewRef}
               style={styles.tabletScrollView}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.tabletScrollContent}
@@ -1005,6 +1018,14 @@ const SettingsScreen: React.FC = () => {
                     />
                   </View>
 
+                  <View style={styles.brandLogoContainer}>
+                    <FastImage
+                      source={require('../../assets/nuviotext.png')}
+                      style={styles.brandLogo}
+                      resizeMode={FastImage.resizeMode.contain}
+                    />
+                  </View>
+
                   <View style={styles.footer}>
                     <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
                       Made with ❤️ by Tapframe and Friends
@@ -1040,6 +1061,7 @@ const SettingsScreen: React.FC = () => {
 
         <View style={styles.contentContainer}>
           <ScrollView
+            ref={mobileScrollViewRef}
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
@@ -1128,6 +1150,14 @@ const SettingsScreen: React.FC = () => {
                 loop
                 style={styles.monkeyAnimation}
                 resizeMode="contain"
+              />
+            </View>
+
+            <View style={styles.brandLogoContainer}>
+              <FastImage
+                source={require('../../assets/nuviotext.png')}
+                style={styles.brandLogo}
+                resizeMode={FastImage.resizeMode.contain}
               />
             </View>
 
@@ -1368,7 +1398,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 0,
-    marginBottom: 12,
+    marginBottom: 48,
   },
   footerText: {
     fontSize: 13,
@@ -1437,11 +1467,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 0,
-    marginBottom: 32,
+    marginBottom: 16,
   },
   monkeyAnimation: {
     width: 180,
     height: 180,
+  },
+  brandLogoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 0,
+    marginBottom: 16,
+    opacity: 0.8,
+  },
+  brandLogo: {
+    width: 120,
+    height: 40,
   },
 });
 

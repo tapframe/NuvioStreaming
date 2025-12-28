@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ScreenHeader from '../components/common/ScreenHeader';
+import { useScrollToTop } from '../contexts/ScrollToTopContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -237,6 +238,14 @@ const SearchScreen = () => {
   const isInitialMount = useRef(true);
   // Track mount status for async operations
   const isMounted = useRef(true);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Scroll to top handler
+  const scrollToTop = useCallback(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  useScrollToTop('Search', scrollToTop);
 
   useEffect(() => {
     isMounted.current = true;
@@ -994,6 +1003,7 @@ const SearchScreen = () => {
           </View>
         ) : (
           <ScrollView
+            ref={scrollViewRef}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollViewContent}
             keyboardShouldPersistTaps="handled"

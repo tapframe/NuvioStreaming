@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ import type { DownloadItem } from '../contexts/DownloadsContext';
 import { useToast } from '../contexts/ToastContext';
 import CustomAlert from '../components/CustomAlert';
 import ScreenHeader from '../components/common/ScreenHeader';
+import { useScrollToTop } from '../contexts/ScrollToTopContext';
 
 const { height, width } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -355,6 +356,14 @@ const DownloadsScreen: React.FC = () => {
   const [showHelpAlert, setShowHelpAlert] = useState(false);
   const [showRemoveAlert, setShowRemoveAlert] = useState(false);
   const [pendingRemoveItem, setPendingRemoveItem] = useState<DownloadItem | null>(null);
+  const flatListRef = useRef<FlatList>(null);
+
+  // Scroll to top handler
+  const scrollToTop = useCallback(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  useScrollToTop('Downloads', scrollToTop);
 
   // Filter downloads based on selected filter
   const filteredDownloads = useMemo(() => {
@@ -656,6 +665,7 @@ const DownloadsScreen: React.FC = () => {
         <EmptyDownloadsState navigation={navigation} />
       ) : (
         <FlatList
+          ref={flatListRef}
           data={filteredDownloads}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (

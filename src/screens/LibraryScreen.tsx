@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import { Share } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
@@ -38,6 +38,7 @@ import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { traktService, TraktService, TraktImages } from '../services/traktService';
 import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
 import { useSettings } from '../hooks/useSettings';
+import { useScrollToTop } from '../contexts/ScrollToTopContext';
 
 interface LibraryItem extends StreamingContent {
   progress?: number;
@@ -225,6 +226,14 @@ const LibraryScreen = () => {
   const insets = useSafeAreaInsets();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
+  const flashListRef = useRef<any>(null);
+
+  // Scroll to top handler
+  const scrollToTop = useCallback(() => {
+    flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  useScrollToTop('Library', scrollToTop);
 
   const {
     isAuthenticated: traktAuthenticated,
@@ -733,6 +742,7 @@ const LibraryScreen = () => {
 
       return (
         <FlashList
+          ref={flashListRef}
           data={traktFolders}
           renderItem={({ item }) => renderTraktCollectionFolder({ folder: item })}
           keyExtractor={item => item.id}
@@ -774,6 +784,7 @@ const LibraryScreen = () => {
 
     return (
       <FlashList
+        ref={flashListRef}
         data={folderItems}
         renderItem={({ item }) => renderTraktItem({ item })}
         keyExtractor={(item) => `${item.type}-${item.id}`}
@@ -874,6 +885,7 @@ const LibraryScreen = () => {
 
     return (
       <FlashList
+        ref={flashListRef}
         data={filteredItems}
         renderItem={({ item }) => renderItem({ item: item as LibraryItem })}
         keyExtractor={item => item.id}

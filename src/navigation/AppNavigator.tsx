@@ -16,6 +16,7 @@ import { Stream } from '../types/streams';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { PostHogProvider } from 'posthog-react-native';
+import { ScrollToTopProvider, useScrollToTopEmitter } from '../contexts/ScrollToTopContext';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback
 let GlassViewComp: any = null;
@@ -581,6 +582,7 @@ const MainTabs = () => {
   const isIosTablet = Platform.OS === 'ios' && isTablet;
   const [hidden, setHidden] = React.useState(HeaderVisibility.isHidden());
   React.useEffect(() => HeaderVisibility.subscribe(setHidden), []);
+  const emitScrollToTop = useScrollToTopEmitter();
   // Smooth animate header hide/show
   const headerAnim = React.useRef(new Animated.Value(0)).current; // 0: shown, 1: hidden
   React.useEffect(() => {
@@ -674,7 +676,10 @@ const MainTabs = () => {
                   target: route.key,
                   canPreventDefault: true,
                 });
-                if (!isFocused && !event.defaultPrevented) {
+                if (isFocused) {
+                  // Same tab pressed - emit scroll to top
+                  emitScrollToTop(route.name);
+                } else if (!event.defaultPrevented) {
                   props.navigation.navigate(route.name);
                 }
               };
@@ -789,7 +794,10 @@ const MainTabs = () => {
                   canPreventDefault: true,
                 });
 
-                if (!isFocused && !event.defaultPrevented) {
+                if (isFocused) {
+                  // Same tab pressed - emit scroll to top
+                  emitScrollToTop(route.name);
+                } else if (!event.defaultPrevented) {
                   props.navigation.navigate(route.name);
                 }
               };
@@ -893,6 +901,13 @@ const MainTabs = () => {
               tabBarIcon: () => ({ sfSymbol: 'house' }),
               freezeOnBlur: true,
             }}
+            listeners={({ navigation }) => ({
+              tabPress: (e) => {
+                if (navigation.isFocused()) {
+                  emitScrollToTop('Home');
+                }
+              },
+            })}
           />
           <IOSTab.Screen
             name="Library"
@@ -901,6 +916,13 @@ const MainTabs = () => {
               title: 'Library',
               tabBarIcon: () => ({ sfSymbol: 'heart' }),
             }}
+            listeners={({ navigation }) => ({
+              tabPress: (e) => {
+                if (navigation.isFocused()) {
+                  emitScrollToTop('Library');
+                }
+              },
+            })}
           />
           <IOSTab.Screen
             name="Search"
@@ -909,6 +931,13 @@ const MainTabs = () => {
               title: 'Search',
               tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
             }}
+            listeners={({ navigation }) => ({
+              tabPress: (e) => {
+                if (navigation.isFocused()) {
+                  emitScrollToTop('Search');
+                }
+              },
+            })}
           />
           {downloadsEnabled && (
             <IOSTab.Screen
@@ -918,6 +947,13 @@ const MainTabs = () => {
                 title: 'Downloads',
                 tabBarIcon: () => ({ sfSymbol: 'arrow.down.circle' }),
               }}
+              listeners={({ navigation }) => ({
+                tabPress: (e) => {
+                  if (navigation.isFocused()) {
+                    emitScrollToTop('Downloads');
+                  }
+                },
+              })}
             />
           )}
           <IOSTab.Screen
@@ -927,6 +963,13 @@ const MainTabs = () => {
               title: 'Settings',
               tabBarIcon: () => ({ sfSymbol: 'gear' }),
             }}
+            listeners={({ navigation }) => ({
+              tabPress: (e) => {
+                if (navigation.isFocused()) {
+                  emitScrollToTop('Settings');
+                }
+              },
+            })}
           />
         </IOSTab.Navigator>
       </View>
@@ -1612,9 +1655,11 @@ const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStack
       host: "https://us.i.posthog.com",
     }}
   >
-    <LoadingProvider>
-      <InnerNavigator initialRouteName={initialRouteName} />
-    </LoadingProvider>
+    <ScrollToTopProvider>
+      <LoadingProvider>
+        <InnerNavigator initialRouteName={initialRouteName} />
+      </LoadingProvider>
+    </ScrollToTopProvider>
   </PostHogProvider>
 );
 
