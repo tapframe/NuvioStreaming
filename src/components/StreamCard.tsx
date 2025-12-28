@@ -10,7 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { Stream } from '../types/metadata';
 import QualityBadge from './metadata/QualityBadge';
 import { useSettings } from '../hooks/useSettings';
@@ -38,36 +38,36 @@ interface StreamCardProps {
   parentImdbId?: string;
 }
 
-const StreamCard = memo(({ 
-  stream, 
-  onPress, 
-  index, 
-  isLoading, 
-  statusMessage, 
-  theme, 
-  showLogos, 
-  scraperLogo, 
-  showAlert, 
-  parentTitle, 
-  parentType, 
-  parentSeason, 
-  parentEpisode, 
-  parentEpisodeTitle, 
-  parentPosterUrl, 
-  providerName, 
-  parentId, 
-  parentImdbId 
+const StreamCard = memo(({
+  stream,
+  onPress,
+  index,
+  isLoading,
+  statusMessage,
+  theme,
+  showLogos,
+  scraperLogo,
+  showAlert,
+  parentTitle,
+  parentType,
+  parentSeason,
+  parentEpisode,
+  parentEpisodeTitle,
+  parentPosterUrl,
+  providerName,
+  parentId,
+  parentImdbId
 }: StreamCardProps) => {
   const { settings } = useSettings();
   const { startDownload } = useDownloads();
   const { showSuccess, showInfo } = useToast();
-  
+
   // Handle long press to copy stream URL to clipboard
   const handleLongPress = useCallback(async () => {
     if (stream.url) {
       try {
         await Clipboard.setString(stream.url);
-        
+
         // Use toast for Android, custom alert for iOS
         if (Platform.OS === 'android') {
           showSuccess('URL Copied', 'Stream URL copied to clipboard!');
@@ -85,13 +85,13 @@ const StreamCard = memo(({
       }
     }
   }, [stream.url, showAlert, showSuccess, showInfo]);
-  
+
   const styles = React.useMemo(() => createStyles(theme.colors), [theme.colors]);
-  
+
   const streamInfo = useMemo(() => {
     const title = stream.title || '';
     const name = stream.name || '';
-    
+
     // Helper function to format size from bytes
     const formatSize = (bytes: number): string => {
       if (bytes === 0) return '0 Bytes';
@@ -100,16 +100,16 @@ const StreamCard = memo(({
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
-    
+
     // Get size from title (legacy format) or from stream.size field
     let sizeDisplay = title.match(/💾\s*([\d.]+\s*[GM]B)/)?.[1];
     if (!sizeDisplay && stream.size && typeof stream.size === 'number' && stream.size > 0) {
       sizeDisplay = formatSize(stream.size);
     }
-    
+
     // Extract quality for badge display
     const basicQuality = title.match(/(\d+)p/)?.[1] || null;
-    
+
     return {
       quality: basicQuality,
       isHDR: title.toLowerCase().includes('hdr'),
@@ -120,7 +120,7 @@ const StreamCard = memo(({
       subTitle: title && title !== name ? title : null
     };
   }, [stream.name, stream.title, stream.behaviorHints, stream.size]);
-  
+
   const handleDownload = useCallback(async () => {
     try {
       const url = stream.url;
@@ -132,7 +132,7 @@ const StreamCard = memo(({
           showAlert('Already Downloading', 'This download has already started for this exact link.');
           return;
         }
-      } catch {}
+      } catch { }
       // Show immediate feedback on both platforms
       showAlert('Starting Download', 'Download will be started.');
       const parent: any = stream as any;
@@ -143,10 +143,10 @@ const StreamCard = memo(({
       const episodeTitle = parentEpisodeTitle || parent.episodeTitle || parent.episode_name;
       // Prefer the stream's display name (often includes provider + resolution)
       const provider = (stream.name as any) || (stream.title as any) || providerName || parent.addonName || parent.addonId || (stream.addonName as any) || (stream.addonId as any) || 'Provider';
-      
+
       // Use parentId first (from route params), fallback to stream metadata
       const idForContent = parentId || parent.imdbId || parent.tmdbId || parent.addonId || inferredTitle;
-      
+
       // Extract tmdbId if available (from parentId or parent metadata)
       let tmdbId: number | undefined = undefined;
       if (parentId && parentId.startsWith('tmdb:')) {
@@ -172,99 +172,99 @@ const StreamCard = memo(({
         tmdbId: tmdbId,
       });
       showAlert('Download Started', 'Your download has been added to the queue.');
-    } catch {}
+    } catch { }
   }, [startDownload, stream.url, stream.headers, streamInfo.quality, showAlert, stream.name, stream.title, parentId, parentImdbId, parentTitle, parentType, parentSeason, parentEpisode, parentEpisodeTitle, parentPosterUrl, providerName]);
 
   const isDebrid = streamInfo.isDebrid;
   return (
     <TouchableOpacity
-        style={[
-          styles.streamCard,
-          isLoading && styles.streamCardLoading,
-          isDebrid && styles.streamCardHighlighted
-        ]}
-        onPress={onPress}
-        onLongPress={handleLongPress}
-        disabled={isLoading}
-        activeOpacity={0.7}
-      >
-        {/* Scraper Logo */}
-        {showLogos && scraperLogo && (
-          <View style={styles.scraperLogoContainer}>
-            {scraperLogo.toLowerCase().endsWith('.svg') || scraperLogo.toLowerCase().includes('.svg?') ? (
-              <Image
-                source={{ uri: scraperLogo }}
-                style={styles.scraperLogo}
-                resizeMode="contain"
-              />
-            ) : (
-              <FastImage
-                source={{ uri: scraperLogo }}
-                style={styles.scraperLogo}
-                resizeMode={FastImage.resizeMode.contain}
-              />
-            )}
-          </View>
-        )}
-        
-        <View style={styles.streamDetails}>
-          <View style={styles.streamNameRow}>
-            <View style={styles.streamTitleContainer}>
-              <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
-                {streamInfo.displayName}
-              </Text>
-              {streamInfo.subTitle && (
-                <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
-                  {streamInfo.subTitle}
-                </Text>
-              )}
-            </View>
-            
-            {/* Show loading indicator if stream is loading */}
-            {isLoading && (
-              <View style={styles.loadingIndicator}>
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-                <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
-                  {statusMessage || "Loading..."}
-                </Text>
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.streamMetaRow}>
-            {streamInfo.isDolby && (
-              <QualityBadge type="VISION" />
-            )}
-            
-            {streamInfo.size && (
-              <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
-                <Text style={[styles.chipText, { color: theme.colors.white }]}>💾 {streamInfo.size}</Text>
-              </View>
-            )}
-            
-            {streamInfo.isDebrid && (
-              <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
-                <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        
-        
-        {settings?.enableDownloads !== false && (
-          <TouchableOpacity
-            style={[styles.streamAction, { marginLeft: 8, backgroundColor: theme.colors.elevation2 }]}
-            onPress={handleDownload}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons
-              name="download"
-              size={20}
-              color={theme.colors.highEmphasis}
+      style={[
+        styles.streamCard,
+        isLoading && styles.streamCardLoading,
+        isDebrid && styles.streamCardHighlighted
+      ]}
+      onPress={onPress}
+      onLongPress={handleLongPress}
+      disabled={isLoading}
+      activeOpacity={0.7}
+    >
+      {/* Scraper Logo */}
+      {showLogos && scraperLogo && (
+        <View style={styles.scraperLogoContainer}>
+          {scraperLogo.toLowerCase().endsWith('.svg') || scraperLogo.toLowerCase().includes('.svg?') ? (
+            <Image
+              source={{ uri: scraperLogo }}
+              style={styles.scraperLogo}
+              resizeMode="contain"
             />
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
+          ) : (
+            <FastImage
+              source={{ uri: scraperLogo }}
+              style={styles.scraperLogo}
+              resizeMode={FIResizeMode.contain}
+            />
+          )}
+        </View>
+      )}
+
+      <View style={styles.streamDetails}>
+        <View style={styles.streamNameRow}>
+          <View style={styles.streamTitleContainer}>
+            <Text style={[styles.streamName, { color: theme.colors.highEmphasis }]}>
+              {streamInfo.displayName}
+            </Text>
+            {streamInfo.subTitle && (
+              <Text style={[styles.streamAddonName, { color: theme.colors.mediumEmphasis }]}>
+                {streamInfo.subTitle}
+              </Text>
+            )}
+          </View>
+
+          {/* Show loading indicator if stream is loading */}
+          {isLoading && (
+            <View style={styles.loadingIndicator}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={[styles.loadingText, { color: theme.colors.primary }]}>
+                {statusMessage || "Loading..."}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.streamMetaRow}>
+          {streamInfo.isDolby && (
+            <QualityBadge type="VISION" />
+          )}
+
+          {streamInfo.size && (
+            <View style={[styles.chip, { backgroundColor: theme.colors.darkGray }]}>
+              <Text style={[styles.chipText, { color: theme.colors.white }]}>💾 {streamInfo.size}</Text>
+            </View>
+          )}
+
+          {streamInfo.isDebrid && (
+            <View style={[styles.chip, { backgroundColor: theme.colors.success }]}>
+              <Text style={[styles.chipText, { color: theme.colors.white }]}>DEBRID</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+
+      {settings?.enableDownloads !== false && (
+        <TouchableOpacity
+          style={[styles.streamAction, { marginLeft: 8, backgroundColor: theme.colors.elevation2 }]}
+          onPress={handleDownload}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons
+            name="download"
+            size={20}
+            color={theme.colors.highEmphasis}
+          />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
   );
 });
 

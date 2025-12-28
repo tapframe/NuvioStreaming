@@ -16,7 +16,17 @@ import { MaterialIcons, Entypo, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 // Replaced FastImage with standard Image for logos
 import { BlurView as ExpoBlurView } from 'expo-blur';
-import { BlurView as CommunityBlurView } from '@react-native-community/blur';
+
+// Lazy-safe community blur import (avoid bundling issues on web)
+let CommunityBlurView: any = null;
+if (Platform.OS === 'android') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    CommunityBlurView = require('@react-native-community/blur').BlurView;
+  } catch (_) {
+    CommunityBlurView = null;
+  }
+}
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for HeroSection
 let GlassViewComp: any = null;
@@ -1956,6 +1966,7 @@ const styles = StyleSheet.create({
   heroGradient: {
     flex: 1,
     justifyContent: 'flex-end',
+    alignItems: 'center',
     paddingBottom: 20,
   },
   bottomFadeGradient: {
@@ -1972,31 +1983,26 @@ const styles = StyleSheet.create({
     paddingBottom: isTablet ? 16 : 8,
     position: 'relative',
     zIndex: 2,
+    width: '100%',
+    alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
     marginBottom: 4,
-    flex: 0,
-    display: 'flex',
-    maxWidth: isTablet ? 600 : '100%',
-    alignSelf: 'center',
+    maxWidth: isTablet ? 600 : undefined,
   },
   titleLogoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    flex: 0,
-    display: 'flex',
-    maxWidth: isTablet ? 600 : '100%',
-    alignSelf: 'center',
+    maxWidth: isTablet ? 600 : undefined,
   },
   titleLogo: {
-    width: width * 0.75,
+    width: '75%',
+    maxWidth: 400,
     height: 90,
-    alignSelf: 'center',
-    textAlign: 'center',
   },
   heroTitle: {
     fontSize: 26,
@@ -2016,8 +2022,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 14,
     gap: 0,
-    maxWidth: isTablet ? 600 : '100%',
-    alignSelf: 'center',
+    width: '100%',
+    maxWidth: isTablet ? 600 : undefined,
   },
   genreText: {
     fontSize: 12,
@@ -2046,17 +2052,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     position: 'relative',
-    maxWidth: isTablet ? 600 : '100%',
-    alignSelf: 'center',
+    maxWidth: isTablet ? 600 : undefined,
   },
   singleRowLayout: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 8,
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    maxWidth: isTablet ? 600 : '100%',
-    alignSelf: 'center',
+    maxWidth: isTablet ? 600 : undefined,
+    flexWrap: 'nowrap',
   },
   singleRowPlayButton: {
     flex: 2,
@@ -2070,7 +2075,8 @@ const styles = StyleSheet.create({
     width: isTablet ? 50 : 44,
     height: isTablet ? 50 : 44,
     borderRadius: isTablet ? 25 : 22,
-    flex: 0,
+    flexShrink: 0,
+    flexGrow: 0,
   },
   singleRowPlayButtonFullWidth: {
     flex: 1,
@@ -2087,7 +2093,8 @@ const styles = StyleSheet.create({
   },
   primaryActionButton: {
     flex: 1,
-    maxWidth: '48%',
+    minWidth: 100,
+    maxWidth: 200,
   },
   playButtonRow: {
     flexDirection: 'row',
@@ -2133,6 +2140,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    flexShrink: 0,
   },
   traktButton: {
     width: 50,
@@ -2163,8 +2171,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 36,
     position: 'relative',
-    maxWidth: isTablet ? 600 : '100%',
-    alignSelf: 'center',
+    maxWidth: isTablet ? 600 : undefined,
   },
   progressGlassBackground: {
     width: '75%',

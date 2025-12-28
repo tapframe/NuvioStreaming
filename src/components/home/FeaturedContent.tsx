@@ -10,12 +10,18 @@ import {
   TextStyle,
   ImageStyle,
   ActivityIndicator,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
+
+import FastImage, {
+  priority as FastImagePriority,
+  cacheControl as FastImageCacheControl,
+  resizeMode as FastImageResizeMode
+} from '../../utils/FastImageCompat';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -443,7 +449,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
               <LinearGradient
                 colors={[
                   'transparent',
-                  'transparent', 
+                  'transparent',
                   'rgba(0,0,0,0.3)',
                   'rgba(0,0,0,0.7)',
                   'rgba(0,0,0,0.95)'
@@ -459,13 +465,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
           {logoUrl && !logoLoadError ? (
             <Animated.View style={logoAnimatedStyle}>
               <FastImage
-                source={{ 
+                source={{
                   uri: logoUrl,
-                  priority: FastImage.priority.high,
-                  cache: FastImage.cacheControl.immutable
+                  priority: FastImagePriority.high,
+                  cache: FastImageCacheControl.immutable
                 }}
                 style={styles.tabletLogo as any}
-                resizeMode={FastImage.resizeMode.contain}
+                resizeMode={FastImageResizeMode.contain}
                 onError={onLogoLoadError}
               />
             </Animated.View>
@@ -536,7 +542,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             </TouchableOpacity>
           </Animated.View>
         </Animated.View>
-        
+
         {/* Bottom fade to blend with background */}
         <LinearGradient
           colors={[
@@ -589,13 +595,13 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                   {logoUrl && !logoLoadError ? (
                     <Animated.View style={logoAnimatedStyle}>
                       <FastImage
-                        source={{ 
+                        source={{
                           uri: logoUrl,
-                          priority: FastImage.priority.high,
-                          cache: FastImage.cacheControl.immutable
+                          priority: FastImagePriority.high,
+                          cache: FastImageCacheControl.immutable
                         }}
                         style={styles.featuredLogo as any}
-                        resizeMode={FastImage.resizeMode.contain}
+                        resizeMode={FastImageResizeMode.contain}
                         onError={onLogoLoadError}
                       />
                     </Animated.View>
@@ -663,7 +669,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             </ImageBackground>
           </Animated.View>
         </TouchableOpacity>
-        
+
         {/* Bottom fade to blend with background */}
         <LinearGradient
           colors={[

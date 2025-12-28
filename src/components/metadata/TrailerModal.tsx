@@ -14,7 +14,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useTrailer } from '../../contexts/TrailerContext';
 import { logger } from '../../utils/logger';
 import TrailerService from '../../services/trailerService';
-import Video, { VideoRef, OnLoadData, OnProgressData } from 'react-native-video';
+import Video, { VideoRef, OnLoadData, OnProgressData } from '../../utils/VideoCompat';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -135,7 +135,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
 
   const handleClose = useCallback(() => {
     setIsPlaying(false);
-    
+
     // Resume hero section trailer when modal closes
     try {
       resumeTrailer();
@@ -143,7 +143,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
     } catch (error) {
       logger.warn('TrailerModal', 'Error resuming hero trailer:', error);
     }
-    
+
     onClose();
   }, [onClose, resumeTrailer]);
 

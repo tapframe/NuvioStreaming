@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import Animated, {
   FadeIn,
 } from 'react-native-reanimated';
@@ -40,7 +40,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
   const deviceHeight = Dimensions.get('window').height;
-  
+
   // Determine device type based on width
   const getDeviceType = useCallback(() => {
     if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
@@ -48,13 +48,13 @@ export const CastSection: React.FC<CastSectionProps> = ({
     if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
     return 'phone';
   }, [deviceWidth]);
-  
+
   const deviceType = getDeviceType();
   const isTablet = deviceType === 'tablet';
   const isLargeTablet = deviceType === 'largeTablet';
   const isTV = deviceType === 'tv';
   const isLargeScreen = isTablet || isLargeTablet || isTV;
-  
+
   // Enhanced spacing and padding
   const horizontalPadding = useMemo(() => {
     switch (deviceType) {
@@ -68,7 +68,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         return 16; // phone
     }
   }, [deviceType]);
-  
+
   // Enhanced cast card sizing
   const castCardWidth = useMemo(() => {
     switch (deviceType) {
@@ -82,7 +82,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         return 90; // phone
     }
   }, [deviceType]);
-  
+
   const castImageSize = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -95,7 +95,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
         return 80; // phone
     }
   }, [deviceType]);
-  
+
   const castCardSpacing = useMemo(() => {
     switch (deviceType) {
       case 'tv':
@@ -122,7 +122,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
   }
 
   return (
-    <Animated.View 
+    <Animated.View
       style={styles.castSection}
       entering={FadeIn.duration(300).delay(150)}
     >
@@ -131,8 +131,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
         { paddingHorizontal: horizontalPadding }
       ]}>
         <Text style={[
-          styles.sectionTitle, 
-          { 
+          styles.sectionTitle,
+          {
             color: currentTheme.colors.highEmphasis,
             fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 18,
             marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
@@ -149,10 +149,10 @@ export const CastSection: React.FC<CastSectionProps> = ({
         ]}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item, index }) => (
-          <Animated.View 
-            entering={FadeIn.duration(300).delay(50 + index * 30)} 
+          <Animated.View
+            entering={FadeIn.duration(300).delay(50 + index * 30)}
           >
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.castCard,
                 {
@@ -178,19 +178,19 @@ export const CastSection: React.FC<CastSectionProps> = ({
                       uri: `https://image.tmdb.org/t/p/w185${item.profile_path}`,
                     }}
                     style={styles.castImage}
-                    resizeMode={FastImage.resizeMode.cover}
+                    resizeMode={FIResizeMode.cover}
                   />
                 ) : (
                   <View style={[
-                    styles.castImagePlaceholder, 
-                    { 
+                    styles.castImagePlaceholder,
+                    {
                       backgroundColor: currentTheme.colors.darkBackground,
                       borderRadius: castImageSize / 2
                     }
                   ]}>
                     <Text style={[
-                      styles.placeholderText, 
-                      { 
+                      styles.placeholderText,
+                      {
                         color: currentTheme.colors.textMuted,
                         fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
                       }
@@ -201,8 +201,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
                 )}
               </View>
               <Text style={[
-                styles.castName, 
-                { 
+                styles.castName,
+                {
                   color: currentTheme.colors.text,
                   fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
                   width: castCardWidth
@@ -210,8 +210,8 @@ export const CastSection: React.FC<CastSectionProps> = ({
               ]} numberOfLines={1}>{item.name}</Text>
               {isTmdbEnrichmentEnabled && item.character && (
                 <Text style={[
-                  styles.characterName, 
-                  { 
+                  styles.characterName,
+                  {
                     color: currentTheme.colors.textMuted,
                     fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12,
                     width: castCardWidth,

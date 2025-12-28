@@ -67,6 +67,7 @@
     "lottie-react-native": "~7.3.1",
     "posthog-react-native": "^4.4.0",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.4",
     "react-native-boost": "^0.6.2",
     "react-native-bottom-tabs": "^1.0.2",

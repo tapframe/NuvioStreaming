@@ -19,7 +19,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { Meta, stremioService, CatalogExtra } from '../services/stremioService';
 import { useTheme } from '../contexts/ThemeContext';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -776,7 +776,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         <FastImage
           source={{ uri: optimizePosterUrl(item.poster) }}
           style={[styles.poster, { aspectRatio }]}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FIResizeMode.cover}
         />
 
         {type === 'movie' && nowPlayingMovies.has(item.id) && (

@@ -29,7 +29,7 @@ import { stremioService } from '../services/stremioService';
 import { Stream } from '../types/metadata';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { priority as FIPriority, cacheControl as FICacheControl, preload as FIPreload, clearMemoryCache as FIClearMemoryCache } from '../utils/FastImageCompat';
 import Animated, { FadeIn, Layout, useSharedValue, useAnimatedScrollHandler } from 'react-native-reanimated';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import {
@@ -483,7 +483,7 @@ const HomeScreen = () => {
         // Only clear memory cache when app goes to background
         // This frees memory while keeping disk cache intact for fast restoration
         try {
-          FastImage.clearMemoryCache();
+          FIClearMemoryCache();
           if (__DEV__) console.log('[HomeScreen] Cleared memory cache on background');
         } catch (error) {
           if (__DEV__) console.warn('[HomeScreen] Failed to clear memory cache:', error);
@@ -534,12 +534,12 @@ const HomeScreen = () => {
       // FastImage preload with proper source format
       const sources = posterImages.map(uri => ({
         uri,
-        priority: FastImage.priority.normal,
-        cache: FastImage.cacheControl.immutable
+        priority: FIPriority.normal,
+        cache: FICacheControl.immutable
       }));
 
       // Preload all images at once - FastImage handles batching internally
-      FastImage.preload(sources);
+      FIPreload(sources);
     } catch (error) {
       // Silently handle preload errors
       if (__DEV__) console.warn('Image preload error:', error);

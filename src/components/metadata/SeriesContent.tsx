@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList, Modal, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlashList, FlashListRef } from '@shopify/flash-list';
@@ -911,7 +911,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     <FastImage
                       source={{ uri: seasonPoster }}
                       style={styles.seasonPoster}
-                      resizeMode={FastImage.resizeMode.cover}
+                      resizeMode={FIResizeMode.cover}
                     />
                     {selectedSeason === season && (
                       <View style={[
@@ -1050,7 +1050,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           <FastImage
             source={{ uri: episodeImage }}
             style={styles.episodeImage}
-            resizeMode={FastImage.resizeMode.cover}
+            resizeMode={FIResizeMode.cover}
           />
           <View style={[
             styles.episodeNumberBadge,
@@ -1166,7 +1166,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                             height: isTV ? 17 : isLargeTablet ? 16 : isTablet ? 15 : 15
                           }
                         ]}
-                        resizeMode={FastImage.resizeMode.contain}
+                        resizeMode={FIResizeMode.contain}
                       />
                       <Text style={[
                         styles.ratingText,
@@ -1190,7 +1190,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                             height: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
                           }
                         ]}
-                        resizeMode={FastImage.resizeMode.contain}
+                        resizeMode={FIResizeMode.contain}
                       />
                       <Text style={[
                         styles.ratingText,
@@ -1329,7 +1329,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         <FastImage
           source={{ uri: episodeImage }}
           style={styles.episodeBackgroundImage}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FIResizeMode.cover}
         />
 
         {/* Standard Gradient Overlay */}
@@ -1432,7 +1432,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                             height: isTV ? 17 : isLargeTablet ? 16 : isTablet ? 15 : 15
                           }
                         ]}
-                        resizeMode={FastImage.resizeMode.contain}
+                        resizeMode={FIResizeMode.contain}
                       />
                       <Text style={[
                         styles.ratingTextHorizontal,

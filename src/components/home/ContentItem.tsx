@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { DeviceEventEmitter } from 'react-native';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share, Image } from 'react-native';
+
+import FastImage, {
+  priority as FastImagePriority,
+  cacheControl as FastImageCacheControl,
+  resizeMode as FastImageResizeMode
+} from '../../utils/FastImageCompat';
+
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
@@ -315,11 +321,11 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
               <FastImage
                 source={{
                   uri: optimizedPosterUrl,
-                  priority: FastImage.priority.normal,
-                  cache: FastImage.cacheControl.immutable
+                  priority: FastImagePriority.normal,
+                  cache: FastImageCacheControl.immutable
                 }}
                 style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, borderRadius }]}
-                resizeMode={FastImage.resizeMode.cover}
+                resizeMode={FastImageResizeMode.cover}
                 onLoad={() => {
                   setImageError(false);
                 }}

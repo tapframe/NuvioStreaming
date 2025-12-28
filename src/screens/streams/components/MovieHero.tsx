@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { View, StyleSheet, Platform, Dimensions } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../../utils/FastImageCompat';
 
 import AnimatedText from '../../../components/AnimatedText';
 
@@ -30,7 +30,7 @@ const MovieHero = memo(
             <FastImage
               source={{ uri: metadata.logo }}
               style={styles.logo}
-              resizeMode={FastImage.resizeMode.contain}
+              resizeMode={FIResizeMode.contain}
               onError={() => setMovieLogoError(true)}
             />
           ) : (

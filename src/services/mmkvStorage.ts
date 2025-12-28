@@ -1,15 +1,102 @@
-import { createMMKV } from 'react-native-mmkv';
+import { Platform } from 'react-native';
 import { logger } from '../utils/logger';
+
+// Platform-specific storage implementation
+let createMMKV: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    createMMKV = require('react-native-mmkv').createMMKV;
+  } catch (e) {
+    logger.warn('[MMKVStorage] react-native-mmkv not available, using fallback');
+  }
+}
+
+// Web fallback storage interface
+class WebStorage {
+  getString(key: string): string | undefined {
+    try {
+      const value = localStorage.getItem(key);
+      return value ?? undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  set(key: string, value: string | number | boolean): void {
+    try {
+      localStorage.setItem(key, String(value));
+    } catch (e) {
+      logger.error('[WebStorage] Error setting item:', e);
+    }
+  }
+
+  getNumber(key: string): number | undefined {
+    try {
+      const value = localStorage.getItem(key);
+      return value ? Number(value) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  getBoolean(key: string): boolean | undefined {
+    try {
+      const value = localStorage.getItem(key);
+      return value === 'true' ? true : value === 'false' ? false : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  contains(key: string): boolean {
+    try {
+      return localStorage.getItem(key) !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  remove(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      logger.error('[WebStorage] Error removing item:', e);
+    }
+  }
+
+  clearAll(): void {
+    try {
+      localStorage.clear();
+    } catch (e) {
+      logger.error('[WebStorage] Error clearing storage:', e);
+    }
+  }
+
+  getAllKeys(): string[] {
+    try {
+      return Object.keys(localStorage);
+    } catch {
+      return [];
+    }
+  }
+}
 
 class MMKVStorage {
   private static instance: MMKVStorage;
-  private storage = createMMKV();
+  private storage: any;
   // In-memory cache for frequently accessed data
   private cache = new Map<string, { value: any; timestamp: number }>();
   private readonly CACHE_TTL = 30000; // 30 seconds
   private readonly MAX_CACHE_SIZE = 100; // Limit cache size to prevent memory issues
 
-  private constructor() {}
+  private constructor() {
+    // Use MMKV on native platforms, localStorage on web
+    if (createMMKV) {
+      this.storage = createMMKV();
+    } else {
+      this.storage = new WebStorage();
+    }
+  }
 
   public static getInstance(): MMKVStorage {
     if (!MMKVStorage.instance) {
@@ -57,16 +144,16 @@ class MMKVStorage {
       if (cached !== null) {
         return cached;
       }
-      
+
       // Read from storage
       const value = this.storage.getString(key);
       const result = value ?? null;
-      
+
       // Cache the result
       if (result !== null) {
         this.setCached(key, result);
       }
-      
+
       return result;
     } catch (error) {
       logger.error(`[MMKVStorage] Error getting item ${key}:`, error);

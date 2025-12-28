@@ -21,7 +21,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { mmkvStorage } from '../services/mmkvStorage';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { tmdbService } from '../services/tmdbService';
 import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
@@ -450,14 +450,14 @@ const TMDBSettingsScreen = () => {
         <FastImage
           source={{ uri: banner || undefined }}
           style={styles.bannerImage}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FIResizeMode.cover}
         />
         <View style={styles.bannerOverlay} />
         {logo && (
           <FastImage
             source={{ uri: logo }}
             style={styles.logoOverBanner}
-            resizeMode={FastImage.resizeMode.contain}
+            resizeMode={FIResizeMode.contain}
           />
         )}
         {!logo && (

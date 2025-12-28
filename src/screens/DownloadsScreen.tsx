@@ -27,7 +27,7 @@ import Animated, {
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { useDownloads } from '../contexts/DownloadsContext';
 import { useSettings } from '../hooks/useSettings';
 import { VideoPlayerService } from '../services/videoPlayerService';
@@ -216,7 +216,7 @@ const DownloadItemComponent: React.FC<{
         <FastImage
           source={{ uri: optimizePosterUrl(posterUrl) }}
           style={styles.poster}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FIResizeMode.cover}
         />
         {/* Status indicator overlay */}
         <View style={[styles.statusOverlay, { backgroundColor: getStatusColor() }]}>

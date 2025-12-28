@@ -3,7 +3,7 @@ import { Platform, AppState, AppStateStatus } from 'react-native';
 import { mmkvStorage } from './mmkvStorage';
 import { parseISO, differenceInHours, isToday, addDays, isAfter, startOfToday } from 'date-fns';
 import { stremioService } from './stremioService';
-import { catalogService } from './catalogService';
+// catalogService is imported lazily to avoid circular dependency
 import { traktService } from './traktService';
 import { tmdbService } from './tmdbService';
 import { logger } from '../utils/logger';
@@ -64,7 +64,8 @@ class NotificationService {
     this.configureNotifications();
     this.loadSettings();
     this.loadScheduledNotifications();
-    this.setupLibraryIntegration();
+    // Defer library integration setup to avoid circular dependency
+    // It will be set up lazily when first needed
     this.setupBackgroundSync();
     this.setupAppStateHandling();
   }
@@ -265,8 +266,15 @@ class NotificationService {
   }
 
   // Setup library integration - automatically sync notifications when library changes
+  // This is called lazily to avoid circular dependency issues
   private setupLibraryIntegration(): void {
+    // Skip if already set up
+    if (this.librarySubscription) return;
+
     try {
+      // Lazy import to avoid circular dependency
+      const { catalogService } = require('./catalogService');
+
       // Subscribe to library updates from catalog service
       this.librarySubscription = catalogService.subscribeToLibraryUpdates(async (libraryItems) => {
         if (!this.settings.enabled) return;
@@ -421,13 +429,17 @@ class NotificationService {
   // Perform comprehensive background sync including Trakt integration
   private async performBackgroundSync(): Promise<void> {
     try {
+      // Ensure library integration is set up (lazy initialization)
+      this.setupLibraryIntegration();
+
       // Update last sync time at the start
       this.lastSyncTime = Date.now();
 
       // Reduced logging verbosity
       // logger.log('[NotificationService] Starting comprehensive background sync');
 
-      // Get library items
+      // Get library items - use lazy import to avoid circular dependency
+      const { catalogService } = require('./catalogService');
       const libraryItems = await catalogService.getLibraryItems();
       await this.syncNotificationsForLibrary(libraryItems);
 

@@ -15,7 +15,15 @@ import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import { PostHogProvider } from 'posthog-react-native';
+// PostHogProvider is conditionally imported to avoid issues on web
+let PostHogProvider: any = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+if (Platform.OS !== 'web') {
+  try {
+    PostHogProvider = require('posthog-react-native').PostHogProvider;
+  } catch (e) {
+    // Fallback already set above
+  }
+}
 import { ScrollToTopProvider, useScrollToTopEmitter } from '../contexts/ScrollToTopContext';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback
@@ -866,6 +874,7 @@ const MainTabs = () => {
   };
 
   // iOS: Use native bottom tabs (@bottom-tabs/react-navigation)
+  // Exclude web to use standard tabs instead
   if (Platform.OS === 'ios') {
     // Dynamically require to avoid impacting Android bundle
     const { createNativeBottomTabNavigator } = require('@bottom-tabs/react-navigation');

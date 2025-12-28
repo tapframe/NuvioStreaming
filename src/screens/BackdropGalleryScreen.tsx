@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { MaterialIcons } from '@expo/vector-icons';
 import { TMDBService } from '../services/tmdbService';
 import { useTheme } from '../contexts/ThemeContext';
@@ -51,7 +51,7 @@ const BackdropGalleryScreen: React.FC = () => {
       try {
         setLoading(true);
         const tmdbService = TMDBService.getInstance();
-        
+
         // Get language preference
         const language = settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en';
 
@@ -100,7 +100,7 @@ const BackdropGalleryScreen: React.FC = () => {
         <FastImage
           source={{ uri: imageUrl }}
           style={styles.backdropImage}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FIResizeMode.cover}
         />
         <View style={styles.backdropInfo}>
           <Text style={[styles.backdropResolution, { color: currentTheme.colors.highEmphasis }]}>

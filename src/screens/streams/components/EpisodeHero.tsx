@@ -1,7 +1,7 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../../utils/FastImageCompat';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import AnimatedImage from '../../../components/AnimatedImage';
@@ -83,7 +83,7 @@ const EpisodeHero = memo(
                             <FastImage
                               source={{ uri: IMDb_LOGO }}
                               style={styles.imdbLogo}
-                              resizeMode={FastImage.resizeMode.contain}
+                              resizeMode={FIResizeMode.contain}
                             />
                             <Text style={[styles.ratingText, { color: '#F5C518' }]}>
                               {effectiveEpisodeVote.toFixed(1)}
@@ -94,7 +94,7 @@ const EpisodeHero = memo(
                             <FastImage
                               source={{ uri: TMDB_LOGO }}
                               style={styles.tmdbLogo}
-                              resizeMode={FastImage.resizeMode.contain}
+                              resizeMode={FIResizeMode.contain}
                             />
                             <Text style={styles.ratingText}>{effectiveEpisodeVote.toFixed(1)}</Text>
                           </>

@@ -1,11 +1,11 @@
 import React, { memo, useEffect } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming
 } from 'react-native-reanimated';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 
 interface AnimatedImageProps {
   source: { uri: string } | undefined;
@@ -41,12 +41,17 @@ const AnimatedImage = memo(({
     };
   }, []);
 
+  // Don't render FastImage if no source
+  if (!source?.uri) {
+    return <Animated.View style={[style, animatedStyle]} />;
+  }
+
   return (
     <Animated.View style={[style, animatedStyle]}>
       <FastImage
         source={source}
         style={StyleSheet.absoluteFillObject}
-        resizeMode={FastImage.resizeMode.cover}
+        resizeMode={FIResizeMode.cover}
         onLoad={onLoad}
       />
     </Animated.View>

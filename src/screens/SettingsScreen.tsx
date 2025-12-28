@@ -17,7 +17,7 @@ import {
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import LottieView from 'lottie-react-native';
 import { Feather } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
@@ -966,7 +966,7 @@ const SettingsScreen: React.FC = () => {
                       <FastImage
                         source={require('../../assets/support_me_on_kofi_red.png')}
                         style={styles.kofiImage}
-                        resizeMode={FastImage.resizeMode.contain}
+                        resizeMode={FIResizeMode.contain}
                       />
                     </TouchableOpacity>
 
@@ -980,7 +980,7 @@ const SettingsScreen: React.FC = () => {
                           <FastImage
                             source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
                             style={styles.discordLogo}
-                            resizeMode={FastImage.resizeMode.contain}
+                            resizeMode={FIResizeMode.contain}
                           />
                           <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
                             Discord
@@ -997,7 +997,7 @@ const SettingsScreen: React.FC = () => {
                           <FastImage
                             source={{ uri: 'https://www.iconpacks.net/icons/2/free-reddit-logo-icon-2436-thumb.png' }}
                             style={styles.discordLogo}
-                            resizeMode={FastImage.resizeMode.contain}
+                            resizeMode={FIResizeMode.contain}
                           />
                           <Text style={[styles.discordButtonText, { color: '#FF4500' }]}>
                             Reddit
@@ -1022,7 +1022,7 @@ const SettingsScreen: React.FC = () => {
                     <FastImage
                       source={require('../../assets/nuviotext.png')}
                       style={styles.brandLogo}
-                      resizeMode={FastImage.resizeMode.contain}
+                      resizeMode={FIResizeMode.contain}
                     />
                   </View>
 
@@ -1101,7 +1101,7 @@ const SettingsScreen: React.FC = () => {
                 <FastImage
                   source={require('../../assets/support_me_on_kofi_red.png')}
                   style={styles.kofiImage}
-                  resizeMode={FastImage.resizeMode.contain}
+                  resizeMode={FIResizeMode.contain}
                 />
               </TouchableOpacity>
 
@@ -1115,7 +1115,7 @@ const SettingsScreen: React.FC = () => {
                     <FastImage
                       source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
                       style={styles.discordLogo}
-                      resizeMode={FastImage.resizeMode.contain}
+                      resizeMode={FIResizeMode.contain}
                     />
                     <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
                       Discord
@@ -1132,7 +1132,7 @@ const SettingsScreen: React.FC = () => {
                     <FastImage
                       source={{ uri: 'https://www.iconpacks.net/icons/2/free-reddit-logo-icon-2436-thumb.png' }}
                       style={styles.discordLogo}
-                      resizeMode={FastImage.resizeMode.contain}
+                      resizeMode={FIResizeMode.contain}
                     />
                     <Text style={[styles.discordButtonText, { color: '#FF4500' }]}>
                       Reddit
@@ -1157,7 +1157,7 @@ const SettingsScreen: React.FC = () => {
               <FastImage
                 source={require('../../assets/nuviotext.png')}
                 style={styles.brandLogo}
-                resizeMode={FastImage.resizeMode.contain}
+                resizeMode={FIResizeMode.contain}
               />
             </View>
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Animated, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../../utils/FastImageCompat';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -175,7 +175,7 @@ export const PauseOverlay: React.FC<PauseOverlayProps> = ({
                                             <FastImage
                                                 source={{ uri: `https://image.tmdb.org/t/p/w300${selectedCastMember.profile_path}` }}
                                                 style={{ width: Math.min(120, screenDimensions.width * 0.18), height: Math.min(180, screenDimensions.width * 0.27), borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)' }}
-                                                resizeMode={FastImage.resizeMode.cover}
+                                                resizeMode={FIResizeMode.cover}
                                             />
                                         </View>
                                     )}

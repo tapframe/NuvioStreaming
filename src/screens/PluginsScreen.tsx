@@ -17,7 +17,7 @@ import {
   Image,
 } from 'react-native';
 import CustomAlert from '../components/CustomAlert';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -1644,7 +1644,7 @@ const PluginsScreen: React.FC = () => {
                         <FastImage
                           source={{ uri: scraper.logo }}
                           style={styles.scraperLogo}
-                          resizeMode={FastImage.resizeMode.contain}
+                          resizeMode={FIResizeMode.contain}
                         />
                       )
                     ) : (

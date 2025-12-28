@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Platform, Animated, Easing, TextInput, ActivityIndicator } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -52,7 +52,7 @@ const AccountManageScreen: React.FC = () => {
     if (err) {
       setAlertTitle('Error');
       setAlertMessage(err);
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertActions([{ label: 'OK', onPress: () => { } }]);
       setAlertVisible(true);
     }
     setSaving(false);
@@ -62,7 +62,7 @@ const AccountManageScreen: React.FC = () => {
     setAlertTitle('Sign out');
     setAlertMessage('Are you sure you want to sign out?');
     setAlertActions([
-      { label: 'Cancel', onPress: () => {} },
+      { label: 'Cancel', onPress: () => { } },
       {
         label: 'Sign out',
         onPress: async () => {
@@ -70,7 +70,7 @@ const AccountManageScreen: React.FC = () => {
             await signOut();
             // @ts-ignore
             navigation.goBack();
-          } catch (_) {}
+          } catch (_) { }
         },
         style: { opacity: 1 },
       },
@@ -109,11 +109,11 @@ const AccountManageScreen: React.FC = () => {
         {/* Profile Badge */}
         <View style={styles.profileContainer}>
           {avatarUrl && !avatarError ? (
-            <View style={[styles.avatar, { overflow: 'hidden' }]}> 
+            <View style={[styles.avatar, { overflow: 'hidden' }]}>
               <FastImage
                 source={{ uri: avatarUrl }}
                 style={styles.avatarImage}
-                resizeMode={FastImage.resizeMode.cover}
+                resizeMode={FIResizeMode.cover}
                 onError={() => setAvatarError(true)}
               />
             </View>

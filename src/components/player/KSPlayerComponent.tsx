@@ -1,5 +1,5 @@
 import React, { useRef, useImperativeHandle, forwardRef, useEffect, useState } from 'react';
-import { View, requireNativeComponent, UIManager, findNodeHandle, NativeModules } from 'react-native';
+import { View, requireNativeComponent, UIManager, findNodeHandle, NativeModules, Platform } from 'react-native';
 
 export interface KSPlayerSource {
   uri: string;
@@ -29,8 +29,11 @@ interface KSPlayerViewProps {
   style?: any;
 }
 
-const KSPlayerViewManager = requireNativeComponent<KSPlayerViewProps>('KSPlayerView');
-const KSPlayerModule = NativeModules.KSPlayerModule;
+// Only require native component on iOS
+const KSPlayerViewManager = Platform.OS === 'ios'
+  ? requireNativeComponent<KSPlayerViewProps>('KSPlayerView')
+  : View as any;
+const KSPlayerModule = Platform.OS === 'ios' ? NativeModules.KSPlayerModule : null;
 
 export interface KSPlayerRef {
   seek: (time: number) => void;

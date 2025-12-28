@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for CastDetailsModal
 let GlassViewComp: any = null;
@@ -82,14 +82,14 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
     if (visible && castMember) {
       modalOpacity.value = withTiming(1, { duration: 250 });
       modalScale.value = withSpring(1, { damping: 20, stiffness: 200 });
-      
+
       if (!hasFetched || personDetails?.id !== castMember.id) {
         fetchPersonDetails();
       }
     } else {
       modalOpacity.value = withTiming(0, { duration: 200 });
       modalScale.value = withTiming(0.9, { duration: 200 });
-      
+
       if (!visible) {
         setHasFetched(false);
         setPersonDetails(null);
@@ -99,7 +99,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
 
   const fetchPersonDetails = async () => {
     if (!castMember || loading) return;
-    
+
     setLoading(true);
     try {
       const details = await tmdbService.getPersonDetails(castMember.id);
@@ -150,11 +150,11 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
     const birthDate = new Date(birthday);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
@@ -196,8 +196,8 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
             height: MODAL_HEIGHT,
             overflow: 'hidden',
             borderRadius: isTablet ? 32 : 24,
-            backgroundColor: Platform.OS === 'android' 
-              ? 'rgba(20, 20, 20, 0.95)' 
+            backgroundColor: Platform.OS === 'android'
+              ? 'rgba(20, 20, 20, 0.95)'
               : 'transparent',
           },
           modalStyle,
@@ -261,7 +261,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                     uri: `https://image.tmdb.org/t/p/w185${castMember.profile_path}`,
                   }}
                   style={{ width: '100%', height: '100%' }}
-                  resizeMode={FastImage.resizeMode.cover}
+                  resizeMode={FIResizeMode.cover}
                 />
               ) : (
                 <View style={{
@@ -280,7 +280,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                 </View>
               )}
             </View>
-            
+
             <View style={{ flex: 1 }}>
               <Text style={{
                 color: '#fff',
@@ -352,8 +352,8 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                   borderColor: 'rgba(255, 255, 255, 0.06)',
                 }}>
                   {personDetails?.birthday && (
-                    <View style={{ 
-                      flexDirection: 'row', 
+                    <View style={{
+                      flexDirection: 'row',
                       alignItems: 'center',
                       marginBottom: personDetails?.place_of_birth ? 10 : 0
                     }}>

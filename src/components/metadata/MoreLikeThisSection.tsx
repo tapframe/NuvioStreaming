@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import { useNavigation, StackActions } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -33,9 +33,9 @@ interface MoreLikeThisSectionProps {
   loadingRecommendations: boolean;
 }
 
-export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({ 
-  recommendations, 
-  loadingRecommendations 
+export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
+  recommendations,
+  loadingRecommendations
 }) => {
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -91,16 +91,16 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
     try {
       // Extract TMDB ID from the tmdb:123456 format
       const tmdbId = item.id.replace('tmdb:', '');
-      
+
       // Get Stremio ID directly using catalogService
       // The catalogService.getStremioId method already handles the conversion internally
       const stremioId = await catalogService.getStremioId(item.type, tmdbId);
-      
+
       if (stremioId) {
         navigation.dispatch(
-          StackActions.push('Metadata', { 
-            id: stremioId, 
-            type: item.type 
+          StackActions.push('Metadata', {
+            id: stremioId,
+            type: item.type
           })
         );
       } else {
@@ -110,20 +110,20 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       if (__DEV__) console.error('Error navigating to recommendation:', error);
       setAlertTitle('Error');
       setAlertMessage('Unable to load this content. Please try again later.');
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertActions([{ label: 'OK', onPress: () => { } }]);
       setAlertVisible(true);
     }
   };
 
   const renderItem = ({ item }: { item: StreamingContent }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.itemContainer, { width: posterWidth, marginRight: itemSpacing }]}
       onPress={() => handleItemPress(item)}
     >
       <FastImage
         source={{ uri: item.poster }}
         style={[styles.poster, { backgroundColor: currentTheme.colors.elevation1, width: posterWidth, height: posterHeight, borderRadius: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 10 : 8 }]}
-        resizeMode={FastImage.resizeMode.cover}
+        resizeMode={FIResizeMode.cover}
       />
       <Text style={[styles.title, { color: currentTheme.colors.mediumEmphasis, fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13, lineHeight: isTV ? 20 : 18 }]} numberOfLines={2}>
         {item.name}
@@ -144,7 +144,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   }
 
   return (
-    <View style={[styles.container, { paddingLeft: 0 }] }>
+    <View style={[styles.container, { paddingLeft: 0 }]}>
       <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis, fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20, paddingHorizontal: horizontalPadding }]}>More Like This</Text>
       <FlatList
         data={recommendations}

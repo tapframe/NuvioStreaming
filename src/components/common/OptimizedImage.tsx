@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import FastImage, { priority as FIPriority, cacheControl as FICacheControl, resizeMode as FIResizeMode, preload as FIPreload } from '../../utils/FastImageCompat';
 import { logger } from '../../utils/logger';
 
 interface OptimizedImageProps {
@@ -28,7 +28,7 @@ const getOptimizedImageUrl = (originalUrl: string, containerWidth?: number, cont
   if (originalUrl.includes('image.tmdb.org')) {
     const width = containerWidth || 300;
     let size = 'w300';
-    
+
     if (width <= 92) size = 'w92';
     else if (width <= 154) size = 'w154';
     else if (width <= 185) size = 'w185';
@@ -36,7 +36,7 @@ const getOptimizedImageUrl = (originalUrl: string, containerWidth?: number, cont
     else if (width <= 500) size = 'w500';
     else if (width <= 780) size = 'w780';
     else size = 'w1280';
-    
+
     // Replace the size in the URL
     return originalUrl.replace(/\/w\d+\//, `/${size}/`);
   }
@@ -106,7 +106,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
     if (!optimizedUrl || !isVisible) return;
 
     try {
-      FastImage.preload([{ uri: optimizedUrl }]);
+      FIPreload([{ uri: optimizedUrl }]);
       if (!mountedRef.current) return;
       setIsLoaded(true);
       onLoad?.();
@@ -135,25 +135,25 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
       <FastImage
         source={{ uri: placeholder }}
         style={style}
-        resizeMode={FastImage.resizeMode.cover}
+        resizeMode={FIResizeMode.cover}
       />
     );
   }
 
   return (
     <FastImage
-      source={{ 
+      source={{
         uri: optimizedUrl,
-        priority: priority === 'high' ? FastImage.priority.high : priority === 'low' ? FastImage.priority.low : FastImage.priority.normal,
-        cache: FastImage.cacheControl.immutable
+        priority: priority === 'high' ? FIPriority.high : priority === 'low' ? FIPriority.low : FIPriority.normal,
+        cache: FICacheControl.immutable
       }}
       style={style}
-      resizeMode={contentFit === 'contain' ? FastImage.resizeMode.contain : contentFit === 'cover' ? FastImage.resizeMode.cover : FastImage.resizeMode.cover}
+      resizeMode={contentFit === 'contain' ? FIResizeMode.contain : contentFit === 'cover' ? FIResizeMode.cover : FIResizeMode.cover}
       onLoad={() => {
         setIsLoaded(true);
         onLoad?.();
       }}
-      onError={(error) => {
+      onError={(error: any) => {
         setHasError(true);
         onError?.(error);
       }}

@@ -14,7 +14,7 @@ import {
 import { NavigationProp, useNavigation, useIsFocused } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { priority as FIPriority, cacheControl as FICacheControl, resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import { MaterialIcons, Entypo } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -1013,11 +1013,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             <FastImage
               source={{
                 uri: bannerUrl,
-                priority: FastImage.priority.high,
-                cache: FastImage.cacheControl.immutable,
+                priority: FIPriority.high,
+                cache: FICacheControl.immutable,
               }}
               style={styles.backgroundImage}
-              resizeMode={FastImage.resizeMode.cover}
+              resizeMode={FIResizeMode.cover}
               onLoad={() => setBannerLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
             />
           </Animated.View>
@@ -1028,11 +1028,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
               <FastImage
                 source={{
                   uri: nextBannerUrl,
-                  priority: FastImage.priority.high,
-                  cache: FastImage.cacheControl.immutable,
+                  priority: FIPriority.high,
+                  cache: FICacheControl.immutable,
                 }}
                 style={styles.backgroundImage}
-                resizeMode={FastImage.resizeMode.cover}
+                resizeMode={FIResizeMode.cover}
                 onLoad={() => setBannerLoaded((prev) => ({ ...prev, [nextIndex]: true }))}
               />
             </Animated.View>

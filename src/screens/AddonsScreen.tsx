@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { stremioService, Manifest } from '../services/stremioService';
 import { MaterialIcons } from '@expo/vector-icons';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -1004,7 +1004,7 @@ const AddonsScreen = () => {
             <FastImage
               source={{ uri: logo }}
               style={styles.addonIcon}
-              resizeMode={FastImage.resizeMode.contain}
+              resizeMode={FIResizeMode.contain}
             />
           ) : (
             <View style={styles.addonIconPlaceholder}>
@@ -1080,7 +1080,7 @@ const AddonsScreen = () => {
           <FastImage
             source={{ uri: logo }}
             style={styles.communityAddonIcon}
-            resizeMode={FastImage.resizeMode.contain}
+            resizeMode={FIResizeMode.contain}
           />
         ) : (
           <View style={styles.communityAddonIconPlaceholder}>
@@ -1272,7 +1272,7 @@ const AddonsScreen = () => {
                       <FastImage
                         source={{ uri: promoAddon.logo }}
                         style={styles.addonIcon}
-                        resizeMode={FastImage.resizeMode.contain}
+                        resizeMode={FIResizeMode.contain}
                       />
                     ) : (
                       <View style={styles.addonIconPlaceholder}>
@@ -1350,7 +1350,7 @@ const AddonsScreen = () => {
                           <FastImage
                             source={{ uri: item.manifest.logo }}
                             style={styles.addonIcon}
-                            resizeMode={FastImage.resizeMode.contain}
+                            resizeMode={FIResizeMode.contain}
                           />
                         ) : (
                           <View style={styles.addonIconPlaceholder}>
@@ -1456,7 +1456,7 @@ const AddonsScreen = () => {
                       <FastImage
                         source={{ uri: addonDetails.logo }}
                         style={styles.addonLogo}
-                        resizeMode={FastImage.resizeMode.contain}
+                        resizeMode={FIResizeMode.contain}
                       />
                     ) : (
                       <View style={styles.addonLogoPlaceholder}>

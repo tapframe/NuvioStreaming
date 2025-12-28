@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { priority as FIPriority, cacheControl as FICacheControl, resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -272,11 +272,11 @@ export const ThisWeekSection = React.memo(() => {
             <FastImage
               source={{
                 uri: imageUrl || undefined,
-                priority: FastImage.priority.normal,
-                cache: FastImage.cacheControl.immutable
+                priority: FIPriority.normal,
+                cache: FICacheControl.immutable
               }}
               style={styles.poster}
-              resizeMode={FastImage.resizeMode.cover}
+              resizeMode={FIResizeMode.cover}
             />
 
             <LinearGradient

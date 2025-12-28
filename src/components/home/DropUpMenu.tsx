@@ -11,7 +11,7 @@ import {
   Platform
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { priority as FIPriority, cacheControl as FICacheControl, resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import { useTraktContext } from '../../contexts/TraktContext';
 import { colors } from '../../styles/colors';
 import Animated, {
@@ -165,11 +165,11 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
                 <FastImage
                   source={{
                     uri: item.poster,
-                    priority: FastImage.priority.high,
-                    cache: FastImage.cacheControl.immutable
+                    priority: FIPriority.high,
+                    cache: FICacheControl.immutable
                   }}
                   style={styles.menuPoster}
-                  resizeMode={FastImage.resizeMode.cover}
+                  resizeMode={FIResizeMode.cover}
                 />
                 <View style={styles.menuTitleContainer}>
                   <Text style={[styles.menuTitle, { color: isDarkMode ? '#FFFFFF' : '#000000' }]}>

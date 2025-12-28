@@ -18,7 +18,7 @@ import {
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -106,7 +106,7 @@ const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, currentT
           styles.avatar,
           isTablet && styles.tabletAvatar
         ]}
-        resizeMode={FastImage.resizeMode.cover}
+        resizeMode={FIResizeMode.cover}
       />
       <View style={styles.contributorInfo}>
         <Text style={[
@@ -190,7 +190,7 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
               styles.avatar,
               isTablet && styles.tabletAvatar
             ]}
-            resizeMode={FastImage.resizeMode.cover}
+            resizeMode={FIResizeMode.cover}
           />
         )}
         <View style={[styles.discordBadgeSmall, { backgroundColor: DISCORD_BRAND_COLOR }]}>

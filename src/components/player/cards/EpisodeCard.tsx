@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../../utils/FastImageCompat';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Episode } from '../../../types/metadata';
 
@@ -28,7 +28,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
 }) => {
   const { width } = Dimensions.get('window');
   const isTablet = width >= 768;
-  
+
   // Get episode image
   let episodeImage = EPISODE_PLACEHOLDER;
   if (episode.still_path) {
@@ -42,11 +42,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
   } else if (metadata?.poster) {
     episodeImage = metadata.poster;
   }
-  
+
   const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
   const seasonNumber = typeof episode.season_number === 'number' ? episode.season_number.toString() : '';
   const episodeString = seasonNumber && episodeNumber ? `S${seasonNumber.padStart(2, '0')}E${episodeNumber.padStart(2, '0')}` : '';
-  
+
   // Get episode progress
   const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
   const tmdbOverride = tmdbEpisodeOverrides?.[`${metadata?.id}:${episode.season_number}:${episode.episode_number}`];
@@ -60,7 +60,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
   const progress = episodeProgress?.[episodeId];
   const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
   const showProgress = progress && progressPercent < 85;
-  
+
   const formatRuntime = (runtime: number) => {
     if (!runtime) return null;
     const hours = Math.floor(runtime / 60);
@@ -70,7 +70,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
     }
     return `${minutes}m`;
   };
-  
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -94,7 +94,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
         <FastImage
           source={{ uri: episodeImage }}
           style={styles.episodeImage}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FIResizeMode.cover}
         />
         {isCurrent && (
           <View style={styles.currentBadge}>
@@ -106,11 +106,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
         </View>
         {showProgress && (
           <View style={styles.progressBarContainer}>
-            <View 
+            <View
               style={[
                 styles.progressBar,
                 { width: `${progressPercent}%`, backgroundColor: currentTheme.colors.primary }
-              ]} 
+              ]}
             />
           </View>
         )}
@@ -138,7 +138,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
                 <FastImage
                   source={{ uri: TMDB_LOGO }}
                   style={styles.tmdbLogo}
-                  resizeMode={FastImage.resizeMode.contain}
+                  resizeMode={FIResizeMode.contain}
                 />
                 <Text style={[styles.ratingText, { color: currentTheme.colors.textMuted }]}>
                   {effectiveVote.toFixed(1)}

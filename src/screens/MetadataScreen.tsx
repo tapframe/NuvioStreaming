@@ -52,7 +52,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
 import { MetadataLoadingScreen, MetadataLoadingScreenRef } from '../components/loading/MetadataLoadingScreen';
 import { useTrailer } from '../contexts/TrailerContext';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 
 // Import our optimized components and hooks
 import HeroSection from '../components/metadata/HeroSection';
@@ -1050,7 +1050,7 @@ const MetadataScreen: React.FC = () => {
                                   height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
                                 }
                               ]}
-                              resizeMode={FastImage.resizeMode.contain}
+                              resizeMode={FIResizeMode.contain}
                             />
                           ) : (
                             <Text style={[
@@ -1122,7 +1122,7 @@ const MetadataScreen: React.FC = () => {
                                     height: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 22
                                   }
                                 ]}
-                                resizeMode={FastImage.resizeMode.contain}
+                                resizeMode={FIResizeMode.contain}
                               />
                             </View>
                           ))}

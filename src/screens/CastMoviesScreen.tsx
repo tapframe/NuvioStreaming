@@ -10,7 +10,7 @@ import {
   FlatList,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -89,27 +89,27 @@ const CastMoviesScreen: React.FC = () => {
 
   const fetchCastCredits = async () => {
     if (!castMember) return;
-    
+
     setLoading(true);
     try {
       const credits = await tmdbService.getPersonCombinedCredits(castMember.id);
-      
+
       if (credits && credits.cast) {
         const currentDate = new Date();
-        
+
         // Combine cast roles with enhanced data, excluding talk shows and variety shows
         const allCredits = credits.cast
           .filter((item: any) => {
             // Filter out talk shows, variety shows, and ensure we have required data
             const hasPoster = item.poster_path;
             const hasReleaseDate = item.release_date || item.first_air_date;
-            
+
             if (!hasPoster || !hasReleaseDate) return false;
-            
+
             // Enhanced talk show filtering
             const title = (item.title || item.name || '').toLowerCase();
             const overview = (item.overview || '').toLowerCase();
-            
+
             // List of common talk show and variety show keywords
             const talkShowKeywords = [
               'talk', 'show', 'late night', 'tonight show', 'jimmy fallon', 'snl', 'saturday night live',
@@ -120,18 +120,18 @@ const CastMoviesScreen: React.FC = () => {
               'red carpet', 'premiere', 'after party', 'behind the scenes', 'making of', 'documentary',
               'special', 'concert', 'live performance', 'mtv', 'vh1', 'bet', 'comedy', 'roast'
             ];
-            
+
             // Check if any keyword matches
-            const isTalkShow = talkShowKeywords.some(keyword => 
+            const isTalkShow = talkShowKeywords.some(keyword =>
               title.includes(keyword) || overview.includes(keyword)
             );
-            
+
             return !isTalkShow;
           })
           .map((item: any) => {
             const releaseDate = new Date(item.release_date || item.first_air_date);
             const isUpcoming = releaseDate > currentDate;
-            
+
             return {
               id: item.id,
               title: item.title || item.name,
@@ -144,7 +144,7 @@ const CastMoviesScreen: React.FC = () => {
               isUpcoming,
             };
           });
-        
+
         setMovies(allCredits);
       }
     } catch (error) {
@@ -223,41 +223,41 @@ const CastMoviesScreen: React.FC = () => {
         isUpcoming: movie.isUpcoming
       });
     }
-    
+
     try {
       if (__DEV__) console.log('Attempting to get Stremio ID for:', movie.media_type, movie.id.toString());
-      
+
       // Get Stremio ID using catalogService
       const stremioId = await catalogService.getStremioId(movie.media_type, movie.id.toString());
-      
+
       if (__DEV__) console.log('Stremio ID result:', stremioId);
-      
+
       if (stremioId) {
         if (__DEV__) console.log('Successfully found Stremio ID, navigating to Metadata with:', {
           id: stremioId,
           type: movie.media_type
         });
-        
+
         // Convert TMDB media type to Stremio media type
         const stremioType = movie.media_type === 'tv' ? 'series' : movie.media_type;
-        
+
         if (__DEV__) console.log('Navigating with Stremio type conversion:', {
           originalType: movie.media_type,
           stremioType: stremioType,
           id: stremioId
         });
-        
+
         navigation.dispatch(
-          StackActions.push('Metadata', { 
-            id: stremioId, 
-            type: stremioType 
+          StackActions.push('Metadata', {
+            id: stremioId,
+            type: stremioType
           })
         );
       } else {
         if (__DEV__) console.warn('Stremio ID is null/undefined for movie:', movie.title);
         throw new Error('Could not find Stremio ID');
       }
-  } catch (error: any) {
+    } catch (error: any) {
       if (__DEV__) {
         console.error('=== Error in handleMoviePress ===');
         console.error('Movie:', movie.title);
@@ -267,7 +267,7 @@ const CastMoviesScreen: React.FC = () => {
       }
       setAlertTitle('Error');
       setAlertMessage(`Unable to load "${movie.title}". Please try again later.`);
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertActions([{ label: 'OK', onPress: () => { } }]);
       setAlertVisible(true);
     }
   };
@@ -278,7 +278,7 @@ const CastMoviesScreen: React.FC = () => {
 
   const renderFilterButton = (filter: 'all' | 'movies' | 'tv', label: string, count: number) => {
     const isSelected = selectedFilter === filter;
-    
+
     return (
       <Animated.View entering={FadeIn.delay(100)}>
         <TouchableOpacity
@@ -286,8 +286,8 @@ const CastMoviesScreen: React.FC = () => {
             paddingHorizontal: 18,
             paddingVertical: 10,
             borderRadius: 25,
-            backgroundColor: isSelected 
-              ? currentTheme.colors.primary 
+            backgroundColor: isSelected
+              ? currentTheme.colors.primary
               : 'rgba(255, 255, 255, 0.08)',
             marginRight: 12,
             borderWidth: isSelected ? 0 : 1,
@@ -311,7 +311,7 @@ const CastMoviesScreen: React.FC = () => {
 
   const renderSortButton = (sort: 'popularity' | 'latest' | 'upcoming', label: string, icon: string) => {
     const isSelected = sortBy === sort;
-    
+
     return (
       <Animated.View entering={FadeIn.delay(200)}>
         <TouchableOpacity
@@ -319,8 +319,8 @@ const CastMoviesScreen: React.FC = () => {
             paddingHorizontal: 16,
             paddingVertical: 8,
             borderRadius: 20,
-            backgroundColor: isSelected 
-              ? 'rgba(255, 255, 255, 0.15)' 
+            backgroundColor: isSelected
+              ? 'rgba(255, 255, 255, 0.15)'
               : 'transparent',
             marginRight: 12,
             flexDirection: 'row',
@@ -329,10 +329,10 @@ const CastMoviesScreen: React.FC = () => {
           onPress={() => setSortBy(sort)}
           activeOpacity={0.7}
         >
-          <MaterialIcons 
-            name={icon as any} 
-            size={16} 
-            color={isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.6)'} 
+          <MaterialIcons
+            name={icon as any}
+            size={16}
+            color={isSelected ? currentTheme.colors.primary : 'rgba(255, 255, 255, 0.6)'}
             style={{ marginRight: 6 }}
           />
           <Text style={{
@@ -384,7 +384,7 @@ const CastMoviesScreen: React.FC = () => {
                 uri: `https://image.tmdb.org/t/p/w500${item.poster_path}`,
               }}
               style={{ width: '100%', height: '100%' }}
-              resizeMode={FastImage.resizeMode.cover}
+              resizeMode={FIResizeMode.cover}
             />
           ) : (
             <View style={{
@@ -397,7 +397,7 @@ const CastMoviesScreen: React.FC = () => {
               <MaterialIcons name="movie" size={32} color="rgba(255, 255, 255, 0.2)" />
             </View>
           )}
-          
+
           {/* Upcoming indicator */}
           {item.isUpcoming && (
             <View style={{
@@ -463,7 +463,7 @@ const CastMoviesScreen: React.FC = () => {
             }}
           />
         </View>
-        
+
         <View style={{ paddingHorizontal: 4, marginTop: 8 }}>
           <Text style={{
             color: '#fff',
@@ -474,7 +474,7 @@ const CastMoviesScreen: React.FC = () => {
           }} numberOfLines={2}>
             {`${item.title}`}
           </Text>
-          
+
           {item.character && (
             <Text style={{
               color: 'rgba(255, 255, 255, 0.65)',
@@ -485,7 +485,7 @@ const CastMoviesScreen: React.FC = () => {
               {`as ${item.character}`}
             </Text>
           )}
-          
+
           <View style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -502,7 +502,7 @@ const CastMoviesScreen: React.FC = () => {
                 {`${new Date(item.release_date).getFullYear()}`}
               </Text>
             )}
-            
+
             {item.isUpcoming && (
               <View style={{
                 flexDirection: 'row',
@@ -538,7 +538,7 @@ const CastMoviesScreen: React.FC = () => {
       [1, 0.9],
       Extrapolate.CLAMP
     );
-    
+
     return {
       opacity,
     };
@@ -547,7 +547,7 @@ const CastMoviesScreen: React.FC = () => {
   return (
     <View style={{ flex: 1, backgroundColor: currentTheme.colors.darkBackground }}>
       {/* Minimal Header */}
-      <Animated.View 
+      <Animated.View
         style={[
           {
             paddingTop: safeAreaTop + 16,
@@ -560,7 +560,7 @@ const CastMoviesScreen: React.FC = () => {
           headerAnimatedStyle
         ]}
       >
-        <Animated.View 
+        <Animated.View
           entering={SlideInDown.delay(100)}
           style={{ flexDirection: 'row', alignItems: 'center' }}
         >
@@ -579,7 +579,7 @@ const CastMoviesScreen: React.FC = () => {
           >
             <MaterialIcons name="arrow-back" size={20} color="rgba(255, 255, 255, 0.9)" />
           </TouchableOpacity>
-          
+
           <View style={{
             width: 44,
             height: 44,
@@ -594,7 +594,7 @@ const CastMoviesScreen: React.FC = () => {
                   uri: `https://image.tmdb.org/t/p/w185${castMember.profile_path}`,
                 }}
                 style={{ width: '100%', height: '100%' }}
-                resizeMode={FastImage.resizeMode.cover}
+                resizeMode={FIResizeMode.cover}
               />
             ) : (
               <View style={{
@@ -613,7 +613,7 @@ const CastMoviesScreen: React.FC = () => {
               </View>
             )}
           </View>
-          
+
           <View style={{ flex: 1 }}>
             <Text style={{
               color: '#fff',
@@ -654,8 +654,8 @@ const CastMoviesScreen: React.FC = () => {
           }}>
             Filter
           </Text>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingRight: 20 }}
           >
@@ -677,8 +677,8 @@ const CastMoviesScreen: React.FC = () => {
           }}>
             Sort By
           </Text>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingRight: 20 }}
           >
@@ -763,7 +763,7 @@ const CastMoviesScreen: React.FC = () => {
             ) : null
           }
           ListEmptyComponent={
-            <Animated.View 
+            <Animated.View
               entering={FadeIn.delay(400)}
               style={{
                 alignItems: 'center',
@@ -799,9 +799,9 @@ const CastMoviesScreen: React.FC = () => {
                 lineHeight: 20,
                 fontWeight: '500',
               }}>
-                {sortBy === 'upcoming' 
+                {sortBy === 'upcoming'
                   ? 'No upcoming releases available for this actor'
-                  : selectedFilter === 'all' 
+                  : selectedFilter === 'all'
                     ? 'No content available for this actor'
                     : selectedFilter === 'movies'
                       ? 'No movies available for this actor'

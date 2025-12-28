@@ -22,7 +22,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { NavigationProp } from '@react-navigation/native';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { catalogService, StreamingContent, GroupedSearchResults, AddonSearchResults } from '../services/catalogService';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../utils/FastImageCompat';
 import debounce from 'lodash/debounce';
 import { DropUpMenu } from '../components/home/DropUpMenu';
 import { DeviceEventEmitter, Share } from 'react-native';
@@ -685,7 +685,7 @@ const SearchScreen = () => {
           <FastImage
             source={{ uri: item.poster || PLACEHOLDER_POSTER }}
             style={styles.horizontalItemPoster}
-            resizeMode={FastImage.resizeMode.cover}
+            resizeMode={FIResizeMode.cover}
           />
           {/* Bookmark and watched icons top right, bookmark to the left of watched */}
           {inLibrary && (

@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -242,7 +242,7 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
                   height: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 18
                 }
               ]}
-              resizeMode={FastImage.resizeMode.contain}
+              resizeMode={FIResizeMode.contain}
             />
             <Text style={[
               styles.ratingText,

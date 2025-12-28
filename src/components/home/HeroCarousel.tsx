@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, TextStyle, ImageSt
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS, SharedValue, interpolate, Extrapolation } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { priority as FIPriority, cacheControl as FICacheControl, resizeMode as FIResizeMode, preload as FIPreload } from '../../utils/FastImageCompat';
 import { Pagination } from 'react-native-reanimated-carousel';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -106,17 +106,17 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
         const result: { uri: string; priority?: any }[] = [];
         const bannerOrPoster = it.banner || it.poster;
         if (bannerOrPoster) {
-          result.push({ uri: bannerOrPoster, priority: (FastImage as any).priority?.low });
+          result.push({ uri: bannerOrPoster, priority: FIPriority.low });
         }
         if (it.logo) {
-          result.push({ uri: it.logo, priority: (FastImage as any).priority?.normal });
+          result.push({ uri: it.logo, priority: FIPriority.normal });
         }
         return result;
       });
       // de-duplicate by uri
       const uniqueSources = Array.from(new Map(sources.map((s) => [s.uri, s])).values());
-      if (uniqueSources.length && (FastImage as any).preload) {
-        (FastImage as any).preload(uniqueSources);
+      if (uniqueSources.length) {
+        FIPreload(uniqueSources);
       }
     } catch {
       // no-op: prefetch is best-effort
@@ -309,11 +309,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
               <FastImage
                 source={{
                   uri: item.banner || item.poster,
-                  priority: FastImage.priority.low,
-                  cache: FastImage.cacheControl.immutable
+                  priority: FIPriority.low,
+                  cache: FICacheControl.immutable
                 }}
                 style={styles.backgroundImage as any}
-                resizeMode={FastImage.resizeMode.cover}
+                resizeMode={FIResizeMode.cover}
               />
               {Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable ? (
                 <GlassViewComp
@@ -550,11 +550,11 @@ const AnimatedCardWrapper: React.FC<AnimatedCardWrapperProps> = memo(({
         <FastImage
           source={{
             uri: item.banner || item.poster,
-            priority: FastImage.priority.normal,
-            cache: FastImage.cacheControl.immutable
+            priority: FIPriority.normal,
+            cache: FICacheControl.immutable
           }}
           style={{ width: '100%', height: '100%', position: 'absolute' }}
-          resizeMode={FastImage.resizeMode.cover}
+          resizeMode={FIResizeMode.cover}
         />
         <LinearGradient
           colors={["transparent", "rgba(0,0,0,0.2)", "rgba(0,0,0,0.6)"]}
@@ -567,11 +567,11 @@ const AnimatedCardWrapper: React.FC<AnimatedCardWrapperProps> = memo(({
               <FastImage
                 source={{
                   uri: item.logo,
-                  priority: FastImage.priority.high,
-                  cache: FastImage.cacheControl.immutable
+                  priority: FIPriority.high,
+                  cache: FICacheControl.immutable
                 }}
                 style={{ width: Math.round(cardWidth * 0.72), height: 64 }}
-                resizeMode={FastImage.resizeMode.contain}
+                resizeMode={FIResizeMode.contain}
                 onLoad={() => setLogoLoaded(true)}
               />
             </Animated.View>
@@ -806,11 +806,11 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                   <FastImage
                     source={{
                       uri: item.banner || item.poster,
-                      priority: FastImage.priority.normal,
-                      cache: FastImage.cacheControl.immutable
+                      priority: FIPriority.normal,
+                      cache: FICacheControl.immutable
                     }}
                     style={styles.banner as any}
-                    resizeMode={FastImage.resizeMode.cover}
+                    resizeMode={FIResizeMode.cover}
                     onLoad={() => setBannerLoaded(true)}
                   />
                 </Animated.View>
@@ -819,9 +819,9 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
               <View style={styles.backContent as ViewStyle}>
                 {item.logo && !logoFailed ? (
                   <FastImage
-                    source={{ uri: item.logo, priority: FastImage.priority.normal, cache: FastImage.cacheControl.immutable }}
+                    source={{ uri: item.logo, priority: FIPriority.normal, cache: FICacheControl.immutable }}
                     style={[styles.logo as any, { width: Math.round(cardWidth * 0.72) }]}
-                    resizeMode={FastImage.resizeMode.contain}
+                    resizeMode={FIResizeMode.contain}
                   />
                 ) : (
                   <Text style={[styles.backTitle as TextStyle, { color: colors.highEmphasis }]} numberOfLines={1}>
@@ -866,11 +866,11 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                       <FastImage
                         source={{
                           uri: item.banner || item.poster,
-                          priority: FastImage.priority.normal,
-                          cache: FastImage.cacheControl.immutable
+                          priority: FIPriority.normal,
+                          cache: FICacheControl.immutable
                         }}
                         style={styles.banner as any}
-                        resizeMode={FastImage.resizeMode.cover}
+                        resizeMode={FIResizeMode.cover}
                         onLoad={() => setBannerLoaded(true)}
                       />
                     </Animated.View>
@@ -882,11 +882,11 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                         <FastImage
                           source={{
                             uri: item.logo,
-                            priority: FastImage.priority.high,
-                            cache: FastImage.cacheControl.immutable
+                            priority: FIPriority.high,
+                            cache: FICacheControl.immutable
                           }}
                           style={[styles.logo as any, { width: Math.round(cardWidth * 0.72) }]}
-                          resizeMode={FastImage.resizeMode.contain}
+                          resizeMode={FIResizeMode.contain}
                           onLoad={() => setLogoLoaded(true)}
                           onError={onLogoError}
                         />
@@ -920,18 +920,18 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
               <Animated.View style={[styles.flipFace as any, styles.backFace as any, backFlipStyle]} pointerEvents={flipped ? 'auto' : 'none'}>
                 <View style={styles.bannerContainer as ViewStyle}>
                   <FastImage
-                    source={{ uri: item.banner || item.poster, priority: FastImage.priority.low, cache: FastImage.cacheControl.immutable }}
+                    source={{ uri: item.banner || item.poster, priority: FIPriority.low, cache: FICacheControl.immutable }}
                     style={styles.banner as any}
-                    resizeMode={FastImage.resizeMode.cover}
+                    resizeMode={FIResizeMode.cover}
                   />
                   {/* Overlay removed for performance - readability via text shadows */}
                 </View>
                 <View style={styles.backContent as ViewStyle}>
                   {item.logo && !logoFailed ? (
                     <FastImage
-                      source={{ uri: item.logo, priority: FastImage.priority.normal, cache: FastImage.cacheControl.immutable }}
+                      source={{ uri: item.logo, priority: FIPriority.normal, cache: FICacheControl.immutable }}
                       style={[styles.logo as any, { width: Math.round(cardWidth * 0.72) }]}
-                      resizeMode={FastImage.resizeMode.contain}
+                      resizeMode={FIResizeMode.contain}
                     />
                   ) : (
                     <Text style={[styles.backTitle as TextStyle, { color: colors.highEmphasis }]} numberOfLines={1}>

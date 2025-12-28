@@ -12,7 +12,7 @@ import {
   Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import FastImage from '@d11/react-native-fast-image';
+import FastImage, { resizeMode as FIResizeMode } from '../../utils/FastImageCompat';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useTrailer } from '../../contexts/TrailerContext';
@@ -675,7 +675,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
                           borderRadius: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16
                         }
                       ]}
-                      resizeMode={FastImage.resizeMode.cover}
+                      resizeMode={FIResizeMode.cover}
                     />
                     {/* Subtle Gradient Overlay */}
                     <View style={[
