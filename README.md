@@ -22,8 +22,7 @@
     <a href="#getting-started"><strong>Get Started »</strong></a>
     <br />
     <br />
-    <a href="#demo">View Screenshots</a>
-    ·
+
     <a href="https://github.com/tapframe/NuvioStreaming/issues/new?labels=bug&template=bug_report.md">Report Bug</a>
     ·
     <a href="https://github.com/tapframe/NuvioStreaming/issues/new?labels=enhancement&template=feature_request.md">Request Feature</a>
@@ -38,7 +37,7 @@
       <a href="#about-the-project">About The Project</a>
     </li>
     <li><a href="#installation">Installation</a></li>
-    <li><a href="#demo">Screenshots</a></li>
+
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#support">Support</a></li>
@@ -79,15 +78,7 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!-- DEMO / SCREENSHOTS -->
-## Demo
-<a id="demo"></a>
 
-| Home | Details |
-|:----:|:-------:|
-| ![Home](screenshots/Simulator%20Screenshot%20-%20iPhone%2016%20Pro%20-%202025-08-27%20at%2021.08.32-portrait.png) | ![Details](screenshots/WhatsApp%20Image%202025-09-02%20at%2000.24.31-portrait.png) |
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- GETTING STARTED -->
 ## Getting Started
