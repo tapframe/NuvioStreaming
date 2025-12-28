@@ -89,3 +89,8 @@ android/sentry.properties
 Stremio addons refer
 trakt-docs
 trakt-docss
+
+# Removed submodules (kept locally)
+libmpv-android/
+mpv-android/
+mpvKt/
