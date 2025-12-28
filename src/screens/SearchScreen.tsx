@@ -49,187 +49,40 @@ import { useScrollToTop } from '../contexts/ScrollToTopContext';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useSettings } from '../hooks/useSettings';
 
-// Catalog info type for discover
-interface DiscoverCatalog {
-  addonId: string;
-  addonName: string;
-  catalogId: string;
-  catalogName: string;
-  type: string;
-  genres: string[];
-}
+// Import extracted search components
+import {
+  DiscoverCatalog,
+  BREAKPOINTS,
+  getDeviceType,
+  isTablet,
+  isLargeTablet,
+  isTV,
+  TAB_BAR_HEIGHT,
+  RECENT_SEARCHES_KEY,
+  MAX_RECENT_SEARCHES,
+  PLACEHOLDER_POSTER,
+  HORIZONTAL_ITEM_WIDTH,
+  HORIZONTAL_POSTER_HEIGHT,
+  POSTER_WIDTH,
+  POSTER_HEIGHT,
+} from '../components/search/searchUtils';
+import { SearchSkeletonLoader } from '../components/search/SearchSkeletonLoader';
+import { SearchAnimation } from '../components/search/SearchAnimation';
+import { SearchResultItem } from '../components/search/SearchResultItem';
+import { RecentSearches } from '../components/search/RecentSearches';
 
 const { width, height } = Dimensions.get('window');
 
-// Enhanced responsive breakpoints
-const BREAKPOINTS = {
-  phone: 0,
-  tablet: 768,
-  largeTablet: 1024,
-  tv: 1440,
-};
-
-const getDeviceType = (deviceWidth: number) => {
-  if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
-  if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
-  if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
-  return 'phone';
-};
-
+// Re-export for local use (backward compatibility)
 const deviceType = getDeviceType(width);
-const isTablet = deviceType === 'tablet';
-const isLargeTablet = deviceType === 'largeTablet';
-const isTV = deviceType === 'tv';
-const TAB_BAR_HEIGHT = 85;
-
-// Responsive poster sizes
-const HORIZONTAL_ITEM_WIDTH = isTV ? width * 0.14 : isLargeTablet ? width * 0.16 : isTablet ? width * 0.18 : width * 0.3;
-const HORIZONTAL_POSTER_HEIGHT = HORIZONTAL_ITEM_WIDTH * 1.5;
-const POSTER_WIDTH = isTV ? 90 : isLargeTablet ? 80 : isTablet ? 70 : 90;
-const POSTER_HEIGHT = POSTER_WIDTH * 1.5;
-const RECENT_SEARCHES_KEY = 'recent_searches';
-const MAX_RECENT_SEARCHES = 10;
-
-const PLACEHOLDER_POSTER = 'https://placehold.co/300x450/222222/CCCCCC?text=No+Poster';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-const SkeletonLoader = () => {
-  const pulseAnim = React.useRef(new RNAnimated.Value(0)).current;
-  const { currentTheme } = useTheme();
-
-  React.useEffect(() => {
-    const pulse = RNAnimated.loop(
-      RNAnimated.sequence([
-        RNAnimated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, [pulseAnim]);
-
-  const opacity = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
-
-  const renderSkeletonItem = () => (
-    <View style={styles.skeletonVerticalItem}>
-      <RNAnimated.View style={[
-        styles.skeletonPoster,
-        { opacity, backgroundColor: currentTheme.colors.darkBackground }
-      ]} />
-      <View style={styles.skeletonItemDetails}>
-        <RNAnimated.View style={[
-          styles.skeletonTitle,
-          { opacity, backgroundColor: currentTheme.colors.darkBackground }
-        ]} />
-        <View style={styles.skeletonMetaRow}>
-          <RNAnimated.View style={[
-            styles.skeletonMeta,
-            { opacity, backgroundColor: currentTheme.colors.darkBackground }
-          ]} />
-          <RNAnimated.View style={[
-            styles.skeletonMeta,
-            { opacity, backgroundColor: currentTheme.colors.darkBackground }
-          ]} />
-        </View>
-      </View>
-    </View>
-  );
-
-  return (
-    <View style={styles.skeletonContainer}>
-      {[...Array(5)].map((_, index) => (
-        <View key={index}>
-          {index === 0 && (
-            <RNAnimated.View style={[
-              styles.skeletonSectionHeader,
-              { opacity, backgroundColor: currentTheme.colors.darkBackground }
-            ]} />
-          )}
-          {renderSkeletonItem()}
-        </View>
-      ))}
-    </View>
-  );
-};
+// Alias imported components for backward compatibility with existing code
+const SkeletonLoader = SearchSkeletonLoader;
+const SimpleSearchAnimation = SearchAnimation;
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
-
-// Create a simple, elegant animation component
-const SimpleSearchAnimation = () => {
-  // Simple animation values that work reliably
-  const spinAnim = React.useRef(new RNAnimated.Value(0)).current;
-  const fadeAnim = React.useRef(new RNAnimated.Value(0)).current;
-  const { currentTheme } = useTheme();
-
-  React.useEffect(() => {
-    // Rotation animation
-    const spin = RNAnimated.loop(
-      RNAnimated.timing(spinAnim, {
-        toValue: 1,
-        duration: 1500,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-
-    // Fade animation
-    const fade = RNAnimated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    });
-
-    // Start animations
-    spin.start();
-    fade.start();
-
-    // Clean up
-    return () => {
-      spin.stop();
-    };
-  }, [spinAnim, fadeAnim]);
-
-  // Simple rotation interpolation
-  const spin = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  return (
-    <RNAnimated.View
-      style={[
-        styles.simpleAnimationContainer,
-        { opacity: fadeAnim }
-      ]}
-    >
-      <View style={styles.simpleAnimationContent}>
-        <RNAnimated.View style={[
-          styles.spinnerContainer,
-          { transform: [{ rotate: spin }], backgroundColor: currentTheme.colors.primary }
-        ]}>
-          <MaterialIcons
-            name="search"
-            size={32}
-            color={currentTheme.colors.white}
-          />
-        </RNAnimated.View>
-        <Text style={[styles.simpleAnimationText, { color: currentTheme.colors.white }]}>Searching</Text>
-      </View>
-    </RNAnimated.View>
-  );
-};
 
 const SearchScreen = () => {
   const { settings } = useSettings();
@@ -264,6 +117,7 @@ const SearchScreen = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [discoverResults, setDiscoverResults] = useState<StreamingContent[]>([]);
+  const [pendingDiscoverResults, setPendingDiscoverResults] = useState<StreamingContent[]>([]);
 
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverInitialized, setDiscoverInitialized] = useState(false);
@@ -289,6 +143,18 @@ const SearchScreen = () => {
       isMounted.current = false;
     };
   }, []);
+
+  const handleShowMore = () => {
+    if (pendingDiscoverResults.length === 0) return;
+
+    // Show next batch of 300 items
+    const batchSize = 300;
+    const nextBatch = pendingDiscoverResults.slice(0, batchSize);
+    const remaining = pendingDiscoverResults.slice(batchSize);
+
+    setDiscoverResults(prev => [...prev, ...nextBatch]);
+    setPendingDiscoverResults(remaining);
+  };
 
   // Load discover catalogs on mount
   useEffect(() => {
@@ -335,6 +201,7 @@ const SearchScreen = () => {
       setDiscoverLoading(true);
       setPage(1); // Reset page on new filter
       setHasMore(true);
+      setPendingDiscoverResults([]);
       try {
         const results = await catalogService.discoverContentFromCatalog(
           selectedCatalog.addonId,
@@ -344,8 +211,15 @@ const SearchScreen = () => {
           1 // page 1
         );
         if (isMounted.current) {
-          setDiscoverResults(results);
-          setHasMore(results.length > 0);
+          if (results.length > 300) {
+            setDiscoverResults(results.slice(0, 300));
+            setPendingDiscoverResults(results.slice(300));
+            setHasMore(true);
+          } else {
+            setDiscoverResults(results);
+            setPendingDiscoverResults([]);
+            setHasMore(results.length > 0);
+          }
         }
       } catch (error) {
         logger.error('Failed to fetch discover content:', error);
@@ -364,7 +238,7 @@ const SearchScreen = () => {
 
   // Load more content for pagination
   const loadMoreDiscoverContent = async () => {
-    if (!hasMore || loadingMore || discoverLoading || !selectedCatalog) return;
+    if (!hasMore || loadingMore || discoverLoading || !selectedCatalog || pendingDiscoverResults.length > 0) return;
 
     setLoadingMore(true);
     const nextPage = page + 1;
@@ -380,7 +254,12 @@ const SearchScreen = () => {
 
       if (isMounted.current) {
         if (moreResults.length > 0) {
-          setDiscoverResults(prev => [...prev, ...moreResults]);
+          if (moreResults.length > 300) {
+            setDiscoverResults(prev => [...prev, ...moreResults.slice(0, 300)]);
+            setPendingDiscoverResults(moreResults.slice(300));
+          } else {
+            setDiscoverResults(prev => [...prev, ...moreResults]);
+          }
           setPage(nextPage);
         } else {
           setHasMore(false);
@@ -893,8 +772,14 @@ const SearchScreen = () => {
             </Text>
           </View>
         ) : discoverResults.length > 0 ? (
-          <View style={styles.discoverGrid}>
-            {discoverResults.map((item, index) => (
+          <FlatList
+            data={discoverResults}
+            keyExtractor={(item, index) => `discover-${item.id}-${index}`}
+            numColumns={isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3}
+            key={isTV ? 'tv-6' : isLargeTablet ? 'ltab-5' : isTablet ? 'tab-4' : 'phone-3'}
+            columnWrapperStyle={styles.discoverGridRow}
+            contentContainerStyle={styles.discoverGridContent}
+            renderItem={({ item, index }) => (
               <SearchResultItem
                 key={`discover-${item.id}-${index}`}
                 item={item}
@@ -905,13 +790,31 @@ const SearchScreen = () => {
                 currentTheme={currentTheme}
                 isGrid={true}
               />
-            ))}
-            {loadingMore && (
-              <View style={styles.loadingMoreContainer}>
-                <ActivityIndicator size="small" color={currentTheme.colors.primary} />
-              </View>
             )}
-          </View>
+            initialNumToRender={9}
+            maxToRenderPerBatch={6}
+            windowSize={5}
+            removeClippedSubviews={true}
+            scrollEnabled={false}
+            ListFooterComponent={
+              pendingDiscoverResults.length > 0 ? (
+                <TouchableOpacity
+                  style={styles.showMoreButton}
+                  onPress={handleShowMore}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.showMoreButtonText, { color: currentTheme.colors.white }]}>
+                    Show More ({pendingDiscoverResults.length})
+                  </Text>
+                  <MaterialIcons name="expand-more" size={20} color={currentTheme.colors.white} />
+                </TouchableOpacity>
+              ) : loadingMore ? (
+                <View style={styles.loadingMoreContainer}>
+                  <ActivityIndicator size="small" color={currentTheme.colors.primary} />
+                </View>
+              ) : null
+            }
+          />
         ) : discoverInitialized && !discoverLoading && selectedCatalog ? (
           <View style={styles.discoverEmptyContainer}>
             <MaterialIcons name="movie-filter" size={48} color={currentTheme.colors.lightGray} />
@@ -961,11 +864,12 @@ const SearchScreen = () => {
         // Grid Calculation: (Window Width - Padding) / Columns
         // Padding: 16 (left) + 16 (right) = 32
         // Gap: 12 (between items) * (columns - 1)
+        // Ensure minimum 3 columns on all devices
         const columns = isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3;
         const totalPadding = 32;
-        const totalGap = 12 * (columns - 1);
+        const totalGap = 12 * (Math.max(3, columns) - 1);
         const availableWidth = width - totalPadding - totalGap;
-        w = availableWidth / columns;
+        w = availableWidth / Math.max(3, columns);
       } else {
         if (shape === 'landscape') {
           r = 16 / 9;
@@ -1020,7 +924,11 @@ const SearchScreen = () => {
           borderRadius: settings.posterBorderRadius ?? 12,
         }]}>
           <FastImage
-            source={{ uri: item.poster || PLACEHOLDER_POSTER }}
+            source={{
+              uri: item.poster || PLACEHOLDER_POSTER,
+              priority: FastImage.priority.low,
+              cache: FastImage.cacheControl.immutable,
+            }}
             style={[styles.horizontalItemPoster, { borderRadius: settings.posterBorderRadius ?? 12 }]}
             resizeMode={FastImage.resizeMode.cover}
           />
@@ -1342,7 +1250,7 @@ const SearchScreen = () => {
             scrollEventThrottle={16}
             onScroll={({ nativeEvent }) => {
               // Only paginate if query is empty (Discover mode)
-              if (query.trim().length > 0 || !settings.showDiscover) return;
+              if (query.trim().length > 0 || !settings.showDiscover || pendingDiscoverResults.length > 0) return;
 
               const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
               const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 500;
@@ -1418,6 +1326,8 @@ const SearchScreen = () => {
         enableDynamicSizing={false}
         enablePanDownToClose={true}
         backdropComponent={renderBackdrop}
+        android_keyboardInputMode="adjustResize"
+        animateOnMount={true}
         backgroundStyle={{
           backgroundColor: currentTheme.colors.darkGray || '#0A0C0C',
           borderTopLeftRadius: 16,
@@ -1476,6 +1386,8 @@ const SearchScreen = () => {
         enableDynamicSizing={false}
         enablePanDownToClose={true}
         backdropComponent={renderBackdrop}
+        android_keyboardInputMode="adjustResize"
+        animateOnMount={true}
         backgroundStyle={{
           backgroundColor: currentTheme.colors.darkGray || '#0A0C0C',
           borderTopLeftRadius: 16,
@@ -2030,9 +1942,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12, // vertical and horizontal gap
   },
+  discoverGridRow: {
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  discoverGridContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
   discoverGridItem: {
     marginRight: 0, // Override horizontalItem margin
-    marginBottom: 0, // Gap handles this now
+    marginBottom: 12,
   },
   loadingMoreContainer: {
     width: '100%',
@@ -2118,6 +2038,22 @@ const styles = StyleSheet.create({
   bottomSheetItemSubtitle: {
     fontSize: 13,
     marginTop: 2,
+  },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    marginVertical: 20,
+    alignSelf: 'center',
+  },
+  showMoreButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
   },
 });
 

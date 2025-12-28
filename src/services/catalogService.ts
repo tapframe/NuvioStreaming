@@ -1142,18 +1142,16 @@ class CatalogService {
         const supportsGenre = catalog.extra?.some(e => e.name === 'genre') ||
           catalog.extraSupported?.includes('genre');
 
-        // If genre is specified, only use catalogs that support genre OR have no filter restrictions
-        // If genre is specified but catalog doesn't support genre filter, skip it
-        if (genre && !supportsGenre) {
-          continue;
-        }
+        // If genre is specified but not supported, we still fetch but without the filter
+        // This ensures we don't skip addons that don't support the filter
 
         const manifest = manifests.find(m => m.id === addon.id);
         if (!manifest) continue;
 
         const fetchPromise = (async () => {
           try {
-            const filters = genre ? [{ title: 'genre', value: genre }] : [];
+            // Only apply genre filter if supported
+            const filters = (genre && supportsGenre) ? [{ title: 'genre', value: genre }] : [];
             const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
 
             if (metas && metas.length > 0) {
@@ -1220,7 +1218,17 @@ class CatalogService {
         return [];
       }
 
-      const filters = genre ? [{ title: 'genre', value: genre }] : [];
+      // Find the catalog to check if it supports genre filter
+      const addon = (await this.getAllAddons()).find(a => a.id === addonId);
+      const catalog = addon?.catalogs?.find(c => c.id === catalogId);
+
+      // Check if catalog supports genre filter
+      const supportsGenre = catalog?.extra?.some((e: any) => e.name === 'genre') ||
+        catalog?.extraSupported?.includes('genre');
+
+      // Only apply genre filter if the catalog supports it
+      const filters = (genre && supportsGenre) ? [{ title: 'genre', value: genre }] : [];
+
       const metas = await stremioService.getCatalog(manifest, type, catalogId, page, filters);
 
       if (metas && metas.length > 0) {
