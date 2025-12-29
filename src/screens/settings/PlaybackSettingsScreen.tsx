@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, StatusBar, Platform } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -8,12 +8,25 @@ import { useSettings } from '../../hooks/useSettings';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './SettingsComponents';
+import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 
 const PlaybackSettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const { settings, updateSetting } = useSettings();
     const insets = useSafeAreaInsets();
+    const config = useRealtimeConfig();
+
+    const isItemVisible = (itemId: string) => {
+        if (!config?.items) return true;
+        const item = config.items[itemId];
+        if (item && item.visible === false) return false;
+        return true;
+    };
+
+    const hasVisibleItems = (itemIds: string[]) => {
+        return itemIds.some(id => isItemVisible(id));
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -25,56 +38,70 @@ const PlaybackSettingsScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
             >
-                <SettingsCard title="VIDEO PLAYER">
-                    <SettingItem
-                        title="Video Player"
-                        description={Platform.OS === 'ios'
-                            ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
-                            : (settings?.useExternalPlayer ? 'External' : 'Built-in')
-                        }
-                        icon="play-circle"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('PlayerSettings')}
-                        isLast
-                    />
-                </SettingsCard>
-
-                <SettingsCard title="MEDIA">
-                    <SettingItem
-                        title="Show Trailers"
-                        description="Display trailers in hero section"
-                        icon="film"
-                        renderControl={() => (
-                            <CustomSwitch
-                                value={settings?.showTrailers ?? true}
-                                onValueChange={(value) => updateSetting('showTrailers', value)}
+                {hasVisibleItems(['video_player']) && (
+                    <SettingsCard title="VIDEO PLAYER">
+                        {isItemVisible('video_player') && (
+                            <SettingItem
+                                title="Video Player"
+                                description={Platform.OS === 'ios'
+                                    ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
+                                    : (settings?.useExternalPlayer ? 'External' : 'Built-in')
+                                }
+                                icon="play-circle"
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('PlayerSettings')}
+                                isLast
                             />
                         )}
-                    />
-                    <SettingItem
-                        title="Enable Downloads (Beta)"
-                        description="Show Downloads tab and enable saving streams"
-                        icon="download"
-                        renderControl={() => (
-                            <CustomSwitch
-                                value={settings?.enableDownloads ?? false}
-                                onValueChange={(value) => updateSetting('enableDownloads', value)}
+                    </SettingsCard>
+                )}
+
+                {hasVisibleItems(['show_trailers', 'enable_downloads']) && (
+                    <SettingsCard title="MEDIA">
+                        {isItemVisible('show_trailers') && (
+                            <SettingItem
+                                title="Show Trailers"
+                                description="Display trailers in hero section"
+                                icon="film"
+                                renderControl={() => (
+                                    <CustomSwitch
+                                        value={settings?.showTrailers ?? true}
+                                        onValueChange={(value) => updateSetting('showTrailers', value)}
+                                    />
+                                )}
                             />
                         )}
-                        isLast
-                    />
-                </SettingsCard>
+                        {isItemVisible('enable_downloads') && (
+                            <SettingItem
+                                title="Enable Downloads (Beta)"
+                                description="Show Downloads tab and enable saving streams"
+                                icon="download"
+                                renderControl={() => (
+                                    <CustomSwitch
+                                        value={settings?.enableDownloads ?? false}
+                                        onValueChange={(value) => updateSetting('enableDownloads', value)}
+                                    />
+                                )}
+                                isLast
+                            />
+                        )}
+                    </SettingsCard>
+                )}
 
-                <SettingsCard title="NOTIFICATIONS">
-                    <SettingItem
-                        title="Notifications"
-                        description="Episode reminders"
-                        icon="bell"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('NotificationSettings')}
-                        isLast
-                    />
-                </SettingsCard>
+                {hasVisibleItems(['notifications']) && (
+                    <SettingsCard title="NOTIFICATIONS">
+                        {isItemVisible('notifications') && (
+                            <SettingItem
+                                title="Notifications"
+                                description="Episode reminders"
+                                icon="bell"
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('NotificationSettings')}
+                                isLast
+                            />
+                        )}
+                    </SettingsCard>
+                )}
             </ScrollView>
         </View>
     );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, StatusBar, Platform } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -11,6 +11,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import PluginIcon from '../../components/icons/PluginIcon';
 import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './SettingsComponents';
+import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 
 const ContentDiscoverySettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -20,6 +21,7 @@ const ContentDiscoverySettingsScreen: React.FC = () => {
 
     const [addonCount, setAddonCount] = useState<number>(0);
     const [catalogCount, setCatalogCount] = useState<number>(0);
+    const config = useRealtimeConfig();
 
     const loadData = useCallback(async () => {
         try {
@@ -48,16 +50,22 @@ const ContentDiscoverySettingsScreen: React.FC = () => {
         }
     }, []);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
-
-    useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', () => {
+    useFocusEffect(
+        useCallback(() => {
             loadData();
-        });
-        return unsubscribe;
-    }, [navigation, loadData]);
+        }, [loadData])
+    );
+
+    const isItemVisible = (itemId: string) => {
+        if (!config?.items) return true;
+        const item = config.items[itemId];
+        if (item && item.visible === false) return false;
+        return true;
+    };
+
+    const hasVisibleItems = (itemIds: string[]) => {
+        return itemIds.some(id => isItemVisible(id));
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -69,70 +77,90 @@ const ContentDiscoverySettingsScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
             >
-                <SettingsCard title="SOURCES">
-                    <SettingItem
-                        title="Addons"
-                        description={`${addonCount} installed`}
-                        icon="layers"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('Addons')}
-                    />
-                    <SettingItem
-                        title="Debrid Integration"
-                        description="Connect Torbox for premium streams"
-                        icon="link"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('DebridIntegration')}
-                    />
-                    <SettingItem
-                        title="Plugins"
-                        description="Manage plugins and repositories"
-                        customIcon={<PluginIcon size={18} color={currentTheme.colors.primary} />}
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('ScraperSettings')}
-                        isLast
-                    />
-                </SettingsCard>
-
-                <SettingsCard title="CATALOGS">
-                    <SettingItem
-                        title="Catalogs"
-                        description={`${catalogCount} active`}
-                        icon="list"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('CatalogSettings')}
-                    />
-                    <SettingItem
-                        title="Home Screen"
-                        description="Layout and content"
-                        icon="home"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('HomeScreenSettings')}
-                    />
-                    <SettingItem
-                        title="Continue Watching"
-                        description="Cache and playback behavior"
-                        icon="play-circle"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('ContinueWatchingSettings')}
-                        isLast
-                    />
-                </SettingsCard>
-
-                <SettingsCard title="DISCOVERY">
-                    <SettingItem
-                        title="Show Discover Section"
-                        description="Display discover content in Search"
-                        icon="compass"
-                        renderControl={() => (
-                            <CustomSwitch
-                                value={settings?.showDiscover ?? true}
-                                onValueChange={(value) => updateSetting('showDiscover', value)}
+                {hasVisibleItems(['addons', 'debrid', 'plugins']) && (
+                    <SettingsCard title="SOURCES">
+                        {isItemVisible('addons') && (
+                            <SettingItem
+                                title="Addons"
+                                description={`${addonCount} installed`}
+                                icon="layers"
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('Addons')}
                             />
                         )}
-                        isLast
-                    />
-                </SettingsCard>
+                        {isItemVisible('debrid') && (
+                            <SettingItem
+                                title="Debrid Integration"
+                                description="Connect Torbox for premium streams"
+                                icon="link"
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('DebridIntegration')}
+                            />
+                        )}
+                        {isItemVisible('plugins') && (
+                            <SettingItem
+                                title="Plugins"
+                                description="Manage plugins and repositories"
+                                customIcon={<PluginIcon size={18} color={currentTheme.colors.primary} />}
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('ScraperSettings')}
+                                isLast
+                            />
+                        )}
+                    </SettingsCard>
+                )}
+
+                {hasVisibleItems(['catalogs', 'home_screen', 'continue_watching']) && (
+                    <SettingsCard title="CATALOGS">
+                        {isItemVisible('catalogs') && (
+                            <SettingItem
+                                title="Catalogs"
+                                description={`${catalogCount} active`}
+                                icon="list"
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('CatalogSettings')}
+                            />
+                        )}
+                        {isItemVisible('home_screen') && (
+                            <SettingItem
+                                title="Home Screen"
+                                description="Layout and content"
+                                icon="home"
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('HomeScreenSettings')}
+                            />
+                        )}
+                        {isItemVisible('continue_watching') && (
+                            <SettingItem
+                                title="Continue Watching"
+                                description="Cache and playback behavior"
+                                icon="play-circle"
+                                renderControl={() => <ChevronRight />}
+                                onPress={() => navigation.navigate('ContinueWatchingSettings')}
+                                isLast
+                            />
+                        )}
+                    </SettingsCard>
+                )}
+
+                {hasVisibleItems(['show_discover']) && (
+                    <SettingsCard title="DISCOVERY">
+                        {isItemVisible('show_discover') && (
+                            <SettingItem
+                                title="Show Discover Section"
+                                description="Display discover content in Search"
+                                icon="compass"
+                                renderControl={() => (
+                                    <CustomSwitch
+                                        value={settings?.showDiscover ?? true}
+                                        onValueChange={(value) => updateSetting('showDiscover', value)}
+                                    />
+                                )}
+                                isLast
+                            />
+                        )}
+                    </SettingsCard>
+                )}
             </ScrollView>
         </View>
     );

@@ -1,4 +1,8 @@
+import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { useRealtimeConfig } from '../hooks/useRealtimeConfig';
+
+
 import {
   View,
   Text,
@@ -316,10 +320,12 @@ const SettingsScreen: React.FC = () => {
   const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
   const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState<boolean>(false);
-  const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
+  const [totalDownloads, setTotalDownloads] = useState<number>(0);
   const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
   const [isCountingUp, setIsCountingUp] = useState<boolean>(false);
+
+  // Use Realtime Config Hook
+  const settingsConfig = useRealtimeConfig();
 
   // Scroll to top ref and handler
   const mobileScrollViewRef = useRef<ScrollView>(null);
@@ -354,7 +360,6 @@ const SettingsScreen: React.FC = () => {
       // Load addon count and get their catalogs
       const addons = await stremioService.getInstalledAddonsAsync();
       setAddonCount(addons.length);
-      setInitialLoadComplete(true);
 
       // Count total available catalogs
       let totalCatalogs = 0;
@@ -525,8 +530,17 @@ const SettingsScreen: React.FC = () => {
     />
   );
 
+  // Helper to check item visibility
+  const isItemVisible = (itemId: string) => {
+    if (!settingsConfig?.items) return true;
+    const item = settingsConfig.items[itemId];
+    if (item && item.visible === false) return false;
+    return true;
+  };
+
   // Filter categories based on conditions
   const visibleCategories = SETTINGS_CATEGORIES.filter(category => {
+    if (settingsConfig?.categories?.[category.id]?.visible === false) return false;
     if (category.id === 'developer' && !__DEV__) return false;
     if (category.id === 'cache' && !mdblistKeySet) return false;
     return true;
@@ -539,110 +553,130 @@ const SettingsScreen: React.FC = () => {
       case 'account':
         return (
           <SettingsCard title="ACCOUNT" isTablet={isTablet}>
-            <SettingItem
-              title="Trakt"
-              description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
-              customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('TraktSettings')}
-              isLast={true}
-              isTablet={isTablet}
-            />
+            {isItemVisible('trakt') && (
+              <SettingItem
+                title="Trakt"
+                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
+                customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('TraktSettings')}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
           </SettingsCard>
         );
 
       case 'content':
         return (
           <SettingsCard title="CONTENT & DISCOVERY" isTablet={isTablet}>
-            <SettingItem
-              title="Addons"
-              description={`${addonCount} installed`}
-              icon="layers"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('Addons')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Debrid Integration"
-              description="Connect Torbox for premium streams"
-              icon="link"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('DebridIntegration')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Plugins"
-              description="Manage plugins and repositories"
-              customIcon={<PluginIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('ScraperSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Catalogs"
-              description={`${catalogCount} active`}
-              icon="list"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('CatalogSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Home Screen"
-              description="Layout and content"
-              icon="home"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('HomeScreenSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Show Discover Section"
-              description="Display discover content in Search"
-              icon="compass"
-              renderControl={() => (
-                <CustomSwitch
-                  value={settings?.showDiscover ?? true}
-                  onValueChange={(value) => updateSetting('showDiscover', value)}
-                />
-              )}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Continue Watching"
-              description="Cache and playback behavior"
-              icon="play-circle"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('ContinueWatchingSettings')}
-              isLast={true}
-              isTablet={isTablet}
-            />
+            {isItemVisible('addons') && (
+              <SettingItem
+                title="Addons"
+                description={`${addonCount} installed`}
+                icon="layers"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('Addons')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('debrid') && (
+              <SettingItem
+                title="Debrid Integration"
+                description="Connect Torbox for premium streams"
+                icon="link"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('DebridIntegration')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('plugins') && (
+              <SettingItem
+                title="Plugins"
+                description="Manage plugins and repositories"
+                customIcon={<PluginIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ScraperSettings')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('catalogs') && (
+              <SettingItem
+                title="Catalogs"
+                description={`${catalogCount} active`}
+                icon="list"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('CatalogSettings')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('home_screen') && (
+              <SettingItem
+                title="Home Screen"
+                description="Layout and content"
+                icon="home"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('HomeScreenSettings')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('show_discover') && (
+              <SettingItem
+                title="Show Discover Section"
+                description="Display discover content in Search"
+                icon="compass"
+                renderControl={() => (
+                  <CustomSwitch
+                    value={settings?.showDiscover ?? true}
+                    onValueChange={(value) => updateSetting('showDiscover', value)}
+                  />
+                )}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('continue_watching') && (
+              <SettingItem
+                title="Continue Watching"
+                description="Cache and playback behavior"
+                icon="play-circle"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ContinueWatchingSettings')}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
           </SettingsCard>
         );
 
       case 'appearance':
         return (
           <SettingsCard title="APPEARANCE" isTablet={isTablet}>
-            <SettingItem
-              title="Theme"
-              description={currentTheme.name}
-              icon="sliders"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('ThemeSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Episode Layout"
-              description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
-              icon="grid"
-              renderControl={() => (
-                <CustomSwitch
-                  value={settings?.episodeLayoutStyle === 'horizontal'}
-                  onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
-                />
-              )}
-              isLast={isTablet}
-              isTablet={isTablet}
-            />
-            {!isTablet && (
+            {isItemVisible('theme') && (
+              <SettingItem
+                title="Theme"
+                description={currentTheme.name}
+                icon="sliders"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ThemeSettings')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('episode_layout') && (
+              <SettingItem
+                title="Episode Layout"
+                description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
+                icon="grid"
+                renderControl={() => (
+                  <CustomSwitch
+                    value={settings?.episodeLayoutStyle === 'horizontal'}
+                    onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
+                  />
+                )}
+                isLast={isTablet}
+                isTablet={isTablet}
+              />
+            )}
+            {!isTablet && isItemVisible('streams_backdrop') && (
               <SettingItem
                 title="Streams Backdrop"
                 description="Show blurred backdrop on mobile streams"
@@ -663,92 +697,106 @@ const SettingsScreen: React.FC = () => {
       case 'integrations':
         return (
           <SettingsCard title="INTEGRATIONS" isTablet={isTablet}>
-            <SettingItem
-              title="MDBList"
-              description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
-              customIcon={<MDBListIcon size={isTablet ? 24 : 20} colorPrimary={currentTheme.colors.primary} colorSecondary={currentTheme.colors.white} />}
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('MDBListSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="TMDB"
-              description="Metadata & logo source provider"
-              customIcon={<TMDBIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('TMDBSettings')}
-              isLast={true}
-              isTablet={isTablet}
-            />
+            {isItemVisible('mdblist') && (
+              <SettingItem
+                title="MDBList"
+                description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
+                customIcon={<MDBListIcon size={isTablet ? 24 : 20} colorPrimary={currentTheme.colors.primary} colorSecondary={currentTheme.colors.white} />}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('MDBListSettings')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('tmdb') && (
+              <SettingItem
+                title="TMDB"
+                description="Metadata & logo source provider"
+                customIcon={<TMDBIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('TMDBSettings')}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
           </SettingsCard>
         );
 
       case 'ai':
         return (
           <SettingsCard title="AI ASSISTANT" isTablet={isTablet}>
-            <SettingItem
-              title="OpenRouter API"
-              description={openRouterKeySet ? "Connected" : "Add your API key to enable AI chat"}
-              icon="cpu"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('AISettings')}
-              isLast={true}
-              isTablet={isTablet}
-            />
+            {isItemVisible('openrouter') && (
+              <SettingItem
+                title="OpenRouter API"
+                description={openRouterKeySet ? "Connected" : "Add your API key to enable AI chat"}
+                icon="cpu"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('AISettings')}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
           </SettingsCard>
         );
 
       case 'playback':
         return (
           <SettingsCard title="PLAYBACK" isTablet={isTablet}>
-            <SettingItem
-              title="Video Player"
-              description={Platform.OS === 'ios'
-                ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
-                : (settings?.useExternalPlayer ? 'External' : 'Built-in')
-              }
-              icon="play-circle"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('PlayerSettings')}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Show Trailers"
-              description="Display trailers in hero section"
-              icon="film"
-              renderControl={() => (
-                <Switch
-                  value={settings?.showTrailers ?? true}
-                  onValueChange={(value) => updateSetting('showTrailers', value)}
-                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
-                  thumbColor={settings?.showTrailers ? '#fff' : '#f4f3f4'}
-                />
-              )}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Enable Downloads (Beta)"
-              description="Show Downloads tab and enable saving streams"
-              icon="download"
-              renderControl={() => (
-                <Switch
-                  value={settings?.enableDownloads ?? false}
-                  onValueChange={(value) => updateSetting('enableDownloads', value)}
-                  trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
-                  thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
-                />
-              )}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Notifications"
-              description="Episode reminders"
-              icon="bell"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('NotificationSettings')}
-              isLast={true}
-              isTablet={isTablet}
-            />
+            {isItemVisible('video_player') && (
+              <SettingItem
+                title="Video Player"
+                description={Platform.OS === 'ios'
+                  ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
+                  : (settings?.useExternalPlayer ? 'External' : 'Built-in')
+                }
+                icon="play-circle"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('PlayerSettings')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('show_trailers') && (
+              <SettingItem
+                title="Show Trailers"
+                description="Display trailers in hero section"
+                icon="film"
+                renderControl={() => (
+                  <Switch
+                    value={settings?.showTrailers ?? true}
+                    onValueChange={(value) => updateSetting('showTrailers', value)}
+                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                    thumbColor={settings?.showTrailers ? '#fff' : '#f4f3f4'}
+                  />
+                )}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('enable_downloads') && (
+              <SettingItem
+                title="Enable Downloads (Beta)"
+                description="Show Downloads tab and enable saving streams"
+                icon="download"
+                renderControl={() => (
+                  <Switch
+                    value={settings?.enableDownloads ?? false}
+                    onValueChange={(value) => updateSetting('enableDownloads', value)}
+                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
+                    thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
+                  />
+                )}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('notifications') && (
+              <SettingItem
+                title="Notifications"
+                description="Episode reminders"
+                icon="bell"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('NotificationSettings')}
+                isLast={true}
+                isTablet={isTablet}
+              />
+            )}
           </SettingsCard>
         );
 
@@ -1079,75 +1127,103 @@ const SettingsScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Account */}
-            <SettingsCard title="ACCOUNT">
-              <SettingItem
-                title="Trakt"
-                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
-                customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('TraktSettings')}
-                isLast
-              />
-            </SettingsCard>
+            {(settingsConfig?.categories?.['account']?.visible !== false) && isItemVisible('trakt') && (
+              <SettingsCard title="ACCOUNT">
+                {isItemVisible('trakt') && (
+                  <SettingItem
+                    title="Trakt"
+                    description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
+                    customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
+                    renderControl={ChevronRight}
+                    onPress={() => navigation.navigate('TraktSettings')}
+                    isLast
+                  />
+                )}
+              </SettingsCard>
+            )}
 
             {/* General Settings */}
-            <SettingsCard title="GENERAL">
-              <SettingItem
-                title="Content & Discovery"
-                description="Addons, catalogs, and sources"
-                icon="compass"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ContentDiscoverySettings')}
-              />
-              <SettingItem
-                title="Appearance"
-                description={currentTheme.name}
-                icon="sliders"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('AppearanceSettings')}
-              />
-              <SettingItem
-                title="Integrations"
-                description="MDBList, TMDB, AI"
-                icon="layers"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('IntegrationsSettings')}
-              />
-              <SettingItem
-                title="Playback"
-                description="Player, trailers, downloads"
-                icon="play-circle"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('PlaybackSettings')}
-                isLast
-              />
-            </SettingsCard>
+            {(
+              (settingsConfig?.categories?.['content']?.visible !== false) ||
+              (settingsConfig?.categories?.['appearance']?.visible !== false) ||
+              (settingsConfig?.categories?.['integrations']?.visible !== false) ||
+              (settingsConfig?.categories?.['playback']?.visible !== false)
+            ) && (
+                <SettingsCard title="GENERAL">
+                  {(settingsConfig?.categories?.['content']?.visible !== false) && (
+                    <SettingItem
+                      title="Content & Discovery"
+                      description="Addons, catalogs, and sources"
+                      icon="compass"
+                      renderControl={ChevronRight}
+                      onPress={() => navigation.navigate('ContentDiscoverySettings')}
+                    />
+                  )}
+                  {(settingsConfig?.categories?.['appearance']?.visible !== false) && (
+                    <SettingItem
+                      title="Appearance"
+                      description={currentTheme.name}
+                      icon="sliders"
+                      renderControl={ChevronRight}
+                      onPress={() => navigation.navigate('AppearanceSettings')}
+                    />
+                  )}
+                  {(settingsConfig?.categories?.['integrations']?.visible !== false) && (
+                    <SettingItem
+                      title="Integrations"
+                      description="MDBList, TMDB, AI"
+                      icon="layers"
+                      renderControl={ChevronRight}
+                      onPress={() => navigation.navigate('IntegrationsSettings')}
+                    />
+                  )}
+                  {(settingsConfig?.categories?.['playback']?.visible !== false) && (
+                    <SettingItem
+                      title="Playback"
+                      description="Player, trailers, downloads"
+                      icon="play-circle"
+                      renderControl={ChevronRight}
+                      onPress={() => navigation.navigate('PlaybackSettings')}
+                      isLast
+                    />
+                  )}
+                </SettingsCard>
+              )}
 
             {/* Data */}
-            <SettingsCard title="DATA">
-              <SettingItem
-                title="Backup & Restore"
-                description="Create and restore app backups"
-                icon="archive"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('Backup')}
-              />
-              <SettingItem
-                title="App Updates"
-                description="Check for updates"
-                icon="refresh-ccw"
-                badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
-                renderControl={ChevronRight}
-                onPress={async () => {
-                  if (Platform.OS === 'android') {
-                    try { await mmkvStorage.removeItem('@update_badge_pending'); } catch { }
-                    setHasUpdateBadge(false);
-                  }
-                  navigation.navigate('Update');
-                }}
-                isLast
-              />
-            </SettingsCard>
+            {(
+              (settingsConfig?.categories?.['backup']?.visible !== false) ||
+              (settingsConfig?.categories?.['updates']?.visible !== false)
+            ) && (
+                <SettingsCard title="DATA">
+                  {(settingsConfig?.categories?.['backup']?.visible !== false) && (
+                    <SettingItem
+                      title="Backup & Restore"
+                      description="Create and restore app backups"
+                      icon="archive"
+                      renderControl={ChevronRight}
+                      onPress={() => navigation.navigate('Backup')}
+                    />
+                  )}
+                  {(settingsConfig?.categories?.['updates']?.visible !== false) && (
+                    <SettingItem
+                      title="App Updates"
+                      description="Check for updates"
+                      icon="refresh-ccw"
+                      badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
+                      renderControl={ChevronRight}
+                      onPress={async () => {
+                        if (Platform.OS === 'android') {
+                          try { await mmkvStorage.removeItem('@update_badge_pending'); } catch { }
+                          setHasUpdateBadge(false);
+                        }
+                        navigation.navigate('Update');
+                      }}
+                      isLast
+                    />
+                  )}
+                </SettingsCard>
+              )}
 
             {/* Cache - only if MDBList is set */}
             {mdblistKeySet && (
@@ -1188,7 +1264,7 @@ const SettingsScreen: React.FC = () => {
             )}
 
             {/* Downloads Counter */}
-            {displayDownloads !== null && (
+            {settingsConfig?.items?.['downloads_counter']?.visible !== false && displayDownloads !== null && (
               <View style={styles.downloadsContainer}>
                 <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
                   {displayDownloads.toLocaleString()}
