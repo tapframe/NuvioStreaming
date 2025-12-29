@@ -757,16 +757,26 @@ extension KSPlayerView: KSPlayerLayerDelegate {
                         print("KSPlayerView: [READY TO PLAY] Found subtitle part: start=\(firstPart.start), end=\(firstPart.end), text='\(firstPart.text?.string ?? "nil")'")
                     }
                     
-                    // Auto-select first enabled subtitle if none selected
-                    if self.playerView.srtControl.selectedSubtitleInfo == nil {
-                        self.playerView.srtControl.selectedSubtitleInfo = self.playerView.srtControl.subtitleInfos.first { $0.isEnabled }
-                        if let selected = self.playerView.srtControl.selectedSubtitleInfo {
-                            print("KSPlayerView: [READY TO PLAY] Auto-selected subtitle: \(selected.name)")
+                    // Only auto-select first enabled subtitle if textTrack prop is NOT set to -1 (disabled)
+                    // If React Native explicitly set textTrack=-1, user wants subtitles off
+                    if self.textTrack.intValue != -1 {
+                        // Auto-select first enabled subtitle if none selected
+                        if self.playerView.srtControl.selectedSubtitleInfo == nil {
+                            self.playerView.srtControl.selectedSubtitleInfo = self.playerView.srtControl.subtitleInfos.first { $0.isEnabled }
+                            if let selected = self.playerView.srtControl.selectedSubtitleInfo {
+                                print("KSPlayerView: [READY TO PLAY] Auto-selected subtitle: \(selected.name)")
+                            } else {
+                                print("KSPlayerView: [READY TO PLAY] No enabled subtitle found for auto-selection")
+                            }
                         } else {
-                            print("KSPlayerView: [READY TO PLAY] No enabled subtitle found for auto-selection")
+                            print("KSPlayerView: [READY TO PLAY] Subtitle already selected: \(self.playerView.srtControl.selectedSubtitleInfo?.name ?? "unknown")")
                         }
                     } else {
-                        print("KSPlayerView: [READY TO PLAY] Subtitle already selected: \(self.playerView.srtControl.selectedSubtitleInfo?.name ?? "unknown")")
+                        print("KSPlayerView: [READY TO PLAY] textTrack=-1 (disabled), skipping auto-selection")
+                        // Ensure subtitles are disabled
+                        self.playerView.srtControl.selectedSubtitleInfo = nil
+                        self.playerView.subtitleLabel.isHidden = true
+                        self.playerView.subtitleBackView.isHidden = true
                     }
                 }
             } else {

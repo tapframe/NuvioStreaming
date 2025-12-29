@@ -651,6 +651,201 @@ const TMDBSettingsScreen = () => {
                   </View>
                 </>
               )}
+
+              {/* Granular Enrichment Options */}
+              <View style={styles.divider} />
+
+              <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 4 }]}>Enrichment Options</Text>
+              <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, marginBottom: 16 }]}>
+                Control which data is fetched from TMDb. Disabled options will use addon data if available.
+              </Text>
+
+              {/* Cast & Crew */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Cast & Crew</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Actors, directors, writers with profile photos
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichCast}
+                  onValueChange={(v) => updateSetting('tmdbEnrichCast', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Title Logos */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Title Logos</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    High-quality title treatment images
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichLogos}
+                  onValueChange={(v) => updateSetting('tmdbEnrichLogos', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Banners/Backdrops */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Banners & Backdrops</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    High-resolution backdrop images
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichBanners}
+                  onValueChange={(v) => updateSetting('tmdbEnrichBanners', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Certification */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Content Certification</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Age ratings (PG-13, R, TV-MA, etc.)
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichCertification}
+                  onValueChange={(v) => updateSetting('tmdbEnrichCertification', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Recommendations */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Recommendations</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Similar content suggestions
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichRecommendations}
+                  onValueChange={(v) => updateSetting('tmdbEnrichRecommendations', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Episode Data */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Episode Data</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Episode thumbnails, info & fallbacks for TV shows
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichEpisodes}
+                  onValueChange={(v) => updateSetting('tmdbEnrichEpisodes', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Season Posters */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Season Posters</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Season-specific poster images
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichSeasonPosters}
+                  onValueChange={(v) => updateSetting('tmdbEnrichSeasonPosters', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Production Info */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Production Info</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Networks & production companies with logos
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichProductionInfo}
+                  onValueChange={(v) => updateSetting('tmdbEnrichProductionInfo', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Movie Details */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Movie Details</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Budget, revenue, runtime, tagline
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichMovieDetails}
+                  onValueChange={(v) => updateSetting('tmdbEnrichMovieDetails', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* TV Details */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>TV Show Details</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Status, seasons count, networks, creators
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichTvDetails}
+                  onValueChange={(v) => updateSetting('tmdbEnrichTvDetails', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
+              {/* Collections */}
+              <View style={[styles.settingRow, { marginBottom: 0 }]}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Movie Collections</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Franchise movies (Marvel, Star Wars, etc.)
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichCollections}
+                  onValueChange={(v) => updateSetting('tmdbEnrichCollections', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
             </>
           )}
         </View>

@@ -78,8 +78,20 @@ export interface AppSettings {
   // AI
   aiChatEnabled: boolean; // Enable/disable Ask AI and AI features
   // Metadata enrichment
-  enrichMetadataWithTMDB: boolean; // Use TMDB to enrich metadata (cast, certification, posters, fallbacks)
+  enrichMetadataWithTMDB: boolean; // Master switch - use TMDB to enrich metadata
   useTmdbLocalizedMetadata: boolean; // Use TMDB localized metadata (titles, overviews) per tmdbLanguagePreference
+  // Granular TMDB enrichment controls (only apply when enrichMetadataWithTMDB is true)
+  tmdbEnrichCast: boolean; // Use TMDB cast data (actors, directors, crew)
+  tmdbEnrichLogos: boolean; // Use TMDB title logos
+  tmdbEnrichBanners: boolean; // Use TMDB backdrop/banner images
+  tmdbEnrichCertification: boolean; // Show TMDB content certification (PG-13, R, etc.)
+  tmdbEnrichRecommendations: boolean; // Show TMDB recommendations
+  tmdbEnrichEpisodes: boolean; // Use TMDB episode data (thumbnails, info, fallbacks)
+  tmdbEnrichSeasonPosters: boolean; // Use TMDB season posters
+  tmdbEnrichProductionInfo: boolean; // Show networks/production companies with logos
+  tmdbEnrichMovieDetails: boolean; // Show movie details (budget, revenue, tagline, etc.)
+  tmdbEnrichTvDetails: boolean; // Show TV details (status, seasons count, networks, etc.)
+  tmdbEnrichCollections: boolean; // Show movie collections/franchises
   // Trakt integration
   showTraktComments: boolean; // Show Trakt comments in metadata screens
   // Continue Watching behavior
@@ -147,6 +159,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Metadata enrichment
   enrichMetadataWithTMDB: true,
   useTmdbLocalizedMetadata: false,
+  // Granular TMDB enrichment controls (all enabled by default for backward compatibility)
+  tmdbEnrichCast: true,
+  tmdbEnrichLogos: true,
+  tmdbEnrichBanners: true,
+  tmdbEnrichCertification: true,
+  tmdbEnrichRecommendations: true,
+  tmdbEnrichEpisodes: true,
+  tmdbEnrichSeasonPosters: true,
+  tmdbEnrichProductionInfo: true,
+  tmdbEnrichMovieDetails: true,
+  tmdbEnrichTvDetails: true,
+  tmdbEnrichCollections: true,
   // Trakt integration
   showTraktComments: true, // Show Trakt comments by default when authenticated
   // Continue Watching behavior

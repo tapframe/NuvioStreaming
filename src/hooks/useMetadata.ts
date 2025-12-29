@@ -402,8 +402,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     if (__DEV__) logger.log('[loadCast] Starting cast fetch for:', id);
     setLoadingCast(true);
     try {
-      if (!settings.enrichMetadataWithTMDB) {
-        if (__DEV__) logger.log('[loadCast] TMDB enrichment disabled by settings');
+      // Check both master switch AND granular cast setting
+      if (!settings.enrichMetadataWithTMDB || !settings.tmdbEnrichCast) {
+        if (__DEV__) logger.log('[loadCast] TMDB cast enrichment disabled by settings');
 
         // Check if we have addon cast data available
         if (metadata?.addonCast && metadata.addonCast.length > 0) {
@@ -908,8 +909,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Centralized logo fetching logic
         try {
-          if (settings.enrichMetadataWithTMDB) {
-            // Only use TMDB logos when enrichment is ON
+          // Check both master switch AND granular logos setting
+          if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichLogos) {
+            // Only use TMDB logos when both enrichment AND logos option are ON
             const tmdbService = TMDBService.getInstance();
             const preferredLanguage = settings.tmdbLanguagePreference || 'en';
             const contentType = type === 'series' ? 'tv' : 'movie';
@@ -940,12 +942,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               if (__DEV__) console.log('[useMetadata] No TMDB ID found for logo, will show text title');
             }
           } else {
-            // When enrichment is OFF, keep addon logo or undefined
+            // When enrichment or logos is OFF, keep addon logo or undefined
             finalMetadata.logo = finalMetadata.logo || undefined;
             if (__DEV__) {
-              console.log('[useMetadata] TMDB enrichment disabled, using addon logo:', {
+              console.log('[useMetadata] TMDB logo enrichment disabled, using addon logo:', {
                 hasAddonLogo: !!finalMetadata.logo,
-                enrichmentEnabled: false
+                enrichmentEnabled: settings.enrichMetadataWithTMDB,
+                logosEnabled: settings.tmdbEnrichLogos
               });
             }
           }
@@ -961,8 +964,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           (finalMetadata as any).addonLogo = addonLogo;
         }
 
-        // Clear banner field if TMDB enrichment is enabled to prevent flash
-        if (settings.enrichMetadataWithTMDB) {
+        // Clear banner field if TMDB banner enrichment is enabled to prevent flash
+        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichBanners) {
           finalMetadata = {
             ...finalMetadata,
             banner: undefined, // Let useMetadataAssets handle banner via TMDB
@@ -1114,8 +1117,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         if (__DEV__) logger.log(`📺 Processed addon episodes into ${Object.keys(groupedAddonEpisodes).length} seasons`);
 
-        // Fetch season posters from TMDB only if enrichment is enabled; otherwise skip quietly
-        if (settings.enrichMetadataWithTMDB) {
+        // Fetch season posters from TMDB only if enrichment AND season posters are enabled
+        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichSeasonPosters) {
           try {
             const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
             if (tmdbIdToUse) {
@@ -1140,11 +1143,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             logger.error('Failed to fetch TMDB season posters for addon episodes:', error);
           }
         } else {
-          if (__DEV__) logger.log('[loadSeriesData] TMDB enrichment disabled; skipping season poster fetch');
+          if (__DEV__) logger.log('[loadSeriesData] TMDB season poster enrichment disabled; skipping season poster fetch');
         }
 
-        // If localized TMDB text is enabled, merge episode names/overviews per language
-        if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata) {
+        // If localized TMDB text is enabled AND episode enrichment is enabled, merge episode names/overviews per language
+        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichEpisodes && settings.useTmdbLocalizedMetadata) {
           try {
             const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
             if (tmdbIdToUse) {
@@ -1241,8 +1244,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
 
         // Try to get TMDB ID for additional metadata (cast, etc.) but don't override episodes
-        if (!settings.enrichMetadataWithTMDB) {
-          if (__DEV__) logger.log('[loadSeriesData] TMDB enrichment disabled; skipping TMDB episode fallback (preserving current episodes)');
+        // Skip TMDB episode fallback if enrichment or episode enrichment is disabled
+        if (!settings.enrichMetadataWithTMDB || !settings.tmdbEnrichEpisodes) {
+          if (__DEV__) logger.log('[loadSeriesData] TMDB episode enrichment disabled; skipping TMDB episode fallback (preserving current episodes)');
           return;
         }
         const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
@@ -2053,7 +2057,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
   useEffect(() => {
     const fetchTmdbIdAndRecommendations = async () => {
       if (!settings.enrichMetadataWithTMDB) {
-        if (__DEV__) console.log('[useMetadata] enrichment disabled; skip TMDB id extraction and certification (extract path)');
+        if (__DEV__) console.log('[useMetadata] enrichment disabled; skip TMDB id extraction (extract path)');
         return;
       }
       if (metadata && !tmdbId) {
@@ -2063,17 +2067,22 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           if (fetchedTmdbId) {
             if (__DEV__) console.log('[useMetadata] extracted TMDB id from content id', { id, fetchedTmdbId });
             setTmdbId(fetchedTmdbId);
-            // Fetch certification
-            const certification = await tmdbService.getCertification(type, fetchedTmdbId);
-            if (certification) {
-              if (__DEV__) console.log('[useMetadata] fetched certification via TMDB id (extract path)', { type, fetchedTmdbId, certification });
-              setMetadata(prev => prev ? {
-                ...prev,
-                tmdbId: fetchedTmdbId,
-                certification
-              } : null);
+            // Fetch certification only if granular setting is enabled
+            if (settings.tmdbEnrichCertification) {
+              const certification = await tmdbService.getCertification(type, fetchedTmdbId);
+              if (certification) {
+                if (__DEV__) console.log('[useMetadata] fetched certification via TMDB id (extract path)', { type, fetchedTmdbId, certification });
+                setMetadata(prev => prev ? {
+                  ...prev,
+                  tmdbId: fetchedTmdbId,
+                  certification
+                } : null);
+              } else {
+                if (__DEV__) console.warn('[useMetadata] certification not returned from TMDB (extract path)', { type, fetchedTmdbId });
+              }
             } else {
-              if (__DEV__) console.warn('[useMetadata] certification not returned from TMDB (extract path)', { type, fetchedTmdbId });
+              // Just set the TMDB ID without certification
+              setMetadata(prev => prev ? { ...prev, tmdbId: fetchedTmdbId } : null);
             }
           } else {
             if (__DEV__) console.warn('[useMetadata] Could not determine TMDB ID for recommendations / certification', { id });
@@ -2089,8 +2098,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
   useEffect(() => {
     if (tmdbId) {
-      if (settings.enrichMetadataWithTMDB) {
-        if (__DEV__) console.log('[useMetadata] tmdbId available; loading recommendations and enabling certification checks', { tmdbId });
+      // Check both master switch AND granular recommendations setting
+      if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichRecommendations) {
+        if (__DEV__) console.log('[useMetadata] tmdbId available; loading recommendations', { tmdbId });
         loadRecommendations();
       }
       // Reset recommendations when tmdbId changes
@@ -2099,21 +2109,23 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         setLoadingRecommendations(true);
       };
     }
-  }, [tmdbId, loadRecommendations, settings.enrichMetadataWithTMDB]);
+  }, [tmdbId, loadRecommendations, settings.enrichMetadataWithTMDB, settings.tmdbEnrichRecommendations]);
 
-  // Load addon cast data when metadata is available and TMDB enrichment is disabled
+  // Load addon cast data when metadata is available and TMDB cast enrichment is disabled
   useEffect(() => {
-    if (!settings.enrichMetadataWithTMDB && metadata?.addonCast && metadata.addonCast.length > 0) {
+    // Load addon cast if master switch is off OR if cast enrichment specifically is off
+    if ((!settings.enrichMetadataWithTMDB || !settings.tmdbEnrichCast) && metadata?.addonCast && metadata.addonCast.length > 0) {
       if (__DEV__) logger.log('[useMetadata] Loading addon cast data after metadata loaded');
       loadCast();
     }
-  }, [metadata, settings.enrichMetadataWithTMDB]);
+  }, [metadata, settings.enrichMetadataWithTMDB, settings.tmdbEnrichCast]);
 
   // Ensure certification is attached whenever a TMDB id is known and metadata lacks it
   useEffect(() => {
     const maybeAttachCertification = async () => {
-      if (!settings.enrichMetadataWithTMDB) {
-        if (__DEV__) console.log('[useMetadata] enrichment disabled; skip certification (attach path)');
+      // Check both master switch AND granular certification setting
+      if (!settings.enrichMetadataWithTMDB || !settings.tmdbEnrichCertification) {
+        if (__DEV__) console.log('[useMetadata] certification enrichment disabled; skip (attach path)');
         return;
       }
       try {
@@ -2142,12 +2154,18 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
       }
     };
     maybeAttachCertification();
-  }, [tmdbId, metadata, type, settings.enrichMetadataWithTMDB]);
+  }, [tmdbId, metadata, type, settings.enrichMetadataWithTMDB, settings.tmdbEnrichCertification]);
 
   // Fetch TMDB networks/production companies when TMDB ID is available and enrichment is enabled
   const productionInfoFetchedRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!tmdbId || !settings.enrichMetadataWithTMDB || !metadata) {
+    // Check if any of the relevant granular settings are enabled
+    const anyProductionEnrichmentEnabled = settings.tmdbEnrichProductionInfo ||
+      settings.tmdbEnrichTvDetails ||
+      settings.tmdbEnrichMovieDetails ||
+      settings.tmdbEnrichCollections;
+
+    if (!tmdbId || !settings.enrichMetadataWithTMDB || !metadata || !anyProductionEnrichmentEnabled) {
       return;
     }
 
@@ -2175,7 +2193,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           tmdbId,
           useLocalized: settings.useTmdbLocalizedMetadata,
           lang: settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en',
-          hasExistingNetworks: !!(metadata as any).networks
+          hasExistingNetworks: !!(metadata as any).networks,
+          productionInfoEnabled: settings.tmdbEnrichProductionInfo,
+          tvDetailsEnabled: settings.tmdbEnrichTvDetails,
+          movieDetailsEnabled: settings.tmdbEnrichMovieDetails,
+          collectionsEnabled: settings.tmdbEnrichCollections
         });
 
         if (type === 'series') {
@@ -2187,8 +2209,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               hasNetworks: !!showDetails.networks,
               networksCount: showDetails.networks?.length || 0
             });
-            // Fetch networks
-            if (showDetails.networks) {
+            // Fetch networks only if production info is enabled
+            if (settings.tmdbEnrichProductionInfo && showDetails.networks) {
               productionInfo = Array.isArray(showDetails.networks)
                 ? showDetails.networks
                   .map((n: any) => ({
@@ -2200,30 +2222,32 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 : [];
             }
 
-            // Fetch additional TV details
-            const tvDetails = {
-              status: showDetails.status,
-              firstAirDate: showDetails.first_air_date,
-              lastAirDate: showDetails.last_air_date,
-              numberOfSeasons: showDetails.number_of_seasons,
-              numberOfEpisodes: showDetails.number_of_episodes,
-              episodeRunTime: showDetails.episode_run_time,
-              type: showDetails.type,
-              originCountry: showDetails.origin_country,
-              originalLanguage: showDetails.original_language,
-              createdBy: showDetails.created_by?.map(creator => ({
-                id: creator.id,
-                name: creator.name,
-                profile_path: creator.profile_path || undefined
-              })),
-            };
+            // Fetch additional TV details only if TV details is enabled
+            if (settings.tmdbEnrichTvDetails) {
+              const tvDetails = {
+                status: showDetails.status,
+                firstAirDate: showDetails.first_air_date,
+                lastAirDate: showDetails.last_air_date,
+                numberOfSeasons: showDetails.number_of_seasons,
+                numberOfEpisodes: showDetails.number_of_episodes,
+                episodeRunTime: showDetails.episode_run_time,
+                type: showDetails.type,
+                originCountry: showDetails.origin_country,
+                originalLanguage: showDetails.original_language,
+                createdBy: showDetails.created_by?.map(creator => ({
+                  id: creator.id,
+                  name: creator.name,
+                  profile_path: creator.profile_path || undefined
+                })),
+              };
 
-            // Update metadata with TV details
-            setMetadata((prev: any) => ({
-              ...prev,
-              tmdbId,
-              tvDetails
-            }));
+              // Update metadata with TV details
+              setMetadata((prev: any) => ({
+                ...prev,
+                tmdbId,
+                tvDetails
+              }));
+            }
           }
         } else if (type === 'movie') {
           // Fetch production companies and additional details for movies
@@ -2234,8 +2258,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               hasProductionCompanies: !!movieDetails.production_companies,
               productionCompaniesCount: movieDetails.production_companies?.length || 0
             });
-            // Fetch production companies
-            if (movieDetails.production_companies) {
+            // Fetch production companies only if production info is enabled
+            if (settings.tmdbEnrichProductionInfo && movieDetails.production_companies) {
               productionInfo = Array.isArray(movieDetails.production_companies)
                 ? movieDetails.production_companies
                   .map((c: any) => ({
@@ -2247,27 +2271,29 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
                 : [];
             }
 
-            // Fetch additional movie details
-            const movieDetailsObj = {
-              status: movieDetails.status,
-              releaseDate: movieDetails.release_date,
-              runtime: movieDetails.runtime,
-              budget: movieDetails.budget,
-              revenue: movieDetails.revenue,
-              originalLanguage: movieDetails.original_language,
-              originCountry: movieDetails.production_countries?.map((c: any) => c.iso_3166_1),
-              tagline: movieDetails.tagline,
-            };
+            // Fetch additional movie details only if movie details is enabled
+            if (settings.tmdbEnrichMovieDetails) {
+              const movieDetailsObj = {
+                status: movieDetails.status,
+                releaseDate: movieDetails.release_date,
+                runtime: movieDetails.runtime,
+                budget: movieDetails.budget,
+                revenue: movieDetails.revenue,
+                originalLanguage: movieDetails.original_language,
+                originCountry: movieDetails.production_countries?.map((c: any) => c.iso_3166_1),
+                tagline: movieDetails.tagline,
+              };
 
-            // Update metadata with movie details
-            setMetadata((prev: any) => ({
-              ...prev,
-              tmdbId,
-              movieDetails: movieDetailsObj
-            }));
+              // Update metadata with movie details
+              setMetadata((prev: any) => ({
+                ...prev,
+                tmdbId,
+                movieDetails: movieDetailsObj
+              }));
+            }
 
-            // Fetch collection data if movie belongs to a collection
-            if (movieDetails.belongs_to_collection) {
+            // Fetch collection data if movie belongs to a collection AND collections is enabled
+            if (settings.tmdbEnrichCollections && movieDetails.belongs_to_collection) {
               setLoadingCollection(true);
               try {
                 const collectionDetails = await tmdbService.getCollectionDetails(
@@ -2365,7 +2391,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     };
 
     fetchProductionInfo();
-  }, [tmdbId, settings.enrichMetadataWithTMDB, metadata, type]);
+  }, [tmdbId, settings.enrichMetadataWithTMDB, metadata, type, settings.tmdbEnrichProductionInfo, settings.tmdbEnrichTvDetails, settings.tmdbEnrichMovieDetails, settings.tmdbEnrichCollections]);
 
   // Reset tmdbId when id changes
   useEffect(() => {

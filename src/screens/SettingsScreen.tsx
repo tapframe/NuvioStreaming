@@ -1310,7 +1310,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     width: '100%',
     paddingTop: 8,
-    paddingBottom: 100,
+    paddingBottom: 32,
   },
 
   // Tablet-specific styles
