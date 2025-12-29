@@ -87,6 +87,7 @@ export interface StreamingContent {
   imdb_id?: string;
   slug?: string;
   releaseInfo?: string;
+  addonId?: string;
   traktSource?: 'watchlist' | 'continue-watching' | 'watched';
   addonCast?: Array<{
     id: number;
@@ -1155,7 +1156,10 @@ class CatalogService {
             const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
 
             if (metas && metas.length > 0) {
-              const items = metas.slice(0, limit).map(meta => this.convertMetaToStreamingContent(meta));
+              const items = metas.slice(0, limit).map(meta => ({
+                ...this.convertMetaToStreamingContent(meta),
+                addonId: addon.id  // Attach addon ID to each result
+              }));
               return {
                 addonName: addon.name,
                 items
@@ -1232,7 +1236,10 @@ class CatalogService {
       const metas = await stremioService.getCatalog(manifest, type, catalogId, page, filters);
 
       if (metas && metas.length > 0) {
-        return metas.map(meta => this.convertMetaToStreamingContent(meta));
+       return metas.map(meta => ({
+         ...this.convertMetaToStreamingContent(meta),
+         addonId: addonId 
+         }));
       }
       return [];
     } catch (error) {
@@ -1525,7 +1532,10 @@ class CatalogService {
       const metas = response.data?.metas || [];
 
       if (metas.length > 0) {
-        const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+        const items = metas.map(meta => ({
+          ...this.convertMetaToStreamingContent(meta),
+          addonId: addon.id  
+        }));
         logger.log(`Found ${items.length} results from ${addon.name}`);
         return items;
       }
