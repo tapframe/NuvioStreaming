@@ -1,9 +1,8 @@
 import { mmkvStorage } from './mmkvStorage';
 import { Platform } from 'react-native';
 
-const DEV_URL = '';
-const PROD_URL = process.env.EXPO_PUBLIC_CAMPAIGN_API_URL || '';
-const CAMPAIGN_API_URL = __DEV__ ? DEV_URL : PROD_URL;
+// Campaign API URL - use env variable, fallback to local dev server
+const CAMPAIGN_API_URL = process.env.EXPO_PUBLIC_CAMPAIGN_API_URL || 'http://localhost:3000';
 
 export type CampaignAction = {
     type: 'link' | 'navigate' | 'dismiss';
@@ -15,7 +14,9 @@ export type CampaignAction = {
 export type CampaignContent = {
     title?: string;
     message?: string;
+    mediaType?: 'image' | 'video';
     imageUrl?: string;
+    videoUrl?: string;
     backgroundColor?: string;
     textColor?: string;
     closeButtonColor?: string;
@@ -58,11 +59,16 @@ class CampaignService {
         try {
             const now = Date.now();
 
+            console.log('[CampaignService] getActiveCampaign called, API URL:', CAMPAIGN_API_URL);
+
             if (this.campaignQueue.length > 0 && (now - this.lastFetch) < this.CACHE_TTL) {
+                console.log('[CampaignService] Using cached campaigns');
                 return this.getNextValidCampaign();
             }
 
             const platform = Platform.OS;
+            const url = `${CAMPAIGN_API_URL}/api/campaigns/queue?platform=${platform}`;
+            console.log('[CampaignService] Fetching from:', url);
             const response = await fetch(
                 `${CAMPAIGN_API_URL}/api/campaigns/queue?platform=${platform}`,
                 {
@@ -89,13 +95,20 @@ class CampaignService {
                 if (campaign.content?.imageUrl && campaign.content.imageUrl.startsWith('/')) {
                     campaign.content.imageUrl = `${CAMPAIGN_API_URL}${campaign.content.imageUrl}`;
                 }
+                if (campaign.content?.videoUrl && campaign.content.videoUrl.startsWith('/')) {
+                    campaign.content.videoUrl = `${CAMPAIGN_API_URL}${campaign.content.videoUrl}`;
+                }
             });
+
+            console.log('[CampaignService] Fetched campaigns:', campaigns.length, 'CAMPAIGN_API_URL:', CAMPAIGN_API_URL);
 
             this.campaignQueue = campaigns;
             this.currentIndex = 0;
             this.lastFetch = now;
 
-            return this.getNextValidCampaign();
+            const result = this.getNextValidCampaign();
+            console.log('[CampaignService] Next valid campaign:', result?.id, result?.type);
+            return result;
         } catch (error) {
             console.warn('[CampaignService] Error fetching campaigns:', error);
             return null;

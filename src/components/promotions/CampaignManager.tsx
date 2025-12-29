@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Image, Linking, useWindowDimensions } from 'react-native';
+import Video from 'react-native-video';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown, SlideInUp, SlideOutUp } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -148,18 +149,34 @@ const BottomSheetCampaign: React.FC<BottomSheetProps> = ({ campaign, onDismiss, 
                     <Ionicons name="close" size={isTablet ? 26 : 22} color={content.closeButtonColor || '#fff'} />
                 </TouchableOpacity>
 
-                {content.imageUrl && (
-                    <Image
-                        source={{ uri: content.imageUrl }}
-                        style={[
-                            styles.bottomSheetImage,
-                            {
-                                aspectRatio: content.aspectRatio || 1.5,
-                                maxHeight: imageMaxHeight,
-                            }
-                        ]}
-                        resizeMode="cover"
-                    />
+                {/* Media - Image or Video */}
+                {(content.imageUrl || content.videoUrl) && (
+                    <View style={[
+                        styles.bottomSheetImage,
+                        {
+                            aspectRatio: content.aspectRatio || 1.5,
+                            maxHeight: imageMaxHeight,
+                        }
+                    ]}>
+                        {content.mediaType === 'video' && content.videoUrl ? (
+                            <Video
+                                source={{ uri: content.videoUrl }}
+                                style={StyleSheet.absoluteFill}
+                                resizeMode="cover"
+                                repeat={true}
+                                muted={true}
+                                paused={false}
+                                playInBackground={false}
+                                playWhenInactive={false}
+                            />
+                        ) : content.imageUrl ? (
+                            <Image
+                                source={{ uri: content.imageUrl }}
+                                style={StyleSheet.absoluteFill}
+                                resizeMode="cover"
+                            />
+                        ) : null}
+                    </View>
                 )}
 
                 <View style={styles.bottomSheetContent}>

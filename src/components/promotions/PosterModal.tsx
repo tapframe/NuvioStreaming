@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Campaign } from '../../services/campaignService';
+import Video from 'react-native-video';
 
 interface PosterModalProps {
     campaign: Campaign;
@@ -94,7 +95,8 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                         </View>
                     </TouchableOpacity>
 
-                    {content.imageUrl && (
+                    {/* Media Container - Image or Video */}
+                    {(content.imageUrl || content.videoUrl) && (
                         <View style={[
                             styles.imageContainer,
                             {
@@ -102,11 +104,24 @@ export const PosterModal: React.FC<PosterModalProps> = ({
                                 maxHeight: maxImageHeight,
                             }
                         ]}>
-                            <Image
-                                source={{ uri: content.imageUrl }}
-                                style={styles.image}
-                                resizeMode="cover"
-                            />
+                            {content.mediaType === 'video' && content.videoUrl ? (
+                                <Video
+                                    source={{ uri: content.videoUrl }}
+                                    style={styles.image}
+                                    resizeMode="cover"
+                                    repeat={true}
+                                    muted={true}
+                                    paused={false}
+                                    playInBackground={false}
+                                    playWhenInactive={false}
+                                />
+                            ) : content.imageUrl ? (
+                                <Image
+                                    source={{ uri: content.imageUrl }}
+                                    style={styles.image}
+                                    resizeMode="cover"
+                                />
+                            ) : null}
                         </View>
                     )}
 

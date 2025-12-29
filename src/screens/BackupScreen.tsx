@@ -29,19 +29,19 @@ const BackupScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
   const { preferences, updatePreference, getBackupOptions } = useBackupOptions();
-  
+
   // Collapsible sections state
   const [expandedSections, setExpandedSections] = useState({
     coreData: false,
     addonsIntegrations: false,
     settingsPreferences: false,
   });
-  
+
   // Animated values for each section
   const coreDataAnim = useRef(new Animated.Value(0)).current;
   const addonsAnim = useRef(new Animated.Value(0)).current;
   const settingsAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Chevron rotation animated values
   const coreDataChevron = useRef(new Animated.Value(0)).current;
   const addonsChevron = useRef(new Animated.Value(0)).current;
@@ -60,7 +60,7 @@ const BackupScreen: React.FC = () => {
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
-    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => {} }]);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => { } }]);
     setAlertVisible(true);
   };
 
@@ -73,7 +73,7 @@ const BackupScreen: React.FC = () => {
       openAlert(
         'Restart Failed',
         'Failed to restart the app. Please manually close and reopen the app to see your restored data.',
-        [{ label: 'OK', onPress: () => {} }]
+        [{ label: 'OK', onPress: () => { } }]
       );
     }
   };
@@ -81,10 +81,10 @@ const BackupScreen: React.FC = () => {
   // Toggle section collapse/expand
   const toggleSection = useCallback((section: 'coreData' | 'addonsIntegrations' | 'settingsPreferences') => {
     const isExpanded = expandedSections[section];
-    
+
     let heightAnim: Animated.Value;
     let chevronAnim: Animated.Value;
-    
+
     if (section === 'coreData') {
       heightAnim = coreDataAnim;
       chevronAnim = coreDataChevron;
@@ -95,7 +95,7 @@ const BackupScreen: React.FC = () => {
       heightAnim = settingsAnim;
       chevronAnim = settingsChevron;
     }
-    
+
     // Animate height and chevron rotation
     Animated.parallel([
       Animated.timing(heightAnim, {
@@ -111,8 +111,8 @@ const BackupScreen: React.FC = () => {
         easing: Easing.inOut(Easing.ease),
       }),
     ]).start();
-    
-    setExpandedSections(prev => ({...prev, [section]: !isExpanded}));
+
+    setExpandedSections(prev => ({ ...prev, [section]: !isExpanded }));
   }, [expandedSections, coreDataAnim, addonsAnim, settingsAnim, coreDataChevron, addonsChevron, settingsChevron]);
 
   // Create backup
@@ -135,6 +135,9 @@ const BackupScreen: React.FC = () => {
       if (preferences.includeWatchProgress) {
         items.push(`Watch Progress: ${preview.watchProgress} entries`);
         total += preview.watchProgress;
+        // Include watched status with watch progress
+        items.push(`Watched Status: ${preview.watchedStatus} items`);
+        total += preview.watchedStatus;
       }
 
       if (preferences.includeAddons) {
@@ -149,7 +152,7 @@ const BackupScreen: React.FC = () => {
 
       // Check if no items are selected
       const message = items.length > 0
-        ? `Backup Contents:\n\n${items.join('\n')}\n\nTotal: ${total} items\n\nThis backup includes your selected app settings, themes, and integration data.`
+        ? `Backup Contents:\n\n${items.join('\n')}\n\nTotal: ${total} items\n\nThis backup includes your selected app settings, themes, watched markers, and integration data.`
         : `No content selected for backup.\n\nPlease enable at least one option in the Backup Options section above.`;
 
       openAlert(
@@ -157,51 +160,51 @@ const BackupScreen: React.FC = () => {
         message,
         items.length > 0
           ? [
-              { label: 'Cancel', onPress: () => {} },
-              {
-                label: 'Create Backup',
-                onPress: async () => {
-                  try {
-                    setIsLoading(true);
+            { label: 'Cancel', onPress: () => { } },
+            {
+              label: 'Create Backup',
+              onPress: async () => {
+                try {
+                  setIsLoading(true);
 
-                    const backupOptions = getBackupOptions();
+                  const backupOptions = getBackupOptions();
 
-                    const fileUri = await backupService.createBackup(backupOptions);
+                  const fileUri = await backupService.createBackup(backupOptions);
 
-                    // Share the backup file
-                    if (await Sharing.isAvailableAsync()) {
-                      await Sharing.shareAsync(fileUri, {
-                        mimeType: 'application/json',
-                        dialogTitle: 'Share Nuvio Backup',
-                      });
-                    }
-
-                    openAlert(
-                      'Backup Created',
-                      'Your backup has been created and is ready to share.',
-                      [{ label: 'OK', onPress: () => {} }]
-                    );
-                  } catch (error) {
-                    logger.error('[BackupScreen] Failed to create backup:', error);
-                    openAlert(
-                      'Backup Failed',
-                      `Failed to create backup: ${error instanceof Error ? error.message : String(error)}`,
-                      [{ label: 'OK', onPress: () => {} }]
-                    );
-                  } finally {
-                    setIsLoading(false);
+                  // Share the backup file
+                  if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(fileUri, {
+                      mimeType: 'application/json',
+                      dialogTitle: 'Share Nuvio Backup',
+                    });
                   }
+
+                  openAlert(
+                    'Backup Created',
+                    'Your backup has been created and is ready to share.',
+                    [{ label: 'OK', onPress: () => { } }]
+                  );
+                } catch (error) {
+                  logger.error('[BackupScreen] Failed to create backup:', error);
+                  openAlert(
+                    'Backup Failed',
+                    `Failed to create backup: ${error instanceof Error ? error.message : String(error)}`,
+                    [{ label: 'OK', onPress: () => { } }]
+                  );
+                } finally {
+                  setIsLoading(false);
                 }
               }
-            ]
-          : [{ label: 'OK', onPress: () => {} }]
+            }
+          ]
+          : [{ label: 'OK', onPress: () => { } }]
       );
     } catch (error) {
       logger.error('[BackupScreen] Failed to get backup preview:', error);
       openAlert(
         'Error',
         'Failed to prepare backup information. Please try again.',
-        [{ label: 'OK', onPress: () => {} }]
+        [{ label: 'OK', onPress: () => { } }]
       );
       setIsLoading(false);
     }
@@ -228,7 +231,7 @@ const BackupScreen: React.FC = () => {
         'Confirm Restore',
         `This will restore your data from a backup created on ${new Date(backupInfo.timestamp || 0).toLocaleDateString()}.\n\nThis action will overwrite your current data. Are you sure you want to continue?`,
         [
-          { label: 'Cancel', onPress: () => {} },
+          { label: 'Cancel', onPress: () => { } },
           {
             label: 'Restore',
             onPress: async () => {
@@ -243,9 +246,9 @@ const BackupScreen: React.FC = () => {
                   'Restore Complete',
                   'Your data has been successfully restored. Please restart the app to see all changes.',
                   [
-                    { label: 'Cancel', onPress: () => {} },
-                    { 
-                      label: 'Restart App', 
+                    { label: 'Cancel', onPress: () => { } },
+                    {
+                      label: 'Restart App',
                       onPress: restartApp,
                       style: { fontWeight: 'bold' }
                     }
@@ -256,7 +259,7 @@ const BackupScreen: React.FC = () => {
                 openAlert(
                   'Restore Failed',
                   `Failed to restore backup: ${error instanceof Error ? error.message : String(error)}`,
-                  [{ label: 'OK', onPress: () => {} }]
+                  [{ label: 'OK', onPress: () => { } }]
                 );
               } finally {
                 setIsLoading(false);
@@ -270,7 +273,7 @@ const BackupScreen: React.FC = () => {
       openAlert(
         'File Selection Failed',
         `Failed to select backup file: ${error instanceof Error ? error.message : String(error)}`,
-        [{ label: 'OK', onPress: () => {} }]
+        [{ label: 'OK', onPress: () => { } }]
       );
     }
   }, [openAlert]);
@@ -281,26 +284,26 @@ const BackupScreen: React.FC = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.white} />
           <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
         </TouchableOpacity>
-        
+
         <View style={styles.headerActions}>
           {/* Empty for now, but keeping structure consistent */}
         </View>
       </View>
-      
+
       <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>
         Backup & Restore
       </Text>
 
       {/* Content */}
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="automatic"
       >
@@ -321,7 +324,7 @@ const BackupScreen: React.FC = () => {
             <Text style={[styles.sectionDescription, { color: currentTheme.colors.mediumEmphasis }]}>
               Choose what to include in your backups
             </Text>
-            
+
             {/* Core Data Group */}
             <TouchableOpacity
               style={styles.sectionHeader}
@@ -369,7 +372,7 @@ const BackupScreen: React.FC = () => {
                 theme={currentTheme}
               />
             </Animated.View>
-            
+
             {/* Addons & Integrations Group */}
             <TouchableOpacity
               style={styles.sectionHeader}
@@ -424,7 +427,7 @@ const BackupScreen: React.FC = () => {
                 theme={currentTheme}
               />
             </Animated.View>
-            
+
             {/* Settings & Preferences Group */}
             <TouchableOpacity
               style={styles.sectionHeader}
