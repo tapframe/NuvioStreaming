@@ -18,7 +18,7 @@ export class UpdateService {
   private readonly MAX_LOGS = 100; // Keep last 100 logs
   private updateCheckCallbacks: UpdateCheckCallback[] = [];
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): UpdateService {
     if (!UpdateService.instance) {
@@ -104,11 +104,11 @@ export class UpdateService {
    */
   public async testUpdateConnectivity(): Promise<boolean> {
     this.addLog('Testing update server connectivity...', 'INFO');
-    
+
     try {
       const updateUrl = this.getUpdateUrl();
       this.addLog(`Testing URL: ${updateUrl}`, 'INFO');
-      
+
       const response = await fetch(updateUrl, {
         method: 'GET',
         headers: {
@@ -118,13 +118,13 @@ export class UpdateService {
           'expo-api-version': '1',
         },
       });
-      
+
       this.addLog(`Response status: ${response.status}`, 'INFO');
       this.addLog(`Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'INFO');
-      
+
       if (response.ok) {
         this.addLog('Update server is reachable', 'INFO');
-        
+
         // Try to get the response body to see what we're getting
         try {
           const responseText = await response.text();
@@ -132,7 +132,7 @@ export class UpdateService {
         } catch (bodyError) {
           this.addLog(`Could not read response body: ${bodyError instanceof Error ? bodyError.message : String(bodyError)}`, 'WARN');
         }
-        
+
         return true;
       } else {
         this.addLog(`Update server returned error: ${response.status} ${response.statusText}`, 'ERROR');
@@ -150,15 +150,15 @@ export class UpdateService {
    */
   public async testAssetUrl(assetUrl: string): Promise<boolean> {
     this.addLog(`Testing asset URL: ${assetUrl}`, 'INFO');
-    
+
     try {
       const response = await fetch(assetUrl, {
         method: 'HEAD', // Use HEAD to avoid downloading the full asset
       });
-      
+
       this.addLog(`Asset response status: ${response.status}`, 'INFO');
       this.addLog(`Asset response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'INFO');
-      
+
       if (response.ok) {
         this.addLog('Asset URL is accessible', 'INFO');
         return true;
@@ -178,17 +178,17 @@ export class UpdateService {
    */
   public async testAllAssetUrls(): Promise<void> {
     this.addLog('Testing all asset URLs from latest update...', 'INFO');
-    
+
     try {
       const update = await Updates.checkForUpdateAsync();
-      
+
       if (!update.isAvailable || !update.manifest) {
         this.addLog('No update available or no manifest found', 'WARN');
         return;
       }
-      
+
       this.addLog(`Found update with ${update.manifest.assets?.length || 0} assets`, 'INFO');
-      
+
       if (update.manifest.assets && update.manifest.assets.length > 0) {
         for (let i = 0; i < update.manifest.assets.length; i++) {
           const asset = update.manifest.assets[i];
@@ -203,7 +203,7 @@ export class UpdateService {
           }
         }
       }
-      
+
       // Test launch asset (check if it exists in the manifest)
       const manifest = update.manifest as any; // Type assertion to access launchAsset
       if (manifest.launchAsset?.url) {
@@ -215,7 +215,7 @@ export class UpdateService {
       } else {
         this.addLog('No launch asset URL found', 'ERROR');
       }
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.addLog(`Failed to test asset URLs: ${errorMessage}`, 'ERROR');
@@ -292,25 +292,25 @@ export class UpdateService {
     this.addLog(`Runtime version: ${Updates.runtimeVersion || 'unknown'}`, 'INFO');
     this.addLog(`Platform: ${Platform.OS}`, 'INFO');
     this.addLog(`Updates enabled: ${Updates.isEnabled}`, 'INFO');
-    
+
     try {
       // Always attempt the check for debugging purposes
       this.addLog('Calling Updates.checkForUpdateAsync()...', 'INFO');
       const startTime = Date.now();
-      
+
       const update = await Updates.checkForUpdateAsync();
       const duration = Date.now() - startTime;
-      
+
       this.addLog(`Update check completed in ${duration}ms`, 'INFO');
       this.addLog(`Check result - isAvailable: ${update.isAvailable}`, 'INFO');
-      
+
       if (update.isAvailable) {
         this.addLog(`Update available! ID: ${update.manifest?.id || 'unknown'}`, 'INFO');
-        
+
         if (update.manifest) {
           this.addLog(`Manifest ID: ${update.manifest.id || 'unknown'}`, 'INFO');
         }
-        
+
         // Check if we can actually install updates
         if (__DEV__) {
           this.addLog('WARNING: Update found but in development mode - installation will be skipped', 'WARN');
@@ -319,7 +319,7 @@ export class UpdateService {
         } else {
           this.addLog('Update found and installation is possible', 'INFO');
         }
-        
+
         return {
           isAvailable: true,
           manifest: update.manifest,
@@ -343,7 +343,7 @@ export class UpdateService {
    */
   public async downloadAndInstallUpdate(): Promise<boolean> {
     this.addLog('Starting update download and installation...', 'INFO');
-    
+
     try {
       // Check environment and updates status first
       if (__DEV__) {
@@ -363,25 +363,25 @@ export class UpdateService {
       this.addLog(`Update URL: ${this.getUpdateUrl()}`, 'INFO');
       this.addLog(`Runtime version: ${Updates.runtimeVersion || 'unknown'}`, 'INFO');
       this.addLog(`Platform: ${Platform.OS}`, 'INFO');
-      
+
       const update = await Updates.checkForUpdateAsync();
-      
+
       if (update.isAvailable) {
         this.addLog(`Update found, starting download. ID: ${update.manifest?.id || 'unknown'}`, 'INFO');
         this.addLog(`Manifest details: ${JSON.stringify(update.manifest, null, 2)}`, 'INFO');
-        
+
         const downloadStartTime = Date.now();
         this.addLog('Calling Updates.fetchUpdateAsync()...', 'INFO');
-        
+
         try {
           await Updates.fetchUpdateAsync();
           const downloadDuration = Date.now() - downloadStartTime;
-          
+
           this.addLog(`Update downloaded successfully in ${downloadDuration}ms`, 'INFO');
           this.addLog('Calling Updates.reloadAsync() to apply update...', 'INFO');
-          
+
           await Updates.reloadAsync();
-          
+
           this.addLog('Update installation completed successfully', 'INFO');
           return true;
         } catch (fetchError) {
@@ -412,7 +412,7 @@ export class UpdateService {
       this.addLog('Getting current update info...', 'INFO');
       this.addLog(`Updates.isEnabled: ${Updates.isEnabled}`, 'INFO');
       this.addLog(`Updates.isEmbeddedLaunch: ${Updates.isEmbeddedLaunch}`, 'INFO');
-      
+
       if (__DEV__) {
         this.addLog('In development mode - update info may not be accurate', 'WARN');
       }
@@ -430,7 +430,7 @@ export class UpdateService {
       };
 
       this.addLog(`Current update info - Available: ${info.isAvailable}, Embedded: ${info.isEmbeddedLaunch}`, 'INFO');
-      
+
       if (info.manifest) {
         this.addLog(`Current manifest ID: ${info.manifest.id || 'unknown'}`, 'INFO');
       } else {
@@ -469,7 +469,7 @@ export class UpdateService {
    */
   public getUpdateUrl(): string {
     // Use the URL from app.json configuration
-    return 'https://grim-reyna-tapframe-69970143.koyeb.app/api/manifest';
+    return 'https://ota.nuvioapp.space/api/manifest';
   }
 
   /**
