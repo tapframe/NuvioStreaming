@@ -20,17 +20,17 @@ export interface SettingsConfig {
 }
 
 class ConfigService {
-    private configCache: Record<string, any> = {};
-
     async getConfig<T>(key: string): Promise<T | null> {
-        // Return memory cache if available (fetch once per session)
-        if (this.configCache[key]) {
-            return this.configCache[key] as T;
-        }
-
         try {
             console.log(`[ConfigService] Fetching config for key: ${key}`);
-            const response = await fetch(`${CAMPAIGN_API_URL}/api/config?key=${key}`);
+            const timestamp = Date.now();
+            const response = await fetch(`${CAMPAIGN_API_URL}/api/config?key=${key}&t=${timestamp}`, {
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
 
             if (!response.ok) {
                 return null;
@@ -43,7 +43,6 @@ class ConfigService {
                 return null;
             }
 
-            this.configCache[key] = data;
             return data as T;
         } catch (error) {
             console.warn('[ConfigService] Error fetching config:', error);

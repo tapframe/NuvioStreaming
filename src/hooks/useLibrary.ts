@@ -9,7 +9,7 @@ export const useLibrary = () => {
   const [libraryItems, setLibraryItems] = useState<StreamingContent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load library items from storage
+  //Load library items from storage
   const loadLibraryItems = useCallback(async () => {
     try {
       setLoading(true);
@@ -24,7 +24,7 @@ export const useLibrary = () => {
           storedItems = legacy;
         }
       }
-      
+
       if (storedItems) {
         const parsedItems = JSON.parse(storedItems);
         // Handle both array and object formats
@@ -94,7 +94,7 @@ export const useLibrary = () => {
   // Toggle item in library
   const toggleLibrary = useCallback(async (item: StreamingContent) => {
     const exists = libraryItems.some(i => i.id === item.id);
-    
+
     if (exists) {
       return await removeFromLibrary(item.id);
     } else {
