@@ -113,7 +113,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.mediumGray,
     fontSize: 15,
   },
-  scraperItem: {
+  pluginItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.elevation2,
@@ -126,46 +126,46 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  scraperLogo: {
+  pluginLogo: {
     width: 40,
     height: 40,
     marginRight: 12,
     borderRadius: 6,
     backgroundColor: colors.elevation3,
   },
-  scraperInfo: {
+  pluginInfo: {
     flex: 1,
   },
-  scraperName: {
+  pluginName: {
     fontSize: 15,
     fontWeight: '600',
     color: colors.white,
     marginBottom: 2,
   },
-  scraperDescription: {
+  pluginDescription: {
     fontSize: 13,
     color: colors.mediumGray,
     marginBottom: 4,
     lineHeight: 18,
   },
-  scraperMeta: {
+  pluginMeta: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  scraperVersion: {
+  pluginVersion: {
     fontSize: 12,
     color: colors.mediumGray,
   },
-  scraperDot: {
+  pluginDot: {
     fontSize: 12,
     color: colors.mediumGray,
     marginHorizontal: 8,
   },
-  scraperTypes: {
+  pluginTypes: {
     fontSize: 12,
     color: colors.mediumGray,
   },
-  scraperLanguage: {
+  pluginLanguage: {
     fontSize: 12,
     color: colors.mediumGray,
   },
@@ -307,10 +307,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  scrapersList: {
+  pluginsList: {
     gap: 12,
   },
-  scrapersContainer: {
+  pluginsContainer: {
     marginBottom: 24,
   },
   inputContainer: {
@@ -649,7 +649,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-  scraperCard: {
+  pluginCard: {
     backgroundColor: colors.elevation2,
     borderRadius: 12,
     padding: 16,
@@ -658,29 +658,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.elevation3,
     minHeight: 120,
   },
-  scraperCardHeader: {
+  pluginCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  scraperCardInfo: {
+  pluginCardInfo: {
     flex: 1,
     marginRight: 12,
   },
-  scraperCardMeta: {
+  pluginCardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
     gap: 8,
     flexWrap: 'wrap',
   },
-  scraperCardMetaItem: {
+  pluginCardMetaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
     marginBottom: 4,
   },
-  scraperCardMetaText: {
+  pluginCardMetaText: {
     fontSize: 12,
     color: colors.mediumGray,
   },
@@ -862,7 +862,7 @@ const PluginsScreen: React.FC = () => {
 
   // Core state
   const [repositoryUrl, setRepositoryUrl] = useState(settings.scraperRepositoryUrl);
-  const [installedScrapers, setInstalledScrapers] = useState<ScraperInfo[]>([]);
+  const [installedPlugins, setInstalledPlugins] = useState<ScraperInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasRepository, setHasRepository] = useState(false);
@@ -883,7 +883,7 @@ const PluginsScreen: React.FC = () => {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'movie' | 'tv'>('all');
   const [expandedSections, setExpandedSections] = useState({
     repository: true,
-    scrapers: true,
+    plugins: true,
     settings: false,
     quality: false,
   });
@@ -904,29 +904,29 @@ const PluginsScreen: React.FC = () => {
     { value: 'SZ', label: 'China' },
   ];
 
-  // Filtered scrapers based on search and filter
-  const filteredScrapers = useMemo(() => {
-    let filtered = installedScrapers;
+  // Filtered plugins based on search and filter
+  const filteredPlugins = useMemo(() => {
+    let filtered = installedPlugins;
 
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(scraper =>
-        scraper.name.toLowerCase().includes(query) ||
-        scraper.description.toLowerCase().includes(query) ||
-        scraper.id.toLowerCase().includes(query)
+      filtered = filtered.filter(plugin =>
+        plugin.name.toLowerCase().includes(query) ||
+        plugin.description.toLowerCase().includes(query) ||
+        plugin.id.toLowerCase().includes(query)
       );
     }
 
     // Filter by type
     if (selectedFilter !== 'all') {
-      filtered = filtered.filter(scraper =>
-        scraper.supportedTypes?.includes(selectedFilter as 'movie' | 'tv')
+      filtered = filtered.filter(plugin =>
+        plugin.supportedTypes?.includes(selectedFilter as 'movie' | 'tv')
       );
     }
 
     return filtered;
-  }, [installedScrapers, searchQuery, selectedFilter]);
+  }, [installedPlugins, searchQuery, selectedFilter]);
 
   // Helper functions
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -936,26 +936,26 @@ const PluginsScreen: React.FC = () => {
     }));
   };
 
-  const getScraperStatus = (scraper: ScraperInfo): 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error' | 'limited' => {
-    if (scraper.manifestEnabled === false) return 'disabled';
-    if (scraper.disabledPlatforms?.includes(Platform.OS as 'ios' | 'android')) return 'platform-disabled';
-    if (scraper.limited) return 'limited';
-    if (scraper.enabled) return 'enabled';
+  const getPluginStatus = (plugin: ScraperInfo): 'enabled' | 'disabled' | 'available' | 'platform-disabled' | 'error' | 'limited' => {
+    if (plugin.manifestEnabled === false) return 'disabled';
+    if (plugin.disabledPlatforms?.includes(Platform.OS as 'ios' | 'android')) return 'platform-disabled';
+    if (plugin.limited) return 'limited';
+    if (plugin.enabled) return 'enabled';
     return 'available';
   };
 
   const handleBulkToggle = async (enabled: boolean) => {
     try {
       setIsRefreshing(true);
-      const promises = filteredScrapers.map(scraper =>
-        pluginService.setScraperEnabled(scraper.id, enabled)
+      const promises = filteredPlugins.map(plugin =>
+        pluginService.setScraperEnabled(plugin.id, enabled)
       );
       await Promise.all(promises);
-      await loadScrapers();
-      openAlert('Success', `${enabled ? 'Enabled' : 'Disabled'} ${filteredScrapers.length} scrapers`);
+      await loadPlugins();
+      openAlert('Success', `${enabled ? 'Enabled' : 'Disabled'} ${filteredPlugins.length} plugins`);
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to bulk toggle:', error);
-      openAlert('Error', 'Failed to update scrapers');
+      logger.error('[PluginSettings] Failed to bulk toggle:', error);
+      openAlert('Error', 'Failed to update plugins');
     } finally {
       setIsRefreshing(false);
     }
@@ -1014,7 +1014,7 @@ const PluginsScreen: React.FC = () => {
       // Switch to the new repository and refresh it
       await pluginService.setCurrentRepository(repoId);
       await loadRepositories();
-      await loadScrapers();
+      await loadPlugins();
 
       setNewRepositoryUrl('');
       setShowAddRepositoryModal(false);
@@ -1032,10 +1032,10 @@ const PluginsScreen: React.FC = () => {
       setSwitchingRepository(repoId);
       await pluginService.setCurrentRepository(repoId);
       await loadRepositories();
-      await loadScrapers();
+      await loadPlugins();
       openAlert('Success', 'Repository switched successfully');
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to switch repository:', error);
+      logger.error('[PluginSettings] Failed to switch repository:', error);
       openAlert('Error', 'Failed to switch repository');
     } finally {
       setSwitchingRepository(null);
@@ -1051,8 +1051,8 @@ const PluginsScreen: React.FC = () => {
 
     const alertTitle = isLastRepository ? 'Remove Last Repository' : 'Remove Repository';
     const alertMessage = isLastRepository
-      ? `Are you sure you want to remove "${repo.name}"? This is your only repository, so you'll have no scrapers available until you add a new repository.`
-      : `Are you sure you want to remove "${repo.name}"? This will also remove all scrapers from this repository.`;
+      ? `Are you sure you want to remove "${repo.name}"? This is your only repository, so you'll have no plugins available until you add a new repository.`
+      : `Are you sure you want to remove "${repo.name}"? This will also remove all plugins from this repository.`;
 
     openAlert(
       alertTitle,
@@ -1065,13 +1065,13 @@ const PluginsScreen: React.FC = () => {
             try {
               await pluginService.removeRepository(repoId);
               await loadRepositories();
-              await loadScrapers();
+              await loadPlugins();
               const successMessage = isLastRepository
                 ? 'Repository removed successfully. You can add a new repository using the "Add Repository" button.'
                 : 'Repository removed successfully';
               openAlert('Success', successMessage);
             } catch (error) {
-              logger.error('[ScraperSettings] Failed to remove repository:', error);
+              logger.error('[PluginSettings] Failed to remove repository:', error);
               openAlert('Error', error instanceof Error ? error.message : 'Failed to remove repository');
             }
           },
@@ -1081,16 +1081,16 @@ const PluginsScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    loadScrapers();
+    loadPlugins();
     loadRepositories();
   }, []);
 
-  const loadScrapers = async () => {
+  const loadPlugins = async () => {
     try {
       const scrapers = await pluginService.getAvailableScrapers();
 
 
-      setInstalledScrapers(scrapers);
+      setInstalledPlugins(scrapers);
       // Detect ShowBox scraper dynamically and preload settings
       const sb = scrapers.find(s => {
         const id = (s.id || '').toLowerCase();
@@ -1111,7 +1111,7 @@ const PluginsScreen: React.FC = () => {
         setShowboxTokenVisible(false);
       }
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to load scrapers:', error);
+      logger.error('[PluginSettings] Failed to load plugins:', error);
     }
   };
 
@@ -1132,7 +1132,7 @@ const PluginsScreen: React.FC = () => {
         setRepositoryUrl(currentRepo.url);
       }
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to load repositories:', error);
+      logger.error('[PluginSettings] Failed to load repositories:', error);
     }
   };
 
@@ -1144,7 +1144,7 @@ const PluginsScreen: React.FC = () => {
         setRepositoryUrl(repoUrl);
       }
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to check repository:', error);
+      logger.error('[PluginSettings] Failed to check repository:', error);
     }
   };
 
@@ -1171,7 +1171,7 @@ const PluginsScreen: React.FC = () => {
       setHasRepository(true);
       openAlert('Success', 'Repository URL saved successfully');
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to save repository:', error);
+      logger.error('[PluginSettings] Failed to save repository:', error);
       openAlert('Error', 'Failed to save repository URL');
     } finally {
       setIsLoading(false);
@@ -1191,8 +1191,8 @@ const PluginsScreen: React.FC = () => {
       // Force a complete hard refresh by clearing any cached data first
       await pluginService.refreshRepository();
 
-      // Load fresh scrapers from the updated repository
-      await loadScrapers();
+      // Load fresh plugins from the updated repository
+      await loadPlugins();
 
       openAlert('Success', 'Repository refreshed successfully with latest files');
     } catch (error) {
@@ -1207,34 +1207,34 @@ const PluginsScreen: React.FC = () => {
     }
   };
 
-  const handleToggleScraper = async (scraperId: string, enabled: boolean) => {
+  const handleTogglePlugin = async (pluginId: string, enabled: boolean) => {
     try {
       if (enabled) {
-        // If enabling a scraper, ensure it's installed first
-        const installedScrapers = await pluginService.getInstalledScrapers();
-        const isInstalled = installedScrapers.some(scraper => scraper.id === scraperId);
+        // If enabling a plugin, ensure it's installed first
+        const installedPluginsList = await pluginService.getInstalledScrapers();
+        const isInstalled = installedPluginsList.some(plugin => plugin.id === pluginId);
 
         if (!isInstalled) {
-          // Need to install the scraper first
+          // Need to install the plugin first
           setIsRefreshing(true);
           await pluginService.refreshRepository();
           setIsRefreshing(false);
         }
       }
 
-      await pluginService.setScraperEnabled(scraperId, enabled);
-      await loadScrapers();
+      await pluginService.setScraperEnabled(pluginId, enabled);
+      await loadPlugins();
     } catch (error) {
-      logger.error('[ScraperSettings] Failed to toggle scraper:', error);
-      openAlert('Error', 'Failed to update scraper status');
+      logger.error('[PluginSettings] Failed to toggle plugin:', error);
+      openAlert('Error', 'Failed to update plugin status');
       setIsRefreshing(false);
     }
   };
 
-  const handleClearScrapers = () => {
+  const handleClearPlugins = () => {
     openAlert(
-      'Clear All Scrapers',
-      'Are you sure you want to remove all installed scrapers? This action cannot be undone.',
+      'Clear All Plugins',
+      'Are you sure you want to remove all installed plugins? This action cannot be undone.',
       [
         { label: 'Cancel', onPress: () => { } },
         {
@@ -1242,11 +1242,11 @@ const PluginsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await pluginService.clearScrapers();
-              await loadScrapers();
-              openAlert('Success', 'All scrapers have been removed');
+              await loadPlugins();
+              openAlert('Success', 'All plugins have been removed');
             } catch (error) {
-              logger.error('[ScraperSettings] Failed to clear scrapers:', error);
-              openAlert('Error', 'Failed to clear scrapers');
+              logger.error('[PluginSettings] Failed to clear plugins:', error);
+              openAlert('Error', 'Failed to clear plugins');
             }
           },
         },
@@ -1254,10 +1254,10 @@ const PluginsScreen: React.FC = () => {
     );
   };
 
-  const handleClearCache = () => {
+  const handleClearPluginCache = () => {
     openAlert(
       'Clear Repository Cache',
-      'This will remove the saved repository URL and clear all cached scraper data. You will need to re-enter your repository URL.',
+      'This will remove the saved repository URL and clear all cached plugin data. You will need to re-enter your repository URL.',
       [
         { label: 'Cancel', onPress: () => { } },
         {
@@ -1269,10 +1269,10 @@ const PluginsScreen: React.FC = () => {
               await updateSetting('scraperRepositoryUrl', '');
               setRepositoryUrl('');
               setHasRepository(false);
-              await loadScrapers();
+              await loadPlugins();
               openAlert('Success', 'Repository cache cleared successfully');
             } catch (error) {
-              logger.error('[ScraperSettings] Failed to clear cache:', error);
+              logger.error('[PluginSettings] Failed to clear cache:', error);
               openAlert('Error', 'Failed to clear repository cache');
             }
           },
@@ -1299,7 +1299,7 @@ const PluginsScreen: React.FC = () => {
         await pluginService.refreshRepository();
 
         // Reload plugins to get the latest state
-        await loadScrapers();
+        await loadPlugins();
 
         logger.log('[PluginsScreen] Plugins enabled and repository refreshed');
       } catch (error) {
@@ -1394,7 +1394,7 @@ const PluginsScreen: React.FC = () => {
 
                 // Force hard refresh of repository
                 await pluginService.refreshRepository();
-                await loadScrapers();
+                await loadPlugins();
 
                 logger.log('[PluginsScreen] Pull-to-refresh completed');
               } catch (error) {
@@ -1441,7 +1441,7 @@ const PluginsScreen: React.FC = () => {
           styles={styles}
         >
           <Text style={styles.sectionDescription}>
-            Manage multiple scraper repositories. Switch between repositories to access different sets of scrapers.
+            Manage multiple plugin repositories. Switch between repositories to access different sets of plugins.
           </Text>
 
           {/* Current Repository */}
@@ -1480,7 +1480,7 @@ const PluginsScreen: React.FC = () => {
                     )}
                     <Text style={styles.repositoryUrl}>{repo.url}</Text>
                     <Text style={styles.repositoryMeta}>
-                      {repo.scraperCount || 0} scrapers • Last updated: {repo.lastUpdated ? new Date(repo.lastUpdated).toLocaleDateString() : 'Never'}
+                      {repo.scraperCount || 0} plugins • Last updated: {repo.lastUpdated ? new Date(repo.lastUpdated).toLocaleDateString() : 'Never'}
                     </Text>
                   </View>
                   <View style={styles.repositoryActions}>
@@ -1534,13 +1534,13 @@ const PluginsScreen: React.FC = () => {
 
         {/* Available Plugins */}
         <CollapsibleSection
-          title={`Available Plugins (${filteredScrapers.length})`}
-          isExpanded={expandedSections.scrapers}
-          onToggle={() => toggleSection('scrapers')}
+          title={`Available Plugins (${filteredPlugins.length})`}
+          isExpanded={expandedSections.plugins}
+          onToggle={() => toggleSection('plugins')}
           colors={colors}
           styles={styles}
         >
-          {installedScrapers.length > 0 && (
+          {installedPlugins.length > 0 && (
             <>
               {/* Search and Filter */}
               <View style={styles.searchContainer}>
@@ -1549,7 +1549,7 @@ const PluginsScreen: React.FC = () => {
                   style={styles.searchInput}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Search scrapers..."
+                  placeholder="Search plugins..."
                   placeholderTextColor={colors.mediumGray}
                 />
                 {searchQuery.length > 0 && (
@@ -1581,7 +1581,7 @@ const PluginsScreen: React.FC = () => {
               </View>
 
               {/* Bulk Actions */}
-              {filteredScrapers.length > 0 && (
+              {filteredPlugins.length > 0 && (
                 <View style={styles.bulkActionsContainer}>
                   <TouchableOpacity
                     style={[styles.bulkActionButton, styles.bulkActionButtonEnabled]}
@@ -1602,7 +1602,7 @@ const PluginsScreen: React.FC = () => {
             </>
           )}
 
-          {filteredScrapers.length === 0 ? (
+          {filteredPlugins.length === 0 ? (
             <View style={styles.emptyStateContainer}>
               <Ionicons
                 name={searchQuery ? "search" : "download-outline"}
@@ -1611,12 +1611,12 @@ const PluginsScreen: React.FC = () => {
                 style={styles.emptyStateIcon}
               />
               <Text style={styles.emptyStateTitle}>
-                {searchQuery ? 'No Scrapers Found' : 'No Scrapers Available'}
+                {searchQuery ? 'No Plugins Found' : 'No Plugins Available'}
               </Text>
               <Text style={styles.emptyStateDescription}>
                 {searchQuery
-                  ? `No scrapers match "${searchQuery}". Try a different search term.`
-                  : 'Configure a repository above to view available scrapers.'
+                  ? `No plugins match "${searchQuery}". Try a different search term.`
+                  : 'Configure a repository above to view available plugins.'
                 }
               </Text>
               {searchQuery && (
@@ -1629,74 +1629,74 @@ const PluginsScreen: React.FC = () => {
               )}
             </View>
           ) : (
-            <View style={styles.scrapersContainer}>
-              {filteredScrapers.map((scraper) => (
-                <View key={scraper.id} style={styles.scraperCard}>
-                  <View style={styles.scraperCardHeader}>
-                    {scraper.logo ? (
-                      (scraper.logo.toLowerCase().endsWith('.svg') || scraper.logo.toLowerCase().includes('.svg?')) ? (
+            <View style={styles.pluginsContainer}>
+              {filteredPlugins.map((plugin) => (
+                <View key={plugin.id} style={styles.pluginCard}>
+                  <View style={styles.pluginCardHeader}>
+                    {plugin.logo ? (
+                      (plugin.logo.toLowerCase().endsWith('.svg') || plugin.logo.toLowerCase().includes('.svg?')) ? (
                         <Image
-                          source={{ uri: scraper.logo }}
-                          style={styles.scraperLogo}
+                          source={{ uri: plugin.logo }}
+                          style={styles.pluginLogo}
                           resizeMode="contain"
                         />
                       ) : (
                         <FastImage
-                          source={{ uri: scraper.logo }}
-                          style={styles.scraperLogo}
+                          source={{ uri: plugin.logo }}
+                          style={styles.pluginLogo}
                           resizeMode={FastImage.resizeMode.contain}
                         />
                       )
                     ) : (
-                      <View style={styles.scraperLogo} />
+                      <View style={styles.pluginLogo} />
                     )}
-                    <View style={styles.scraperCardInfo}>
+                    <View style={styles.pluginCardInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 8 }}>
-                        <Text style={styles.scraperName}>{scraper.name}</Text>
-                        <StatusBadge status={getScraperStatus(scraper)} colors={colors} />
+                        <Text style={styles.pluginName}>{plugin.name}</Text>
+                        <StatusBadge status={getPluginStatus(plugin)} colors={colors} />
                       </View>
-                      <Text style={styles.scraperDescription}>{scraper.description}</Text>
+                      <Text style={styles.pluginDescription}>{plugin.description}</Text>
                     </View>
                     <Switch
-                      value={scraper.enabled && settings.enableLocalScrapers}
-                      onValueChange={(enabled) => handleToggleScraper(scraper.id, enabled)}
+                      value={plugin.enabled && settings.enableLocalScrapers}
+                      onValueChange={(enabled) => handleTogglePlugin(plugin.id, enabled)}
                       trackColor={{ false: colors.elevation3, true: colors.primary }}
-                      thumbColor={scraper.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-                      disabled={!settings.enableLocalScrapers || scraper.manifestEnabled === false || (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
+                      thumbColor={plugin.enabled && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
+                      disabled={!settings.enableLocalScrapers || plugin.manifestEnabled === false || (plugin.disabledPlatforms && plugin.disabledPlatforms.includes(Platform.OS as 'ios' | 'android'))}
                     />
                   </View>
 
-                  <View style={styles.scraperCardMeta}>
-                    <View style={styles.scraperCardMetaItem}>
+                  <View style={styles.pluginCardMeta}>
+                    <View style={styles.pluginCardMetaItem}>
                       <Ionicons name="information-circle" size={12} color={colors.mediumGray} />
-                      <Text style={styles.scraperCardMetaText}>v{scraper.version}</Text>
+                      <Text style={styles.pluginCardMetaText}>v{plugin.version}</Text>
                     </View>
-                    <View style={styles.scraperCardMetaItem}>
+                    <View style={styles.pluginCardMetaItem}>
                       <Ionicons name="film" size={12} color={colors.mediumGray} />
-                      <Text style={styles.scraperCardMetaText}>
-                        {scraper.supportedTypes?.join(', ') || 'Unknown'}
+                      <Text style={styles.pluginCardMetaText}>
+                        {plugin.supportedTypes?.join(', ') || 'Unknown'}
                       </Text>
                     </View>
-                    {scraper.contentLanguage && scraper.contentLanguage.length > 0 && (
-                      <View style={styles.scraperCardMetaItem}>
+                    {plugin.contentLanguage && plugin.contentLanguage.length > 0 && (
+                      <View style={styles.pluginCardMetaItem}>
                         <Ionicons name="globe" size={12} color={colors.mediumGray} />
-                        <Text style={styles.scraperCardMetaText}>
-                          {scraper.contentLanguage.map(lang => lang.toUpperCase()).join(', ')}
+                        <Text style={styles.pluginCardMetaText}>
+                          {plugin.contentLanguage.map((lang: string) => lang.toUpperCase()).join(', ')}
                         </Text>
                       </View>
                     )}
-                    {scraper.supportsExternalPlayer === false && (
-                      <View style={styles.scraperCardMetaItem}>
+                    {plugin.supportsExternalPlayer === false && (
+                      <View style={styles.pluginCardMetaItem}>
                         <Ionicons name="play-circle" size={12} color={colors.mediumGray} />
-                        <Text style={styles.scraperCardMetaText}>
+                        <Text style={styles.pluginCardMetaText}>
                           No external player
                         </Text>
                       </View>
                     )}
                   </View>
 
-                  {/* ShowBox Settings - only visible when ShowBox scraper is available */}
-                  {showboxScraperId && scraper.id === showboxScraperId && settings.enableLocalScrapers && (
+                  {/* ShowBox Settings - only visible when ShowBox plugin is available */}
+                  {showboxScraperId && plugin.id === showboxScraperId && settings.enableLocalScrapers && (
                     <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
                       <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox UI Token</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
@@ -1804,7 +1804,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Sort by Quality First</Text>
               <Text style={styles.settingDescription}>
-                When enabled, streams are sorted by quality first, then by scraper. When disabled, streams are sorted by scraper first, then by quality. Only available when grouping is enabled.
+                When enabled, streams are sorted by quality first, then by plugin. When disabled, streams are sorted by plugin first, then by quality. Only available when grouping is enabled.
               </Text>
             </View>
             <Switch
@@ -1818,9 +1818,9 @@ const PluginsScreen: React.FC = () => {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Show Scraper Logos</Text>
+              <Text style={styles.settingTitle}>Show Plugin Logos</Text>
               <Text style={styles.settingDescription}>
-                Display scraper logos next to streaming links on the streams screen.
+                Display plugin logos next to streaming links on the streams screen.
               </Text>
             </View>
             <Switch
@@ -1959,10 +1959,10 @@ const PluginsScreen: React.FC = () => {
               2. <Text style={{ fontWeight: '600' }}>Add Repository</Text> - Add a GitHub raw URL or use the default repository
             </Text>
             <Text style={styles.modalText}>
-              3. <Text style={{ fontWeight: '600' }}>Refresh Repository</Text> - Download available scrapers from the repository
+              3. <Text style={{ fontWeight: '600' }}>Refresh Repository</Text> - Download available plugins from the repository
             </Text>
             <Text style={styles.modalText}>
-              4. <Text style={{ fontWeight: '600' }}>Enable Scrapers</Text> - Turn on the scrapers you want to use for streaming
+              4. <Text style={{ fontWeight: '600' }}>Enable Plugins</Text> - Turn on the plugins you want to use for streaming
             </Text>
             <TouchableOpacity
               style={styles.modalButton}

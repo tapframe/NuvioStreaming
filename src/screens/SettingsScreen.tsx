@@ -1059,7 +1059,7 @@ const SettingsScreen: React.FC = () => {
     );
   }
 
-  // Mobile Layout (original)
+  // Mobile Layout - Simplified navigation hub
   return (
     <View style={[
       styles.container,
@@ -1078,18 +1078,116 @@ const SettingsScreen: React.FC = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {renderCategoryContent('account')}
-            {renderCategoryContent('content')}
-            {renderCategoryContent('appearance')}
-            {renderCategoryContent('integrations')}
-            {renderCategoryContent('ai')}
-            {renderCategoryContent('playback')}
-            {renderCategoryContent('backup')}
-            {renderCategoryContent('updates')}
-            {renderCategoryContent('about')}
-            {renderCategoryContent('developer')}
-            {renderCategoryContent('cache')}
+            {/* Account */}
+            <SettingsCard title="ACCOUNT">
+              <SettingItem
+                title="Trakt"
+                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
+                customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('TraktSettings')}
+                isLast
+              />
+            </SettingsCard>
 
+            {/* General Settings */}
+            <SettingsCard title="GENERAL">
+              <SettingItem
+                title="Content & Discovery"
+                description="Addons, catalogs, and sources"
+                icon="compass"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('ContentDiscoverySettings')}
+              />
+              <SettingItem
+                title="Appearance"
+                description={currentTheme.name}
+                icon="sliders"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('AppearanceSettings')}
+              />
+              <SettingItem
+                title="Integrations"
+                description="MDBList, TMDB, AI"
+                icon="layers"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('IntegrationsSettings')}
+              />
+              <SettingItem
+                title="Playback"
+                description="Player, trailers, downloads"
+                icon="play-circle"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('PlaybackSettings')}
+                isLast
+              />
+            </SettingsCard>
+
+            {/* Data */}
+            <SettingsCard title="DATA">
+              <SettingItem
+                title="Backup & Restore"
+                description="Create and restore app backups"
+                icon="archive"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('Backup')}
+              />
+              <SettingItem
+                title="App Updates"
+                description="Check for updates"
+                icon="refresh-ccw"
+                badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
+                renderControl={ChevronRight}
+                onPress={async () => {
+                  if (Platform.OS === 'android') {
+                    try { await mmkvStorage.removeItem('@update_badge_pending'); } catch { }
+                    setHasUpdateBadge(false);
+                  }
+                  navigation.navigate('Update');
+                }}
+                isLast
+              />
+            </SettingsCard>
+
+            {/* Cache - only if MDBList is set */}
+            {mdblistKeySet && (
+              <SettingsCard title="CACHE">
+                <SettingItem
+                  title="Clear MDBList Cache"
+                  icon="database"
+                  onPress={handleClearMDBListCache}
+                  isLast
+                />
+              </SettingsCard>
+            )}
+
+            {/* About */}
+            <SettingsCard title="ABOUT">
+              <SettingItem
+                title="About Nuvio"
+                description={getDisplayedAppVersion()}
+                icon="info"
+                renderControl={ChevronRight}
+                onPress={() => navigation.navigate('AboutSettings')}
+                isLast
+              />
+            </SettingsCard>
+
+            {/* Developer - only in DEV mode */}
+            {__DEV__ && (
+              <SettingsCard title="DEVELOPER">
+                <SettingItem
+                  title="Developer Tools"
+                  description="Testing and debug options"
+                  icon="code"
+                  renderControl={ChevronRight}
+                  onPress={() => navigation.navigate('DeveloperSettings')}
+                  isLast
+                />
+              </SettingsCard>
+            )}
+
+            {/* Downloads Counter */}
             {displayDownloads !== null && (
               <View style={styles.downloadsContainer}>
                 <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
@@ -1178,6 +1276,8 @@ const SettingsScreen: React.FC = () => {
                 Made with ❤️ by Tapframe and friends
               </Text>
             </View>
+
+            <View style={{ height: 50 }} />
           </ScrollView>
         </View>
       </View>

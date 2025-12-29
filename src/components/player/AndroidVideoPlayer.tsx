@@ -42,6 +42,8 @@ import { CustomSubtitles } from './subtitles/CustomSubtitles';
 import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import SkipIntroButton from './overlays/SkipIntroButton';
 import UpNextButton from './common/UpNextButton';
+import { CustomAlert } from '../CustomAlert';
+
 
 // Android-specific components
 import { VideoSurface } from './android/components/VideoSurface';
@@ -98,6 +100,8 @@ const AndroidVideoPlayer: React.FC = () => {
   const shouldUseMpvOnly = settings.videoPlayerEngine === 'mpv';
   const [useExoPlayer, setUseExoPlayer] = useState(!shouldUseMpvOnly);
   const hasExoPlayerFailed = useRef(false);
+  const [showMpvSwitchAlert, setShowMpvSwitchAlert] = useState(false);
+
 
   // Sync useExoPlayer with settings when videoPlayerEngine is set to 'mpv'
   // Only run once on mount to avoid re-render loops
@@ -365,6 +369,34 @@ const AndroidVideoPlayer: React.FC = () => {
       setUseExoPlayer(false);
     }
   }, []);
+
+  // Handle manual switch to MPV - for users experiencing black screen
+  const handleManualSwitchToMPV = useCallback(() => {
+    if (useExoPlayer && !hasExoPlayerFailed.current) {
+      setShowMpvSwitchAlert(true);
+    }
+  }, [useExoPlayer]);
+
+  // Confirm and execute the switch to MPV
+  const confirmSwitchToMPV = useCallback(() => {
+    hasExoPlayerFailed.current = true;
+    logger.info('[AndroidVideoPlayer] User confirmed switch to MPV');
+    ToastAndroid.show('Switching to MPV player...', ToastAndroid.SHORT);
+
+    // Store current playback position before switching
+    const currentPos = playerState.currentTime;
+
+    // Switch to MPV
+    setUseExoPlayer(false);
+
+    // Seek to current position after a brief delay to ensure MPV is loaded
+    setTimeout(() => {
+      if (mpvPlayerRef.current && currentPos > 0) {
+        mpvPlayerRef.current.seek(currentPos);
+      }
+    }, 500);
+  }, [playerState.currentTime]);
+
 
   const handleSelectStream = async (newStream: any) => {
     if (newStream.url === currentStreamUrl) {
@@ -722,6 +754,8 @@ const AndroidVideoPlayer: React.FC = () => {
           buffered={playerState.buffered}
           formatTime={formatTime}
           playerBackend={useExoPlayer ? 'ExoPlayer' : 'MPV'}
+          onSwitchToMPV={handleManualSwitchToMPV}
+          useExoPlayer={useExoPlayer}
         />
 
         <SpeedActivatedOverlay
@@ -908,6 +942,27 @@ const AndroidVideoPlayer: React.FC = () => {
         episode={modals.selectedEpisodeForStreams}
         onSelectStream={handleEpisodeStreamSelect}
         metadata={{ id: id, name: title }}
+      />
+
+      {/* MPV Switch Confirmation Alert */}
+      <CustomAlert
+        visible={showMpvSwitchAlert}
+        title="Switch to MPV Player?"
+        message="This will switch from ExoPlayer to MPV player. Use this if you're facing playback issues that don't automatically switch to MPV. The switch cannot be undone during this playback session."
+        onClose={() => setShowMpvSwitchAlert(false)}
+        actions={[
+          {
+            label: 'Cancel',
+            onPress: () => setShowMpvSwitchAlert(false),
+          },
+          {
+            label: 'Switch to MPV',
+            onPress: () => {
+              setShowMpvSwitchAlert(false);
+              confirmSwitchToMPV();
+            },
+          },
+        ]}
       />
 
     </View>

@@ -24,7 +24,7 @@ interface PlayerControlsProps {
   duration: number;
   zoomScale: number;
   currentResizeMode?: string;
-  ksAudioTracks: Array<{id: number, name: string, language?: string}>;
+  ksAudioTracks: Array<{ id: number, name: string, language?: string }>;
   selectedAudioTrack: number | null;
   availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
   togglePlayback: () => void;
@@ -50,6 +50,9 @@ interface PlayerControlsProps {
   isAirPlayActive?: boolean;
   allowsAirPlay?: boolean;
   onAirPlayPress?: () => void;
+  // MPV Switch (Android only)
+  onSwitchToMPV?: () => void;
+  useExoPlayer?: boolean;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -92,6 +95,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   isAirPlayActive,
   allowsAirPlay,
   onAirPlayPress,
+  onSwitchToMPV,
+  useExoPlayer,
 }) => {
   const { currentTheme } = useTheme();
 
@@ -131,7 +136,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   /* Handle Seek with Animation */
   const handleSeekWithAnimation = (seconds: number) => {
     const isForward = seconds > 0;
-    
+
     if (isForward) {
       setShowForwardSign(true);
     } else {
@@ -336,6 +341,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   />
                 </TouchableOpacity>
               )}
+              {/* Switch to MPV Button - Android only, when using ExoPlayer */}
+              {Platform.OS === 'android' && onSwitchToMPV && useExoPlayer && (
+                <TouchableOpacity
+                  style={{ padding: 8 }}
+                  onPress={onSwitchToMPV}
+                >
+                  <Ionicons
+                    name="swap-horizontal"
+                    size={closeIconSize}
+                    color="white"
+                  />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
                 <Ionicons name="close" size={closeIconSize} color="white" />
               </TouchableOpacity>
@@ -343,34 +361,34 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           </View>
         </LinearGradient>
 
-        
+
         {/* Center Controls - CloudStream Style */}
-        <View style={[styles.controls, { 
-          transform: [{ translateY: -(playButtonSize / 2) }] 
+        <View style={[styles.controls, {
+          transform: [{ translateY: -(playButtonSize / 2) }]
         }]}>
-          
+
           {/* Backward Seek Button (-10s) */}
-          <TouchableOpacity 
-            onPress={() => handleSeekWithAnimation(-10)} 
+          <TouchableOpacity
+            onPress={() => handleSeekWithAnimation(-10)}
             activeOpacity={0.7}
           >
             <Animated.View style={[
               styles.seekButtonContainer,
-              { 
+              {
                 width: seekButtonSize,
                 height: seekButtonSize,
-                transform: [{ scale: backwardScaleAnim }] 
+                transform: [{ scale: backwardScaleAnim }]
               }
             ]}>
-              <Ionicons 
-                name="reload-outline" 
-                size={seekIconSize} 
-                color="white" 
-                style={{ transform: [{ scaleX: -1 }] }} 
+              <Ionicons
+                name="reload-outline"
+                size={seekIconSize}
+                color="white"
+                style={{ transform: [{ scaleX: -1 }] }}
               />
               <Animated.View style={[
                 styles.buttonCircle,
-                { 
+                {
                   opacity: backwardPressAnim,
                   width: seekButtonSize * 0.6,
                   height: seekButtonSize * 0.6,
@@ -383,65 +401,65 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               }]}>
                 <Animated.Text style={[
                   styles.seekNumber,
-                  { 
+                  {
                     fontSize: seekNumberSize,
                     marginLeft: 7,
-                    transform: [{ translateX: backwardSlideAnim }] 
+                    transform: [{ translateX: backwardSlideAnim }]
                   }
                 ]}>
                   {showBackwardSign ? '-10' : '10'}
                 </Animated.Text>
               </View>
-              </Animated.View>
-              <Animated.View style={[
-                styles.arcContainer,
+            </Animated.View>
+            <Animated.View style={[
+              styles.arcContainer,
+              {
+                width: seekButtonSize,
+                height: seekButtonSize,
+                opacity: backwardArcOpacity,
+                transform: [{
+                  rotate: backwardArcRotation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['90deg', '-90deg']
+                  })
+                }]
+              }
+            ]}>
+              <View style={[
+                styles.arcLeft,
                 {
                   width: seekButtonSize,
                   height: seekButtonSize,
-                  opacity: backwardArcOpacity,
-                  transform: [{
-                    rotate: backwardArcRotation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['90deg', '-90deg']
-                    })
-                  }]
+                  borderRadius: seekButtonSize / 2,
+                  borderWidth: arcBorderWidth,
                 }
-              ]}>
-                <View style={[
-                  styles.arcLeft,
-                  {
-                    width: seekButtonSize,
-                    height: seekButtonSize,
-                    borderRadius: seekButtonSize / 2,
-                    borderWidth: arcBorderWidth,
-                  }
-                ]} />
-              </Animated.View>
+              ]} />
+            </Animated.View>
           </TouchableOpacity>
 
           {/* Play/Pause Button */}
-          <TouchableOpacity 
-            onPress={handlePlayPauseWithAnimation} 
+          <TouchableOpacity
+            onPress={handlePlayPauseWithAnimation}
             activeOpacity={0.7}
             style={{ marginHorizontal: buttonSpacing }}
           >
             <View style={[styles.playButtonCircle, { width: playButtonSize, height: playButtonSize }]}>
               <Animated.View style={[
                 styles.playPressCircle,
-                { 
+                {
                   opacity: playPressAnim,
                   width: playButtonSize * 0.85,
                   height: playButtonSize * 0.85,
                   borderRadius: (playButtonSize * 0.85) / 2,
                 }
               ]} />
-              <Animated.View style={{ 
+              <Animated.View style={{
                 transform: [{ scale: playIconScale }],
-                opacity: playIconOpacity 
+                opacity: playIconOpacity
               }}>
-                <Ionicons 
-                  name={paused ? "play" : "pause"} 
-                  size={playIconSizeCalculated} 
+                <Ionicons
+                  name={paused ? "play" : "pause"}
+                  size={playIconSizeCalculated}
                   color="#FFFFFF"
                 />
               </Animated.View>
@@ -449,26 +467,26 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           </TouchableOpacity>
 
           {/* Forward Seek Button (+10s) */}
-            <TouchableOpacity 
-              onPress={() => handleSeekWithAnimation(10)} 
-              activeOpacity={0.7}
-            >
-              <Animated.View style={[
-                styles.seekButtonContainer,
-                { 
-                  width: seekButtonSize,
-                  height: seekButtonSize,
-                  transform: [{ scale: forwardScaleAnim }] 
-                }
-              ]}>
-                <Ionicons 
-                  name="reload-outline" 
-                  size={seekIconSize} 
-                  color="white" 
-                />
+          <TouchableOpacity
+            onPress={() => handleSeekWithAnimation(10)}
+            activeOpacity={0.7}
+          >
+            <Animated.View style={[
+              styles.seekButtonContainer,
+              {
+                width: seekButtonSize,
+                height: seekButtonSize,
+                transform: [{ scale: forwardScaleAnim }]
+              }
+            ]}>
+              <Ionicons
+                name="reload-outline"
+                size={seekIconSize}
+                color="white"
+              />
               <Animated.View style={[
                 styles.buttonCircle,
-                { 
+                {
                   opacity: forwardPressAnim,
                   width: seekButtonSize * 0.6,
                   height: seekButtonSize * 0.6,
@@ -481,9 +499,9 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               }]}>
                 <Animated.Text style={[
                   styles.seekNumber,
-                  { 
+                  {
                     fontSize: seekNumberSize,
-                    transform: [{ translateX: forwardSlideAnim }] 
+                    transform: [{ translateX: forwardSlideAnim }]
                   }
                 ]}>
                   {showForwardSign ? '+10' : '10'}
@@ -566,10 +584,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 onPress={() => setShowAudioModal(true)}
                 disabled={ksAudioTracks.length <= 1}
               >
-                <Ionicons 
-                  name="musical-notes-outline" 
-                  size={24} 
-                  color={ksAudioTracks.length <= 1 ? 'grey' : 'white'} 
+                <Ionicons
+                  name="musical-notes-outline"
+                  size={24}
+                  color={ksAudioTracks.length <= 1 ? 'grey' : 'white'}
                 />
               </TouchableOpacity>
 
