@@ -909,8 +909,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Centralized logo fetching logic
         try {
+          if (addonLogo) {
+            finalMetadata.logo = addonLogo;
+            if (__DEV__) {
+              console.log('[useMetadata] Using addon-provided logo:', { hasLogo: true });
+         }
           // Check both master switch AND granular logos setting
-          if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichLogos) {
+            } else if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichLogos) {
             // Only use TMDB logos when both enrichment AND logos option are ON
             const tmdbService = TMDBService.getInstance();
             const preferredLanguage = settings.tmdbLanguagePreference || 'en';
