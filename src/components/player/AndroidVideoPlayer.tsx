@@ -56,6 +56,7 @@ import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSRT
 import { storageService } from '../../services/storageService';
 import stremioService from '../../services/stremioService';
 import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
+import { findBestSubtitleTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import axios from 'axios';
 
 const DEBUG_MODE = false;
@@ -120,6 +121,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const [useCustomSubtitles, setUseCustomSubtitles] = useState(false);
   const [customSubtitles, setCustomSubtitles] = useState<SubtitleCue[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+  const [selectedExternalSubtitleId, setSelectedExternalSubtitleId] = useState<string | null>(null);
 
   // Subtitle customization state
   const [subtitleSize, setSubtitleSize] = useState(28);
@@ -135,6 +137,9 @@ const AndroidVideoPlayer: React.FC = () => {
   const [subtitleLetterSpacing, setSubtitleLetterSpacing] = useState(0);
   const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState(1.2);
   const [subtitleOffsetSec, setSubtitleOffsetSec] = useState(0);
+
+  // Track auto-selection ref to prevent duplicate selections
+  const hasAutoSelectedTracks = useRef(false);
 
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
   const { metadata, cast } = Boolean(id && type) ? (metadataResult as any) : { metadata: null, cast: [] };
@@ -299,6 +304,52 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.setIsVideoLoaded(true);
     openingAnimation.completeOpeningAnimation();
 
+    // Auto-select audio track based on preferences
+    if (data.audioTracks && data.audioTracks.length > 0 && settings?.preferredAudioLanguage) {
+      const formatted = data.audioTracks.map((t: any, i: number) => ({
+        id: t.index !== undefined ? t.index : i,
+        name: t.title || t.name || `Track ${i + 1}`,
+        language: t.language
+      }));
+      const bestAudioTrack = findBestAudioTrack(formatted, settings.preferredAudioLanguage);
+      if (bestAudioTrack !== null) {
+        logger.debug(`[AndroidVideoPlayer] Auto-selecting audio track ${bestAudioTrack} for language: ${settings.preferredAudioLanguage}`);
+        tracksHook.setSelectedAudioTrack({ type: 'index', value: bestAudioTrack });
+      }
+    }
+
+    // Auto-select subtitle track based on preferences
+    // Only auto-select internal tracks here if preference is 'internal' or 'any'
+    // If preference is 'external', we wait for the useEffect to handle selection after external subs load
+    if (data.textTracks && data.textTracks.length > 0 && !hasAutoSelectedTracks.current && settings?.enableSubtitleAutoSelect) {
+      const sourcePreference = settings?.subtitleSourcePreference || 'internal';
+
+      // Only pre-select internal if preference is internal or any
+      if (sourcePreference === 'internal' || sourcePreference === 'any') {
+        const formatted = data.textTracks.map((t: any, i: number) => ({
+          id: t.index !== undefined ? t.index : i,
+          name: t.title || t.name || `Track ${i + 1}`,
+          language: t.language
+        }));
+        const subtitleSelection = findBestSubtitleTrack(
+          formatted,
+          [], // External subtitles not yet loaded
+          {
+            preferredSubtitleLanguage: settings?.preferredSubtitleLanguage || 'en',
+            subtitleSourcePreference: sourcePreference,
+            enableSubtitleAutoSelect: true
+          }
+        );
+
+        if (subtitleSelection.type === 'internal' && subtitleSelection.internalTrackId !== undefined) {
+          logger.debug(`[AndroidVideoPlayer] Auto-selecting internal subtitle track ${subtitleSelection.internalTrackId}`);
+          tracksHook.setSelectedTextTrack(subtitleSelection.internalTrackId);
+          hasAutoSelectedTracks.current = true;
+        }
+      }
+      // If preference is 'external', don't select anything here - useEffect will handle it
+    }
+
     // Handle Resume - check both initialPosition and initialSeekTargetRef
     const resumeTarget = watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
     if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && videoDuration > 0) {
@@ -331,6 +382,45 @@ const AndroidVideoPlayer: React.FC = () => {
       playerState.setBuffered(data.playableDuration || currentTimeInSeconds);
     }
   }, [playerState.currentTime, playerState.isDragging, playerState.isSeeking, setupHook.isAppBackgrounded]);
+
+  // Auto-select subtitles when both internal tracks and video are loaded
+  // This ensures we wait for internal tracks before falling back to external
+  useEffect(() => {
+    if (!playerState.isVideoLoaded || hasAutoSelectedTracks.current || !settings?.enableSubtitleAutoSelect) {
+      return;
+    }
+
+    const internalTracks = tracksHook.ksTextTracks;
+    const externalSubs = availableSubtitles;
+
+    // Wait a short delay to ensure tracks are fully populated
+    const timeoutId = setTimeout(() => {
+      if (hasAutoSelectedTracks.current) return;
+
+      const subtitleSelection = findBestSubtitleTrack(
+        internalTracks,
+        externalSubs,
+        {
+          preferredSubtitleLanguage: settings?.preferredSubtitleLanguage || 'en',
+          subtitleSourcePreference: settings?.subtitleSourcePreference || 'internal',
+          enableSubtitleAutoSelect: true
+        }
+      );
+
+      // Trust the findBestSubtitleTrack function's decision - it already implements priority logic
+      if (subtitleSelection.type === 'internal' && subtitleSelection.internalTrackId !== undefined) {
+        logger.debug(`[AndroidVideoPlayer] Auto-selecting internal subtitle track ${subtitleSelection.internalTrackId}`);
+        tracksHook.setSelectedTextTrack(subtitleSelection.internalTrackId);
+        hasAutoSelectedTracks.current = true;
+      } else if (subtitleSelection.type === 'external' && subtitleSelection.externalSubtitle) {
+        logger.debug(`[AndroidVideoPlayer] Auto-selecting external subtitle: ${subtitleSelection.externalSubtitle.display}`);
+        loadWyzieSubtitle(subtitleSelection.externalSubtitle);
+        hasAutoSelectedTracks.current = true;
+      }
+    }, 500); // Short delay to ensure tracks are populated
+
+    return () => clearTimeout(timeoutId);
+  }, [playerState.isVideoLoaded, tracksHook.ksTextTracks, availableSubtitles, settings]);
 
   // Sync custom subtitle text with current playback time
   useEffect(() => {
@@ -496,6 +586,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
       setAvailableSubtitles(subs);
       logger.info(`[AndroidVideoPlayer] Fetched ${subs.length} addon subtitles`);
+      // Auto-selection is now handled by useEffect that waits for internal tracks
     } catch (e) {
       logger.error('[AndroidVideoPlayer] Error fetching addon subtitles', e);
     } finally {
@@ -523,6 +614,7 @@ const AndroidVideoPlayer: React.FC = () => {
       const parsedCues = parseSRT(srtContent);
       setCustomSubtitles(parsedCues);
       setUseCustomSubtitles(true);
+      setSelectedExternalSubtitleId(subtitle.id); // Track the selected external subtitle
 
       // Disable MPV's built-in subtitle track when using custom subtitles
       tracksHook.setSelectedTextTrack(-1);
@@ -549,6 +641,7 @@ const AndroidVideoPlayer: React.FC = () => {
     setUseCustomSubtitles(false);
     setCustomSubtitles([]);
     setCurrentSubtitle('');
+    setSelectedExternalSubtitleId(null); // Clear external selection
   }, []);
 
   const cycleResizeMode = useCallback(() => {
@@ -893,6 +986,7 @@ const AndroidVideoPlayer: React.FC = () => {
         setSubtitleLineHeightMultiplier={setSubtitleLineHeightMultiplier}
         subtitleOffsetSec={subtitleOffsetSec}
         setSubtitleOffsetSec={setSubtitleOffsetSec}
+        selectedExternalSubtitleId={selectedExternalSubtitleId}
       />
 
       <SourcesModal

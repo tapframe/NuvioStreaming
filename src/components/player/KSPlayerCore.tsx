@@ -51,6 +51,8 @@ import { logger } from '../../utils/logger';
 import { formatTime } from './utils/playerUtils';
 import { WyzieSubtitle } from './utils/playerTypes';
 import { parseSRT } from './utils/subtitleParser';
+import { findBestSubtitleTrack, autoSelectAudioTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
+import { useSettings } from '../../hooks/useSettings';
 
 // Player route params interface
 interface PlayerRouteParams {
@@ -130,6 +132,10 @@ const KSPlayerCore: React.FC = () => {
   const tracks = usePlayerTracks();
   const { ksPlayerRef, seek } = useKSPlayer();
   const customSubs = useCustomSubtitles();
+  const { settings } = useSettings();
+
+  // Track auto-selection refs to prevent duplicate selections
+  const hasAutoSelectedTracks = useRef(false);
 
   // Next Episode Hook
   const { nextEpisode, currentEpisodeDescription } = useNextEpisode({
@@ -267,19 +273,8 @@ const KSPlayerCore: React.FC = () => {
       }));
 
       customSubs.setAvailableSubtitles(subs);
-
-      if (autoSelectEnglish) {
-        const englishSubtitle = subs.find(sub =>
-          sub.language.includes('en') || sub.display.toLowerCase().includes('english')
-        );
-        if (englishSubtitle) {
-          loadWyzieSubtitle(englishSubtitle);
-          return;
-        }
-      }
-      if (!autoSelectEnglish) {
-        modals.setShowSubtitleLanguageModal(true);
-      }
+      // Auto-selection is now handled by useEffect that waits for internal tracks
+      // This ensures internal tracks are considered before falling back to external
     } catch (e) {
       logger.error('[VideoPlayer] Error fetching subtitles', e);
     } finally {
@@ -302,6 +297,7 @@ const KSPlayerCore: React.FC = () => {
       const parsedCues = parseSRT(srtContent);
       customSubs.setCustomSubtitles(parsedCues);
       customSubs.setUseCustomSubtitles(true);
+      customSubs.setSelectedExternalSubtitleId(subtitle.id); // Track the selected external subtitle
       tracks.selectTextTrack(-1);
 
       const adjustedTime = currentTime + (customSubs.subtitleOffsetSec || 0);
@@ -321,6 +317,45 @@ const KSPlayerCore: React.FC = () => {
       fetchAvailableSubtitles(undefined, true);
     }
   }, [imdbId]);
+
+  // Auto-select subtitles when both internal tracks and video are loaded
+  // This ensures we wait for internal tracks before falling back to external
+  useEffect(() => {
+    if (!isVideoLoaded || hasAutoSelectedTracks.current || !settings?.enableSubtitleAutoSelect) {
+      return;
+    }
+
+    const internalTracks = tracks.ksTextTracks;
+    const externalSubs = customSubs.availableSubtitles;
+
+    // Wait a short delay to ensure tracks are fully populated
+    const timeoutId = setTimeout(() => {
+      if (hasAutoSelectedTracks.current) return;
+
+      const subtitleSelection = findBestSubtitleTrack(
+        internalTracks,
+        externalSubs,
+        {
+          preferredSubtitleLanguage: settings?.preferredSubtitleLanguage || 'en',
+          subtitleSourcePreference: settings?.subtitleSourcePreference || 'internal',
+          enableSubtitleAutoSelect: true
+        }
+      );
+
+      // Trust the findBestSubtitleTrack function's decision - it already implements priority logic
+      if (subtitleSelection.type === 'internal' && subtitleSelection.internalTrackId !== undefined) {
+        logger.debug(`[KSPlayerCore] Auto-selecting internal subtitle track ${subtitleSelection.internalTrackId}`);
+        tracks.selectTextTrack(subtitleSelection.internalTrackId);
+        hasAutoSelectedTracks.current = true;
+      } else if (subtitleSelection.type === 'external' && subtitleSelection.externalSubtitle) {
+        logger.debug(`[KSPlayerCore] Auto-selecting external subtitle: ${subtitleSelection.externalSubtitle.display}`);
+        loadWyzieSubtitle(subtitleSelection.externalSubtitle);
+        hasAutoSelectedTracks.current = true;
+      }
+    }, 500); // Short delay to ensure tracks are populated
+
+    return () => clearTimeout(timeoutId);
+  }, [isVideoLoaded, tracks.ksTextTracks, customSubs.availableSubtitles, settings]);
 
   // Sync custom subtitle text with current playback time
   useEffect(() => {
@@ -346,6 +381,45 @@ const KSPlayerCore: React.FC = () => {
     setIsVideoLoaded(true);
     setIsPlayerReady(true);
     openingAnim.completeOpeningAnimation();
+
+    // Auto-select audio track based on preferences
+    if (data.audioTracks && data.audioTracks.length > 0 && settings?.preferredAudioLanguage) {
+      const bestAudioTrack = findBestAudioTrack(data.audioTracks, settings.preferredAudioLanguage);
+      if (bestAudioTrack !== null) {
+        logger.debug(`[KSPlayerCore] Auto-selecting audio track ${bestAudioTrack} for language: ${settings.preferredAudioLanguage}`);
+        tracks.selectAudioTrack(bestAudioTrack);
+        if (ksPlayerRef.current) {
+          ksPlayerRef.current.setAudioTrack(bestAudioTrack);
+        }
+      }
+    }
+
+    // Auto-select subtitle track based on preferences
+    // Only auto-select internal tracks here if preference is 'internal' or 'any'
+    // If preference is 'external', we wait for the useEffect to handle selection after external subs load
+    if (data.textTracks && data.textTracks.length > 0 && !hasAutoSelectedTracks.current && settings?.enableSubtitleAutoSelect) {
+      const sourcePreference = settings?.subtitleSourcePreference || 'internal';
+
+      // Only pre-select internal if preference is internal or any
+      if (sourcePreference === 'internal' || sourcePreference === 'any') {
+        const subtitleSelection = findBestSubtitleTrack(
+          data.textTracks,
+          [], // External subtitles not yet loaded
+          {
+            preferredSubtitleLanguage: settings?.preferredSubtitleLanguage || 'en',
+            subtitleSourcePreference: sourcePreference,
+            enableSubtitleAutoSelect: true
+          }
+        );
+
+        if (subtitleSelection.type === 'internal' && subtitleSelection.internalTrackId !== undefined) {
+          logger.debug(`[KSPlayerCore] Auto-selecting internal subtitle track ${subtitleSelection.internalTrackId} on load`);
+          tracks.selectTextTrack(subtitleSelection.internalTrackId);
+          hasAutoSelectedTracks.current = true;
+        }
+      }
+      // If preference is 'external', don't select anything here - useEffect will handle it
+    }
 
     // Initial Seek
     const resumeTarget = routeInitialPosition || watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
@@ -800,8 +874,10 @@ const KSPlayerCore: React.FC = () => {
         selectTextTrack={handleSelectTextTrack}
         disableCustomSubtitles={() => {
           customSubs.setUseCustomSubtitles(false);
+          customSubs.setSelectedExternalSubtitleId(null); // Clear external selection
           handleSelectTextTrack(-1);
         }}
+        selectedExternalSubtitleId={customSubs.selectedExternalSubtitleId}
       />
 
       <SourcesModal

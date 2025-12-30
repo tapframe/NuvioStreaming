@@ -59,6 +59,7 @@ interface SubtitleModalsProps {
   setSubtitleLineHeightMultiplier: (n: number) => void;
   subtitleOffsetSec: number;
   setSubtitleOffsetSec: (n: number) => void;
+  selectedExternalSubtitleId?: string | null; // ID of currently selected external/addon subtitle
 }
 
 const MorphingTab = ({ label, isSelected, onPress }: any) => {
@@ -91,11 +92,15 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleBottomOffset, setSubtitleBottomOffset, subtitleLetterSpacing, setSubtitleLetterSpacing,
   subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier, subtitleOffsetSec, setSubtitleOffsetSec,
   setSubtitlesAutoSelect,
+  selectedExternalSubtitleId,
 }) => {
   const { width, height } = useWindowDimensions();
   const isIos = Platform.OS === 'ios';
   const isLandscape = width > height;
-  const [selectedOnlineSubtitleId, setSelectedOnlineSubtitleId] = React.useState<string | null>(null);
+  // Use prop value if provided (for auto-selected subtitles), otherwise use local state
+  const [localSelectedId, setLocalSelectedId] = React.useState<string | null>(null);
+  const selectedOnlineSubtitleId = selectedExternalSubtitleId ?? localSelectedId;
+  const setSelectedOnlineSubtitleId = setLocalSelectedId;
   const [activeTab, setActiveTab] = React.useState<'built-in' | 'addon' | 'appearance'>('built-in');
 
   const isCompact = width < 360 || height < 640;

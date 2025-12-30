@@ -18,6 +18,7 @@ export const useCustomSubtitles = () => {
     const [currentFormattedSegments, setCurrentFormattedSegments] = useState<SubtitleSegment[][]>([]);
     const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
     const [useCustomSubtitles, setUseCustomSubtitles] = useState<boolean>(false);
+    const [selectedExternalSubtitleId, setSelectedExternalSubtitleId] = useState<string | null>(null);
 
     // Loading State
     const [isLoadingSubtitles, setIsLoadingSubtitles] = useState<boolean>(false);
@@ -91,6 +92,7 @@ export const useCustomSubtitles = () => {
         currentFormattedSegments, setCurrentFormattedSegments,
         availableSubtitles, setAvailableSubtitles,
         useCustomSubtitles, setUseCustomSubtitles,
+        selectedExternalSubtitleId, setSelectedExternalSubtitleId,
         isLoadingSubtitles, setIsLoadingSubtitles,
         isLoadingSubtitleList, setIsLoadingSubtitleList,
         subtitleSize, setSubtitleSize,

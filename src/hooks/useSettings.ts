@@ -105,6 +105,11 @@ export interface AppSettings {
   decoderMode: 'auto' | 'sw' | 'hw' | 'hw+'; // Decoder mode: auto (auto-copy), sw (software), hw (mediacodec-copy), hw+ (mediacodec)
   gpuMode: 'gpu' | 'gpu-next'; // GPU rendering mode: gpu (standard) or gpu-next (advanced HDR/color)
   showDiscover: boolean;
+  // Audio/Subtitle Language Preferences
+  preferredSubtitleLanguage: string; // Preferred language for subtitles (ISO 639-1 code, e.g., 'en', 'es', 'fr')
+  preferredAudioLanguage: string; // Preferred language for audio tracks (ISO 639-1 code)
+  subtitleSourcePreference: 'internal' | 'external' | 'any'; // Prefer internal (embedded), external (addon), or any
+  enableSubtitleAutoSelect: boolean; // Auto-select subtitles based on preferences
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -183,6 +188,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   decoderMode: 'auto', // Default to auto (best compatibility and performance)
   gpuMode: 'gpu', // Default to gpu (gpu-next for advanced HDR)
   showDiscover: true, // Show Discover section in SearchScreen
+  // Audio/Subtitle Language Preferences
+  preferredSubtitleLanguage: 'en', // Default to English subtitles
+  preferredAudioLanguage: 'en', // Default to English audio
+  subtitleSourcePreference: 'internal', // Prefer internal/embedded subtitles first
+  enableSubtitleAutoSelect: true, // Auto-select subtitles by default
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
