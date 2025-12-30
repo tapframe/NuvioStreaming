@@ -923,13 +923,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             navigation.navigate('Metadata', {
               id: item.id,
               type: item.type,
-              episodeId: episodeId
+              episodeId: episodeId,
               addonId: item.addonId
             });
           } else {
             navigation.navigate('Metadata', {
               id: item.id,
-              type: item.type
+              type: item.type,
               addonId: item.addonId
             });
           }
