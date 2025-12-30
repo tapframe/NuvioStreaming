@@ -50,6 +50,7 @@ interface ThisWeekEpisode {
   vote_average: number;
   still_path: string | null;
   season_poster_path: string | null;
+  addonId?: string;
   // Grouping fields
   isGroup?: boolean;
   episodeCount?: number;
@@ -195,34 +196,37 @@ export const ThisWeekSection = React.memo(() => {
   }, [calendarData]);
 
   const handleEpisodePress = (episode: ThisWeekEpisode) => {
-    // For grouped episodes, always go to series details
-    if (episode.isGroup) {
-      navigation.navigate('Metadata', {
-        id: episode.seriesId,
-        type: 'series'
-      });
-      return;
-    }
-
-    // For upcoming episodes, go to the metadata screen
-    if (!episode.isReleased) {
-      const episodeId = `${episode.seriesId}:${episode.season}:${episode.episode}`;
-      navigation.navigate('Metadata', {
-        id: episode.seriesId,
-        type: 'series',
-        episodeId
-      });
-      return;
-    }
-
-    // For released episodes, go to the streams screen
-    const episodeId = `${episode.seriesId}:${episode.season}:${episode.episode}`;
-    navigation.navigate('Streams', {
+  // For grouped episodes, always go to series details
+  if (episode.isGroup) {
+    navigation.navigate('Metadata', {
       id: episode.seriesId,
       type: 'series',
-      episodeId
+      addonId: episode.addonId,
     });
-  };
+    return;
+  }
+
+  // For upcoming episodes, go to the metadata screen
+  if (!episode.isReleased) {
+    const episodeId = `${episode.seriesId}:${episode.season}:${episode.episode}`;
+    navigation.navigate('Metadata', {
+      id: episode.seriesId,
+      type: 'series',
+      episodeId,
+      addonId: episode.addonId,
+    });
+    return;
+  }
+
+  // For released episodes, go to the streams screen
+  const episodeId = `${episode.seriesId}:${episode.season}:${episode.episode}`;
+  navigation.navigate('Streams', {
+    id: episode.seriesId,
+    type: 'series',
+    episodeId,
+    addonId: episode.addonId,
+  });
+};
 
   const handleViewAll = () => {
     navigation.navigate('Calendar' as any);
