@@ -22,6 +22,7 @@ interface CalendarEpisode {
   vote_average: number;
   still_path: string | null;
   season_poster_path: string | null;
+  addonId?: string;
 }
 
 interface CalendarSection {
@@ -219,6 +220,7 @@ export const useCalendarData = (): UseCalendarDataReturn => {
                   vote_average: tmdbEpisode.vote_average || 0,
                   still_path: tmdbEpisode.still_path || null,
                   season_poster_path: tmdbEpisode.season_poster_path || null
+                  addonId: series.addonId,
                 };
 
 
@@ -245,6 +247,7 @@ export const useCalendarData = (): UseCalendarDataReturn => {
                   vote_average: 0,
                   still_path: null,
                   season_poster_path: null
+                  addonId: series.addonId,
                 }
               };
             }
@@ -265,6 +268,7 @@ export const useCalendarData = (): UseCalendarDataReturn => {
                 vote_average: 0,
                 still_path: null,
                 season_poster_path: null
+                addonId: series.addonId,
               }
             };
           }
