@@ -118,74 +118,75 @@ export function useFeaturedContent() {
               return { ...base, logo: base.logo || undefined };
             }
 
-            const rawId = String(item.id);
-            const isTmdb = rawId.startsWith('tmdb:');
-            const isImdb = rawId.startsWith('tt');
-            let tmdbId: string | null = null;
-            let imdbId: string | null = null;
+    const enrichItems = async (items: any[]): Promise<StreamingContent[]> => {
+    const preferredLanguage = settings.tmdbLanguagePreference || 'en';
 
-            if (isTmdb) tmdbId = rawId.split(':')[1];
-            if (isImdb) imdbId = rawId.split(':')[0];
-            if (!tmdbId && imdbId) {
-              const found = await tmdbService.findTMDBIdByIMDB(imdbId);
-              tmdbId = found ? String(found) : null;
-            }
+    const enrichLogo = async (item: any): Promise<StreamingContent> => {
+    const base: StreamingContent = {
+      id: item.id,
+      type: item.type,
+      name: item.name,
+      addonId: item.addonId,
+      poster: item.poster,
+      banner: (item as any).banner,
+      logo: (item as any).logo,
+      description: (item as any).description,
+      year: (item as any).year,
+      genres: (item as any).genres,
+      inLibrary: Boolean((item as any).inLibrary),
+    };
 
-            if (tmdbId) {
-              const logoUrl = await tmdbService.getContentLogo(item.type === 'series' ? 'tv' : 'movie', tmdbId as string, preferredLanguage);
-              return { ...base, logo: logoUrl || undefined };
-            }
+    if (base.logo && base.logo.trim() !== '' && base.logo !== 'null' && base.logo !== 'undefined') {
+      return base;
+    }
 
-            return { ...base, logo: undefined };
-          } catch (error) {
-            return { ...base, logo: undefined };
-          }
-        };
+    try {
+      const meta = await catalogService.getBasicContentDetails(item.type, item.id, item.addonId);
+      if (meta?.logo && meta.logo.trim() !== '' && meta.logo !== 'null' && meta.logo !== 'undefined') {
+        return { ...base, logo: meta.logo };
+      }
+    } catch (error) {
+      logger.warn('[useFeaturedContent] Addon logo fetch failed for', item.id, error);
+    }
 
-        if (settings.enrichMetadataWithTMDB) {
-          return Promise.all(items.map(enrichLogo));
-        } else {
-          // Fallback logic for when enrichment is disabled
-          const baseItems = items.map((item: any) => ({
-            id: item.id,
-            type: item.type,
-            name: item.name,
-            poster: item.poster,
-            banner: (item as any).banner,
-            logo: (item as any).logo || undefined,
-            description: (item as any).description,
-            year: (item as any).year,
-            genres: (item as any).genres,
-            inLibrary: Boolean((item as any).inLibrary),
-          }));
+    try {
+      const rawId = String(item.id);
+      const isTmdb = rawId.startsWith('tmdb:');
+      const isImdb = rawId.startsWith('tt');
+      let tmdbId: string | null = null;
 
-          // Try to get logos for items missing them
-          const missingLogoCandidates = baseItems.filter((i: any) => !i.logo);
-          if (missingLogoCandidates.length > 0) {
-            try {
-              const filled = await Promise.allSettled(missingLogoCandidates.map(async (item: any) => {
-                try {
-                  const meta = await catalogService.getBasicContentDetails(item.type, item.id);
-                  if (meta?.logo) return { id: item.id, logo: meta.logo };
-                } catch { }
-                return { id: item.id, logo: undefined };
-              }));
-
-              const idToLogo = new Map();
-              filled.forEach((res: any) => {
-                if (res.status === 'fulfilled' && res.value?.logo) {
-                  idToLogo.set(res.value.id, res.value.logo);
-                }
-              });
-
-              return baseItems.map((i: any) => idToLogo.has(i.id) ? { ...i, logo: idToLogo.get(i.id) } : i);
-            } catch {
-              return baseItems;
-            }
-          }
-          return baseItems;
+      if (isTmdb) {
+        tmdbId = rawId.split(':')[1];
+      } else if (isImdb) {
+        const imdbId = rawId.split(':')[0];
+        const found = await tmdbService.findTMDBIdByIMDB(imdbId);
+        tmdbId = found ? String(found) : null;
+      } else {
+        const imdbMatch = rawId.match(/tt\d+/);
+        if (imdbMatch) {
+          const found = await tmdbService.findTMDBIdByIMDB(imdbMatch[0]);
+          tmdbId = found ? String(found) : null;
         }
-      };
+      }
+
+      if (tmdbId) {
+        const contentType = item.type === 'series' || item.type === 'tv' ? 'tv' : 'movie';
+        const logoUrl = await tmdbService.getContentLogo(contentType, tmdbId, preferredLanguage);
+        if (logoUrl) {
+          return { ...base, logo: logoUrl };
+        }
+      }
+
+      return { ...base, logo: undefined };
+    } catch (error) {
+      logger.warn('[useFeaturedContent] TMDB logo fetch failed for', item.id, error);
+      return { ...base, logo: undefined };
+    }
+  };
+
+  return Promise.all(items.map(enrichLogo));
+};
+
 
       // Process each catalog independently
       const processCatalog = async (config: { addon: any, catalog: any }) => {
