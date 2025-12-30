@@ -123,6 +123,7 @@ export type RootStackParamList = {
     };
     resumeTime?: number;
     duration?: number;
+    addonId?: string;
   };
   PlayerIOS: {
     uri: string;

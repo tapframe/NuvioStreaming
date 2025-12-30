@@ -88,7 +88,6 @@ export interface StreamingContent {
   imdb_id?: string;
   slug?: string;
   releaseInfo?: string;
-  addonId?: string;
   traktSource?: 'watchlist' | 'continue-watching' | 'watched';
   addonCast?: Array<{
     id: number;
@@ -376,7 +375,7 @@ class CatalogService {
       if (metas && metas.length > 0) {
         // Cap items per catalog to reduce memory and rendering load
         const limited = metas.slice(0, 12);
-        const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
+        const items = limited.map(meta => this.convertMetaToStreamingContent(meta, addon.id));
 
         // Get potentially custom display name; if customized, respect it as-is
         const originalName = catalog.name || catalog.id;
@@ -468,7 +467,7 @@ class CatalogService {
             const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
 
             if (metas && metas.length > 0) {
-              const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+              const items = metas.map(meta => this.convertMetaToStreamingContent(meta, addon.id));
 
               // Get potentially custom display name
               const displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
@@ -705,7 +704,7 @@ class CatalogService {
         });
 
         // Add to recent content using enhanced conversion for full metadata
-        const content = this.convertMetaToStreamingContentEnhanced(meta);
+        const content = this.convertMetaToStreamingContentEnhanced(meta, preferredAddonId);
         this.addToRecentContent(content);
 
         // Check if it's in the library
@@ -799,7 +798,7 @@ class CatalogService {
 
       if (meta) {
         // Use basic conversion without enhanced metadata processing
-        const content = this.convertMetaToStreamingContent(meta);
+        const content = this.convertMetaToStreamingContent(meta, preferredAddonId);
 
         // Check if it's in the library
         content.inLibrary = this.library[`${type}:${id}`] !== undefined;
@@ -818,7 +817,7 @@ class CatalogService {
     }
   }
 
-  private convertMetaToStreamingContent(meta: Meta): StreamingContent {
+  private convertMetaToStreamingContent(meta: Meta, addonId?: string): StreamingContent {
     // Basic conversion for catalog display - no enhanced metadata processing
     // Use addon's poster if available, otherwise use placeholder
     let posterUrl = meta.poster;
@@ -853,7 +852,7 @@ class CatalogService {
   }
 
   // Enhanced conversion for detailed metadata (used only when fetching individual content details)
-  private convertMetaToStreamingContentEnhanced(meta: Meta): StreamingContent {
+  private convertMetaToStreamingContentEnhanced(meta: Meta, addonId?: string): StreamingContent {
     // Enhanced conversion to utilize all available metadata from addons
     const converted: StreamingContent = {
       id: meta.id,
@@ -1239,10 +1238,10 @@ class CatalogService {
       const metas = await stremioService.getCatalog(manifest, type, catalogId, page, filters);
 
       if (metas && metas.length > 0) {
-       return metas.map(meta => ({
-         ...this.convertMetaToStreamingContent(meta),
-         addonId: addonId 
-         }));
+        return metas.map(meta => ({
+          ...this.convertMetaToStreamingContent(meta),
+          addonId: addonId
+        }));
       }
       return [];
     } catch (error) {
@@ -1537,7 +1536,7 @@ class CatalogService {
       if (metas.length > 0) {
         const items = metas.map(meta => ({
           ...this.convertMetaToStreamingContent(meta),
-          addonId: addon.id  
+          addonId: addon.id
         }));
         logger.log(`Found ${items.length} results from ${addon.name}`);
         return items;

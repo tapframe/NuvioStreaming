@@ -678,8 +678,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
           banner: currentItem.banner,
           releaseInfo: currentItem.releaseInfo,
           genres: currentItem.genres
-         }
-       };
+        }
+      };
 
       // Add resume data if we have progress that's not near completion
       if (shouldResume && watchProgress) {

@@ -997,14 +997,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         navigation.navigate('Streams', {
           id: item.id,
           type: item.type,
-          episodeId: episodeId
+          episodeId: episodeId,
           addonId: item.addonId
         });
       } else {
         // For movies or series without specific episode, navigate to main content
         navigation.navigate('Streams', {
           id: item.id,
-          type: item.type
+          type: item.type,
           addonId: item.addonId
         });
       }
