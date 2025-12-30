@@ -60,6 +60,7 @@ interface SubtitleModalsProps {
   subtitleOffsetSec: number;
   setSubtitleOffsetSec: (n: number) => void;
   selectedExternalSubtitleId?: string | null; // ID of currently selected external/addon subtitle
+  onOpenSyncModal?: () => void; // Callback to open the visual sync modal
 }
 
 const MorphingTab = ({ label, isSelected, onPress }: any) => {
@@ -93,6 +94,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier, subtitleOffsetSec, setSubtitleOffsetSec,
   setSubtitlesAutoSelect,
   selectedExternalSubtitleId,
+  onOpenSyncModal,
 }) => {
   const { width, height } = useWindowDimensions();
   const isIos = Platform.OS === 'ios';
@@ -489,6 +491,29 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             </TouchableOpacity>
                           </View>
                         </View>
+                        {/* Visual Sync Button */}
+                        {onOpenSyncModal && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              setShowSubtitleModal(false);
+                              setTimeout(() => onOpenSyncModal(), 100);
+                            }}
+                            style={{
+                              marginTop: 12,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 12,
+                              borderRadius: 10,
+                              backgroundColor: 'rgba(255,255,255,0.08)',
+                              borderWidth: 1,
+                              borderColor: 'rgba(255,255,255,0.15)',
+                            }}
+                          >
+                            <MaterialIcons name="sync" color="#fff" size={18} style={{ marginRight: 8 }} />
+                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Visual Sync</Text>
+                          </TouchableOpacity>
+                        )}
                         <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 6 }}>Nudge subtitles earlier (-) or later (+) to sync if needed.</Text>
                       </View>
                     )}

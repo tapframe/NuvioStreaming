@@ -33,6 +33,7 @@ import LoadingOverlay from './modals/LoadingOverlay';
 import PlayerControls from './controls/PlayerControls';
 import { AudioTrackModal } from './modals/AudioTrackModal';
 import { SubtitleModals } from './modals/SubtitleModals';
+import { SubtitleSyncModal } from './modals/SubtitleSyncModal';
 import SpeedModal from './modals/SpeedModal';
 import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
@@ -57,6 +58,7 @@ import { storageService } from '../../services/storageService';
 import stremioService from '../../services/stremioService';
 import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
 import { findBestSubtitleTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
+import { useTheme } from '../../contexts/ThemeContext';
 import axios from 'axios';
 
 const DEBUG_MODE = false;
@@ -65,6 +67,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, 'PlayerAndroid'>>();
   const insets = useSafeAreaInsets();
+  const { currentTheme } = useTheme();
 
   const {
     uri, title = 'Episode Name', season, episode, episodeTitle, quality, year,
@@ -138,8 +141,30 @@ const AndroidVideoPlayer: React.FC = () => {
   const [subtitleLineHeightMultiplier, setSubtitleLineHeightMultiplier] = useState(1.2);
   const [subtitleOffsetSec, setSubtitleOffsetSec] = useState(0);
 
+  // Subtitle sync modal state
+  const [showSyncModal, setShowSyncModal] = useState(false);
+
   // Track auto-selection ref to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
+
+  // Track previous video session to reset subtitle offset only when video actually changes
+  const previousVideoRef = useRef<{ uri?: string; episodeId?: string }>({});
+  
+  // Reset subtitle offset when starting a new video session
+  useEffect(() => {
+    const currentVideo = { uri, episodeId };
+    const previousVideo = previousVideoRef.current;
+    
+    // Only reset if this is actually a new video (uri or episodeId changed)
+    if (previousVideo.uri !== undefined && 
+        (previousVideo.uri !== currentVideo.uri || previousVideo.episodeId !== currentVideo.episodeId)) {
+      setSubtitleOffsetSec(0);
+    }
+    
+    // Update the ref for next comparison
+    previousVideoRef.current = currentVideo;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uri, episodeId]);
 
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
   const { metadata, cast } = Boolean(id && type) ? (metadataResult as any) : { metadata: null, cast: [] };
@@ -987,6 +1012,18 @@ const AndroidVideoPlayer: React.FC = () => {
         subtitleOffsetSec={subtitleOffsetSec}
         setSubtitleOffsetSec={setSubtitleOffsetSec}
         selectedExternalSubtitleId={selectedExternalSubtitleId}
+        onOpenSyncModal={() => setShowSyncModal(true)}
+      />
+
+      {/* Visual Subtitle Sync Modal */}
+      <SubtitleSyncModal
+        visible={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
+        onConfirm={(offset) => setSubtitleOffsetSec(offset)}
+        currentOffset={subtitleOffsetSec}
+        currentTime={playerState.currentTime}
+        subtitles={customSubtitles}
+        primaryColor={currentTheme.colors.primary}
       />
 
       <SourcesModal

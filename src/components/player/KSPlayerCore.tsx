@@ -11,6 +11,7 @@ import { PlayerControls } from './controls/PlayerControls';
 import AudioTrackModal from './modals/AudioTrackModal';
 import SpeedModal from './modals/SpeedModal';
 import SubtitleModals from './modals/SubtitleModals';
+import { SubtitleSyncModal } from './modals/SubtitleSyncModal';
 import SourcesModal from './modals/SourcesModal';
 import EpisodesModal from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
@@ -53,6 +54,7 @@ import { WyzieSubtitle } from './utils/playerTypes';
 import { parseSRT } from './utils/subtitleParser';
 import { findBestSubtitleTrack, autoSelectAudioTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import { useSettings } from '../../hooks/useSettings';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Player route params interface
 interface PlayerRouteParams {
@@ -133,9 +135,32 @@ const KSPlayerCore: React.FC = () => {
   const { ksPlayerRef, seek } = useKSPlayer();
   const customSubs = useCustomSubtitles();
   const { settings } = useSettings();
+  const { currentTheme } = useTheme();
+
+  // Subtitle sync modal state
+  const [showSyncModal, setShowSyncModal] = useState(false);
 
   // Track auto-selection refs to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
+
+  // Track previous video session to reset subtitle offset only when video actually changes
+  const previousVideoRef = useRef<{ uri?: string; episodeId?: string }>({});
+  
+  // Reset subtitle offset when starting a new video session
+  useEffect(() => {
+    const currentVideo = { uri, episodeId };
+    const previousVideo = previousVideoRef.current;
+    
+    // Only reset if this is actually a new video (uri or episodeId changed)
+    if (previousVideo.uri !== undefined && 
+        (previousVideo.uri !== currentVideo.uri || previousVideo.episodeId !== currentVideo.episodeId)) {
+      customSubs.setSubtitleOffsetSec(0);
+    }
+    
+    // Update the ref for next comparison
+    previousVideoRef.current = currentVideo;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uri, episodeId]);
 
   // Next Episode Hook
   const { nextEpisode, currentEpisodeDescription } = useNextEpisode({
@@ -878,6 +903,18 @@ const KSPlayerCore: React.FC = () => {
           handleSelectTextTrack(-1);
         }}
         selectedExternalSubtitleId={customSubs.selectedExternalSubtitleId}
+        onOpenSyncModal={() => setShowSyncModal(true)}
+      />
+
+      {/* Visual Subtitle Sync Modal */}
+      <SubtitleSyncModal
+        visible={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
+        onConfirm={(offset) => customSubs.setSubtitleOffsetSec(offset)}
+        currentOffset={customSubs.subtitleOffsetSec}
+        currentTime={currentTime}
+        subtitles={customSubs.customSubtitles}
+        primaryColor={currentTheme.colors.primary}
       />
 
       <SourcesModal
