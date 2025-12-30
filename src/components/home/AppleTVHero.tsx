@@ -672,13 +672,14 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         id: currentItem.id,
         type: currentItem.type,
         title: currentItem.name,
+        addonId: currentItem.addonId,
         metadata: {
           poster: currentItem.poster,
           banner: currentItem.banner,
           releaseInfo: currentItem.releaseInfo,
           genres: currentItem.genres
-        }
-      };
+         }
+       };
 
       // Add resume data if we have progress that's not near completion
       if (shouldResume && watchProgress) {
@@ -697,6 +698,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         id: currentItem.id,
         type: currentItem.type,
         title: currentItem.name,
+        addonId: currentItem.addonId,
         metadata: {
           poster: currentItem.poster,
           banner: currentItem.banner,
@@ -1184,6 +1186,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                     navigation.navigate('Metadata', {
                       id: currentItem.id,
                       type: currentItem.type,
+                      addonId: currentItem.addonId,
                     });
                   }
                 }}
@@ -1220,6 +1223,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
                     navigation.navigate('Metadata', {
                       id: currentItem.id,
                       type: currentItem.type,
+                      addonId: currentItem.addonId,
                     });
                   }
                 }}

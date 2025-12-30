@@ -5,6 +5,7 @@ interface WatchProgress {
   currentTime: number;
   duration: number;
   lastUpdated: number;
+  addonId?: string;
   traktSynced?: boolean;
   traktLastSynced?: number;
   traktProgress?: number;

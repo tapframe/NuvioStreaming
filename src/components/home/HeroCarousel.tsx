@@ -228,9 +228,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
 
   const contentPadding = useMemo(() => ({ paddingHorizontal: (windowWidth - cardWidth) / 2 }), [windowWidth, cardWidth]);
 
-  const handleNavigateToMetadata = useCallback((id: string, type: any) => {
-    navigation.navigate('Metadata', { id, type });
-  }, [navigation]);
+  const handleNavigateToMetadata = useCallback((id: string, type: any, addonId?: string) => {
+  navigation.navigate('Metadata', { id, type, addonId });
+}, [navigation]);
 
   // Container animation based on scroll - must be before early returns
   // TEMPORARILY DISABLED FOR PERFORMANCE TESTING
@@ -399,7 +399,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) =
               colors={currentTheme.colors}
               logoFailed={failedLogoIds.has(item.id)}
               onLogoError={() => setFailedLogoIds((prev) => new Set(prev).add(item.id))}
-              onPressInfo={() => handleNavigateToMetadata(item.id, item.type)}
+              onPressInfo={() => handleNavigateToMetadata(item.id, item.type, item.addonId)}
               scrollX={scrollX}
               index={index}
               flipped={!!flippedMap[item.id]}
