@@ -35,6 +35,7 @@ interface ContinueWatchingItem extends StreamingContent {
   season?: number;
   episode?: number;
   episodeTitle?: string;
+  addonId?: string;
 }
 
 // Define the ref interface
@@ -997,12 +998,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           id: item.id,
           type: item.type,
           episodeId: episodeId
+          addonId: item.addonId
         });
       } else {
         // For movies or series without specific episode, navigate to main content
         navigation.navigate('Streams', {
           id: item.id,
           type: item.type
+          addonId: item.addonId
         });
       }
     } catch (error) {
