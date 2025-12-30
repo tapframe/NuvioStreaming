@@ -918,8 +918,8 @@ const MainTabs = () => {
               tabBarIcon: () => ({ sfSymbol: 'house' }),
               freezeOnBlur: true,
             }}
-            listeners={({ navigation }) => ({
-              tabPress: (e) => {
+            listeners={({ navigation }: { navigation: any }) => ({
+              tabPress: (e: any) => {
                 if (navigation.isFocused()) {
                   emitScrollToTop('Home');
                 }
@@ -933,8 +933,8 @@ const MainTabs = () => {
               title: 'Library',
               tabBarIcon: () => ({ sfSymbol: 'heart' }),
             }}
-            listeners={({ navigation }) => ({
-              tabPress: (e) => {
+            listeners={({ navigation }: { navigation: any }) => ({
+              tabPress: (e: any) => {
                 if (navigation.isFocused()) {
                   emitScrollToTop('Library');
                 }
@@ -948,8 +948,8 @@ const MainTabs = () => {
               title: 'Search',
               tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
             }}
-            listeners={({ navigation }) => ({
-              tabPress: (e) => {
+            listeners={({ navigation }: { navigation: any }) => ({
+              tabPress: (e: any) => {
                 if (navigation.isFocused()) {
                   emitScrollToTop('Search');
                 }
@@ -964,8 +964,8 @@ const MainTabs = () => {
                 title: 'Downloads',
                 tabBarIcon: () => ({ sfSymbol: 'arrow.down.circle' }),
               }}
-              listeners={({ navigation }) => ({
-                tabPress: (e) => {
+              listeners={({ navigation }: { navigation: any }) => ({
+                tabPress: (e: any) => {
                   if (navigation.isFocused()) {
                     emitScrollToTop('Downloads');
                   }
@@ -980,8 +980,8 @@ const MainTabs = () => {
               title: 'Settings',
               tabBarIcon: () => ({ sfSymbol: 'gear' }),
             }}
-            listeners={({ navigation }) => ({
-              tabPress: (e) => {
+            listeners={({ navigation }: { navigation: any }) => ({
+              tabPress: (e: any) => {
                 if (navigation.isFocused()) {
                   emitScrollToTop('Settings');
                 }
