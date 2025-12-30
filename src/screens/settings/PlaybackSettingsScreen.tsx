@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Modal, FlatList } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import ScreenHeader from '../../components/common/ScreenHeader';
 import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './SettingsComponents';
 import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 import { MaterialIcons } from '@expo/vector-icons';
+import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 
 // Available languages for audio/subtitle selection
 const AVAILABLE_LANGUAGES = [
@@ -53,145 +54,6 @@ const SUBTITLE_SOURCE_OPTIONS = [
     { value: 'any', label: 'Any Available', description: 'Use first available subtitle track' },
 ];
 
-interface LanguagePickerModalProps {
-    visible: boolean;
-    onClose: () => void;
-    selectedLanguage: string;
-    onSelectLanguage: (code: string) => void;
-    title: string;
-}
-
-const LanguagePickerModal: React.FC<LanguagePickerModalProps> = ({
-    visible,
-    onClose,
-    selectedLanguage,
-    onSelectLanguage,
-    title,
-}) => {
-    const { currentTheme } = useTheme();
-    const insets = useSafeAreaInsets();
-
-    const renderItem = ({ item }: { item: { code: string; name: string } }) => {
-        const isSelected = item.code === selectedLanguage;
-        return (
-            <TouchableOpacity
-                style={[
-                    styles.languageItem,
-                    isSelected && { backgroundColor: currentTheme.colors.primary + '20' }
-                ]}
-                onPress={() => {
-                    onSelectLanguage(item.code);
-                    onClose();
-                }}
-            >
-                <Text style={[styles.languageName, { color: isSelected ? currentTheme.colors.primary : '#fff' }]}>
-                    {item.name}
-                </Text>
-                <Text style={[styles.languageCode, { color: 'rgba(255,255,255,0.5)' }]}>
-                    {item.code.toUpperCase()}
-                </Text>
-                {isSelected && (
-                    <MaterialIcons name="check" size={20} color={currentTheme.colors.primary} />
-                )}
-            </TouchableOpacity>
-        );
-    };
-
-    return (
-        <Modal
-            visible={visible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={onClose}
-        >
-            <View style={styles.modalOverlay}>
-                <View style={[styles.modalContent, { backgroundColor: '#1a1a1a', paddingBottom: insets.bottom }]}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>{title}</Text>
-                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <MaterialIcons name="close" size={24} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                    <FlatList
-                        data={AVAILABLE_LANGUAGES}
-                        renderItem={renderItem}
-                        keyExtractor={(item) => item.code}
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.languageList}
-                    />
-                </View>
-            </View>
-        </Modal>
-    );
-};
-
-interface SubtitleSourceModalProps {
-    visible: boolean;
-    onClose: () => void;
-    selectedSource: string;
-    onSelectSource: (value: 'internal' | 'external' | 'any') => void;
-}
-
-const SubtitleSourceModal: React.FC<SubtitleSourceModalProps> = ({
-    visible,
-    onClose,
-    selectedSource,
-    onSelectSource,
-}) => {
-    const { currentTheme } = useTheme();
-    const insets = useSafeAreaInsets();
-
-    return (
-        <Modal
-            visible={visible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={onClose}
-        >
-            <View style={styles.modalOverlay}>
-                <View style={[styles.modalContent, { backgroundColor: '#1a1a1a', paddingBottom: insets.bottom, maxHeight: 400 }]}>
-                    <View style={styles.modalHeader}>
-                        <Text style={styles.modalTitle}>Subtitle Source Priority</Text>
-                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                            <MaterialIcons name="close" size={24} color="#fff" />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.languageList}>
-                        {SUBTITLE_SOURCE_OPTIONS.map((option) => {
-                            const isSelected = option.value === selectedSource;
-                            return (
-                                <TouchableOpacity
-                                    key={option.value}
-                                    style={[
-                                        styles.sourceItem,
-                                        isSelected && { backgroundColor: currentTheme.colors.primary + '20', borderColor: currentTheme.colors.primary }
-                                    ]}
-                                    onPress={() => {
-                                        onSelectSource(option.value as 'internal' | 'external' | 'any');
-                                        onClose();
-                                    }}
-                                >
-                                    <View style={styles.sourceItemContent}>
-                                        <Text style={[styles.sourceLabel, { color: isSelected ? currentTheme.colors.primary : '#fff' }]}>
-                                            {option.label}
-                                        </Text>
-                                        <Text style={styles.sourceDescription}>
-                                            {option.description}
-                                        </Text>
-                                    </View>
-                                    {isSelected && (
-                                        <MaterialIcons name="check" size={20} color={currentTheme.colors.primary} />
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-                </View>
-            </View>
-        </Modal>
-    );
-};
-
 const PlaybackSettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
@@ -199,10 +61,33 @@ const PlaybackSettingsScreen: React.FC = () => {
     const insets = useSafeAreaInsets();
     const config = useRealtimeConfig();
 
-    // Modal states
-    const [showAudioLanguageModal, setShowAudioLanguageModal] = useState(false);
-    const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState(false);
-    const [showSubtitleSourceModal, setShowSubtitleSourceModal] = useState(false);
+    // Bottom sheet refs
+    const audioLanguageSheetRef = useRef<BottomSheetModal>(null);
+    const subtitleLanguageSheetRef = useRef<BottomSheetModal>(null);
+    const subtitleSourceSheetRef = useRef<BottomSheetModal>(null);
+
+    // Snap points
+    const languageSnapPoints = useMemo(() => ['70%'], []);
+    const sourceSnapPoints = useMemo(() => ['45%'], []);
+
+    // Handlers to present sheets - ensure only one is open at a time
+    const openAudioLanguageSheet = useCallback(() => {
+        subtitleLanguageSheetRef.current?.dismiss();
+        subtitleSourceSheetRef.current?.dismiss();
+        setTimeout(() => audioLanguageSheetRef.current?.present(), 100);
+    }, []);
+
+    const openSubtitleLanguageSheet = useCallback(() => {
+        audioLanguageSheetRef.current?.dismiss();
+        subtitleSourceSheetRef.current?.dismiss();
+        setTimeout(() => subtitleLanguageSheetRef.current?.present(), 100);
+    }, []);
+
+    const openSubtitleSourceSheet = useCallback(() => {
+        audioLanguageSheetRef.current?.dismiss();
+        subtitleLanguageSheetRef.current?.dismiss();
+        setTimeout(() => subtitleSourceSheetRef.current?.present(), 100);
+    }, []);
 
     const isItemVisible = (itemId: string) => {
         if (!config?.items) return true;
@@ -223,6 +108,34 @@ const PlaybackSettingsScreen: React.FC = () => {
     const getSourceLabel = (value: string) => {
         const option = SUBTITLE_SOURCE_OPTIONS.find(o => o.value === value);
         return option ? option.label : 'Internal First';
+    };
+
+    // Render backdrop for bottom sheets
+    const renderBackdrop = useCallback(
+        (props: any) => (
+            <BottomSheetBackdrop
+                {...props}
+                disappearsOnIndex={-1}
+                appearsOnIndex={0}
+                opacity={0.5}
+            />
+        ),
+        []
+    );
+
+    const handleSelectAudioLanguage = (code: string) => {
+        updateSetting('preferredAudioLanguage', code);
+        audioLanguageSheetRef.current?.dismiss();
+    };
+
+    const handleSelectSubtitleLanguage = (code: string) => {
+        updateSetting('preferredSubtitleLanguage', code);
+        subtitleLanguageSheetRef.current?.dismiss();
+    };
+
+    const handleSelectSubtitleSource = (value: 'internal' | 'external' | 'any') => {
+        updateSetting('subtitleSourcePreference', value);
+        subtitleSourceSheetRef.current?.dismiss();
     };
 
     return (
@@ -260,21 +173,21 @@ const PlaybackSettingsScreen: React.FC = () => {
                         description={getLanguageName(settings?.preferredAudioLanguage || 'en')}
                         icon="volume-2"
                         renderControl={() => <ChevronRight />}
-                        onPress={() => setShowAudioLanguageModal(true)}
+                        onPress={openAudioLanguageSheet}
                     />
                     <SettingItem
                         title="Preferred Subtitle Language"
                         description={getLanguageName(settings?.preferredSubtitleLanguage || 'en')}
                         icon="type"
                         renderControl={() => <ChevronRight />}
-                        onPress={() => setShowSubtitleLanguageModal(true)}
+                        onPress={openSubtitleLanguageSheet}
                     />
                     <SettingItem
                         title="Subtitle Source Priority"
                         description={getSourceLabel(settings?.subtitleSourcePreference || 'internal')}
                         icon="layers"
                         renderControl={() => <ChevronRight />}
-                        onPress={() => setShowSubtitleSourceModal(true)}
+                        onPress={openSubtitleSourceSheet}
                     />
                     <SettingItem
                         title="Auto-Select Subtitles"
@@ -338,27 +251,130 @@ const PlaybackSettingsScreen: React.FC = () => {
                 )}
             </ScrollView>
 
-            {/* Language Picker Modals */}
-            <LanguagePickerModal
-                visible={showAudioLanguageModal}
-                onClose={() => setShowAudioLanguageModal(false)}
-                selectedLanguage={settings?.preferredAudioLanguage || 'en'}
-                onSelectLanguage={(code) => updateSetting('preferredAudioLanguage', code)}
-                title="Preferred Audio Language"
-            />
-            <LanguagePickerModal
-                visible={showSubtitleLanguageModal}
-                onClose={() => setShowSubtitleLanguageModal(false)}
-                selectedLanguage={settings?.preferredSubtitleLanguage || 'en'}
-                onSelectLanguage={(code) => updateSetting('preferredSubtitleLanguage', code)}
-                title="Preferred Subtitle Language"
-            />
-            <SubtitleSourceModal
-                visible={showSubtitleSourceModal}
-                onClose={() => setShowSubtitleSourceModal(false)}
-                selectedSource={settings?.subtitleSourcePreference || 'internal'}
-                onSelectSource={(value) => updateSetting('subtitleSourcePreference', value)}
-            />
+            {/* Audio Language Bottom Sheet */}
+            <BottomSheetModal
+                ref={audioLanguageSheetRef}
+                index={0}
+                snapPoints={languageSnapPoints}
+                enableDynamicSizing={false}
+                enablePanDownToClose={true}
+                backdropComponent={renderBackdrop}
+                backgroundStyle={{ backgroundColor: '#1a1a1a' }}
+                handleIndicatorStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+            >
+                <View style={styles.sheetHeader}>
+                    <Text style={styles.sheetTitle}>Preferred Audio Language</Text>
+                </View>
+                <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
+                    {AVAILABLE_LANGUAGES.map((lang) => {
+                        const isSelected = lang.code === (settings?.preferredAudioLanguage || 'en');
+                        return (
+                            <TouchableOpacity
+                                key={lang.code}
+                                style={[
+                                    styles.languageItem,
+                                    isSelected && { backgroundColor: currentTheme.colors.primary + '20' }
+                                ]}
+                                onPress={() => handleSelectAudioLanguage(lang.code)}
+                            >
+                                <Text style={[styles.languageName, { color: isSelected ? currentTheme.colors.primary : '#fff' }]}>
+                                    {lang.name}
+                                </Text>
+                                <Text style={styles.languageCode}>
+                                    {lang.code.toUpperCase()}
+                                </Text>
+                                {isSelected && (
+                                    <MaterialIcons name="check" size={20} color={currentTheme.colors.primary} />
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </BottomSheetScrollView>
+            </BottomSheetModal>
+
+            {/* Subtitle Language Bottom Sheet */}
+            <BottomSheetModal
+                ref={subtitleLanguageSheetRef}
+                index={0}
+                snapPoints={languageSnapPoints}
+                enableDynamicSizing={false}
+                enablePanDownToClose={true}
+                backdropComponent={renderBackdrop}
+                backgroundStyle={{ backgroundColor: '#1a1a1a' }}
+                handleIndicatorStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+            >
+                <View style={styles.sheetHeader}>
+                    <Text style={styles.sheetTitle}>Preferred Subtitle Language</Text>
+                </View>
+                <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
+                    {AVAILABLE_LANGUAGES.map((lang) => {
+                        const isSelected = lang.code === (settings?.preferredSubtitleLanguage || 'en');
+                        return (
+                            <TouchableOpacity
+                                key={lang.code}
+                                style={[
+                                    styles.languageItem,
+                                    isSelected && { backgroundColor: currentTheme.colors.primary + '20' }
+                                ]}
+                                onPress={() => handleSelectSubtitleLanguage(lang.code)}
+                            >
+                                <Text style={[styles.languageName, { color: isSelected ? currentTheme.colors.primary : '#fff' }]}>
+                                    {lang.name}
+                                </Text>
+                                <Text style={styles.languageCode}>
+                                    {lang.code.toUpperCase()}
+                                </Text>
+                                {isSelected && (
+                                    <MaterialIcons name="check" size={20} color={currentTheme.colors.primary} />
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </BottomSheetScrollView>
+            </BottomSheetModal>
+
+            {/* Subtitle Source Priority Bottom Sheet */}
+            <BottomSheetModal
+                ref={subtitleSourceSheetRef}
+                index={0}
+                snapPoints={sourceSnapPoints}
+                enableDynamicSizing={false}
+                enablePanDownToClose={true}
+                backdropComponent={renderBackdrop}
+                backgroundStyle={{ backgroundColor: '#1a1a1a' }}
+                handleIndicatorStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+            >
+                <View style={styles.sheetHeader}>
+                    <Text style={styles.sheetTitle}>Subtitle Source Priority</Text>
+                </View>
+                <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
+                    {SUBTITLE_SOURCE_OPTIONS.map((option) => {
+                        const isSelected = option.value === (settings?.subtitleSourcePreference || 'internal');
+                        return (
+                            <TouchableOpacity
+                                key={option.value}
+                                style={[
+                                    styles.sourceItem,
+                                    isSelected && { backgroundColor: currentTheme.colors.primary + '20', borderColor: currentTheme.colors.primary }
+                                ]}
+                                onPress={() => handleSelectSubtitleSource(option.value as 'internal' | 'external' | 'any')}
+                            >
+                                <View style={styles.sourceItemContent}>
+                                    <Text style={[styles.sourceLabel, { color: isSelected ? currentTheme.colors.primary : '#fff' }]}>
+                                        {option.label}
+                                    </Text>
+                                    <Text style={styles.sourceDescription}>
+                                        {option.description}
+                                    </Text>
+                                </View>
+                                {isSelected && (
+                                    <MaterialIcons name="check" size={20} color={currentTheme.colors.primary} />
+                                )}
+                            </TouchableOpacity>
+                        );
+                    })}
+                </BottomSheetScrollView>
+            </BottomSheetModal>
         </View>
     );
 };
@@ -373,35 +389,23 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingTop: 16,
     },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: '70%',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 20,
+    sheetHeader: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 20,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(255,255,255,0.1)',
+        marginBottom: 8,
     },
-    modalTitle: {
+    sheetTitle: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '700',
     },
-    closeButton: {
-        padding: 4,
-    },
-    languageList: {
+    sheetContent: {
         paddingHorizontal: 16,
-        paddingBottom: 16,
+        paddingTop: 12,
+        paddingBottom: 24,
     },
     languageItem: {
         flexDirection: 'row',
@@ -419,6 +423,7 @@ const styles = StyleSheet.create({
     languageCode: {
         fontSize: 12,
         marginRight: 12,
+        color: 'rgba(255,255,255,0.5)',
     },
     sourceItem: {
         flexDirection: 'row',
