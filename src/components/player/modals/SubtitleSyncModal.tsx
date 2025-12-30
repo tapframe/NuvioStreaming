@@ -12,7 +12,19 @@ import {
     useWindowDimensions,
     StatusBar,
     BackHandler,
+    Platform,
 } from 'react-native';
+import { BlurView as ExpoBlurView } from 'expo-blur';
+
+// Dynamically import community blur for Android
+let AndroidBlurView: any = null;
+if (Platform.OS === 'android') {
+    try {
+        AndroidBlurView = require('@react-native-community/blur').BlurView;
+    } catch (e) {
+        AndroidBlurView = null;
+    }
+}
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
@@ -265,103 +277,214 @@ export const SubtitleSyncModal: React.FC<SubtitleSyncModalProps> = ({
                     </View>
                 </View>
 
-                {/* Right side - Controls */}
-                <View style={[
-                    styles.rightPanel,
-                    {
-                        width: rightPanelWidth,
-                        paddingBottom: Math.max(insets.bottom, isLargeScreen ? 48 : 16),
-                        paddingTop: isLargeScreen ? 48 : 32
-                    }
-                ]}>
-                    {/* Offset display */}
-                    <View style={styles.offsetContainer}>
-                        <Text style={[styles.offsetLabel, isLargeScreen && styles.offsetLabelLarge]}>Delay</Text>
-                        <Text style={[
-                            styles.offsetValue,
-                            { color: primaryColor },
-                            isLargeScreen && styles.offsetValueLarge
-                        ]}>
-                            {formatOffset(tempOffset)}
-                        </Text>
-                    </View>
+                {/* Right side - Controls with blur background */}
+                {Platform.OS === 'android' && AndroidBlurView ? (
+                    <View style={[
+                        styles.rightPanel,
+                        styles.androidRightPanelContainer,
+                        {
+                            width: rightPanelWidth,
+                            paddingBottom: Math.max(insets.bottom, isLargeScreen ? 48 : 16),
+                            paddingTop: isLargeScreen ? 48 : 32,
+                        }
+                    ]}>
+                        <AndroidBlurView
+                            blurType="dark"
+                            blurAmount={15}
+                            blurRadius={8}
+                            style={StyleSheet.absoluteFill}
+                        />
+                        {/* Offset display */}
+                        <View style={styles.offsetContainer}>
+                            <Text style={[styles.offsetLabel, isLargeScreen && styles.offsetLabelLarge]}>Delay</Text>
+                            <Text style={[
+                                styles.offsetValue,
+                                { color: primaryColor },
+                                isLargeScreen && styles.offsetValueLarge
+                            ]}>
+                                {formatOffset(tempOffset)}
+                            </Text>
+                        </View>
 
-                    {/* Slider - horizontal with buttons */}
-                    <View style={styles.sliderContainer}>
-                        <View style={styles.sliderRow}>
+                        {/* Slider - horizontal with buttons */}
+                        <View style={styles.sliderContainer}>
+                            <View style={styles.sliderRow}>
+                                <TouchableOpacity
+                                    onPress={() => handleSliderChange(tempOffset - 0.1)}
+                                    style={[styles.nudgeBtn, isLargeScreen && styles.nudgeBtnLarge]}
+                                >
+                                    <MaterialIcons name="remove" size={isLargeScreen ? 28 : 20} color="#fff" />
+                                </TouchableOpacity>
+
+                                <Slider
+                                    style={styles.slider}
+                                    minimumValue={-10}
+                                    maximumValue={10}
+                                    step={0.1}
+                                    value={tempOffset}
+                                    onValueChange={handleSliderChange}
+                                    minimumTrackTintColor={primaryColor}
+                                    maximumTrackTintColor="rgba(255,255,255,0.25)"
+                                    thumbTintColor={primaryColor}
+                                />
+
+                                <TouchableOpacity
+                                    onPress={() => handleSliderChange(tempOffset + 0.1)}
+                                    style={[styles.nudgeBtn, isLargeScreen && styles.nudgeBtnLarge]}
+                                >
+                                    <MaterialIcons name="add" size={isLargeScreen ? 28 : 20} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.sliderLabels}>
+                                <Text style={styles.sliderLabel}>-10s</Text>
+                                <Text style={styles.sliderLabel}>+10s</Text>
+                            </View>
+                        </View>
+
+                        {/* Reset Button */}
+                        <View style={styles.resetBtnContainer}>
                             <TouchableOpacity
-                                onPress={() => handleSliderChange(tempOffset - 0.1)}
-                                style={[styles.nudgeBtn, isLargeScreen && styles.nudgeBtnLarge]}
+                                onPress={handleReset}
+                                style={[
+                                    styles.resetBtn,
+                                    isLargeScreen && styles.resetBtnLarge
+                                ]}
+                                activeOpacity={0.7}
                             >
-                                <MaterialIcons name="remove" size={isLargeScreen ? 28 : 20} color="#fff" />
-                            </TouchableOpacity>
-
-                            <Slider
-                                style={styles.slider}
-                                minimumValue={-10}
-                                maximumValue={10}
-                                step={0.1}
-                                value={tempOffset}
-                                onValueChange={handleSliderChange}
-                                minimumTrackTintColor={primaryColor}
-                                maximumTrackTintColor="rgba(255,255,255,0.25)"
-                                thumbTintColor={primaryColor}
-                            />
-
-                            <TouchableOpacity
-                                onPress={() => handleSliderChange(tempOffset + 0.1)}
-                                style={[styles.nudgeBtn, isLargeScreen && styles.nudgeBtnLarge]}
-                            >
-                                <MaterialIcons name="add" size={isLargeScreen ? 28 : 20} color="#fff" />
+                                <MaterialIcons name="refresh" size={isLargeScreen ? 16 : 14} color="#fff" style={{ marginRight: 4 }} />
+                                <Text style={[styles.resetBtnText, isLargeScreen && styles.resetBtnTextLarge]}>Reset</Text>
                             </TouchableOpacity>
                         </View>
-                        <View style={styles.sliderLabels}>
-                            <Text style={styles.sliderLabel}>-10s</Text>
-                            <Text style={styles.sliderLabel}>+10s</Text>
+
+                        {/* Buttons - stacked vertically */}
+                        <View style={[styles.buttons, isLargeScreen && { gap: 16 }]}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.okBtn,
+                                    { backgroundColor: primaryColor },
+                                    isLargeScreen && styles.btnLarge
+                                ]}
+                                onPress={handleConfirm}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.okBtnText, isLargeScreen && styles.btnTextLarge]}>OK</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.cancelBtn,
+                                    isLargeScreen && styles.btnLarge
+                                ]}
+                                onPress={onClose}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.cancelBtnText, isLargeScreen && styles.btnTextLarge]}>CANCEL</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
+                ) : (
+                    <ExpoBlurView
+                        intensity={80}
+                        tint="dark"
+                        style={[
+                            styles.rightPanel,
+                            {
+                                width: rightPanelWidth,
+                                paddingBottom: Math.max(insets.bottom, isLargeScreen ? 48 : 16),
+                                paddingTop: isLargeScreen ? 48 : 32,
+                                overflow: 'hidden',
+                            }
+                        ]}
+                    >
+                        {/* Offset display */}
+                        <View style={styles.offsetContainer}>
+                            <Text style={[styles.offsetLabel, isLargeScreen && styles.offsetLabelLarge]}>Delay</Text>
+                            <Text style={[
+                                styles.offsetValue,
+                                { color: primaryColor },
+                                isLargeScreen && styles.offsetValueLarge
+                            ]}>
+                                {formatOffset(tempOffset)}
+                            </Text>
+                        </View>
 
-                    {/* Reset Button */}
-                    <View style={styles.resetBtnContainer}>
-                        <TouchableOpacity
-                            onPress={handleReset}
-                            style={[
-                                styles.resetBtn,
-                                isLargeScreen && styles.resetBtnLarge
-                            ]}
-                            activeOpacity={0.7}
-                        >
-                            <MaterialIcons name="refresh" size={isLargeScreen ? 16 : 14} color="#fff" style={{ marginRight: 4 }} />
-                            <Text style={[styles.resetBtnText, isLargeScreen && styles.resetBtnTextLarge]}>Reset</Text>
-                        </TouchableOpacity>
-                    </View>
+                        {/* Slider - horizontal with buttons */}
+                        <View style={styles.sliderContainer}>
+                            <View style={styles.sliderRow}>
+                                <TouchableOpacity
+                                    onPress={() => handleSliderChange(tempOffset - 0.1)}
+                                    style={[styles.nudgeBtn, isLargeScreen && styles.nudgeBtnLarge]}
+                                >
+                                    <MaterialIcons name="remove" size={isLargeScreen ? 28 : 20} color="#fff" />
+                                </TouchableOpacity>
 
-                    {/* Buttons - stacked vertically */}
-                    <View style={[styles.buttons, isLargeScreen && { gap: 16 }]}>
-                        <TouchableOpacity
-                            style={[
-                                styles.okBtn,
-                                { backgroundColor: primaryColor },
-                                isLargeScreen && styles.btnLarge
-                            ]}
-                            onPress={handleConfirm}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={[styles.okBtnText, isLargeScreen && styles.btnTextLarge]}>OK</Text>
-                        </TouchableOpacity>
+                                <Slider
+                                    style={styles.slider}
+                                    minimumValue={-10}
+                                    maximumValue={10}
+                                    step={0.1}
+                                    value={tempOffset}
+                                    onValueChange={handleSliderChange}
+                                    minimumTrackTintColor={primaryColor}
+                                    maximumTrackTintColor="rgba(255,255,255,0.25)"
+                                    thumbTintColor={primaryColor}
+                                />
 
-                        <TouchableOpacity
-                            style={[
-                                styles.cancelBtn,
-                                isLargeScreen && styles.btnLarge
-                            ]}
-                            onPress={onClose}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={[styles.cancelBtnText, isLargeScreen && styles.btnTextLarge]}>CANCEL</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                                <TouchableOpacity
+                                    onPress={() => handleSliderChange(tempOffset + 0.1)}
+                                    style={[styles.nudgeBtn, isLargeScreen && styles.nudgeBtnLarge]}
+                                >
+                                    <MaterialIcons name="add" size={isLargeScreen ? 28 : 20} color="#fff" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.sliderLabels}>
+                                <Text style={styles.sliderLabel}>-10s</Text>
+                                <Text style={styles.sliderLabel}>+10s</Text>
+                            </View>
+                        </View>
+
+                        {/* Reset Button */}
+                        <View style={styles.resetBtnContainer}>
+                            <TouchableOpacity
+                                onPress={handleReset}
+                                style={[
+                                    styles.resetBtn,
+                                    isLargeScreen && styles.resetBtnLarge
+                                ]}
+                                activeOpacity={0.7}
+                            >
+                                <MaterialIcons name="refresh" size={isLargeScreen ? 16 : 14} color="#fff" style={{ marginRight: 4 }} />
+                                <Text style={[styles.resetBtnText, isLargeScreen && styles.resetBtnTextLarge]}>Reset</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Buttons - stacked vertically */}
+                        <View style={[styles.buttons, isLargeScreen && { gap: 16 }]}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.okBtn,
+                                    { backgroundColor: primaryColor },
+                                    isLargeScreen && styles.btnLarge
+                                ]}
+                                onPress={handleConfirm}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.okBtnText, isLargeScreen && styles.btnTextLarge]}>OK</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.cancelBtn,
+                                    isLargeScreen && styles.btnLarge
+                                ]}
+                                onPress={onClose}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.cancelBtnText, isLargeScreen && styles.btnTextLarge]}>CANCEL</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </ExpoBlurView>
+                )}
             </View>
         </Animated.View>
     );
@@ -384,11 +507,14 @@ const styles = StyleSheet.create({
     },
     rightPanel: {
         width: 320,
-        backgroundColor: 'rgba(255,255,255,0.05)',
         paddingHorizontal: 24,
         paddingVertical: 32,
         justifyContent: 'space-between',
         alignItems: 'center',
+    },
+    androidRightPanelContainer: {
+        backgroundColor: 'rgba(20,20,20,0.85)',
+        overflow: 'hidden',
     },
     subtitleArea: {
         alignItems: 'center',
