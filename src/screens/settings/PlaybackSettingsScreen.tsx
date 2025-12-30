@@ -258,28 +258,28 @@ const PlaybackSettingsScreen: React.FC = () => {
                     <SettingItem
                         title="Preferred Audio Language"
                         description={getLanguageName(settings?.preferredAudioLanguage || 'en')}
-                        icon="volume-up"
+                        icon="volume-2"
                         renderControl={() => <ChevronRight />}
                         onPress={() => setShowAudioLanguageModal(true)}
                     />
                     <SettingItem
                         title="Preferred Subtitle Language"
                         description={getLanguageName(settings?.preferredSubtitleLanguage || 'en')}
-                        icon="subtitles"
+                        icon="type"
                         renderControl={() => <ChevronRight />}
                         onPress={() => setShowSubtitleLanguageModal(true)}
                     />
                     <SettingItem
                         title="Subtitle Source Priority"
                         description={getSourceLabel(settings?.subtitleSourcePreference || 'internal')}
-                        icon="source"
+                        icon="layers"
                         renderControl={() => <ChevronRight />}
                         onPress={() => setShowSubtitleSourceModal(true)}
                     />
                     <SettingItem
                         title="Auto-Select Subtitles"
                         description="Automatically select subtitles matching your preferences"
-                        icon="auto-fix"
+                        icon="zap"
                         renderControl={() => (
                             <CustomSwitch
                                 value={settings?.enableSubtitleAutoSelect ?? true}
