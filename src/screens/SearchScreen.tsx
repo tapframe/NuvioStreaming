@@ -906,7 +906,11 @@ const SearchScreen = () => {
           isGrid && styles.discoverGridItem
         ]}
         onPress={() => {
-          navigation.navigate('Metadata', { id: item.id, type: item.type });
+          navigation.navigate('Metadata', { 
+            id: item.id, 
+            type: item.type,
+            addonId: item.addonId 
+          });
         }}
         onLongPress={() => {
           setSelectedItem(item);
