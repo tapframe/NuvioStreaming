@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,8 @@ import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './Setting
 import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+
+const { width } = Dimensions.get('window');
 
 // Available languages for audio/subtitle selection
 const AVAILABLE_LANGUAGES = [
@@ -54,11 +56,19 @@ const SUBTITLE_SOURCE_OPTIONS = [
     { value: 'any', label: 'Any Available', description: 'Use first available subtitle track' },
 ];
 
-const PlaybackSettingsScreen: React.FC = () => {
+// Props for the reusable content component
+interface PlaybackSettingsContentProps {
+    isTablet?: boolean;
+}
+
+/**
+ * Reusable PlaybackSettingsContent component
+ * Can be used inline (tablets) or wrapped in a screen (mobile)
+ */
+export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = ({ isTablet = false }) => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const { settings, updateSetting } = useSettings();
-    const insets = useSafeAreaInsets();
     const config = useRealtimeConfig();
 
     // Bottom sheet refs
@@ -139,117 +149,116 @@ const PlaybackSettingsScreen: React.FC = () => {
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-            <StatusBar barStyle="light-content" />
-            <ScreenHeader title="Playback" showBackButton onBackPress={() => navigation.goBack()} />
-
-            <ScrollView
-                style={styles.scrollView}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
-            >
-                {hasVisibleItems(['video_player']) && (
-                    <SettingsCard title="VIDEO PLAYER">
-                        {isItemVisible('video_player') && (
-                            <SettingItem
-                                title="Video Player"
-                                description={Platform.OS === 'ios'
-                                    ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
-                                    : (settings?.useExternalPlayer ? 'External' : 'Built-in')
-                                }
-                                icon="play-circle"
-                                renderControl={() => <ChevronRight />}
-                                onPress={() => navigation.navigate('PlayerSettings')}
-                                isLast
-                            />
-                        )}
-                    </SettingsCard>
-                )}
-
-                {/* Audio & Subtitle Preferences */}
-                <SettingsCard title="AUDIO & SUBTITLES">
-                    <SettingItem
-                        title="Preferred Audio Language"
-                        description={getLanguageName(settings?.preferredAudioLanguage || 'en')}
-                        icon="volume-2"
-                        renderControl={() => <ChevronRight />}
-                        onPress={openAudioLanguageSheet}
-                    />
-                    <SettingItem
-                        title="Preferred Subtitle Language"
-                        description={getLanguageName(settings?.preferredSubtitleLanguage || 'en')}
-                        icon="type"
-                        renderControl={() => <ChevronRight />}
-                        onPress={openSubtitleLanguageSheet}
-                    />
-                    <SettingItem
-                        title="Subtitle Source Priority"
-                        description={getSourceLabel(settings?.subtitleSourcePreference || 'internal')}
-                        icon="layers"
-                        renderControl={() => <ChevronRight />}
-                        onPress={openSubtitleSourceSheet}
-                    />
-                    <SettingItem
-                        title="Auto-Select Subtitles"
-                        description="Automatically select subtitles matching your preferences"
-                        icon="zap"
-                        renderControl={() => (
-                            <CustomSwitch
-                                value={settings?.enableSubtitleAutoSelect ?? true}
-                                onValueChange={(value) => updateSetting('enableSubtitleAutoSelect', value)}
-                            />
-                        )}
-                        isLast
-                    />
+        <>
+            {hasVisibleItems(['video_player']) && (
+                <SettingsCard title="VIDEO PLAYER" isTablet={isTablet}>
+                    {isItemVisible('video_player') && (
+                        <SettingItem
+                            title="Video Player"
+                            description={Platform.OS === 'ios'
+                                ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
+                                : (settings?.useExternalPlayer ? 'External' : 'Built-in')
+                            }
+                            icon="play-circle"
+                            renderControl={() => <ChevronRight />}
+                            onPress={() => navigation.navigate('PlayerSettings')}
+                            isLast
+                            isTablet={isTablet}
+                        />
+                    )}
                 </SettingsCard>
+            )}
 
-                {hasVisibleItems(['show_trailers', 'enable_downloads']) && (
-                    <SettingsCard title="MEDIA">
-                        {isItemVisible('show_trailers') && (
-                            <SettingItem
-                                title="Show Trailers"
-                                description="Display trailers in hero section"
-                                icon="film"
-                                renderControl={() => (
-                                    <CustomSwitch
-                                        value={settings?.showTrailers ?? true}
-                                        onValueChange={(value) => updateSetting('showTrailers', value)}
-                                    />
-                                )}
-                            />
-                        )}
-                        {isItemVisible('enable_downloads') && (
-                            <SettingItem
-                                title="Enable Downloads (Beta)"
-                                description="Show Downloads tab and enable saving streams"
-                                icon="download"
-                                renderControl={() => (
-                                    <CustomSwitch
-                                        value={settings?.enableDownloads ?? false}
-                                        onValueChange={(value) => updateSetting('enableDownloads', value)}
-                                    />
-                                )}
-                                isLast
-                            />
-                        )}
-                    </SettingsCard>
-                )}
+            {/* Audio & Subtitle Preferences */}
+            <SettingsCard title="AUDIO & SUBTITLES" isTablet={isTablet}>
+                <SettingItem
+                    title="Preferred Audio Language"
+                    description={getLanguageName(settings?.preferredAudioLanguage || 'en')}
+                    icon="volume-2"
+                    renderControl={() => <ChevronRight />}
+                    onPress={openAudioLanguageSheet}
+                    isTablet={isTablet}
+                />
+                <SettingItem
+                    title="Preferred Subtitle Language"
+                    description={getLanguageName(settings?.preferredSubtitleLanguage || 'en')}
+                    icon="type"
+                    renderControl={() => <ChevronRight />}
+                    onPress={openSubtitleLanguageSheet}
+                    isTablet={isTablet}
+                />
+                <SettingItem
+                    title="Subtitle Source Priority"
+                    description={getSourceLabel(settings?.subtitleSourcePreference || 'internal')}
+                    icon="layers"
+                    renderControl={() => <ChevronRight />}
+                    onPress={openSubtitleSourceSheet}
+                    isTablet={isTablet}
+                />
+                <SettingItem
+                    title="Auto-Select Subtitles"
+                    description="Automatically select subtitles matching your preferences"
+                    icon="zap"
+                    renderControl={() => (
+                        <CustomSwitch
+                            value={settings?.enableSubtitleAutoSelect ?? true}
+                            onValueChange={(value) => updateSetting('enableSubtitleAutoSelect', value)}
+                        />
+                    )}
+                    isLast
+                    isTablet={isTablet}
+                />
+            </SettingsCard>
 
-                {hasVisibleItems(['notifications']) && (
-                    <SettingsCard title="NOTIFICATIONS">
-                        {isItemVisible('notifications') && (
-                            <SettingItem
-                                title="Notifications"
-                                description="Episode reminders"
-                                icon="bell"
-                                renderControl={() => <ChevronRight />}
-                                onPress={() => navigation.navigate('NotificationSettings')}
-                                isLast
-                            />
-                        )}
-                    </SettingsCard>
-                )}
-            </ScrollView>
+            {hasVisibleItems(['show_trailers', 'enable_downloads']) && (
+                <SettingsCard title="MEDIA" isTablet={isTablet}>
+                    {isItemVisible('show_trailers') && (
+                        <SettingItem
+                            title="Show Trailers"
+                            description="Display trailers in hero section"
+                            icon="film"
+                            renderControl={() => (
+                                <CustomSwitch
+                                    value={settings?.showTrailers ?? true}
+                                    onValueChange={(value) => updateSetting('showTrailers', value)}
+                                />
+                            )}
+                            isTablet={isTablet}
+                        />
+                    )}
+                    {isItemVisible('enable_downloads') && (
+                        <SettingItem
+                            title="Enable Downloads (Beta)"
+                            description="Show Downloads tab and enable saving streams"
+                            icon="download"
+                            renderControl={() => (
+                                <CustomSwitch
+                                    value={settings?.enableDownloads ?? false}
+                                    onValueChange={(value) => updateSetting('enableDownloads', value)}
+                                />
+                            )}
+                            isLast
+                            isTablet={isTablet}
+                        />
+                    )}
+                </SettingsCard>
+            )}
+
+            {hasVisibleItems(['notifications']) && (
+                <SettingsCard title="NOTIFICATIONS" isTablet={isTablet}>
+                    {isItemVisible('notifications') && (
+                        <SettingItem
+                            title="Notifications"
+                            description="Episode reminders"
+                            icon="bell"
+                            renderControl={() => <ChevronRight />}
+                            onPress={() => navigation.navigate('NotificationSettings')}
+                            isLast
+                            isTablet={isTablet}
+                        />
+                    )}
+                </SettingsCard>
+            )}
 
             {/* Audio Language Bottom Sheet */}
             <BottomSheetModal
@@ -375,6 +384,32 @@ const PlaybackSettingsScreen: React.FC = () => {
                     })}
                 </BottomSheetScrollView>
             </BottomSheetModal>
+        </>
+    );
+};
+
+/**
+ * PlaybackSettingsScreen - Wrapper for mobile navigation
+ * Uses PlaybackSettingsContent internally
+ */
+const PlaybackSettingsScreen: React.FC = () => {
+    const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+    const { currentTheme } = useTheme();
+    const insets = useSafeAreaInsets();
+    const screenIsTablet = width >= 768;
+
+    return (
+        <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+            <StatusBar barStyle="light-content" />
+            <ScreenHeader title="Playback" showBackButton onBackPress={() => navigation.goBack()} />
+
+            <ScrollView
+                style={styles.scrollView}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
+            >
+                <PlaybackSettingsContent isTablet={screenIsTablet} />
+            </ScrollView>
         </View>
     );
 };

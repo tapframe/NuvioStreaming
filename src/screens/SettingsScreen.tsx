@@ -2,21 +2,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useRealtimeConfig } from '../hooks/useRealtimeConfig';
 
-
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Switch,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Platform,
   Dimensions,
-  Button,
   Linking,
-  Clipboard
 } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
@@ -24,32 +19,32 @@ import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
 import LottieView from 'lottie-react-native';
 import { Feather } from '@expo/vector-icons';
-import { Picker } from '@react-native-picker/picker';
 import { useSettings, DEFAULT_SETTINGS } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { stremioService } from '../services/stremioService';
 import { useCatalogContext } from '../contexts/CatalogContext';
 import { useTraktContext } from '../contexts/TraktContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { catalogService } from '../services/catalogService';
 import { fetchTotalDownloads } from '../services/githubReleaseService';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Sentry from '@sentry/react-native';
 import { getDisplayedAppVersion } from '../utils/version';
 import CustomAlert from '../components/CustomAlert';
 import ScreenHeader from '../components/common/ScreenHeader';
-import PluginIcon from '../components/icons/PluginIcon';
 import TraktIcon from '../components/icons/TraktIcon';
-import TMDBIcon from '../components/icons/TMDBIcon';
-import MDBListIcon from '../components/icons/MDBListIcon';
 import { campaignService } from '../services/campaignService';
 import { useScrollToTop } from '../contexts/ScrollToTopContext';
 
-const { width, height } = Dimensions.get('window');
-const isTablet = width >= 768;
+// Import reusable content components from settings screens
+import { PlaybackSettingsContent } from './settings/PlaybackSettingsScreen';
+import { ContentDiscoverySettingsContent } from './settings/ContentDiscoverySettingsScreen';
+import { AppearanceSettingsContent } from './settings/AppearanceSettingsScreen';
+import { IntegrationsSettingsContent } from './settings/IntegrationsSettingsScreen';
+import { AboutSettingsContent, AboutFooter } from './settings/AboutSettingsScreen';
+import { SettingsCard, SettingItem, ChevronRight, CustomSwitch } from './settings/SettingsComponents';
 
-const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+const { width } = Dimensions.get('window');
+const isTablet = width >= 768;
 
 // Settings categories for tablet sidebar
 const SETTINGS_CATEGORIES = [
@@ -57,7 +52,6 @@ const SETTINGS_CATEGORIES = [
   { id: 'content', title: 'Content & Discovery', icon: 'compass' as string },
   { id: 'appearance', title: 'Appearance', icon: 'sliders' as string },
   { id: 'integrations', title: 'Integrations', icon: 'layers' as string },
-  { id: 'ai', title: 'AI Assistant', icon: 'cpu' as string },
   { id: 'playback', title: 'Playback', icon: 'play-circle' as string },
   { id: 'backup', title: 'Backup & Restore', icon: 'archive' as string },
   { id: 'updates', title: 'Updates', icon: 'refresh-ccw' as string },
@@ -65,134 +59,6 @@ const SETTINGS_CATEGORIES = [
   { id: 'developer', title: 'Developer', icon: 'code' as string },
   { id: 'cache', title: 'Cache', icon: 'database' as string },
 ];
-
-// Card component with minimalistic style
-interface SettingsCardProps {
-  children: React.ReactNode;
-  title?: string;
-  isTablet?: boolean;
-}
-
-const SettingsCard: React.FC<SettingsCardProps> = ({ children, title, isTablet = false }) => {
-  const { currentTheme } = useTheme();
-
-  return (
-    <View
-      style={[
-        styles.cardContainer,
-        isTablet && styles.tabletCardContainer
-      ]}
-    >
-      {title && (
-        <Text style={[
-          styles.cardTitle,
-          { color: currentTheme.colors.mediumEmphasis },
-          isTablet && styles.tabletCardTitle
-        ]}>
-          {title}
-        </Text>
-      )}
-      <View style={[
-        styles.card,
-        {
-          backgroundColor: currentTheme.colors.elevation1,
-          borderWidth: 1,
-          borderColor: currentTheme.colors.elevation2,
-        },
-        isTablet && styles.tabletCard
-      ]}>
-        {children}
-      </View>
-    </View>
-  );
-};
-
-interface SettingItemProps {
-  title: string;
-  description?: string;
-  icon?: string;
-  customIcon?: React.ReactNode;
-  renderControl?: () => React.ReactNode;
-  isLast?: boolean;
-  onPress?: () => void;
-  badge?: string | number;
-  isTablet?: boolean;
-}
-
-const SettingItem: React.FC<SettingItemProps> = ({
-  title,
-  description,
-  icon,
-  customIcon,
-  renderControl,
-  isLast = false,
-  onPress,
-  badge,
-  isTablet = false
-}) => {
-  const { currentTheme } = useTheme();
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.6}
-      onPress={onPress}
-      style={[
-        styles.settingItem,
-        !isLast && styles.settingItemBorder,
-        { borderBottomColor: currentTheme.colors.elevation2 },
-        isTablet && styles.tabletSettingItem
-      ]}
-    >
-      <View style={[
-        styles.settingIconContainer,
-        {
-          backgroundColor: currentTheme.colors.primary + '12',
-        },
-        isTablet && styles.tabletSettingIconContainer
-      ]}>
-        {customIcon ? (
-          customIcon
-        ) : (
-          <Feather
-            name={icon! as any}
-            size={isTablet ? 22 : 18}
-            color={currentTheme.colors.primary}
-          />
-        )}
-      </View>
-      <View style={styles.settingContent}>
-        <View style={styles.settingTextContainer}>
-          <Text style={[
-            styles.settingTitle,
-            { color: currentTheme.colors.highEmphasis },
-            isTablet && styles.tabletSettingTitle
-          ]}>
-            {title}
-          </Text>
-          {description && (
-            <Text style={[
-              styles.settingDescription,
-              { color: currentTheme.colors.mediumEmphasis },
-              isTablet && styles.tabletSettingDescription
-            ]} numberOfLines={1}>
-              {description}
-            </Text>
-          )}
-        </View>
-        {badge && (
-          <View style={[styles.badge, { backgroundColor: `${currentTheme.colors.primary}20` }]}>
-            <Text style={[styles.badgeText, { color: currentTheme.colors.primary }]}>{String(badge)}</Text>
-          </View>
-        )}
-      </View>
-      {renderControl && (
-        <View style={styles.settingControl}>
-          {renderControl()}
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
 
 // Tablet Sidebar Component
 interface SidebarProps {
@@ -306,6 +172,7 @@ const SettingsScreen: React.FC = () => {
     })();
     return () => { mounted = false; };
   }, []);
+
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
@@ -316,13 +183,9 @@ const SettingsScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('account');
 
   // States for dynamic content
-  const [addonCount, setAddonCount] = useState<number>(0);
-  const [catalogCount, setCatalogCount] = useState<number>(0);
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
-  const [openRouterKeySet, setOpenRouterKeySet] = useState<boolean>(false);
   const [totalDownloads, setTotalDownloads] = useState<number>(0);
   const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
-  const [isCountingUp, setIsCountingUp] = useState<boolean>(false);
 
   // Use Realtime Config Hook
   const settingsConfig = useRealtimeConfig();
@@ -338,91 +201,45 @@ const SettingsScreen: React.FC = () => {
 
   useScrollToTop('Settings', scrollToTop);
 
-  // Add a useEffect to check Trakt authentication status on focus
+  // Refresh Trakt auth status on focus
   useEffect(() => {
-    // This will reload the Trakt auth status whenever the settings screen is focused
     const unsubscribe = navigation.addListener('focus', () => {
-      // Force a re-render when returning to this screen
-      // This will reflect the updated isAuthenticated state from the TraktContext
-      // Refresh auth status
-      if (isAuthenticated || userProfile) {
-        // Just to be cautious, log the current state
-        if (__DEV__) console.log('SettingsScreen focused, refreshing auth status. Current state:', { isAuthenticated, userProfile: userProfile?.username });
-      }
       refreshAuthStatus();
     });
-
     return unsubscribe;
-  }, [navigation, isAuthenticated, userProfile, refreshAuthStatus]);
+  }, [navigation, refreshAuthStatus]);
 
   const loadData = useCallback(async () => {
     try {
-      // Load addon count and get their catalogs
-      const addons = await stremioService.getInstalledAddonsAsync();
-      setAddonCount(addons.length);
-
-      // Count total available catalogs
-      let totalCatalogs = 0;
-      addons.forEach(addon => {
-        if (addon.catalogs && addon.catalogs.length > 0) {
-          totalCatalogs += addon.catalogs.length;
-        }
-      });
-
-      // Load saved catalog settings
-      const catalogSettingsJson = await mmkvStorage.getItem('catalog_settings');
-      if (catalogSettingsJson) {
-        const catalogSettings = JSON.parse(catalogSettingsJson);
-        // Filter out _lastUpdate key and count only explicitly disabled catalogs
-        const disabledCount = Object.entries(catalogSettings)
-          .filter(([key, value]) => key !== '_lastUpdate' && value === false)
-          .length;
-        // Since catalogs are enabled by default, subtract disabled ones from total
-        setCatalogCount(totalCatalogs - disabledCount);
-      } else {
-        // If no settings saved, all catalogs are enabled by default
-        setCatalogCount(totalCatalogs);
-      }
-
       // Check MDBList API key status
       const mdblistKey = await mmkvStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
 
-      // Check OpenRouter API key status
-      const openRouterKey = await mmkvStorage.getItem('openrouter_api_key');
-      setOpenRouterKeySet(!!openRouterKey);
-
-      // Load GitHub total downloads (initial load only, polling happens in useEffect)
+      // Load GitHub total downloads
       const downloads = await fetchTotalDownloads();
       if (downloads !== null) {
         setTotalDownloads(downloads);
         setDisplayDownloads(downloads);
       }
-
     } catch (error) {
       if (__DEV__) console.error('Error loading settings data:', error);
     }
   }, []);
 
-  // Load data initially and when catalogs are updated
   useEffect(() => {
     loadData();
   }, [loadData, lastUpdate]);
 
-  // Add focus listener to reload data when screen comes into focus
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadData();
     });
-
     return unsubscribe;
   }, [navigation, loadData]);
 
-  // Poll GitHub downloads every 10 seconds when on the About section
+  // Poll GitHub downloads
   useEffect(() => {
-    // Only poll when viewing the About section (where downloads counter is shown)
     const shouldPoll = isTablet ? selectedCategory === 'about' : true;
-
     if (!shouldPoll) return;
 
     const pollInterval = setInterval(async () => {
@@ -434,28 +251,25 @@ const SettingsScreen: React.FC = () => {
       } catch (error) {
         if (__DEV__) console.error('Error polling downloads:', error);
       }
-    }, 3600000); // 3600000 milliseconds (1 hour)
+    }, 3600000);
 
     return () => clearInterval(pollInterval);
-  }, [selectedCategory, isTablet, totalDownloads]);
+  }, [selectedCategory, totalDownloads]);
 
   // Animate counting up when totalDownloads changes
   useEffect(() => {
     if (totalDownloads === null || displayDownloads === null) return;
     if (totalDownloads === displayDownloads) return;
 
-    setIsCountingUp(true);
     const start = displayDownloads;
     const end = totalDownloads;
-    const duration = 2000; // 2 seconds animation
+    const duration = 2000;
     const startTime = Date.now();
 
     const animate = () => {
       const now = Date.now();
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-
-      // Ease out quad for smooth deceleration
       const easeProgress = 1 - Math.pow(1 - progress, 2);
       const current = Math.floor(start + (end - start) * easeProgress);
 
@@ -465,30 +279,11 @@ const SettingsScreen: React.FC = () => {
         requestAnimationFrame(animate);
       } else {
         setDisplayDownloads(end);
-        setIsCountingUp(false);
       }
     };
 
     requestAnimationFrame(animate);
   }, [totalDownloads]);
-
-  const handleResetSettings = useCallback(() => {
-    openAlert(
-      'Reset Settings',
-      'Are you sure you want to reset all settings to default values?',
-      [
-        { label: 'Cancel', onPress: () => { } },
-        {
-          label: 'Reset',
-          onPress: () => {
-            (Object.keys(DEFAULT_SETTINGS) as Array<keyof typeof DEFAULT_SETTINGS>).forEach(key => {
-              updateSetting(key, DEFAULT_SETTINGS[key]);
-            });
-          }
-        }
-      ]
-    );
-  }, [updateSetting]);
 
   const handleClearMDBListCache = () => {
     openAlert(
@@ -512,24 +307,6 @@ const SettingsScreen: React.FC = () => {
     );
   };
 
-  const CustomSwitch = ({ value, onValueChange }: { value: boolean, onValueChange: (value: boolean) => void }) => (
-    <Switch
-      value={value}
-      onValueChange={onValueChange}
-      trackColor={{ false: currentTheme.colors.elevation2, true: currentTheme.colors.primary }}
-      thumbColor={value ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
-      ios_backgroundColor={currentTheme.colors.elevation2}
-    />
-  );
-
-  const ChevronRight = () => (
-    <Feather
-      name="chevron-right"
-      size={isTablet ? 24 : 20}
-      color={currentTheme.colors.mediumEmphasis}
-    />
-  );
-
   // Helper to check item visibility
   const isItemVisible = (itemId: string) => {
     if (!settingsConfig?.items) return true;
@@ -546,8 +323,7 @@ const SettingsScreen: React.FC = () => {
     return true;
   });
 
-
-
+  // Render tablet category content using reusable components
   const renderCategoryContent = (categoryId: string) => {
     switch (categoryId) {
       case 'account':
@@ -558,7 +334,7 @@ const SettingsScreen: React.FC = () => {
                 title="Trakt"
                 description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
                 customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-                renderControl={ChevronRight}
+                renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
                 isLast={true}
                 isTablet={isTablet}
@@ -568,272 +344,19 @@ const SettingsScreen: React.FC = () => {
         );
 
       case 'content':
-        return (
-          <SettingsCard title="CONTENT & DISCOVERY" isTablet={isTablet}>
-            {isItemVisible('addons') && (
-              <SettingItem
-                title="Addons"
-                description={`${addonCount} installed`}
-                icon="layers"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('Addons')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('debrid') && (
-              <SettingItem
-                title="Debrid Integration"
-                description="Connect Torbox for premium streams"
-                icon="link"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('DebridIntegration')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('plugins') && (
-              <SettingItem
-                title="Plugins"
-                description="Manage plugins and repositories"
-                customIcon={<PluginIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ScraperSettings')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('catalogs') && (
-              <SettingItem
-                title="Catalogs"
-                description={`${catalogCount} active`}
-                icon="list"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('CatalogSettings')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('home_screen') && (
-              <SettingItem
-                title="Home Screen"
-                description="Layout and content"
-                icon="home"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('HomeScreenSettings')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('show_discover') && (
-              <SettingItem
-                title="Show Discover Section"
-                description="Display discover content in Search"
-                icon="compass"
-                renderControl={() => (
-                  <CustomSwitch
-                    value={settings?.showDiscover ?? true}
-                    onValueChange={(value) => updateSetting('showDiscover', value)}
-                  />
-                )}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('continue_watching') && (
-              <SettingItem
-                title="Continue Watching"
-                description="Cache and playback behavior"
-                icon="play-circle"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ContinueWatchingSettings')}
-                isLast={true}
-                isTablet={isTablet}
-              />
-            )}
-          </SettingsCard>
-        );
+        return <ContentDiscoverySettingsContent isTablet={isTablet} />;
 
       case 'appearance':
-        return (
-          <SettingsCard title="APPEARANCE" isTablet={isTablet}>
-            {isItemVisible('theme') && (
-              <SettingItem
-                title="Theme"
-                description={currentTheme.name}
-                icon="sliders"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('ThemeSettings')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('episode_layout') && (
-              <SettingItem
-                title="Episode Layout"
-                description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
-                icon="grid"
-                renderControl={() => (
-                  <CustomSwitch
-                    value={settings?.episodeLayoutStyle === 'horizontal'}
-                    onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
-                  />
-                )}
-                isLast={isTablet}
-                isTablet={isTablet}
-              />
-            )}
-            {!isTablet && isItemVisible('streams_backdrop') && (
-              <SettingItem
-                title="Streams Backdrop"
-                description="Show blurred backdrop on mobile streams"
-                icon="image"
-                renderControl={() => (
-                  <CustomSwitch
-                    value={settings?.enableStreamsBackdrop ?? true}
-                    onValueChange={(value) => updateSetting('enableStreamsBackdrop', value)}
-                  />
-                )}
-                isLast={true}
-                isTablet={isTablet}
-              />
-            )}
-          </SettingsCard>
-        );
+        return <AppearanceSettingsContent isTablet={isTablet} />;
 
       case 'integrations':
-        return (
-          <SettingsCard title="INTEGRATIONS" isTablet={isTablet}>
-            {isItemVisible('mdblist') && (
-              <SettingItem
-                title="MDBList"
-                description={mdblistKeySet ? "Connected" : "Enable to add ratings & reviews"}
-                customIcon={<MDBListIcon size={isTablet ? 24 : 20} colorPrimary={currentTheme.colors.primary} colorSecondary={currentTheme.colors.white} />}
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('MDBListSettings')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('tmdb') && (
-              <SettingItem
-                title="TMDB"
-                description="Metadata & logo source provider"
-                customIcon={<TMDBIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('TMDBSettings')}
-                isLast={true}
-                isTablet={isTablet}
-              />
-            )}
-          </SettingsCard>
-        );
-
-      case 'ai':
-        return (
-          <SettingsCard title="AI ASSISTANT" isTablet={isTablet}>
-            {isItemVisible('openrouter') && (
-              <SettingItem
-                title="OpenRouter API"
-                description={openRouterKeySet ? "Connected" : "Add your API key to enable AI chat"}
-                icon="cpu"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('AISettings')}
-                isLast={true}
-                isTablet={isTablet}
-              />
-            )}
-          </SettingsCard>
-        );
+        return <IntegrationsSettingsContent isTablet={isTablet} />;
 
       case 'playback':
-        return (
-          <SettingsCard title="PLAYBACK" isTablet={isTablet}>
-            {isItemVisible('video_player') && (
-              <SettingItem
-                title="Video Player"
-                description={Platform.OS === 'ios'
-                  ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
-                  : (settings?.useExternalPlayer ? 'External' : 'Built-in')
-                }
-                icon="play-circle"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('PlayerSettings')}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('show_trailers') && (
-              <SettingItem
-                title="Show Trailers"
-                description="Display trailers in hero section"
-                icon="film"
-                renderControl={() => (
-                  <Switch
-                    value={settings?.showTrailers ?? true}
-                    onValueChange={(value) => updateSetting('showTrailers', value)}
-                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
-                    thumbColor={settings?.showTrailers ? '#fff' : '#f4f3f4'}
-                  />
-                )}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('enable_downloads') && (
-              <SettingItem
-                title="Enable Downloads (Beta)"
-                description="Show Downloads tab and enable saving streams"
-                icon="download"
-                renderControl={() => (
-                  <Switch
-                    value={settings?.enableDownloads ?? false}
-                    onValueChange={(value) => updateSetting('enableDownloads', value)}
-                    trackColor={{ false: 'rgba(255,255,255,0.2)', true: currentTheme.colors.primary }}
-                    thumbColor={settings?.enableDownloads ? '#fff' : '#f4f3f4'}
-                  />
-                )}
-                isTablet={isTablet}
-              />
-            )}
-            {isItemVisible('notifications') && (
-              <SettingItem
-                title="Notifications"
-                description="Episode reminders"
-                icon="bell"
-                renderControl={ChevronRight}
-                onPress={() => navigation.navigate('NotificationSettings')}
-                isLast={true}
-                isTablet={isTablet}
-              />
-            )}
-          </SettingsCard>
-        );
+        return <PlaybackSettingsContent isTablet={isTablet} />;
 
       case 'about':
-        return (
-          <SettingsCard title="ABOUT" isTablet={isTablet}>
-            <SettingItem
-              title="Privacy Policy"
-              icon="lock"
-              onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
-              renderControl={ChevronRight}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Report Issue"
-              icon="alert-triangle"
-              onPress={() => Sentry.showFeedbackWidget()}
-              renderControl={ChevronRight}
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Version"
-              description={getDisplayedAppVersion()}
-              icon="info"
-              isTablet={isTablet}
-            />
-            <SettingItem
-              title="Contributors"
-              description="View all contributors"
-              icon="users"
-              renderControl={ChevronRight}
-              onPress={() => navigation.navigate('Contributors')}
-              isLast={true}
-              isTablet={isTablet}
-            />
-          </SettingsCard>
-        );
+        return <AboutSettingsContent isTablet={isTablet} displayDownloads={displayDownloads} />;
 
       case 'developer':
         return __DEV__ ? (
@@ -842,7 +365,7 @@ const SettingsScreen: React.FC = () => {
               title="Test Onboarding"
               icon="play-circle"
               onPress={() => navigation.navigate('Onboarding')}
-              renderControl={ChevronRight}
+              renderControl={() => <ChevronRight />}
               isTablet={isTablet}
             />
             <SettingItem
@@ -856,7 +379,7 @@ const SettingsScreen: React.FC = () => {
                   openAlert('Error', 'Failed to reset onboarding.');
                 }
               }}
-              renderControl={ChevronRight}
+              renderControl={() => <ChevronRight />}
               isTablet={isTablet}
             />
             <SettingItem
@@ -871,7 +394,7 @@ const SettingsScreen: React.FC = () => {
                   openAlert('Error', 'Failed to reset announcement.');
                 }
               }}
-              renderControl={ChevronRight}
+              renderControl={() => <ChevronRight />}
               isTablet={isTablet}
             />
             <SettingItem
@@ -882,7 +405,7 @@ const SettingsScreen: React.FC = () => {
                 await campaignService.resetCampaigns();
                 openAlert('Success', 'Campaign history reset. Restart app to see posters again.');
               }}
-              renderControl={ChevronRight}
+              renderControl={() => <ChevronRight />}
               isTablet={isTablet}
             />
             <SettingItem
@@ -934,7 +457,7 @@ const SettingsScreen: React.FC = () => {
               title="Backup & Restore"
               description="Create and restore app backups"
               icon="archive"
-              renderControl={ChevronRight}
+              renderControl={() => <ChevronRight />}
               onPress={() => navigation.navigate('Backup')}
               isLast={true}
               isTablet={isTablet}
@@ -949,7 +472,7 @@ const SettingsScreen: React.FC = () => {
               title="App Updates"
               description="Check for updates and manage app version"
               icon="refresh-ccw"
-              renderControl={ChevronRight}
+              renderControl={() => <ChevronRight />}
               badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
               onPress={async () => {
                 if (Platform.OS === 'android') {
@@ -969,15 +492,13 @@ const SettingsScreen: React.FC = () => {
     }
   };
 
-  // Keep headers below floating top navigator on tablets by adding extra offset
+  // Keep headers below floating top navigator on tablets
   const tabletNavOffset = isTablet ? 64 : 0;
 
+  // TABLET LAYOUT
   if (isTablet) {
     return (
-      <View style={[
-        styles.container,
-        { backgroundColor: currentTheme.colors.darkBackground }
-      ]}>
+      <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar barStyle={'light-content'} />
         <View style={styles.tabletContainer}>
           <Sidebar
@@ -1003,95 +524,7 @@ const SettingsScreen: React.FC = () => {
               {renderCategoryContent(selectedCategory)}
 
               {selectedCategory === 'about' && (
-                <>
-                  {displayDownloads !== null && (
-                    <View style={styles.downloadsContainer}>
-                      <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
-                        {displayDownloads.toLocaleString()}
-                      </Text>
-                      <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
-                        downloads and counting
-                      </Text>
-                    </View>
-                  )}
-
-                  <View style={styles.discordContainer}>
-                    <TouchableOpacity
-                      style={[styles.discordButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0, marginBottom: 8 }]}
-                      onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
-                        presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
-                      })}
-                      activeOpacity={0.7}
-                    >
-                      <FastImage
-                        source={require('../../assets/support_me_on_kofi_red.png')}
-                        style={styles.kofiImage}
-                        resizeMode={FastImage.resizeMode.contain}
-                      />
-                    </TouchableOpacity>
-
-                    <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
-                      <TouchableOpacity
-                        style={[styles.discordButton, { backgroundColor: currentTheme.colors.elevation1 }]}
-                        onPress={() => Linking.openURL('https://discord.gg/KVgDTjhA4H')}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.discordButtonContent}>
-                          <FastImage
-                            source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
-                            style={styles.discordLogo}
-                            resizeMode={FastImage.resizeMode.contain}
-                          />
-                          <Text style={[styles.discordButtonText, { color: currentTheme.colors.highEmphasis }]}>
-                            Discord
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.discordButton, { backgroundColor: '#FF4500' + '15' }]}
-                        onPress={() => Linking.openURL('https://www.reddit.com/r/Nuvio/')}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.discordButtonContent}>
-                          <FastImage
-                            source={{ uri: 'https://www.iconpacks.net/icons/2/free-reddit-logo-icon-2436-thumb.png' }}
-                            style={styles.discordLogo}
-                            resizeMode={FastImage.resizeMode.contain}
-                          />
-                          <Text style={[styles.discordButtonText, { color: '#FF4500' }]}>
-                            Reddit
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Monkey Animation */}
-                  <View style={styles.monkeyContainer}>
-                    <LottieView
-                      source={require('../assets/lottie/monito.json')}
-                      autoPlay
-                      loop
-                      style={styles.monkeyAnimation}
-                      resizeMode="contain"
-                    />
-                  </View>
-
-                  <View style={styles.brandLogoContainer}>
-                    <FastImage
-                      source={require('../../assets/nuviotext.png')}
-                      style={styles.brandLogo}
-                      resizeMode={FastImage.resizeMode.contain}
-                    />
-                  </View>
-
-                  <View style={styles.footer}>
-                    <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
-                      Made with ❤️ by Tapframe and Friends
-                    </Text>
-                  </View>
-                </>
+                <AboutFooter displayDownloads={displayDownloads} />
               )}
             </ScrollView>
           </View>
@@ -1107,18 +540,12 @@ const SettingsScreen: React.FC = () => {
     );
   }
 
-  // Mobile Layout - Simplified navigation hub
+  // MOBILE LAYOUT - Simplified navigation hub
   return (
-    <View style={[
-      styles.container,
-      { backgroundColor: currentTheme.colors.darkBackground }
-    ]}>
+    <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle={'light-content'} />
-      <ScreenHeader
-        title="Settings"
-      />
+      <ScreenHeader title="Settings" />
       <View style={{ flex: 1 }}>
-
         <View style={styles.contentContainer}>
           <ScrollView
             ref={mobileScrollViewRef}
@@ -1134,7 +561,7 @@ const SettingsScreen: React.FC = () => {
                     title="Trakt"
                     description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
                     customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
-                    renderControl={ChevronRight}
+                    renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
                     isLast
                   />
@@ -1155,7 +582,7 @@ const SettingsScreen: React.FC = () => {
                       title="Content & Discovery"
                       description="Addons, catalogs, and sources"
                       icon="compass"
-                      renderControl={ChevronRight}
+                      renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('ContentDiscoverySettings')}
                     />
                   )}
@@ -1164,7 +591,7 @@ const SettingsScreen: React.FC = () => {
                       title="Appearance"
                       description={currentTheme.name}
                       icon="sliders"
-                      renderControl={ChevronRight}
+                      renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('AppearanceSettings')}
                     />
                   )}
@@ -1173,7 +600,7 @@ const SettingsScreen: React.FC = () => {
                       title="Integrations"
                       description="MDBList, TMDB, AI"
                       icon="layers"
-                      renderControl={ChevronRight}
+                      renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('IntegrationsSettings')}
                     />
                   )}
@@ -1182,7 +609,7 @@ const SettingsScreen: React.FC = () => {
                       title="Playback"
                       description="Player, trailers, downloads"
                       icon="play-circle"
-                      renderControl={ChevronRight}
+                      renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('PlaybackSettings')}
                       isLast
                     />
@@ -1201,7 +628,7 @@ const SettingsScreen: React.FC = () => {
                       title="Backup & Restore"
                       description="Create and restore app backups"
                       icon="archive"
-                      renderControl={ChevronRight}
+                      renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('Backup')}
                     />
                   )}
@@ -1211,7 +638,7 @@ const SettingsScreen: React.FC = () => {
                       description="Check for updates"
                       icon="refresh-ccw"
                       badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
-                      renderControl={ChevronRight}
+                      renderControl={() => <ChevronRight />}
                       onPress={async () => {
                         if (Platform.OS === 'android') {
                           try { await mmkvStorage.removeItem('@update_badge_pending'); } catch { }
@@ -1243,7 +670,7 @@ const SettingsScreen: React.FC = () => {
                 title="About Nuvio"
                 description={getDisplayedAppVersion()}
                 icon="info"
-                renderControl={ChevronRight}
+                renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('AboutSettings')}
                 isLast
               />
@@ -1256,7 +683,7 @@ const SettingsScreen: React.FC = () => {
                   title="Developer Tools"
                   description="Testing and debug options"
                   icon="code"
-                  renderControl={ChevronRight}
+                  renderControl={() => <ChevronRight />}
                   onPress={() => navigation.navigate('DeveloperSettings')}
                   isLast
                 />
@@ -1388,7 +815,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 32,
   },
-
   // Tablet-specific styles
   tabletContainer: {
     flex: 1,
@@ -1449,139 +875,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 40,
   },
-
-  // Common card styles
-  cardContainer: {
-    width: '100%',
-    marginBottom: 24,
-  },
-  tabletCardContainer: {
-    marginBottom: 28,
-  },
-  cardTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginLeft: Math.max(16, width * 0.045),
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  tabletCardTitle: {
-    fontSize: 12,
-    marginLeft: 4,
-    marginBottom: 12,
-  },
-  card: {
-    marginHorizontal: Math.max(16, width * 0.04),
-    borderRadius: 14,
-    overflow: 'hidden',
-    width: undefined,
-  },
-  tabletCard: {
-    marginHorizontal: 0,
-    borderRadius: 16,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: Math.max(14, width * 0.04),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    minHeight: Math.max(60, width * 0.15),
-    width: '100%',
-  },
-  tabletSettingItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    minHeight: 68,
-  },
-  settingItemBorder: {
-    // Border styling handled directly in the component with borderBottomWidth
-  },
-  settingIconContainer: {
-    marginRight: 14,
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabletSettingIconContainer: {
-    width: 42,
-    height: 42,
-    borderRadius: 11,
-    marginRight: 16,
-  },
-  settingContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  settingTextContainer: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: Math.min(16, width * 0.04),
-    fontWeight: '500',
-    marginBottom: 2,
-    letterSpacing: -0.2,
-  },
-  tabletSettingTitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    marginBottom: 3,
-  },
-  settingDescription: {
-    fontSize: Math.min(13, width * 0.034),
-    opacity: 0.7,
-  },
-  tabletSettingDescription: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  settingControl: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingLeft: 10,
-  },
-  badge: {
-    height: 20,
-    minWidth: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-    marginRight: 8,
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 8,
-    padding: 2,
-  },
-  segment: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  segmentActive: {
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
-  segmentText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  segmentTextActive: {
-    color: 'white',
-    fontWeight: '600',
-  },
+  // Footer and social styles
   footer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1593,7 +887,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     letterSpacing: 0.2,
   },
-  // Support buttons
   discordContainer: {
     marginTop: 12,
     marginBottom: 24,
@@ -1642,14 +935,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-  },
-  loadingSpinner: {
-    width: 16,
-    height: 16,
-    borderWidth: 2,
-    borderRadius: 8,
-    borderTopColor: 'transparent',
-    marginRight: 8,
   },
   monkeyContainer: {
     alignItems: 'center',

@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar, Platform, Dimensions } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React from 'react';
+import { View, StyleSheet, ScrollView, StatusBar, Dimensions } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -11,13 +11,19 @@ import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './Setting
 import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 
 const { width } = Dimensions.get('window');
-const isTablet = width >= 768;
 
-const AppearanceSettingsScreen: React.FC = () => {
+interface AppearanceSettingsContentProps {
+    isTablet?: boolean;
+}
+
+/**
+ * Reusable AppearanceSettingsContent component
+ * Can be used inline (tablets) or wrapped in a screen (mobile)
+ */
+export const AppearanceSettingsContent: React.FC<AppearanceSettingsContentProps> = ({ isTablet = false }) => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const { settings, updateSetting } = useSettings();
-    const insets = useSafeAreaInsets();
     const config = useRealtimeConfig();
 
     const isItemVisible = (itemId: string) => {
@@ -35,6 +41,71 @@ const AppearanceSettingsScreen: React.FC = () => {
     };
 
     return (
+        <>
+            {hasVisibleItems(['theme']) && (
+                <SettingsCard title="THEME" isTablet={isTablet}>
+                    {isItemVisible('theme') && (
+                        <SettingItem
+                            title="Theme"
+                            description={currentTheme.name}
+                            icon="sliders"
+                            renderControl={() => <ChevronRight />}
+                            onPress={() => navigation.navigate('ThemeSettings')}
+                            isLast
+                            isTablet={isTablet}
+                        />
+                    )}
+                </SettingsCard>
+            )}
+
+            {hasVisibleItems(['episode_layout', 'streams_backdrop']) && (
+                <SettingsCard title="LAYOUT" isTablet={isTablet}>
+                    {isItemVisible('episode_layout') && (
+                        <SettingItem
+                            title="Episode Layout"
+                            description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
+                            icon="grid"
+                            renderControl={() => (
+                                <CustomSwitch
+                                    value={settings?.episodeLayoutStyle === 'horizontal'}
+                                    onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
+                                />
+                            )}
+                            isLast={isTablet || !isItemVisible('streams_backdrop')}
+                            isTablet={isTablet}
+                        />
+                    )}
+                    {!isTablet && isItemVisible('streams_backdrop') && (
+                        <SettingItem
+                            title="Streams Backdrop"
+                            description="Show blurred backdrop on mobile streams"
+                            icon="image"
+                            renderControl={() => (
+                                <CustomSwitch
+                                    value={settings?.enableStreamsBackdrop ?? true}
+                                    onValueChange={(value) => updateSetting('enableStreamsBackdrop', value)}
+                                />
+                            )}
+                            isLast
+                            isTablet={isTablet}
+                        />
+                    )}
+                </SettingsCard>
+            )}
+        </>
+    );
+};
+
+/**
+ * AppearanceSettingsScreen - Wrapper for mobile navigation
+ */
+const AppearanceSettingsScreen: React.FC = () => {
+    const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+    const { currentTheme } = useTheme();
+    const insets = useSafeAreaInsets();
+    const screenIsTablet = width >= 768;
+
+    return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
             <StatusBar barStyle="light-content" />
             <ScreenHeader title="Appearance" showBackButton onBackPress={() => navigation.goBack()} />
@@ -44,53 +115,7 @@ const AppearanceSettingsScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
             >
-                {hasVisibleItems(['theme']) && (
-                    <SettingsCard title="THEME">
-                        {isItemVisible('theme') && (
-                            <SettingItem
-                                title="Theme"
-                                description={currentTheme.name}
-                                icon="sliders"
-                                renderControl={() => <ChevronRight />}
-                                onPress={() => navigation.navigate('ThemeSettings')}
-                                isLast
-                            />
-                        )}
-                    </SettingsCard>
-                )}
-
-                {hasVisibleItems(['episode_layout', 'streams_backdrop']) && (
-                    <SettingsCard title="LAYOUT">
-                        {isItemVisible('episode_layout') && (
-                            <SettingItem
-                                title="Episode Layout"
-                                description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
-                                icon="grid"
-                                renderControl={() => (
-                                    <CustomSwitch
-                                        value={settings?.episodeLayoutStyle === 'horizontal'}
-                                        onValueChange={(value) => updateSetting('episodeLayoutStyle', value ? 'horizontal' : 'vertical')}
-                                    />
-                                )}
-                                isLast={isTablet || !isItemVisible('streams_backdrop')}
-                            />
-                        )}
-                        {!isTablet && isItemVisible('streams_backdrop') && (
-                            <SettingItem
-                                title="Streams Backdrop"
-                                description="Show blurred backdrop on mobile streams"
-                                icon="image"
-                                renderControl={() => (
-                                    <CustomSwitch
-                                        value={settings?.enableStreamsBackdrop ?? true}
-                                        onValueChange={(value) => updateSetting('enableStreamsBackdrop', value)}
-                                    />
-                                )}
-                                isLast
-                            />
-                        )}
-                    </SettingsCard>
-                )}
+                <AppearanceSettingsContent isTablet={screenIsTablet} />
             </ScrollView>
         </View>
     );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, Platform, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, Platform, Linking, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,53 +14,186 @@ import { getDisplayedAppVersion } from '../../utils/version';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { SettingsCard, SettingItem, ChevronRight } from './SettingsComponents';
 
+const { width } = Dimensions.get('window');
+
+interface AboutSettingsContentProps {
+    isTablet?: boolean;
+    displayDownloads?: number | null;
+}
+
+/**
+ * Reusable AboutSettingsContent component
+ * Can be used inline (tablets) or wrapped in a screen (mobile)
+ */
+export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
+    isTablet = false,
+    displayDownloads: externalDisplayDownloads
+}) => {
+    const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+    const { currentTheme } = useTheme();
+
+    const [internalDisplayDownloads, setInternalDisplayDownloads] = useState<number | null>(null);
+
+    // Use external downloads if provided (for tablet inline use), otherwise load internally
+    const displayDownloads = externalDisplayDownloads ?? internalDisplayDownloads;
+
+    useEffect(() => {
+        // Only load downloads internally if not provided externally
+        if (externalDisplayDownloads === undefined) {
+            const loadDownloads = async () => {
+                const downloads = await fetchTotalDownloads();
+                if (downloads !== null) {
+                    setInternalDisplayDownloads(downloads);
+                }
+            };
+            loadDownloads();
+        }
+    }, [externalDisplayDownloads]);
+
+    return (
+        <>
+            <SettingsCard title="INFORMATION" isTablet={isTablet}>
+                <SettingItem
+                    title="Privacy Policy"
+                    icon="lock"
+                    onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
+                    renderControl={() => <ChevronRight />}
+                    isTablet={isTablet}
+                />
+                <SettingItem
+                    title="Report Issue"
+                    icon="alert-triangle"
+                    onPress={() => Sentry.showFeedbackWidget()}
+                    renderControl={() => <ChevronRight />}
+                    isTablet={isTablet}
+                />
+                <SettingItem
+                    title="Version"
+                    description={getDisplayedAppVersion()}
+                    icon="info"
+                    isTablet={isTablet}
+                />
+                <SettingItem
+                    title="Contributors"
+                    description="View all contributors"
+                    icon="users"
+                    renderControl={() => <ChevronRight />}
+                    onPress={() => navigation.navigate('Contributors')}
+                    isLast
+                    isTablet={isTablet}
+                />
+            </SettingsCard>
+        </>
+    );
+};
+
+/**
+ * Reusable AboutFooter component - Downloads counter, social links, branding
+ */
+export const AboutFooter: React.FC<{ displayDownloads: number | null }> = ({ displayDownloads }) => {
+    const { currentTheme } = useTheme();
+
+    return (
+        <>
+            {displayDownloads !== null && (
+                <View style={styles.downloadsContainer}>
+                    <Text style={[styles.downloadsNumber, { color: currentTheme.colors.primary }]}>
+                        {displayDownloads.toLocaleString()}
+                    </Text>
+                    <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                        downloads and counting
+                    </Text>
+                </View>
+            )}
+
+            <View style={styles.communityContainer}>
+                <TouchableOpacity
+                    style={styles.supportButton}
+                    onPress={() => WebBrowser.openBrowserAsync('https://ko-fi.com/tapframe', {
+                        presentationStyle: Platform.OS === 'ios' ? WebBrowser.WebBrowserPresentationStyle.FORM_SHEET : WebBrowser.WebBrowserPresentationStyle.FORM_SHEET
+                    })}
+                    activeOpacity={0.7}
+                >
+                    <FastImage
+                        source={require('../../../assets/support_me_on_kofi_red.png')}
+                        style={styles.kofiImage}
+                        resizeMode={FastImage.resizeMode.contain}
+                    />
+                </TouchableOpacity>
+
+                <View style={styles.socialRow}>
+                    <TouchableOpacity
+                        style={[styles.socialButton, { backgroundColor: currentTheme.colors.elevation1 }]}
+                        onPress={() => Linking.openURL('https://discord.gg/KVgDTjhA4H')}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.socialButtonContent}>
+                            <FastImage
+                                source={{ uri: 'https://pngimg.com/uploads/discord/discord_PNG3.png' }}
+                                style={styles.socialLogo}
+                                resizeMode={FastImage.resizeMode.contain}
+                            />
+                            <Text style={[styles.socialButtonText, { color: currentTheme.colors.highEmphasis }]}>
+                                Discord
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.socialButton, { backgroundColor: '#FF4500' + '15' }]}
+                        onPress={() => Linking.openURL('https://www.reddit.com/r/Nuvio/')}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.socialButtonContent}>
+                            <FastImage
+                                source={{ uri: 'https://www.iconpacks.net/icons/2/free-reddit-logo-icon-2436-thumb.png' }}
+                                style={styles.socialLogo}
+                                resizeMode={FastImage.resizeMode.contain}
+                            />
+                            <Text style={[styles.socialButtonText, { color: '#FF4500' }]}>
+                                Reddit
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            {/* Monkey Animation */}
+            <View style={styles.monkeyContainer}>
+                <LottieView
+                    source={require('../../assets/lottie/monito.json')}
+                    autoPlay
+                    loop
+                    style={styles.monkeyAnimation}
+                    resizeMode="contain"
+                />
+            </View>
+
+            <View style={styles.brandLogoContainer}>
+                <FastImage
+                    source={require('../../../assets/nuviotext.png')}
+                    style={styles.brandLogo}
+                    resizeMode={FastImage.resizeMode.contain}
+                />
+            </View>
+
+            <View style={styles.footer}>
+                <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Made with ❤️ by Tapframe and Friends
+                </Text>
+            </View>
+        </>
+    );
+};
+
+/**
+ * AboutSettingsScreen - Wrapper for mobile navigation
+ */
 const AboutSettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const insets = useSafeAreaInsets();
-
-    const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
-    const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
-
-    useEffect(() => {
-        const loadDownloads = async () => {
-            const downloads = await fetchTotalDownloads();
-            if (downloads !== null) {
-                setTotalDownloads(downloads);
-                setDisplayDownloads(downloads);
-            }
-        };
-        loadDownloads();
-    }, []);
-
-    // Animate counting up when totalDownloads changes
-    useEffect(() => {
-        if (totalDownloads === null || displayDownloads === null) return;
-        if (totalDownloads === displayDownloads) return;
-
-        const start = displayDownloads;
-        const end = totalDownloads;
-        const duration = 2000;
-        const startTime = Date.now();
-
-        const animate = () => {
-            const now = Date.now();
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const easeProgress = 1 - Math.pow(1 - progress, 2);
-            const current = Math.floor(start + (end - start) * easeProgress);
-
-            setDisplayDownloads(current);
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                setDisplayDownloads(end);
-            }
-        };
-
-        requestAnimationFrame(animate);
-    }, [totalDownloads]);
+    const screenIsTablet = width >= 768;
 
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -72,34 +205,7 @@ const AboutSettingsScreen: React.FC = () => {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
             >
-                <SettingsCard title="INFORMATION">
-                    <SettingItem
-                        title="Privacy Policy"
-                        icon="lock"
-                        onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
-                        renderControl={() => <ChevronRight />}
-                    />
-                    <SettingItem
-                        title="Report Issue"
-                        icon="alert-triangle"
-                        onPress={() => Sentry.showFeedbackWidget()}
-                        renderControl={() => <ChevronRight />}
-                    />
-                    <SettingItem
-                        title="Version"
-                        description={getDisplayedAppVersion()}
-                        icon="info"
-                    />
-                    <SettingItem
-                        title="Contributors"
-                        description="View all contributors"
-                        icon="users"
-                        renderControl={() => <ChevronRight />}
-                        onPress={() => navigation.navigate('Contributors')}
-                        isLast
-                    />
-                </SettingsCard>
-
+                <AboutSettingsContent isTablet={screenIsTablet} />
                 <View style={{ height: 24 }} />
             </ScrollView>
         </View>
