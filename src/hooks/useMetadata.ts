@@ -857,8 +857,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: localized.title || finalMetadata.name,
-                    description: localized.overview || finalMetadata.description,
+                    name: finalMetadata.name || localized.title,
+                    description: finalMetadata.description || localized.overview,
                     movieDetails: movieDetailsObj,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -894,8 +894,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: localized.name || finalMetadata.name,
-                    description: localized.overview || finalMetadata.description,
+                    name: finalMetadata.name || localized.name,
+                    description: finalMetadata.description || localized.overview,
                     tvDetails,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -970,7 +970,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
 
         // Clear banner field if TMDB banner enrichment is enabled to prevent flash
-        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichBanners) {
+        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichBanners && !finalMetadata.banner) {
           finalMetadata = {
             ...finalMetadata,
             banner: undefined, // Let useMetadataAssets handle banner via TMDB
