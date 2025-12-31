@@ -248,7 +248,7 @@ const AndroidVideoPlayer: React.FC = () => {
         if (!playerState.isDragging.current) {
           playerState.setShowControls(false);
         }
-      }, 3000); // 3 seconds delay
+      }, 2000); // 2 seconds delay
     }
 
     // Cleanup on unmount or when dependencies change
