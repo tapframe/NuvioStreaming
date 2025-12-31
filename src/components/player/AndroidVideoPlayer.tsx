@@ -72,7 +72,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const {
     uri, title = 'Episode Name', season, episode, episodeTitle, quality, year,
     streamProvider, streamName, headers, id, type, episodeId, imdbId,
-    availableStreams: passedAvailableStreams, backdrop, groupedEpisodes
+    availableStreams: passedAvailableStreams, backdrop, groupedEpisodes, subtitles
   } = route.params;
 
   // --- State & Custom Hooks ---
