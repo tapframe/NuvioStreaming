@@ -108,4 +108,5 @@ export interface WyzieSubtitle {
   language: string;
   isHearingImpaired: boolean;
   source: string;
+  headers?: Record<string, string>;
 } 

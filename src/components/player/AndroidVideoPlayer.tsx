@@ -131,6 +131,7 @@ const AndroidVideoPlayer: React.FC = () => {
         display: sub.lang || "Unknown",
         language: (sub.lang || "").toLowerCase(),
         isHearingImpaired: false,
+        headers: sub.headers,
         source: sub.addonName || sub.addon || "Stream",
       }));
       setAvailableSubtitles(mappedSubs);
@@ -624,6 +625,7 @@ const AndroidVideoPlayer: React.FC = () => {
         language: (sub.lang || '').toLowerCase(),
         isHearingImpaired: false,
         source: sub.addonName || sub.addon || 'Addon',
+        headers: sub.headers,
       }));
 
       setAvailableSubtitles(subs);
@@ -645,10 +647,10 @@ const AndroidVideoPlayer: React.FC = () => {
       // Download subtitle file
       let srtContent = '';
       try {
-        const resp = await axios.get(subtitle.url, { timeout: 10000 });
+        const resp = await axios.get(subtitle.url, { timeout: 10000, headers: subtitle.headers });
         srtContent = typeof resp.data === 'string' ? resp.data : String(resp.data);
       } catch {
-        const resp = await fetch(subtitle.url);
+        const resp = await fetch(subtitle.url, { headers: subtitle.headers as any });
         srtContent = await resp.text();
       }
 
