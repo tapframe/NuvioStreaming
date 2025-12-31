@@ -523,7 +523,7 @@ export function useTraktIntegration() {
       // Fetch both playback progress and recently watched movies
       const [traktProgress, watchedMovies, watchedShows] = await Promise.all([
         getTraktPlaybackProgress(),
-        traktService.getWatchedMovies()
+        traktService.getWatchedMovies(),
         traktService.getWatchedShows()
       ]);
 
@@ -616,7 +616,8 @@ export function useTraktIntegration() {
           }
         } catch (error) {
           logger.error('[useTraktIntegration] Error preparing watched show update:', error);
-
+        }
+      }
       // Execute all updates in parallel
       await Promise.all(updatePromises);
 

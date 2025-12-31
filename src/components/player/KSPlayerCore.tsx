@@ -145,18 +145,18 @@ const KSPlayerCore: React.FC = () => {
 
   // Track previous video session to reset subtitle offset only when video actually changes
   const previousVideoRef = useRef<{ uri?: string; episodeId?: string }>({});
-  
+
   // Reset subtitle offset when starting a new video session
   useEffect(() => {
     const currentVideo = { uri, episodeId };
     const previousVideo = previousVideoRef.current;
-    
+
     // Only reset if this is actually a new video (uri or episodeId changed)
-    if (previousVideo.uri !== undefined && 
-        (previousVideo.uri !== currentVideo.uri || previousVideo.episodeId !== currentVideo.episodeId)) {
+    if (previousVideo.uri !== undefined &&
+      (previousVideo.uri !== currentVideo.uri || previousVideo.episodeId !== currentVideo.episodeId)) {
       customSubs.setSubtitleOffsetSec(0);
     }
-    
+
     // Update the ref for next comparison
     previousVideoRef.current = currentVideo;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -750,6 +750,7 @@ const KSPlayerCore: React.FC = () => {
         visible={speedControl.showSpeedActivatedOverlay}
         opacity={speedControl.speedActivatedOverlayOpacity}
         speed={speedControl.holdToSpeedValue}
+        screenDimensions={screenDimensions}
       />
 
       <ResumeOverlay
