@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.3.3",
+          "buildVersion": "31",
+          "date": "2026-01-01",
+          "localizedDescription": "# Nuvio Media Hub – v1.3.3\n\n## Update Notes\n\n### Playback & Preferences\n- Added **default audio and subtitle track selection**\n\n### Plugins & Repositories\n- Added support for **multiple active repositories**\n- Improved **plugin fetch logic** for better reliability and performance\n- Changed OTA server.\n\n### Trakt & Metadata Fixes\n- Fixed **TMDB enrichment logic**\n- Fixed **Trakt watch progress not syncing** for older seasons  \n  - Contributed by **@chrisk325**  \n  - Fixes #331 and closes #233  \n  - ⚠️ It is recommended to **log out and log back into Trakt** inside the app to correctly reflect watched status for older seasons\n\n### UI Improvements & Bug Fixes\n- Minor UI refinements and bug fixes  \n- Added **YouTube-style press-and-hold playback speed indicator**  \n- Refined **gesture indicator pill**  \n- Fixed **OSC not auto-hiding on Android**  \n  - Contributed by **@AdityasahuX07**  \n  - Fixes #326 and #298  \n\nThis release includes valuable contributions from the community and focuses on improving playback preferences, plugin handling, Trakt syncing, and overall UI polish.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/1.3.3/Stable_1-3-3.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.3.2",
           "buildVersion": "30",
           "date": "2025-12-28",
