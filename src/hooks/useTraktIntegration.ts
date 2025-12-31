@@ -521,9 +521,10 @@ export function useTraktIntegration() {
 
     try {
       // Fetch both playback progress and recently watched movies
-      const [traktProgress, watchedMovies] = await Promise.all([
+      const [traktProgress, watchedMovies, watchedShows] = await Promise.all([
         getTraktPlaybackProgress(),
         traktService.getWatchedMovies()
+        traktService.getWatchedShows()
       ]);
 
       // Progress retrieval logging removed
@@ -593,6 +594,28 @@ export function useTraktIntegration() {
           logger.error('[useTraktIntegration] Error preparing watched movie update:', error);
         }
       }
+      for (const show of watchedShows) {
+        try {
+          if (show.show?.ids?.imdb && show.seasons) {
+            const showImdbId = show.show.ids.imdb;
+
+            for (const season of show.seasons) {
+              for (const episode of season.episodes) {
+                const episodeId = `${showImdbId}:${season.number}:${episode.number}`;
+                updatePromises.push(
+                  storageService.mergeWithTraktProgress(
+                    showImdbId,
+                    'series',
+                    100,
+                    episode.last_watched_at,
+                    episodeId
+                  )
+                );
+              }
+            }
+          }
+        } catch (error) {
+          logger.error('[useTraktIntegration] Error preparing watched show update:', error);
 
       // Execute all updates in parallel
       await Promise.all(updatePromises);
