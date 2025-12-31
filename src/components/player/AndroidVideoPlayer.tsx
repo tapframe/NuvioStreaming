@@ -234,6 +234,33 @@ const AndroidVideoPlayer: React.FC = () => {
     }).start();
   }, [playerState.showControls]);
 
+  // Auto-hide controls after 3 seconds of inactivity
+  useEffect(() => {
+    // Clear any existing timeout
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current);
+      controlsTimeout.current = null;
+    }
+
+    // Only set timeout if controls are visible and video is playing
+    if (playerState.showControls && !playerState.paused) {
+      controlsTimeout.current = setTimeout(() => {
+        // Don't hide if user is dragging the seek bar
+        if (!playerState.isDragging.current) {
+          playerState.setShowControls(false);
+        }
+      }, 2000); // 2 seconds delay
+    }
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (controlsTimeout.current) {
+        clearTimeout(controlsTimeout.current);
+        controlsTimeout.current = null;
+      }
+    };
+  }, [playerState.showControls, playerState.paused, playerState.isDragging]);
+
   useEffect(() => {
     openingAnimation.startOpeningAnimation();
   }, []);
@@ -459,7 +486,10 @@ const AndroidVideoPlayer: React.FC = () => {
   }, [playerState.currentTime, useCustomSubtitles, customSubtitles]);
 
   const toggleControls = useCallback(() => {
-    playerState.setShowControls(prev => !prev);
+    playerState.setShowControls(prev => {
+      // If we're showing controls, the useEffect will handle the auto-hide timer
+      return !prev;
+    });
   }, []);
 
   const hideControls = useCallback(() => {
@@ -881,6 +911,7 @@ const AndroidVideoPlayer: React.FC = () => {
           visible={speedControl.showSpeedActivatedOverlay}
           opacity={speedControl.speedActivatedOverlayOpacity}
           speed={speedControl.holdToSpeedValue}
+          screenDimensions={playerState.screenDimensions}
         />
 
         <PauseOverlay

@@ -274,8 +274,8 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     borderRadius: 24,
     paddingVertical: 8,
-    paddingHorizontal: 14,
-    gap: 8,
+    paddingHorizontal: 8,
+    gap: 4,
   },
   iconWrapper: {
     width: 28,
@@ -289,7 +289,7 @@ export const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    minWidth: 48,
+    minWidth: 38,
     textAlign: 'center',
   },
 

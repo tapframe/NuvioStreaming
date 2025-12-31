@@ -1,35 +1,57 @@
-/**
- * Shared Speed Activated Overlay Component
- * Used by both Android (VLC) and iOS (KSPlayer) players
- */
 import React from 'react';
 import { View, Text, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { styles } from '../utils/playerStyles';
 
 interface SpeedActivatedOverlayProps {
     visible: boolean;
-    opacity: Animated.Value;
+    opacity: Animated.Value | number;
     speed: number;
+    screenDimensions: { width: number; height: number };
 }
 
 export const SpeedActivatedOverlay: React.FC<SpeedActivatedOverlayProps> = ({
     visible,
     opacity,
-    speed
+    speed,
+    screenDimensions
 }) => {
-    if (!visible) return null;
+    // Safety check to prevent the 'height' of undefined error
+    if (!visible || !screenDimensions) return null;
 
     return (
         <Animated.View
-            style={[
-                styles.speedActivatedOverlay,
-                { opacity: opacity }
-            ]}
+            style={{
+                position: 'absolute',
+                top: screenDimensions.height * 0.06,
+                left: 0,
+                right: 0,
+                alignItems: 'center',
+                opacity: opacity,
+                zIndex: 1000,
+            }}
         >
-            <View style={styles.speedActivatedContainer}>
-                <MaterialIcons name="fast-forward" size={32} color="#FFFFFF" />
-                <Text style={styles.speedActivatedText}>{speed}x Speed</Text>
+            <View style={{
+                flexDirection: 'row',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                borderRadius: 35,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                alignItems: 'center',
+                elevation: 5,
+            }}>
+                <MaterialIcons
+                    name="fast-forward"
+                    size={20}
+                    color="white"
+                    style={{ marginRight: 6 }}
+                />
+                <Text style={{
+                    color: 'white',
+                    fontSize: 15,
+                    fontWeight: '600',
+                }}>
+                    {speed}x
+                </Text>
             </View>
         </Animated.View>
     );
