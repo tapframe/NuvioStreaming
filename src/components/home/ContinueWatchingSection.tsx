@@ -504,6 +504,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                       season: nextEpisodeVideo.season,
                       episode: nextEpisodeVideo.episode,
                       episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
+                      addonId: progress.addonId,
                     } as ContinueWatchingItem);
                   }
                 }
@@ -582,6 +583,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                     season: nextEpisodeVideo.season,
                     episode: nextEpisodeVideo.episode,
                     episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
+                    addonId: progress.addonId,
                   } as ContinueWatchingItem);
                 }
               }
@@ -595,6 +597,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               season,
               episode: episodeNumber,
               episodeTitle,
+              addonId: progress.addonId,
             } as ContinueWatchingItem);
           }
 
