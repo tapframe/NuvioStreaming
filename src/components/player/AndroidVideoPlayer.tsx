@@ -119,6 +119,23 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Subtitle addon state
   const [availableSubtitles, setAvailableSubtitles] = useState<WyzieSubtitle[]>([]);
+  useEffect(() => {
+    if (subtitles && Array.isArray(subtitles)) {
+      const mappedSubs = subtitles.map((sub: any) => ({
+        id: sub.id || `${sub.lang}-${sub.url}`,
+        url: sub.url,
+        flagUrl: "",
+        format: sub.format || "srt",
+        encoding: "utf-8",
+        media: sub.addonName || sub.addon || "",
+        display: sub.lang || "Unknown",
+        language: (sub.lang || "").toLowerCase(),
+        isHearingImpaired: false,
+        source: sub.addonName || sub.addon || "Stream",
+      }));
+      setAvailableSubtitles(mappedSubs);
+    }
+  }, [subtitles]);
   const [isLoadingSubtitleList, setIsLoadingSubtitleList] = useState(false);
   const [isLoadingSubtitles, setIsLoadingSubtitles] = useState(false);
   const [useCustomSubtitles, setUseCustomSubtitles] = useState(false);

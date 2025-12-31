@@ -1279,6 +1279,14 @@ class LocalScraperService {
         behaviorHints: {
           bingeGroup: `local-scraper-${scraper.id}`
         }
+        // Include subtitles from scraper result if available
+        subtitles: result.subtitles?.map((sub: any, subIndex: number) => ({
+          id: sub.id || `${scraper.id}-${sub.language || sub.lang || "unknown"}-${index}-${subIndex}`,
+          url: sub.url,
+          lang: sub.language || sub.lang || "Unknown",
+          addon: scraper.id,
+          addonName: scraper.name
+        })),
       };
       
       // Add additional properties if available

@@ -411,6 +411,7 @@ export const useStreamsScreen = () => {
         imdbId: imdbId || undefined,
         availableStreams: streamsToPass,
         backdrop: bannerImage,
+        subtitles: stream.subtitles,
         videoType,
       } as any);
     },
