@@ -11,7 +11,8 @@ export const useWatchProgress = (
     duration: number,
     paused: boolean,
     traktAutosync: any,
-    seekToTime: (time: number) => void
+    seekToTime: (time: number) => void,
+    addonId?: string
 ) => {
     const [resumePosition, setResumePosition] = useState<number | null>(null);
     const [savedDuration, setSavedDuration] = useState<number | null>(null);
@@ -74,7 +75,8 @@ export const useWatchProgress = (
             const progress = {
                 currentTime: currentTimeRef.current,
                 duration: durationRef.current,
-                lastUpdated: Date.now()
+                lastUpdated: Date.now(),
+                addonId: addonId
             };
             try {
                 await storageService.setWatchProgress(id, type, progress, episodeId);
