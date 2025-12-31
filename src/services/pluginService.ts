@@ -1126,7 +1126,7 @@ class LocalScraperService {
       if (this.inFlightByKey.has(flightKey)) {
         promise = this.inFlightByKey.get(flightKey)!;
       } else {
-        promise = this.executeSandboxed(code, {
+        promise = this.executePlugin(code, {
           tmdbId,
           mediaType: type,
           season,
@@ -1162,11 +1162,10 @@ class LocalScraperService {
   }
 
 
-  // Execute scraper code in sandboxed environment
-  private async executeSandboxed(code: string, params: any): Promise<LocalScraperResult[]> {
-    // This is a simplified sandbox - in production, you'd want more security
+  // Execute scraper code with full access to app environment (non-sandboxed)
+  private async executePlugin(code: string, params: any): Promise<LocalScraperResult[]> {
     try {
-      // Get URL validation setting from AsyncStorage
+      // Get URL validation setting from storage
       const settingsData = await mmkvStorage.getItem('app_settings');
       const settings = settingsData ? JSON.parse(settingsData) : {};
       const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
@@ -1174,209 +1173,114 @@ class LocalScraperService {
       // Load per-scraper settings for this run
       const allScraperSettingsRaw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
       const allScraperSettings = allScraperSettingsRaw ? JSON.parse(allScraperSettingsRaw) : {};
-      const perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId]) ? allScraperSettings[params.scraperId] : (params?.settings || {});
+      const perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId])
+        ? allScraperSettings[params.scraperId]
+        : (params?.settings || {});
 
-      // Create a limited global context
-      const moduleExports = {};
+      // Module exports for CommonJS compatibility
+      const moduleExports: any = {};
       const moduleObj = { exports: moduleExports };
 
-      // Try to load cheerio-without-node-native
-      let cheerio = null;
+      // Load cheerio (try multiple package names for compatibility)
+      let cheerio: any = null;
       try {
         cheerio = require('cheerio-without-node-native');
-      } catch (error) {
+      } catch {
         try {
           cheerio = require('react-native-cheerio');
-        } catch (error2) {
-          // Cheerio not available, scrapers will fall back to regex
+        } catch {
+          // Cheerio not available - plugins will need to use regex
         }
       }
 
-      // MovieBox constants - read from Expo public envs so they bundle in builds
+      // Environment variables for specific providers
       const MOVIEBOX_PRIMARY_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY;
       const MOVIEBOX_TMDB_API_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_TMDB_API_KEY || '439c478a771f35c05022f9feabcca01c';
-      if (!MOVIEBOX_PRIMARY_KEY) {
-        throw new Error('Missing EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY');
-      }
 
-      const sandbox = {
-        console: {
-          log: (...args: any[]) => logger.log('[Scraper]', ...args),
-          error: (...args: any[]) => logger.error('[Scraper]', ...args),
-          warn: (...args: any[]) => logger.warn('[Scraper]', ...args)
-        },
-        setTimeout,
-        clearTimeout,
-        Promise,
-        JSON,
-        Date,
-        Math,
-        parseInt,
-        parseFloat,
-        encodeURIComponent,
-        decodeURIComponent,
-        // Add require function for specific modules
-        require: (moduleName: string) => {
-          switch (moduleName) {
-            case 'cheerio-without-node-native':
-              if (cheerio) return cheerio;
-              throw new Error('cheerio-without-node-native not available');
-            case 'react-native-cheerio':
-              if (cheerio) return cheerio;
-              throw new Error('react-native-cheerio not available');
-            case 'crypto-js':
-              return CryptoJS;
-            default:
-              throw new Error(`Module '${moduleName}' is not available in sandbox`);
-          }
-        },
-        // Add fetch for HTTP requests (using native fetch for MovieBox, axios for others)
-        fetch: async (url: string, options: any = {}) => {
-          const isMovieBoxRequest = url.includes('api.inmoviebox.com') || url.includes('themoviedb.org');
-
-          if (isMovieBoxRequest) {
-            // Always use native fetch for MovieBox requests
-            try {
-              logger.log(`[Sandbox] Using native fetch for MovieBox request: ${url}`, {
-                method: options.method || 'GET',
-                hasBody: !!options.body
-              });
-
-              const nativeResponse = await fetch(url, {
-                method: options.method || 'GET',
-                headers: {
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                  'Accept': 'application/json',
-                  ...options.headers
-                },
-                body: options.body
-              });
-
-              const responseData = await nativeResponse.text();
-              logger.log(`[Sandbox] Native fetch successful for MovieBox:`, {
-                status: nativeResponse.status,
-                ok: nativeResponse.ok
-              });
-
-              return {
-                ok: nativeResponse.ok,
-                status: nativeResponse.status,
-                statusText: nativeResponse.statusText || 'OK',
-                headers: nativeResponse.headers,
-                json: async () => {
-                  try {
-                    return JSON.parse(responseData);
-                  } catch (e) {
-                    logger.error(`[Sandbox] Failed to parse JSON from native fetch: ${e}`);
-                    throw e;
-                  }
-                },
-                text: async () => responseData
-              };
-            } catch (error: any) {
-              logger.error(`[Sandbox] Native fetch failed for MovieBox ${url}:`, error.message);
-              throw new Error(`Fetch failed: ${error.message}`);
-            }
-          } else {
-            // Use axios for other requests
-            const axiosConfig = {
-              url,
-              method: options.method || 'GET',
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'application/json',
-                ...options.headers
-              },
-              data: options.body,
-              timeout: 120000, // Increased to 2 minutes for complex scrapers
-              validateStatus: () => true // Don't throw on HTTP error status codes
-            };
-
-            try {
-              logger.log(`[Sandbox] Using axios for request: ${url}`, {
-                method: axiosConfig.method,
-                headers: axiosConfig.headers,
-                hasBody: !!axiosConfig.data
-              });
-              const response = await axios(axiosConfig);
-
-              return {
-                ok: response.status >= 200 && response.status < 300,
-                status: response.status,
-                statusText: response.statusText || 'OK',
-                headers: response.headers,
-                json: async () => {
-                  try {
-                    return typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-                  } catch (e) {
-                    logger.error(`[Sandbox] Failed to parse JSON response: ${e}`);
-                    throw e;
-                  }
-                },
-                text: async () => typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-              };
-            } catch (error: any) {
-              logger.error(`[Sandbox] Axios error for ${url}:`, error.message);
-              throw new Error(`Fetch failed: ${error.message}`);
-            }
-          }
-        },
-        // Add axios for HTTP requests
-        axios: axios.create({
-          timeout: 120000, // Increased to 2 minutes for complex scrapers
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-          }
-        }),
-        // Node.js compatibility
-        module: moduleObj,
-        exports: moduleExports,
-        global: {}, // Empty global object
-        // URL validation setting
-        URL_VALIDATION_ENABLED: urlValidationEnabled,
-        // Expose per-scraper settings to the plugin code
-        SCRAPER_SETTINGS: perScraperSettings,
-        SCRAPER_ID: params?.scraperId
+      // Custom require function for backward compatibility with existing plugins
+      const pluginRequire = (moduleName: string): any => {
+        switch (moduleName) {
+          case 'cheerio-without-node-native':
+          case 'react-native-cheerio':
+          case 'cheerio':
+            if (cheerio) return cheerio;
+            throw new Error(`${moduleName} not available`);
+          case 'crypto-js':
+            return CryptoJS;
+          case 'axios':
+            return axios;
+          default:
+            throw new Error(`Module '${moduleName}' is not available in plugins`);
+        }
       };
 
-      // Execute the scraper code with 1 minute timeout
-      const SCRAPER_EXECUTION_TIMEOUT_MS = 60000; // 1 minute
+      // Execution timeout (1 minute)
+      const PLUGIN_TIMEOUT_MS = 60000;
 
       const executionPromise = new Promise<LocalScraperResult[]>((resolve, reject) => {
         try {
-          // Create function from code
-          const func = new Function('sandbox', 'params', 'PRIMARY_KEY', 'TMDB_API_KEY', `
-            const { console, setTimeout, clearTimeout, Promise, JSON, Date, Math, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, require, axios, fetch, module, exports, global, URL_VALIDATION_ENABLED, SCRAPER_SETTINGS, SCRAPER_ID } = sandbox;
+          // Create function with full global access
+          // We pass specific utilities but the plugin has access to everything
+          const executePlugin = new Function(
+            'module',
+            'exports',
+            'require',
+            'axios',
+            'fetch',
+            'CryptoJS',
+            'cheerio',
+            'logger',
+            'params',
+            'PRIMARY_KEY',
+            'TMDB_API_KEY',
+            'URL_VALIDATION_ENABLED',
+            'SCRAPER_SETTINGS',
+            'SCRAPER_ID',
+            `
+            // Make env vars available globally for backward compatibility
+            if (typeof global !== 'undefined') {
+              global.PRIMARY_KEY = PRIMARY_KEY;
+              global.TMDB_API_KEY = TMDB_API_KEY;
+              global.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
+              global.SCRAPER_ID = SCRAPER_ID;
+              global.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
+            }
 
-            // Inject MovieBox constants into global scope
-            global.PRIMARY_KEY = PRIMARY_KEY;
-            global.TMDB_API_KEY = TMDB_API_KEY;
-            window.PRIMARY_KEY = PRIMARY_KEY;
-            window.TMDB_API_KEY = TMDB_API_KEY;
-
-            // Expose per-scraper context to plugin globals
-            global.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
-            global.SCRAPER_ID = SCRAPER_ID;
-            window.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
-            window.SCRAPER_ID = SCRAPER_ID;
-
+            // Plugin code
             ${code}
 
-            // Call the main function (assuming it's exported)
+            // Find and call getStreams function
             if (typeof getStreams === 'function') {
               return getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
-            } else if (typeof module !== 'undefined' && module.exports && typeof module.exports.getStreams === 'function') {
+            } else if (module.exports && typeof module.exports.getStreams === 'function') {
               return module.exports.getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
-            } else if (typeof global !== 'undefined' && global.getStreams && typeof global.getStreams === 'function') {
+            } else if (typeof global !== 'undefined' && typeof global.getStreams === 'function') {
               return global.getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
             } else {
-              throw new Error('No getStreams function found in scraper');
+              throw new Error('No getStreams function found in plugin');
             }
-          `);
+            `
+          );
 
-          const result = func(sandbox, params, MOVIEBOX_PRIMARY_KEY, MOVIEBOX_TMDB_API_KEY);
+          // Execute with full access to utilities
+          const result = executePlugin(
+            moduleObj,
+            moduleExports,
+            pluginRequire,
+            axios,
+            fetch,
+            CryptoJS,
+            cheerio,
+            logger,
+            params,
+            MOVIEBOX_PRIMARY_KEY,
+            MOVIEBOX_TMDB_API_KEY,
+            urlValidationEnabled,
+            perScraperSettings,
+            params?.scraperId
+          );
 
-          // Handle both sync and async results
+          // Handle async results
           if (result && typeof result.then === 'function') {
             result.then(resolve).catch(reject);
           } else {
@@ -1387,16 +1291,16 @@ class LocalScraperService {
         }
       });
 
-      // Apply 1-minute timeout to prevent hanging scrapers
+      // Apply timeout to prevent hanging plugins
       return await Promise.race([
         executionPromise,
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Scraper execution timed out after ${SCRAPER_EXECUTION_TIMEOUT_MS}ms`)), SCRAPER_EXECUTION_TIMEOUT_MS)
+          setTimeout(() => reject(new Error(`Plugin execution timed out after ${PLUGIN_TIMEOUT_MS}ms`)), PLUGIN_TIMEOUT_MS)
         )
       ]);
 
     } catch (error) {
-      logger.error('[LocalScraperService] Sandbox execution failed:', error);
+      logger.error('[LocalScraperService] Plugin execution failed:', error);
       throw error;
     }
   }
