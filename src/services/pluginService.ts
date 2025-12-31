@@ -1278,7 +1278,7 @@ class LocalScraperService {
         size: result.size ? this.parseSize(result.size) : undefined,
         behaviorHints: {
           bingeGroup: `local-scraper-${scraper.id}`
-        }
+        },
         // Include subtitles from scraper result if available
         subtitles: result.subtitles?.map((sub: any, subIndex: number) => ({
           id: sub.id || `${scraper.id}-${sub.language || sub.lang || "unknown"}-${index}-${subIndex}`,
