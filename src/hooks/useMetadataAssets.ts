@@ -177,17 +177,17 @@ export const useMetadataAssets = (
                 // Only update if request wasn't aborted and component is still mounted
                 if (!isMountedRef.current) return;
 
-                if (details?.backdrop_path) {
+                if (metadata?.banner) {
+                  finalBanner = metadata.banner;
+                  bannerSourceType = 'default';
+                } else if (details?.backdrop_path) {
                   finalBanner = tmdbService.getImageUrl(details.backdrop_path);
                   bannerSourceType = 'tmdb';
-
-                  // Preload the image
                   if (finalBanner) {
                     FastImage.preload([{ uri: finalBanner }]);
                   }
                 } else {
-                  // TMDB has no backdrop, gracefully fall back
-                  finalBanner = metadata?.banner || bannerImage || null;
+                  finalBanner = bannerImage || null;
                   bannerSourceType = 'default';
                 }
               } catch (error) {

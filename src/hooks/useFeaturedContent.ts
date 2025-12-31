@@ -114,6 +114,10 @@ export function useFeaturedContent() {
           };
 
           try {
+            if (base.logo && !isTmdbUrl(base.logo)) {
+              return base;
+          }
+          
             if (!settings.enrichMetadataWithTMDB) {
               return { ...base, logo: base.logo || undefined };
             }
@@ -150,6 +154,7 @@ export function useFeaturedContent() {
             id: item.id,
             type: item.type,
             name: item.name,
+            addonId: item.addonId,
             poster: item.poster,
             banner: (item as any).banner,
             logo: (item as any).logo || undefined,
