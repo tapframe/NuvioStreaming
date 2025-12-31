@@ -207,7 +207,8 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.duration,
     playerState.paused,
     traktAutosync,
-    controlsHook.seekToTime
+    controlsHook.seekToTime,
+    currentStreamProvider
   );
 
   const gestureControls = usePlayerGestureControls({
