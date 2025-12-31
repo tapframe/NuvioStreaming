@@ -146,21 +146,21 @@ class LocalScraperService {
       if (storedScrapers) {
         const scrapers: ScraperInfo[] = JSON.parse(storedScrapers);
         const validScrapers: ScraperInfo[] = [];
-        
+
         scrapers.forEach(scraper => {
           // Skip scrapers with missing essential fields
           if (!scraper.id || !scraper.name || !scraper.version) {
             logger.warn('[LocalScraperService] Skipping invalid scraper with missing essential fields:', scraper);
             return;
           }
-          
+
           // Ensure contentLanguage is an array (migration for older scrapers)
           if (!scraper.contentLanguage) {
             scraper.contentLanguage = ['en']; // Default to English
           } else if (typeof scraper.contentLanguage === 'string') {
             scraper.contentLanguage = [scraper.contentLanguage]; // Convert string to array
           }
-          
+
           // Ensure supportedTypes is an array (migration for older scrapers)
           if (!scraper.supportedTypes || !Array.isArray(scraper.supportedTypes)) {
             scraper.supportedTypes = ['movie', 'tv']; // Default to both types
@@ -175,7 +175,7 @@ class LocalScraperService {
           if (!scraper.supportedFormats && scraper.formats) {
             scraper.supportedFormats = scraper.formats;
           }
-          
+
           // Ensure other required fields have defaults
           if (!scraper.description) {
             scraper.description = 'No description available';
@@ -186,16 +186,16 @@ class LocalScraperService {
           if (scraper.enabled === undefined) {
             scraper.enabled = true;
           }
-          
+
           this.installedScrapers.set(scraper.id, scraper);
           validScrapers.push(scraper);
         });
-        
+
         // Save cleaned scrapers back to storage if any were filtered out
         if (validScrapers.length !== scrapers.length) {
           logger.log('[LocalScraperService] Cleaned up invalid scrapers, saving valid ones');
           await mmkvStorage.setItem(this.STORAGE_KEY, JSON.stringify(validScrapers));
-          
+
           // Clean up cached code for removed scrapers
           const validScraperIds = new Set(validScrapers.map(s => s.id));
           const removedScrapers = scrapers.filter(s => s.id && !validScraperIds.has(s.id));
@@ -212,20 +212,18 @@ class LocalScraperService {
 
       // Load scraper code from cache
       await this.loadScraperCode();
-      
-      // Auto-refresh repository on app startup if URL is configured (only once)
-      if (this.repositoryUrl && !this.autoRefreshCompleted) {
-        try {
-          logger.log('[LocalScraperService] Auto-refreshing repository on startup');
-          await this.performRepositoryRefresh();
-          this.autoRefreshCompleted = true;
-        } catch (error) {
-          logger.error('[LocalScraperService] Auto-refresh failed on startup:', error);
-          // Don't fail initialization if auto-refresh fails
-          this.autoRefreshCompleted = true; // Mark as completed even on error to prevent retries
-        }
+
+      // Auto-refresh ALL enabled repositories on app startup (non-blocking, in background)
+      const enabledRepos = Array.from(this.repositories.values()).filter(r => r.enabled !== false);
+      if (enabledRepos.length > 0 && !this.autoRefreshCompleted) {
+        this.autoRefreshCompleted = true; // Mark immediately to prevent duplicate calls
+        logger.log('[LocalScraperService] Scheduling background refresh of', enabledRepos.length, 'enabled repositories');
+        // Don't await - let it run in background so app loads fast
+        this.refreshAllEnabledRepositories().catch(error => {
+          logger.error('[LocalScraperService] Background auto-refresh failed:', error);
+        });
       }
-      
+
       this.initialized = true;
       logger.log('[LocalScraperService] Initialized with', this.installedScrapers.size, 'scrapers');
     } catch (error) {
@@ -268,7 +266,7 @@ class LocalScraperService {
   async addRepository(repo: Omit<RepositoryInfo, 'id' | 'lastUpdated' | 'scraperCount'>): Promise<string> {
     await this.ensureInitialized();
     const id = `repo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Try to fetch the repository name from manifest if not provided
     let repositoryName = repo.name;
     if (!repositoryName || repositoryName.trim() === '') {
@@ -279,7 +277,7 @@ class LocalScraperService {
         repositoryName = this.extractRepositoryName(repo.url);
       }
     }
-    
+
     const newRepo: RepositoryInfo = {
       ...repo,
       name: repositoryName,
@@ -302,7 +300,7 @@ class LocalScraperService {
     const updatedRepo = { ...repo, ...updates };
     this.repositories.set(id, updatedRepo);
     await this.saveRepositories();
-    
+
     // If this is the current repository, update current values
     if (id === this.currentRepositoryId) {
       this.repositoryUrl = updatedRepo.url;
@@ -316,10 +314,10 @@ class LocalScraperService {
     if (!this.repositories.has(id)) {
       throw new Error(`Repository with id ${id} not found`);
     }
-    
+
     // Allow removing the last repository - users can add new ones
     // The app will work without repositories (no scrapers available)
-    
+
     // If removing current repository, switch to another one or clear current
     if (id === this.currentRepositoryId) {
       const remainingRepos = Array.from(this.repositories.values()).filter(r => r.id !== id);
@@ -331,18 +329,18 @@ class LocalScraperService {
         await mmkvStorage.removeItem('current-repository-id');
       }
     }
-    
+
     // Remove scrapers from this repository
     const scrapersToRemove = Array.from(this.installedScrapers.values())
       .filter(s => s.repositoryId === id)
       .map(s => s.id);
-    
+
     for (const scraperId of scrapersToRemove) {
       this.installedScrapers.delete(scraperId);
       this.scraperCode.delete(scraperId);
       await mmkvStorage.removeItem(`scraper-code-${scraperId}`);
     }
-    
+
     this.repositories.delete(id);
     await this.saveRepositories();
     await this.saveInstalledScrapers();
@@ -355,13 +353,13 @@ class LocalScraperService {
     if (!repo) {
       throw new Error(`Repository with id ${id} not found`);
     }
-    
+
     this.currentRepositoryId = id;
     this.repositoryUrl = repo.url;
     this.repositoryName = repo.name;
-    
+
     await mmkvStorage.setItem('current-repository-id', id);
-    
+
     // Refresh the repository to get its scrapers
     try {
       logger.log('[LocalScraperService] Refreshing repository after switch:', repo.name);
@@ -370,7 +368,7 @@ class LocalScraperService {
       logger.error('[LocalScraperService] Failed to refresh repository after switch:', error);
       // Don't throw error, just log it - the switch should still succeed
     }
-    
+
     logger.log('[LocalScraperService] Switched to repository:', repo.name);
   }
 
@@ -396,21 +394,21 @@ class LocalScraperService {
   async fetchRepositoryNameFromManifest(repositoryUrl: string): Promise<string> {
     try {
       logger.log('[LocalScraperService] Fetching repository name from manifest:', repositoryUrl);
-      
+
       // Construct manifest URL
-      const baseManifestUrl = repositoryUrl.endsWith('/') 
+      const baseManifestUrl = repositoryUrl.endsWith('/')
         ? `${repositoryUrl}manifest.json`
         : `${repositoryUrl}/manifest.json`;
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
-      
-      const response = await axios.get(manifestUrl, { 
+
+      const response = await axios.get(manifestUrl, {
         timeout: 10000,
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (response.data && response.data.name) {
         logger.log('[LocalScraperService] Found repository name in manifest:', response.data.name);
         return response.data.name;
@@ -427,14 +425,14 @@ class LocalScraperService {
   // Update repository name from manifest for existing repositories
   async refreshRepositoryNamesFromManifests(): Promise<void> {
     await this.ensureInitialized();
-    
+
     for (const [id, repo] of this.repositories) {
       try {
         const manifestName = await this.fetchRepositoryNameFromManifest(repo.url);
         if (manifestName !== repo.name) {
           logger.log('[LocalScraperService] Updating repository name:', repo.name, '->', manifestName);
           repo.name = manifestName;
-          
+
           // If this is the current repository, update the current name
           if (id === this.currentRepositoryId) {
             this.repositoryName = manifestName;
@@ -444,7 +442,7 @@ class LocalScraperService {
         logger.warn('[LocalScraperService] Failed to refresh name for repository:', repo.name, error);
       }
     }
-    
+
     await this.saveRepositories();
   }
 
@@ -453,23 +451,56 @@ class LocalScraperService {
     await mmkvStorage.setItem(this.REPOSITORIES_KEY, JSON.stringify(reposObject));
   }
 
+  // Get a single repository
+  getRepository(id: string): RepositoryInfo | undefined {
+    return this.repositories.get(id);
+  }
+
+  // Get all enabled repositories (for multi-repo support)
+  async getEnabledRepositories(): Promise<RepositoryInfo[]> {
+    await this.ensureInitialized();
+    return Array.from(this.repositories.values()).filter(r => r.enabled !== false);
+  }
+
+  // Toggle a repository's enabled state (for multi-repo support)
+  async toggleRepositoryEnabled(id: string, enabled: boolean): Promise<void> {
+    await this.ensureInitialized();
+    const repo = this.repositories.get(id);
+    if (!repo) {
+      throw new Error(`Repository with id ${id} not found`);
+    }
+
+    repo.enabled = enabled;
+    this.repositories.set(id, repo);
+    await this.saveRepositories();
+
+    logger.log('[LocalScraperService] Toggled repository', repo.name, 'to', enabled ? 'enabled' : 'disabled');
+  }
+
+  // Get the repository info for a scraper
+  getScraperRepository(scraperId: string): RepositoryInfo | undefined {
+    const scraper = this.installedScrapers.get(scraperId);
+    if (!scraper?.repositoryId) return undefined;
+    return this.repositories.get(scraper.repositoryId);
+  }
+
 
   // Check if a scraper is compatible with the current platform
   private isPlatformCompatible(scraper: ScraperInfo): boolean {
     const currentPlatform = Platform.OS as 'ios' | 'android';
-    
+
     // If disabledPlatforms is specified and includes current platform, scraper is not compatible
     if (scraper.disabledPlatforms && scraper.disabledPlatforms.includes(currentPlatform)) {
       logger.log(`[LocalScraperService] Scraper ${scraper.name} is disabled on ${currentPlatform}`);
       return false;
     }
-    
+
     // If supportedPlatforms is specified and doesn't include current platform, scraper is not compatible
     if (scraper.supportedPlatforms && !scraper.supportedPlatforms.includes(currentPlatform)) {
       logger.log(`[LocalScraperService] Scraper ${scraper.name} is not supported on ${currentPlatform}`);
       return false;
     }
-    
+
     // If neither supportedPlatforms nor disabledPlatforms is specified, or current platform is supported
     return true;
   }
@@ -477,8 +508,101 @@ class LocalScraperService {
   // Fetch and install scrapers from repository
   async refreshRepository(): Promise<void> {
     await this.ensureInitialized();
-    await this.performRepositoryRefresh();
+    await this.refreshAllEnabledRepositories();
     this.autoRefreshCompleted = true; // Mark as completed after manual refresh
+  }
+
+  // Refresh ALL enabled repositories (for multi-repo support)
+  async refreshAllEnabledRepositories(): Promise<void> {
+    await this.ensureInitialized();
+
+    const enabledRepos = await this.getEnabledRepositories();
+
+    if (enabledRepos.length === 0) {
+      logger.log('[LocalScraperService] No enabled repositories to refresh');
+      // Clear all caches when no repositories are enabled
+      this.scraperCode.clear();
+      this.installedScrapers.clear();
+      this.inFlightByKey.clear();
+      this.scraperSettingsCache = null;
+      try {
+        cacheService.clearCache();
+      } catch (error) {
+        logger.warn('[LocalScraperService] Failed to clear cacheService:', error);
+      }
+      await this.saveInstalledScrapers();
+      return;
+    }
+
+    logger.log('[LocalScraperService] Refreshing', enabledRepos.length, 'enabled repositories...');
+
+    // IMPORTANT: Preserve user's enabled preferences before clearing
+    const previousEnabledStates = new Map<string, boolean>();
+    for (const [id, scraper] of this.installedScrapers) {
+      previousEnabledStates.set(id, scraper.enabled);
+    }
+    // Store it on the instance so downloadScraper can access it
+    (this as any)._previousEnabledStates = previousEnabledStates;
+
+    // Clear caches before refreshing all
+    this.scraperCode.clear();
+    this.installedScrapers.clear();
+    this.inFlightByKey.clear();
+    this.scraperSettingsCache = null;
+
+    try {
+      const allKeys = await mmkvStorage.getAllKeys();
+      const scraperCodeKeys = allKeys.filter(key => key.startsWith('scraper-code-'));
+      if (scraperCodeKeys.length > 0) {
+        await mmkvStorage.multiRemove(scraperCodeKeys);
+        logger.log('[LocalScraperService] Removed', scraperCodeKeys.length, 'cached scraper code entries');
+      }
+    } catch (error) {
+      logger.error('[LocalScraperService] Failed to clear cached scraper code:', error);
+    }
+
+    try {
+      cacheService.clearCache();
+      logger.log('[LocalScraperService] Cleared cacheService during refresh');
+    } catch (error) {
+      logger.warn('[LocalScraperService] Failed to clear cacheService:', error);
+    }
+
+    // Refresh all enabled repositories in PARALLEL for faster loading
+    logger.log('[LocalScraperService] Starting parallel refresh of', enabledRepos.length, 'repositories...');
+
+    const refreshResults = await Promise.allSettled(
+      enabledRepos.map(repo => this.refreshSingleRepository(repo.id))
+    );
+
+    // Log results
+    refreshResults.forEach((result, index) => {
+      const repo = enabledRepos[index];
+      if (result.status === 'fulfilled') {
+        logger.log('[LocalScraperService] Successfully refreshed repository:', repo.name);
+      } else {
+        logger.error('[LocalScraperService] Failed to refresh repository:', repo.name, result.reason);
+      }
+    });
+
+    await this.saveInstalledScrapers();
+
+    // Clean up the temporary preserved states
+    delete (this as any)._previousEnabledStates;
+
+    logger.log('[LocalScraperService] Finished refreshing all enabled repositories. Total scrapers:', this.installedScrapers.size);
+  }
+
+  // Refresh a single repository by ID (parallel-safe - no shared state mutation)
+  async refreshSingleRepository(repoId: string): Promise<void> {
+    await this.ensureInitialized();
+    const repo = this.repositories.get(repoId);
+    if (!repo) {
+      throw new Error(`Repository with id ${repoId} not found`);
+    }
+
+    // Directly call performSingleRepositoryRefresh - it handles everything with explicit repo object
+    await this.performSingleRepositoryRefresh(repo);
   }
 
   // Internal method to refresh repository without initialization check
@@ -516,33 +640,33 @@ class LocalScraperService {
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
 
       const response = await axios.get(manifestUrl, {
-         timeout: 10000,
-         headers: {
-           'Cache-Control': 'no-cache',
-           'Pragma': 'no-cache',
-           'Expires': '0'
-         }
-       });
-       const manifest: ScraperManifest = response.data;
-       
-       // Store repository name from manifest
-       if (manifest.name) {
-         this.repositoryName = manifest.name;
-       }
-       
-       logger.log('[LocalScraperService] getAvailableScrapers - Raw manifest data:', JSON.stringify(manifest, null, 2));
-       logger.log('[LocalScraperService] getAvailableScrapers - Manifest scrapers count:', manifest.scrapers?.length || 0);
-       
-       // Log each scraper's enabled status from manifest
-       manifest.scrapers?.forEach(scraper => {
-         logger.log(`[LocalScraperService] getAvailableScrapers - Scraper ${scraper.name}: enabled=${scraper.enabled}`);
-       });
-      
+        timeout: 10000,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      const manifest: ScraperManifest = response.data;
+
+      // Store repository name from manifest
+      if (manifest.name) {
+        this.repositoryName = manifest.name;
+      }
+
+      logger.log('[LocalScraperService] getAvailableScrapers - Raw manifest data:', JSON.stringify(manifest, null, 2));
+      logger.log('[LocalScraperService] getAvailableScrapers - Manifest scrapers count:', manifest.scrapers?.length || 0);
+
+      // Log each scraper's enabled status from manifest
+      manifest.scrapers?.forEach(scraper => {
+        logger.log(`[LocalScraperService] getAvailableScrapers - Scraper ${scraper.name}: enabled=${scraper.enabled}`);
+      });
+
       logger.log('[LocalScraperService] Found', manifest.scrapers.length, 'scrapers in repository');
-      
+
       // Get current manifest scraper IDs
       const manifestScraperIds = new Set(manifest.scrapers.map(s => s.id));
-      
+
       // Remove scrapers that are no longer in the manifest
       const currentScraperIds = Array.from(this.installedScrapers.keys());
       for (const scraperId of currentScraperIds) {
@@ -554,11 +678,11 @@ class LocalScraperService {
           await mmkvStorage.removeItem(`scraper-code-${scraperId}`);
         }
       }
-      
+
       // Download and install each scraper from manifest
       for (const scraperInfo of manifest.scrapers) {
         const isPlatformCompatible = this.isPlatformCompatible(scraperInfo);
-        
+
         if (isPlatformCompatible) {
           // Add repository ID to scraper info
           const scraperWithRepo = { ...scraperInfo, repositoryId: this.currentRepositoryId };
@@ -575,9 +699,9 @@ class LocalScraperService {
           }
         }
       }
-      
+
       await this.saveInstalledScrapers();
-      
+
       // Update repository info
       const currentRepo = this.repositories.get(this.currentRepositoryId);
       if (currentRepo) {
@@ -588,9 +712,9 @@ class LocalScraperService {
           scraperCount
         });
       }
-      
+
       logger.log('[LocalScraperService] Repository refresh completed');
-      
+
     } catch (error) {
       logger.error('[LocalScraperService] Failed to refresh repository:', error);
       throw error;
@@ -599,15 +723,97 @@ class LocalScraperService {
     }
   }
 
-  // Download individual scraper
-  private async downloadScraper(scraperInfo: ScraperInfo): Promise<void> {
+  // Refresh a single repository without clearing others (for multi-repo support)
+  private async performSingleRepositoryRefresh(repo: RepositoryInfo): Promise<void> {
+    logger.log('[LocalScraperService] Fetching repository manifest from:', repo.url);
+
     try {
-      const scraperUrl = this.repositoryUrl.endsWith('/') 
-        ? `${this.repositoryUrl}${scraperInfo.filename}`
-        : `${this.repositoryUrl}/${scraperInfo.filename}`;
-      
+      // Fetch manifest with cache busting
+      const baseManifestUrl = repo.url.endsWith('/')
+        ? `${repo.url}manifest.json`
+        : `${repo.url}/manifest.json`;
+      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
+
+      const response = await axios.get(manifestUrl, {
+        timeout: 10000,
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      const manifest: ScraperManifest = response.data;
+
+      // Update repository name from manifest
+      if (manifest.name) {
+        repo.name = manifest.name;
+        this.repositories.set(repo.id, repo);
+      }
+
+      logger.log('[LocalScraperService] Repository', repo.name, 'has', manifest.scrapers?.length || 0, 'scrapers');
+
+      // Get current manifest scraper IDs for this repository
+      const manifestScraperIds = new Set(manifest.scrapers.map(s => s.id));
+
+      // Remove scrapers from this repository that are no longer in its manifest
+      const currentScraperIds = Array.from(this.installedScrapers.keys());
+      for (const scraperId of currentScraperIds) {
+        const scraper = this.installedScrapers.get(scraperId);
+        if (scraper?.repositoryId === repo.id && !manifestScraperIds.has(scraperId)) {
+          logger.log('[LocalScraperService] Removing scraper no longer in manifest:', scraper.name);
+          this.installedScrapers.delete(scraperId);
+          this.scraperCode.delete(scraperId);
+          await mmkvStorage.removeItem(`scraper-code-${scraperId}`);
+        }
+      }
+
+      // Download and install each scraper from manifest
+      for (const scraperInfo of manifest.scrapers) {
+        const isPlatformCompatible = this.isPlatformCompatible(scraperInfo);
+
+        if (isPlatformCompatible) {
+          // Add repository ID to scraper info
+          const scraperWithRepo = { ...scraperInfo, repositoryId: repo.id };
+          // Download/update the scraper - pass repo.url explicitly for parallel-safe operation
+          await this.downloadScraper(scraperWithRepo, repo.url);
+        } else {
+          logger.log('[LocalScraperService] Skipping platform-incompatible scraper:', scraperInfo.name);
+          // Remove if it was previously installed but is now platform-incompatible
+          if (this.installedScrapers.has(scraperInfo.id)) {
+            this.installedScrapers.delete(scraperInfo.id);
+            this.scraperCode.delete(scraperInfo.id);
+            await mmkvStorage.removeItem(`scraper-code-${scraperInfo.id}`);
+          }
+        }
+      }
+
+      // Update repository info
+      const scraperCount = Array.from(this.installedScrapers.values())
+        .filter(s => s.repositoryId === repo.id).length;
+      await this.updateRepository(repo.id, {
+        lastUpdated: Date.now(),
+        scraperCount
+      });
+
+      logger.log('[LocalScraperService] Repository', repo.name, 'refresh completed with', scraperCount, 'scrapers');
+
+    } catch (error) {
+      logger.error('[LocalScraperService] Failed to refresh repository:', repo.name, error);
+      throw error;
+    }
+  }
+
+  // Download individual scraper (repositoryUrl passed explicitly for parallel-safe operation)
+  private async downloadScraper(scraperInfo: ScraperInfo, repositoryUrl?: string): Promise<void> {
+    try {
+      // Use passed repositoryUrl or fall back to this.repositoryUrl for backward compatibility
+      const repoUrl = repositoryUrl || this.repositoryUrl;
+      const scraperUrl = repoUrl.endsWith('/')
+        ? `${repoUrl}${scraperInfo.filename}`
+        : `${repoUrl}/${scraperInfo.filename}`;
+
       logger.log('[LocalScraperService] Downloading scraper:', scraperInfo.name);
-      
+
       // Add cache-busting parameters to force fresh download
       const scraperUrlWithCacheBust = `${scraperUrl}?t=${Date.now()}&v=${Math.random()}`;
 
@@ -620,11 +826,16 @@ class LocalScraperService {
         }
       });
       const scraperCode = response.data;
-      
+
       // Store scraper info and code
       const existingScraper = this.installedScrapers.get(scraperInfo.id);
       const isPlatformCompatible = this.isPlatformCompatible(scraperInfo);
-      
+
+      // Check preserved states first (from refresh), then existing scraper, then default
+      const previousStates = (this as any)._previousEnabledStates as Map<string, boolean> | undefined;
+      const previousEnabled = previousStates?.get(scraperInfo.id);
+      const userEnabledState = previousEnabled !== undefined ? previousEnabled : (existingScraper?.enabled ?? true);
+
       const updatedScraperInfo = {
         ...scraperInfo,
         // Store the manifest's enabled state separately
@@ -632,17 +843,17 @@ class LocalScraperService {
         // Force disable if:
         // 1. Manifest says enabled: false (globally disabled)
         // 2. Platform incompatible
-        // Otherwise, preserve user's enabled state or default to true for new installations
-        enabled: scraperInfo.enabled && isPlatformCompatible ? (existingScraper?.enabled ?? true) : false
+        // Otherwise, preserve user's enabled state
+        enabled: scraperInfo.enabled && isPlatformCompatible ? userEnabledState : false
       };
-      
+
       // Ensure contentLanguage is an array (migration for older scrapers)
       if (!updatedScraperInfo.contentLanguage) {
         updatedScraperInfo.contentLanguage = ['en']; // Default to English
       } else if (typeof updatedScraperInfo.contentLanguage === 'string') {
         updatedScraperInfo.contentLanguage = [updatedScraperInfo.contentLanguage]; // Convert string to array
       }
-      
+
       // Ensure supportedTypes is an array (migration for older scrapers)
       if (!updatedScraperInfo.supportedTypes || !Array.isArray(updatedScraperInfo.supportedTypes)) {
         updatedScraperInfo.supportedTypes = ['movie', 'tv']; // Default to both types
@@ -657,16 +868,16 @@ class LocalScraperService {
       if (!updatedScraperInfo.supportedFormats && updatedScraperInfo.formats) {
         updatedScraperInfo.supportedFormats = updatedScraperInfo.formats;
       }
-      
+
       this.installedScrapers.set(scraperInfo.id, updatedScraperInfo);
-      
+
       this.scraperCode.set(scraperInfo.id, scraperCode);
-      
+
       // Cache the scraper code
       await this.cacheScraperCode(scraperInfo.id, scraperCode);
-      
+
       logger.log('[LocalScraperService] Successfully downloaded:', scraperInfo.name);
-      
+
     } catch (error) {
       logger.error('[LocalScraperService] Failed to download scraper', scraperInfo.name, ':', error);
     }
@@ -743,83 +954,29 @@ class LocalScraperService {
     }
   }
 
-  // Get available scrapers from manifest.json (for display in settings)
+  // Get available scrapers from ALL enabled repositories (for display in settings)
   async getAvailableScrapers(): Promise<ScraperInfo[]> {
-    if (!this.repositoryUrl) {
-      logger.log('[LocalScraperService] No repository URL configured, returning installed scrapers');
-      return this.getInstalledScrapers();
+    await this.ensureInitialized();
+
+    const enabledRepos = await this.getEnabledRepositories();
+
+    if (enabledRepos.length === 0) {
+      logger.log('[LocalScraperService] No enabled repositories, returning empty list');
+      return [];
     }
 
-    try {
-      logger.log('[LocalScraperService] Fetching available scrapers from manifest');
-      
-      // Fetch manifest with cache busting
-      const baseManifestUrl = this.repositoryUrl.endsWith('/')
-        ? `${this.repositoryUrl}manifest.json`
-        : `${this.repositoryUrl}/manifest.json`;
-      const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
+    // Return installed scrapers from all enabled repositories
+    // These are already synced with manifests during refresh
+    const allScrapers = Array.from(this.installedScrapers.values())
+      .filter(scraper => {
+        // Only include scrapers from enabled repositories
+        const repo = this.repositories.get(scraper.repositoryId || '');
+        return repo?.enabled !== false;
+      });
 
-      const response = await axios.get(manifestUrl, {
-         timeout: 10000,
-         headers: {
-           'Cache-Control': 'no-cache',
-           'Pragma': 'no-cache',
-           'Expires': '0'
-         }
-       });
-      const manifest: ScraperManifest = response.data;
-      
-      // Store repository name from manifest
-      if (manifest.name) {
-        this.repositoryName = manifest.name;
-      }
-      
-      // Return scrapers from manifest, respecting manifest's enabled field and platform compatibility
-      const availableScrapers = manifest.scrapers
-        .filter(scraperInfo => this.isPlatformCompatible(scraperInfo))
-        .map(scraperInfo => {
-          const installedScraper = this.installedScrapers.get(scraperInfo.id);
-          
-          // Create a copy with manifest data
-          const scraperWithManifestData = {
-            ...scraperInfo,
-            // Store the manifest's enabled state separately
-            manifestEnabled: scraperInfo.enabled,
-            // If manifest says enabled: false, scraper cannot be enabled
-            // If manifest says enabled: true, use installed state or default to true for new installs
-            enabled: scraperInfo.enabled ? (installedScraper?.enabled ?? true) : false
-          };
+    logger.log('[LocalScraperService] Found', allScrapers.length, 'scrapers from', enabledRepos.length, 'enabled repositories');
 
-
-          // Normalize formats fields (support both `formats` and `supportedFormats`)
-          const anyScraper: any = scraperWithManifestData as any;
-          if (typeof anyScraper.formats === 'string') {
-            anyScraper.formats = [anyScraper.formats];
-          }
-          if (typeof anyScraper.supportedFormats === 'string') {
-            anyScraper.supportedFormats = [anyScraper.supportedFormats];
-          }
-          if (!anyScraper.supportedFormats && anyScraper.formats) {
-            anyScraper.supportedFormats = anyScraper.formats;
-          }
-          
-          return scraperWithManifestData;
-        });
-      
-      logger.log('[LocalScraperService] Found', availableScrapers.length, 'available scrapers in repository');
-       
-       // Log final scraper states being returned to UI
-       availableScrapers.forEach(scraper => {
-         logger.log(`[LocalScraperService] Final scraper ${scraper.name}: manifestEnabled=${scraper.manifestEnabled}, enabled=${scraper.enabled}`);
-       });
-       
-       return availableScrapers;
-      
-    } catch (error) {
-      logger.error('[LocalScraperService] Failed to fetch available scrapers from manifest:', error);
-      // Fallback to installed scrapers if manifest fetch fails
-      return this.getInstalledScrapers();
-    }
+    return allScrapers;
   }
 
   // Check if a given scraper declares support for a specific format (e.g., 'mkv')
@@ -844,7 +1001,7 @@ class LocalScraperService {
   // Enable/disable scraper
   async setScraperEnabled(scraperId: string, enabled: boolean): Promise<void> {
     await this.ensureInitialized();
-    
+
     const scraper = this.installedScrapers.get(scraperId);
     if (scraper) {
       // Prevent enabling if manifest has disabled it or if platform-incompatible
@@ -852,7 +1009,7 @@ class LocalScraperService {
         logger.log('[LocalScraperService] Cannot enable scraper', scraperId, '- disabled in manifest or platform-incompatible');
         return;
       }
-      
+
       scraper.enabled = enabled;
       this.installedScrapers.set(scraperId, scraper);
       await this.saveInstalledScrapers();
@@ -920,7 +1077,7 @@ class LocalScraperService {
     if (enabledScrapers.length > 0) {
       try {
         logger.log('[LocalScraperService] Enabled scrapers:', enabledScrapers.map(s => s.name).join(', '));
-      } catch {}
+      } catch { }
     }
 
     if (enabledScrapers.length === 0) {
@@ -983,7 +1140,7 @@ class LocalScraperService {
         promise.finally(() => {
           const current = this.inFlightByKey.get(flightKey);
           if (current === promise) this.inFlightByKey.delete(flightKey);
-        }).catch(() => {});
+        }).catch(() => { });
       }
 
       const results = await promise;
@@ -1013,16 +1170,16 @@ class LocalScraperService {
       const settingsData = await mmkvStorage.getItem('app_settings');
       const settings = settingsData ? JSON.parse(settingsData) : {};
       const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
-      
+
       // Load per-scraper settings for this run
       const allScraperSettingsRaw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
       const allScraperSettings = allScraperSettingsRaw ? JSON.parse(allScraperSettingsRaw) : {};
       const perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId]) ? allScraperSettings[params.scraperId] : (params?.settings || {});
-      
+
       // Create a limited global context
       const moduleExports = {};
       const moduleObj = { exports: moduleExports };
-      
+
       // Try to load cheerio-without-node-native
       let cheerio = null;
       try {
@@ -1034,14 +1191,14 @@ class LocalScraperService {
           // Cheerio not available, scrapers will fall back to regex
         }
       }
-      
+
       // MovieBox constants - read from Expo public envs so they bundle in builds
       const MOVIEBOX_PRIMARY_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY;
       const MOVIEBOX_TMDB_API_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_TMDB_API_KEY || '439c478a771f35c05022f9feabcca01c';
       if (!MOVIEBOX_PRIMARY_KEY) {
         throw new Error('Missing EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY');
       }
-      
+
       const sandbox = {
         console: {
           log: (...args: any[]) => logger.log('[Scraper]', ...args),
@@ -1076,7 +1233,7 @@ class LocalScraperService {
         // Add fetch for HTTP requests (using native fetch for MovieBox, axios for others)
         fetch: async (url: string, options: any = {}) => {
           const isMovieBoxRequest = url.includes('api.inmoviebox.com') || url.includes('themoviedb.org');
-          
+
           if (isMovieBoxRequest) {
             // Always use native fetch for MovieBox requests
             try {
@@ -1084,7 +1241,7 @@ class LocalScraperService {
                 method: options.method || 'GET',
                 hasBody: !!options.body
               });
-              
+
               const nativeResponse = await fetch(url, {
                 method: options.method || 'GET',
                 headers: {
@@ -1094,13 +1251,13 @@ class LocalScraperService {
                 },
                 body: options.body
               });
-              
+
               const responseData = await nativeResponse.text();
               logger.log(`[Sandbox] Native fetch successful for MovieBox:`, {
                 status: nativeResponse.status,
                 ok: nativeResponse.ok
               });
-              
+
               return {
                 ok: nativeResponse.ok,
                 status: nativeResponse.status,
@@ -1134,7 +1291,7 @@ class LocalScraperService {
               timeout: 120000, // Increased to 2 minutes for complex scrapers
               validateStatus: () => true // Don't throw on HTTP error status codes
             };
-            
+
             try {
               logger.log(`[Sandbox] Using axios for request: ${url}`, {
                 method: axiosConfig.method,
@@ -1142,7 +1299,7 @@ class LocalScraperService {
                 hasBody: !!axiosConfig.data
               });
               const response = await axios(axiosConfig);
-              
+
               return {
                 ok: response.status >= 200 && response.status < 300,
                 status: response.status,
@@ -1181,7 +1338,7 @@ class LocalScraperService {
         SCRAPER_SETTINGS: perScraperSettings,
         SCRAPER_ID: params?.scraperId
       };
-      
+
       // Execute the scraper code with 1 minute timeout
       const SCRAPER_EXECUTION_TIMEOUT_MS = 60000; // 1 minute
 
@@ -1237,7 +1394,7 @@ class LocalScraperService {
           setTimeout(() => reject(new Error(`Scraper execution timed out after ${SCRAPER_EXECUTION_TIMEOUT_MS}ms`)), SCRAPER_EXECUTION_TIMEOUT_MS)
         )
       ]);
-      
+
     } catch (error) {
       logger.error('[LocalScraperService] Sandbox execution failed:', error);
       throw error;
@@ -1250,22 +1407,22 @@ class LocalScraperService {
       logger.warn('[LocalScraperService] Scraper returned non-array result');
       return [];
     }
-    
+
     return results.map((result, index) => {
       // Build title with quality information for UI compatibility
       let title = result.title || result.name || `${scraper.name} Stream ${index + 1}`;
-      
+
       // Add quality to title if available and not already present
       if (result.quality && !title.includes(result.quality)) {
         title = `${title} ${result.quality}`;
       }
-      
+
       // Build name with quality information
       let streamName = result.name || `${scraper.name}`;
       if (result.quality && !streamName.includes(result.quality)) {
         streamName = `${streamName} - ${result.quality}`;
       }
-      
+
       const stream: Stream = {
         // Include quality in name field for proper display
         name: streamName,
@@ -1280,22 +1437,22 @@ class LocalScraperService {
           bingeGroup: `local-scraper-${scraper.id}`
         }
       };
-      
+
       // Add additional properties if available
       if (result.infoHash) {
         stream.infoHash = result.infoHash;
       }
-      
+
       // Preserve any additional fields from the scraper result
       if (result.quality && !stream.quality) {
         stream.quality = result.quality;
       }
-      
+
       // Pass headers from scraper result if available
       if (result.headers) {
         stream.headers = result.headers;
       }
-      
+
       return stream;
     }).filter(stream => stream.url); // Filter out streams without URLs
   }
@@ -1303,13 +1460,13 @@ class LocalScraperService {
   // Parse size string to bytes
   private parseSize(sizeStr: string): number {
     if (!sizeStr) return 0;
-    
+
     const match = sizeStr.match(/([0-9.]+)\s*(GB|MB|KB|TB)/i);
     if (!match) return 0;
-    
+
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();
-    
+
     switch (unit) {
       case 'TB': return value * 1024 * 1024 * 1024 * 1024;
       case 'GB': return value * 1024 * 1024 * 1024;
@@ -1323,22 +1480,22 @@ class LocalScraperService {
   async clearScrapers(): Promise<void> {
     this.installedScrapers.clear();
     this.scraperCode.clear();
-    
+
     // Clear from storage
     await mmkvStorage.removeItem(this.STORAGE_KEY);
-    
+
     // Clear cached code
     const keys = await mmkvStorage.getAllKeys();
     const scraperCodeKeys = keys.filter(key => key.startsWith('scraper-code-'));
     await mmkvStorage.multiRemove(scraperCodeKeys);
-    
+
     logger.log('[LocalScraperService] All scrapers cleared');
   }
 
   // Check if local scrapers are available
   async hasScrapers(): Promise<boolean> {
     await this.ensureInitialized();
-    
+
     // Get user settings to check if local scrapers are enabled
     const userSettings = await this.getUserScraperSettings();
     logger.log('[LocalScraperService.hasScrapers] enableLocalScrapers:', userSettings.enableLocalScrapers);
@@ -1346,13 +1503,13 @@ class LocalScraperService {
       logger.log('[LocalScraperService.hasScrapers] Returning false: local scrapers disabled');
       return false;
     }
-    
+
     // If no repository is configured, return false
     if (!this.repositoryUrl) {
       logger.log('[LocalScraperService.hasScrapers] Returning false: no repository URL configured');
       return false;
     }
-    
+
     // If no scrapers are installed, try to refresh repository
     if (this.installedScrapers.size === 0) {
       logger.log('[LocalScraperService.hasScrapers] No scrapers installed, attempting to refresh repository');
@@ -1363,16 +1520,16 @@ class LocalScraperService {
         return false;
       }
     }
-    
+
     logger.log('[LocalScraperService.hasScrapers] installedScrapers.size:', this.installedScrapers.size);
     logger.log('[LocalScraperService.hasScrapers] enabledScrapers set size:', userSettings.enabledScrapers?.size);
-    
+
     // Check if there are any enabled scrapers based on user settings
     if (userSettings.enabledScrapers && userSettings.enabledScrapers.size > 0) {
       logger.log('[LocalScraperService.hasScrapers] Returning true: enabledScrapers set has items');
       return true;
     }
-    
+
     // Fallback: check if any scrapers are enabled in the internal state
     const hasEnabledScrapers = Array.from(this.installedScrapers.values()).some(scraper => scraper.enabled);
     logger.log('[LocalScraperService.hasScrapers] Fallback check - hasEnabledScrapers:', hasEnabledScrapers);

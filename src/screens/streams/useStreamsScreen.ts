@@ -588,7 +588,11 @@ export const useStreamsScreen = () => {
 
   // Reset provider if no longer available
   useEffect(() => {
-    const isSpecialFilter = selectedProvider === 'all' || selectedProvider === 'grouped-plugins';
+    const isSpecialFilter =
+      selectedProvider === 'all' ||
+      selectedProvider === 'grouped-plugins' ||
+      selectedProvider.startsWith('repo-');
+
     if (isSpecialFilter) return;
 
     const currentStreamsData = selectedEpisode ? episodeStreams : groupedStreams;
@@ -753,8 +757,23 @@ export const useStreamsScreen = () => {
           filterChips.push({ id: provider, name: installedAddon?.name || provider });
         });
 
+      // Group plugins by repository
       if (pluginProviders.length > 0) {
-        filterChips.push({ id: 'grouped-plugins', name: localScraperService.getRepositoryName() });
+        const repoMap = new Map<string, { id: string; name: string }>();
+
+        pluginProviders.forEach(providerId => {
+          const repoInfo = localScraperService.getScraperRepository(providerId);
+          if (repoInfo) {
+            if (!repoMap.has(repoInfo.id)) {
+              repoMap.set(repoInfo.id, { id: repoInfo.id, name: repoInfo.name });
+            }
+          }
+        });
+
+        // Add a chip for each repository that has plugins with streams
+        repoMap.forEach(repo => {
+          filterChips.push({ id: `repo-${repo.id}`, name: repo.name });
+        });
       }
 
       return filterChips;
@@ -789,10 +808,26 @@ export const useStreamsScreen = () => {
 
     const filteredEntries = Object.entries(streams).filter(([addonId]) => {
       if (selectedProvider === 'all') return true;
+
+      // Handle repository-based filtering (repo-{repoId})
+      if (settings.streamDisplayMode === 'grouped' && selectedProvider && selectedProvider.startsWith('repo-')) {
+        const repoId = selectedProvider.replace('repo-', '');
+        if (!repoId) return false;
+
+        const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+        if (isInstalledAddon) return false; // Not a plugin
+
+        // Check if this plugin belongs to the selected repository
+        const repoInfo = localScraperService.getScraperRepository(addonId);
+        return !!(repoInfo && (repoInfo.id === repoId || repoInfo.id?.toLowerCase() === repoId?.toLowerCase()));
+      }
+
+      // Legacy: handle old grouped-plugins filter (fallback)
       if (settings.streamDisplayMode === 'grouped' && selectedProvider === 'grouped-plugins') {
         const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
         return !isInstalledAddon;
       }
+
       return addonId === selectedProvider;
     });
 
@@ -847,12 +882,24 @@ export const useStreamsScreen = () => {
         combinedStreams.push(...pluginStreams);
       }
 
+      let sectionId = 'grouped-all';
+      let sectionTitle = 'Available Streams';
+
+      if (selectedProvider && selectedProvider.startsWith('repo-')) {
+        const repoId = selectedProvider.replace('repo-', '');
+        const repo = localScraperService.getRepository(repoId);
+        if (repo) {
+          sectionTitle = `Streams from ${repo.name}`;
+          sectionId = `grouped-${repoId}`;
+        }
+      }
+
       if (combinedStreams.length === 0) return [];
 
       return [
         {
-          title: 'Available Streams',
-          addonId: 'grouped-all',
+          title: sectionTitle,
+          addonId: sectionId,
           data: combinedStreams,
           isEmptyDueToQualityFilter: false,
         },
