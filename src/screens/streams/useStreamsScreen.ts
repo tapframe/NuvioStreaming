@@ -410,7 +410,7 @@ export const useStreamsScreen = () => {
         episodeId: (type === 'series' || type === 'other') && selectedEpisode ? selectedEpisode : undefined,
         imdbId: imdbId || undefined,
         availableStreams: streamsToPass,
-        backdrop: bannerImage,
+        backdrop: bannerImage || metadata?.banner,
         videoType,
       } as any);
     },
