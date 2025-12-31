@@ -440,6 +440,45 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.white,
     fontWeight: '600',
   },
+  // Repository tabs
+  repositoryTabsContainer: {
+    marginBottom: 16,
+  },
+  repositoryTabsScroll: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  repositoryTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.elevation2,
+    borderWidth: 1,
+    borderColor: colors.elevation3,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  repositoryTabSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  repositoryTabText: {
+    color: colors.mediumGray,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  repositoryTabTextSelected: {
+    color: colors.white,
+    fontWeight: '600',
+  },
+  repositoryTabCount: {
+    fontSize: 12,
+    color: colors.mediumGray,
+    marginTop: 2,
+  },
+  repositoryTabCountSelected: {
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -761,6 +800,29 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: '500',
     color: colors.white,
   },
+  repositoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  repositoryNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  pluginRepositoryBadge: {
+    backgroundColor: colors.elevation3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  pluginRepositoryBadgeText: {
+    fontSize: 10,
+    color: colors.mediumGray,
+    fontWeight: '500',
+  },
 });
 
 // Helper component for collapsible sections
@@ -881,6 +943,7 @@ const PluginsScreen: React.FC = () => {
   // New UX state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'movie' | 'tv'>('all');
+  const [selectedRepositoryTab, setSelectedRepositoryTab] = useState<string>('all'); // 'all' or repository ID
   const [expandedSections, setExpandedSections] = useState({
     repository: true,
     plugins: true,
@@ -904,9 +967,19 @@ const PluginsScreen: React.FC = () => {
     { value: 'SZ', label: 'China' },
   ];
 
-  // Filtered plugins based on search and filter
+  // Get enabled repositories for tabs
+  const enabledRepositories = useMemo(() => {
+    return repositories.filter(r => r.enabled !== false);
+  }, [repositories]);
+
+  // Filtered plugins based on search, type filter, and repository tab
   const filteredPlugins = useMemo(() => {
     let filtered = installedPlugins;
+
+    // Filter by repository tab
+    if (selectedRepositoryTab !== 'all') {
+      filtered = filtered.filter(plugin => plugin.repositoryId === selectedRepositoryTab);
+    }
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -926,7 +999,7 @@ const PluginsScreen: React.FC = () => {
     }
 
     return filtered;
-  }, [installedPlugins, searchQuery, selectedFilter]);
+  }, [installedPlugins, searchQuery, selectedFilter, selectedRepositoryTab]);
 
   // Helper functions
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -1009,16 +1082,14 @@ const PluginsScreen: React.FC = () => {
         enabled: true
       });
 
-      await loadRepositories();
-
-      // Switch to the new repository and refresh it
-      await pluginService.setCurrentRepository(repoId);
+      // Refresh all enabled repositories to include the new one
+      await pluginService.refreshRepository();
       await loadRepositories();
       await loadPlugins();
 
       setNewRepositoryUrl('');
       setShowAddRepositoryModal(false);
-      openAlert('Success', 'Repository added and refreshed successfully');
+      openAlert('Success', 'Repository added and plugins loaded successfully');
     } catch (error) {
       logger.error('[PluginsScreen] Failed to add repository:', error);
       openAlert('Error', 'Failed to add repository');
@@ -1027,16 +1098,25 @@ const PluginsScreen: React.FC = () => {
     }
   };
 
-  const handleSwitchRepository = async (repoId: string) => {
+  const handleToggleRepositoryEnabled = async (repoId: string, enabled: boolean) => {
     try {
       setSwitchingRepository(repoId);
-      await pluginService.setCurrentRepository(repoId);
+      await pluginService.toggleRepositoryEnabled(repoId, enabled);
+
+      if (enabled) {
+        // When enabling, refresh just this repository to fetch its plugins
+        await pluginService.refreshSingleRepository(repoId);
+      }
+
+      // Reload the data
       await loadRepositories();
       await loadPlugins();
-      openAlert('Success', 'Repository switched successfully');
+
+      const repo = repositories.find(r => r.id === repoId);
+      openAlert('Success', `Repository "${repo?.name || 'Unknown'}" ${enabled ? 'enabled' : 'disabled'} successfully`);
     } catch (error) {
-      logger.error('[PluginSettings] Failed to switch repository:', error);
-      openAlert('Error', 'Failed to switch repository');
+      logger.error('[PluginSettings] Failed to toggle repository:', error);
+      openAlert('Error', 'Failed to update repository');
     } finally {
       setSwitchingRepository(null);
     }
@@ -1441,40 +1521,43 @@ const PluginsScreen: React.FC = () => {
           styles={styles}
         >
           <Text style={styles.sectionDescription}>
-            Manage multiple plugin repositories. Switch between repositories to access different sets of plugins.
+            Enable multiple repositories to combine plugins from different sources. Toggle each repository on or off below.
           </Text>
-
-          {/* Current Repository */}
-          {currentRepositoryId && (
-            <View style={styles.currentRepoContainer}>
-              <Text style={styles.currentRepoLabel}>Current Repository:</Text>
-              <Text style={styles.currentRepoUrl}>{pluginService.getRepositoryName()}</Text>
-              <Text style={[styles.currentRepoUrl, { fontSize: 12, opacity: 0.7, marginTop: 4 }]}>{repositoryUrl}</Text>
-            </View>
-          )}
 
           {/* Repository List */}
           {repositories.length > 0 && (
             <View style={styles.repositoriesList}>
-              <Text style={[styles.settingTitle, { marginBottom: 12 }]}>Available Repositories</Text>
+              <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Your Repositories</Text>
+              <Text style={[styles.settingDescription, { marginBottom: 12 }]}>
+                Enable multiple repositories to combine plugins from different sources.
+              </Text>
               {repositories.map((repo) => (
-                <View key={repo.id} style={styles.repositoryItem}>
-                  <View style={styles.repositoryInfo}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <View key={repo.id} style={[styles.repositoryItem, repo.enabled === false && { opacity: 0.6 }]}>
+                  <View style={styles.repositoryHeader}>
+                    <View style={styles.repositoryNameContainer}>
                       <Text style={styles.repositoryName}>{repo.name}</Text>
-                      {repo.id === currentRepositoryId && (
+                      {repo.enabled !== false && (
                         <View style={[styles.statusBadge, { backgroundColor: '#34C759' }]}>
                           <Ionicons name="checkmark-circle" size={12} color="white" />
-                          <Text style={styles.statusBadgeText}>Active</Text>
+                          <Text style={styles.statusBadgeText}>Enabled</Text>
                         </View>
                       )}
                       {switchingRepository === repo.id && (
                         <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
                           <ActivityIndicator size={12} color="white" />
-                          <Text style={styles.statusBadgeText}>Switching...</Text>
+                          <Text style={styles.statusBadgeText}>Updating...</Text>
                         </View>
                       )}
                     </View>
+                    <Switch
+                      value={repo.enabled !== false}
+                      onValueChange={(enabled) => handleToggleRepositoryEnabled(repo.id, enabled)}
+                      trackColor={{ false: colors.elevation3, true: colors.primary }}
+                      thumbColor={repo.enabled !== false ? colors.white : '#f4f3f4'}
+                      disabled={!settings.enableLocalScrapers || switchingRepository !== null}
+                    />
+                  </View>
+                  <View style={styles.repositoryInfo}>
                     {repo.description && (
                       <Text style={styles.repositoryDescription}>{repo.description}</Text>
                     )}
@@ -1484,23 +1567,10 @@ const PluginsScreen: React.FC = () => {
                     </Text>
                   </View>
                   <View style={styles.repositoryActions}>
-                    {repo.id !== currentRepositoryId && (
-                      <TouchableOpacity
-                        style={[styles.repositoryActionButton, styles.repositoryActionButtonPrimary]}
-                        onPress={() => handleSwitchRepository(repo.id)}
-                        disabled={switchingRepository === repo.id}
-                      >
-                        {switchingRepository === repo.id ? (
-                          <ActivityIndicator size="small" color={colors.primary} />
-                        ) : (
-                          <Text style={styles.repositoryActionButtonText}>Switch</Text>
-                        )}
-                      </TouchableOpacity>
-                    )}
                     <TouchableOpacity
                       style={[styles.repositoryActionButton, styles.repositoryActionButtonSecondary]}
                       onPress={() => handleRefreshRepository()}
-                      disabled={isRefreshing || switchingRepository !== null}
+                      disabled={isRefreshing || switchingRepository !== null || repo.enabled === false}
                     >
                       {isRefreshing ? (
                         <ActivityIndicator size="small" color={colors.mediumGray} />
@@ -1559,6 +1629,70 @@ const PluginsScreen: React.FC = () => {
                 )}
               </View>
 
+              {/* Repository Tabs - only show if multiple repositories */}
+              {enabledRepositories.length > 1 && (
+                <View style={styles.repositoryTabsContainer}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.repositoryTabsScroll}
+                  >
+                    {/* All tab */}
+                    <TouchableOpacity
+                      style={[
+                        styles.repositoryTab,
+                        selectedRepositoryTab === 'all' && styles.repositoryTabSelected
+                      ]}
+                      onPress={() => setSelectedRepositoryTab('all')}
+                    >
+                      <Text style={[
+                        styles.repositoryTabText,
+                        selectedRepositoryTab === 'all' && styles.repositoryTabTextSelected
+                      ]}>
+                        All
+                      </Text>
+                      <Text style={[
+                        styles.repositoryTabCount,
+                        selectedRepositoryTab === 'all' && styles.repositoryTabCountSelected
+                      ]}>
+                        {installedPlugins.length}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Repository tabs */}
+                    {enabledRepositories.map((repo) => {
+                      const repoPluginCount = installedPlugins.filter(p => p.repositoryId === repo.id).length;
+                      return (
+                        <TouchableOpacity
+                          key={repo.id}
+                          style={[
+                            styles.repositoryTab,
+                            selectedRepositoryTab === repo.id && styles.repositoryTabSelected
+                          ]}
+                          onPress={() => setSelectedRepositoryTab(repo.id)}
+                        >
+                          <Text
+                            style={[
+                              styles.repositoryTabText,
+                              selectedRepositoryTab === repo.id && styles.repositoryTabTextSelected
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {repo.name}
+                          </Text>
+                          <Text style={[
+                            styles.repositoryTabCount,
+                            selectedRepositoryTab === repo.id && styles.repositoryTabCountSelected
+                          ]}>
+                            {repoPluginCount}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
               {/* Filter Chips */}
               <View style={styles.filterContainer}>
                 {['all', 'movie', 'tv'].map((filter) => (
@@ -1574,7 +1708,7 @@ const PluginsScreen: React.FC = () => {
                       styles.filterChipText,
                       selectedFilter === filter && styles.filterChipTextSelected
                     ]}>
-                      {filter === 'all' ? 'All' : filter === 'movie' ? 'Movies' : 'TV Shows'}
+                      {filter === 'all' ? 'All Types' : filter === 'movie' ? 'Movies' : 'TV Shows'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -1693,6 +1827,14 @@ const PluginsScreen: React.FC = () => {
                         </Text>
                       </View>
                     )}
+                    {/* Repository badge */}
+                    {plugin.repositoryId && repositories.length > 1 && (
+                      <View style={styles.pluginRepositoryBadge}>
+                        <Text style={styles.pluginRepositoryBadgeText}>
+                          {repositories.find(r => r.id === plugin.repositoryId)?.name || 'Unknown'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* ShowBox Settings - only visible when ShowBox plugin is available */}
@@ -1782,7 +1924,7 @@ const PluginsScreen: React.FC = () => {
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>Group Plugin Streams</Text>
               <Text style={styles.settingDescription}>
-                When enabled, all plugin streams are grouped under "{pluginService.getRepositoryName()}". When disabled, each plugin shows as a separate provider.
+                When enabled, plugin streams are grouped by repository. When disabled, each plugin shows as a separate provider.
               </Text>
             </View>
             <Switch
