@@ -857,8 +857,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: finalMetadata.name || localized.title,
-                    description: finalMetadata.description || localized.overview,
+                    name: localized.title || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     movieDetails: movieDetailsObj,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -894,8 +894,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: finalMetadata.name || localized.name,
-                    description: finalMetadata.description || localized.overview,
+                    name: localized.name || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     tvDetails,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
