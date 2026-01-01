@@ -110,7 +110,11 @@ export const useWatchProgress = (
           } else {
             const COMPLETION_THRESHOLD = 85;
             const incompleteProgresses = seriesProgresses.filter(({ progress }) => {
-              const progressPercent = (progress.currentTime / progress.duration) * 100;
+              const progressPercent = progress.traktProgress !== undefined && progress.traktProgress > 0
+                       ? progress.traktProgress
+                       : progress.duration > 0
+                         ? (progress.currentTime / progress.duration) * 100
+                         : 0;
               return progressPercent < COMPLETION_THRESHOLD;
             });
             if (incompleteProgresses.length > 0) {
@@ -121,33 +125,23 @@ export const useWatchProgress = (
               setWatchProgress({
                 ...mostRecentIncomplete.progress,
                 episodeId: mostRecentIncomplete.episodeId,
-                traktSynced: mostRecentIncomplete.progress.traktSynced,
-                traktProgress: mostRecentIncomplete.progress.traktProgress
               });
             } else if (seriesProgresses.length > 0) {
-              const watchedEpisodeNumbers = seriesProgresses
-              .map(({ episodeId }) => getEpisodeNumber(episodeId))
-              .filter(Boolean)
-              .sort((a, b) => {
-                if (a!.season !== b!.season) return a!.season - b!.season;
-                return a!.episode - b!.episode;
+              const watchedEpisodeIds = new Set(seriesProgresses.map(({ episodeId }) => episodeId));
+              const sortedEpisodes = [...(episodesRef.current || [])].sort((a, b) => {
+                if (a.season_number !== b.season_number) return a.season_number - b.season_number;
+                return a.episode_number - b.episode_number;
               });
-            if (watchedEpisodeNumbers.length > 0) {
-              const lastWatched = watchedEpisodeNumbers[watchedEpisodeNumbers.length - 1]!;
-              const currentEpisodes = episodesRef.current;
-              
-              const nextEpisode = currentEpisodes.find(ep => {
-                if (ep.season_number > lastWatched.season) return true;
-                if (ep.season_number === lastWatched.season && ep.episode_number > lastWatched.episode) return true;
-                return false;
-              });
-
-              if (nextEpisode) {
+              const nextUnwatched = sortedEpisodes.find(ep => {
+                const episodeId = `${id}:${ep.season_number}:${ep.episode_number}`;
+                return !watchedEpisodeIds.has(episodeId);
+              }); 
+              if (nextUnwatched) {
                 setWatchProgress({
                   currentTime: 0,
-                  duration: nextEpisode.runtime * 60 || 0,
+                  duration: nextUnwatched.runtime * 60 || 0,
                   lastUpdated: Date.now(),
-                  episodeId: `${id}:${nextEpisode.season_number}:${nextEpisode.episode_number}`,
+                  episodeId: `${id}:${nextUnwatched.season_number}:${nextUnwatched.episode_number}`,
                   traktSynced: false,
                   traktProgress: 0
                 });
@@ -157,10 +151,7 @@ export const useWatchProgress = (
             } else {
               setWatchProgress(null);
             }
-          } else {
-            setWatchProgress(null);
           }
-        }
         
         } else {
           // For movies
