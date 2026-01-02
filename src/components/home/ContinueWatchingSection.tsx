@@ -36,6 +36,9 @@ interface ContinueWatchingItem extends StreamingContent {
   episode?: number;
   episodeTitle?: string;
   addonId?: string;
+  addonPoster?: string;
+  addonName?: string;
+  addonDescription?: string;
 }
 
 // Define the ref interface
@@ -212,9 +215,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  // Helper function to get cached or fetch metadata
-  const getCachedMetadata = useCallback(async (type: string, id: string) => {
-    const cacheKey = `${type}:${id}`;
+  const getCachedMetadata = useCallback(async (type: string, id: string, addonId?: string) => {
+    const cacheKey = `${type}:${id}:${addonId || 'default'}`;
     const cached = metadataCache.current[cacheKey];
     const now = Date.now();
 
@@ -224,22 +226,31 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
     try {
       const shouldFetchMeta = await stremioService.isValidContentId(type, id);
-      const [metadata, basicContent] = await Promise.all([
+    
+      const [metadata, basicContent, addonContent] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
-        catalogService.getBasicContentDetails(type, id)
+        catalogService.getBasicContentDetails(type, id),
+        addonId ? stremioService.getMetaDetails(type, id, addonId).catch(() => null) : Promise.resolve(null)
       ]);
 
-      if (basicContent) {
-        const result = { metadata, basicContent, timestamp: now };
+      const finalContent = basicContent ? {
+        ...basicContent,
+        ...(addonContent?.name && { name: addonContent.name }),
+        ...(addonContent?.poster && { poster: addonContent.poster }),
+        ...(addonContent?.description && { description: addonContent.description }),
+      } : null;
+
+      if (finalContent) {
+        const result = { metadata, basicContent: finalContent, addonContent, timestamp: now };
         metadataCache.current[cacheKey] = result;
         return result;
       }
       return null;
     } catch (error: any) {
-      // Skip logging 404 errors to reduce noise
       return null;
     }
   }, []);
+  
 
   const findNextEpisode = useCallback((
     currentSeason: number, 
@@ -459,7 +470,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               return;
             }
           }
-          const cachedData = await getCachedMetadata(group.type, group.id);
+          const cachedData = await getCachedMetadata(group.type, group.id, group.episodes[0]?.progress?.addonId);
           if (!cachedData?.basicContent) return;
           const { metadata, basicContent } = cachedData;
 
@@ -658,7 +669,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 const movieKey = `movie:${imdbId}`;
                 if (recentlyRemovedRef.current.has(movieKey)) continue;
 
-                const cachedData = await getCachedMetadata('movie', imdbId);
+                const cachedData = await getCachedMetadata('movie', imdbId, item.addonId);
                 if (!cachedData?.basicContent) continue;
 
                 const pausedAt = new Date(item.paused_at).getTime();
@@ -690,7 +701,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   continue;
                 }
 
-                const cachedData = await getCachedMetadata('series', showImdb);
+                const cachedData = await getCachedMetadata('series', showImdb, item.addonId);
                 if (!cachedData?.basicContent) continue;
 
                 traktBatch.push({
