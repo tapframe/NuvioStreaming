@@ -278,6 +278,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
             height: 40,
             marginHorizontal: 0,
           }}
+          step={1}
           minimumValue={0}
           maximumValue={duration || 1}
           value={currentTime}

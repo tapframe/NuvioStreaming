@@ -894,7 +894,7 @@ const AndroidVideoPlayer: React.FC = () => {
           isSubtitleModalOpen={modals.showSubtitleModal}
           setShowSourcesModal={modals.setShowSourcesModal}
           setShowEpisodesModal={type === 'series' ? modals.setShowEpisodesModal : undefined}
-          onSliderValueChange={(val) => { playerState.isDragging.current = true; }}
+          onSliderValueChange={(val) => { playerState.isDragging.current = true; playerState.setCurrentTime(val); }}
           onSlidingStart={() => { playerState.isDragging.current = true; }}
           onSlidingComplete={(val) => {
             playerState.isDragging.current = false;
