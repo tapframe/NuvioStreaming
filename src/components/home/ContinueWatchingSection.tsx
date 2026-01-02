@@ -241,43 +241,41 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
   }, []);
 
-  // Helper function to find the next episode
-  const findNextEpisode = useCallback((currentSeason: number, currentEpisode: number, videos: any[]) => {
+  const findNextEpisode = useCallback((
+    currentSeason: number, 
+    currentEpisode: number, 
+    videos: any[],
+    watchedSet?: Set<string>,
+    showId?: string
+  ) => {
     if (!videos || !Array.isArray(videos)) return null;
 
-    // Sort videos to ensure correct order
     const sortedVideos = [...videos].sort((a, b) => {
       if (a.season !== b.season) return a.season - b.season;
       return a.episode - b.episode;
     });
 
-    // Strategy 1: Look for next episode in the same season
-    let nextEp = sortedVideos.find(v => v.season === currentSeason && v.episode === currentEpisode + 1);
+    const isAlreadyWatched = (season: number, episode: number): boolean => {
+      if (!watchedSet || !showId) return false;
+      const cleanShowId = showId.startsWith('tt') ? showId : `tt${showId}`;
+      return watchedSet.has(`${cleanShowId}:${season}:${episode}`) || 
+             watchedSet.has(`${showId}:${season}:${episode}`);
+    };
 
-    // Strategy 2: If not found, look for the first episode of the next season
-    if (!nextEp) {
-      nextEp = sortedVideos.find(v => v.season === currentSeason + 1 && v.episode === 1);
-    }
-
-    // Strategy 3: Just find the very next video in the list after the current one
-    // This handles cases where episode numbering isn't sequential or S+1 E1 isn't the standard start
-    if (!nextEp) {
-      const currentIndex = sortedVideos.findIndex(v => v.season === currentSeason && v.episode === currentEpisode);
-      if (currentIndex !== -1 && currentIndex + 1 < sortedVideos.length) {
-        const candidate = sortedVideos[currentIndex + 1];
-        // Ensure we didn't just jump to a random special; check reasonable bounds if needed,
-        // but generally taking the next sorted item is correct for sequential viewing.
-        nextEp = candidate;
+    for (const video of sortedVideos) {
+      if (video.season < currentSeason) continue;
+      if (video.season === currentSeason && video.episode <= currentEpisode) continue;
+      
+      if (isAlreadyWatched(video.season, video.episode)) continue;
+      
+      if (isEpisodeReleased(video)) {
+        return video;
       }
-    }
-
-    // Verify the found episode is released
-    if (nextEp && isEpisodeReleased(nextEp)) {
-      return nextEp;
     }
 
     return null;
   }, []);
+  
 
   // Modified loadContinueWatching to render incrementally
   const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
