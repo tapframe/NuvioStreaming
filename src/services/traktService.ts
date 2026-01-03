@@ -1105,7 +1105,8 @@ export class TraktService {
       const history = await this.client.get(
         `/sync/history/movies/${imdbId}?limit=1`
       );
-
+      
+      const history = response.data;
       return Array.isArray(history) && history.length > 0;
     } catch {
       return false;
@@ -1122,7 +1123,8 @@ export class TraktService {
         `/sync/history/episodes/${showId}`,
         { params: { limit: 20 } }
       );
-
+      
+      const history = response.data;
       if (!Array.isArray(history)) return false;
 
       for (const entry of history) {
