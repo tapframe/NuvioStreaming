@@ -583,6 +583,7 @@ export class TraktService {
   private refreshToken: string | null = null;
   private tokenExpiry: number = 0;
   private isInitialized: boolean = false;
+  private client: any;
 
   // Rate limiting - Optimized for real-time scrobbling
   private lastApiCall: number = 0;
@@ -1102,7 +1103,7 @@ export class TraktService {
 
   public async isMovieWatchedAccurate(imdbId: string): Promise<boolean> {
     try {
-      const history = await this.client.get(
+      const response = await this.client.get(
         `/sync/history/movies/${imdbId}?limit=1`
       );
       
@@ -1119,7 +1120,7 @@ export class TraktService {
     episode: number
   ): Promise<boolean> {
     try {
-      const history = await this.client.get(
+      const response = await this.client.get(
         `/sync/history/episodes/${showId}`,
         { params: { limit: 20 } }
       );
@@ -1147,6 +1148,7 @@ export class TraktService {
       return false;
     }
   }
+
 
   /**
    * Get the user's watchlist movies
