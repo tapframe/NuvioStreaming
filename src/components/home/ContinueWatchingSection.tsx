@@ -227,18 +227,17 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     try {
       const shouldFetchMeta = await stremioService.isValidContentId(type, id);
     
-      const [metadata, basicContent, addonSpecificMeta, metadataAddonMeta] = await Promise.all([
+      const [metadata, basicContent, addonSpecificMeta] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
         catalogService.getBasicContentDetails(type, id),
 
         addonId
           ? stremioService.getMetaDetails(type, id, addonId).catch(() => null)
-          : Promise.resolve(null),
-
-        stremioService.getMetaDetails(type, id).catch(() => null)
+          : Promise.resolve(null)
       ]);
 
-      const preferredAddonMeta = addonSpecificMeta || metadataAddonMeta;
+      const preferredAddonMeta = addonSpecificMeta || metadata;
+      
 
       const finalContent = basicContent ? {
         ...basicContent,
