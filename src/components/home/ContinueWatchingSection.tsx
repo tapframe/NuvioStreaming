@@ -249,7 +249,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       
 
       if (finalContent) {
-        const result = { metadata, basicContent: finalContent, addonContent, timestamp: now };
+        const result = {
+          metadata,
+          basicContent: finalContent,
+          addonContent: preferredAddonMeta,
+          timestamp: now
+        };
+
         metadataCache.current[cacheKey] = result;
         return result;
       }
