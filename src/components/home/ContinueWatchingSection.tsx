@@ -227,18 +227,26 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     try {
       const shouldFetchMeta = await stremioService.isValidContentId(type, id);
     
-      const [metadata, basicContent, addonContent] = await Promise.all([
+      const [metadata, basicContent, addonSpecificMeta, metadataAddonMeta] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
         catalogService.getBasicContentDetails(type, id),
-        addonId ? stremioService.getMetaDetails(type, id, addonId).catch(() => null) : Promise.resolve(null)
+
+        addonId
+          ? stremioService.getMetaDetails(type, id, addonId).catch(() => null)
+          : Promise.resolve(null),
+
+        stremioService.getMetaDetails(type, id).catch(() => null)
       ]);
+
+      const preferredAddonMeta = addonSpecificMeta || metadataAddonMeta;
 
       const finalContent = basicContent ? {
         ...basicContent,
-        ...(addonContent?.name && { name: addonContent.name }),
-        ...(addonContent?.poster && { poster: addonContent.poster }),
-        ...(addonContent?.description && { description: addonContent.description }),
+        ...(preferredAddonMeta?.name && { name: preferredAddonMeta.name }),
+        ...(preferredAddonMeta?.poster && { poster: preferredAddonMeta.poster }),
+        ...(preferredAddonMeta?.description && { description: preferredAddonMeta.description }),
       } : null;
+      
 
       if (finalContent) {
         const result = { metadata, basicContent: finalContent, addonContent, timestamp: now };
