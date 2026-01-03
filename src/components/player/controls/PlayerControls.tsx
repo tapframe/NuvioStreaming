@@ -7,7 +7,6 @@ import Slider from '@react-native-community/slider';
 import { styles } from '../utils/playerStyles'; // Updated styles
 import { getTrackDisplayName } from '../utils/playerUtils';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { useDebounceCallback } from '../android/hooks/useDebounceCallback';
 
 interface PlayerControlsProps {
   showControls: boolean;
@@ -135,15 +134,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   const playIconOpacity = React.useRef(new Animated.Value(1)).current;
 
   /* Handle Seek with Animation */
-  const [skipRewindSeconds, setSkipRewindSeconds] = React.useState(0);
-  const finalSkipRewind = (finalValue: number) => {
-    console.log(`Final value processed: ${finalValue}`);
-    skip(finalValue);
-    setSkipRewindSeconds(0);
-  }
-  const debouncedSkip = useDebounceCallback((val: number) => {
-    finalSkipRewind(val);
-  }, 800);
   const handleSeekWithAnimation = (seconds: number) => {
     const isForward = seconds > 0;
 
@@ -222,11 +212,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
       arcRotation.setValue(0);
     });
 
-    setSkipRewindSeconds(prev => {
-      const nextVal = prev + seconds;
-      debouncedSkip(nextVal);
-      return nextVal;
-    });
+    skip(seconds);
   };
 
   /* Handle Play/Pause with Animation */
