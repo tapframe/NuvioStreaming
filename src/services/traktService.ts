@@ -1099,6 +1099,53 @@ export class TraktService {
     return this.apiRequest<TraktWatchedItem[]>('/sync/watched/shows');
   }
 
+
+  public async isMovieWatchedAccurate(imdbId: string): Promise<boolean> {
+    try {
+      const history = await this.client.get(
+        `/sync/history/movies/${imdbId}?limit=1`
+      );
+
+      return Array.isArray(history) && history.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  public async isEpisodeWatchedAccurate(
+    showId: string,
+    season: number,
+    episode: number
+  ): Promise<boolean> {
+    try {
+      const history = await this.client.get(
+        `/sync/history/episodes/${showId}`,
+        { params: { limit: 20 } }
+      );
+
+      if (!Array.isArray(history)) return false;
+
+      for (const entry of history) {
+        if (
+          entry.episode?.season === season &&
+          entry.episode?.number === episode
+        ) {
+    
+          if (entry.reset_at) {
+            const watchedAt = new Date(entry.watched_at).getTime();
+            const resetAt = new Date(entry.reset_at).getTime();
+            if (watchedAt < resetAt) return false;
+          }
+          return true;
+        }
+      }
+
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Get the user's watchlist movies
    */
