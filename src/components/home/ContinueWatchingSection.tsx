@@ -500,23 +500,46 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   }
                 }
 
-                if (currentSeason !== undefined && currentEpisode !== undefined && metadata?.videos) {
-                  const nextEpisodeVideo = findNextEpisode(currentSeason, currentEpisode, metadata.videos);
+                if (currentSeason !== undefined && currentEpisode !== undefined) {
+                  const traktService = TraktService.getInstance();
+                  let nextEpisode: any = null;
 
-                  if (nextEpisodeVideo) {
+                  try {
+                    const isAuthed = await traktService.isAuthenticated();
+                    if (isAuthed && typeof (traktService as any).getShowWatchedProgress === 'function') {
+                      const showProgress = await (traktService as any).getShowWatchedProgress(group.id);
+
+                      if (showProgress && !showProgress.completed && showProgress.next_episode) {
+                        nextEpisode = showProgress.next_episode;
+                      }
+                    }
+                  } catch {
+  
+                  }
+
+                  if (!nextEpisode && metadata?.videos) {
+                    nextEpisode = findNextEpisode(
+                      currentSeason,
+                      currentEpisode,
+                      metadata.videos
+                    );
+                  }
+
+                  if (nextEpisode) {
                     batch.push({
                       ...basicContent,
                       id: group.id,
                       type: group.type,
                       progress: 0,
                       lastUpdated: progress.lastUpdated,
-                      season: nextEpisodeVideo.season,
-                      episode: nextEpisodeVideo.episode,
-                      episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
+                      season: nextEpisode.season,
+                      episode: nextEpisode.number ?? nextEpisode.episode,
+                      episodeTitle: nextEpisode.title || `Episode ${nextEpisode.number ?? nextEpisode.episode}`,
                       addonId: progress.addonId,
                     } as ContinueWatchingItem);
                   }
                 }
+                
               }
               continue;
             }
