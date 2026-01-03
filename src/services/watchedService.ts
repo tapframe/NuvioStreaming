@@ -301,52 +301,60 @@ class WatchedService {
      * Check if a movie is marked as watched (locally)
      */
     public async isMovieWatched(imdbId: string): Promise<boolean> {
-        try {
-            // First check local watched flag
-            const localWatched = await mmkvStorage.getItem(`watched:movie:${imdbId}`);
-            if (localWatched === 'true') {
-                return true;
-            }
+      try {
+        const isAuthed = await this.traktService.isAuthenticated();
 
-            // Check local progress
-            const progress = await storageService.getWatchProgress(imdbId, 'movie');
-            if (progress) {
-                const progressPercent = (progress.currentTime / progress.duration) * 100;
-                if (progressPercent >= 85) {
-                    return true;
-                }
-            }
-
-            return false;
-        } catch (error) {
-            logger.error('[WatchedService] Error checking movie watched status:', error);
-            return false;
+        if (isAuthed) {
+          const traktWatched =
+            await this.traktService.isMovieWatchedAccurate(imdbId);
+          if (traktWatched) return true;
         }
+
+        const local = await mmkvStorage.getItem(`watched:movie:${imdbId}`);
+        return local === 'true';
+      } catch {
+        return false;
+      }
     }
+    
 
     /**
      * Check if an episode is marked as watched (locally)
      */
-    public async isEpisodeWatched(showId: string, season: number, episode: number): Promise<boolean> {
-        try {
-            const episodeId = `${showId}:${season}:${episode}`;
+    public async isEpisodeWatched(
+      showId: string,
+      season: number,
+      episode: number
+    ): Promise<boolean> {
+      try {
+        const isAuthed = await this.traktService.isAuthenticated();
 
-            // Check local progress
-            const progress = await storageService.getWatchProgress(showId, 'series', episodeId);
-            if (progress) {
-                const progressPercent = (progress.currentTime / progress.duration) * 100;
-                if (progressPercent >= 85) {
-                    return true;
-                }
-            }
-
-            return false;
-        } catch (error) {
-            logger.error('[WatchedService] Error checking episode watched status:', error);
-            return false;
+        if (isAuthed) {
+          const traktWatched =
+            await this.traktService.isEpisodeWatchedAccurate(
+              showId,
+              season,
+              episode
+            );
+          if (traktWatched) return true;
         }
-    }
 
+        const episodeId = `${showId}:${season}:${episode}`;
+        const progress = await storageService.getWatchProgress(
+          showId,
+          'series',
+          episodeId
+        );
+
+        if (!progress) return false;
+
+        const pct = (progress.currentTime / progress.duration) * 100;
+        return pct >= 99;
+      } catch {
+        return false;
+      }
+    }
+    
     /**
      * Set local watched status by creating a "completed" progress entry
      */

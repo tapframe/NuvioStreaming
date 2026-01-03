@@ -227,21 +227,34 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     try {
       const shouldFetchMeta = await stremioService.isValidContentId(type, id);
     
-      const [metadata, basicContent, addonContent] = await Promise.all([
+      const [metadata, basicContent, addonSpecificMeta] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
         catalogService.getBasicContentDetails(type, id),
-        addonId ? stremioService.getMetaDetails(type, id, addonId).catch(() => null) : Promise.resolve(null)
+
+        addonId
+          ? stremioService.getMetaDetails(type, id, addonId).catch(() => null)
+          : Promise.resolve(null)
       ]);
+
+      const preferredAddonMeta = addonSpecificMeta || metadata;
+      
 
       const finalContent = basicContent ? {
         ...basicContent,
-        ...(addonContent?.name && { name: addonContent.name }),
-        ...(addonContent?.poster && { poster: addonContent.poster }),
-        ...(addonContent?.description && { description: addonContent.description }),
+        ...(preferredAddonMeta?.name && { name: preferredAddonMeta.name }),
+        ...(preferredAddonMeta?.poster && { poster: preferredAddonMeta.poster }),
+        ...(preferredAddonMeta?.description && { description: preferredAddonMeta.description }),
       } : null;
+      
 
       if (finalContent) {
-        const result = { metadata, basicContent: finalContent, addonContent, timestamp: now };
+        const result = {
+          metadata,
+          basicContent: finalContent,
+          addonContent: preferredAddonMeta,
+          timestamp: now
+        };
+
         metadataCache.current[cacheKey] = result;
         return result;
       }
@@ -500,23 +513,46 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   }
                 }
 
-                if (currentSeason !== undefined && currentEpisode !== undefined && metadata?.videos) {
-                  const nextEpisodeVideo = findNextEpisode(currentSeason, currentEpisode, metadata.videos);
+                if (currentSeason !== undefined && currentEpisode !== undefined) {
+                  const traktService = TraktService.getInstance();
+                  let nextEpisode: any = null;
 
-                  if (nextEpisodeVideo) {
+                  try {
+                    const isAuthed = await traktService.isAuthenticated();
+                    if (isAuthed && typeof (traktService as any).getShowWatchedProgress === 'function') {
+                      const showProgress = await (traktService as any).getShowWatchedProgress(group.id);
+
+                      if (showProgress && !showProgress.completed && showProgress.next_episode) {
+                        nextEpisode = showProgress.next_episode;
+                      }
+                    }
+                  } catch {
+  
+                  }
+
+                  if (!nextEpisode && metadata?.videos) {
+                    nextEpisode = findNextEpisode(
+                      currentSeason,
+                      currentEpisode,
+                      metadata.videos
+                    );
+                  }
+
+                  if (nextEpisode) {
                     batch.push({
                       ...basicContent,
                       id: group.id,
                       type: group.type,
                       progress: 0,
                       lastUpdated: progress.lastUpdated,
-                      season: nextEpisodeVideo.season,
-                      episode: nextEpisodeVideo.episode,
-                      episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
+                      season: nextEpisode.season,
+                      episode: nextEpisode.number ?? nextEpisode.episode,
+                      episodeTitle: nextEpisode.title || `Episode ${nextEpisode.number ?? nextEpisode.episode}`,
                       addonId: progress.addonId,
                     } as ContinueWatchingItem);
                   }
                 }
+                
               }
               continue;
             }
@@ -769,23 +805,35 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               if (!cachedData?.basicContent) continue;
               const { metadata, basicContent } = cachedData;
 
-              if (metadata?.videos) {
-                const nextEpisodeVideo = findNextEpisode(info.season, info.episode, metadata.videos);
-                if (nextEpisodeVideo) {
-                  logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${nextEpisodeVideo.season}E${nextEpisodeVideo.episode}`);
-                  traktBatch.push({
-                    ...basicContent,
-                    id: showId,
-                    type: 'series',
-                    progress: 0, // Next episode, not started
-                    lastUpdated: info.watchedAt,
-                    season: nextEpisodeVideo.season,
-                    episode: nextEpisodeVideo.episode,
-                    episodeTitle: `Episode ${nextEpisodeVideo.episode}`,
-                    addonId: undefined,
-                  } as ContinueWatchingItem);
-                }
+              const traktService = TraktService.getInstance();
+              let showProgress: any = null;
+
+              try {
+                showProgress = await (traktService as any).getShowWatchedProgress?.(showId);
+              } catch {
+                showProgress = null;
               }
+
+              if (!showProgress || showProgress.completed || !showProgress.next_episode) {
+                logger.log(`🚫 [TraktSync] Skipping completed show: ${showId}`);
+                continue;
+              }
+
+              const nextEp = showProgress.next_episode;
+
+              logger.log(`➕ [TraktSync] Adding next episode for ${showId}: S${nextEp.season}E${nextEp.number}`);
+
+              traktBatch.push({
+                ...basicContent,
+                id: showId,
+                type: 'series',
+                progress: 0,
+                lastUpdated: info.watchedAt,
+                season: nextEp.season,
+                episode: nextEp.number,
+                episodeTitle: nextEp.title || `Episode ${nextEp.number}`,
+                addonId: undefined,
+              } as ContinueWatchingItem);
 
               // Persist "watched" progress for the episode that Trakt reported
               if (!recentlyRemovedRef.current.has(showKey)) {
