@@ -17,6 +17,7 @@ interface PlayerControlsConfig {
     duration: number;
     isSeeking: MutableRefObject<boolean>;
     isMounted: MutableRefObject<boolean>;
+    setCurrentTime?: (time: number) => void; // add this line
 }
 
 export const usePlayerControls = (config: PlayerControlsConfig) => {
@@ -62,9 +63,13 @@ export const usePlayerControls = (config: PlayerControlsConfig) => {
         }
     }, [duration, paused, setPaused, playerRef, isSeeking, isMounted]);
 
+    const setCurrentTime = config.setCurrentTime || (() => {});
+
     const skip = useCallback((seconds: number) => {
-        seekToTime(currentTime + seconds);
-    }, [currentTime, seekToTime]);
+        const targetTime = currentTime + seconds;
+        setCurrentTime(targetTime);
+        seekToTime(targetTime);
+    }, [currentTime, seekToTime, setCurrentTime]);
 
     return {
         togglePlayback,
