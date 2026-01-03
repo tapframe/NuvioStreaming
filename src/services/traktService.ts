@@ -1102,14 +1102,15 @@ export class TraktService {
 
   public async isMovieWatchedAccurate(imdbId: string): Promise<boolean> {
     try {
-      const watched = await this.client.get(
-        '/sync/watched/movies'
-      );
+      const imdb = imdbId.startsWith('tt')
+        ? imdbId
+        : `tt${imdbId}`;
 
-      const movies = watched.data;
+      const response = await this.client.get('/sync/watched/movies');
+      const movies = Array.isArray(response.data) ? response.data : [];
 
       return movies.some(
-        (m: any) => m.movie?.ids?.imdb === imdbId
+        (m: any) => m.movie?.ids?.imdb === imdb
       );
     } catch (err) {
       logger.warn('[TraktService] Movie watched check failed', err);
@@ -1124,21 +1125,56 @@ export class TraktService {
   ): Promise<boolean> {
     try {
       if (season === 0) return false;
-      const watchedShows = await this.apiRequest<any[]>('/sync/watched/shows');
+
+      const imdb = showImdbId.startsWith('tt')
+        ? showImdbId
+        : `tt${showImdbId}`;
+
+      const watchedShows = await this.apiRequest<any[]>(
+        '/sync/watched/shows'
+      );
 
       const show = watchedShows.find(
-      s => s.show?.ids?.imdb === showImdbId
+        s => s.show?.ids?.imdb === imdb
       );
-      if (!show) return false;
 
-      const seasonData = show.seasons?.find(
-        (s: any) => s.number === season
-      );
-      if (!seasonData) return false;
+      if (show) {
+        const seasonData = show.seasons?.find(
+          (s: any) => s.number === season
+        );
 
-      return seasonData.episodes?.some(
-        (e: any) => e.number === episode
-      ) ?? false;
+        if (
+          seasonData?.episodes?.some(
+            (e: any) => e.number === episode
+          )
+        ) {
+          return true;
+        }
+      }
+
+      let page = 1;
+
+      while (true) {
+        const history = await this.apiRequest<any[]>(
+          `/sync/history/shows/${imdb}?page=${page}&limit=100`
+        );
+
+        if (!history.length) break;
+
+        if (
+          history.some(
+            (h: any) =>
+              h.episode?.season === season &&
+              h.episode?.number === episode
+          )
+        ) {
+          return true;
+        }
+
+        page++;
+      }
+
+      return false;
     } catch (err) {
       logger.warn('[TraktService] Episode watched check failed', err);
       return false;
@@ -1153,21 +1189,53 @@ export class TraktService {
     try {
       if (seasonNumber === 0) return false;
       if (!totalAiredEpisodes || totalAiredEpisodes <= 0) return false;
-      const watchedShows = await this.apiRequest<any[]>('/sync/watched/shows');
+
+      const imdb = showImdbId.startsWith('tt')
+        ? showImdbId
+        : `tt${showImdbId}`;
+
+      const watchedEpisodes = new Set<number>();
+
+      const watchedShows = await this.apiRequest<any[]>(
+        '/sync/watched/shows'
+      );
 
       const show = watchedShows.find(
-        s => s.show?.ids?.imdb === showImdbId
+        s => s.show?.ids?.imdb === imdb
       );
-      if (!show) return false;
 
-      const season = show.seasons?.find(
-        (s: any) => s.number === seasonNumber
-      );
-      if (!season) return false;
+      if (show) {
+        const season = show.seasons?.find(
+          (s: any) => s.number === seasonNumber
+        );
 
-      const watchedCount = season.episodes?.length ?? 0;
+        season?.episodes?.forEach(
+          (e: any) => watchedEpisodes.add(e.number)
+        );
+      }
 
-      return watchedCount >= totalAiredEpisodes;
+      let page = 1;
+
+      while (true) {
+        const history = await this.apiRequest<any[]>(
+          `/sync/history/shows/${imdb}?page=${page}&limit=10`
+        );
+
+        if (!history.length) break;
+
+        history.forEach((h: any) => {
+          if (
+            h.episode?.season === seasonNumber &&
+            typeof h.episode?.number === 'number'
+          ) {
+            watchedEpisodes.add(h.episode.number);
+          }
+        });
+
+        page++;
+      }
+
+      return watchedEpisodes.size >= totalAiredEpisodes;
     } catch (err) {
       logger.warn('[TraktService] Season completion check failed', err);
       return false;
