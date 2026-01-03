@@ -36,6 +36,9 @@ interface ContinueWatchingItem extends StreamingContent {
   episode?: number;
   episodeTitle?: string;
   addonId?: string;
+  addonPoster?: string;
+  addonName?: string;
+  addonDescription?: string;
 }
 
 // Define the ref interface
@@ -212,9 +215,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
   const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  // Helper function to get cached or fetch metadata
-  const getCachedMetadata = useCallback(async (type: string, id: string) => {
-    const cacheKey = `${type}:${id}`;
+  const getCachedMetadata = useCallback(async (type: string, id: string, addonId?: string) => {
+    const cacheKey = `${type}:${id}:${addonId || 'default'}`;
     const cached = metadataCache.current[cacheKey];
     const now = Date.now();
 
@@ -224,60 +226,67 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
     try {
       const shouldFetchMeta = await stremioService.isValidContentId(type, id);
-      const [metadata, basicContent] = await Promise.all([
+    
+      const [metadata, basicContent, addonContent] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
-        catalogService.getBasicContentDetails(type, id)
+        catalogService.getBasicContentDetails(type, id),
+        addonId ? stremioService.getMetaDetails(type, id, addonId).catch(() => null) : Promise.resolve(null)
       ]);
 
-      if (basicContent) {
-        const result = { metadata, basicContent, timestamp: now };
+      const finalContent = basicContent ? {
+        ...basicContent,
+        ...(addonContent?.name && { name: addonContent.name }),
+        ...(addonContent?.poster && { poster: addonContent.poster }),
+        ...(addonContent?.description && { description: addonContent.description }),
+      } : null;
+
+      if (finalContent) {
+        const result = { metadata, basicContent: finalContent, addonContent, timestamp: now };
         metadataCache.current[cacheKey] = result;
         return result;
       }
       return null;
     } catch (error: any) {
-      // Skip logging 404 errors to reduce noise
       return null;
     }
   }, []);
+  
 
-  // Helper function to find the next episode
-  const findNextEpisode = useCallback((currentSeason: number, currentEpisode: number, videos: any[]) => {
+  const findNextEpisode = useCallback((
+    currentSeason: number, 
+    currentEpisode: number, 
+    videos: any[],
+    watchedSet?: Set<string>,
+    showId?: string
+  ) => {
     if (!videos || !Array.isArray(videos)) return null;
 
-    // Sort videos to ensure correct order
     const sortedVideos = [...videos].sort((a, b) => {
       if (a.season !== b.season) return a.season - b.season;
       return a.episode - b.episode;
     });
 
-    // Strategy 1: Look for next episode in the same season
-    let nextEp = sortedVideos.find(v => v.season === currentSeason && v.episode === currentEpisode + 1);
+    const isAlreadyWatched = (season: number, episode: number): boolean => {
+      if (!watchedSet || !showId) return false;
+      const cleanShowId = showId.startsWith('tt') ? showId : `tt${showId}`;
+      return watchedSet.has(`${cleanShowId}:${season}:${episode}`) || 
+             watchedSet.has(`${showId}:${season}:${episode}`);
+    };
 
-    // Strategy 2: If not found, look for the first episode of the next season
-    if (!nextEp) {
-      nextEp = sortedVideos.find(v => v.season === currentSeason + 1 && v.episode === 1);
-    }
-
-    // Strategy 3: Just find the very next video in the list after the current one
-    // This handles cases where episode numbering isn't sequential or S+1 E1 isn't the standard start
-    if (!nextEp) {
-      const currentIndex = sortedVideos.findIndex(v => v.season === currentSeason && v.episode === currentEpisode);
-      if (currentIndex !== -1 && currentIndex + 1 < sortedVideos.length) {
-        const candidate = sortedVideos[currentIndex + 1];
-        // Ensure we didn't just jump to a random special; check reasonable bounds if needed,
-        // but generally taking the next sorted item is correct for sequential viewing.
-        nextEp = candidate;
+    for (const video of sortedVideos) {
+      if (video.season < currentSeason) continue;
+      if (video.season === currentSeason && video.episode <= currentEpisode) continue;
+      
+      if (isAlreadyWatched(video.season, video.episode)) continue;
+      
+      if (isEpisodeReleased(video)) {
+        return video;
       }
-    }
-
-    // Verify the found episode is released
-    if (nextEp && isEpisodeReleased(nextEp)) {
-      return nextEp;
     }
 
     return null;
   }, []);
+  
 
   // Modified loadContinueWatching to render incrementally
   const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
@@ -461,7 +470,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               return;
             }
           }
-          const cachedData = await getCachedMetadata(group.type, group.id);
+          const cachedData = await getCachedMetadata(group.type, group.id, group.episodes[0]?.progress?.addonId);
           if (!cachedData?.basicContent) return;
           const { metadata, basicContent } = cachedData;
 
@@ -660,7 +669,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 const movieKey = `movie:${imdbId}`;
                 if (recentlyRemovedRef.current.has(movieKey)) continue;
 
-                const cachedData = await getCachedMetadata('movie', imdbId);
+                const cachedData = await getCachedMetadata('movie', imdbId, item.addonId);
                 if (!cachedData?.basicContent) continue;
 
                 const pausedAt = new Date(item.paused_at).getTime();
@@ -692,7 +701,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   continue;
                 }
 
-                const cachedData = await getCachedMetadata('series', showImdb);
+                const cachedData = await getCachedMetadata('series', showImdb, item.addonId);
                 if (!cachedData?.basicContent) continue;
 
                 traktBatch.push({
