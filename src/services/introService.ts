@@ -10,6 +10,7 @@ import { tmdbService } from './tmdbService';
 const INTRODB_API_URL = process.env.EXPO_PUBLIC_INTRODB_API_URL;
 const ANISKIP_API_URL = 'https://api.aniskip.com/v2';
 const KITSU_API_URL = 'https://kitsu.io/api/edge';
+const ARM_IMDB_URL = 'https://arm.haglund.dev/api/v2/imdb';
 
 export type SkipType = 'op' | 'ed' | 'recap' | 'intro' | 'outro' | 'mixed-op' | 'mixed-ed';
 
@@ -30,6 +31,31 @@ export interface IntroTimestamps {
     start_ms: number;
     end_ms: number;
     confidence: number;
+}
+
+async function getMalIdFromArm(imdbId: string): Promise<string | null> {
+    try {
+        const response = await axios.get(ARM_IMDB_URL, {
+            params: {
+                id: imdbId,
+                include: 'myanimelist'
+            }
+        });
+        
+        // ARM returns an array of matches (e.g. for different seasons)
+        // We typically take the first one or try to match logic if possible
+        if (Array.isArray(response.data) && response.data.length > 0) {
+            const result = response.data[0];
+            if (result && result.myanimelist) {
+                logger.log(`[IntroService] Found MAL ID via ARM: ${result.myanimelist}`);
+                return result.myanimelist.toString();
+            }
+        }
+    } catch (error) {
+        // Silent fail as this is just one of the resolution methods
+        // logger.warn('[IntroService] Failed to fetch MAL ID from ARM', error);
+    }
+    return null;
 }
 
 async function getMalIdFromKitsu(kitsuId: string): Promise<string | null> {
@@ -171,7 +197,15 @@ export async function getSkipTimes(
     malId?: string,
     kitsuId?: string
 ): Promise<SkipInterval[]> {
-    // 1. Try AniSkip (Anime) if we have MAL ID or Kitsu ID
+    // 1. Try IntroDB (TV Shows) first
+    if (imdbId) {
+        const introDbIntervals = await fetchFromIntroDb(imdbId, season, episode);
+        if (introDbIntervals.length > 0) {
+            return introDbIntervals;
+        }
+    }
+
+    // 2. Try AniSkip (Anime) if we have MAL ID or Kitsu ID
     let finalMalId = malId;
     
     // If we have Kitsu ID but no MAL ID, try to resolve it
@@ -182,8 +216,15 @@ export async function getSkipTimes(
 
     // If we still don't have MAL ID but have IMDb ID (e.g. Cinemeta), try to resolve it
     if (!finalMalId && imdbId) {
-        logger.log(`[IntroService] Attempting to resolve MAL ID from IMDb ID: ${imdbId}`);
-        finalMalId = await getMalIdFromImdb(imdbId) || undefined;
+        // Priority 1: ARM API (Fastest)
+        logger.log(`[IntroService] Attempting to resolve MAL ID via ARM for: ${imdbId}`);
+        finalMalId = await getMalIdFromArm(imdbId) || undefined;
+
+        // Priority 2: Kitsu/TMDB Chain (Fallback)
+        if (!finalMalId) {
+            logger.log(`[IntroService] ARM failed, falling back to Kitsu/TMDB chain for: ${imdbId}`);
+            finalMalId = await getMalIdFromImdb(imdbId) || undefined;
+        }
     }
 
     if (finalMalId) {
@@ -192,14 +233,6 @@ export async function getSkipTimes(
         if (aniSkipIntervals.length > 0) {
             logger.log(`[IntroService] Found ${aniSkipIntervals.length} skip intervals from AniSkip`);
             return aniSkipIntervals;
-        }
-    }
-
-    // 2. Try IntroDB (TV Shows) as fallback or for non-anime
-    if (imdbId) {
-        const introDbIntervals = await fetchFromIntroDb(imdbId, season, episode);
-        if (introDbIntervals.length > 0) {
-            return introDbIntervals;
         }
     }
 
