@@ -115,6 +115,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   /* Animations - State & Refs */
   const [showBackwardSign, setShowBackwardSign] = React.useState(false);
   const [showForwardSign, setShowForwardSign] = React.useState(false);
+  const [previewTime, setPreviewTime] = React.useState(currentTime);
+  const isSlidingRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!isSlidingRef.current) {
+      setPreviewTime(currentTime);
+    }
+  }, [currentTime]);
 
   /* Separate Animations for Each Button */
   const backwardPressAnim = React.useRef(new Animated.Value(0)).current;
@@ -280,10 +287,22 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           }}
           minimumValue={0}
           maximumValue={duration || 1}
-          value={currentTime}
-          onValueChange={onSliderValueChange}
-          onSlidingStart={onSlidingStart}
-          onSlidingComplete={onSlidingComplete}
+          
+          value={previewTime}
+
+          onValueChange={(v) => setPreviewTime(v)}
+
+          onSlidingStart={() => {
+            isSlidingRef.current = true;
+            onSlidingStart();
+          }}
+
+          onSlidingComplete={(v) => {
+            isSlidingRef.current = false;
+            setPreviewTime(v);
+            onSlidingComplete(v);
+          }}
+
           minimumTrackTintColor={currentTheme.colors.primary}
           maximumTrackTintColor={currentTheme.colors.mediumEmphasis}
           thumbTintColor={Platform.OS === 'android' ? currentTheme.colors.white : undefined}
