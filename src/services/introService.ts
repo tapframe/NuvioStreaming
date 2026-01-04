@@ -50,7 +50,12 @@ async function getMalIdFromKitsu(kitsuId: string): Promise<string | null> {
 async function fetchFromAniSkip(malId: string, episode: number): Promise<SkipInterval[]> {
     try {
         // Fetch OP, ED, and Recap
-        const url = `${ANISKIP_API_URL}/skip-times/${malId}/${episode}?types[]=op&types[]=ed&types[]=recap&types[]=mixed-op&types[]=mixed-ed`;
+        // AniSkip expects repeated 'types' parameters without brackets: ?types=op&types=ed...
+        // episodeLength=0 is required for validation
+        const types = ['op', 'ed', 'recap', 'mixed-op', 'mixed-ed'];
+        const queryParams = types.map(t => `types=${t}`).join('&');
+        const url = `${ANISKIP_API_URL}/skip-times/${malId}/${episode}?${queryParams}&episodeLength=0`;
+        
         const response = await axios.get(url);
         
         if (response.data.found && response.data.results) {
