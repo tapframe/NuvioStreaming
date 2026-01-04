@@ -226,7 +226,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
     try {
       const shouldFetchMeta = await stremioService.isValidContentId(type, id);
-    
+
       const [metadata, basicContent, addonSpecificMeta] = await Promise.all([
         shouldFetchMeta ? stremioService.getMetaDetails(type, id) : Promise.resolve(null),
         catalogService.getBasicContentDetails(type, id),
@@ -237,7 +237,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       ]);
 
       const preferredAddonMeta = addonSpecificMeta || metadata;
-      
+
 
       const finalContent = basicContent ? {
         ...basicContent,
@@ -245,7 +245,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         ...(preferredAddonMeta?.poster && { poster: preferredAddonMeta.poster }),
         ...(preferredAddonMeta?.description && { description: preferredAddonMeta.description }),
       } : null;
-      
+
 
       if (finalContent) {
         const result = {
@@ -263,11 +263,11 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       return null;
     }
   }, []);
-  
+
 
   const findNextEpisode = useCallback((
-    currentSeason: number, 
-    currentEpisode: number, 
+    currentSeason: number,
+    currentEpisode: number,
     videos: any[],
     watchedSet?: Set<string>,
     showId?: string
@@ -282,16 +282,16 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     const isAlreadyWatched = (season: number, episode: number): boolean => {
       if (!watchedSet || !showId) return false;
       const cleanShowId = showId.startsWith('tt') ? showId : `tt${showId}`;
-      return watchedSet.has(`${cleanShowId}:${season}:${episode}`) || 
-             watchedSet.has(`${showId}:${season}:${episode}`);
+      return watchedSet.has(`${cleanShowId}:${season}:${episode}`) ||
+        watchedSet.has(`${showId}:${season}:${episode}`);
     };
 
     for (const video of sortedVideos) {
       if (video.season < currentSeason) continue;
       if (video.season === currentSeason && video.episode <= currentEpisode) continue;
-      
+
       if (isAlreadyWatched(video.season, video.episode)) continue;
-      
+
       if (isEpisodeReleased(video)) {
         return video;
       }
@@ -299,7 +299,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
     return null;
   }, []);
-  
+
 
   // Modified loadContinueWatching to render incrementally
   const loadContinueWatching = useCallback(async (isBackgroundRefresh = false) => {
@@ -379,7 +379,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         const progressPercent =
           progress.duration > 0
             ? (progress.currentTime / progress.duration) * 100
-                : 0;
+            : 0;
         // Skip fully watched movies
         if (type === 'movie' && progressPercent >= 85) continue;
         // Skip movies with no actual progress (ensure > 0%)
@@ -533,7 +533,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                       }
                     }
                   } catch {
-  
+
                   }
 
                   if (!nextEpisode && metadata?.videos) {
@@ -558,7 +558,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                     } as ContinueWatchingItem);
                   }
                 }
-                
+
               }
               continue;
             }
@@ -711,7 +711,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 const movieKey = `movie:${imdbId}`;
                 if (recentlyRemovedRef.current.has(movieKey)) continue;
 
-                const cachedData = await getCachedMetadata('movie', imdbId, item.addonId);
+                const cachedData = await getCachedMetadata('movie', imdbId);
                 if (!cachedData?.basicContent) continue;
 
                 const pausedAt = new Date(item.paused_at).getTime();
@@ -743,7 +743,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   continue;
                 }
 
-                const cachedData = await getCachedMetadata('series', showImdb, item.addonId);
+                const cachedData = await getCachedMetadata('series', showImdb);
                 if (!cachedData?.basicContent) continue;
 
                 traktBatch.push({
@@ -1204,41 +1204,40 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
         }
       ]}>
-          {(() => {
-            const isUpNext = item.type === 'series' && item.progress === 0;
-            return (
-              <View style={styles.titleRow}>
-                <Text
-                  style={[
-                    styles.contentTitle,
-                    {
-                      color: currentTheme.colors.highEmphasis,
-                      fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
-                    }
-                  ]}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-                {isUpNext && (
-                  <View style={[
-                    styles.progressBadge,
-                    {
-                      backgroundColor: currentTheme.colors.primary,
-                      paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
-                      paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
-                    }
-                  ]}>
-                    <Text style={[
-                      styles.progressText,
-                      { fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12 }
-                    ]}>Up Next</Text>
-                  </View>
-                )}
-              </View>
-            );
-          })()}
-        </View>
+        {(() => {
+          const isUpNext = item.type === 'series' && item.progress === 0;
+          return (
+            <View style={styles.titleRow}>
+              <Text
+                style={[
+                  styles.contentTitle,
+                  {
+                    color: currentTheme.colors.highEmphasis,
+                    fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16
+                  }
+                ]}
+                numberOfLines={1}
+              >
+                {item.name}
+              </Text>
+              {isUpNext && (
+                <View style={[
+                  styles.progressBadge,
+                  {
+                    backgroundColor: currentTheme.colors.primary,
+                    paddingHorizontal: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8,
+                    paddingVertical: isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 3
+                  }
+                ]}>
+                  <Text style={[
+                    styles.progressText,
+                    { fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12 }
+                  ]}>Up Next</Text>
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Episode Info or Year */}
         {(() => {

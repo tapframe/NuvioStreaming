@@ -53,7 +53,7 @@ const TraktSettingsScreen: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState<TraktUser | null>(null);
   const { currentTheme } = useTheme();
-  
+
   const {
     settings: autosyncSettings,
     isSyncing,
@@ -101,7 +101,7 @@ const TraktSettingsScreen: React.FC = () => {
     try {
       const authenticated = await traktService.isAuthenticated();
       setIsAuthenticated(authenticated);
-      
+
       if (authenticated) {
         const profile = await traktService.getUserProfile();
         setUserProfile(profile);
@@ -151,8 +151,8 @@ const TraktSettingsScreen: React.FC = () => {
                   'Successfully Connected',
                   'Your Trakt account has been connected successfully.',
                   [
-                    { 
-                      label: 'OK', 
+                    {
+                      label: 'OK',
                       onPress: () => navigation.goBack(),
                     }
                   ]
@@ -190,9 +190,9 @@ const TraktSettingsScreen: React.FC = () => {
       'Sign Out',
       'Are you sure you want to sign out of your Trakt account?',
       [
-        { label: 'Cancel', onPress: () => {} },
-        { 
-          label: 'Sign Out', 
+        { label: 'Cancel', onPress: () => { } },
+        {
+          label: 'Sign Out',
           onPress: async () => {
             setIsLoading(true);
             try {
@@ -224,26 +224,39 @@ const TraktSettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <MaterialIcons 
-            name="arrow-back" 
-            size={24} 
-            color={isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark} 
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark}
           />
           <Text style={[styles.backText, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
             Settings
           </Text>
         </TouchableOpacity>
-        
+
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
         </View>
       </View>
-      
+
       <Text style={[styles.headerTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
         Trakt Settings
       </Text>
 
-      <ScrollView 
+      {/* Maintenance Mode Banner */}
+      {traktService.isMaintenanceMode() && (
+        <View style={styles.maintenanceBanner}>
+          <MaterialIcons name="engineering" size={24} color="#FFF" />
+          <View style={styles.maintenanceBannerTextContainer}>
+            <Text style={styles.maintenanceBannerTitle}>Under Maintenance</Text>
+            <Text style={styles.maintenanceBannerMessage}>
+              {traktService.getMaintenanceMessage()}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
@@ -255,12 +268,44 @@ const TraktSettingsScreen: React.FC = () => {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={currentTheme.colors.primary} />
             </View>
+          ) : traktService.isMaintenanceMode() ? (
+            <View style={styles.signInContainer}>
+              <TraktIcon
+                width={120}
+                height={120}
+                style={[styles.traktLogo, { opacity: 0.5 }]}
+              />
+              <Text style={[
+                styles.signInTitle,
+                { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
+              ]}>
+                Trakt Unavailable
+              </Text>
+              <Text style={[
+                styles.signInDescription,
+                { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
+              ]}>
+                The Trakt integration is temporarily paused for maintenance. All syncing and authentication is disabled until maintenance is complete.
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  { backgroundColor: currentTheme.colors.border, opacity: 0.6 }
+                ]}
+                disabled={true}
+              >
+                <MaterialIcons name="engineering" size={20} color={currentTheme.colors.mediumEmphasis} style={{ marginRight: 8 }} />
+                <Text style={[styles.buttonText, { color: currentTheme.colors.mediumEmphasis }]}>
+                  Service Under Maintenance
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : isAuthenticated && userProfile ? (
             <View style={styles.profileContainer}>
               <View style={styles.profileHeader}>
                 {userProfile.avatar ? (
-                  <FastImage 
-                    source={{ uri: userProfile.avatar }} 
+                  <FastImage
+                    source={{ uri: userProfile.avatar }}
                     style={styles.avatar}
                     resizeMode={FastImage.resizeMode.cover}
                   />
@@ -315,7 +360,7 @@ const TraktSettingsScreen: React.FC = () => {
             </View>
           ) : (
             <View style={styles.signInContainer}>
-              <TraktIcon 
+              <TraktIcon
                 width={120}
                 height={120}
                 style={styles.traktLogo}
@@ -497,7 +542,7 @@ const TraktSettingsScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
-      
+
       <CustomAlert
         visible={alertVisible}
         title={alertTitle}
@@ -703,6 +748,31 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  // Maintenance mode styles
+  maintenanceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E67E22',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+  },
+  maintenanceBannerTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  maintenanceBannerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  maintenanceBannerMessage: {
+    fontSize: 13,
+    color: '#FFF',
+    opacity: 0.9,
   },
 });
 

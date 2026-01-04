@@ -577,12 +577,26 @@ export type TraktContentCommentLegacy =
   | TraktEpisodeComment
   | TraktListComment;
 
+
+const TRAKT_MAINTENANCE_MODE = true;
+const TRAKT_MAINTENANCE_MESSAGE = 'Trakt integration is temporarily unavailable for maintenance. Please try again later.';
+
 export class TraktService {
   private static instance: TraktService;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private tokenExpiry: number = 0;
   private isInitialized: boolean = false;
+
+
+  public isMaintenanceMode(): boolean {
+    return TRAKT_MAINTENANCE_MODE;
+  }
+
+
+  public getMaintenanceMessage(): string {
+    return TRAKT_MAINTENANCE_MESSAGE;
+  }
 
   // Rate limiting - Optimized for real-time scrobbling
   private lastApiCall: number = 0;
@@ -726,6 +740,12 @@ export class TraktService {
    * Check if the user is authenticated with Trakt
    */
   public async isAuthenticated(): Promise<boolean> {
+    // During maintenance, report as not authenticated to disable all syncing
+    if (this.isMaintenanceMode()) {
+      logger.log('[TraktService] Maintenance mode: reporting as not authenticated');
+      return false;
+    }
+
     await this.ensureInitialized();
 
     if (!this.accessToken) {
@@ -756,6 +776,12 @@ export class TraktService {
    * Exchange the authorization code for an access token
    */
   public async exchangeCodeForToken(code: string, codeVerifier: string): Promise<boolean> {
+    // Block authentication during maintenance
+    if (this.isMaintenanceMode()) {
+      logger.warn('[TraktService] Maintenance mode: blocking new authentication');
+      return false;
+    }
+
     await this.ensureInitialized();
 
     try {
@@ -887,6 +913,12 @@ export class TraktService {
     body?: any,
     retryCount: number = 0
   ): Promise<T> {
+    // Block all API requests during maintenance
+    if (this.isMaintenanceMode()) {
+      logger.warn('[TraktService] Maintenance mode: blocking API request to', endpoint);
+      throw new Error(TRAKT_MAINTENANCE_MESSAGE);
+    }
+
     await this.ensureInitialized();
 
     // Rate limiting: ensure minimum interval between API calls
@@ -1106,10 +1138,10 @@ export class TraktService {
         ? imdbId
         : `tt${imdbId}`;
 
-      const response = await this.client.get('/sync/watched/movies');
-      const movies = Array.isArray(response.data) ? response.data : [];
+      const movies = await this.apiRequest<any[]>('/sync/watched/movies');
+      const moviesArray = Array.isArray(movies) ? movies : [];
 
-      return movies.some(
+      return moviesArray.some(
         (m: any) => m.movie?.ids?.imdb === imdb
       );
     } catch (err) {

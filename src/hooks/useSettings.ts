@@ -92,6 +92,7 @@ export interface AppSettings {
   tmdbEnrichMovieDetails: boolean; // Show movie details (budget, revenue, tagline, etc.)
   tmdbEnrichTvDetails: boolean; // Show TV details (status, seasons count, networks, etc.)
   tmdbEnrichCollections: boolean; // Show movie collections/franchises
+  tmdbEnrichTitleDescription: boolean; // Use TMDB title/description (overrides addon when localization enabled)
   // Trakt integration
   showTraktComments: boolean; // Show Trakt comments in metadata screens
   // Continue Watching behavior
@@ -176,6 +177,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tmdbEnrichMovieDetails: true,
   tmdbEnrichTvDetails: true,
   tmdbEnrichCollections: true,
+  tmdbEnrichTitleDescription: true, // Enabled by default for backward compatibility
   // Trakt integration
   showTraktComments: true, // Show Trakt comments by default when authenticated
   // Continue Watching behavior
