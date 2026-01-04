@@ -39,6 +39,7 @@ interface ContinueWatchingItem extends StreamingContent {
   addonPoster?: string;
   addonName?: string;
   addonDescription?: string;
+  traktPlaybackId?: number; // Trakt playback ID for removal
 }
 
 // Define the ref interface
@@ -652,6 +653,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   progress: item.progress,
                   lastUpdated: pausedAt,
                   addonId: undefined,
+                  traktPlaybackId: item.id, // Store playback ID for removal
                 } as ContinueWatchingItem);
 
                 logger.log(`📺 [TraktPlayback] Adding movie ${item.movie.title} with ${item.progress.toFixed(1)}% progress`);
@@ -680,6 +682,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   episode: item.episode.number,
                   episodeTitle: item.episode.title || `Episode ${item.episode.number}`,
                   addonId: undefined,
+                  traktPlaybackId: item.id, // Store playback ID for removal
                 } as ContinueWatchingItem);
 
                 logger.log(`📺 [TraktPlayback] Adding ${item.show.title} S${item.episode.season}E${item.episode.number} with ${item.progress.toFixed(1)}% progress`);
@@ -934,7 +937,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }, [navigation, settings.useCachedStreams, settings.openMetadataScreenWhenCacheDisabled]);
 
   // Handle long press to delete (moved before renderContinueWatchingItem)
-  const handleLongPress = useCallback((item: ContinueWatchingItem) => {
+  const handleLongPress = useCallback(async (item: ContinueWatchingItem) => {
     try {
       // Trigger haptic feedback
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -942,8 +945,17 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // Ignore haptic errors
     }
 
+    const traktService = TraktService.getInstance();
+    const isAuthed = await traktService.isAuthenticated();
+
     setAlertTitle('Remove from Continue Watching');
-    setAlertMessage(`Remove "${item.name}" from your continue watching list?`);
+
+    if (isAuthed) {
+      setAlertMessage(`Remove "${item.name}" from your continue watching list?\n\nThis will also remove it from your Trakt Continue Watching.`);
+    } else {
+      setAlertMessage(`Remove "${item.name}" from your continue watching list?`);
+    }
+
     setAlertActions([
       {
         label: 'Cancel',
@@ -958,11 +970,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           try {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             await storageService.removeAllWatchProgressForContent(item.id, item.type, { addBaseTombstone: true });
-            const traktService = TraktService.getInstance();
-            const isAuthed = await traktService.isAuthenticated();
+
             if (isAuthed) {
               let traktResult = false;
-              if (item.type === 'movie') {
+              // If we have a playback ID (from sync/playback), use that to remove from Continue Watching
+              if (item.traktPlaybackId) {
+                traktResult = await traktService.removePlaybackItem(item.traktPlaybackId);
+              } else if (item.type === 'movie') {
                 traktResult = await traktService.removeMovieFromHistory(item.id);
               } else if (item.type === 'series' && item.season !== undefined && item.episode !== undefined) {
                 traktResult = await traktService.removeEpisodeFromHistory(item.id, item.season, item.episode);

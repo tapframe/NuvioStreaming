@@ -2723,6 +2723,26 @@ export class TraktService {
   }
 
   /**
+   * Remove a playback item from Trakt (Continue Watching) by Playback ID
+   */
+  public async removePlaybackItem(playbackId: number): Promise<boolean> {
+    try {
+      logger.log(`🔍 [TraktService] removePlaybackItem called for playback ID: ${playbackId}`);
+      if (!playbackId) return false;
+
+      // Use DELETE /sync/playback/{id}
+      // Note: The ID here is the playback ID, not the movie/episode ID
+      await this.apiRequest<any>(`/sync/playback/${playbackId}`, 'DELETE');
+
+      logger.log(`✅ [TraktService] Successfully removed playback item ${playbackId}. Response: 204 No Content (Standard for DELETE)`);
+      return true;
+    } catch (error) {
+      logger.error(`[TraktService] Failed to remove playback item ${playbackId}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Remove entire show from watched history by IMDB ID
    */
   public async removeShowFromHistory(imdbId: string): Promise<boolean> {

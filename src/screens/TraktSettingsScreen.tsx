@@ -417,7 +417,7 @@ const TraktSettingsScreen: React.FC = () => {
                   styles.infoText,
                   { color: currentTheme.colors.mediumEmphasis }
                 ]}>
-                  When connected to Trakt, Continue Watching is sourced from Trakt. Account sync for watch progress is disabled to avoid conflicts.
+                  When connected to Trakt, full history is synced directly from the API and is not written to local storage. Your Continue Watching list reflects your global Trakt progress.
                 </Text>
               </View>
               <View style={styles.settingItem}>
