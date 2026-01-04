@@ -578,7 +578,7 @@ export type TraktContentCommentLegacy =
   | TraktListComment;
 
 
-const TRAKT_MAINTENANCE_MODE = true;
+const TRAKT_MAINTENANCE_MODE = false;
 const TRAKT_MAINTENANCE_MESSAGE = 'Trakt integration is temporarily unavailable for maintenance. Please try again later.';
 
 export class TraktService {
