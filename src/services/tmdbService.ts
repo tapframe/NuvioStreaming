@@ -850,9 +850,9 @@ export class TMDBService {
   }
 
   /**
-   * Get external IDs for a TV show (including IMDb ID)
+   * Get external IDs for a TV show (including IMDb ID and TVDB ID)
    */
-  async getShowExternalIds(tmdbId: number): Promise<{ imdb_id: string | null } | null> {
+  async getShowExternalIds(tmdbId: number): Promise<{ imdb_id: string | null, tvdb_id?: number | null, [key: string]: any } | null> {
     const cacheKey = this.generateCacheKey(`tv_${tmdbId}_external_ids`);
     
     // Check cache (local or remote)

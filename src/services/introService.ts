@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
+import { tmdbService } from './tmdbService';
 
 /**
  * IntroDB API service for fetching TV show intro timestamps
@@ -43,6 +44,56 @@ async function getMalIdFromKitsu(kitsuId: string): Promise<string | null> {
         }
     } catch (error) {
         logger.warn('[IntroService] Failed to fetch MAL ID from Kitsu:', error);
+    }
+    return null;
+}
+
+async function getMalIdFromImdb(imdbId: string): Promise<string | null> {
+    try {
+        // 1. Try direct Kitsu mapping (IMDb -> Kitsu)
+        const kitsuDirectResponse = await axios.get(`${KITSU_API_URL}/mappings`, {
+            params: {
+                'filter[external_site]': 'imdb',
+                'filter[external_id]': imdbId,
+                'include': 'item'
+            }
+        });
+
+        if (kitsuDirectResponse.data?.data?.length > 0) {
+            const kitsuId = kitsuDirectResponse.data.data[0].relationships?.item?.data?.id;
+            if (kitsuId) {
+                return await getMalIdFromKitsu(kitsuId);
+            }
+        }
+
+        // 2. Try TMDB -> TVDB -> Kitsu path (Robust for Cinemeta users)
+        const tmdbId = await tmdbService.findTMDBIdByIMDB(imdbId);
+        
+        if (tmdbId) {
+            const extIds = await tmdbService.getShowExternalIds(tmdbId);
+            const tvdbId = extIds?.tvdb_id;
+            
+            if (tvdbId) {
+                // Search Kitsu for TVDB mapping
+                const kitsuTvdbResponse = await axios.get(`${KITSU_API_URL}/mappings`, {
+                    params: {
+                        'filter[external_site]': 'thetvdb/series',
+                        'filter[external_id]': tvdbId.toString(),
+                        'include': 'item'
+                    }
+                });
+
+                if (kitsuTvdbResponse.data?.data?.length > 0) {
+                    const kitsuId = kitsuTvdbResponse.data.data[0].relationships?.item?.data?.id;
+                    if (kitsuId) {
+                        logger.log(`[IntroService] Resolved Kitsu ID ${kitsuId} from TVDB ID ${tvdbId} (via IMDb ${imdbId})`);
+                        return await getMalIdFromKitsu(kitsuId);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        // Silent fail - it might just not be an anime or API limit reached
     }
     return null;
 }
@@ -127,6 +178,12 @@ export async function getSkipTimes(
     if (!finalMalId && kitsuId) {
         logger.log(`[IntroService] Resolving MAL ID from Kitsu ID: ${kitsuId}`);
         finalMalId = await getMalIdFromKitsu(kitsuId) || undefined;
+    }
+
+    // If we still don't have MAL ID but have IMDb ID (e.g. Cinemeta), try to resolve it
+    if (!finalMalId && imdbId) {
+        logger.log(`[IntroService] Attempting to resolve MAL ID from IMDb ID: ${imdbId}`);
+        finalMalId = await getMalIdFromImdb(imdbId) || undefined;
     }
 
     if (finalMalId) {
