@@ -376,7 +376,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         const [type, id, ...episodeIdParts] = keyParts;
         const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
-        const progressPercent = (progress.currentTime / progress.duration) * 100;
+        const progressPercent =
+          progress.duration > 0
+            ? (progress.currentTime / progress.duration) * 100
+                : 0;
         // Skip fully watched movies
         if (type === 'movie' && progressPercent >= 85) continue;
         // Skip movies with no actual progress (ensure > 0%)
