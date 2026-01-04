@@ -1157,27 +1157,37 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               // Use just the language code (e.g., 'ar', not 'ar-US') for TMDB API
               const lang = settings.tmdbLanguagePreference || 'en';
               const seasons = Object.keys(groupedAddonEpisodes).map(Number);
-              for (const seasonNum of seasons) {
-                const seasonEps = groupedAddonEpisodes[seasonNum];
-                // Parallel fetch a reasonable batch (limit concurrency implicitly by season)
-                const localized = await Promise.all(
-                  seasonEps.map(async ep => {
-                    try {
-                      const data = await tmdbService.getEpisodeDetails(Number(tmdbIdToUse), seasonNum, ep.episode_number, lang);
-                      if (data) {
+
+              // Fetch all seasons in parallel (much faster than fetching each episode individually)
+              const seasonPromises = seasons.map(async seasonNum => {
+                try {
+                  // getSeasonDetails returns all episodes for a season in one call
+                  const seasonData = await tmdbService.getSeasonDetails(Number(tmdbIdToUse), seasonNum, undefined, lang);
+                  if (seasonData && seasonData.episodes) {
+                    // Create a map of episode number -> localized data for fast lookup
+                    const localizedMap = new Map<number, { name: string; overview: string }>();
+                    for (const ep of seasonData.episodes) {
+                      localizedMap.set(ep.episode_number, { name: ep.name, overview: ep.overview });
+                    }
+
+                    // Merge localized data into addon episodes
+                    groupedAddonEpisodes[seasonNum] = groupedAddonEpisodes[seasonNum].map(ep => {
+                      const localized = localizedMap.get(ep.episode_number);
+                      if (localized) {
                         return {
                           ...ep,
-                          name: data.name || ep.name,
-                          overview: data.overview || ep.overview,
+                          name: localized.name || ep.name,
+                          overview: localized.overview || ep.overview,
                         };
                       }
-                    } catch { }
-                    return ep;
-                  })
-                );
-                groupedAddonEpisodes[seasonNum] = localized;
-              }
-              if (__DEV__) logger.log('[useMetadata] merged localized episode names/overviews from TMDB');
+                      return ep;
+                    });
+                  }
+                } catch { }
+              });
+
+              await Promise.all(seasonPromises);
+              if (__DEV__) logger.log('[useMetadata] merged localized episode names/overviews from TMDB (batch)');
             }
           } catch (e) {
             if (__DEV__) console.log('[useMetadata] failed to merge localized episode text', e);

@@ -489,9 +489,18 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     };
   }, []);
 
-  // Add effect to scroll to selected season
+  // Track previous season to only scroll when it actually changes
+  const previousSeasonRef = React.useRef<number | null>(null);
+
+  // Add effect to scroll to selected season (only when season changes, not on every groupedEpisodes update)
   useEffect(() => {
     if (selectedSeason && seasonScrollViewRef.current && Object.keys(groupedEpisodes).length > 0) {
+      // Only scroll if the season actually changed (not just groupedEpisodes update)
+      if (previousSeasonRef.current === selectedSeason) {
+        return; // Season didn't change, don't scroll
+      }
+      previousSeasonRef.current = selectedSeason;
+
       // Find the index of the selected season
       const seasons = Object.keys(groupedEpisodes).map(Number).sort((a, b) => a - b);
       const selectedIndex = seasons.findIndex(season => season === selectedSeason);
