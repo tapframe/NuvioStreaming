@@ -376,7 +376,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         const [type, id, ...episodeIdParts] = keyParts;
         const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
         const progress = allProgress[key];
-        const progressPercent = (progress.currentTime / progress.duration) * 100;
+        const progressPercent =
+          progress.duration > 0
+            ? (progress.currentTime / progress.duration) * 100
+                : 0;
         // Skip fully watched movies
         if (type === 'movie' && progressPercent >= 85) continue;
         // Skip movies with no actual progress (ensure > 0%)
@@ -469,7 +472,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           // Skip movies that are already watched on Trakt
           if (group.type === 'movie') {
             const watchedSet = await traktMoviesSetPromise;
-            if (watchedSet.has(group.id)) {
+            const imdbId = group.id.startsWith('tt')
+              ? group.id
+              : `tt${group.id}`;
+            if (watchedSet.has(imdbId)) {
               // Optional: sync local store to watched to prevent reappearance
               try {
                 await storageService.setWatchProgress(group.id, 'movie', {
@@ -1198,7 +1204,6 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           padding: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
         }
       ]}>
-        <View style={styles.titleRow}>
           {(() => {
             const isUpNext = item.type === 'series' && item.progress === 0;
             return (
