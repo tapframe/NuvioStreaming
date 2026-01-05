@@ -153,6 +153,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
               color: currentTheme.colors.textMuted,
               fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
               marginRight: isTV ? 6 : isLargeTablet ? 5 : 4,
+              marginLeft: 6
             }
           ]}>View All</Text>
           <MaterialIcons
