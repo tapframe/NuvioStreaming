@@ -667,7 +667,9 @@ const HomeScreen = () => {
     }
 
     // Normal flow when addons are present (featured moved to ListHeaderComponent)
-    data.push({ type: 'thisWeek', key: 'thisWeek' });
+    if (settings.showThisWeekSection) {
+      data.push({ type: 'thisWeek', key: 'thisWeek' });
+    }
 
     // Only show a limited number of catalogs initially for performance
     const catalogsToShow = catalogs.slice(0, visibleCatalogCount);
@@ -687,7 +689,7 @@ const HomeScreen = () => {
     }
 
     return data;
-  }, [hasAddons, catalogs, visibleCatalogCount]);
+  }, [hasAddons, catalogs, visibleCatalogCount, settings.showThisWeekSection]);
 
   const handleLoadMoreCatalogs = useCallback(() => {
     setVisibleCatalogCount(prev => Math.min(prev + 3, catalogs.length));

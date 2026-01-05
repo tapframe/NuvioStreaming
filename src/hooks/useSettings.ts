@@ -37,6 +37,7 @@ export interface AppSettings {
   useExternalPlayer: boolean;
   preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'infuse_livecontainer' | 'external';
   showHeroSection: boolean;
+  showThisWeekSection: boolean; // Toggle "This Week" section
   featuredContentSource: 'tmdb' | 'catalogs';
   heroStyle: 'legacy' | 'carousel' | 'appletv';
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
@@ -123,6 +124,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useExternalPlayer: false,
   preferredPlayer: 'internal',
   showHeroSection: true,
+  showThisWeekSection: true, // Enabled by default
   featuredContentSource: 'catalogs',
   heroStyle: 'appletv',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
