@@ -300,8 +300,8 @@ const OnboardingScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" translucent />
 
       <View style={styles.fullScreenContainer}>
-        {/* Shape Animation Background */}
-        <ShapeAnimation scrollX={scrollX} />
+        {/* Shape Animation Background - iOS only */}
+        {Platform.OS === 'ios' && <ShapeAnimation scrollX={scrollX} />}
 
         {/* Header */}
         <Animated.View
@@ -417,12 +417,12 @@ const styles = StyleSheet.create({
   slide: {
     width,
     flex: 1,
-    justifyContent: 'flex-start', // Align to top
+    justifyContent: Platform.OS === 'ios' ? 'flex-start' : 'center', // Top on iOS, center on Android
     paddingHorizontal: 32,
-    paddingTop: '20%', // Push text down slightly from header
+    paddingTop: Platform.OS === 'ios' ? '20%' : 0, // Padding only on iOS
   },
   textContainer: {
-    alignItems: 'flex-start',
+    alignItems: 'flex-start', // Text always left-aligned
   },
   title: {
     fontSize: 52,
@@ -444,6 +444,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: 'rgba(255, 255, 255, 0.4)',
     maxWidth: 300,
+    textAlign: 'left', // Always left-aligned text
   },
   footer: {
     paddingHorizontal: 24,
