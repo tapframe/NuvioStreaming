@@ -53,7 +53,7 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
       if (Platform.OS === 'ios') {
         StatusBar.setHidden(false);
       }
-    } catch {}
+    } catch { }
   }, [colors.darkBackground]);
 
   const handleBack = useCallback(() => {
@@ -97,22 +97,22 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
     />
   );
 
-  const SettingItem = ({ 
-    title, 
-    description, 
-    value, 
-    onValueChange, 
-    isLast = false 
-  }: { 
-    title: string; 
-    description: string; 
-    value: boolean; 
+  const SettingItem = ({
+    title,
+    description,
+    value,
+    onValueChange,
+    isLast = false
+  }: {
+    title: string;
+    description: string;
+    value: boolean;
     onValueChange: (value: boolean) => void;
     isLast?: boolean;
   }) => (
     <View style={[
       styles.settingItem,
-      { 
+      {
         borderBottomColor: isLast ? 'transparent' : colors.border,
       }
     ]}>
@@ -159,10 +159,10 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.darkBackground }]}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={handleBack}
         >
@@ -170,13 +170,13 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
           <Text style={styles.backText}>Settings</Text>
         </TouchableOpacity>
       </View>
-      
+
       <Text style={styles.headerTitle}>
         Continue Watching
       </Text>
 
       {/* Content */}
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
@@ -184,22 +184,98 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>PLAYBACK BEHAVIOR</Text>
           <View style={styles.settingsCard}>
-          <SettingItem
-            title="Use Cached Streams"
-            description="When enabled, clicking Continue Watching items will open the player directly using previously played streams. When disabled, opens a content screen instead."
-            value={settings.useCachedStreams}
-            onValueChange={(value) => handleUpdateSetting('useCachedStreams', value)}
-            isLast={!settings.useCachedStreams}
-          />
-          {!settings.useCachedStreams && (
             <SettingItem
-              title="Open Metadata Screen"
-              description="When cached streams are disabled, open the Metadata screen instead of the Streams screen. This shows content details and allows manual stream selection."
-              value={settings.openMetadataScreenWhenCacheDisabled}
-              onValueChange={(value) => handleUpdateSetting('openMetadataScreenWhenCacheDisabled', value)}
-              isLast={true}
+              title="Use Cached Streams"
+              description="When enabled, clicking Continue Watching items will open the player directly using previously played streams. When disabled, opens a content screen instead."
+              value={settings.useCachedStreams}
+              onValueChange={(value) => handleUpdateSetting('useCachedStreams', value)}
+              isLast={!settings.useCachedStreams}
             />
-          )}
+            {!settings.useCachedStreams && (
+              <SettingItem
+                title="Open Metadata Screen"
+                description="When cached streams are disabled, open the Metadata screen instead of the Streams screen. This shows content details and allows manual stream selection."
+                value={settings.openMetadataScreenWhenCacheDisabled}
+                onValueChange={(value) => handleUpdateSetting('openMetadataScreenWhenCacheDisabled', value)}
+                isLast={true}
+              />
+            )}
+          </View>
+        </View>
+
+        {/* Card Appearance Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>CARD APPEARANCE</Text>
+          <View style={styles.settingsCard}>
+            <View style={[styles.settingItem, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
+              <Text style={[styles.settingTitle, { color: colors.highEmphasis, marginBottom: 8 }]}>
+                Card Style
+              </Text>
+              <Text style={[styles.settingDescription, { color: colors.mediumEmphasis, marginBottom: 16 }]}>
+                Choose how Continue Watching items appear on the home screen
+              </Text>
+              <View style={styles.cardStyleOptionsContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.cardStyleOption,
+                    {
+                      backgroundColor: settings.continueWatchingCardStyle === 'wide' ? colors.primary : colors.elevation1,
+                      borderColor: settings.continueWatchingCardStyle === 'wide' ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => handleUpdateSetting('continueWatchingCardStyle', 'wide')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardPreviewWide}>
+                    <View style={[styles.cardPreviewImage, { backgroundColor: colors.mediumGray }]} />
+                    <View style={styles.cardPreviewContent}>
+                      <View style={[styles.cardPreviewLine, { backgroundColor: colors.highEmphasis, width: '70%' }]} />
+                      <View style={[styles.cardPreviewLine, { backgroundColor: colors.mediumEmphasis, width: '50%', height: 6 }]} />
+                      <View style={[styles.cardPreviewProgress, { backgroundColor: colors.elevation2 }]}>
+                        <View style={[styles.cardPreviewProgressFill, { backgroundColor: colors.primary, width: '60%' }]} />
+                      </View>
+                    </View>
+                  </View>
+                  <Text style={[
+                    styles.cardStyleLabel,
+                    { color: settings.continueWatchingCardStyle === 'wide' ? colors.white : colors.highEmphasis }
+                  ]}>
+                    Wide
+                  </Text>
+                  {settings.continueWatchingCardStyle === 'wide' && (
+                    <MaterialIcons name="check-circle" size={18} color={colors.white} style={styles.cardStyleCheck} />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.cardStyleOption,
+                    {
+                      backgroundColor: settings.continueWatchingCardStyle === 'poster' ? colors.primary : colors.elevation1,
+                      borderColor: settings.continueWatchingCardStyle === 'poster' ? colors.primary : colors.border,
+                    }
+                  ]}
+                  onPress={() => handleUpdateSetting('continueWatchingCardStyle', 'poster')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardPreviewPoster}>
+                    <View style={[styles.cardPreviewPosterImage, { backgroundColor: colors.mediumGray }]} />
+                    <View style={[styles.cardPreviewPosterProgress, { backgroundColor: colors.elevation2 }]}>
+                      <View style={[styles.cardPreviewProgressFill, { backgroundColor: colors.primary, width: '45%' }]} />
+                    </View>
+                  </View>
+                  <Text style={[
+                    styles.cardStyleLabel,
+                    { color: settings.continueWatchingCardStyle === 'poster' ? colors.white : colors.highEmphasis }
+                  ]}>
+                    Poster
+                  </Text>
+                  {settings.continueWatchingCardStyle === 'poster' && (
+                    <MaterialIcons name="check-circle" size={18} color={colors.white} style={styles.cardStyleCheck} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -207,80 +283,80 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>CACHE SETTINGS</Text>
             <View style={styles.settingsCard}>
-            <View style={[styles.settingItem, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
-              <Text style={[styles.settingTitle, { color: colors.highEmphasis, marginBottom: 8 }]}>
-                Stream Cache Duration
-              </Text>
-              <Text style={[styles.settingDescription, { color: colors.mediumEmphasis, marginBottom: 16 }]}>
-                How long to keep cached stream links before they expire
-              </Text>
-              <View style={styles.ttlOptionsContainer}>
-                {TTL_OPTIONS.map((row, rowIndex) => (
-                  <View key={rowIndex} style={styles.ttlRow}>
-                    {row.map((option) => (
-                      <TTLPickerItem key={option.value} option={option} />
-                    ))}
-                  </View>
-                ))}
+              <View style={[styles.settingItem, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
+                <Text style={[styles.settingTitle, { color: colors.highEmphasis, marginBottom: 8 }]}>
+                  Stream Cache Duration
+                </Text>
+                <Text style={[styles.settingDescription, { color: colors.mediumEmphasis, marginBottom: 16 }]}>
+                  How long to keep cached stream links before they expire
+                </Text>
+                <View style={styles.ttlOptionsContainer}>
+                  {TTL_OPTIONS.map((row, rowIndex) => (
+                    <View key={rowIndex} style={styles.ttlRow}>
+                      {row.map((option) => (
+                        <TTLPickerItem key={option.value} option={option} />
+                      ))}
+                    </View>
+                  ))}
+                </View>
               </View>
             </View>
-          </View>
           </View>
         )}
 
         {settings.useCachedStreams && (
           <View style={styles.section}>
             <View style={[styles.warningCard, { borderColor: colors.warning }]}>
-            <View style={styles.warningHeader}>
-              <MaterialIcons name="warning" size={20} color={colors.warning} />
-              <Text style={[styles.warningTitle, { color: colors.warning }]}>
-                Important Note
+              <View style={styles.warningHeader}>
+                <MaterialIcons name="warning" size={20} color={colors.warning} />
+                <Text style={[styles.warningTitle, { color: colors.warning }]}>
+                  Important Note
+                </Text>
+              </View>
+              <Text style={[styles.warningText, { color: colors.mediumEmphasis }]}>
+                Not all stream links may remain active for the full cache duration. Longer cache times may result in expired links. If a cached link fails, the app will fall back to fetching fresh streams.
               </Text>
-            </View>
-            <Text style={[styles.warningText, { color: colors.mediumEmphasis }]}>
-              Not all stream links may remain active for the full cache duration. Longer cache times may result in expired links. If a cached link fails, the app will fall back to fetching fresh streams.
-            </Text>
             </View>
           </View>
         )}
 
         <View style={styles.section}>
           <View style={styles.infoCard}>
-          <View style={styles.infoHeader}>
-            <MaterialIcons name="info" size={20} color={colors.primary} />
-            <Text style={[styles.infoTitle, { color: colors.highEmphasis }]}>
-              How it works
+            <View style={styles.infoHeader}>
+              <MaterialIcons name="info" size={20} color={colors.primary} />
+              <Text style={[styles.infoTitle, { color: colors.highEmphasis }]}>
+                How it works
+              </Text>
+            </View>
+            <Text style={[styles.infoText, { color: colors.mediumEmphasis }]}>
+              {settings.useCachedStreams ? (
+                <>
+                  • Streams are cached for your selected duration after playing{'\n'}
+                  • Cached streams are validated before use{'\n'}
+                  • If cache is invalid or expired, falls back to content screen{'\n'}
+                  • "Use Cached Streams" controls direct player vs screen navigation{'\n'}
+                  • "Open Metadata Screen" appears only when cached streams are disabled
+                </>
+              ) : (
+                <>
+                  • When cached streams are disabled, clicking Continue Watching items opens content screens{'\n'}
+                  • "Open Metadata Screen" option controls which screen to open{'\n'}
+                  • Metadata screen shows content details and allows manual stream selection{'\n'}
+                  • Streams screen shows available streams for immediate playback
+                </>
+              )}
             </Text>
-          </View>
-          <Text style={[styles.infoText, { color: colors.mediumEmphasis }]}>
-            {settings.useCachedStreams ? (
-              <>
-                • Streams are cached for your selected duration after playing{'\n'}
-                • Cached streams are validated before use{'\n'}
-                • If cache is invalid or expired, falls back to content screen{'\n'}
-                • "Use Cached Streams" controls direct player vs screen navigation{'\n'}
-                • "Open Metadata Screen" appears only when cached streams are disabled
-              </>
-            ) : (
-              <>
-                • When cached streams are disabled, clicking Continue Watching items opens content screens{'\n'}
-                • "Open Metadata Screen" option controls which screen to open{'\n'}
-                • Metadata screen shows content details and allows manual stream selection{'\n'}
-                • Streams screen shows available streams for immediate playback
-              </>
-            )}
-          </Text>
           </View>
         </View>
       </ScrollView>
 
       {/* Saved indicator */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.savedIndicator,
-          { 
+          {
             backgroundColor: colors.primary,
-            opacity: fadeAnim 
+            opacity: fadeAnim
           }
         ]}
       >
@@ -465,6 +541,84 @@ const createStyles = (colors: any) => StyleSheet.create({
   warningText: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  // Card Style Selector Styles
+  cardStyleOptionsContainer: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: 12,
+  },
+  cardStyleOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    position: 'relative',
+  },
+  cardPreviewWide: {
+    flexDirection: 'row',
+    width: 100,
+    height: 60,
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 8,
+    alignSelf: 'center',
+  },
+  cardPreviewImage: {
+    width: 40,
+    height: '100%',
+    borderTopLeftRadius: 6,
+    borderBottomLeftRadius: 6,
+  },
+  cardPreviewContent: {
+    flex: 1,
+    padding: 4,
+    justifyContent: 'space-between',
+  },
+  cardPreviewLine: {
+    height: 8,
+    borderRadius: 2,
+  },
+  cardPreviewProgress: {
+    height: 4,
+    borderRadius: 2,
+    width: '100%',
+  },
+  cardPreviewProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  cardPreviewPoster: {
+    width: 44,
+    height: 60,
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 8,
+    position: 'relative',
+  },
+  cardPreviewPosterImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 6,
+  },
+  cardPreviewPosterProgress: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+  },
+  cardStyleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  cardStyleCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
   },
 });
 

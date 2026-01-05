@@ -1002,8 +1002,128 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     setAlertVisible(true);
   }, [currentTheme.colors.error]);
 
-  // Memoized render function for continue watching items
-  const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
+  // Compute poster dimensions for poster-style cards
+  const computedPosterWidth = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 180;
+      case 'largeTablet':
+        return 160;
+      case 'tablet':
+        return 140;
+      default:
+        return 120;
+    }
+  }, [deviceType]);
+
+  const computedPosterHeight = useMemo(() => {
+    return computedPosterWidth * 1.5; // 2:3 aspect ratio
+  }, [computedPosterWidth]);
+
+  // Memoized render function for poster-style continue watching items
+  const renderPosterStyleItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
+    <TouchableOpacity
+      style={[
+        styles.posterContentItem,
+        {
+          width: computedPosterWidth,
+        }
+      ]}
+      activeOpacity={0.8}
+      onPress={() => handleContentPress(item)}
+      onLongPress={() => handleLongPress(item)}
+      delayLongPress={800}
+    >
+      {/* Poster Image */}
+      <View style={[
+        styles.posterImageContainer,
+        {
+          height: computedPosterHeight,
+          borderRadius: settings.posterBorderRadius ?? 12,
+        }
+      ]}>
+        <FastImage
+          source={{
+            uri: item.poster || 'https://via.placeholder.com/300x450',
+            priority: FastImage.priority.high,
+            cache: FastImage.cacheControl.immutable
+          }}
+          style={[styles.posterImage, { borderRadius: settings.posterBorderRadius ?? 12 }]}
+          resizeMode={FastImage.resizeMode.cover}
+        />
+
+        {/* Gradient overlay */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.8)']}
+          style={[styles.posterGradient, { borderRadius: settings.posterBorderRadius ?? 12 }]}
+        />
+
+        {/* Episode Info Overlay */}
+        {item.type === 'series' && item.season && item.episode && (
+          <View style={styles.posterEpisodeOverlay}>
+            <Text style={[styles.posterEpisodeText, { fontSize: isTV ? 14 : isLargeTablet ? 13 : 12 }]}>
+              S{item.season} E{item.episode}
+            </Text>
+          </View>
+        )}
+
+        {/* Up Next Badge */}
+        {item.type === 'series' && item.progress === 0 && (
+          <View style={[styles.posterUpNextBadge, { backgroundColor: currentTheme.colors.primary }]}>
+            <Text style={[styles.posterUpNextText, { fontSize: isTV ? 12 : 10 }]}>UP NEXT</Text>
+          </View>
+        )}
+
+        {/* Progress Bar */}
+        {item.progress > 0 && (
+          <View style={styles.posterProgressContainer}>
+            <View style={[styles.posterProgressTrack, { backgroundColor: 'rgba(255,255,255,0.3)' }]}>
+              <View
+                style={[
+                  styles.posterProgressBar,
+                  {
+                    width: `${item.progress}%`,
+                    backgroundColor: currentTheme.colors.primary
+                  }
+                ]}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Delete Indicator Overlay */}
+        {deletingItemId === item.id && (
+          <View style={[styles.deletingOverlay, { borderRadius: settings.posterBorderRadius ?? 12 }]}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        )}
+      </View>
+
+      {/* Title below poster */}
+      <View style={styles.posterTitleContainer}>
+        <Text
+          style={[
+            styles.posterTitle,
+            {
+              color: currentTheme.colors.highEmphasis,
+              fontSize: isTV ? 16 : isLargeTablet ? 15 : 14
+            }
+          ]}
+          numberOfLines={2}
+        >
+          {item.name}
+        </Text>
+        {item.progress > 0 && (
+          <Text style={[styles.posterProgressLabel, { color: currentTheme.colors.textMuted, fontSize: isTV ? 13 : 11 }]}>
+            {Math.round(item.progress)}%
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedPosterWidth, computedPosterHeight, isTV, isLargeTablet, settings.posterBorderRadius]);
+
+  // Memoized render function for wide-style continue watching items
+  const renderWideStyleItem = useCallback(({ item }: { item: ContinueWatchingItem }) => (
     <TouchableOpacity
       style={[
         styles.wideContentItem,
@@ -1165,7 +1285,15 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         )}
       </View>
     </TouchableOpacity>
-  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedItemWidth, computedItemHeight, isTV, isLargeTablet, isTablet]);
+  ), [currentTheme.colors, handleContentPress, handleLongPress, deletingItemId, computedItemWidth, computedItemHeight, isTV, isLargeTablet, isTablet, settings.posterBorderRadius]);
+
+  // Choose the appropriate render function based on settings
+  const renderContinueWatchingItem = useCallback(({ item }: { item: ContinueWatchingItem }) => {
+    if (settings.continueWatchingCardStyle === 'poster') {
+      return renderPosterStyleItem({ item });
+    }
+    return renderWideStyleItem({ item });
+  }, [settings.continueWatchingCardStyle, renderPosterStyleItem, renderWideStyleItem]);
 
   // Memoized key extractor
   const keyExtractor = useCallback((item: ContinueWatchingItem) => `continue-${item.id}-${item.type}`, []);
@@ -1420,6 +1548,87 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
+  },
+  // Poster-style card styles
+  posterContentItem: {
+    overflow: 'visible',
+  },
+  posterImageContainer: {
+    width: '100%',
+    overflow: 'hidden',
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+  },
+  posterImage: {
+    width: '100%',
+    height: '100%',
+  },
+  posterGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+  },
+  posterEpisodeOverlay: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  posterEpisodeText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  posterUpNextBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  posterUpNextText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  posterProgressContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  posterProgressTrack: {
+    height: 4,
+  },
+  posterProgressBar: {
+    height: '100%',
+  },
+  posterTitleContainer: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  posterTitle: {
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 18,
+  },
+  posterProgressLabel: {
+    fontWeight: '500',
+    marginLeft: 6,
   },
 });
 
