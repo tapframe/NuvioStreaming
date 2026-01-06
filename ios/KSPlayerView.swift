@@ -19,6 +19,7 @@ class KSPlayerView: UIView {
     weak var viewManager: KSPlayerViewManager?
 
     // Event blocks for Fabric
+    @objc var onExitFullscreen: RCTDirectEventBlock?
     @objc var onLoad: RCTDirectEventBlock?
     @objc var onProgress: RCTDirectEventBlock?
     @objc var onBuffering: RCTDirectEventBlock?
@@ -100,6 +101,17 @@ class KSPlayerView: UIView {
         super.init(coder: coder)
         setupPlayerView()
     }
+
+    override var canBecomeFirstResponder: Bool {
+        return true
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        becomeFirstResponder()
+    }
+
+
 
     private func setupPlayerView() {
         playerView = IOSVideoPlayerView()
@@ -237,10 +249,10 @@ class KSPlayerView: UIView {
         options.registerRemoteControll = false
         
         // PERFORMANCE OPTIMIZATION: Buffer durations for smooth high bitrate playback
-        // preferredForwardBufferDuration = 5.0s: Increased to prevent stalling on network hiccups
-        options.preferredForwardBufferDuration = 5.0
-        // maxBufferDuration = 300.0s: Increased to allow 5 minutes of cache ahead
-        options.maxBufferDuration = 300.0
+        // preferredForwardBufferDuration = 3.0s: Slightly increased to reduce rebuffering during playback
+        options.preferredForwardBufferDuration = 1.0
+        // maxBufferDuration = 120.0s: Increased to allow the player to cache more content ahead of time (2 minutes)
+        options.maxBufferDuration = 120.0
         
         // Enable "second open" to relax startup/seek buffering thresholds (already enabled)
         options.isSecondOpen = true
@@ -313,6 +325,22 @@ class KSPlayerView: UIView {
         } else {
             playerView.play()
         }
+    }
+
+    override var keyCommands: [UIKeyCommand]? {
+        return [
+            UIKeyCommand(
+                input: UIKeyCommand.inputEscape,
+                modifierFlags: [],
+                action: #selector(handleEscapeKey),
+                discoverabilityTitle: "Exit Fullscreen"
+            )
+        ]
+    }
+
+    @objc func handleEscapeKey() {
+        print("KSPlayerView: ESC pressed")
+        sendEvent("onExitFullscreen", [:])
     }
 
     func setVolume(_ volume: Float) {
@@ -979,3 +1007,8 @@ extension KSPlayerView {
     }
 }
 
+extension IOSVideoPlayerView {
+    @objc func handleEscapeKey() {
+        self.next?.perform(#selector(handleEscapeKey))
+    }
+}
