@@ -511,8 +511,54 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               const { episodeId, progress, progressPercent } = episode;
 
               if (group.type === 'series' && progressPercent >= 85) {
-                // Skip completed episodes - don't add "next episode" here
-                // The Trakt playback endpoint handles in-progress items
+                // Episode is completed - find the next unwatched episode
+                let completedSeason: number | undefined;
+                let completedEpisode: number | undefined;
+
+                if (episodeId) {
+                  const match = episodeId.match(/s(\d+)e(\d+)/i);
+                  if (match) {
+                    completedSeason = parseInt(match[1], 10);
+                    completedEpisode = parseInt(match[2], 10);
+                  } else {
+                    const parts = episodeId.split(':');
+                    if (parts.length >= 3) {
+                      const seasonPart = parts[parts.length - 2];
+                      const episodePart = parts[parts.length - 1];
+                      const seasonNum = parseInt(seasonPart, 10);
+                      const episodeNum = parseInt(episodePart, 10);
+                      if (!isNaN(seasonNum) && !isNaN(episodeNum)) {
+                        completedSeason = seasonNum;
+                        completedEpisode = episodeNum;
+                      }
+                    }
+                  }
+                }
+
+                // If we have valid season/episode info, find the next episode
+                if (completedSeason !== undefined && completedEpisode !== undefined && metadata?.videos) {
+                  const watchedEpisodesSet = await traktShowsSetPromise;
+                  const nextEpisode = findNextEpisode(
+                    completedSeason,
+                    completedEpisode,
+                    metadata.videos,
+                    watchedEpisodesSet,
+                    group.id
+                  );
+
+                  if (nextEpisode) {
+                    logger.log(`📺 [ContinueWatching] Found next episode: S${nextEpisode.season}E${nextEpisode.episode} for ${basicContent.name}`);
+                    batch.push({
+                      ...basicContent,
+                      progress: 0, // Up next - no progress yet
+                      lastUpdated: progress.lastUpdated, // Keep the timestamp from completed episode
+                      season: nextEpisode.season,
+                      episode: nextEpisode.episode,
+                      episodeTitle: nextEpisode.title || `Episode ${nextEpisode.episode}`,
+                      addonId: progress.addonId,
+                    } as ContinueWatchingItem);
+                  }
+                }
                 continue;
               }
 
@@ -627,13 +673,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             try {
               // Skip items with < 2% progress (accidental clicks)
               if (item.progress < 2) continue;
-              // Skip items with >= 85% progress (completed)
-              if (item.progress >= 85) continue;
               // Skip items older than 30 days
               const pausedAt = new Date(item.paused_at).getTime();
               if (pausedAt < thirtyDaysAgo) continue;
 
               if (item.type === 'movie' && item.movie?.ids?.imdb) {
+                // Skip completed movies
+                if (item.progress >= 85) continue;
+
                 const imdbId = item.movie.ids.imdb.startsWith('tt')
                   ? item.movie.ids.imdb
                   : `tt${item.movie.ids.imdb}`;
@@ -672,6 +719,37 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 const cachedData = await getCachedMetadata('series', showImdb);
                 if (!cachedData?.basicContent) continue;
 
+                // If episode is completed (>= 85%), find next episode
+                if (item.progress >= 85) {
+                  const metadata = cachedData.metadata;
+                  if (metadata?.videos) {
+                    const nextEpisode = findNextEpisode(
+                      item.episode.season,
+                      item.episode.number,
+                      metadata.videos,
+                      undefined, // No watched set needed, findNextEpisode handles it
+                      showImdb
+                    );
+
+                    if (nextEpisode) {
+                      logger.log(`📺 [TraktPlayback] Episode completed, adding next: S${nextEpisode.season}E${nextEpisode.episode} for ${item.show.title}`);
+                      traktBatch.push({
+                        ...cachedData.basicContent,
+                        id: showImdb,
+                        type: 'series',
+                        progress: 0, // Up next - no progress yet
+                        lastUpdated: pausedAt,
+                        season: nextEpisode.season,
+                        episode: nextEpisode.episode,
+                        episodeTitle: nextEpisode.title || `Episode ${nextEpisode.episode}`,
+                        addonId: undefined,
+                        traktPlaybackId: item.id,
+                      } as ContinueWatchingItem);
+                    }
+                  }
+                  continue;
+                }
+
                 traktBatch.push({
                   ...cachedData.basicContent,
                   id: showImdb,
@@ -690,6 +768,93 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             } catch (err) {
               // Continue with other items
             }
+          }
+
+          // STEP 2: Get watched shows and find "Up Next" episodes
+          // This handles cases where episodes are fully completed and removed from playback progress
+          try {
+            const watchedShows = await traktService.getWatchedShows();
+            const thirtyDaysAgoForShows = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+            for (const watchedShow of watchedShows) {
+              try {
+                if (!watchedShow.show?.ids?.imdb) continue;
+
+                // Skip shows that haven't been watched recently
+                const lastWatchedAt = new Date(watchedShow.last_watched_at).getTime();
+                if (lastWatchedAt < thirtyDaysAgoForShows) continue;
+
+                const showImdb = watchedShow.show.ids.imdb.startsWith('tt')
+                  ? watchedShow.show.ids.imdb
+                  : `tt${watchedShow.show.ids.imdb}`;
+
+                // Check if recently removed
+                const showKey = `series:${showImdb}`;
+                if (recentlyRemovedRef.current.has(showKey)) continue;
+
+                // Find the last watched episode
+                let lastWatchedSeason = 0;
+                let lastWatchedEpisode = 0;
+                let latestEpisodeTimestamp = 0;
+
+                if (watchedShow.seasons) {
+                  for (const season of watchedShow.seasons) {
+                    for (const episode of season.episodes) {
+                      const episodeTimestamp = new Date(episode.last_watched_at).getTime();
+                      if (episodeTimestamp > latestEpisodeTimestamp) {
+                        latestEpisodeTimestamp = episodeTimestamp;
+                        lastWatchedSeason = season.number;
+                        lastWatchedEpisode = episode.number;
+                      }
+                    }
+                  }
+                }
+
+                if (lastWatchedSeason === 0 && lastWatchedEpisode === 0) continue;
+
+                // Get metadata with episode list
+                const cachedData = await getCachedMetadata('series', showImdb);
+                if (!cachedData?.basicContent || !cachedData?.metadata?.videos) continue;
+
+                // Build a set of watched episodes for this show
+                const watchedEpisodeSet = new Set<string>();
+                if (watchedShow.seasons) {
+                  for (const season of watchedShow.seasons) {
+                    for (const episode of season.episodes) {
+                      watchedEpisodeSet.add(`${showImdb}:${season.number}:${episode.number}`);
+                    }
+                  }
+                }
+
+                // Find the next unwatched episode
+                const nextEpisode = findNextEpisode(
+                  lastWatchedSeason,
+                  lastWatchedEpisode,
+                  cachedData.metadata.videos,
+                  watchedEpisodeSet,
+                  showImdb
+                );
+
+                if (nextEpisode) {
+                  logger.log(`📺 [TraktWatched] Found Up Next: ${watchedShow.show.title} S${nextEpisode.season}E${nextEpisode.episode}`);
+                  traktBatch.push({
+                    ...cachedData.basicContent,
+                    id: showImdb,
+                    type: 'series',
+                    progress: 0, // Up next - no progress yet
+                    lastUpdated: latestEpisodeTimestamp,
+                    season: nextEpisode.season,
+                    episode: nextEpisode.episode,
+                    episodeTitle: nextEpisode.title || `Episode ${nextEpisode.episode}`,
+                    addonId: undefined,
+                  } as ContinueWatchingItem);
+                }
+              } catch (err) {
+                // Continue with other shows
+              }
+            }
+          } catch (err) {
+            logger.warn('[TraktSync] Error fetching watched shows for Up Next:', err);
           }
 
           // Set Trakt playback items as state (replace, don't merge with local storage)
