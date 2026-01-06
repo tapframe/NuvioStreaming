@@ -550,7 +550,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             if (__DEV__) logger.log('Fetching movie details from TMDB for:', tmdbId);
             const movieDetails = await tmdbService.getMovieDetails(
               tmdbId,
-              settings.useTmdbLocalizedMetadata ? `${settings.tmdbLanguagePreference || 'en'}-US` : 'en-US'
+              settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en'
             );
             if (movieDetails) {
               const imdbId = movieDetails.imdb_id || movieDetails.external_ids?.imdb_id;
@@ -634,7 +634,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             try {
               const showDetails = await tmdbService.getTVShowDetails(
                 parseInt(tmdbId),
-                settings.useTmdbLocalizedMetadata ? `${settings.tmdbLanguagePreference || 'en'}-US` : 'en-US'
+                settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en'
               );
               if (showDetails) {
                 // OPTIMIZATION: Fetch external IDs, credits, and logo in parallel
@@ -824,9 +824,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // Store addon logo before TMDB enrichment overwrites it
         const addonLogo = (finalMetadata as any).logo;
 
-        // If localization is enabled, merge TMDB localized text (name/overview) before first render
+        // If localization is enabled AND title/description enrichment is enabled, merge TMDB localized text (name/overview) before first render
         try {
-          if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata) {
+          if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata && settings.tmdbEnrichTitleDescription) {
             const tmdbSvc = TMDBService.getInstance();
             let finalTmdbId: number | null = tmdbId;
             if (!finalTmdbId) {
@@ -857,8 +857,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: finalMetadata.name || localized.title,
-                    description: finalMetadata.description || localized.overview,
+                    name: localized.title || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     movieDetails: movieDetailsObj,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -894,8 +894,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: finalMetadata.name || localized.name,
-                    description: finalMetadata.description || localized.overview,
+                    name: localized.name || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     tvDetails,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -909,14 +909,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Centralized logo fetching logic
         try {
-          if (addonLogo) {
-            finalMetadata.logo = addonLogo;
-            if (__DEV__) {
-              console.log('[useMetadata] Using addon-provided logo:', { hasLogo: true });
-         }
-          // Check both master switch AND granular logos setting
-            } else if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichLogos) {
-            // Only use TMDB logos when both enrichment AND logos option are ON
+          // When TMDB enrichment AND logos are enabled, prioritize TMDB logo over addon logo
+          if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichLogos) {
             const tmdbService = TMDBService.getInstance();
             const preferredLanguage = settings.tmdbLanguagePreference || 'en';
             const contentType = type === 'series' ? 'tv' : 'movie';
@@ -932,23 +926,26 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
             if (tmdbIdForLogo) {
               const logoUrl = await tmdbService.getContentLogo(contentType, tmdbIdForLogo, preferredLanguage);
-              finalMetadata.logo = logoUrl || undefined; // TMDB logo or undefined (no addon fallback)
+              // Use TMDB logo if found, otherwise fall back to addon logo
+              finalMetadata.logo = logoUrl || addonLogo || undefined;
               if (__DEV__) {
                 console.log('[useMetadata] Logo fetch result:', {
                   contentType,
                   tmdbIdForLogo,
                   preferredLanguage,
-                  logoUrl: !!logoUrl,
+                  tmdbLogoFound: !!logoUrl,
+                  usingAddonFallback: !logoUrl && !!addonLogo,
                   enrichmentEnabled: true
                 });
               }
             } else {
-              finalMetadata.logo = undefined; // No TMDB ID means no logo
-              if (__DEV__) console.log('[useMetadata] No TMDB ID found for logo, will show text title');
+              // No TMDB ID, fall back to addon logo
+              finalMetadata.logo = addonLogo || undefined;
+              if (__DEV__) console.log('[useMetadata] No TMDB ID found for logo, using addon logo');
             }
           } else {
-            // When enrichment or logos is OFF, keep addon logo or undefined
-            finalMetadata.logo = finalMetadata.logo || undefined;
+            // When enrichment or logos is OFF, use addon logo
+            finalMetadata.logo = addonLogo || finalMetadata.logo || undefined;
             if (__DEV__) {
               console.log('[useMetadata] TMDB logo enrichment disabled, using addon logo:', {
                 hasAddonLogo: !!finalMetadata.logo,
@@ -1125,10 +1122,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // Fetch season posters from TMDB only if enrichment AND season posters are enabled
         if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichSeasonPosters) {
           try {
+            const lang = settings.useTmdbLocalizedMetadata ? `${settings.tmdbLanguagePreference || 'en'}` : 'en';
             const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
             if (tmdbIdToUse) {
               if (!tmdbId) setTmdbId(tmdbIdToUse);
-              const showDetails = await tmdbService.getTVShowDetails(tmdbIdToUse);
+              const showDetails = await tmdbService.getTVShowDetails(tmdbIdToUse, lang);
               if (showDetails?.seasons) {
                 Object.keys(groupedAddonEpisodes).forEach(seasonStr => {
                   const seasonNum = parseInt(seasonStr, 10);
@@ -1156,29 +1154,40 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           try {
             const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
             if (tmdbIdToUse) {
-              const lang = `${settings.tmdbLanguagePreference || 'en'}-US`;
+              // Use just the language code (e.g., 'ar', not 'ar-US') for TMDB API
+              const lang = settings.tmdbLanguagePreference || 'en';
               const seasons = Object.keys(groupedAddonEpisodes).map(Number);
-              for (const seasonNum of seasons) {
-                const seasonEps = groupedAddonEpisodes[seasonNum];
-                // Parallel fetch a reasonable batch (limit concurrency implicitly by season)
-                const localized = await Promise.all(
-                  seasonEps.map(async ep => {
-                    try {
-                      const data = await tmdbService.getEpisodeDetails(Number(tmdbIdToUse), seasonNum, ep.episode_number, lang);
-                      if (data) {
+
+              // Fetch all seasons in parallel (much faster than fetching each episode individually)
+              const seasonPromises = seasons.map(async seasonNum => {
+                try {
+                  // getSeasonDetails returns all episodes for a season in one call
+                  const seasonData = await tmdbService.getSeasonDetails(Number(tmdbIdToUse), seasonNum, undefined, lang);
+                  if (seasonData && seasonData.episodes) {
+                    // Create a map of episode number -> localized data for fast lookup
+                    const localizedMap = new Map<number, { name: string; overview: string }>();
+                    for (const ep of seasonData.episodes) {
+                      localizedMap.set(ep.episode_number, { name: ep.name, overview: ep.overview });
+                    }
+
+                    // Merge localized data into addon episodes
+                    groupedAddonEpisodes[seasonNum] = groupedAddonEpisodes[seasonNum].map(ep => {
+                      const localized = localizedMap.get(ep.episode_number);
+                      if (localized) {
                         return {
                           ...ep,
-                          name: data.name || ep.name,
-                          overview: data.overview || ep.overview,
+                          name: localized.name || ep.name,
+                          overview: localized.overview || ep.overview,
                         };
                       }
-                    } catch { }
-                    return ep;
-                  })
-                );
-                groupedAddonEpisodes[seasonNum] = localized;
-              }
-              if (__DEV__) logger.log('[useMetadata] merged localized episode names/overviews from TMDB');
+                      return ep;
+                    });
+                  }
+                } catch { }
+              });
+
+              await Promise.all(seasonPromises);
+              if (__DEV__) logger.log('[useMetadata] merged localized episode names/overviews from TMDB (batch)');
             }
           } catch (e) {
             if (__DEV__) console.log('[useMetadata] failed to merge localized episode text', e);
@@ -1264,13 +1273,14 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       // Fallback to TMDB if no addon episodes
       logger.log('📺 No addon episodes found, falling back to TMDB');
+      const lang = settings.useTmdbLocalizedMetadata ? `${settings.tmdbLanguagePreference || 'en'}` : 'en';
       const tmdbIdResult = await tmdbService.findTMDBIdByIMDB(id);
       if (tmdbIdResult) {
         setTmdbId(tmdbIdResult);
 
         const [allEpisodes, showDetails] = await Promise.all([
-          tmdbService.getAllEpisodes(tmdbIdResult),
-          tmdbService.getTVShowDetails(tmdbIdResult)
+          tmdbService.getAllEpisodes(tmdbIdResult, lang),
+          tmdbService.getTVShowDetails(tmdbIdResult, lang)
         ]);
 
         const transformedEpisodes: GroupedEpisodes = {};
@@ -2038,7 +2048,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     setLoadingRecommendations(true);
     try {
       const tmdbService = TMDBService.getInstance();
-      const results = await tmdbService.getRecommendations(type === 'movie' ? 'movie' : 'tv', String(tmdbId));
+      const lang = settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en';
+      const results = await tmdbService.getRecommendations(type === 'movie' ? 'movie' : 'tv', String(tmdbId), lang);
 
       // Convert TMDB results to StreamingContent format (simplified)
       const formattedRecommendations: StreamingContent[] = results.map((item: any) => ({
@@ -2056,7 +2067,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
     } finally {
       setLoadingRecommendations(false);
     }
-  }, [tmdbId, type]);
+  }, [tmdbId, type, settings.useTmdbLocalizedMetadata, settings.tmdbLanguagePreference]);
 
   // Fetch TMDB ID if needed and then recommendations
   useEffect(() => {

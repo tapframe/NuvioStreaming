@@ -25,6 +25,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { mmkvStorage } from '../services/mmkvStorage';
+import { ShapeAnimation } from '../components/onboarding/ShapeAnimation';
 
 const { width, height } = Dimensions.get('window');
 
@@ -263,6 +264,29 @@ const OnboardingScreen = () => {
     transform: [{ scale: buttonScale.value }],
   }));
 
+  // Animated opacity for button and swipe indicator based on scroll
+  const lastSlideStart = (onboardingData.length - 1) * width;
+
+  const buttonOpacityStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollX.value,
+      [lastSlideStart - width * 0.3, lastSlideStart],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
+  });
+
+  const swipeOpacityStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollX.value,
+      [lastSlideStart - width * 0.3, lastSlideStart],
+      [1, 0],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
+  });
+
   const handlePressIn = () => {
     buttonScale.value = withSpring(0.95, { damping: 15, stiffness: 400 });
   };
@@ -276,6 +300,9 @@ const OnboardingScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" translucent />
 
       <View style={styles.fullScreenContainer}>
+        {/* Shape Animation Background - iOS only */}
+        {Platform.OS === 'ios' && <ShapeAnimation scrollX={scrollX} />}
+
         {/* Header */}
         <Animated.View
           entering={FadeIn.delay(300).duration(600)}
@@ -321,19 +348,28 @@ const OnboardingScreen = () => {
             ))}
           </View>
 
-          {/* Animated Button */}
-          <TouchableOpacity
-            onPress={handleNext}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={1}
-          >
-            <Animated.View style={[styles.button, buttonStyle]}>
-              <Text style={styles.buttonText}>
-                {currentIndex === onboardingData.length - 1 ? 'Get Started' : 'Continue'}
-              </Text>
+          {/* Button and Swipe indicator with crossfade based on scroll */}
+          <View style={styles.footerButtonContainer}>
+            {/* Swipe Indicator - fades out on last slide */}
+            <Animated.View style={[styles.swipeIndicator, styles.absoluteFill, swipeOpacityStyle]}>
+              <Text style={styles.swipeText}>Swipe to continue</Text>
+              <Text style={styles.swipeArrow}>→</Text>
             </Animated.View>
-          </TouchableOpacity>
+
+            {/* Get Started Button - fades in on last slide */}
+            <Animated.View style={[styles.absoluteFill, buttonOpacityStyle]}>
+              <TouchableOpacity
+                onPress={handleGetStarted}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                activeOpacity={1}
+              >
+                <Animated.View style={[styles.button, buttonStyle]}>
+                  <Text style={styles.buttonText}>Get Started</Text>
+                </Animated.View>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
         </Animated.View>
       </View>
     </View>
@@ -381,11 +417,12 @@ const styles = StyleSheet.create({
   slide: {
     width,
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: Platform.OS === 'ios' ? 'flex-start' : 'center', // Top on iOS, center on Android
     paddingHorizontal: 32,
+    paddingTop: Platform.OS === 'ios' ? '20%' : 0, // Padding only on iOS
   },
   textContainer: {
-    alignItems: 'flex-start',
+    alignItems: 'flex-start', // Text always left-aligned
   },
   title: {
     fontSize: 52,
@@ -407,6 +444,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: 'rgba(255, 255, 255, 0.4)',
     maxWidth: 300,
+    textAlign: 'left', // Always left-aligned text
   },
   footer: {
     paddingHorizontal: 24,
@@ -436,6 +474,34 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0A0A0A',
     letterSpacing: 0.3,
+  },
+  swipeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    gap: 8,
+  },
+  swipeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.4)',
+    letterSpacing: 0.3,
+  },
+  swipeArrow: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.4)',
+  },
+  footerButtonContainer: {
+    height: 56,
+    position: 'relative',
+  },
+  absoluteFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });
 

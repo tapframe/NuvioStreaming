@@ -37,6 +37,7 @@ export interface AppSettings {
   useExternalPlayer: boolean;
   preferredPlayer: 'internal' | 'vlc' | 'infuse' | 'outplayer' | 'vidhub' | 'infuse_livecontainer' | 'external';
   showHeroSection: boolean;
+  showThisWeekSection: boolean; // Toggle "This Week" section
   featuredContentSource: 'tmdb' | 'catalogs';
   heroStyle: 'legacy' | 'carousel' | 'appletv';
   selectedHeroCatalogs: string[]; // Array of catalog IDs to display in hero section
@@ -92,12 +93,14 @@ export interface AppSettings {
   tmdbEnrichMovieDetails: boolean; // Show movie details (budget, revenue, tagline, etc.)
   tmdbEnrichTvDetails: boolean; // Show TV details (status, seasons count, networks, etc.)
   tmdbEnrichCollections: boolean; // Show movie collections/franchises
+  tmdbEnrichTitleDescription: boolean; // Use TMDB title/description (overrides addon when localization enabled)
   // Trakt integration
   showTraktComments: boolean; // Show Trakt comments in metadata screens
   // Continue Watching behavior
   useCachedStreams: boolean; // Enable/disable direct player navigation from Continue Watching cache
   openMetadataScreenWhenCacheDisabled: boolean; // When cache disabled, open MetadataScreen instead of StreamsScreen
   streamCacheTTL: number; // Stream cache duration in milliseconds (default: 1 hour)
+  continueWatchingCardStyle: 'wide' | 'poster'; // Card style: 'wide' (horizontal) or 'poster' (vertical)
   enableStreamsBackdrop: boolean; // Enable blurred backdrop background on StreamsScreen mobile
   useExternalPlayerForDownloads: boolean; // Enable/disable external player for downloaded content
   // Android MPV player settings
@@ -122,6 +125,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   useExternalPlayer: false,
   preferredPlayer: 'internal',
   showHeroSection: true,
+  showThisWeekSection: true, // Enabled by default
   featuredContentSource: 'catalogs',
   heroStyle: 'appletv',
   selectedHeroCatalogs: [], // Empty array means all catalogs are selected
@@ -176,12 +180,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tmdbEnrichMovieDetails: true,
   tmdbEnrichTvDetails: true,
   tmdbEnrichCollections: true,
+  tmdbEnrichTitleDescription: true, // Enabled by default for backward compatibility
   // Trakt integration
   showTraktComments: true, // Show Trakt comments by default when authenticated
   // Continue Watching behavior
   useCachedStreams: false, // Enable by default
   openMetadataScreenWhenCacheDisabled: true, // Default to StreamsScreen when cache disabled
   streamCacheTTL: 60 * 60 * 1000, // Default: 1 hour in milliseconds
+  continueWatchingCardStyle: 'wide', // Default to wide (horizontal) card style
   enableStreamsBackdrop: true, // Enable by default (new behavior)
   // Android MPV player settings
   videoPlayerEngine: 'auto', // Default to auto (ExoPlayer primary, MPV fallback)

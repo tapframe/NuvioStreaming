@@ -677,6 +677,23 @@ const TMDBSettingsScreen = () => {
                 />
               </View>
 
+              {/* Title & Description */}
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Title & Description</Text>
+                  <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Use TMDb localized title and overview text
+                  </Text>
+                </View>
+                <Switch
+                  value={settings.tmdbEnrichTitleDescription}
+                  onValueChange={(v) => updateSetting('tmdbEnrichTitleDescription', v)}
+                  trackColor={{ false: 'rgba(255,255,255,0.1)', true: currentTheme.colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? currentTheme.colors.white : ''}
+                  ios_backgroundColor={'rgba(255,255,255,0.1)'}
+                />
+              </View>
+
               {/* Title Logos */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>

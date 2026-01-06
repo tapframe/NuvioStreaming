@@ -1,12 +1,13 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useTraktIntegration } from '../hooks/useTraktIntegration';
-import { 
-  TraktUser, 
-  TraktWatchedItem, 
-  TraktWatchlistItem, 
-  TraktCollectionItem, 
+import {
+  TraktUser,
+  TraktWatchedItem,
+  TraktWatchlistItem,
+  TraktCollectionItem,
   TraktRatingItem,
-  TraktPlaybackItem 
+  TraktPlaybackItem,
+  traktService
 } from '../services/traktService';
 
 interface TraktContextProps {
@@ -37,15 +38,25 @@ interface TraktContextProps {
   removeFromCollection: (imdbId: string, type: 'movie' | 'show') => Promise<boolean>;
   isInWatchlist: (imdbId: string, type: 'movie' | 'show') => boolean;
   isInCollection: (imdbId: string, type: 'movie' | 'show') => boolean;
+  // Maintenance mode
+  isMaintenanceMode: boolean;
+  maintenanceMessage: string;
 }
 
 const TraktContext = createContext<TraktContextProps | undefined>(undefined);
 
 export function TraktProvider({ children }: { children: ReactNode }) {
   const traktIntegration = useTraktIntegration();
-  
+
+  // Add maintenance mode values to the context
+  const contextValue: TraktContextProps = {
+    ...traktIntegration,
+    isMaintenanceMode: traktService.isMaintenanceMode(),
+    maintenanceMessage: traktService.getMaintenanceMessage(),
+  };
+
   return (
-    <TraktContext.Provider value={traktIntegration}>
+    <TraktContext.Provider value={contextValue}>
       {children}
     </TraktContext.Provider>
   );
