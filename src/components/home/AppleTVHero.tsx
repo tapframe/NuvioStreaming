@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { NavigationProp, useNavigation, useIsFocused } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
@@ -144,6 +145,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   onRetry,
   scrollY: externalScrollY,
 }) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
   const { currentTheme } = useTheme();
@@ -158,7 +160,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const [inLibrary, setInLibrary] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [isWatched, setIsWatched] = useState(false);
-  const [playButtonText, setPlayButtonText] = useState('Play');
+  const [shouldResume, setShouldResume] = useState(false);
   const [type, setType] = useState<'movie' | 'series'>('movie');
 
   // Create internal scrollY if not provided externally
@@ -530,7 +532,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   useEffect(() => {
     if (currentItem) {
       const buttonText = getProgressPlayButtonText();
-      setPlayButtonText(buttonText);
+      // Use internal state for resume logic instead of string comparison
+      setShouldResume(buttonText === 'Resume');
 
       // Update watched state based on progress
       if (watchProgress) {
@@ -987,10 +990,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
       <View style={[styles.container, { height: HERO_HEIGHT, marginTop: -insets.top }]}>
         <View style={styles.noContentContainer}>
           <MaterialIcons name="theaters" size={48} color="rgba(255,255,255,0.5)" />
-          <Text style={styles.noContentText}>No featured content available</Text>
+          <Text style={styles.noContentText}>{t('home.no_featured_available')}</Text>
           {onRetry && (
             <TouchableOpacity style={styles.retryButton} onPress={onRetry} activeOpacity={0.7}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <Text style={styles.retryButtonText}>{t('home.retry')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1242,7 +1245,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
             <View style={styles.metadataBadge}>
               <MaterialIcons name="tv" size={16} color="#fff" />
               <Text style={styles.metadataText}>
-                {currentItem.type === 'series' ? 'TV Show' : 'Movie'}
+                {currentItem.type === 'series' ? t('home.tv_show') : t('home.movie')}
               </Text>
               {currentItem.genres && currentItem.genres.length > 0 && (
                 <>
@@ -1262,11 +1265,11 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
               activeOpacity={0.85}
             >
               <MaterialIcons
-                name={playButtonText === 'Resume' ? "replay" : "play-arrow"}
+                name={shouldResume ? "replay" : "play-arrow"}
                 size={24}
                 color="#000"
               />
-              <Text style={styles.playButtonText}>{playButtonText}</Text>
+              <Text style={styles.playButtonText}>{shouldResume ? t('home.resume') : t('home.play')}</Text>
             </TouchableOpacity>
 
             {/* Save Button */}

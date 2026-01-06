@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, memo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle, TextStyle, ImageStyle, ScrollView, StyleProp, Platform, Image, useWindowDimensions } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, Easing, useSharedValue, withTiming, useAnimatedStyle, useAnimatedScrollHandler, useAnimatedReaction, runOnJS, SharedValue, interpolate, Extrapolation } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -38,6 +39,7 @@ interface HeroCarouselProps {
 const TOP_TABS_OFFSET = Platform.OS === 'ios' ? 44 : 48;
 
 const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, loading = false }) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -610,6 +612,7 @@ interface CarouselCardProps {
 }
 
 const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFailed, onLogoError, onPressInfo, scrollX, index, flipped, onToggleFlip, interval, cardWidth, cardHeight, isTablet }) => {
+  const { t } = useTranslation();
   const [bannerLoaded, setBannerLoaded] = useState(false);
   const [logoLoaded, setLogoLoaded] = useState(false);
 
@@ -847,7 +850,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                       textShadowRadius: 2,
                     }
                   ]}>
-                    {item.description || 'No description available'}
+                    {item.description || t('home.no_description')}
                   </Text>
                 </ScrollView>
               </View>
@@ -956,7 +959,7 @@ const CarouselCard: React.FC<CarouselCardProps> = memo(({ item, colors, logoFail
                         textShadowRadius: 2,
                       }
                     ]}>
-                      {item.description || 'No description available'}
+                      {item.description || t('home.no_description')}
                     </Text>
                   </ScrollView>
                 </View>

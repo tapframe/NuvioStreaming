@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -113,6 +114,7 @@ const SkeletonCatalog = React.memo(() => {
 });
 
 const HomeScreen = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
   const { currentTheme } = useTheme();
@@ -288,7 +290,7 @@ const HomeScreen = () => {
                       displayName = uniqueWords.join(' ');
 
                       // Append content type if not present
-                      const contentType = catalog.type === 'movie' ? 'Movies' : 'TV Shows';
+                      const contentType = catalog.type === 'movie' ? t('home.movies') : t('home.tv_shows');
                       if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
                         displayName = `${displayName} ${contentType}`;
                       }
@@ -422,7 +424,7 @@ const HomeScreen = () => {
           await mmkvStorage.removeItem('showLoginHintToastOnce');
           hideTimer = setTimeout(() => setHintVisible(false), 2000);
           // Also show a global toast for consistency across screens
-          // showInfo('Sign In Available', 'You can sign in anytime from Settings → Account');
+          // showInfo(t('home.sign_in_available'), t('home.sign_in_desc'));
         }
       } catch { }
     })();
@@ -813,7 +815,7 @@ const HomeScreen = () => {
               >
                 <MaterialIcons name="expand-more" size={20} color={currentTheme.colors.white} />
                 <Text style={[styles.loadMoreText, { color: currentTheme.colors.white }]}>
-                  Load More Catalogs
+                  {t('home.load_more_catalogs')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -835,14 +837,14 @@ const HomeScreen = () => {
         <View style={[styles.emptyCatalog, { backgroundColor: currentTheme.colors.elevation1 }]}>
           <MaterialIcons name="movie-filter" size={40} color={currentTheme.colors.textDark} />
           <Text style={{ color: currentTheme.colors.textDark, marginTop: 8, fontSize: 16, textAlign: 'center' }}>
-            No content available
+            {t('home.no_content')}
           </Text>
           <TouchableOpacity
             style={[styles.addCatalogButton, { backgroundColor: currentTheme.colors.primary }]}
             onPress={() => navigation.navigate('Settings')}
           >
             <MaterialIcons name="add-circle" size={20} color={currentTheme.colors.white} />
-            <Text style={[styles.addCatalogButtonText, { color: currentTheme.colors.white }]}>Add Catalogs</Text>
+            <Text style={[styles.addCatalogButtonText, { color: currentTheme.colors.white }]}>{t('home.add_catalogs')}</Text>
           </TouchableOpacity>
         </View>
       )}

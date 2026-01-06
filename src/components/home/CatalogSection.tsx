@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CatalogContent, StreamingContent } from '../../services/catalogService';
@@ -73,6 +74,7 @@ const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
 const CatalogSection = ({ catalog }: CatalogSectionProps) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
 
@@ -154,7 +156,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
               fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
               marginRight: isTV ? 6 : isLargeTablet ? 5 : 4,
             }
-          ]}>View All</Text>
+          ]}>{t('home.view_all')}</Text>
           <MaterialIcons
             name="chevron-right"
             size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}

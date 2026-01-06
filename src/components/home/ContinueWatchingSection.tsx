@@ -11,6 +11,7 @@ import {
   Platform
 } from 'react-native';
 import { FlatList } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import BottomSheet, { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,6 +108,7 @@ const isEpisodeReleased = (video: any): boolean => {
 
 // Create a proper imperative handle with React.forwardRef and updated type
 const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, ref) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
@@ -1310,7 +1312,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         {/* Up Next Badge */}
         {item.type === 'series' && item.progress === 0 && (
           <View style={[styles.posterUpNextBadge, { backgroundColor: currentTheme.colors.primary }]}>
-            <Text style={[styles.posterUpNextText, { fontSize: isTV ? 12 : 10 }]}>UP NEXT</Text>
+            <Text style={[styles.posterUpNextText, { fontSize: isTV ? 12 : 10 }]}>{t('home.up_next_caps')}</Text>
           </View>
         )}
 
@@ -1441,7 +1443,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   <Text style={[
                     styles.progressText,
                     { fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 12 }
-                  ]}>Up Next</Text>
+                  ]}>{t('home.up_next')}</Text>
                 </View>
               )}
             </View>
@@ -1460,7 +1462,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                     fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
                   }
                 ]}>
-                  Season {item.season}
+                  {t('home.season', { season: item.season })}
                 </Text>
                 {item.episodeTitle && (
                   <Text
@@ -1487,7 +1489,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 13
                 }
               ]}>
-                {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
+                {item.year} • {item.type === 'movie' ? t('home.movie') : t('home.series')}
               </Text>
             );
           }
@@ -1519,7 +1521,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 12 : 11
               }
             ]}>
-              {Math.round(item.progress)}% watched
+              {t('home.percent_watched', { percent: Math.round(item.progress) })}
             </Text>
           </View>
         )}
@@ -1558,7 +1560,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               color: currentTheme.colors.text,
               fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
             }
-          ]}>Continue Watching</Text>
+          ]}>{t('home.continue_watching')}</Text>
           <View style={[
             styles.titleUnderline,
             {
@@ -1631,12 +1633,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   </Text>
                   {selectedItem.type === 'series' && selectedItem.season && selectedItem.episode ? (
                     <Text style={[styles.actionSheetSubtitle, { color: currentTheme.colors.textMuted }]}>
-                      Season {selectedItem.season} · Episode {selectedItem.episode}
+                      {t('home.season', { season: selectedItem.season })} · {t('home.episode', { episode: selectedItem.episode })}
                       {selectedItem.episodeTitle && selectedItem.episodeTitle !== `Episode ${selectedItem.episode}` && `\n${selectedItem.episodeTitle}`}
                     </Text>
                   ) : (
                     <Text style={[styles.actionSheetSubtitle, { color: currentTheme.colors.textMuted }]}>
-                      {selectedItem.year ? `${selectedItem.type === 'movie' ? 'Movie' : 'Series'} · ${selectedItem.year}` : selectedItem.type === 'movie' ? 'Movie' : 'Series'}
+                      {selectedItem.year ? `${selectedItem.type === 'movie' ? t('home.movie') : t('home.series')} · ${selectedItem.year}` : selectedItem.type === 'movie' ? t('home.movie') : t('home.series')}
                     </Text>
                   )}
                   {selectedItem.progress > 0 && (
@@ -1653,7 +1655,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                         />
                       </View>
                       <Text style={[styles.actionSheetProgressText, { color: currentTheme.colors.textMuted }]}>
-                        {Math.round(selectedItem.progress)}% watched
+                        {t('home.percent_watched', { percent: Math.round(selectedItem.progress) })}
                       </Text>
                     </View>
                   )}
@@ -1668,7 +1670,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   activeOpacity={0.8}
                 >
                   <Ionicons name="information-circle-outline" size={22} color="#fff" />
-                  <Text style={styles.actionButtonText}>View Details</Text>
+                  <Text style={styles.actionButtonText}>{t('home.view_details')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1677,7 +1679,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                   activeOpacity={0.8}
                 >
                   <Ionicons name="trash-outline" size={22} color={currentTheme.colors.error} />
-                  <Text style={[styles.actionButtonText, { color: currentTheme.colors.error }]}>Remove</Text>
+                  <Text style={[styles.actionButtonText, { color: currentTheme.colors.error }]}>{t('home.remove')}</Text>
                 </TouchableOpacity>
               </View>
             </>

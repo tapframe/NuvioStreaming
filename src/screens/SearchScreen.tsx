@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { catalogService, StreamingContent, GroupedSearchResults, AddonSearchResults } from '../services/catalogService';
 import FastImage from '@d11/react-native-fast-image';
@@ -85,6 +86,7 @@ const SimpleSearchAnimation = SearchAnimation;
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 const SearchScreen = () => {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = true;
@@ -597,7 +599,7 @@ const SearchScreen = () => {
         style={styles.recentSearchesContainer}
       >
         <Text style={[styles.carouselTitle, { color: currentTheme.colors.white }]}>
-          Recent Searches
+          {t('search.recent_searches')}
         </Text>
         {recentSearches.map((search, index) => (
           <TouchableOpacity
@@ -705,7 +707,7 @@ const SearchScreen = () => {
         {/* Section Header */}
         <View style={styles.discoverHeader}>
           <Text style={[styles.discoverTitle, { color: currentTheme.colors.white }]}>
-            Discover
+            {t('search.discover')}
           </Text>
         </View>
 
@@ -723,7 +725,7 @@ const SearchScreen = () => {
             onPress={() => typeSheetRef.current?.present()}
           >
             <Text style={[styles.discoverSelectorText, { color: currentTheme.colors.white }]} numberOfLines={1}>
-              {selectedDiscoverType === 'movie' ? 'Movies' : 'TV Shows'}
+              {selectedDiscoverType === 'movie' ? t('search.movies') : t('search.tv_shows')}
             </Text>
             <MaterialIcons name="keyboard-arrow-down" size={20} color={currentTheme.colors.lightGray} />
           </TouchableOpacity>
@@ -734,7 +736,7 @@ const SearchScreen = () => {
             onPress={() => catalogSheetRef.current?.present()}
           >
             <Text style={[styles.discoverSelectorText, { color: currentTheme.colors.white }]} numberOfLines={1}>
-              {selectedCatalog ? selectedCatalog.catalogName : 'Select Catalog'}
+              {selectedCatalog ? selectedCatalog.catalogName : t('search.select_catalog')}
             </Text>
             <MaterialIcons name="keyboard-arrow-down" size={20} color={currentTheme.colors.lightGray} />
           </TouchableOpacity>
@@ -746,7 +748,7 @@ const SearchScreen = () => {
               onPress={() => genreSheetRef.current?.present()}
             >
               <Text style={[styles.discoverSelectorText, { color: currentTheme.colors.white }]} numberOfLines={1}>
-                {selectedDiscoverGenre || 'All Genres'}
+                {selectedDiscoverGenre || t('search.all_genres')}
               </Text>
               <MaterialIcons name="keyboard-arrow-down" size={20} color={currentTheme.colors.lightGray} />
             </TouchableOpacity>
@@ -757,7 +759,7 @@ const SearchScreen = () => {
         {selectedCatalog && (
           <View style={styles.discoverFilterSummary}>
             <Text style={[styles.discoverFilterSummaryText, { color: currentTheme.colors.lightGray }]}>
-              {selectedCatalog.addonName} • {selectedCatalog.type === 'movie' ? 'Movies' : 'TV Shows'}
+              {selectedCatalog.addonName} • {selectedCatalog.type === 'movie' ? t('search.movies') : t('search.tv_shows')}
               {selectedDiscoverGenre ? ` • ${selectedDiscoverGenre}` : ''}
             </Text>
           </View>
@@ -768,7 +770,7 @@ const SearchScreen = () => {
           <View style={styles.discoverLoadingContainer}>
             <ActivityIndicator size="large" color={currentTheme.colors.primary} />
             <Text style={[styles.discoverLoadingText, { color: currentTheme.colors.lightGray }]}>
-              Discovering content...
+              {t('search.discovering')}
             </Text>
           </View>
         ) : discoverResults.length > 0 ? (
@@ -804,7 +806,7 @@ const SearchScreen = () => {
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.showMoreButtonText, { color: currentTheme.colors.white }]}>
-                    Show More ({pendingDiscoverResults.length})
+                    {t('search.show_more', { count: pendingDiscoverResults.length })}
                   </Text>
                   <MaterialIcons name="expand-more" size={20} color={currentTheme.colors.white} />
                 </TouchableOpacity>
@@ -819,20 +821,20 @@ const SearchScreen = () => {
           <View style={styles.discoverEmptyContainer}>
             <MaterialIcons name="movie-filter" size={48} color={currentTheme.colors.lightGray} />
             <Text style={[styles.discoverEmptyText, { color: currentTheme.colors.lightGray }]}>
-              No content found
+              {t('search.no_content_found')}
             </Text>
             <Text style={[styles.discoverEmptySubtext, { color: currentTheme.colors.mediumGray }]}>
-              Try a different genre or catalog
+              {t('search.try_different')}
             </Text>
           </View>
         ) : !selectedCatalog && discoverInitialized ? (
           <View style={styles.discoverEmptyContainer}>
             <MaterialIcons name="touch-app" size={48} color={currentTheme.colors.lightGray} />
             <Text style={[styles.discoverEmptyText, { color: currentTheme.colors.lightGray }]}>
-              Select a catalog to discover
+              {t('search.select_catalog_desc')}
             </Text>
             <Text style={[styles.discoverEmptySubtext, { color: currentTheme.colors.mediumGray }]}>
-              Tap the catalog chip above to get started
+              {t('search.tap_catalog_desc')}
             </Text>
           </View>
         ) : null}
@@ -906,10 +908,10 @@ const SearchScreen = () => {
           isGrid && styles.discoverGridItem
         ]}
         onPress={() => {
-          navigation.navigate('Metadata', { 
-            id: item.id, 
+          navigation.navigate('Metadata', {
+            id: item.id,
             type: item.type,
-            addonId: item.addonId 
+            addonId: item.addonId
           });
         }}
         onLongPress={() => {
@@ -1022,7 +1024,7 @@ const SearchScreen = () => {
                 paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
               }
             ]}>
-              Movies ({movieResults.length})
+              {t('search.movies')} ({movieResults.length})
             </Text>
             <FlatList
               data={movieResults}
@@ -1056,7 +1058,7 @@ const SearchScreen = () => {
                 paddingHorizontal: isTV ? 24 : isLargeTablet ? 20 : isTablet ? 16 : 16
               }
             ]}>
-              TV Shows ({seriesResults.length})
+              {t('search.tv_shows')} ({seriesResults.length})
             </Text>
             <FlatList
               data={seriesResults}
@@ -1176,7 +1178,7 @@ const SearchScreen = () => {
                   styles.searchInput,
                   { color: currentTheme.colors.white }
                 ]}
-                placeholder="Search movies, shows..."
+                placeholder={t('search.search_placeholder')}
                 placeholderTextColor={currentTheme.colors.lightGray}
                 value={query}
                 onChangeText={setQuery}
@@ -1221,10 +1223,10 @@ const SearchScreen = () => {
               color={currentTheme.colors.lightGray}
             />
             <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
-              Keep typing...
+              {t('search.keep_typing')}
             </Text>
             <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
-              Type at least 2 characters to search
+              {t('search.type_characters')}
             </Text>
           </View>
         ) : searched && !hasResultsToShow ? (
@@ -1237,10 +1239,10 @@ const SearchScreen = () => {
               color={currentTheme.colors.lightGray}
             />
             <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
-              No results found
+              {t('search.no_results')}
             </Text>
             <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
-              Try different keywords or check your spelling
+              {t('search.try_keywords')}
             </Text>
           </View>
         ) : (
@@ -1343,7 +1345,7 @@ const SearchScreen = () => {
       >
         <View style={[styles.bottomSheetHeader, { backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }]}>
           <Text style={[styles.bottomSheetTitle, { color: currentTheme.colors.white }]}>
-            Select Catalog
+            {t('search.select_catalog')}
           </Text>
           <TouchableOpacity onPress={() => catalogSheetRef.current?.dismiss()}>
             <MaterialIcons name="close" size={24} color={currentTheme.colors.lightGray} />
@@ -1369,8 +1371,8 @@ const SearchScreen = () => {
                   {catalog.catalogName}
                 </Text>
                 <Text style={[styles.bottomSheetItemSubtitle, { color: currentTheme.colors.lightGray }]}>
-                  {catalog.addonName} • {catalog.type === 'movie' ? 'Movies' : 'TV Shows'}
-                  {catalog.genres.length > 0 ? ` • ${catalog.genres.length} genres` : ''}
+                  {catalog.addonName} • {catalog.type === 'movie' ? t('search.movies') : t('search.tv_shows')}
+                  {catalog.genres.length > 0 ? ` • ${t('search.genres_count', { count: catalog.genres.length })}` : ''}
                 </Text>
               </View>
               {selectedCatalog?.catalogId === catalog.catalogId &&
@@ -1403,7 +1405,7 @@ const SearchScreen = () => {
       >
         <View style={[styles.bottomSheetHeader, { backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }]}>
           <Text style={[styles.bottomSheetTitle, { color: currentTheme.colors.white }]}>
-            Select Genre
+            {t('search.select_genre')}
           </Text>
           <TouchableOpacity onPress={() => genreSheetRef.current?.dismiss()}>
             <MaterialIcons name="close" size={24} color={currentTheme.colors.lightGray} />
@@ -1423,10 +1425,10 @@ const SearchScreen = () => {
           >
             <View style={styles.bottomSheetItemContent}>
               <Text style={[styles.bottomSheetItemTitle, { color: currentTheme.colors.white }]}>
-                All Genres
+                {t('search.all_genres')}
               </Text>
               <Text style={[styles.bottomSheetItemSubtitle, { color: currentTheme.colors.lightGray }]}>
-                Show all content
+                {t('search.show_all_content')}
               </Text>
             </View>
             {!selectedDiscoverGenre && (
@@ -1476,7 +1478,7 @@ const SearchScreen = () => {
       >
         <View style={[styles.bottomSheetHeader, { backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }]}>
           <Text style={[styles.bottomSheetTitle, { color: currentTheme.colors.white }]}>
-            Select Type
+            {t('search.select_type')}
           </Text>
           <TouchableOpacity onPress={() => typeSheetRef.current?.dismiss()}>
             <MaterialIcons name="close" size={24} color={currentTheme.colors.lightGray} />
@@ -1496,10 +1498,10 @@ const SearchScreen = () => {
           >
             <View style={styles.bottomSheetItemContent}>
               <Text style={[styles.bottomSheetItemTitle, { color: currentTheme.colors.white }]}>
-                Movies
+                {t('search.movies')}
               </Text>
               <Text style={[styles.bottomSheetItemSubtitle, { color: currentTheme.colors.lightGray }]}>
-                Browse movie catalogs
+                {t('search.browse_movies')}
               </Text>
             </View>
             {selectedDiscoverType === 'movie' && (
@@ -1517,10 +1519,10 @@ const SearchScreen = () => {
           >
             <View style={styles.bottomSheetItemContent}>
               <Text style={[styles.bottomSheetItemTitle, { color: currentTheme.colors.white }]}>
-                TV Shows
+                {t('search.tv_shows')}
               </Text>
               <Text style={[styles.bottomSheetItemSubtitle, { color: currentTheme.colors.lightGray }]}>
-                Browse TV series catalogs
+                {t('search.browse_tv')}
               </Text>
             </View>
             {selectedDiscoverType === 'series' && (
