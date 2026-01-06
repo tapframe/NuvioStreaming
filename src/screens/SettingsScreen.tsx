@@ -50,25 +50,15 @@ const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
 
 // Settings categories for tablet sidebar
-const SETTINGS_CATEGORIES = [
-  { id: 'account', title: 'Account', icon: 'user' as string },
-  { id: 'content', title: 'Content & Discovery', icon: 'compass' as string },
-  { id: 'appearance', title: 'Appearance', icon: 'sliders' as string },
-  { id: 'integrations', title: 'Integrations', icon: 'layers' as string },
-  { id: 'playback', title: 'Playback', icon: 'play-circle' as string },
-  { id: 'backup', title: 'Backup & Restore', icon: 'archive' as string },
-  { id: 'updates', title: 'Updates', icon: 'refresh-ccw' as string },
-  { id: 'about', title: 'About', icon: 'info' as string },
-  { id: 'developer', title: 'Developer', icon: 'code' as string },
-  { id: 'cache', title: 'Cache', icon: 'database' as string },
-];
+// Settings categories moved inside component for translation
+
 
 // Tablet Sidebar Component
 interface SidebarProps {
   selectedCategory: string;
   onCategorySelect: (category: string) => void;
   currentTheme: any;
-  categories: typeof SETTINGS_CATEGORIES;
+  categories: any[];
   extraTopPadding?: number;
 }
 
@@ -143,9 +133,21 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
   );
 };
 
-
 const SettingsScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
+
+  const SETTINGS_CATEGORIES = [
+    { id: 'account', title: t('settings.account'), icon: 'user' },
+    { id: 'content', title: t('settings.content_discovery'), icon: 'compass' },
+    { id: 'appearance', title: t('settings.appearance'), icon: 'sliders' },
+    { id: 'integrations', title: t('settings.integrations'), icon: 'layers' },
+    { id: 'playback', title: t('settings.playback'), icon: 'play-circle' },
+    { id: 'backup', title: t('settings.backup_restore'), icon: 'archive' },
+    { id: 'updates', title: t('settings.updates'), icon: 'refresh-ccw' },
+    { id: 'about', title: t('settings.about'), icon: 'info' },
+    { id: 'developer', title: t('settings.developer'), icon: 'code' },
+    { id: 'cache', title: t('settings.cache'), icon: 'database' },
+  ];
   const { settings, updateSetting } = useSettings();
   const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
@@ -333,11 +335,11 @@ const SettingsScreen: React.FC = () => {
     switch (categoryId) {
       case 'account':
         return (
-          <SettingsCard title="ACCOUNT" isTablet={isTablet}>
+          <SettingsCard title={t('settings.sections.account')} isTablet={isTablet}>
             {isItemVisible('trakt') && (
               <SettingItem
                 title="Trakt"
-                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
+                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                 customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
@@ -365,16 +367,16 @@ const SettingsScreen: React.FC = () => {
 
       case 'developer':
         return __DEV__ ? (
-          <SettingsCard title="DEVELOPER" isTablet={isTablet}>
+          <SettingsCard title={t('settings.sections.testing')} isTablet={isTablet}>
             <SettingItem
-              title="Test Onboarding"
+              title={t('settings.items.test_onboarding')}
               icon="play-circle"
               onPress={() => navigation.navigate('Onboarding')}
               renderControl={() => <ChevronRight />}
               isTablet={isTablet}
             />
             <SettingItem
-              title="Reset Onboarding"
+              title={t('settings.items.reset_onboarding')}
               icon="refresh-ccw"
               onPress={async () => {
                 try {
@@ -388,9 +390,9 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
-              title="Test Announcement"
+              title={t('settings.items.test_announcement')}
               icon="bell"
-              description="Show what's new overlay"
+              description={t('settings.items.test_announcement_desc')}
               onPress={async () => {
                 try {
                   await mmkvStorage.removeItem('announcement_v1.0.0_shown');
@@ -403,8 +405,8 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
-              title="Reset Campaigns"
-              description="Clear campaign impressions"
+              title={t('settings.items.reset_campaigns')}
+              description={t('settings.items.reset_campaigns_desc')}
               icon="refresh-cw"
               onPress={async () => {
                 await campaignService.resetCampaigns();
@@ -414,7 +416,7 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
-              title="Clear All Data"
+              title={t('settings.items.clear_all_data')}
               icon="trash-2"
               onPress={() => {
                 openAlert(
@@ -444,9 +446,9 @@ const SettingsScreen: React.FC = () => {
 
       case 'cache':
         return mdblistKeySet ? (
-          <SettingsCard title="CACHE MANAGEMENT" isTablet={isTablet}>
+          <SettingsCard title={t('settings.sections.cache_management')} isTablet={isTablet}>
             <SettingItem
-              title="Clear MDBList Cache"
+              title={t('settings.clear_mdblist_cache')}
               icon="database"
               onPress={handleClearMDBListCache}
               isLast={true}
@@ -457,9 +459,9 @@ const SettingsScreen: React.FC = () => {
 
       case 'backup':
         return (
-          <SettingsCard title="BACKUP & RESTORE" isTablet={isTablet}>
+          <SettingsCard title={t('settings.backup_restore').toUpperCase()} isTablet={isTablet}>
             <SettingItem
-              title="Backup & Restore"
+              title={t('settings.backup_restore')}
               description="Create and restore app backups"
               icon="archive"
               renderControl={() => <ChevronRight />}
@@ -472,10 +474,10 @@ const SettingsScreen: React.FC = () => {
 
       case 'updates':
         return (
-          <SettingsCard title="UPDATES" isTablet={isTablet}>
+          <SettingsCard title={t('settings.updates').toUpperCase()} isTablet={isTablet}>
             <SettingItem
               title="App Updates"
-              description="Check for updates and manage app version"
+              description={t('settings.check_updates')}
               icon="refresh-ccw"
               renderControl={() => <ChevronRight />}
               badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
@@ -549,7 +551,7 @@ const SettingsScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
       <StatusBar barStyle={'light-content'} />
-      <ScreenHeader title="Settings" />
+      <ScreenHeader title={t('settings.settings_title')} />
       <View style={{ flex: 1 }}>
         <View style={styles.contentContainer}>
           <ScrollView
@@ -560,11 +562,11 @@ const SettingsScreen: React.FC = () => {
           >
             {/* Account */}
             {(settingsConfig?.categories?.['account']?.visible !== false) && isItemVisible('trakt') && (
-              <SettingsCard title="ACCOUNT">
+              <SettingsCard title={t('settings.account').toUpperCase()}>
                 {isItemVisible('trakt') && (
                   <SettingItem
                     title="Trakt"
-                    description={isAuthenticated ? `@${userProfile?.username || 'User'}` : "Sign in to sync"}
+                    description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                     customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
@@ -591,8 +593,8 @@ const SettingsScreen: React.FC = () => {
                   />
                   {(settingsConfig?.categories?.['content']?.visible !== false) && (
                     <SettingItem
-                      title="Content & Discovery"
-                      description="Addons, catalogs, and sources"
+                      title={t('settings.content_discovery')}
+                      description={t('settings.add_catalogs_sources')}
                       icon="compass"
                       renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('ContentDiscoverySettings')}
@@ -600,7 +602,7 @@ const SettingsScreen: React.FC = () => {
                   )}
                   {(settingsConfig?.categories?.['appearance']?.visible !== false) && (
                     <SettingItem
-                      title="Appearance"
+                      title={t('settings.appearance')}
                       description={currentTheme.name}
                       icon="sliders"
                       renderControl={() => <ChevronRight />}
@@ -609,8 +611,8 @@ const SettingsScreen: React.FC = () => {
                   )}
                   {(settingsConfig?.categories?.['integrations']?.visible !== false) && (
                     <SettingItem
-                      title="Integrations"
-                      description="MDBList, TMDB, AI"
+                      title={t('settings.integrations')}
+                      description={t('settings.mdblist_tmdb_ai')}
                       icon="layers"
                       renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('IntegrationsSettings')}
@@ -618,8 +620,8 @@ const SettingsScreen: React.FC = () => {
                   )}
                   {(settingsConfig?.categories?.['playback']?.visible !== false) && (
                     <SettingItem
-                      title="Playback"
-                      description="Player, trailers, downloads"
+                      title={t('settings.playback')}
+                      description={t('settings.player_trailers_downloads')}
                       icon="play-circle"
                       renderControl={() => <ChevronRight />}
                       onPress={() => navigation.navigate('PlaybackSettings')}
@@ -637,7 +639,7 @@ const SettingsScreen: React.FC = () => {
                 <SettingsCard title="DATA">
                   {(settingsConfig?.categories?.['backup']?.visible !== false) && (
                     <SettingItem
-                      title="Backup & Restore"
+                      title={t('settings.backup_restore')}
                       description="Create and restore app backups"
                       icon="archive"
                       renderControl={() => <ChevronRight />}
@@ -647,7 +649,7 @@ const SettingsScreen: React.FC = () => {
                   {(settingsConfig?.categories?.['updates']?.visible !== false) && (
                     <SettingItem
                       title="App Updates"
-                      description="Check for updates"
+                      description={t('settings.check_updates')}
                       icon="refresh-ccw"
                       badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
                       renderControl={() => <ChevronRight />}
@@ -668,7 +670,7 @@ const SettingsScreen: React.FC = () => {
             {mdblistKeySet && (
               <SettingsCard title="CACHE">
                 <SettingItem
-                  title="Clear MDBList Cache"
+                  title={t('settings.clear_mdblist_cache')}
                   icon="database"
                   onPress={handleClearMDBListCache}
                   isLast
@@ -677,7 +679,7 @@ const SettingsScreen: React.FC = () => {
             )}
 
             {/* About */}
-            <SettingsCard title="ABOUT">
+            <SettingsCard title={t('settings.about').toUpperCase()}>
               <SettingItem
                 title="About Nuvio"
                 description={getDisplayedAppVersion()}
@@ -690,10 +692,10 @@ const SettingsScreen: React.FC = () => {
 
             {/* Developer - only in DEV mode */}
             {__DEV__ && (
-              <SettingsCard title="DEVELOPER">
+              <SettingsCard title={t('settings.sections.testing')}>
                 <SettingItem
-                  title="Developer Tools"
-                  description="Testing and debug options"
+                  title={t('settings.items.developer_tools')}
+                  description={t('settings.developer_tools')}
                   icon="code"
                   renderControl={() => <ChevronRight />}
                   onPress={() => navigation.navigate('DeveloperSettings')}
@@ -709,7 +711,7 @@ const SettingsScreen: React.FC = () => {
                   {displayDownloads.toLocaleString()}
                 </Text>
                 <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
-                  downloads and counting
+                  {t('settings.downloads_counter')}
                 </Text>
               </View>
             )}
@@ -788,7 +790,7 @@ const SettingsScreen: React.FC = () => {
 
             <View style={styles.footer}>
               <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
-                Made with ❤️ by Tapframe and friends
+                {t('settings.made_with_love')}
               </Text>
             </View>
 
