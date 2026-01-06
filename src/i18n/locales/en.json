@@ -604,6 +604,7 @@
         "made_with_love": "Made with ❤️ by Tapframe and friends",
         "sections": {
             "information": "INFORMATION",
+            "account": "ACCOUNT",
             "theme": "THEME",
             "layout": "LAYOUT",
             "sources": "SOURCES",
