@@ -12,9 +12,9 @@ import {
   Platform,
   Dimensions,
   Linking,
-  Modal,
   FlatList,
 } from 'react-native';
+import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useTranslation } from 'react-i18next';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
@@ -150,7 +150,22 @@ const SettingsScreen: React.FC = () => {
   ];
   const { settings, updateSetting } = useSettings();
   const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
-  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const languageSheetRef = useRef<BottomSheetModal>(null);
+  const insets = useSafeAreaInsets();
+
+  // Render backdrop for bottom sheet
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.6}
+      />
+    ),
+    []
+  );
+
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -184,7 +199,6 @@ const SettingsScreen: React.FC = () => {
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
   const { currentTheme } = useTheme();
-  const insets = useSafeAreaInsets();
 
   // Tablet-specific state
   const [selectedCategory, setSelectedCategory] = useState('account');
@@ -589,11 +603,13 @@ const SettingsScreen: React.FC = () => {
                     description={
                       i18n.language === 'pt' ? t('settings.portuguese') : 
                       i18n.language === 'ar' ? t('settings.arabic') : 
+                      i18n.language === 'es' ? t('settings.spanish') : 
+                      i18n.language === 'fr' ? t('settings.french') : 
                       t('settings.english')
                     }
                     icon="globe"
                     renderControl={() => <ChevronRight />}
-                    onPress={() => setLanguageModalVisible(true)}
+                    onPress={() => languageSheetRef.current?.present()}
                   />
                   {(settingsConfig?.categories?.['content']?.visible !== false) && (
                     <SettingItem
@@ -810,90 +826,147 @@ const SettingsScreen: React.FC = () => {
         onClose={() => setAlertVisible(false)}
       />
 
-      <Modal
-        visible={languageModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setLanguageModalVisible(false)}
+      <BottomSheetModal
+        ref={languageSheetRef}
+        index={0}
+        snapPoints={['50%']}
+        enablePanDownToClose={true}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{
+          backgroundColor: currentTheme.colors.darkGray || '#0A0C0C',
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+        }}
+        handleIndicatorStyle={{
+          backgroundColor: currentTheme.colors.mediumGray,
+          width: 40,
+        }}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setLanguageModalVisible(false)}
-        >
-          <View style={[styles.modalContent, { backgroundColor: currentTheme.colors.elevation1 }]}>
-            <Text style={[styles.modalTitle, { color: currentTheme.colors.highEmphasis }]}>
+        <BottomSheetView style={[styles.actionSheetContent, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.bottomSheetHeader, { backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }]}>
+            <Text style={[styles.bottomSheetTitle, { color: currentTheme.colors.white }]}>
               {t('settings.select_language')}
             </Text>
-
-            <TouchableOpacity
-              style={[
-                styles.languageOption,
-                i18n.language === 'en' && { backgroundColor: currentTheme.colors.primary + '20' }
-              ]}
-              onPress={() => {
-                i18n.changeLanguage('en');
-                setLanguageModalVisible(false);
-              }}
-            >
-              <Text style={[
-                styles.languageText,
-                { color: currentTheme.colors.highEmphasis },
-                i18n.language === 'en' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
-              ]}>
-                {t('settings.english')}
-              </Text>
-              {i18n.language === 'en' && (
-                <Feather name="check" size={20} color={currentTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.languageOption,
-                i18n.language === 'pt' && { backgroundColor: currentTheme.colors.primary + '20' }
-              ]}
-              onPress={() => {
-                i18n.changeLanguage('pt');
-                setLanguageModalVisible(false);
-              }}
-            >
-              <Text style={[
-                styles.languageText,
-                { color: currentTheme.colors.highEmphasis },
-                i18n.language === 'pt' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
-              ]}>
-                {t('settings.portuguese')}
-              </Text>
-              {i18n.language === 'pt' && (
-                <Feather name="check" size={20} color={currentTheme.colors.primary} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.languageOption,
-                i18n.language === 'ar' && { backgroundColor: currentTheme.colors.primary + '20' }
-              ]}
-              onPress={() => {
-                i18n.changeLanguage('ar');
-                setLanguageModalVisible(false);
-              }}
-            >
-              <Text style={[
-                styles.languageText,
-                { color: currentTheme.colors.highEmphasis },
-                i18n.language === 'ar' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
-              ]}>
-                {t('settings.arabic')}
-              </Text>
-              {i18n.language === 'ar' && (
-                <Feather name="check" size={20} color={currentTheme.colors.primary} />
-              )}
+            <TouchableOpacity onPress={() => languageSheetRef.current?.close()}>
+              <Feather name="x" size={24} color={currentTheme.colors.lightGray} />
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </Modal>
+          <ScrollView
+            style={{ backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }}
+            contentContainerStyle={styles.bottomSheetContent}
+          >
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              i18n.language === 'en' && { backgroundColor: currentTheme.colors.primary + '20' }
+            ]}
+            onPress={() => {
+              i18n.changeLanguage('en');
+              languageSheetRef.current?.close();
+            }}
+          >
+            <Text style={[
+              styles.languageText,
+              { color: currentTheme.colors.highEmphasis },
+              i18n.language === 'en' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+            ]}>
+              {t('settings.english')}
+            </Text>
+            {i18n.language === 'en' && (
+              <Feather name="check" size={20} color={currentTheme.colors.primary} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              i18n.language === 'pt' && { backgroundColor: currentTheme.colors.primary + '20' }
+            ]}
+            onPress={() => {
+              i18n.changeLanguage('pt');
+              languageSheetRef.current?.close();
+            }}
+          >
+            <Text style={[
+              styles.languageText,
+              { color: currentTheme.colors.highEmphasis },
+              i18n.language === 'pt' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+            ]}>
+              {t('settings.portuguese')}
+            </Text>
+            {i18n.language === 'pt' && (
+              <Feather name="check" size={20} color={currentTheme.colors.primary} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              i18n.language === 'ar' && { backgroundColor: currentTheme.colors.primary + '20' }
+            ]}
+            onPress={() => {
+              i18n.changeLanguage('ar');
+              languageSheetRef.current?.close();
+            }}
+          >
+            <Text style={[
+              styles.languageText,
+              { color: currentTheme.colors.highEmphasis },
+              i18n.language === 'ar' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+            ]}>
+              {t('settings.arabic')}
+            </Text>
+            {i18n.language === 'ar' && (
+              <Feather name="check" size={20} color={currentTheme.colors.primary} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              i18n.language === 'es' && { backgroundColor: currentTheme.colors.primary + '20' }
+            ]}
+            onPress={() => {
+              i18n.changeLanguage('es');
+              languageSheetRef.current?.close();
+            }}
+          >
+            <Text style={[
+              styles.languageText,
+              { color: currentTheme.colors.highEmphasis },
+              i18n.language === 'es' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+            ]}>
+              {t('settings.spanish')}
+            </Text>
+            {i18n.language === 'es' && (
+              <Feather name="check" size={20} color={currentTheme.colors.primary} />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              i18n.language === 'fr' && { backgroundColor: currentTheme.colors.primary + '20' }
+            ]}
+            onPress={() => {
+              i18n.changeLanguage('fr');
+              languageSheetRef.current?.close();
+            }}
+          >
+            <Text style={[
+              styles.languageText,
+              { color: currentTheme.colors.highEmphasis },
+              i18n.language === 'fr' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+            ]}>
+              {t('settings.french')}
+            </Text>
+            {i18n.language === 'fr' && (
+              <Feather name="check" size={20} color={currentTheme.colors.primary} />
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+        </BottomSheetView>
+      </BottomSheetModal>
     </View>
   );
 };
@@ -902,32 +975,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  modalOverlay: {
+  actionSheetContent: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
+  },
+  bottomSheetHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  modalContent: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: 16,
-    padding: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  modalTitle: {
+  bottomSheetTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
+    fontWeight: '600',
+  },
+  bottomSheetContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   languageOption: {
     flexDirection: 'row',
