@@ -301,7 +301,12 @@
         "no_content_found": "No content found",
         "no_content_filters": "No content found for the selected filters",
         "loading_content": "Loading content...",
-        "back": "Back"
+        "back": "Back",
+        "in_theaters": "In Theaters",
+        "all": "All",
+        "failed_tmdb": "Failed to load content from TMDB",
+        "movies": "Movies",
+        "tv_shows": "TV Shows"
     },
     "streams": {
         "back_to_episodes": "Back to Episodes",

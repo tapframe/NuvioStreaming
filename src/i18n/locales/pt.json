@@ -301,7 +301,12 @@
         "no_content_found": "Nenhum conteúdo encontrado",
         "no_content_filters": "Nenhum conteúdo encontrado para os filtros selecionados",
         "loading_content": "Carregando conteúdo...",
-        "back": "Voltar"
+        "back": "Voltar",
+        "in_theaters": "Em Cartaz",
+        "all": "Todos",
+        "failed_tmdb": "Falha ao carregar conteúdo do TMDB",
+        "movies": "Filmes",
+        "tv_shows": "Séries"
     },
     "streams": {
         "back_to_episodes": "Voltar aos Episódios",

@@ -1150,7 +1150,7 @@ const SearchScreen = () => {
 
       {/* ScreenHeader Component */}
       <ScreenHeader
-        title="Search"
+        title={t('search.title')}
         isTablet={isTV || isLargeTablet || isTablet}
       >
         {/* Search Bar */}

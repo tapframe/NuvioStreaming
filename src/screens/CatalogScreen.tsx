@@ -334,7 +334,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
     // Check if the name already includes content type indicators
     const lowerName = catalogName.toLowerCase();
-    const contentType = type === 'movie' ? 'Movies' : type === 'series' ? 'TV Shows' : `${type.charAt(0).toUpperCase() + type.slice(1)}s`;
+    const contentType = type === 'movie' ? t('catalog.movies') : type === 'series' ? t('catalog.tv_shows') : `${type.charAt(0).toUpperCase() + type.slice(1)}s`;
 
     // If the name already contains type information, return as is
     if (lowerName.includes('movie') || lowerName.includes('tv') || lowerName.includes('show') || lowerName.includes('series')) {
@@ -349,8 +349,8 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const displayName = actualCatalogName
     ? getCustomName(addonId || '', type || '', id || '', createDisplayName(actualCatalogName))
     : getCustomName(addonId || '', type || '', id || '', originalName ? createDisplayName(originalName) : '') ||
-    (genreFilter ? `${genreFilter} ${type === 'movie' ? 'Movies' : 'TV Shows'}` :
-      `${type.charAt(0).toUpperCase() + type.slice(1)}s`);
+    (genreFilter ? `${genreFilter} ${type === 'movie' ? t('catalog.movies') : t('catalog.tv_shows')}` :
+      (type === 'movie' ? t('catalog.movies') : type === 'series' ? t('catalog.tv_shows') : `${type.charAt(0).toUpperCase() + type.slice(1)}s`));
 
   // Add effect to get the actual catalog name and filter extras from addon manifest
   useEffect(() => {
@@ -509,7 +509,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         } catch (error) {
           logger.error('Failed to get TMDB catalog:', error);
           InteractionManager.runAfterInteractions(() => {
-            setError('Failed to load content from TMDB');
+            setError(t('catalog.failed_tmdb'));
             setItems([]);
             setLoading(false);
             setRefreshing(false);
@@ -793,7 +793,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
                       color={colors.white}
                       style={{ marginRight: 4 }}
                     />
-                    <Text style={styles.badgeText}>In Theaters</Text>
+                    <Text style={styles.badgeText}>{t('catalog.in_theaters')}</Text>
                   </View>
                 </GlassViewComp>
               ) : (
@@ -805,7 +805,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
                       color={colors.white}
                       style={{ marginRight: 4 }}
                     />
-                    <Text style={styles.badgeText}>In Theaters</Text>
+                    <Text style={styles.badgeText}>{t('catalog.in_theaters')}</Text>
                   </View>
                 </BlurView>
               )}
@@ -818,7 +818,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
                 color={colors.white}
                 style={{ marginRight: 4 }}
               />
-              <Text style={styles.badgeText}>In Theaters</Text>
+              <Text style={styles.badgeText}>{t('catalog.in_theaters')}</Text>
             </View>
           )
         )}
@@ -892,7 +892,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
           >
             <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t('catalog.back')}</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.headerTitle}>{displayName || originalName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
@@ -911,7 +911,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             onPress={() => navigation.goBack()}
           >
             <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-            <Text style={styles.backText}>Back</Text>
+            <Text style={styles.backText}>{t('catalog.back')}</Text>
           </TouchableOpacity>
         </View>
         <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
@@ -929,7 +929,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('catalog.back')}</Text>
         </TouchableOpacity>
       </View>
       <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
@@ -955,7 +955,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
                   <Text style={[
                     styles.filterChipText,
                     (extra.name === 'genre' ? !activeGenreFilter : !selectedFilters[extra.name]) && styles.filterChipTextActive
-                  ]}>All</Text>
+                  ]}>{t('catalog.all')}</Text>
                 </TouchableOpacity>
 
                 {/* Filter options from catalog extra */}
