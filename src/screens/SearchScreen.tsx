@@ -130,8 +130,11 @@ const SearchScreen = () => {
   const catalogSnapPoints = useMemo(() => ['50%'], []);
   const genreSnapPoints = useMemo(() => ['50%'], []);
 
-  // Scroll to top handler
   const scrollToTop = useCallback(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  const handleHeaderPress = useCallback(() => {
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   }, []);
 
@@ -143,6 +146,36 @@ const SearchScreen = () => {
       isMounted.current = false;
     };
   }, []);
+
+  // NEW: Add focus event listener for when Search tab is pressed while already on Search screen
+  useEffect(() => {
+    const focusSubscription = DeviceEventEmitter.addListener(
+      'FOCUS_SEARCH_INPUT',
+      () => {
+        console.log('Search tab pressed while on Search screen - focusing input');
+
+        // Clear any search results to show a fresh state
+        if (query.length === 0) {
+          setResults({ byAddon: [], allResults: [] });
+          setSearched(false);
+          setShowRecent(true);
+          loadRecentSearches();
+        }
+
+        // Focus the input after a small delay
+        setTimeout(() => {
+          if (inputRef.current && isMounted.current) {
+            console.log('Focusing search input');
+            inputRef.current.focus();
+          }
+        }, 100);
+      }
+    );
+
+    return () => {
+      focusSubscription.remove();
+    };
+  }, [query]);
 
   const handleShowMore = () => {
     if (pendingDiscoverResults.length === 0) return;
@@ -906,10 +939,10 @@ const SearchScreen = () => {
           isGrid && styles.discoverGridItem
         ]}
         onPress={() => {
-          navigation.navigate('Metadata', { 
-            id: item.id, 
+          navigation.navigate('Metadata', {
+            id: item.id,
             type: item.type,
-            addonId: item.addonId 
+            addonId: item.addonId
           });
         }}
         onLongPress={() => {
@@ -1147,60 +1180,67 @@ const SearchScreen = () => {
       />
 
       {/* ScreenHeader Component */}
-      <ScreenHeader
-        title="Search"
-        isTablet={isTV || isLargeTablet || isTablet}
+      <TouchableOpacity
+        onPress={handleHeaderPress}
+        activeOpacity={1}
       >
-        {/* Search Bar */}
-        <View style={styles.searchBarContainer}>
-          <View style={[
-            styles.searchBarWrapper,
-            { width: '100%' }
-          ]}>
+        <ScreenHeader
+          title="Search"
+          isTablet={isTV || isLargeTablet || isTablet}
+        >
+          {/* Search Bar */}
+          <View style={styles.searchBarContainer}>
             <View style={[
-              styles.searchBar,
-              {
-                backgroundColor: currentTheme.colors.elevation2,
-                borderColor: 'rgba(255,255,255,0.1)',
-                borderWidth: 1,
-              }
+              styles.searchBarWrapper,
+              { width: '100%' }
             ]}>
-              <MaterialIcons
-                name="search"
-                size={24}
-                color={currentTheme.colors.lightGray}
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={[
-                  styles.searchInput,
-                  { color: currentTheme.colors.white }
-                ]}
-                placeholder="Search movies, shows..."
-                placeholderTextColor={currentTheme.colors.lightGray}
-                value={query}
-                onChangeText={setQuery}
-                returnKeyType="search"
-                keyboardAppearance="dark"
-                ref={inputRef}
-              />
-              {query.length > 0 && (
-                <TouchableOpacity
-                  onPress={handleClearSearch}
-                  style={styles.clearButton}
-                  hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                >
-                  <MaterialIcons
-                    name="close"
-                    size={20}
-                    color={currentTheme.colors.lightGray}
-                  />
-                </TouchableOpacity>
-              )}
+              <View style={[
+                styles.searchBar,
+                {
+                  backgroundColor: currentTheme.colors.elevation2,
+                  borderColor: 'rgba(255,255,255,0.1)',
+                  borderWidth: 1,
+                }
+              ]}>
+                <MaterialIcons
+                  name="search"
+                  size={24}
+                  color={currentTheme.colors.lightGray}
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    { color: currentTheme.colors.white }
+                  ]}
+                  placeholder="Search movies, shows..."
+                  placeholderTextColor={currentTheme.colors.lightGray}
+                  value={query}
+                  onChangeText={setQuery}
+                  returnKeyType="search"
+                  keyboardAppearance="dark"
+                  ref={inputRef}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
+                />
+                {query.length > 0 && (
+                  <TouchableOpacity
+                    onPress={handleClearSearch}
+                    style={styles.clearButton}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                  >
+                    <MaterialIcons
+                      name="close"
+                      size={20}
+                      color={currentTheme.colors.lightGray}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
-        </View>
-      </ScreenHeader>
+        </ScreenHeader>
+      </TouchableOpacity>
 
       {/* Content Container */}
       <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
