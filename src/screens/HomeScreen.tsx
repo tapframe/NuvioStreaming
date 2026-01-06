@@ -45,7 +45,11 @@ import * as Haptics from 'expo-haptics';
 import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { storageService } from '../services/storageService';
-import { getCatalogDisplayName, clearCustomNameCache } from '../utils/catalogNameUtils';
+import {
+  getCatalogDisplayName,
+  getFormattedCatalogName,
+  clearCustomNameCache
+} from '../utils/catalogNameUtils';
 import { useHomeCatalogs } from '../hooks/useHomeCatalogs';
 import { useFeaturedContent } from '../hooks/useFeaturedContent';
 import { useSettings, settingsEmitter } from '../hooks/useSettings';
@@ -94,13 +98,6 @@ type HomeScreenListItem =
   | { type: 'placeholder'; key: string }
   | { type: 'welcome'; key: string }
   | { type: 'loadMore'; key: string };
-
-// Sample categories (real app would get these from API)
-const SAMPLE_CATEGORIES: Category[] = [
-  { id: 'movie', name: 'Movies' },
-  { id: 'series', name: 'Series' },
-  { id: 'channel', name: 'Channels' },
-];
 
 const SkeletonCatalog = React.memo(() => {
   const { currentTheme } = useTheme();
@@ -279,21 +276,13 @@ const HomeScreen = () => {
                     const isCustom = displayName !== originalName;
 
                     if (!isCustom) {
-                      // De-duplicate repeated words (case-insensitive)
-                      const words = displayName.split(' ').filter(Boolean);
-                      const uniqueWords: string[] = [];
-                      const seen = new Set<string>();
-                      for (const w of words) {
-                        const lw = w.toLowerCase();
-                        if (!seen.has(lw)) { uniqueWords.push(w); seen.add(lw); }
-                      }
-                      displayName = uniqueWords.join(' ');
-
-                      // Append content type if not present
-                      const contentType = catalog.type === 'movie' ? t('home.movies') : t('home.tv_shows');
-                      if (!displayName.toLowerCase().includes(contentType.toLowerCase())) {
-                        displayName = `${displayName} ${contentType}`;
-                      }
+                      displayName = getFormattedCatalogName(
+                        displayName,
+                        catalog.type,
+                        t('home.movies'),
+                        t('home.tv_shows'),
+                        t('home.channels')
+                      );
                     }
 
                     const catalogContent = {
@@ -301,6 +290,7 @@ const HomeScreen = () => {
                       type: catalog.type,
                       id: catalog.id,
                       name: displayName,
+                      originalName: originalName,
                       items
                     };
 

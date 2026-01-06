@@ -24,6 +24,15 @@
             "minutes_ago": "{{count}}m ago",
             "hours_ago": "{{count}}h ago",
             "days_ago": "{{count}}d ago"
+        },
+        "days_short": {
+            "sun": "Sun",
+            "mon": "Mon",
+            "tue": "Tue",
+            "wed": "Wed",
+            "thu": "Thu",
+            "fri": "Fri",
+            "sat": "Sat"
         }
     },
     "home": {
@@ -41,6 +50,10 @@
         "sign_in_desc": "You can sign in anytime from Settings → Account",
         "view_all": "View All",
         "this_week": "This Week",
+        "upcoming": "Upcoming",
+        "recently_released": "Recently Released",
+        "no_scheduled_episodes": "Series with No Scheduled Episodes",
+        "check_back_later": "Check back later",
         "continue_watching": "Continue Watching",
         "up_next": "Up Next",
         "up_next_caps": "UP NEXT",
@@ -306,7 +319,8 @@
         "all": "All",
         "failed_tmdb": "Failed to load content from TMDB",
         "movies": "Movies",
-        "tv_shows": "TV Shows"
+        "tv_shows": "TV Shows",
+        "channels": "Channels"
     },
     "streams": {
         "back_to_episodes": "Back to Episodes",
@@ -563,6 +577,7 @@
         "select_language": "Select Language",
         "english": "English",
         "portuguese": "Portuguese",
+        "arabic": "Arabic",
         "account": "Account",
         "content_discovery": "Content & Discovery",
         "appearance": "Appearance",
@@ -870,6 +885,17 @@
             "movies": "Movies",
             "tv_shows": "TV Shows"
         }
+    },
+    "calendar": {
+        "title": "Calendar",
+        "loading": "Loading calendar...",
+        "no_scheduled_episodes": "No scheduled episodes",
+        "check_back_later": "Check back later",
+        "showing_episodes_for": "Showing episodes for {{date}}",
+        "show_all_episodes": "Show All Episodes",
+        "no_episodes_for": "No episodes for {{date}}",
+        "no_upcoming_found": "No upcoming episodes found",
+        "add_series_desc": "Add series to your library to see their upcoming episodes here"
     },
     "mdblist": {
         "title": "Rating Sources",

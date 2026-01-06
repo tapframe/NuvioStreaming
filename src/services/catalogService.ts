@@ -54,7 +54,6 @@ export interface StreamingContent {
   id: string;
   type: string;
   name: string;
-  addonId?: string;
   tmdbId?: number;
   poster: string;
   posterShape?: 'poster' | 'square' | 'landscape';
@@ -140,6 +139,7 @@ export interface CatalogContent {
   type: string;
   id: string;
   name: string;
+  originalName?: string;
   genre?: string;
   items: StreamingContent[];
 }
@@ -375,7 +375,7 @@ class CatalogService {
       if (metas && metas.length > 0) {
         // Cap items per catalog to reduce memory and rendering load
         const limited = metas.slice(0, 12);
-        const items = limited.map(meta => this.convertMetaToStreamingContent(meta, addon.id));
+        const items = limited.map(meta => this.convertMetaToStreamingContent(meta));
 
         // Get potentially custom display name; if customized, respect it as-is
         const originalName = catalog.name || catalog.id;
@@ -467,7 +467,7 @@ class CatalogService {
             const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
 
             if (metas && metas.length > 0) {
-              const items = metas.map(meta => this.convertMetaToStreamingContent(meta, addon.id));
+              const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
 
               // Get potentially custom display name
               const displayName = await getCatalogDisplayName(addon.id, catalog.type, catalog.id, catalog.name);
@@ -704,7 +704,7 @@ class CatalogService {
         });
 
         // Add to recent content using enhanced conversion for full metadata
-        const content = this.convertMetaToStreamingContentEnhanced(meta, preferredAddonId);
+        const content = this.convertMetaToStreamingContentEnhanced(meta);
         this.addToRecentContent(content);
 
         // Check if it's in the library
@@ -798,7 +798,7 @@ class CatalogService {
 
       if (meta) {
         // Use basic conversion without enhanced metadata processing
-        const content = this.convertMetaToStreamingContent(meta, preferredAddonId);
+        const content = this.convertMetaToStreamingContent(meta);
 
         // Check if it's in the library
         content.inLibrary = this.library[`${type}:${id}`] !== undefined;
@@ -817,7 +817,7 @@ class CatalogService {
     }
   }
 
-  private convertMetaToStreamingContent(meta: Meta, addonId?: string): StreamingContent {
+  private convertMetaToStreamingContent(meta: Meta): StreamingContent {
     // Basic conversion for catalog display - no enhanced metadata processing
     // Use addon's poster if available, otherwise use placeholder
     let posterUrl = meta.poster;
@@ -835,7 +835,6 @@ class CatalogService {
       id: meta.id,
       type: meta.type,
       name: meta.name,
-      addonId,
       poster: posterUrl,
       posterShape: meta.posterShape || 'poster', // Use addon's shape or default to poster type
       banner: meta.background,
@@ -852,13 +851,12 @@ class CatalogService {
   }
 
   // Enhanced conversion for detailed metadata (used only when fetching individual content details)
-  private convertMetaToStreamingContentEnhanced(meta: Meta, addonId?: string): StreamingContent {
+  private convertMetaToStreamingContentEnhanced(meta: Meta): StreamingContent {
     // Enhanced conversion to utilize all available metadata from addons
     const converted: StreamingContent = {
       id: meta.id,
       type: meta.type,
       name: meta.name,
-      addonId,
       poster: meta.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
       posterShape: meta.posterShape || 'poster',
       banner: meta.background,
@@ -1145,23 +1143,22 @@ class CatalogService {
         const supportsGenre = catalog.extra?.some(e => e.name === 'genre') ||
           catalog.extraSupported?.includes('genre');
 
-        // If genre is specified but not supported, we still fetch but without the filter
-        // This ensures we don't skip addons that don't support the filter
+        // If genre is specified, only use catalogs that support genre OR have no filter restrictions
+        // If genre is specified but catalog doesn't support genre filter, skip it
+        if (genre && !supportsGenre) {
+          continue;
+        }
 
         const manifest = manifests.find(m => m.id === addon.id);
         if (!manifest) continue;
 
         const fetchPromise = (async () => {
           try {
-            // Only apply genre filter if supported
-            const filters = (genre && supportsGenre) ? [{ title: 'genre', value: genre }] : [];
+            const filters = genre ? [{ title: 'genre', value: genre }] : [];
             const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
 
             if (metas && metas.length > 0) {
-              const items = metas.slice(0, limit).map(meta => ({
-                ...this.convertMetaToStreamingContent(meta),
-                addonId: addon.id  // Attach addon ID to each result
-              }));
+              const items = metas.slice(0, limit).map(meta => this.convertMetaToStreamingContent(meta));
               return {
                 addonName: addon.name,
                 items
@@ -1213,35 +1210,22 @@ class CatalogService {
     catalogId: string,
     type: string,
     genre?: string,
-    page: number = 1
+    limit: number = 20
   ): Promise<StreamingContent[]> {
     try {
       const manifests = await stremioService.getInstalledAddonsAsync();
       const manifest = manifests.find(m => m.id === addonId);
-
+      
       if (!manifest) {
         logger.error(`Addon ${addonId} not found`);
         return [];
       }
 
-      // Find the catalog to check if it supports genre filter
-      const addon = (await this.getAllAddons()).find(a => a.id === addonId);
-      const catalog = addon?.catalogs?.find(c => c.id === catalogId);
-
-      // Check if catalog supports genre filter
-      const supportsGenre = catalog?.extra?.some((e: any) => e.name === 'genre') ||
-        catalog?.extraSupported?.includes('genre');
-
-      // Only apply genre filter if the catalog supports it
-      const filters = (genre && supportsGenre) ? [{ title: 'genre', value: genre }] : [];
-
-      const metas = await stremioService.getCatalog(manifest, type, catalogId, page, filters);
+      const filters = genre ? [{ title: 'genre', value: genre }] : [];
+      const metas = await stremioService.getCatalog(manifest, type, catalogId, 1, filters);
 
       if (metas && metas.length > 0) {
-        return metas.map(meta => ({
-          ...this.convertMetaToStreamingContent(meta),
-          addonId: addonId
-        }));
+        return metas.slice(0, limit).map(meta => this.convertMetaToStreamingContent(meta));
       }
       return [];
     } catch (error) {
@@ -1534,10 +1518,7 @@ class CatalogService {
       const metas = response.data?.metas || [];
 
       if (metas.length > 0) {
-        const items = metas.map(meta => ({
-          ...this.convertMetaToStreamingContent(meta),
-          addonId: addon.id
-        }));
+        const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
         logger.log(`Found ${items.length} results from ${addon.name}`);
         return items;
       }

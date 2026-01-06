@@ -39,6 +39,7 @@ if (Platform.OS === 'ios') {
   }
 }
 import { logger } from '../utils/logger';
+import { getFormattedCatalogName } from '../utils/catalogNameUtils';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { catalogService, DataSource, StreamingContent } from '../services/catalogService';
@@ -59,6 +60,28 @@ const SPACING = {
 };
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
+
+const { width } = Dimensions.get('window');
+
+// Enhanced responsive breakpoints (matching CatalogSection)
+const BREAKPOINTS = {
+  phone: 0,
+  tablet: 768,
+  largeTablet: 1024,
+  tv: 1440,
+};
+
+const getDeviceType = (deviceWidth: number) => {
+  if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+  if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+  if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+  return 'phone';
+};
+
+const deviceType = getDeviceType(width);
+const isTablet = deviceType === 'tablet';
+const isLargeTablet = deviceType === 'largeTablet';
+const isTV = deviceType === 'tv';
 
 // Dynamic column and spacing calculation based on screen width
 const calculateCatalogLayout = (screenWidth: number) => {
@@ -130,13 +153,27 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.primary,
   },
   headerTitle: {
-    fontSize: 34,
-    fontWeight: '700',
     color: colors.white,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 4,
     paddingTop: 8,
     width: '100%',
+  },
+  titleContainer: {
+    position: 'relative',
+    marginBottom: SPACING.md,
+  },
+  catalogTitle: {
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  titleUnderline: {
+    position: 'absolute',
+    bottom: -2,
+    left: 16,
+    borderRadius: 2,
+    opacity: 0.8,
   },
   list: {
     padding: SPACING.lg,
@@ -330,19 +367,13 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
   // Create display name with proper type suffix
   const createDisplayName = (catalogName: string) => {
-    if (!catalogName) return '';
-
-    // Check if the name already includes content type indicators
-    const lowerName = catalogName.toLowerCase();
-    const contentType = type === 'movie' ? t('catalog.movies') : type === 'series' ? t('catalog.tv_shows') : `${type.charAt(0).toUpperCase() + type.slice(1)}s`;
-
-    // If the name already contains type information, return as is
-    if (lowerName.includes('movie') || lowerName.includes('tv') || lowerName.includes('show') || lowerName.includes('series')) {
-      return catalogName;
-    }
-
-    // Otherwise append the content type
-    return `${catalogName} ${contentType}`;
+    return getFormattedCatalogName(
+      catalogName,
+      type,
+      t('catalog.movies'),
+      t('catalog.tv_shows'),
+      t('catalog.channels')
+    );
   };
 
   // Use actual catalog name if available, otherwise fallback to custom name or original name
@@ -350,7 +381,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     ? getCustomName(addonId || '', type || '', id || '', createDisplayName(actualCatalogName))
     : getCustomName(addonId || '', type || '', id || '', originalName ? createDisplayName(originalName) : '') ||
     (genreFilter ? `${genreFilter} ${type === 'movie' ? t('catalog.movies') : t('catalog.tv_shows')}` :
-      (type === 'movie' ? t('catalog.movies') : type === 'series' ? t('catalog.tv_shows') : `${type.charAt(0).toUpperCase() + type.slice(1)}s`));
+      (originalName ? createDisplayName(originalName) : (type === 'movie' ? t('catalog.movies') : t('catalog.tv_shows'))));
 
   // Add effect to get the actual catalog name and filter extras from addon manifest
   useEffect(() => {
@@ -895,7 +926,25 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             <Text style={styles.backText}>{t('catalog.back')}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>{displayName || originalName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+        <View style={styles.titleContainer}>
+          <Text style={[
+            styles.headerTitle,
+            {
+              fontSize: isTV ? 38 : isLargeTablet ? 36 : isTablet ? 34 : 34,
+            }
+          ]}>
+            {displayName || originalName || (type === 'movie' ? t('catalog.movies') : t('catalog.tv_shows'))}
+          </Text>
+          <View
+            style={[
+              styles.titleUnderline,
+              {
+                backgroundColor: colors.primary,
+                width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 56,
+              }
+            ]}
+          />
+        </View>
         {renderLoadingState()}
       </SafeAreaView>
     );
@@ -914,7 +963,25 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             <Text style={styles.backText}>{t('catalog.back')}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+        <View style={styles.titleContainer}>
+          <Text style={[
+            styles.headerTitle,
+            {
+              fontSize: isTV ? 38 : isLargeTablet ? 36 : isTablet ? 34 : 34,
+            }
+          ]}>
+            {displayName || (type === 'movie' ? t('catalog.movies') : t('catalog.tv_shows'))}
+          </Text>
+          <View
+            style={[
+              styles.titleUnderline,
+              {
+                backgroundColor: colors.primary,
+                width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 56,
+              }
+            ]}
+          />
+        </View>
         {renderErrorState()}
       </SafeAreaView>
     );
@@ -932,7 +999,25 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           <Text style={styles.backText}>{t('catalog.back')}</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.headerTitle}>{displayName || `${type.charAt(0).toUpperCase() + type.slice(1)}s`}</Text>
+      <View style={styles.titleContainer}>
+        <Text style={[
+          styles.headerTitle,
+          {
+            fontSize: isTV ? 38 : isLargeTablet ? 36 : isTablet ? 34 : 34,
+          }
+        ]}>
+          {displayName || (type === 'movie' ? t('catalog.movies') : t('catalog.tv_shows'))}
+        </Text>
+        <View
+          style={[
+            styles.titleUnderline,
+            {
+              backgroundColor: colors.primary,
+              width: isTV ? 80 : isLargeTablet ? 72 : isTablet ? 64 : 56,
+            }
+          ]}
+        />
+      </View>
 
       {/* Filter chip bar - shows when catalog has filterable extras */}
       {catalogExtras.length > 0 && (

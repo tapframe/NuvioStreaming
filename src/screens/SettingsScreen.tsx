@@ -586,7 +586,11 @@ const SettingsScreen: React.FC = () => {
                 <SettingsCard title="GENERAL">
                   <SettingItem
                     title={t('settings.language')}
-                    description={i18n.language === 'pt' ? t('settings.portuguese') : t('settings.english')}
+                    description={
+                      i18n.language === 'pt' ? t('settings.portuguese') : 
+                      i18n.language === 'ar' ? t('settings.arabic') : 
+                      t('settings.english')
+                    }
                     icon="globe"
                     renderControl={() => <ChevronRight />}
                     onPress={() => setLanguageModalVisible(true)}
@@ -862,6 +866,28 @@ const SettingsScreen: React.FC = () => {
                 {t('settings.portuguese')}
               </Text>
               {i18n.language === 'pt' && (
+                <Feather name="check" size={20} color={currentTheme.colors.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                i18n.language === 'ar' && { backgroundColor: currentTheme.colors.primary + '20' }
+              ]}
+              onPress={() => {
+                i18n.changeLanguage('ar');
+                setLanguageModalVisible(false);
+              }}
+            >
+              <Text style={[
+                styles.languageText,
+                { color: currentTheme.colors.highEmphasis },
+                i18n.language === 'ar' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+              ]}>
+                {t('settings.arabic')}
+              </Text>
+              {i18n.language === 'ar' && (
                 <Feather name="check" size={20} color={currentTheme.colors.primary} />
               )}
             </TouchableOpacity>

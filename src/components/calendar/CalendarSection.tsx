@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { InteractionManager } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -16,7 +17,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 7; // 7 days in a week
 const DAY_ITEM_SIZE = (width - 32 - 56) / 7; // Slightly smaller than 1/7 to fit all days
-const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 interface CalendarEpisode {
   id: string;
@@ -76,8 +76,19 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   episodes = [], 
   onSelectDate 
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  const weekDays = [
+    t('common.days_short.sun'), 
+    t('common.days_short.mon'), 
+    t('common.days_short.tue'), 
+    t('common.days_short.wed'), 
+    t('common.days_short.thu'), 
+    t('common.days_short.fri'), 
+    t('common.days_short.sat')
+  ];
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const [uiReady, setUiReady] = useState(false);

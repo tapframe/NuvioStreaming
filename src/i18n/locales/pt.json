@@ -24,6 +24,15 @@
             "minutes_ago": "{{count}}m atrás",
             "hours_ago": "{{count}}h atrás",
             "days_ago": "{{count}}d atrás"
+        },
+        "days_short": {
+            "sun": "Dom",
+            "mon": "Seg",
+            "tue": "Ter",
+            "wed": "Qua",
+            "thu": "Qui",
+            "fri": "Sex",
+            "sat": "Sáb"
         }
     },
     "home": {
@@ -41,6 +50,10 @@
         "sign_in_desc": "Você pode entrar a qualquer momento em Configurações → Conta",
         "view_all": "Ver Tudo",
         "this_week": "Esta Semana",
+        "upcoming": "Próximos",
+        "recently_released": "Lançados Recentemente",
+        "no_scheduled_episodes": "Séries sem episódios agendados",
+        "check_back_later": "Volte mais tarde",
         "continue_watching": "Continue Assistindo",
         "up_next": "A Seguir",
         "up_next_caps": "A SEGUIR",
@@ -306,7 +319,8 @@
         "all": "Todos",
         "failed_tmdb": "Falha ao carregar conteúdo do TMDB",
         "movies": "Filmes",
-        "tv_shows": "Séries"
+        "tv_shows": "Séries",
+        "channels": "Canais"
     },
     "streams": {
         "back_to_episodes": "Voltar aos Episódios",
@@ -541,6 +555,7 @@
         "select_language": "Selecionar Idioma",
         "english": "Inglês",
         "portuguese": "Português",
+        "arabic": "Árabe",
         "account": "Conta",
         "content_discovery": "Conteúdo e Descoberta",
         "appearance": "Aparência",
@@ -838,6 +853,17 @@
             "movies": "Filmes",
             "tv_shows": "Séries e TV"
         }
+    },
+    "calendar": {
+        "title": "Calendário",
+        "loading": "Carregando calendário...",
+        "no_scheduled_episodes": "Sem episódios agendados",
+        "check_back_later": "Volte mais tarde",
+        "showing_episodes_for": "Mostrando episódios para {{date}}",
+        "show_all_episodes": "Mostrar Todos os Episódios",
+        "no_episodes_for": "Nenhum episódio para {{date}}",
+        "no_upcoming_found": "Nenhum episódio futuro encontrado",
+        "add_series_desc": "Adicione séries à sua biblioteca para ver os próximos episódios aqui"
     },
     "mdblist": {
         "title": "Fontes de Avaliação",
