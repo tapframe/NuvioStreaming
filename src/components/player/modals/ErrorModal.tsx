@@ -2,6 +2,7 @@ import React from 'react';
 import * as ExpoClipboard from 'expo-clipboard';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import Animated, {
     FadeIn,
     FadeOut,
@@ -22,6 +23,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
     errorDetails,
     onDismiss,
 }) => {
+    const { t } = useTranslation();
     const [copied, setCopied] = React.useState(false);
     const { width } = useWindowDimensions();
     const MODAL_WIDTH = Math.min(width * 0.8, 400);
@@ -79,7 +81,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
                     marginBottom: 8,
                     textAlign: 'center'
                 }}>
-                    Playback Error
+                    {t('player_ui.playback_error')}
                 </Text>
 
                 <Text
@@ -93,7 +95,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
                         lineHeight: 22
                     }}
                 >
-                    {errorDetails || 'An unknown error occurred during playback.'}
+                    {errorDetails || t('player_ui.unknown_error')}
                 </Text>
 
                 <TouchableOpacity
@@ -114,7 +116,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
                         style={{ marginRight: 6 }}
                     />
                     <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '500' }}>
-                        {copied ? 'Copied to clipboard' : 'Copy error details'}
+                        {copied ? t('player_ui.copied_to_clipboard') : t('player_ui.copy_error')}
                     </Text>
                 </TouchableOpacity>
 
@@ -135,7 +137,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
                         fontSize: 16,
                         fontWeight: '700'
                     }}>
-                        Dismiss
+                        {t('player_ui.dismiss')}
                     </Text>
                 </TouchableOpacity>
             </Animated.View>

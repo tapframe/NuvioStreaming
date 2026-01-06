@@ -866,7 +866,6 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                       styles.seasonTextButton,
                       {
                         marginRight: seasonButtonSpacing,
-                        width: isTV ? 150 : isLargeTablet ? 140 : isTablet ? 130 : 110,
                         paddingVertical: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12,
                         paddingHorizontal: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 16 : 16,
                         borderRadius: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
@@ -885,7 +884,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                         { color: currentTheme.colors.highEmphasis }
                       ]
                     ]} numberOfLines={1}>
-                      {season === 0 ? 'Specials' : `Season ${season}`}
+                      {season === 0 ? t('metadata.specials') : t('metadata.season_number', { number: season })}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -948,7 +947,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                       ]
                     ]}
                   >
-                    {season === 0 ? 'Specials' : `Season ${season}`}
+                    {season === 0 ? t('metadata.specials') : t('metadata.season_number', { number: season })}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1559,7 +1558,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
             paddingHorizontal: horizontalPadding
           }
         ]}>
-          {currentSeasonEpisodes.length} {currentSeasonEpisodes.length === 1 ? 'Episode' : 'Episodes'}
+          {currentSeasonEpisodes.length === 1 ? t('metadata.episode_count', { count: currentSeasonEpisodes.length }) : t('metadata.episode_count_plural', { count: currentSeasonEpisodes.length })}
         </Text>
 
         {/* Show message when no episodes are available for selected season */}
@@ -1567,10 +1566,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
           <View style={styles.centeredContainer}>
             <MaterialIcons name="schedule" size={48} color={currentTheme.colors.textMuted} />
             <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>
-              No episodes available for Season {selectedSeason}
+              {t('metadata.no_episodes_for_season', { season: selectedSeason })}
             </Text>
             <Text style={[styles.centeredSubText, { color: currentTheme.colors.textMuted }]}>
-              Episodes may not be released yet
+              {t('metadata.episodes_not_released')}
             </Text>
           </View>
         )}
@@ -1750,7 +1749,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                       fontSize: isTV ? 16 : 15,
                       fontWeight: '500',
                     }}>
-                      {markingAsWatched ? 'Removing...' : 'Mark as Unwatched'}
+                      {markingAsWatched ? t('metadata.removing') : t('metadata.mark_as_unwatched')}
                     </Text>
                   </TouchableOpacity>
                 ) : (
@@ -1777,7 +1776,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                       fontSize: isTV ? 16 : 15,
                       fontWeight: '600',
                     }}>
-                      {markingAsWatched ? 'Marking...' : 'Mark as Watched'}
+                      {markingAsWatched ? t('metadata.marking') : t('metadata.mark_as_watched')}
                     </Text>
                   </TouchableOpacity>
                 )
@@ -1809,7 +1808,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     fontWeight: '500',
                     flex: 1, // Allow text to take up space
                   }} numberOfLines={1}>
-                    {markingAsWatched ? 'Removing...' : `Unmark Season ${selectedSeason}`}
+                    {markingAsWatched ? t('metadata.removing') : t('metadata.unmark_season', { season: selectedSeason })}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -1837,7 +1836,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     fontWeight: '500',
                     flex: 1,
                   }} numberOfLines={1}>
-                    {markingAsWatched ? 'Marking...' : `Mark Season ${selectedSeason}`}
+                    {markingAsWatched ? t('metadata.marking') : t('metadata.mark_season', { season: selectedSeason })}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1856,7 +1855,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                   fontSize: isTV ? 15 : 14,
                   fontWeight: '500',
                 }}>
-                  Cancel
+                  {t('common.cancel')}
                 </Text>
               </TouchableOpacity>
             </View>

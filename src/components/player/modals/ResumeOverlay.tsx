@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { styles } from '../utils/playerStyles';
 import { formatTime } from '../utils/playerUtils';
 import { logger } from '../../../utils/logger';
@@ -27,6 +28,7 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
   handleResume,
   handleStartFromBeginning,
 }) => {
+  const { t } = useTranslation();
   useEffect(() => {
     // Removed excessive logging for props changes
   }, [showResumeOverlay, resumePosition, duration, title]);
@@ -35,9 +37,9 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
     // Removed excessive logging for overlay visibility
     return null;
   }
-  
+
   // Removed excessive logging for overlay rendering
-  
+
   return (
     <View style={styles.resumeOverlay}>
       <LinearGradient
@@ -49,18 +51,18 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
             <Ionicons name="play-circle" size={40} color="#E50914" />
           </View>
           <View style={styles.resumeTextContainer}>
-            <Text style={styles.resumeTitle}>Continue Watching</Text>
+            <Text style={styles.resumeTitle}>{t('player_ui.continue_watching')}</Text>
             <Text style={styles.resumeInfo}>
               {title}
               {season && episode && ` • S${season}E${episode}`}
             </Text>
             <View style={styles.resumeProgressContainer}>
               <View style={styles.resumeProgressBar}>
-                <View 
+                <View
                   style={[
-                    styles.resumeProgressFill, 
+                    styles.resumeProgressFill,
                     { width: `${duration > 0 ? (resumePosition / duration) * 100 : 0}%` }
-                  ]} 
+                  ]}
                 />
               </View>
               <Text style={styles.resumeTimeText}>
@@ -71,19 +73,19 @@ export const ResumeOverlay: React.FC<ResumeOverlayProps> = ({
         </View>
 
         <View style={styles.resumeButtons}>
-          <TouchableOpacity 
-            style={styles.resumeButton} 
+          <TouchableOpacity
+            style={styles.resumeButton}
             onPress={handleStartFromBeginning}
           >
             <Ionicons name="refresh" size={16} color="white" style={styles.buttonIcon} />
-            <Text style={styles.resumeButtonText}>Start Over</Text>
+            <Text style={styles.resumeButtonText}>{t('player_ui.start_over')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.resumeButton, styles.resumeFromButton]} 
+          <TouchableOpacity
+            style={[styles.resumeButton, styles.resumeFromButton]}
             onPress={handleResume}
           >
             <Ionicons name="play" size={16} color="white" style={styles.buttonIcon} />
-            <Text style={styles.resumeButtonText}>Resume</Text>
+            <Text style={styles.resumeButtonText}>{t('player_ui.resume')}</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>

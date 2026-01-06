@@ -7,6 +7,7 @@ import Animated, {
   SlideInRight,
   SlideOutRight,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { Episode } from '../../../types/metadata';
 import { Stream } from '../../../types/streams';
 import { stremioService } from '../../../services/stremioService';
@@ -58,6 +59,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
   onSelectStream,
   metadata,
 }) => {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const MENU_WIDTH = Math.min(width * 0.85, 400);
 
@@ -177,7 +179,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={{ color: 'white', fontSize: 20, fontWeight: '700' }} numberOfLines={1}>
-                {episode?.name || 'Sources'}
+                {episode?.name || t('player_ui.sources')}
               </Text>
               {episode && (
                 <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 4 }}>
@@ -195,7 +197,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           {isLoading && sortedProviders.length === 0 && (
             <View style={{ padding: 40, alignItems: 'center' }}>
               <ActivityIndicator color="white" />
-              <Text style={{ color: 'white', marginTop: 15, opacity: 0.6 }}>Finding sources...</Text>
+              <Text style={{ color: 'white', marginTop: 15, opacity: 0.6 }}>{t('player_ui.finding_sources')}</Text>
             </View>
           )}
 
@@ -237,7 +239,7 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                             <Text style={{ color: 'white', fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
-                              {stream.name || 'Unknown Source'}
+                              {stream.name || t('player_ui.unknown_source')}
                             </Text>
                             <QualityBadge quality={quality} />
                           </View>
@@ -258,13 +260,13 @@ export const EpisodeStreamsModal: React.FC<EpisodeStreamsModalProps> = ({
           {!isLoading && sortedProviders.length === 0 && (
             <View style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
               <MaterialIcons name="cloud-off" size={48} color="white" />
-              <Text style={{ color: 'white', marginTop: 16, textAlign: 'center', fontWeight: '600' }}>No sources found</Text>
+              <Text style={{ color: 'white', marginTop: 16, textAlign: 'center', fontWeight: '600' }}>{t('player_ui.no_sources_found')}</Text>
             </View>
           )}
 
           {hasErrors.length > 0 && (
             <View style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 12, padding: 12, marginTop: 10 }}>
-              <Text style={{ color: '#EF4444', fontSize: 11 }}>Sources might be limited due to provider errors.</Text>
+              <Text style={{ color: '#EF4444', fontSize: 11 }}>{t('player_ui.sources_limited')}</Text>
             </View>
           )}
         </ScrollView>
