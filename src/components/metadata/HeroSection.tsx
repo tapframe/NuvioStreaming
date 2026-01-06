@@ -51,6 +51,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { useTraktContext } from '../../contexts/TraktContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useTrailer } from '../../contexts/TrailerContext';
+import { useTranslation } from 'react-i18next';
 import { logger } from '../../utils/logger';
 import { TMDBService } from '../../services/tmdbService';
 import TrailerService from '../../services/trailerService';
@@ -149,6 +150,7 @@ const ActionButtons = memo(({
   onToggleCollection?: () => void;
 }) => {
   const { currentTheme } = useTheme();
+  const { t } = useTranslation();
   const { showSaved, showTraktSaved, showRemoved, showTraktRemoved, showSuccess, showInfo } = useToast();
 
   // Performance optimization: Cache theme colors
@@ -235,9 +237,9 @@ const ActionButtons = memo(({
 
     // Show appropriate toast
     if (wasInCollection) {
-      showInfo('Removed from Collection', 'Removed from your Trakt collection');
+      showInfo(t('metadata.removed_from_collection_hero'), t('metadata.removed_from_collection_desc_hero'));
     } else {
-      showSuccess('Added to Collection', 'Added to your Trakt collection');
+      showSuccess(t('metadata.added_to_collection_hero'), t('metadata.added_to_collection_desc_hero'));
     }
   }, [onToggleCollection, isInCollection, showSuccess, showInfo]);
 
@@ -263,7 +265,7 @@ const ActionButtons = memo(({
   const finalPlayButtonText = useMemo(() => {
     // For movies, handle watched state
     if (type === 'movie') {
-      return isWatched ? 'Watch Again' : playButtonText;
+      return isWatched ? t('metadata.watch_again') : playButtonText;
     }
 
     // For series, validate next episode existence for both watched and resume cases
@@ -306,7 +308,7 @@ const ActionButtons = memo(({
             return `Play S${seasonStr}E${episodeStr}`;
           } else {
             // If next episode doesn't exist, show generic text
-            return 'Completed';
+            return t('metadata.completed');
           }
         } else {
           // For non-watched episodes, check if current episode exists
@@ -320,17 +322,17 @@ const ActionButtons = memo(({
             return playButtonText;
           } else {
             // Current episode doesn't exist, fallback to generic play
-            return 'Play';
+            return t('metadata.play');
           }
         }
       }
 
       // Fallback label if parsing fails
-      return isWatched ? 'Play Next Episode' : playButtonText;
+      return isWatched ? t('metadata.play_next_episode') : playButtonText;
     }
 
     // Default fallback for non-series or missing data
-    return isWatched ? 'Play' : playButtonText;
+    return isWatched ? t('metadata.play') : playButtonText;
   }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
   // Count additional buttons (excluding Play and Save) - AI Chat no longer counted
@@ -394,7 +396,7 @@ const ActionButtons = memo(({
             color={inLibrary ? (isAuthenticated && isInWatchlist ? "#E74C3C" : currentTheme.colors.white) : currentTheme.colors.white}
           />
           <Text style={[styles.infoButtonText, isTablet && styles.tabletInfoButtonText]}>
-            {inLibrary ? 'Saved' : 'Save'}
+            {inLibrary ? t('metadata.saved') : t('metadata.save')}
           </Text>
         </TouchableOpacity>
 
@@ -484,6 +486,7 @@ const WatchProgressDisplay = memo(({
   trailerReady: boolean;
 }) => {
   const { currentTheme } = useTheme();
+  const { t } = useTranslation();
   const { isAuthenticated: isTraktAuthenticated, forceSyncTraktProgress } = useTraktContext();
 
   // State to trigger refresh after manual sync
@@ -567,7 +570,7 @@ const WatchProgressDisplay = memo(({
         progressPercent: 100,
         formattedTime: watchedDate,
         episodeInfo,
-        displayText: watchedViaTrakt ? 'Watched on Trakt' : 'Watched',
+        displayText: watchedViaTrakt ? t('metadata.watched_on_trakt') : t('metadata.watched'),
         syncStatus: isTraktAuthenticated && watchProgress?.traktSynced ? '' : '', // Clean look for watched
         isTraktSynced: watchProgress?.traktSynced && isTraktAuthenticated,
         isWatched: true
@@ -597,22 +600,22 @@ const WatchProgressDisplay = memo(({
     }
 
     // Enhanced display text with Trakt integration
-    let displayText = progressPercent >= 85 ? 'Watched' : `${Math.round(progressPercent)}% watched`;
+    let displayText = progressPercent >= 85 ? t('metadata.watched') : t('metadata.percent_watched', { percent: Math.round(progressPercent) });
     let syncStatus = '';
 
     // Show Trakt sync status if user is authenticated
     if (isTraktAuthenticated) {
       if (isUsingTraktProgress) {
-        syncStatus = ' • Using Trakt progress';
+        syncStatus = ' • ' + t('metadata.using_trakt_progress');
         if (watchProgress.traktSynced) {
-          syncStatus = ' • Synced with Trakt';
+          syncStatus = ' • ' + t('metadata.synced_with_trakt_progress');
         }
       } else if (watchProgress.traktSynced) {
-        syncStatus = ' • Synced with Trakt';
+        syncStatus = ' • ' + t('metadata.synced_with_trakt_progress');
         // If we have specific Trakt progress that differs from local, mention it
         if (watchProgress.traktProgress !== undefined &&
           Math.abs(progressPercent - watchProgress.traktProgress) > 5) {
-          displayText = `${Math.round(progressPercent)}% watched (${Math.round(watchProgress.traktProgress)}% on Trakt)`;
+          displayText = t('metadata.percent_watched_trakt', { percent: Math.round(progressPercent), traktPercent: Math.round(watchProgress.traktProgress) });
         }
       } else {
         // Do not show "Sync pending" label anymore; leave status empty.

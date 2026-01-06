@@ -728,15 +728,15 @@ const MetadataScreen: React.FC = () => {
 
   const handleSpoilerPress = useCallback((comment: any) => {
     Alert.alert(
-      'Spoiler Warning',
-      'This comment contains spoilers. Are you sure you want to reveal it?',
+      t('metadata.spoiler_warning'),
+      t('metadata.spoiler_warning_desc'),
       [
         {
-          text: 'Cancel',
+          text: t('metadata.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Reveal Spoilers',
+          text: t('metadata.reveal_spoilers'),
           style: 'destructive',
           onPress: () => {
             setRevealedSpoilers(prev => new Set([...prev, comment.id.toString()]));
@@ -744,7 +744,7 @@ const MetadataScreen: React.FC = () => {
         },
       ]
     );
-  }, []);
+  }, [t]);
 
   // Source switching removed
 
@@ -1025,7 +1025,7 @@ const MetadataScreen: React.FC = () => {
                         fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
                         marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
                       }
-                    ]}>Network</Text>
+                    ]}>{t('metadata.network')}</Text>
                     <View style={[
                       styles.productionRow,
                       {
@@ -1095,7 +1095,7 @@ const MetadataScreen: React.FC = () => {
                           fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
                           marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
                         }
-                      ]}>Production</Text>
+                      ]}>{t('metadata.production')}</Text>
                       <View style={[
                         styles.productionRow,
                         {
@@ -1163,11 +1163,11 @@ const MetadataScreen: React.FC = () => {
                         fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
                         marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
                       }
-                    ]}>Movie Details</Text>
+                    ]}>{t('metadata.movie_details')}</Text>
 
                     {metadata.movieDetails.tagline && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Tagline</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.tagline')}</Text>
                         <Text style={[styles.tvDetailValue, { fontStyle: 'italic', fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           "{metadata.movieDetails.tagline}"
                         </Text>
@@ -1176,14 +1176,14 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.movieDetails.status && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.status')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.status}</Text>
                       </View>
                     )}
 
                     {metadata.movieDetails.releaseDate && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Release Date</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.release_date')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           {new Date(metadata.movieDetails.releaseDate).toLocaleDateString('en-US', {
                             year: 'numeric',
@@ -1196,7 +1196,7 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.movieDetails.runtime && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Runtime</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.runtime')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           {Math.floor(metadata.movieDetails.runtime / 60)}h {metadata.movieDetails.runtime % 60}m
                         </Text>
@@ -1205,7 +1205,7 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.movieDetails.budget && metadata.movieDetails.budget > 0 && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Budget</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.budget')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           ${metadata.movieDetails.budget.toLocaleString()}
                         </Text>
@@ -1214,7 +1214,7 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.movieDetails.revenue && metadata.movieDetails.revenue > 0 && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Revenue</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.revenue')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           ${metadata.movieDetails.revenue.toLocaleString()}
                         </Text>
@@ -1223,14 +1223,14 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.movieDetails.originCountry && metadata.movieDetails.originCountry.length > 0 && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.origin_country')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originCountry.join(', ')}</Text>
                       </View>
                     )}
 
                     {metadata.movieDetails.originalLanguage && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.original_language')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.movieDetails.originalLanguage.toUpperCase()}</Text>
                       </View>
                     )}
@@ -1248,7 +1248,7 @@ const MetadataScreen: React.FC = () => {
                         title: metadata.name || 'Gallery'
                       })}
                     >
-                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>{t('metadata.backdrop_gallery')}</Text>
                       <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
                     </TouchableOpacity>
                   </View>
@@ -1294,18 +1294,18 @@ const MetadataScreen: React.FC = () => {
                         fontSize: isTV ? 20 : isLargeTablet ? 18 : isTablet ? 17 : 16,
                         marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
                       }
-                    ]}>Show Details</Text>
+                    ]}>{t('metadata.show_details')}</Text>
 
                     {metadata.tvDetails.status && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Status</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.status')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.status}</Text>
                       </View>
                     )}
 
                     {metadata.tvDetails.firstAirDate && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>First Air Date</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.first_air_date')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           {new Date(metadata.tvDetails.firstAirDate).toLocaleDateString('en-US', {
                             year: 'numeric',
@@ -1318,7 +1318,7 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.tvDetails.lastAirDate && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Last Air Date</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.last_air_date')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           {new Date(metadata.tvDetails.lastAirDate).toLocaleDateString('en-US', {
                             year: 'numeric',
@@ -1331,21 +1331,21 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.tvDetails.numberOfSeasons && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Seasons</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.seasons')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfSeasons}</Text>
                       </View>
                     )}
 
                     {metadata.tvDetails.numberOfEpisodes && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Total Episodes</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.total_episodes')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.numberOfEpisodes}</Text>
                       </View>
                     )}
 
                     {metadata.tvDetails.episodeRunTime && metadata.tvDetails.episodeRunTime.length > 0 && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Episode Runtime</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.episode_runtime')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           {metadata.tvDetails.episodeRunTime.join(' - ')} min
                         </Text>
@@ -1354,21 +1354,21 @@ const MetadataScreen: React.FC = () => {
 
                     {metadata.tvDetails.originCountry && metadata.tvDetails.originCountry.length > 0 && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Origin Country</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.origin_country')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originCountry.join(', ')}</Text>
                       </View>
                     )}
 
                     {metadata.tvDetails.originalLanguage && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Original Language</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.original_language')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{metadata.tvDetails.originalLanguage.toUpperCase()}</Text>
                       </View>
                     )}
 
                     {metadata.tvDetails.createdBy && metadata.tvDetails.createdBy.length > 0 && (
                       <View style={[styles.tvDetailRow, { paddingVertical: isTV ? 12 : isLargeTablet ? 10 : isTablet ? 8 : 8 }]}>
-                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>Created By</Text>
+                        <Text style={[styles.tvDetailLabel, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>{t('metadata.created_by')}</Text>
                         <Text style={[styles.tvDetailValue, { fontSize: isTV ? 15 : isLargeTablet ? 14 : isTablet ? 14 : 14 }]}>
                           {metadata.tvDetails.createdBy.map(creator => creator.name).join(', ')}
                         </Text>
@@ -1388,7 +1388,7 @@ const MetadataScreen: React.FC = () => {
                         title: metadata.name || 'Gallery'
                       })}
                     >
-                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>Backdrop Gallery</Text>
+                      <Text style={[styles.backdropGalleryText, { color: currentTheme.colors.highEmphasis }]}>{t('metadata.backdrop_gallery')}</Text>
                       <MaterialIcons name="chevron-right" size={24} color={currentTheme.colors.highEmphasis} />
                     </TouchableOpacity>
                   </View>

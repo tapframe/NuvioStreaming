@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo, memo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, useWindowDimensions, useColorScheme, FlatList, Modal, Pressable } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -54,6 +55,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
 }) => {
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isDarkMode = useColorScheme() === 'dark';
 
@@ -740,7 +742,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     return (
       <View style={styles.centeredContainer}>
         <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-        <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>Loading episodes...</Text>
+        <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>{t('metadata.loading_episodes')}</Text>
       </View>
     );
   }
@@ -749,7 +751,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
     return (
       <View style={styles.centeredContainer}>
         <MaterialIcons name="error-outline" size={48} color={currentTheme.colors.textMuted} />
-        <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>No episodes available</Text>
+        <Text style={[styles.centeredText, { color: currentTheme.colors.text }]}>{t('metadata.no_episodes_available')}</Text>
       </View>
     );
   }
@@ -785,7 +787,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
               color: currentTheme.colors.highEmphasis,
               fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 18
             }
-          ]}>Seasons</Text>
+          ]}>{t('metadata.seasons')}</Text>
 
           {/* Dropdown Toggle Button */}
           <TouchableOpacity
