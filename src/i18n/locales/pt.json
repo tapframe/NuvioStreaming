@@ -11,6 +11,13 @@
         "ok": "OK",
         "unknown": "Desconhecido"
     },
+    "navigation": {
+        "home": "Início",
+        "library": "Biblioteca",
+        "search": "Buscar",
+        "downloads": "Downloads",
+        "settings": "Configurações"
+    },
     "addons": {
         "title": "Addons",
         "reorder_mode": "Modo de Reordenação",
