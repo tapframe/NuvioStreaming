@@ -1,16 +1,16 @@
 import { getLocales } from 'expo-localization';
-import { LanguageDetectorModule } from 'i18next';
+import { LanguageDetectorAsyncModule } from 'i18next';
 import { mmkvStorage } from '../services/mmkvStorage';
 
-const languageDetector = {
+const languageDetector: LanguageDetectorAsyncModule = {
     type: 'languageDetector',
     async: true,
-    detect: (callback?: (lng: string) => void): string | undefined => {
+    detect: (callback: (lng: string | undefined) => void): void => {
         const findLanguage = async () => {
             try {
                 const savedLanguage = await mmkvStorage.getItem('user_language');
                 if (savedLanguage) {
-                    if (callback) callback(savedLanguage);
+                    callback(savedLanguage);
                     return;
                 }
             } catch (error) {
@@ -19,10 +19,9 @@ const languageDetector = {
 
             const locales = getLocales();
             const languageCode = locales[0]?.languageCode ?? 'en';
-            if (callback) callback(languageCode);
+            callback(languageCode);
         };
         findLanguage();
-        return undefined;
     },
     init: () => { },
     cacheUserLanguage: (language: string) => {
