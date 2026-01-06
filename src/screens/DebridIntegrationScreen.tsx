@@ -834,8 +834,8 @@ const DebridIntegrationScreen = () => {
     const handleConnect = async () => {
         if (!apiKey.trim()) {
             setAlertTitle(t('common.error'));
-            setAlertMessage(t('debrid.error_api_required')); // Reusing key or common error
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertMessage(t('debrid.error_api_required'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
             return;
         }
@@ -863,14 +863,14 @@ const DebridIntegrationScreen = () => {
             setApiKey('');
 
             setAlertTitle(t('common.success'));
-            setAlertMessage(t('debrid.connected_title')); // Or similar success message
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertMessage(t('debrid.connected_title'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } catch (error) {
             logger.error('Failed to install Torbox addon:', error);
-            setAlertTitle('Error');
-            setAlertMessage('Failed to connect addon. Please check your API Key and try again.');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('common.error'));
+            setAlertMessage(t('addons.install_error'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } finally {
             setLoading(false);
@@ -893,7 +893,7 @@ const DebridIntegrationScreen = () => {
         setAlertTitle(t('debrid.alert_disconnect_title'));
         setAlertMessage(t('debrid.alert_disconnect_msg'));
         setAlertActions([
-            { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
+            { label: t('common.cancel'), onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
             {
                 label: t('debrid.disconnect_button'),
                 onPress: async () => {
@@ -915,15 +915,15 @@ const DebridIntegrationScreen = () => {
                         setConfig(null);
                         setUserData(null);
 
-                        setAlertTitle('Success');
-                        setAlertMessage('Torbox disconnected successfully');
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertTitle(t('common.success'));
+                        setAlertMessage(t('debrid.alert_disconnect_success', 'Torbox disconnected successfully'));
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } catch (error) {
                         logger.error('Failed to disconnect Torbox:', error);
-                        setAlertTitle('Error');
-                        setAlertMessage('Failed to disconnect Torbox');
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertTitle(t('common.error'));
+                        setAlertMessage(t('debrid.alert_disconnect_error', 'Failed to disconnect Torbox'));
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } finally {
                         setLoading(false);
@@ -1011,7 +1011,7 @@ const DebridIntegrationScreen = () => {
         if (!torrentioConfig.debridApiKey.trim()) {
             setAlertTitle(t('debrid.error_api_required'));
             setAlertMessage(t('debrid.error_api_required_desc'));
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
             return;
         }
@@ -1046,13 +1046,13 @@ const DebridIntegrationScreen = () => {
 
             setAlertTitle(t('common.success'));
             setAlertMessage(t('debrid.success_installed'));
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } catch (error) {
             logger.error('Failed to install Torrentio addon:', error);
-            setAlertTitle('Error');
-            setAlertMessage('Failed to install Torrentio addon. Please try again.');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('common.error'));
+            setAlertMessage(t('addons.install_error'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } finally {
             setTorrentioLoading(false);
@@ -1060,8 +1060,8 @@ const DebridIntegrationScreen = () => {
     };
 
     const handleRemoveTorrentio = async () => {
-        setAlertTitle('Remove Torrentio');
-        setAlertMessage('Are you sure you want to remove the Torrentio addon?');
+        setAlertTitle(t('debrid.remove_button'));
+        setAlertMessage(t('addons.uninstall_message', { name: 'Torrentio' }));
         setAlertActions([
             { label: t('common.cancel'), onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
             {
@@ -1091,13 +1091,13 @@ const DebridIntegrationScreen = () => {
 
                         setAlertTitle(t('common.success'));
                         setAlertMessage(t('debrid.success_removed'));
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } catch (error) {
                         logger.error('Failed to remove Torrentio:', error);
-                        setAlertTitle('Error');
-                        setAlertMessage('Failed to remove Torrentio addon');
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertTitle(t('common.error'));
+                        setAlertMessage(t('addons.uninstall_error', 'Failed to remove Torrentio addon'));
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } finally {
                         setTorrentioLoading(false);
@@ -1364,7 +1364,7 @@ const DebridIntegrationScreen = () => {
                 <View>
                     <Text style={styles.accordionHeaderText}>{t('debrid.sorting_label')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || 'By quality'}
+                        {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || t('debrid.by_quality', 'By quality')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1395,7 +1395,7 @@ const DebridIntegrationScreen = () => {
                 <View>
                     <Text style={styles.accordionHeaderText}>{t('debrid.exclude_qualities')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.qualityFilter.length > 0 ? `${torrentioConfig.qualityFilter.length} excluded` : 'None excluded'}
+                        {torrentioConfig.qualityFilter.length > 0 ? t('debrid.excluded_count', { count: torrentioConfig.qualityFilter.length, defaultValue: '{{count}} excluded' }) : t('debrid.none_excluded', 'None excluded')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1426,7 +1426,7 @@ const DebridIntegrationScreen = () => {
                 <View>
                     <Text style={styles.accordionHeaderText}>{t('debrid.priority_languages')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} ${t('home_screen.selected')}` : 'No preference'}
+                        {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} ${t('home_screen.selected')}` : t('debrid.no_preference', 'No preference')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1457,7 +1457,7 @@ const DebridIntegrationScreen = () => {
                 <View>
                     <Text style={styles.accordionHeaderText}>{t('debrid.max_results')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || 'All results'}
+                        {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || t('debrid.all_results', 'All results')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1487,7 +1487,7 @@ const DebridIntegrationScreen = () => {
             >
                 <View>
                     <Text style={styles.accordionHeaderText}>{t('debrid.additional_options')}</Text>
-                    <Text style={styles.accordionSubtext}>Catalog & download settings</Text>
+                    <Text style={styles.accordionSubtext}>{t('debrid.catalog_download_settings', 'Catalog & download settings')}</Text>
                 </View>
                 <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
             </TouchableOpacity>

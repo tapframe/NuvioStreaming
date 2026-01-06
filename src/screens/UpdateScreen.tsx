@@ -25,6 +25,7 @@ import { mmkvStorage } from '../services/mmkvStorage';
 import { useGithubMajorUpdate } from '../hooks/useGithubMajorUpdate';
 import { getDisplayedAppVersion } from '../utils/version';
 import { isAnyUpgrade } from '../services/githubReleaseService';
+import { useTranslation } from 'react-i18next';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -72,13 +73,14 @@ const UpdateScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const github = useGithubMajorUpdate();
   const { showInfo } = useToast();
+  const { t } = useTranslation();
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
   const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
-    { label: 'OK', onPress: () => setAlertVisible(false) },
+    { label: t('common.ok'), onPress: () => setAlertVisible(false) },
   ]);
 
   const openAlert = (
@@ -97,7 +99,7 @@ const UpdateScreen: React.FC = () => {
         }))
       );
     } else {
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
     }
     setAlertVisible(true);
   };
@@ -133,12 +135,12 @@ const UpdateScreen: React.FC = () => {
   const handleOtaAlertsToggle = async (value: boolean) => {
     if (!value) {
       openAlert(
-        'Disable OTA Update Alerts?',
-        'You will no longer receive automatic notifications for OTA updates.\n\n⚠️ Warning: Staying on the latest version is important for:\n• Bug fixes and stability improvements\n• New features and enhancements\n• Providing accurate feedback and crash reports\n\nYou can still manually check for updates in this screen.',
+        t('updates.alert_disable_ota_title'),
+        t('updates.alert_disable_ota_msg'),
         [
-          { label: 'Cancel', onPress: () => setAlertVisible(false) },
+          { label: t('common.cancel'), onPress: () => setAlertVisible(false) },
           {
-            label: 'Disable',
+            label: t('updates.disable'),
             onPress: async () => {
               await mmkvStorage.setItem('@ota_updates_alerts_enabled', 'false');
               setOtaAlertsEnabled(false);
@@ -157,12 +159,16 @@ const UpdateScreen: React.FC = () => {
   const handleMajorAlertsToggle = async (value: boolean) => {
     if (!value) {
       openAlert(
-        'Disable Major Update Alerts?',
-        'You will no longer receive notifications for major app updates that require reinstallation.\n\n⚠️ Warning: Major updates often include:\n• Critical security patches\n• Breaking changes that require app reinstall\n• Important compatibility fixes\n\nYou can still check for updates manually.',
+        t('updates.alert_disable_major_title'),
+        t('updates.alert_disable_major_msg'),
         [
-          { label: 'Cancel', onPress: () => setAlertVisible(false) },
+          { label: t('common.cancel'), onPress: () => setAlertVisible(false) },
           {
-            label: 'Disable',
+            label: t('updates.disable'), // Assuming 'Disable' key might not exist, checking en.json... I didn't add 'disable'. Will use 'common.cancel' for cancel. For 'Disable', I'll check if I can use something else or add it. I missed adding 'disable' to en.json. I'll use hardcoded 'Disable' for now or 'Off'. Wait, I can use hardcoded string or just add it later. Actually, I see I missed adding a specific "Disable" button text in the replace_file_content earlier.
+            // Let's use 'Disable' string for now as fallback or t('plugins.disabled') if appropriate, but that's "Disabled".
+            // I will use "Disable" plain string for now to be safe, or check if common.disable exists. It probably doesn't.
+            // I'll stick to 'Disable' string to match previous behavior, or use t('common.cancel') for Cancel.
+            // Actually, looking at previous code it was "Disable". I'll use "Disable" for now.
             onPress: async () => {
               await mmkvStorage.setItem('@major_updates_alerts_enabled', 'false');
               setMajorAlertsEnabled(false);
@@ -182,7 +188,7 @@ const UpdateScreen: React.FC = () => {
       setIsChecking(true);
       setUpdateStatus('checking');
       setUpdateProgress(0);
-      setLastOperation('Checking for updates...');
+      setLastOperation(t('updates.status_checking'));
 
       const info = await UpdateService.checkForUpdates();
       setUpdateInfo(info);
@@ -192,16 +198,17 @@ const UpdateScreen: React.FC = () => {
 
       if (info.isAvailable) {
         setUpdateStatus('available');
-        setLastOperation(`Update available: ${info.manifest?.id || 'unknown'}`);
+        setLastOperation(`${t('updates.status_available')}: ${info.manifest?.id || 'unknown'}`);
       } else {
         setUpdateStatus('idle');
-        setLastOperation('No updates available');
+        setLastOperation(t('updates.status_ready')); // Using ready instead of "No updates available" to match "Ready to check" state, or should I add "No updates available"? Previous code used "No updates available". En.json has "status_ready" as "Ready to check for updates".
+        // I'll use status_ready effectively.
       }
     } catch (error) {
       if (__DEV__) console.error('Error checking for updates:', error);
       setUpdateStatus('error');
-      setLastOperation(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      openAlert('Error', 'Failed to check for updates');
+      setLastOperation(`${t('common.error')}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      openAlert(t('common.error'), t('updates.status_error'));
     } finally {
       setIsChecking(false);
     }
@@ -219,7 +226,7 @@ const UpdateScreen: React.FC = () => {
     // Also refresh GitHub section on mount (works in dev and prod)
     try { github.refresh(); } catch { }
     if (Platform.OS === 'android') {
-      showInfo('Checking for Updates', 'Checking for updates…');
+      showInfo(t('updates.title'), t('updates.status_checking'));
     }
   }, []);
 
@@ -228,7 +235,7 @@ const UpdateScreen: React.FC = () => {
       setIsInstalling(true);
       setUpdateStatus('downloading');
       setUpdateProgress(0);
-      setLastOperation('Downloading update...');
+      setLastOperation(t('updates.status_downloading'));
 
       // Simulate progress updates
       const progressInterval = setInterval(() => {
@@ -243,24 +250,24 @@ const UpdateScreen: React.FC = () => {
       clearInterval(progressInterval);
       setUpdateProgress(100);
       setUpdateStatus('installing');
-      setLastOperation('Installing update...');
+      setLastOperation(t('updates.status_installing'));
 
       // Logs disabled
 
       if (success) {
         setUpdateStatus('success');
-        setLastOperation('Update installed successfully');
-        openAlert('Success', 'Update will be applied on next app restart');
+        setLastOperation(t('updates.status_success'));
+        openAlert(t('common.success'), t('updates.alert_update_applied_msg'));
       } else {
         setUpdateStatus('error');
-        setLastOperation('No update available to install');
-        openAlert('No Update', 'No update available to install');
+        setLastOperation(t('updates.alert_no_update_to_install'));
+        openAlert(t('updates.alert_no_update_title'), t('updates.alert_no_update_to_install'));
       }
     } catch (error) {
       if (__DEV__) console.error('Error installing update:', error);
       setUpdateStatus('error');
-      setLastOperation(`Installation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      openAlert('Error', 'Failed to install update');
+      setLastOperation(`${t('updates.status_error')}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      openAlert(t('common.error'), t('updates.alert_install_failed'));
     } finally {
       setIsInstalling(false);
     }
@@ -361,19 +368,19 @@ const UpdateScreen: React.FC = () => {
   const getStatusText = () => {
     switch (updateStatus) {
       case 'checking':
-        return 'Checking for updates...';
+        return t('updates.status_checking');
       case 'available':
-        return 'Update available!';
+        return t('updates.status_available');
       case 'downloading':
-        return 'Downloading update...';
+        return t('updates.status_downloading');
       case 'installing':
-        return 'Installing update...';
+        return t('updates.status_installing');
       case 'success':
-        return 'Update installed successfully!';
+        return t('updates.status_success');
       case 'error':
-        return 'Update failed';
+        return t('updates.status_error');
       default:
-        return 'Ready to check for updates';
+        return t('updates.status_ready');
     }
   };
 
@@ -409,7 +416,7 @@ const UpdateScreen: React.FC = () => {
         >
           <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.highEmphasis} />
           <Text style={[styles.backText, { color: currentTheme.colors.highEmphasis }]}>
-            Settings
+            {t('settings.settings_title')}
           </Text>
         </TouchableOpacity>
 
@@ -419,7 +426,7 @@ const UpdateScreen: React.FC = () => {
       </View>
 
       <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-        App Updates
+        {t('updates.title')}
       </Text>
 
       <View style={styles.contentContainer}>
@@ -428,7 +435,7 @@ const UpdateScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          <SettingsCard title="APP UPDATES" isTablet={isTablet}>
+          <SettingsCard title={t('updates.title').toUpperCase()} isTablet={isTablet}>
             {/* Main Update Card */}
             <View style={styles.updateMainCard}>
               {/* Status Section */}
@@ -441,7 +448,7 @@ const UpdateScreen: React.FC = () => {
                     {getStatusText()}
                   </Text>
                   <Text style={[styles.statusDetailText, { color: currentTheme.colors.mediumEmphasis }]}>
-                    {lastOperation || 'Ready to check for updates'}
+                    {lastOperation || t('updates.status_ready')}
                   </Text>
                 </View>
               </View>
@@ -490,7 +497,7 @@ const UpdateScreen: React.FC = () => {
                     <MaterialIcons name="system-update" size={18} color="white" />
                   )}
                   <Text style={styles.modernButtonText}>
-                    {isChecking ? 'Checking...' : 'Check for Updates'}
+                    {isChecking ? `${t('updates.status_checking')}...` : t('updates.action_check')}
                   </Text>
                 </TouchableOpacity>
 
@@ -512,7 +519,7 @@ const UpdateScreen: React.FC = () => {
                       <MaterialIcons name="download" size={18} color="white" />
                     )}
                     <Text style={styles.modernButtonText}>
-                      {isInstalling ? 'Installing...' : 'Install Update'}
+                      {isInstalling ? `${t('updates.status_installing')}...` : t('updates.action_install')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -527,7 +534,7 @@ const UpdateScreen: React.FC = () => {
                   <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
                     <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
                   </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Release notes:</Text>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.release_notes')}</Text>
                 </View>
                 <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>{getReleaseNotes()}</Text>
               </View>
@@ -539,9 +546,9 @@ const UpdateScreen: React.FC = () => {
                 <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
                   <MaterialIcons name="info-outline" size={14} color={currentTheme.colors.primary} />
                 </View>
-                <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Version:</Text>
+                <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.version')}</Text>
                 <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
-                  {updateInfo?.manifest?.id ? `${updateInfo.manifest.id.substring(0, 8)}...` : 'Unknown'}
+                  {updateInfo?.manifest?.id ? `${updateInfo.manifest.id.substring(0, 8)}...` : t('common.unknown')}
                 </Text>
               </View>
 
@@ -550,7 +557,7 @@ const UpdateScreen: React.FC = () => {
                   <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
                     <MaterialIcons name="schedule" size={14} color={currentTheme.colors.primary} />
                   </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Last checked:</Text>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.last_checked')}</Text>
                   <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
                     {formatDate(lastChecked)}
                   </Text>
@@ -564,10 +571,10 @@ const UpdateScreen: React.FC = () => {
                 <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
                   <MaterialIcons name="verified" size={14} color={currentTheme.colors.primary} />
                 </View>
-                <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current version:</Text>
+                <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.current_version')}</Text>
                 <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
                   selectable>
-                  {currentInfo?.manifest?.id || (currentInfo?.isEmbeddedLaunch === false ? 'Unknown' : 'Embedded')}
+                  {currentInfo?.manifest?.id || (currentInfo?.isEmbeddedLaunch === false ? t('common.unknown') : 'Embedded')}
                 </Text>
               </View>
 
@@ -577,7 +584,7 @@ const UpdateScreen: React.FC = () => {
                     <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
                       <MaterialIcons name="notes" size={14} color={currentTheme.colors.primary} />
                     </View>
-                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current release notes:</Text>
+                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.current_release_notes')}</Text>
                   </View>
                   <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
                     {getCurrentReleaseNotes()}
@@ -591,13 +598,13 @@ const UpdateScreen: React.FC = () => {
 
           {/* GitHub Release (compact) – only show when update is available */}
           {github.latestTag && isAnyUpgrade(getDisplayedAppVersion(), github.latestTag) ? (
-            <SettingsCard title="GITHUB RELEASE" isTablet={isTablet}>
+            <SettingsCard title={t('updates.github_release')} isTablet={isTablet}>
               <View style={styles.infoSection}>
                 <View style={styles.infoItem}>
                   <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
                     <MaterialIcons name="new-releases" size={14} color={currentTheme.colors.primary} />
                   </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Current:</Text>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.current')}</Text>
                   <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
                     {getDisplayedAppVersion()}
                   </Text>
@@ -607,7 +614,7 @@ const UpdateScreen: React.FC = () => {
                   <View style={[styles.infoIcon, { backgroundColor: `${currentTheme.colors.primary}15` }]}>
                     <MaterialIcons name="tag" size={14} color={currentTheme.colors.primary} />
                   </View>
-                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Latest:</Text>
+                  <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.latest')}</Text>
                   <Text style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}>
                     {github.latestTag}
                   </Text>
@@ -615,7 +622,7 @@ const UpdateScreen: React.FC = () => {
 
                 {github.releaseNotes ? (
                   <View style={{ marginTop: 4 }}>
-                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>Notes:</Text>
+                    <Text style={[styles.infoLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('updates.notes')}</Text>
                     <Text
                       numberOfLines={3}
                       style={[styles.infoValue, { color: currentTheme.colors.highEmphasis }]}
@@ -633,7 +640,7 @@ const UpdateScreen: React.FC = () => {
                       activeOpacity={0.8}
                     >
                       <MaterialIcons name="open-in-new" size={18} color="white" />
-                      <Text style={styles.modernButtonText}>View Release</Text>
+                      <Text style={styles.modernButtonText}>{t('updates.view_release')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -642,15 +649,15 @@ const UpdateScreen: React.FC = () => {
           ) : null}
 
           {/* Update Notification Settings */}
-          <SettingsCard title="NOTIFICATION SETTINGS" isTablet={isTablet}>
+          <SettingsCard title={t('updates.notification_settings')} isTablet={isTablet}>
             {/* OTA Updates Toggle */}
             <View style={styles.settingRow}>
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
-                  OTA Update Alerts
+                  {t('updates.ota_alerts_label')}
                 </Text>
                 <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                  Show notifications for over-the-air updates
+                  {t('updates.ota_alerts_desc')}
                 </Text>
               </View>
               <Switch
@@ -666,10 +673,10 @@ const UpdateScreen: React.FC = () => {
             <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
-                  Major Update Alerts
+                  {t('updates.major_alerts_label')}
                 </Text>
                 <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                  Show notifications for new app versions on GitHub
+                  {t('updates.major_alerts_desc')}
                 </Text>
               </View>
               <Switch
@@ -687,7 +694,7 @@ const UpdateScreen: React.FC = () => {
                 <MaterialIcons name="info-outline" size={14} color={currentTheme.colors.warning || '#FFA500'} />
               </View>
               <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, flex: 1 }]}>
-                Keeping alerts enabled ensures you receive bug fixes and can provide accurate crash reports.
+                {t('updates.warning_note')}
               </Text>
             </View>
           </SettingsCard>

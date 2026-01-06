@@ -373,8 +373,8 @@ const PlayerSettingsScreen: React.FC = () => {
                   </View>
                   <View style={styles.optionButtonsRow}>
                     {([
-                      { id: 'auto', label: 'Auto', desc: 'ExoPlayer + MPV fallback' },
-                      { id: 'mpv', label: 'MPV', desc: 'MPV only' },
+                      { id: 'auto', label: t('player.option_auto'), desc: t('player.option_auto_desc_engine') },
+                      { id: 'mpv', label: t('player.option_mpv'), desc: t('player.option_mpv_desc') },
                     ] as const).map((option) => (
                       <TouchableOpacity
                         key={option.id}
@@ -432,10 +432,10 @@ const PlayerSettingsScreen: React.FC = () => {
                   </View>
                   <View style={styles.optionButtonsRow}>
                     {([
-                      { id: 'auto', label: 'Auto', desc: 'Best balance' },
-                      { id: 'sw', label: 'SW', desc: 'Software' },
-                      { id: 'hw', label: 'HW', desc: 'Hardware' },
-                      { id: 'hw+', label: 'HW+', desc: 'Full HW' },
+                      { id: 'auto', label: t('player.option_auto'), desc: t('player.option_auto_desc_decoder') },
+                      { id: 'sw', label: t('player.option_sw'), desc: t('player.option_sw_desc') },
+                      { id: 'hw', label: t('player.option_hw'), desc: t('player.option_hw_desc') },
+                      { id: 'hw+', label: t('player.option_hw_plus'), desc: t('player.option_hw_plus_desc') },
                     ] as const).map((option) => (
                       <TouchableOpacity
                         key={option.id}
@@ -498,8 +498,8 @@ const PlayerSettingsScreen: React.FC = () => {
                   </View>
                   <View style={styles.optionButtonsRow}>
                     {([
-                      { id: 'gpu', label: 'GPU', desc: 'Standard' },
-                      { id: 'gpu-next', label: 'GPU-Next', desc: 'Advanced' },
+                      { id: 'gpu', label: t('player.option_gpu_desc') },
+                      { id: 'gpu-next', label: t('player.option_gpu_next_desc') },
                     ] as const).map((option) => (
                       <TouchableOpacity
                         key={option.id}
@@ -582,7 +582,7 @@ const PlayerSettingsScreen: React.FC = () => {
         message={alertMessage}
         onClose={() => setAlertVisible(false)}
       />
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 

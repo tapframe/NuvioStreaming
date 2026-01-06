@@ -383,8 +383,8 @@ const HomeScreenSettings: React.FC = () => {
             {settings.heroStyle === 'carousel' && (
               <SettingsCard isDarkMode={isDarkMode} colors={colors}>
                 <SettingItem
-                  title={t("home_screen.dynamic_hero_background")}
-                  description={t("home_screen.dynamic_hero_background_desc")}
+                  title={t("home_screen.dynamic_bg")}
+                  description={t("home_screen.dynamic_bg_desc")}
                   icon="wallpaper"
                   isDarkMode={isDarkMode}
                   colors={colors}

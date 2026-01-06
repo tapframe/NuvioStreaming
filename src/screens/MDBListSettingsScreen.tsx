@@ -552,7 +552,7 @@ const MDBListSettingsScreen: React.FC = () => {
         logger.warn('[MDBListSettingsScreen] Empty API key provided');
         setAlertTitle(t('common.error'));
         setAlertMessage(t('mdblist.api_key_empty_error'));
-        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
         setAlertVisible(true);
         return;
       }
@@ -562,7 +562,7 @@ const MDBListSettingsScreen: React.FC = () => {
       setIsKeySet(true);
       setAlertTitle(t('common.success'));
       setAlertMessage(t('mdblist.success_saved'));
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
       logger.log('[MDBListSettingsScreen] API key saved successfully');
 
@@ -570,7 +570,7 @@ const MDBListSettingsScreen: React.FC = () => {
       logger.error('[MDBListSettingsScreen] Error saving API key:', error);
       setAlertTitle(t('common.error'));
       setAlertMessage(t('mdblist.error_save'));
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     }
   };
@@ -596,14 +596,14 @@ const MDBListSettingsScreen: React.FC = () => {
             setTestResult(null);
             setAlertTitle(t('common.success'));
             setAlertMessage(t('mdblist.success_cleared'));
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
             logger.log('[MDBListSettingsScreen] API key cleared successfully');
           } catch (error) {
             logger.error('[MDBListSettingsScreen] Failed to clear API key:', error);
             setAlertTitle(t('common.error'));
             setAlertMessage(t('mdblist.error_clear'));
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
           }
         },

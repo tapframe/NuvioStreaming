@@ -806,9 +806,9 @@ const AddonsScreen = () => {
     // If we couldn't determine a config URL, show an error
     if (!configUrl) {
       logger.error(`Failed to determine config URL for addon: ${addon.name}, ID: ${addon.id}`);
-      setAlertTitle('Configuration Unavailable');
-      setAlertMessage('Could not determine configuration URL for this addon.');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('addons.config_unavailable_title'));
+      setAlertMessage(t('addons.config_unavailable_msg'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
       return;
     }
@@ -822,16 +822,16 @@ const AddonsScreen = () => {
         Linking.openURL(configUrl);
       } else {
         logger.error(`URL cannot be opened: ${configUrl}`);
-        setAlertTitle('Cannot Open Configuration');
-        setAlertMessage(`The configuration URL (${configUrl}) cannot be opened. The addon may not have a configuration page.`);
-        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+        setAlertTitle(t('addons.cannot_open_config_title'));
+        setAlertMessage(t('addons.cannot_open_config_msg', { url: configUrl }));
+        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
         setAlertVisible(true);
       }
     }).catch(err => {
       logger.error(`Error checking if URL can be opened: ${configUrl}`, err);
-      setAlertTitle('Error');
-      setAlertMessage('Could not open configuration page.');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('addons.cannot_open_config_msg', { url: configUrl }));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     });
   };
@@ -853,7 +853,7 @@ const AddonsScreen = () => {
     // Format the types into a simple category text
     const categoryText = types.length > 0
       ? types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ')
-      : 'No categories';
+      : t('addons.no_categories');
 
     const isFirstItem = index === 0;
     const isLastItem = index === addons.length - 1;
@@ -904,7 +904,7 @@ const AddonsScreen = () => {
               <Text style={styles.addonName}>{item.name}</Text>
               {isPreInstalled && (
                 <View style={[styles.priorityBadge, { marginLeft: 8, backgroundColor: colors.success }]}>
-                  <Text style={[styles.priorityText, { fontSize: 10 }]}>PRE-INSTALLED</Text>
+                  <Text style={[styles.priorityText, { fontSize: 10 }]}>{t('addons.pre_installed')}</Text>
                 </View>
               )}
             </View>
@@ -1025,7 +1025,7 @@ const AddonsScreen = () => {
 
           {/* Overview Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>OVERVIEW</Text>
+            <Text style={styles.sectionTitle}>{t('addons.overview')}</Text>
             <View style={styles.statsContainer}>
               <StatsCard value={addons.length} label={t('addons.title')} />
               <View style={styles.statsDivider} />
@@ -1149,15 +1149,15 @@ const AddonsScreen = () => {
                   </View>
 
                   <View style={styles.addonDetailSection}>
-                    <Text style={styles.addonDetailSectionTitle}>Description</Text>
+                    <Text style={styles.addonDetailSectionTitle}>{t('addons.description')}</Text>
                     <Text style={styles.addonDetailDescription}>
-                      {addonDetails.description || 'No description available'}
+                      {addonDetails.description || t('addons.no_description')}
                     </Text>
                   </View>
 
                   {addonDetails.types && addonDetails.types.length > 0 && (
                     <View style={styles.addonDetailSection}>
-                      <Text style={styles.addonDetailSectionTitle}>Supported Types</Text>
+                      <Text style={styles.addonDetailSectionTitle}>{t('addons.supported_types')}</Text>
                       <View style={styles.addonDetailChips}>
                         {addonDetails.types.map((type, index) => (
                           <View key={index} style={styles.addonDetailChip}>
@@ -1170,7 +1170,7 @@ const AddonsScreen = () => {
 
                   {addonDetails.catalogs && addonDetails.catalogs.length > 0 && (
                     <View style={styles.addonDetailSection}>
-                      <Text style={styles.addonDetailSectionTitle}>Catalogs</Text>
+                      <Text style={styles.addonDetailSectionTitle}>{t('addons.catalogs')}</Text>
                       <View style={styles.addonDetailChips}>
                         {addonDetails.catalogs.map((catalog, index) => (
                           <View key={index} style={styles.addonDetailChip}>

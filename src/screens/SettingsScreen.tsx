@@ -338,7 +338,7 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title={t('settings.sections.account')} isTablet={isTablet}>
             {isItemVisible('trakt') && (
               <SettingItem
-                title={t('settings.trakt')}
+                title={t('trakt.title')}
                 description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                 customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
                 renderControl={() => <ChevronRight />}
@@ -565,7 +565,7 @@ const SettingsScreen: React.FC = () => {
               <SettingsCard title={t('settings.account').toUpperCase()}>
                 {isItemVisible('trakt') && (
                   <SettingItem
-                    title={t('settings.trakt')}
+                    title={t('trakt.title')}
                     description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                     customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
                     renderControl={() => <ChevronRight />}
