@@ -132,6 +132,7 @@ export interface StreamingContent {
     backdrop_path?: string;
   };
   addedToLibraryAt?: number; // Timestamp when added to library
+  addonId?: string; // ID of the addon that provided this content
 }
 
 export interface CatalogContent {
@@ -1203,29 +1204,29 @@ class CatalogService {
    * @param catalogId - The catalog ID
    * @param type - Content type (movie/series)
    * @param genre - Optional genre filter
-   * @param limit - Maximum items to return
+   * @param page - Page number for pagination (default 1)
    */
   async discoverContentFromCatalog(
     addonId: string,
     catalogId: string,
     type: string,
     genre?: string,
-    limit: number = 20
+    page: number = 1
   ): Promise<StreamingContent[]> {
     try {
       const manifests = await stremioService.getInstalledAddonsAsync();
       const manifest = manifests.find(m => m.id === addonId);
-      
+
       if (!manifest) {
         logger.error(`Addon ${addonId} not found`);
         return [];
       }
 
       const filters = genre ? [{ title: 'genre', value: genre }] : [];
-      const metas = await stremioService.getCatalog(manifest, type, catalogId, 1, filters);
+      const metas = await stremioService.getCatalog(manifest, type, catalogId, page, filters);
 
       if (metas && metas.length > 0) {
-        return metas.slice(0, limit).map(meta => this.convertMetaToStreamingContent(meta));
+        return metas.map(meta => this.convertMetaToStreamingContent(meta));
       }
       return [];
     } catch (error) {
