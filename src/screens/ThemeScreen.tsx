@@ -21,6 +21,7 @@ import ColorPicker from 'react-native-wheel-color-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../styles/colors';
 import { useTheme, Theme, DEFAULT_THEMES } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
 import CustomAlert from '../components/CustomAlert';
@@ -31,10 +32,10 @@ const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 // Theme categories for organization
 const THEME_CATEGORIES = [
-  { id: 'all', name: 'All Themes' },
-  { id: 'dark', name: 'Dark Themes' },
-  { id: 'colorful', name: 'Colorful' },
-  { id: 'custom', name: 'My Themes' },
+  { id: 'all', name: 'themes.categories.all' },
+  { id: 'dark', name: 'themes.categories.dark' },
+  { id: 'colorful', name: 'themes.categories.colorful' },
+  { id: 'custom', name: 'themes.categories.custom' },
 ];
 
 interface ThemeCardProps {
@@ -114,12 +115,9 @@ interface FilterTabProps {
   primaryColor: string;
 }
 
-const FilterTab: React.FC<FilterTabProps> = ({ 
-  category, 
-  isActive, 
-  onPress,
-  primaryColor 
-}) => (
+const FilterTab: React.FC<FilterTabProps> = ({ category, isActive, onPress, primaryColor }) => {
+  const { t } = useTranslation();
+return (
   <TouchableOpacity
     style={[
       styles.filterTab,
@@ -128,16 +126,12 @@ const FilterTab: React.FC<FilterTabProps> = ({
     ]}
     onPress={onPress}
   >
-    <Text 
-      style={[
-        styles.filterTabText, 
-        isActive && { color: '#FFFFFF' }
-      ]}
-    >
-      {category.name}
-    </Text>
+    <Text style={[styles.filterTabText, isActive && { color: '#FFFFFF' }]}>
+        {t(category.name)}
+      </Text>
   </TouchableOpacity>
-);
+  );
+}
 
 type ColorKey = 'primary' | 'secondary' | 'darkBackground';
 
@@ -146,6 +140,7 @@ interface ThemeColorEditorProps {
     primary: string;
     secondary: string;
     darkBackground: string;
+    name?: string;
   };
   onSave: (colors: {
     primary: string;
@@ -171,7 +166,8 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
   setAlertActions,
   setAlertVisible
 }) => {
-  const [themeName, setThemeName] = useState('Custom Theme');
+  const { t } = useTranslation();
+  const [themeName, setThemeName] = useState(initialColors.name || '');
   const [selectedColorKey, setSelectedColorKey] = useState<ColorKey>('primary');
   const [themeColors, setThemeColors] = useState({
     primary: initialColors.primary,
@@ -188,12 +184,12 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
 
   const handleSave = () => {
     if (!themeName.trim()) {
-      setAlertTitle('Invalid Name');
-      setAlertMessage('Please enter a valid theme name');
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
-      setAlertVisible(true);
-      return;
-    }
+    setAlertTitle(t('themes.invalid_name'));
+    setAlertMessage(t('themes.invalid_name_msg'));
+    setAlertActions([{ label: 'OK', onPress: () => {} }]);
+    setAlertVisible(true);
+    return;
+  }
     onSave({ 
       ...themeColors,
       name: themeName 
@@ -252,14 +248,14 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
           style={styles.editorTitleInput}
           value={themeName}
           onChangeText={setThemeName}
-          placeholder="Theme name"
+          placeholder={t('themes.placeholder_name')}
           placeholderTextColor="rgba(255,255,255,0.5)"
         />
         <TouchableOpacity
           style={styles.editorSaveButton}
           onPress={handleSave}
         >
-          <Text style={styles.saveButtonText}>Save</Text>
+          <Text style={styles.saveButtonText}>{t('themes.save')}</Text>
         </TouchableOpacity>
       </View>
       
@@ -276,7 +272,7 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
               ]}
               onPress={() => setSelectedColorKey('primary')}
             >
-              <Text style={styles.colorButtonText}>Primary</Text>
+              <Text style={styles.colorButtonText}>{t('themes.primary')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -287,7 +283,7 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
               ]}
               onPress={() => setSelectedColorKey('secondary')}
             >
-              <Text style={styles.colorButtonText}>Secondary</Text>
+              <Text style={styles.colorButtonText}>{t('themes.secondary')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -298,7 +294,7 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
               ]}
               onPress={() => setSelectedColorKey('darkBackground')}
             >
-              <Text style={styles.colorButtonText}>Background</Text>
+              <Text style={styles.colorButtonText}>{t('themes.background')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -319,6 +315,7 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
 };
 
 const ThemeScreen: React.FC = () => {
+  const { t } = useTranslation();
   const {
     currentTheme,
     availableThemes,
@@ -398,18 +395,18 @@ const ThemeScreen: React.FC = () => {
   }, []);
 
   const handleDeleteTheme = useCallback((theme: Theme) => {
-    setAlertTitle('Delete Theme');
-    setAlertMessage(`Are you sure you want to delete "${theme.name}"?`);
+    setAlertTitle(t('themes.delete_title'));
+    setAlertMessage(t('themes.delete_msg', { name: theme.name }));
     setAlertActions([
-      { label: 'Cancel', style: { color: '#888' }, onPress: () => {} },
-      {
-        label: 'Delete',
-        style: { color: currentTheme.colors.error },
-        onPress: () => deleteCustomTheme(theme.id),
-      },
-    ]);
-    setAlertVisible(true);
-  }, [deleteCustomTheme, currentTheme.colors.error]);
+    { label: t('themes.cancel'), style: { color: '#888' }, onPress: () => {} },
+    {
+      label: t('themes.delete'),
+      style: { color: currentTheme.colors.error },
+      onPress: () => deleteCustomTheme(theme.id),
+    },
+  ]);
+  setAlertVisible(true);
+}, [deleteCustomTheme, currentTheme.colors.error, t]);
 
   const handleCreateTheme = useCallback(() => {
     setEditingTheme(null);
@@ -430,21 +427,19 @@ const ThemeScreen: React.FC = () => {
         }
       });
     } else {
-      // Create new theme
-      addCustomTheme({
-        name: themeData.name || 'Custom Theme',
-        colors: {
-          ...currentTheme.colors,
-          primary: themeData.primary,
-          secondary: themeData.secondary,
-          darkBackground: themeData.darkBackground,
-        }
-      });
-    }
-    
-    setIsEditMode(false);
-    setEditingTheme(null);
-  }, [editingTheme, updateCustomTheme, addCustomTheme, currentTheme]);
+    addCustomTheme({
+      name: themeData.name || t('themes.default_custom_name'), 
+      colors: {
+        ...currentTheme.colors,
+        primary: themeData.primary,
+        secondary: themeData.secondary,
+        darkBackground: themeData.darkBackground,
+      }
+    });
+  }
+  setIsEditMode(false);
+  setEditingTheme(null);
+}, [editingTheme, updateCustomTheme, addCustomTheme, currentTheme, t]);
 
   const handleCancelEdit = useCallback(() => {
     setIsEditMode(false);
@@ -463,42 +458,19 @@ const ThemeScreen: React.FC = () => {
     }
   }, [isEditMode, handleCancelEdit]);
 
-  // Pass alert state to ThemeColorEditor
-  const ThemeColorEditorWithAlert = (props: any) => {
-    const handleSave = (themeName: string, themeColors: any, onSave: any) => {
-      if (!themeName.trim()) {
-        setAlertTitle('Invalid Name');
-        setAlertMessage('Please enter a valid theme name');
-        setAlertActions([{ label: 'OK', onPress: () => {} }]);
-        setAlertVisible(true);
-        return false;
-      }
-      onSave();
-      return true;
-    };
-    return (
-      <>
-        <ThemeColorEditor {...props} handleSave={handleSave} />
-        <CustomAlert
-          visible={alertVisible}
-          title={alertTitle}
-          message={alertMessage}
-          actions={alertActions}
-          onClose={() => setAlertVisible(false)}
-        />
-      </>
-    );
-  };
+  /* const ThemeColorEditorWithAlert **/
 
   if (isEditMode) {
     const initialColors = editingTheme ? {
       primary: editingTheme.colors.primary,
       secondary: editingTheme.colors.secondary,
       darkBackground: editingTheme.colors.darkBackground,
+      name: editingTheme.name,
     } : {
       primary: currentTheme.colors.primary,
       secondary: currentTheme.colors.secondary,
       darkBackground: currentTheme.colors.darkBackground,
+      name: ''
     };
 
     return (
@@ -541,7 +513,7 @@ const ThemeScreen: React.FC = () => {
         >
           <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
           <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
-            Settings
+            {t('settings.title')}
           </Text>
         </TouchableOpacity>
         
@@ -551,7 +523,7 @@ const ThemeScreen: React.FC = () => {
       </View>
       
       <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-        App Themes
+        {t('themes.title')}
       </Text>
       
       {/* Category filter */}
@@ -579,7 +551,7 @@ const ThemeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.textMuted }]}>
-          SELECT THEME
+          {t('themes.select_theme')} 
         </Text>
         
         <View style={styles.themeGrid}>
@@ -604,16 +576,18 @@ const ThemeScreen: React.FC = () => {
           onPress={handleCreateTheme}
         >
           <MaterialIcons name="add" size={20} color="#FFFFFF" />
-          <Text style={styles.createButtonText}>Create Custom Theme</Text>
+          <Text style={styles.createButtonText}>
+            {t('themes.create_custom')}
+          </Text>
         </TouchableOpacity>
 
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.textMuted, marginTop: 24 }]}>
-          OPTIONS
+          {t('themes.options')}
         </Text>
 
         <View style={styles.optionRow}>
           <Text style={[styles.optionLabel, { color: currentTheme.colors.text }]}>
-            Use Dominant Color from Artwork
+            {t('themes.use_dominant')}
           </Text>
           <Switch
             value={settings.useDominantBackgroundColor}
