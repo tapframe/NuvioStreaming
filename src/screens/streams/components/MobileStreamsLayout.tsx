@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -129,6 +130,7 @@ const MobileStreamsLayout = memo(
     id,
     imdbId,
   }: MobileStreamsLayoutProps) => {
+    const { t } = useTranslation();
     const styles = React.useMemo(() => createStyles(colors), [colors]);
     const isEpisode = metadata?.videos && metadata.videos.length > 1 && selectedEpisode;
 
@@ -227,7 +229,7 @@ const MobileStreamsLayout = memo(
           {/* Active Scrapers Status */}
           {activeFetchingScrapers.length > 0 && (
             <View style={styles.activeScrapersContainer}>
-              <Text style={styles.activeScrapersTitle}>Fetching from:</Text>
+              <Text style={styles.activeScrapersTitle}>{t('streams.fetching_from')}</Text>
               <View style={styles.activeScrapersRow}>
                 {activeFetchingScrapers.map((scraperName, index) => (
                   <PulsingChip key={scraperName} text={scraperName} delay={index * 200} />
@@ -240,13 +242,13 @@ const MobileStreamsLayout = memo(
           {showNoSourcesError ? (
             <View style={styles.noStreams}>
               <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.noStreamsText}>No streaming sources available</Text>
-              <Text style={styles.noStreamsSubText}>Please add streaming sources in settings</Text>
+              <Text style={styles.noStreamsText}>{t('streams.no_sources_available')}</Text>
+              <Text style={styles.noStreamsSubText}>{t('streams.add_sources_desc')}</Text>
               <TouchableOpacity
                 style={styles.addSourcesButton}
                 onPress={() => navigation.navigate('Addons' as never)}
               >
-                <Text style={styles.addSourcesButtonText}>Add Sources</Text>
+                <Text style={styles.addSourcesButtonText}>{t('streams.add_sources')}</Text>
               </TouchableOpacity>
             </View>
           ) : streamsEmpty ? (
@@ -254,18 +256,18 @@ const MobileStreamsLayout = memo(
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>
-                  {isAutoplayWaiting ? 'Finding best stream for autoplay...' : 'Finding available streams...'}
+                  {isAutoplayWaiting ? t('streams.finding_best_stream') : t('streams.finding_streams')}
                 </Text>
               </View>
             ) : showStillFetching ? (
               <View style={styles.loadingContainer}>
                 <MaterialIcons name="hourglass-bottom" size={32} color={colors.primary} />
-                <Text style={styles.loadingText}>Still fetching streams…</Text>
+                <Text style={styles.loadingText}>{t('streams.still_fetching')}</Text>
               </View>
             ) : (
               <View style={styles.noStreams}>
                 <MaterialIcons name="error-outline" size={48} color={colors.textMuted} />
-                <Text style={styles.noStreamsText}>No streams available</Text>
+                <Text style={styles.noStreamsText}>{t('streams.no_streams_available')}</Text>
               </View>
             )
           ) : (

@@ -12,6 +12,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -88,6 +89,7 @@ const MetadataScreen: React.FC = () => {
   const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string; addonId?: string }>, string>>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { id, type, episodeId, addonId } = route.params;
+  const { t } = useTranslation();
 
   // Log route parameters for debugging
   React.useEffect(() => {
@@ -780,19 +782,19 @@ const MetadataScreen: React.FC = () => {
         console.log('✅ Found status code:', code);
         switch (code) {
           case 404:
-            return { code: '404', message: 'Content not found', userMessage: 'This content doesn\'t exist or may have been removed.' };
+            return { code: '404', message: t('metadata.content_not_found'), userMessage: t('metadata.content_not_found_desc') };
           case 500:
-            return { code: '500', message: 'Server error', userMessage: 'The server is temporarily unavailable. Please try again later.' };
+            return { code: '500', message: t('metadata.server_error'), userMessage: t('metadata.server_error_desc') };
           case 502:
-            return { code: '502', message: 'Bad gateway', userMessage: 'The server is experiencing issues. Please try again later.' };
+            return { code: '502', message: t('metadata.bad_gateway'), userMessage: t('metadata.bad_gateway_desc') };
           case 503:
-            return { code: '503', message: 'Service unavailable', userMessage: 'The service is currently down for maintenance. Please try again later.' };
+            return { code: '503', message: t('metadata.service_unavailable'), userMessage: t('metadata.service_unavailable_desc') };
           case 429:
-            return { code: '429', message: 'Too many requests', userMessage: 'You\'re making too many requests. Please wait a moment and try again.' };
+            return { code: '429', message: t('metadata.too_many_requests'), userMessage: t('metadata.too_many_requests_desc') };
           case 408:
-            return { code: '408', message: 'Request timeout', userMessage: 'The request took too long. Please try again.' };
+            return { code: '408', message: t('metadata.request_timeout'), userMessage: t('metadata.request_timeout_desc') };
           default:
-            return { code: code.toString(), message: `Error ${code}`, userMessage: 'Something went wrong. Please try again.' };
+            return { code: code.toString(), message: `Error ${code}`, userMessage: t('metadata.something_went_wrong') };
         }
       }
 
@@ -801,7 +803,7 @@ const MetadataScreen: React.FC = () => {
         error.includes('ERR_BAD_RESPONSE') ||
         error.includes('Request failed') ||
         error.includes('ERR_NETWORK')) {
-        return { code: 'NETWORK', message: 'Network error', userMessage: 'Please check your internet connection and try again.' };
+        return { code: 'NETWORK', message: t('metadata.network_error'), userMessage: t('metadata.network_error_desc') };
       }
 
       // Check for timeout errors
@@ -809,36 +811,36 @@ const MetadataScreen: React.FC = () => {
         error.includes('timed out') ||
         error.includes('ECONNABORTED') ||
         error.includes('ETIMEDOUT')) {
-        return { code: 'TIMEOUT', message: 'Request timeout', userMessage: 'The request took too long. Please try again.' };
+        return { code: 'TIMEOUT', message: t('metadata.request_timeout'), userMessage: t('metadata.request_timeout_desc') };
       }
 
       // Check for authentication errors
       if (error.includes('401') || error.includes('Unauthorized') || error.includes('authentication')) {
-        return { code: '401', message: 'Authentication error', userMessage: 'Please check your account settings and try again.' };
+        return { code: '401', message: t('metadata.auth_error'), userMessage: t('metadata.auth_error_desc') };
       }
 
       // Check for permission errors
       if (error.includes('403') || error.includes('Forbidden') || error.includes('permission')) {
-        return { code: '403', message: 'Access denied', userMessage: 'You don\'t have permission to access this content.' };
+        return { code: '403', message: t('metadata.access_denied'), userMessage: t('metadata.access_denied_desc') };
       }
 
       // Check for "not found" errors - but only if no status code was found
       if (!statusCodeMatch && (error.includes('Content not found') || error.includes('not found'))) {
-        return { code: '404', message: 'Content not found', userMessage: 'This content doesn\'t exist or may have been removed.' };
+        return { code: '404', message: t('metadata.content_not_found'), userMessage: t('metadata.content_not_found_desc') };
       }
 
       // Check for retry/attempt errors
       if (error.includes('attempts') || error.includes('Please check your connection')) {
-        return { code: 'CONNECTION', message: 'Connection error', userMessage: 'Please check your internet connection and try again.' };
+        return { code: 'CONNECTION', message: t('metadata.connection_error'), userMessage: t('metadata.network_error_desc') };
       }
 
       // Check for streams-related errors
       if (error.includes('streams') || error.includes('Failed to load streams')) {
-        return { code: 'STREAMS', message: 'Streams unavailable', userMessage: 'Streaming sources are currently unavailable. Please try again later.' };
+        return { code: 'STREAMS', message: t('metadata.streams_unavailable'), userMessage: t('metadata.streams_unavailable_desc') };
       }
 
       // Default case
-      return { code: 'UNKNOWN', message: 'Unknown error', userMessage: 'An unexpected error occurred. Please try again.' };
+      return { code: 'UNKNOWN', message: t('metadata.unknown_error'), userMessage: t('metadata.something_went_wrong') };
     };
 
     const errorInfo = parseError(metadataError);
@@ -852,10 +854,10 @@ const MetadataScreen: React.FC = () => {
         <View style={styles.errorContainer}>
           <MaterialIcons name="error-outline" size={64} color={currentTheme.colors.error || '#FF6B6B'} />
           <Text style={[styles.errorTitle, { color: currentTheme.colors.highEmphasis }]}>
-            Unable to Load Content
+            {t('metadata.unable_to_load')}
           </Text>
           <Text style={[styles.errorCode, { color: currentTheme.colors.textMuted }]}>
-            Error Code: {errorInfo.code}
+            {t('metadata.error_code', { code: errorInfo.code })}
           </Text>
           <Text style={[styles.errorMessage, { color: currentTheme.colors.highEmphasis }]}>
             {errorInfo.userMessage}
@@ -870,13 +872,13 @@ const MetadataScreen: React.FC = () => {
             onPress={loadMetadata}
           >
             <MaterialIcons name="refresh" size={20} color={currentTheme.colors.white} style={{ marginRight: 8 }} />
-            <Text style={styles.retryButtonText}>Try Again</Text>
+            <Text style={styles.retryButtonText}>{t('common.try_again')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.backButton, { borderColor: currentTheme.colors.primary }]}
             onPress={handleBack}
           >
-            <Text style={[styles.backButtonText, { color: currentTheme.colors.primary }]}>Go Back</Text>
+            <Text style={[styles.backButtonText, { color: currentTheme.colors.primary }]}>{t('common.go_back')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

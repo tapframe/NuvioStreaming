@@ -13,6 +13,7 @@ import {
   InteractionManager,
   ScrollView
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { FlashList } from '@shopify/flash-list';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -267,6 +268,7 @@ const createStyles = (colors: any) => StyleSheet.create({
 
 const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const { addonId, type, id, name: originalName, genreFilter } = route.params;
+  const { t } = useTranslation();
   const [items, setItems] = useState<Meta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -495,7 +497,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
             return;
           } else {
             InteractionManager.runAfterInteractions(() => {
-              setError("No content found for the selected filters");
+              setError(t('catalog.no_content_filters'));
               setItems([]);
               setLoading(false);
               setRefreshing(false);
@@ -665,7 +667,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
 
       if (!foundItems) {
         InteractionManager.runAfterInteractions(() => {
-          setError("No content found for the selected filters");
+          setError(t('catalog.no_content_filters'));
           logger.log('[CatalogScreen] No items found after loading');
         });
       }
@@ -845,13 +847,13 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
     <View style={styles.centered}>
       <MaterialIcons name="search-off" size={56} color={colors.mediumGray} />
       <Text style={styles.emptyText}>
-        No content found
+        {t('catalog.no_content_found')}
       </Text>
       <TouchableOpacity
         style={styles.button}
         onPress={handleRefresh}
       >
-        <Text style={styles.buttonText}>Try Again</Text>
+        <Text style={styles.buttonText}>{t('common.try_again')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -866,7 +868,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
         style={styles.button}
         onPress={() => loadItems(true)}
       >
-        <Text style={styles.buttonText}>Retry</Text>
+        <Text style={styles.buttonText}>{t('common.retry')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -874,7 +876,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
   const renderLoadingState = () => (
     <View style={styles.centered}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.loadingText}>Loading content...</Text>
+      <Text style={styles.loadingText}>{t('catalog.loading_content')}</Text>
     </View>
   );
 

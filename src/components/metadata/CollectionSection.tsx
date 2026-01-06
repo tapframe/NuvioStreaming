@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -39,6 +40,7 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
   collectionMovies, 
   loadingCollection 
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
@@ -109,9 +111,9 @@ export const CollectionSection: React.FC<CollectionSectionProps> = ({
       }
     } catch (error) {
       if (__DEV__) console.error('Error navigating to collection item:', error);
-      setAlertTitle('Error');
-      setAlertMessage('Unable to load this content. Please try again later.');
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('metadata.something_went_wrong'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => {} }]);
       setAlertVisible(true);
     }
   };
