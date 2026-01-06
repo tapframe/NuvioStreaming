@@ -12,7 +12,10 @@ import {
   Platform,
   Dimensions,
   Linking,
+  Modal,
+  FlatList,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -142,8 +145,10 @@ const Sidebar: React.FC<SidebarProps> = ({ selectedCategory, onCategorySelect, c
 
 
 const SettingsScreen: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const { settings, updateSetting } = useSettings();
   const [hasUpdateBadge, setHasUpdateBadge] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -577,6 +582,13 @@ const SettingsScreen: React.FC = () => {
               (settingsConfig?.categories?.['playback']?.visible !== false)
             ) && (
                 <SettingsCard title="GENERAL">
+                  <SettingItem
+                    title={t('settings.language')}
+                    description={i18n.language === 'pt' ? t('settings.portuguese') : t('settings.english')}
+                    icon="globe"
+                    renderControl={() => <ChevronRight />}
+                    onPress={() => setLanguageModalVisible(true)}
+                  />
                   {(settingsConfig?.categories?.['content']?.visible !== false) && (
                     <SettingItem
                       title="Content & Discovery"
@@ -791,6 +803,69 @@ const SettingsScreen: React.FC = () => {
         actions={alertActions}
         onClose={() => setAlertVisible(false)}
       />
+
+      <Modal
+        visible={languageModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setLanguageModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: currentTheme.colors.elevation1 }]}>
+            <Text style={[styles.modalTitle, { color: currentTheme.colors.highEmphasis }]}>
+              {t('settings.select_language')}
+            </Text>
+
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                i18n.language === 'en' && { backgroundColor: currentTheme.colors.primary + '20' }
+              ]}
+              onPress={() => {
+                i18n.changeLanguage('en');
+                setLanguageModalVisible(false);
+              }}
+            >
+              <Text style={[
+                styles.languageText,
+                { color: currentTheme.colors.highEmphasis },
+                i18n.language === 'en' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+              ]}>
+                {t('settings.english')}
+              </Text>
+              {i18n.language === 'en' && (
+                <Feather name="check" size={20} color={currentTheme.colors.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                i18n.language === 'pt' && { backgroundColor: currentTheme.colors.primary + '20' }
+              ]}
+              onPress={() => {
+                i18n.changeLanguage('pt');
+                setLanguageModalVisible(false);
+              }}
+            >
+              <Text style={[
+                styles.languageText,
+                { color: currentTheme.colors.highEmphasis },
+                i18n.language === 'pt' && { color: currentTheme.colors.primary, fontWeight: 'bold' }
+              ]}>
+                {t('settings.portuguese')}
+              </Text>
+              {i18n.language === 'pt' && (
+                <Feather name="check" size={20} color={currentTheme.colors.primary} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -798,6 +873,45 @@ const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  languageText: {
+    fontSize: 16,
   },
   // Mobile styles
   contentContainer: {

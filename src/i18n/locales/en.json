@@ -1,0 +1,42 @@
+{
+    "common": {
+        "loading": "Loading...",
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "search": "Search",
+        "error": "Error",
+        "success": "Success",
+        "ok": "OK"
+    },
+    "addons": {
+        "title": "Addons",
+        "reorder_mode": "Reorder Mode",
+        "reorder_info": "Addons at the top have higher priority when loading content",
+        "add_addon_placeholder": "Addon URL",
+        "add_button": "Add Addon",
+        "my_addons": "My Addons",
+        "community_addons": "Community Addons",
+        "no_addons": "No addons installed",
+        "uninstall_title": "Uninstall Addon",
+        "uninstall_message": "Are you sure you want to uninstall {{name}}?",
+        "uninstall_button": "Uninstall",
+        "install_success": "Addon installed successfully",
+        "install_error": "Failed to install addon",
+        "load_error": "Failed to load addons",
+        "fetch_error": "Failed to fetch addon details",
+        "invalid_url": "Please enter an addon URL",
+        "configure": "Configure",
+        "version": "Version: {{version}}",
+        "installed_addons": "INSTALLED ADDONS",
+        "reorder_drag_title": "DRAG ADDONS TO REORDER",
+        "install": "Install"
+    },
+    "settings": {
+        "language": "Language",
+        "select_language": "Select Language",
+        "english": "English",
+        "portuguese": "Portuguese"
+    }
+}

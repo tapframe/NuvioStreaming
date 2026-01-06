@@ -13,6 +13,7 @@ import {
   Platform,
   LogBox
 } from 'react-native';
+import './src/i18n'; // Initialize i18n
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';

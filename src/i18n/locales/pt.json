@@ -1,0 +1,42 @@
+{
+    "common": {
+        "loading": "Carregando...",
+        "cancel": "Cancelar",
+        "save": "Salvar",
+        "delete": "Excluir",
+        "edit": "Editar",
+        "search": "Buscar",
+        "error": "Erro",
+        "success": "Sucesso",
+        "ok": "OK"
+    },
+    "addons": {
+        "title": "Addons",
+        "reorder_mode": "Modo de Reordenação",
+        "reorder_info": "Arraste e solte para reordenar seus addons.",
+        "add_addon_placeholder": "Digite a URL do addon (comece com https://)",
+        "add_button": "Adicionar",
+        "my_addons": "Meus Addons",
+        "community_addons": "Addons da Comunidade",
+        "no_addons": "Nenhum addon instalado",
+        "uninstall_title": "Desinstalar Addon",
+        "uninstall_message": "Tem certeza que deseja desinstalar {{name}}?",
+        "uninstall_button": "Desinstalar",
+        "installed_addons": "ADDONS INSTALADOS",
+        "reorder_drag_title": "ARRASTE PARA REORDENAR",
+        "install": "Instalar",
+        "install_success": "Addon instalado com sucesso",
+        "install_error": "Falha ao instalar addon",
+        "load_error": "Falha ao carregar addons",
+        "fetch_error": "Falha ao buscar detalhes do addon",
+        "invalid_url": "Por favor, digite uma URL de addon",
+        "configure": "Configurar",
+        "version": "Versão: {{version}}"
+    },
+    "settings": {
+        "language": "Idioma",
+        "select_language": "Selecionar Idioma",
+        "english": "Inglês",
+        "portuguese": "Português"
+    }
+}
