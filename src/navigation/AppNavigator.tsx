@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions, DeviceEventEmitter } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
@@ -71,6 +71,7 @@ import BackupScreen from '../screens/BackupScreen';
 import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
 import ContributorsScreen from '../screens/ContributorsScreen';
 import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
+
 import {
   ContentDiscoverySettingsScreen,
   AppearanceSettingsScreen,
@@ -689,15 +690,32 @@ const MainTabs = () => {
               const isFocused = props.state.index === index;
 
               const onPress = () => {
+                // Create a synthetic event object we can modify
+                const syntheticEvent = {
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                  defaultPrevented: false,
+                  preventDefault: () => {
+                    syntheticEvent.defaultPrevented = true;
+                  }
+                };
+
                 const event = props.navigation.emit({
                   type: 'tabPress',
                   target: route.key,
                   canPreventDefault: true,
                 });
+
                 if (isFocused) {
-                  // Same tab pressed - emit scroll to top
-                  emitScrollToTop(route.name);
-                } else if (!event.defaultPrevented) {
+                  if (route.name === 'Search') {
+                    // Send the signal to SearchScreen.tsx to focus input
+                    DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                    syntheticEvent.preventDefault(); // Prevent scroll-to-top
+                  } else {
+                    emitScrollToTop(route.name);
+                  }
+                } else if (!syntheticEvent.defaultPrevented && !event.defaultPrevented) {
                   props.navigation.navigate(route.name);
                 }
               };
@@ -806,6 +824,14 @@ const MainTabs = () => {
               const isFocused = props.state.index === index;
 
               const onPress = () => {
+                // For Search tab, we need to handle this specially
+                if (isFocused && route.name === 'Search') {
+                  // Focus search input instead of scrolling to top
+                  DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                  // Return early to prevent navigation and scroll-to-top
+                  return;
+                }
+
                 const event = props.navigation.emit({
                   type: 'tabPress',
                   target: route.key,
@@ -813,7 +839,7 @@ const MainTabs = () => {
                 });
 
                 if (isFocused) {
-                  // Same tab pressed - emit scroll to top
+                  // For other tabs, scroll to top
                   emitScrollToTop(route.name);
                 } else if (!event.defaultPrevented) {
                   props.navigation.navigate(route.name);
@@ -952,7 +978,10 @@ const MainTabs = () => {
             listeners={({ navigation }: { navigation: any }) => ({
               tabPress: (e: any) => {
                 if (navigation.isFocused()) {
-                  emitScrollToTop('Search');
+                  // Focus search input instead of scrolling to top
+                  DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                  // Don't try to access preventDefault on native iOS tabs
+                  // Just emit the event and let SearchScreen handle it
                 }
               },
             })}
@@ -1059,6 +1088,13 @@ const MainTabs = () => {
             ),
             freezeOnBlur: true,
           }}
+          listeners={({ navigation }: any) => ({
+            tabPress: (e: any) => {
+              if (navigation.isFocused()) {
+                emitScrollToTop('Home');
+              }
+            },
+          })}
         />
         <Tab.Screen
           name="Library"
@@ -1069,6 +1105,13 @@ const MainTabs = () => {
               <MaterialCommunityIcons name={focused ? 'heart' : 'heart-outline'} size={size} color={color} />
             ),
           }}
+          listeners={({ navigation }: any) => ({
+            tabPress: (e: any) => {
+              if (navigation.isFocused()) {
+                emitScrollToTop('Library');
+              }
+            },
+          })}
         />
         <Tab.Screen
           name="Search"
@@ -1079,6 +1122,16 @@ const MainTabs = () => {
               <MaterialCommunityIcons name={'magnify'} size={size} color={color} />
             ),
           }}
+          listeners={({ navigation }: any) => ({
+            tabPress: (e: any) => {
+              if (navigation.isFocused()) {
+                // Focus search input instead of scrolling to top
+                DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                // Simply return to prevent navigation
+                return;
+              }
+            },
+          })}
         />
         {appSettings?.enableDownloads !== false && (
           <Tab.Screen
@@ -1090,6 +1143,13 @@ const MainTabs = () => {
                 <MaterialCommunityIcons name={focused ? 'download' : 'download-outline'} size={size} color={color} />
               ),
             }}
+            listeners={({ navigation }: any) => ({
+              tabPress: (e: any) => {
+                if (navigation.isFocused()) {
+                  emitScrollToTop('Downloads');
+                }
+              },
+            })}
           />
         )}
         <Tab.Screen
@@ -1101,6 +1161,13 @@ const MainTabs = () => {
               <MaterialCommunityIcons name={focused ? 'cog' : 'cog-outline'} size={size} color={color} />
             ),
           }}
+          listeners={({ navigation }: any) => ({
+            tabPress: (e: any) => {
+              if (navigation.isFocused()) {
+                emitScrollToTop('Settings');
+              }
+            },
+          })}
         />
       </Tab.Navigator>
     </View>
