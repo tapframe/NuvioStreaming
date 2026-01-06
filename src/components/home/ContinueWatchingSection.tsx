@@ -12,6 +12,10 @@ import {
 } from 'react-native';
 import { FlatList } from 'react-native';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
+import BottomSheet, { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/AppNavigator';
@@ -26,7 +30,7 @@ import { TraktService } from '../../services/traktService';
 import { stremioService } from '../../services/stremioService';
 import { streamCacheService } from '../../services/streamCacheService';
 import { useSettings } from '../../hooks/useSettings';
-import CustomAlert from '../../components/CustomAlert';
+
 
 // Define interface for continue watching items
 interface ContinueWatchingItem extends StreamingContent {
@@ -106,12 +110,17 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
+  const insets = useSafeAreaInsets();
   const [continueWatchingItems, setContinueWatchingItems] = useState<ContinueWatchingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const appState = useRef(AppState.currentState);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Bottom sheet for item actions
+  const actionSheetRef = useRef<BottomSheetModal>(null);
+  const [selectedItem, setSelectedItem] = useState<ContinueWatchingItem | null>(null);
 
   // Enhanced responsive sizing for tablets and TV screens
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
@@ -195,11 +204,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
   }, [deviceType]);
 
-  // Alert state for CustomAlert
-  const [alertVisible, setAlertVisible] = useState(false);
-  const [alertTitle, setAlertTitle] = useState('');
-  const [alertMessage, setAlertMessage] = useState('');
-  const [alertActions, setAlertActions] = useState<any[]>([]);
+
 
   // Use a ref to track if a background refresh is in progress to avoid state updates
   const isRefreshingRef = useRef(false);
@@ -1101,71 +1106,93 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
   }, [navigation, settings.useCachedStreams, settings.openMetadataScreenWhenCacheDisabled]);
 
-  // Handle long press to delete (moved before renderContinueWatchingItem)
-  const handleLongPress = useCallback(async (item: ContinueWatchingItem) => {
+  // Handle long press to show action sheet
+  const handleLongPress = useCallback((item: ContinueWatchingItem) => {
     try {
-      // Trigger haptic feedback
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (error) {
       // Ignore haptic errors
     }
+    setSelectedItem(item);
+    actionSheetRef.current?.present();
+  }, []);
 
-    const traktService = TraktService.getInstance();
-    const isAuthed = await traktService.isAuthenticated();
+  // Handle view details action
+  const handleViewDetails = useCallback(() => {
+    if (!selectedItem) return;
+    actionSheetRef.current?.dismiss();
 
-    setAlertTitle('Remove from Continue Watching');
+    setTimeout(() => {
+      if (selectedItem.type === 'series' && selectedItem.season && selectedItem.episode) {
+        const episodeId = `${selectedItem.id}:${selectedItem.season}:${selectedItem.episode}`;
+        navigation.navigate('Metadata', {
+          id: selectedItem.id,
+          type: selectedItem.type,
+          episodeId: episodeId,
+          addonId: selectedItem.addonId
+        });
+      } else {
+        navigation.navigate('Metadata', {
+          id: selectedItem.id,
+          type: selectedItem.type,
+          addonId: selectedItem.addonId
+        });
+      }
+    }, 150);
+  }, [selectedItem, navigation]);
 
-    if (isAuthed) {
-      setAlertMessage(`Remove "${item.name}" from your continue watching list?\n\nThis will also remove it from your Trakt Continue Watching.`);
-    } else {
-      setAlertMessage(`Remove "${item.name}" from your continue watching list?`);
+  // Handle remove action
+  const handleRemoveItem = useCallback(async () => {
+    if (!selectedItem) return;
+    actionSheetRef.current?.dismiss();
+
+    setDeletingItemId(selectedItem.id);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await storageService.removeAllWatchProgressForContent(selectedItem.id, selectedItem.type, { addBaseTombstone: true });
+
+      const traktService = TraktService.getInstance();
+      const isAuthed = await traktService.isAuthenticated();
+
+      if (isAuthed) {
+        if (selectedItem.traktPlaybackId) {
+          await traktService.removePlaybackItem(selectedItem.traktPlaybackId);
+        } else if (selectedItem.type === 'movie') {
+          await traktService.removeMovieFromHistory(selectedItem.id);
+        } else if (selectedItem.type === 'series' && selectedItem.season !== undefined && selectedItem.episode !== undefined) {
+          await traktService.removeEpisodeFromHistory(selectedItem.id, selectedItem.season, selectedItem.episode);
+        } else {
+          await traktService.removeShowFromHistory(selectedItem.id);
+        }
+      }
+
+      const itemKey = `${selectedItem.type}:${selectedItem.id}`;
+      recentlyRemovedRef.current.add(itemKey);
+      await storageService.addContinueWatchingRemoved(selectedItem.id, selectedItem.type);
+      setTimeout(() => {
+        recentlyRemovedRef.current.delete(itemKey);
+      }, REMOVAL_IGNORE_DURATION);
+      setContinueWatchingItems(prev => prev.filter(i => i.id !== selectedItem.id));
+    } catch (error) {
+      // Continue even if removal fails
+    } finally {
+      setDeletingItemId(null);
+      setSelectedItem(null);
     }
+  }, [selectedItem]);
 
-    setAlertActions([
-      {
-        label: 'Cancel',
-        style: { color: '#888' },
-        onPress: () => { },
-      },
-      {
-        label: 'Remove',
-        style: { color: currentTheme.colors.error },
-        onPress: async () => {
-          setDeletingItemId(item.id);
-          try {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            await storageService.removeAllWatchProgressForContent(item.id, item.type, { addBaseTombstone: true });
-
-            if (isAuthed) {
-              let traktResult = false;
-              // If we have a playback ID (from sync/playback), use that to remove from Continue Watching
-              if (item.traktPlaybackId) {
-                traktResult = await traktService.removePlaybackItem(item.traktPlaybackId);
-              } else if (item.type === 'movie') {
-                traktResult = await traktService.removeMovieFromHistory(item.id);
-              } else if (item.type === 'series' && item.season !== undefined && item.episode !== undefined) {
-                traktResult = await traktService.removeEpisodeFromHistory(item.id, item.season, item.episode);
-              } else {
-                traktResult = await traktService.removeShowFromHistory(item.id);
-              }
-            }
-            const itemKey = `${item.type}:${item.id}`;
-            recentlyRemovedRef.current.add(itemKey);
-            await storageService.addContinueWatchingRemoved(item.id, item.type);
-            setTimeout(() => {
-              recentlyRemovedRef.current.delete(itemKey);
-            }, REMOVAL_IGNORE_DURATION);
-            setContinueWatchingItems(prev => prev.filter(i => i.id !== item.id));
-          } catch (error) {
-            // Continue even if removal fails
-          } finally {
-            setDeletingItemId(null);
-          }
-        },
-      },
-    ]);
-    setAlertVisible(true);
-  }, [currentTheme.colors.error]);
+  // Render backdrop for bottom sheet
+  const renderBackdrop = useCallback(
+    (props: any) => (
+      <BottomSheetBackdrop
+        {...props}
+        disappearsOnIndex={-1}
+        appearsOnIndex={0}
+        opacity={0.6}
+      />
+    ),
+    []
+  );
 
   // Compute poster dimensions for poster-style cards
   const computedPosterWidth = useMemo(() => {
@@ -1514,13 +1541,101 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         removeClippedSubviews={true}
       />
 
-      <CustomAlert
-        visible={alertVisible}
-        title={alertTitle}
-        message={alertMessage}
-        actions={alertActions}
-        onClose={() => setAlertVisible(false)}
-      />
+      {/* Action Sheet Bottom Sheet */}
+      <BottomSheetModal
+        ref={actionSheetRef}
+        index={0}
+        snapPoints={['35%']}
+        enablePanDownToClose={true}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={{
+          backgroundColor: currentTheme.colors.darkGray || '#0A0C0C',
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+        }}
+        handleIndicatorStyle={{
+          backgroundColor: currentTheme.colors.mediumGray,
+          width: 40,
+        }}
+        onDismiss={() => {
+          setSelectedItem(null);
+        }}
+      >
+        <BottomSheetView style={[styles.actionSheetContent, { paddingBottom: insets.bottom + 16 }]}>
+          {selectedItem && (
+            <>
+              {/* Header with poster and info */}
+              <View style={styles.actionSheetHeader}>
+                <FastImage
+                  source={{
+                    uri: selectedItem.poster || 'https://via.placeholder.com/100x150',
+                    priority: FastImage.priority.high,
+                  }}
+                  style={styles.actionSheetPoster}
+                  resizeMode={FastImage.resizeMode.cover}
+                />
+                <View style={styles.actionSheetInfo}>
+                  <Text
+                    style={[styles.actionSheetTitle, { color: currentTheme.colors.text }]}
+                    numberOfLines={2}
+                  >
+                    {selectedItem.name}
+                  </Text>
+                  {selectedItem.type === 'series' && selectedItem.season && selectedItem.episode ? (
+                    <Text style={[styles.actionSheetSubtitle, { color: currentTheme.colors.textMuted }]}>
+                      Season {selectedItem.season} · Episode {selectedItem.episode}
+                      {selectedItem.episodeTitle && selectedItem.episodeTitle !== `Episode ${selectedItem.episode}` && `\n${selectedItem.episodeTitle}`}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.actionSheetSubtitle, { color: currentTheme.colors.textMuted }]}>
+                      {selectedItem.year ? `${selectedItem.type === 'movie' ? 'Movie' : 'Series'} · ${selectedItem.year}` : selectedItem.type === 'movie' ? 'Movie' : 'Series'}
+                    </Text>
+                  )}
+                  {selectedItem.progress > 0 && (
+                    <View style={styles.actionSheetProgressContainer}>
+                      <View style={[styles.actionSheetProgressTrack, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                        <View
+                          style={[
+                            styles.actionSheetProgressBar,
+                            {
+                              width: `${selectedItem.progress}%`,
+                              backgroundColor: currentTheme.colors.primary
+                            }
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.actionSheetProgressText, { color: currentTheme.colors.textMuted }]}>
+                        {Math.round(selectedItem.progress)}% watched
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.actionSheetButtons}>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: currentTheme.colors.primary }]}
+                  onPress={handleViewDetails}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="information-circle-outline" size={22} color="#fff" />
+                  <Text style={styles.actionButtonText}>View Details</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.actionButtonSecondary, { backgroundColor: currentTheme.colors.elevation1 }]}
+                  onPress={handleRemoveItem}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="trash-outline" size={22} color={currentTheme.colors.error} />
+                  <Text style={[styles.actionButtonText, { color: currentTheme.colors.error }]}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </BottomSheetView>
+      </BottomSheetModal>
     </View>
   );
 });
@@ -1794,6 +1909,74 @@ const styles = StyleSheet.create({
   posterProgressLabel: {
     fontWeight: '500',
     marginLeft: 6,
+  },
+  // Action Sheet Styles
+  actionSheetContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  actionSheetHeader: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  actionSheetPoster: {
+    width: 70,
+    height: 105,
+    borderRadius: 10,
+    marginRight: 16,
+  },
+  actionSheetInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  actionSheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 6,
+    lineHeight: 22,
+  },
+  actionSheetSubtitle: {
+    fontSize: 14,
+    opacity: 0.8,
+    lineHeight: 20,
+  },
+  actionSheetProgressContainer: {
+    marginTop: 10,
+  },
+  actionSheetProgressTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  actionSheetProgressBar: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  actionSheetProgressText: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  actionSheetButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+  },
+  actionButtonSecondary: {
+    borderWidth: 0,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 
