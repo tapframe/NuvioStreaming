@@ -325,15 +325,21 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       // 1. Filter items first (async checks) - do this BEFORE any state updates
       const validItems: ContinueWatchingItem[] = [];
       for (const it of batch) {
-        const key = `${it.type}:${it.id}`;
+        // For series, use episode-specific key
+        const key = it.type === 'series' && it.season && it.episode
+          ? `${it.type}:${it.id}:${it.season}:${it.episode}`
+          : `${it.type}:${it.id}`;
 
         // Skip recently removed items
         if (recentlyRemovedRef.current.has(key)) {
           continue;
         }
 
-        // Skip persistently removed items
-        const isRemoved = await storageService.isContinueWatchingRemoved(it.id, it.type);
+        // Skip persistently removed items (episode-specific for series)
+        const removeId = it.type === 'series' && it.season && it.episode
+          ? `${it.id}:${it.season}:${it.episode}`
+          : it.id;
+        const isRemoved = await storageService.isContinueWatchingRemoved(removeId, it.type);
         if (isRemoved) {
           continue;
         }
@@ -874,9 +880,23 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               }
             }
             const uniqueItems = Array.from(deduped.values());
-            logger.log(`📋 [TraktSync] Setting ${uniqueItems.length} items from Trakt playback (deduped from ${traktBatch.length})`);
+
+            // Filter out removed items
+            const filteredItems: ContinueWatchingItem[] = [];
+            for (const item of uniqueItems) {
+              // Check episode-specific removal for series
+              const removeId = item.type === 'series' && item.season && item.episode
+                ? `${item.id}:${item.season}:${item.episode}`
+                : item.id;
+              const isRemoved = await storageService.isContinueWatchingRemoved(removeId, item.type);
+              if (!isRemoved) {
+                filteredItems.push(item);
+              }
+            }
+
+            logger.log(`📋 [TraktSync] Setting ${filteredItems.length} items from Trakt playback (deduped from ${traktBatch.length})`);
             // Sort by lastUpdated descending and set directly
-            const sortedBatch = uniqueItems.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
+            const sortedBatch = filteredItems.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
             setContinueWatchingItems(sortedBatch);
           }
         } catch (err) {
@@ -1149,30 +1169,58 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     setDeletingItemId(selectedItem.id);
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await storageService.removeAllWatchProgressForContent(selectedItem.id, selectedItem.type, { addBaseTombstone: true });
+
+      // For series episodes, only remove the specific episode's local progress
+      // Don't add a base tombstone which would block all episodes of the series
+      const isEpisode = selectedItem.type === 'series' && selectedItem.season && selectedItem.episode;
+      if (isEpisode) {
+        // Only remove local progress for this specific episode (no base tombstone)
+        await storageService.removeAllWatchProgressForContent(
+          selectedItem.id,
+          selectedItem.type,
+          { addBaseTombstone: false }
+        );
+      } else {
+        // For movies or whole series, add the base tombstone
+        await storageService.removeAllWatchProgressForContent(
+          selectedItem.id,
+          selectedItem.type,
+          { addBaseTombstone: true }
+        );
+      }
 
       const traktService = TraktService.getInstance();
       const isAuthed = await traktService.isAuthenticated();
 
-      if (isAuthed) {
-        if (selectedItem.traktPlaybackId) {
-          await traktService.removePlaybackItem(selectedItem.traktPlaybackId);
-        } else if (selectedItem.type === 'movie') {
-          await traktService.removeMovieFromHistory(selectedItem.id);
-        } else if (selectedItem.type === 'series' && selectedItem.season !== undefined && selectedItem.episode !== undefined) {
-          await traktService.removeEpisodeFromHistory(selectedItem.id, selectedItem.season, selectedItem.episode);
-        } else {
-          await traktService.removeShowFromHistory(selectedItem.id);
-        }
+      // Only remove playback progress from Trakt (not watch history)
+      // This ensures "Up Next" items don't affect Trakt watch history
+      if (isAuthed && selectedItem.traktPlaybackId) {
+        await traktService.removePlaybackItem(selectedItem.traktPlaybackId);
       }
+      // For series, make the key episode-specific so dismissing "Up Next" 
+      // doesn't affect other episodes
+      const itemKey = selectedItem.type === 'series' && selectedItem.season && selectedItem.episode
+        ? `${selectedItem.type}:${selectedItem.id}:${selectedItem.season}:${selectedItem.episode}`
+        : `${selectedItem.type}:${selectedItem.id}`;
 
-      const itemKey = `${selectedItem.type}:${selectedItem.id}`;
       recentlyRemovedRef.current.add(itemKey);
-      await storageService.addContinueWatchingRemoved(selectedItem.id, selectedItem.type);
+
+      // Store with episode-specific ID for series
+      const removeId = selectedItem.type === 'series' && selectedItem.season && selectedItem.episode
+        ? `${selectedItem.id}:${selectedItem.season}:${selectedItem.episode}`
+        : selectedItem.id;
+      await storageService.addContinueWatchingRemoved(removeId, selectedItem.type);
+
       setTimeout(() => {
         recentlyRemovedRef.current.delete(itemKey);
       }, REMOVAL_IGNORE_DURATION);
-      setContinueWatchingItems(prev => prev.filter(i => i.id !== selectedItem.id));
+      setContinueWatchingItems(prev => prev.filter(i => {
+        // For series, also check episode match
+        if (i.type === 'series' && selectedItem.type === 'series') {
+          return !(i.id === selectedItem.id && i.season === selectedItem.season && i.episode === selectedItem.episode);
+        }
+        return i.id !== selectedItem.id;
+      }));
     } catch (error) {
       // Continue even if removal fails
     } finally {
