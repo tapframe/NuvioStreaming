@@ -17,23 +17,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../hooks/useSettings';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTranslation } from 'react-i18next';
 
-// TTL options in milliseconds - organized in rows
-const TTL_OPTIONS = [
-  [
-    { label: '15 min', value: 15 * 60 * 1000 },
-    { label: '30 min', value: 30 * 60 * 1000 },
-    { label: '1 hour', value: 60 * 60 * 1000 },
-  ],
-  [
-    { label: '2 hours', value: 2 * 60 * 60 * 1000 },
-    { label: '6 hours', value: 6 * 60 * 60 * 1000 },
-    { label: '12 hours', value: 12 * 60 * 60 * 1000 },
-  ],
-  [
-    { label: '24 hours', value: 24 * 60 * 60 * 1000 },
-  ],
-];
+
 
 const ContinueWatchingSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -43,6 +29,24 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
   const styles = createStyles(colors);
   const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const { t } = useTranslation();
+
+  // TTL options in milliseconds - organized in rows
+  const TTL_OPTIONS = [
+    [
+      { label: `15 ${t('continue_watching_settings.min')}`, value: 15 * 60 * 1000 },
+      { label: `30 ${t('continue_watching_settings.min')}`, value: 30 * 60 * 1000 },
+      { label: `1 ${t('continue_watching_settings.hour')}`, value: 60 * 60 * 1000 },
+    ],
+    [
+      { label: `2 ${t('continue_watching_settings.hours')}`, value: 2 * 60 * 60 * 1000 },
+      { label: `6 ${t('continue_watching_settings.hours')}`, value: 6 * 60 * 60 * 1000 },
+      { label: `12 ${t('continue_watching_settings.hours')}`, value: 12 * 60 * 60 * 1000 },
+    ],
+    [
+      { label: `24 ${t('continue_watching_settings.hours')}`, value: 24 * 60 * 60 * 1000 },
+    ],
+  ];
 
   // Prevent iOS entrance flicker by restoring a non-translucent StatusBar
   useEffect(() => {
@@ -167,12 +171,12 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
           onPress={handleBack}
         >
           <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Settings</Text>
+          <Text style={styles.backText}>{t('settings.settings_title')}</Text>
         </TouchableOpacity>
       </View>
 
       <Text style={styles.headerTitle}>
-        Continue Watching
+        {t('continue_watching_settings.title')}
       </Text>
 
       {/* Content */}
@@ -182,19 +186,19 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
         contentContainerStyle={styles.contentContainer}
       >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>PLAYBACK BEHAVIOR</Text>
+          <Text style={styles.sectionTitle}>{t('continue_watching_settings.playback_behavior')}</Text>
           <View style={styles.settingsCard}>
             <SettingItem
-              title="Use Cached Streams"
-              description="When enabled, clicking Continue Watching items will open the player directly using previously played streams. When disabled, opens a content screen instead."
+              title={t('continue_watching_settings.use_cached')}
+              description={t('continue_watching_settings.use_cached_desc')}
               value={settings.useCachedStreams}
               onValueChange={(value) => handleUpdateSetting('useCachedStreams', value)}
               isLast={!settings.useCachedStreams}
             />
             {!settings.useCachedStreams && (
               <SettingItem
-                title="Open Metadata Screen"
-                description="When cached streams are disabled, open the Metadata screen instead of the Streams screen. This shows content details and allows manual stream selection."
+                title={t('continue_watching_settings.open_metadata')}
+                description={t('continue_watching_settings.open_metadata_desc')}
                 value={settings.openMetadataScreenWhenCacheDisabled}
                 onValueChange={(value) => handleUpdateSetting('openMetadataScreenWhenCacheDisabled', value)}
                 isLast={true}
@@ -205,14 +209,14 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
 
         {/* Card Appearance Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>CARD APPEARANCE</Text>
+          <Text style={styles.sectionTitle}>{t('continue_watching_settings.card_appearance')}</Text>
           <View style={styles.settingsCard}>
             <View style={[styles.settingItem, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
               <Text style={[styles.settingTitle, { color: colors.highEmphasis, marginBottom: 8 }]}>
-                Card Style
+                {t('continue_watching_settings.card_style')}
               </Text>
               <Text style={[styles.settingDescription, { color: colors.mediumEmphasis, marginBottom: 16 }]}>
-                Choose how Continue Watching items appear on the home screen
+                {t('continue_watching_settings.card_style_desc')}
               </Text>
               <View style={styles.cardStyleOptionsContainer}>
                 <TouchableOpacity
@@ -240,7 +244,7 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
                     styles.cardStyleLabel,
                     { color: settings.continueWatchingCardStyle === 'wide' ? colors.white : colors.highEmphasis }
                   ]}>
-                    Wide
+                    {t('continue_watching_settings.wide')}
                   </Text>
                   {settings.continueWatchingCardStyle === 'wide' && (
                     <MaterialIcons name="check-circle" size={18} color={colors.white} style={styles.cardStyleCheck} />
@@ -268,7 +272,7 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
                     styles.cardStyleLabel,
                     { color: settings.continueWatchingCardStyle === 'poster' ? colors.white : colors.highEmphasis }
                   ]}>
-                    Poster
+                    {t('continue_watching_settings.poster')}
                   </Text>
                   {settings.continueWatchingCardStyle === 'poster' && (
                     <MaterialIcons name="check-circle" size={18} color={colors.white} style={styles.cardStyleCheck} />
@@ -281,14 +285,14 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
 
         {settings.useCachedStreams && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>CACHE SETTINGS</Text>
+            <Text style={styles.sectionTitle}>{t('continue_watching_settings.cache_settings')}</Text>
             <View style={styles.settingsCard}>
               <View style={[styles.settingItem, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
                 <Text style={[styles.settingTitle, { color: colors.highEmphasis, marginBottom: 8 }]}>
-                  Stream Cache Duration
+                  {t('continue_watching_settings.cache_duration')}
                 </Text>
                 <Text style={[styles.settingDescription, { color: colors.mediumEmphasis, marginBottom: 16 }]}>
-                  How long to keep cached stream links before they expire
+                  {t('continue_watching_settings.cache_duration_desc')}
                 </Text>
                 <View style={styles.ttlOptionsContainer}>
                   {TTL_OPTIONS.map((row, rowIndex) => (
@@ -310,11 +314,11 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
               <View style={styles.warningHeader}>
                 <MaterialIcons name="warning" size={20} color={colors.warning} />
                 <Text style={[styles.warningTitle, { color: colors.warning }]}>
-                  Important Note
+                  {t('continue_watching_settings.important_note')}
                 </Text>
               </View>
               <Text style={[styles.warningText, { color: colors.mediumEmphasis }]}>
-                Not all stream links may remain active for the full cache duration. Longer cache times may result in expired links. If a cached link fails, the app will fall back to fetching fresh streams.
+                {t('continue_watching_settings.important_note_text')}
               </Text>
             </View>
           </View>
@@ -325,24 +329,17 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
             <View style={styles.infoHeader}>
               <MaterialIcons name="info" size={20} color={colors.primary} />
               <Text style={[styles.infoTitle, { color: colors.highEmphasis }]}>
-                How it works
+                {t('continue_watching_settings.how_it_works')}
               </Text>
             </View>
             <Text style={[styles.infoText, { color: colors.mediumEmphasis }]}>
               {settings.useCachedStreams ? (
                 <>
-                  • Streams are cached for your selected duration after playing{'\n'}
-                  • Cached streams are validated before use{'\n'}
-                  • If cache is invalid or expired, falls back to content screen{'\n'}
-                  • "Use Cached Streams" controls direct player vs screen navigation{'\n'}
-                  • "Open Metadata Screen" appears only when cached streams are disabled
+                  {t('continue_watching_settings.how_it_works_cached')}
                 </>
               ) : (
                 <>
-                  • When cached streams are disabled, clicking Continue Watching items opens content screens{'\n'}
-                  • "Open Metadata Screen" option controls which screen to open{'\n'}
-                  • Metadata screen shows content details and allows manual stream selection{'\n'}
-                  • Streams screen shows available streams for immediate playback
+                  {t('continue_watching_settings.how_it_works_uncached')}
                 </>
               )}
             </Text>
@@ -361,7 +358,7 @@ const ContinueWatchingSettingsScreen: React.FC = () => {
         ]}
       >
         <MaterialIcons name="check" size={20} color={colors.white} />
-        <Text style={styles.savedText}>Changes saved</Text>
+        <Text style={styles.savedText}>{t('continue_watching_settings.changes_saved')}</Text>
       </Animated.View>
     </SafeAreaView>
   );

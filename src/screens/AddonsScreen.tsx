@@ -664,9 +664,9 @@ const AddonsScreen = () => {
       setAlertVisible(true);
     } catch (error) {
       logger.error('Failed to install addon:', error);
-      setAlertTitle('Error');
-      setAlertMessage('Failed to install addon');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('addons.install_error'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     } finally {
       setInstalling(false);
@@ -909,7 +909,7 @@ const AddonsScreen = () => {
               )}
             </View>
             <View style={styles.addonMetaContainer}>
-              <Text style={styles.addonVersion}>v{item.version || '1.0.0'}</Text>
+              <Text style={styles.addonVersion}>{t('addons.version', { version: item.version || '1.0.0' })}</Text>
               <Text style={styles.addonDot}>•</Text>
               <Text style={styles.addonCategory}>{categoryText}</Text>
             </View>
@@ -967,7 +967,7 @@ const AddonsScreen = () => {
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Settings</Text>
+          <Text style={styles.backText}>{t('settings.settings_title')}</Text>
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
@@ -1027,18 +1027,18 @@ const AddonsScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>OVERVIEW</Text>
             <View style={styles.statsContainer}>
-              <StatsCard value={addons.length} label="Addons" />
+              <StatsCard value={addons.length} label={t('addons.title')} />
               <View style={styles.statsDivider} />
-              <StatsCard value={addons.length} label="Active" />
+              <StatsCard value={addons.length} label={t('settings.items.active')} />
               <View style={styles.statsDivider} />
-              <StatsCard value={catalogCount} label="Catalogs" />
+              <StatsCard value={catalogCount} label={t('settings.items.catalogs')} />
             </View>
           </View>
 
           {/* Hide Add Addon Section in reorder mode */}
           {!reorderMode && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>ADD NEW ADDON</Text>
+              <Text style={styles.sectionTitle}>{t('addons.add_button').toUpperCase()}</Text>
               <View style={styles.addAddonContainer}>
                 <TextInput
                   style={styles.addonInput}
@@ -1055,7 +1055,7 @@ const AddonsScreen = () => {
                   disabled={installing || !addonUrl}
                 >
                   <Text style={styles.addButtonText}>
-                    {installing ? 'Loading...' : t('addons.add_button')}
+                    {installing ? t('common.loading') : t('addons.add_button')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1115,7 +1115,7 @@ const AddonsScreen = () => {
             {addonDetails && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Install Addon</Text>
+                  <Text style={styles.modalTitle}>{t('addons.install')}</Text>
                   <TouchableOpacity
                     onPress={() => {
                       setShowConfirmModal(false);
@@ -1145,7 +1145,7 @@ const AddonsScreen = () => {
                       </View>
                     )}
                     <Text style={styles.addonDetailName}>{addonDetails.name}</Text>
-                    <Text style={styles.addonDetailVersion}>v{addonDetails.version || '1.0.0'}</Text>
+                    <Text style={styles.addonDetailVersion}>{t('addons.version', { version: addonDetails.version || '1.0.0' })}</Text>
                   </View>
 
                   <View style={styles.addonDetailSection}>

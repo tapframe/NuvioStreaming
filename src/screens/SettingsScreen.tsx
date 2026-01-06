@@ -338,7 +338,7 @@ const SettingsScreen: React.FC = () => {
           <SettingsCard title={t('settings.sections.account')} isTablet={isTablet}>
             {isItemVisible('trakt') && (
               <SettingItem
-                title="Trakt"
+                title={t('settings.trakt')}
                 description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                 customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
                 renderControl={() => <ChevronRight />}
@@ -420,8 +420,8 @@ const SettingsScreen: React.FC = () => {
               icon="trash-2"
               onPress={() => {
                 openAlert(
-                  'Clear All Data',
-                  'This will reset all settings and clear all cached data. Are you sure?',
+                  t('settings.clear_data'),
+                  t('settings.clear_data_desc'),
                   [
                     { label: 'Cancel', onPress: () => { } },
                     {
@@ -476,7 +476,7 @@ const SettingsScreen: React.FC = () => {
         return (
           <SettingsCard title={t('settings.updates').toUpperCase()} isTablet={isTablet}>
             <SettingItem
-              title="App Updates"
+              title={t('settings.app_updates')}
               description={t('settings.check_updates')}
               icon="refresh-ccw"
               renderControl={() => <ChevronRight />}
@@ -565,7 +565,7 @@ const SettingsScreen: React.FC = () => {
               <SettingsCard title={t('settings.account').toUpperCase()}>
                 {isItemVisible('trakt') && (
                   <SettingItem
-                    title="Trakt"
+                    title={t('settings.trakt')}
                     description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
                     customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
                     renderControl={() => <ChevronRight />}
@@ -648,7 +648,7 @@ const SettingsScreen: React.FC = () => {
                   )}
                   {(settingsConfig?.categories?.['updates']?.visible !== false) && (
                     <SettingItem
-                      title="App Updates"
+                      title={t('settings.app_updates')}
                       description={t('settings.check_updates')}
                       icon="refresh-ccw"
                       badge={Platform.OS === 'android' && hasUpdateBadge ? 1 : undefined}
@@ -681,7 +681,7 @@ const SettingsScreen: React.FC = () => {
             {/* About */}
             <SettingsCard title={t('settings.about').toUpperCase()}>
               <SettingItem
-                title="About Nuvio"
+                title={t('settings.about_nuvio')}
                 description={getDisplayedAppVersion()}
                 icon="info"
                 renderControl={() => <ChevronRight />}

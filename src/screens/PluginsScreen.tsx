@@ -25,6 +25,7 @@ import { useSettings } from '../hooks/useSettings';
 import { localScraperService, pluginService, ScraperInfo, RepositoryInfo } from '../services/pluginService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -902,6 +903,7 @@ const PluginsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
+  const { t } = useTranslation();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
 
@@ -1025,10 +1027,10 @@ const PluginsScreen: React.FC = () => {
       );
       await Promise.all(promises);
       await loadPlugins();
-      openAlert('Success', `${enabled ? 'Enabled' : 'Disabled'} ${filteredPlugins.length} plugins`);
+      openAlert(t('plugins.success'), `${enabled ? t('plugins.enabled') : t('plugins.disabled')} ${filteredPlugins.length} plugins`);
     } catch (error) {
       logger.error('[PluginSettings] Failed to bulk toggle:', error);
-      openAlert('Error', 'Failed to update plugins');
+      openAlert(t('plugins.error'), 'Failed to update plugins');
     } finally {
       setIsRefreshing(false);
     }
@@ -1048,7 +1050,7 @@ const PluginsScreen: React.FC = () => {
     const url = newRepositoryUrl.trim();
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
       openAlert(
-        'Invalid URL Format',
+        t('plugins.alert_invalid_url'),
         'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nor include manifest.json:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch/manifest.json\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
       );
       return;
@@ -1089,10 +1091,10 @@ const PluginsScreen: React.FC = () => {
 
       setNewRepositoryUrl('');
       setShowAddRepositoryModal(false);
-      openAlert('Success', 'Repository added and plugins loaded successfully');
+      openAlert(t('plugins.success'), t('plugins.alert_repo_added'));
     } catch (error) {
       logger.error('[PluginsScreen] Failed to add repository:', error);
-      openAlert('Error', 'Failed to add repository');
+      openAlert(t('plugins.error'), 'Failed to add repository');
     } finally {
       setIsLoading(false);
     }
@@ -1113,10 +1115,10 @@ const PluginsScreen: React.FC = () => {
       await loadPlugins();
 
       const repo = repositories.find(r => r.id === repoId);
-      openAlert('Success', `Repository "${repo?.name || 'Unknown'}" ${enabled ? 'enabled' : 'disabled'} successfully`);
+      openAlert(t('plugins.success'), `Repository "${repo?.name || t('plugins.unknown')}" ${enabled ? t('plugins.enabled').toLowerCase() : t('plugins.disabled').toLowerCase()} successfully`);
     } catch (error) {
       logger.error('[PluginSettings] Failed to toggle repository:', error);
-      openAlert('Error', 'Failed to update repository');
+      openAlert(t('plugins.error'), 'Failed to update repository');
     } finally {
       setSwitchingRepository(null);
     }
@@ -1249,10 +1251,10 @@ const PluginsScreen: React.FC = () => {
       await pluginService.setRepositoryUrl(url);
       await updateSetting('scraperRepositoryUrl', url);
       setHasRepository(true);
-      openAlert('Success', 'Repository URL saved successfully');
+      openAlert(t('plugins.success'), t('plugins.alert_repo_saved'));
     } catch (error) {
       logger.error('[PluginSettings] Failed to save repository:', error);
-      openAlert('Error', 'Failed to save repository URL');
+      openAlert(t('plugins.error'), 'Failed to save repository URL');
     } finally {
       setIsLoading(false);
     }
@@ -1274,7 +1276,7 @@ const PluginsScreen: React.FC = () => {
       // Load fresh plugins from the updated repository
       await loadPlugins();
 
-      openAlert('Success', 'Repository refreshed successfully with latest files');
+      openAlert(t('plugins.success'), t('plugins.alert_repo_refreshed'));
     } catch (error) {
       logger.error('[PluginsScreen] Failed to refresh repository:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1306,15 +1308,15 @@ const PluginsScreen: React.FC = () => {
       await loadPlugins();
     } catch (error) {
       logger.error('[PluginSettings] Failed to toggle plugin:', error);
-      openAlert('Error', 'Failed to update plugin status');
+      openAlert(t('plugins.error'), 'Failed to update plugin status');
       setIsRefreshing(false);
     }
   };
 
   const handleClearPlugins = () => {
     openAlert(
-      'Clear All Plugins',
-      'Are you sure you want to remove all installed plugins? This action cannot be undone.',
+      t('plugins.clear_all'),
+      t('plugins.clear_all_desc'),
       [
         { label: 'Cancel', onPress: () => { } },
         {
@@ -1323,10 +1325,10 @@ const PluginsScreen: React.FC = () => {
             try {
               await pluginService.clearScrapers();
               await loadPlugins();
-              openAlert('Success', 'All plugins have been removed');
+              openAlert(t('plugins.success'), t('plugins.alert_plugins_cleared'));
             } catch (error) {
               logger.error('[PluginSettings] Failed to clear plugins:', error);
-              openAlert('Error', 'Failed to clear plugins');
+              openAlert(t('plugins.error'), 'Failed to clear plugins');
             }
           },
         },
@@ -1336,8 +1338,8 @@ const PluginsScreen: React.FC = () => {
 
   const handleClearPluginCache = () => {
     openAlert(
-      'Clear Repository Cache',
-      'This will remove the saved repository URL and clear all cached plugin data. You will need to re-enter your repository URL.',
+      t('plugins.clear_cache'),
+      t('plugins.clear_cache_desc'),
       [
         { label: 'Cancel', onPress: () => { } },
         {
@@ -1350,10 +1352,10 @@ const PluginsScreen: React.FC = () => {
               setRepositoryUrl('');
               setHasRepository(false);
               await loadPlugins();
-              openAlert('Success', 'Repository cache cleared successfully');
+              openAlert(t('plugins.success'), t('plugins.alert_cache_cleared'));
             } catch (error) {
               logger.error('[PluginSettings] Failed to clear cache:', error);
-              openAlert('Error', 'Failed to clear repository cache');
+              openAlert(t('plugins.error'), 'Failed to clear repository cache');
             }
           },
         },
