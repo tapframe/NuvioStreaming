@@ -312,7 +312,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         />
         <View style={[styles.timeDisplay, { paddingHorizontal: 14 }]}>
           <View style={styles.timeContainer}>
-            <Text style={styles.duration}>{formatTime(currentTime)}</Text>
+            <Text style={styles.duration}>{formatTime(previewTime)}</Text>
           </View>
           <View style={styles.timeContainer}>
             <Text style={styles.duration}>{formatTime(duration)}</Text>

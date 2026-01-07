@@ -473,6 +473,7 @@ const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material'
 
 // Update the TabScreenWrapper component with fixed layout dimensions
 const TabScreenWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -826,29 +827,29 @@ const MainTabs = () => {
               const isFocused = props.state.index === index;
 
               const onPress = () => {
-                        const now = Date.now();
-                        const DOUBLE_TAP_DELAY = 300;
-                        const lastTap = lastTapRef.current[route.name] || 0;
+                const now = Date.now();
+                const DOUBLE_TAP_DELAY = 300;
+                const lastTap = lastTapRef.current[route.name] || 0;
 
-                        // DOUBLE TAP LOGIC: If search is pressed twice quickly
-                        if (route.name === 'Search' && now - lastTap < DOUBLE_TAP_DELAY) {
-                          DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
-                        }
+                // DOUBLE TAP LOGIC: If search is pressed twice quickly
+                if (route.name === 'Search' && now - lastTap < DOUBLE_TAP_DELAY) {
+                  DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                }
 
-                        lastTapRef.current[route.name] = now;
+                lastTapRef.current[route.name] = now;
 
-                        const event = props.navigation.emit({
-                          type: 'tabPress',
-                          target: route.key,
-                          canPreventDefault: true,
-                        });
+                const event = props.navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
 
-                        if (isFocused) {
-                          emitScrollToTop(route.name);
-                        } else if (!event.defaultPrevented) {
-                          props.navigation.navigate(route.name);
-                        }
-                      };
+                if (isFocused) {
+                  emitScrollToTop(route.name);
+                } else if (!event.defaultPrevented) {
+                  props.navigation.navigate(route.name);
+                }
+              };
 
               let iconName: IconNameType = 'home';
               let iconLibrary: 'material' | 'feather' | 'ionicons' = 'material';
@@ -981,8 +982,19 @@ const MainTabs = () => {
             }}
             listeners={({ navigation }: { navigation: any }) => ({
               tabPress: (e: any) => {
+                const now = Date.now();
+                const DOUBLE_TAP_DELAY = 300;
+                const lastTap = lastTapRef.current['Search'] || 0;
+                const isDoubleTap = (now - lastTap) < DOUBLE_TAP_DELAY;
+
+                lastTapRef.current['Search'] = now;
+
                 if (navigation.isFocused()) {
-                  emitScrollToTop('Search');
+                  if (isDoubleTap) {
+                    DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                  } else {
+                    emitScrollToTop('Search');
+                  }
                 }
               },
             })}
@@ -1113,6 +1125,14 @@ const MainTabs = () => {
               return (
                 <TouchableOpacity
                   {...props}
+                  ref={props.ref as any}
+                  delayLongPress={props.delayLongPress ?? undefined}
+                  disabled={props.disabled ?? undefined}
+                  onBlur={props.onBlur ?? undefined}
+                  onFocus={props.onFocus ?? undefined}
+                  onLongPress={props.onLongPress ?? undefined}
+                  onPressIn={props.onPressIn ?? undefined}
+                  onPressOut={props.onPressOut ?? undefined}
                   activeOpacity={0.7}
                   onPress={(e) => {
                     const now = Date.now();
