@@ -25,6 +25,7 @@ class KSPlayerView: UIView {
     @objc var onEnd: RCTDirectEventBlock?
     @objc var onError: RCTDirectEventBlock?
     @objc var onBufferingProgress: RCTDirectEventBlock?
+    @objc var onExitFullscreen: RCTDirectEventBlock?
     
     // Property setters that React Native will call
     @objc var source: NSDictionary? {
@@ -313,6 +314,22 @@ class KSPlayerView: UIView {
         } else {
             playerView.play()
         }
+    }   
+
+    override var keyCommands: [UIKeyCommand]? {
+        return [
+            UIKeyCommand(
+                input: UIKeyCommand.inputEscape,
+                modifierFlags: [],
+                action: #selector(handleEscapeKey),
+                discoverabilityTitle: "Exit Fullscreen"
+            )
+        ]
+    }
+
+    @objc func handleEscapeKey() {
+        print("KSPlayerView: ESC pressed")
+        sendEvent("onExitFullscreen", [:])
     }
 
     func setVolume(_ volume: Float) {
@@ -979,3 +996,8 @@ extension KSPlayerView {
     }
 }
 
+extension IOSVideoPlayerView {
+    @objc func handleEscapeKey() {
+        self.next?.perform(#selector(handleEscapeKey))
+    }
+}
