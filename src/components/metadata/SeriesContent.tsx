@@ -40,8 +40,7 @@ interface SeriesContentProps {
 // Add placeholder constant at the top
 const DEFAULT_PLACEHOLDER = 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Image';
 const EPISODE_PLACEHOLDER = 'https://via.placeholder.com/500x280/1a1a1a/666666?text=No+Preview';
-const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
-const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
+
 
 const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   episodes,
@@ -1167,17 +1166,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                 <View style={styles.ratingContainer}>
                   {isImdbRating ? (
                     <>
-                      <FastImage
-                        source={{ uri: IMDb_LOGO }}
-                        style={[
-                          styles.imdbLogo,
-                          {
-                            width: isTV ? 32 : isLargeTablet ? 30 : isTablet ? 28 : 28,
-                            height: isTV ? 17 : isLargeTablet ? 16 : isTablet ? 15 : 15
-                          }
-                        ]}
-                        resizeMode={FastImage.resizeMode.contain}
-                      />
+
                       <Text style={[
                         styles.ratingText,
                         {
@@ -1191,22 +1180,12 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     </>
                   ) : (
                     <>
-                      <FastImage
-                        source={{ uri: TMDB_LOGO }}
-                        style={[
-                          styles.tmdbLogo,
-                          {
-                            width: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 20 : 20,
-                            height: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14
-                          }
-                        ]}
-                        resizeMode={FastImage.resizeMode.contain}
-                      />
                       <Text style={[
                         styles.ratingText,
                         {
-                          color: currentTheme.colors.textMuted,
-                          fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13
+                          color: '#F5C518',
+                          fontSize: isTV ? 14 : isLargeTablet ? 13 : isTablet ? 13 : 13,
+                          fontWeight: '600'
                         }
                       ]}>
                         {effectiveVote.toFixed(1)}
@@ -1433,17 +1412,7 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                 <View style={styles.ratingContainerHorizontal}>
                   {isImdbRating ? (
                     <>
-                      <FastImage
-                        source={{ uri: IMDb_LOGO }}
-                        style={[
-                          styles.imdbLogoHorizontal,
-                          {
-                            width: isTV ? 32 : isLargeTablet ? 30 : isTablet ? 28 : 28,
-                            height: isTV ? 17 : isLargeTablet ? 16 : isTablet ? 15 : 15
-                          }
-                        ]}
-                        resizeMode={FastImage.resizeMode.contain}
-                      />
+
                       <Text style={[
                         styles.ratingTextHorizontal,
                         {
@@ -1457,12 +1426,12 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                     </>
                   ) : (
                     <>
-                      <MaterialIcons name="star" size={isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14} color="#FFD700" />
                       <Text style={[
                         styles.ratingTextHorizontal,
                         {
                           fontSize: isTV ? 13 : isLargeTablet ? 12 : isTablet ? 11 : 11,
-                          fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600'
+                          fontWeight: isTV ? '600' : isLargeTablet ? '600' : isTablet ? '600' : '600',
+                          color: '#F5C518'
                         }
                       ]}>
                         {effectiveVote.toFixed(1)}
@@ -2001,16 +1970,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     // chip background removed
   },
-  tmdbLogo: {
-    width: 20,
-    height: 14,
-  },
-  imdbLogo: {
-    width: 35,
-    height: 18,
-  },
   ratingText: {
-    color: '#01b4e4',
+    // color set dynamically or removed from here if unused
     fontSize: 13,
     fontWeight: '700',
     marginLeft: 4,
@@ -2196,10 +2157,7 @@ const styles = StyleSheet.create({
     // chip background removed
     gap: 2,
   },
-  imdbLogoHorizontal: {
-    width: 35,
-    height: 18,
-  },
+
   ratingTextHorizontal: {
     color: '#FFD700',
     fontSize: 11,

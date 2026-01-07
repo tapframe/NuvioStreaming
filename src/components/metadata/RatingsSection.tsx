@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, Dimensions } from 'react-native';
+import { MaterialIcons as MaterialIconsWrapper } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useMDBListRatings } from '../../hooks/useMDBListRatings';
 import { mmkvStorage } from '../../services/mmkvStorage';
@@ -158,42 +159,49 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   // Define the order and icons/colors for the ratings
   const ratingConfig = {
     imdb: {
-      icon: require('../../../assets/rating-icons/imdb.png'),
-      isImage: true,
+      name: 'IMDb',
+      icon: null, // No icon for IMDb
+      isImage: false,
       color: '#F5C518',
       transform: (value: number) => value.toFixed(1)
     },
     tmdb: {
+      name: 'TMDB',
       icon: TMDBIcon,
       isImage: false,
       color: '#01B4E4',
       transform: (value: number) => value.toFixed(0)
     },
     trakt: {
+      name: 'Trakt',
       icon: TraktIcon,
       isImage: false,
       color: '#ED1C24',
       transform: (value: number) => value.toFixed(0)
     },
     letterboxd: {
+      name: 'Letterboxd',
       icon: LetterboxdIcon,
       isImage: false,
       color: '#00E054',
       transform: (value: number) => value.toFixed(1)
     },
     tomatoes: {
+      name: 'Rotten Tomatoes',
       icon: RottenTomatoesIcon,
       isImage: false,
       color: '#FA320A',
       transform: (value: number) => Math.round(value).toString() + '%'
     },
     audience: {
+      name: 'Audience Score',
       icon: AudienceScoreIcon,
       isImage: true,
       color: '#FA320A',
       transform: (value: number) => Math.round(value).toString() + '%'
     },
     metacritic: {
+      name: 'Metacritic',
       icon: MetacriticIcon,
       isImage: true,
       color: '#FFCC33',
@@ -240,13 +248,23 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
                   style={[styles.compactRatingIcon, { width: iconSize, height: iconSize, marginRight: iconTextGap }]}
                   resizeMode="contain"
                 />
-              ) : (
+              ) : config.icon ? (
                 <View style={[styles.compactSvgContainer, { marginRight: iconTextGap }]}>
                   {React.createElement(config.icon as any, {
                     width: iconSize,
                     height: iconSize,
                   })}
                 </View>
+              ) : (
+                // Text fallback
+                <Text style={{
+                  color: config.color,
+                  fontSize: textSize,
+                  fontWeight: '900',
+                  marginRight: iconTextGap
+                }}>
+                  {config.name}
+                </Text>
               )}
               <Text style={[styles.compactRatingValue, { color: config.color, fontSize: textSize }]}>
                 {displayValue}

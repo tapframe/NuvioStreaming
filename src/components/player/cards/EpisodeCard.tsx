@@ -4,7 +4,7 @@ import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Episode } from '../../../types/metadata';
 
-const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
+
 const EPISODE_PLACEHOLDER = 'https://via.placeholder.com/500x280/1a1a1a/666666?text=No+Preview';
 
 interface EpisodeCardProps {
@@ -28,7 +28,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
 }) => {
   const { width } = Dimensions.get('window');
   const isTablet = width >= 768;
-  
+
   // Get episode image
   let episodeImage = EPISODE_PLACEHOLDER;
   if (episode.still_path) {
@@ -42,11 +42,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
   } else if (metadata?.poster) {
     episodeImage = metadata.poster;
   }
-  
+
   const episodeNumber = typeof episode.episode_number === 'number' ? episode.episode_number.toString() : '';
   const seasonNumber = typeof episode.season_number === 'number' ? episode.season_number.toString() : '';
   const episodeString = seasonNumber && episodeNumber ? `S${seasonNumber.padStart(2, '0')}E${episodeNumber.padStart(2, '0')}` : '';
-  
+
   // Get episode progress
   const episodeId = episode.stremioId || `${metadata?.id}:${episode.season_number}:${episode.episode_number}`;
   const tmdbOverride = tmdbEpisodeOverrides?.[`${metadata?.id}:${episode.season_number}:${episode.episode_number}`];
@@ -60,7 +60,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
   const progress = episodeProgress?.[episodeId];
   const progressPercent = progress ? (progress.currentTime / progress.duration) * 100 : 0;
   const showProgress = progress && progressPercent < 85;
-  
+
   const formatRuntime = (runtime: number) => {
     if (!runtime) return null;
     const hours = Math.floor(runtime / 60);
@@ -70,7 +70,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
     }
     return `${minutes}m`;
   };
-  
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -106,11 +106,11 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
         </View>
         {showProgress && (
           <View style={styles.progressBarContainer}>
-            <View 
+            <View
               style={[
                 styles.progressBar,
                 { width: `${progressPercent}%`, backgroundColor: currentTheme.colors.primary }
-              ]} 
+              ]}
             />
           </View>
         )}
@@ -135,12 +135,7 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
           <View style={styles.episodeMetadata}>
             {effectiveVote > 0 && (
               <View style={styles.ratingContainer}>
-                <FastImage
-                  source={{ uri: TMDB_LOGO }}
-                  style={styles.tmdbLogo}
-                  resizeMode={FastImage.resizeMode.contain}
-                />
-                <Text style={[styles.ratingText, { color: currentTheme.colors.textMuted }]}>
+                <Text style={[styles.ratingText, { color: '#F5C518' }]}>
                   {effectiveVote.toFixed(1)}
                 </Text>
               </View>
@@ -234,10 +229,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  tmdbLogo: {
-    width: 20,
-    height: 14,
-  },
+
   ratingText: {
     fontSize: 13,
     fontWeight: '700',

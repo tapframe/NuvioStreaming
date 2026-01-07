@@ -1,6 +1,5 @@
 import React from 'react';
 import HDSvg from '../../assets/qualitybadge/HD.svg';
-import VISIONSvg from '../../assets/qualitybadge/VISION.svg';
 import ADSvg from '../../assets/qualitybadge/AD.svg';
 
 interface QualityBadgeProps {
@@ -17,8 +16,6 @@ const QualityBadge: React.FC<QualityBadgeProps> = ({ type }) => {
   switch (type) {
     case 'HD':
       return <HDSvg {...svgProps} />;
-    case 'VISION':
-      return <VISIONSvg {...svgProps} />;
     case 'AD':
       return <ADSvg {...svgProps} />;
     default:

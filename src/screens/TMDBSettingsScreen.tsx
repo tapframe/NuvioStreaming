@@ -1037,6 +1037,23 @@ const TMDBSettingsScreen = () => {
           </View>
         </View>
 
+        {/* TMDB Attribution */}
+        <View style={styles.attributionContainer}>
+          <FastImage
+            source={require('../assets/tmdb_logo.png')}
+            style={styles.tmdbLogo}
+            resizeMode={FastImage.resizeMode.contain}
+          />
+          <View style={{ width: '90%' }}>
+            <Text style={[styles.attributionText, { color: currentTheme.colors.mediumEmphasis }]}>
+              This product uses the TMDB API but is not
+            </Text>
+            <Text style={[styles.attributionText, { color: currentTheme.colors.mediumEmphasis }]}>
+              endorsed or certified by TMDB.
+            </Text>
+          </View>
+        </View>
+
         {/* Language Picker Modal */}
         <Modal
           visible={languagePickerVisible}
@@ -1734,6 +1751,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 6,
   },
+  attributionContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+    marginTop: 8,
+    paddingHorizontal: 24,
+    width: '100%',
+  },
+  tmdbLogo: {
+    width: 80,
+    height: 60,
+    marginBottom: 8,
+  },
+  attributionText: {
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 16,
+    opacity: 0.7,
+  },
+
 });
 
 export default TMDBSettingsScreen; 
