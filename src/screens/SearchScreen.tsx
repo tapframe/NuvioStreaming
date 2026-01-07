@@ -111,6 +111,26 @@ const SearchScreen = () => {
     return () => { isMounted.current = false; };
   }, []);
 
+  useEffect(() => {
+    const focusSubscription = DeviceEventEmitter.addListener('FOCUS_SEARCH_INPUT', () => {
+      // Optional: Reset search state if user double taps while on search
+      if (query.length === 0) {
+        setResults({ byAddon: [], allResults: [] });
+        setSearched(false);
+        setShowRecent(true);
+      }
+
+      // Use a small timeout to ensure the UI is ready
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 120);
+    });
+
+    return () => focusSubscription.remove();
+  }, [query]);
+
   // Update isSaved and isWatched when selectedItem changes
   useEffect(() => {
     if (!selectedItem) return;

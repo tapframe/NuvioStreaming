@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { NavigationContainer, DefaultTheme as NavigationDefaultTheme, DarkTheme as NavigationDarkTheme, Theme, NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions } from 'react-native';
+import { useColorScheme, Platform, Animated, StatusBar, TouchableOpacity, View, Text, AppState, Easing, Dimensions, DeviceEventEmitter } from 'react-native';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { PaperProvider, MD3DarkTheme, MD3LightTheme, adaptNavigationTheme } from 'react-native-paper';
 import type { MD3Theme } from 'react-native-paper';
@@ -473,7 +473,6 @@ const TabIcon = React.memo(({ focused, color, iconName, iconLibrary = 'material'
 
 // Update the TabScreenWrapper component with fixed layout dimensions
 const TabScreenWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -555,6 +554,7 @@ const MainTabs = () => {
   const { settings: appSettings } = useSettingsHook();
   const [hasUpdateBadge, setHasUpdateBadge] = React.useState(false);
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+  const lastTapRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -692,15 +692,31 @@ const MainTabs = () => {
 
               const isFocused = props.state.index === index;
 
+              const lastTapRef = useRef<Record<string, number>>({}); // Add this ref at the top of MainTabs component
+
               const onPress = () => {
+                const now = Date.now();
+                const DOUBLE_TAP_DELAY = 300;
+                const lastTap = lastTapRef.current[route.name] || 0;
+                const isSearchDoubleTap = route.name === 'Search' && (now - lastTap) < DOUBLE_TAP_DELAY;
+
+                // Update last tap time
+                lastTapRef.current[route.name] = now;
+
                 const event = props.navigation.emit({
                   type: 'tabPress',
                   target: route.key,
                   canPreventDefault: true,
                 });
+
                 if (isFocused) {
-                  // Same tab pressed - emit scroll to top
-                  emitScrollToTop(route.name);
+                  // If double tap on Search -> Open Keyboard
+                  if (isSearchDoubleTap) {
+                    DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                  } else {
+                    // Single tap on active tab -> Scroll to Top
+                    emitScrollToTop(route.name);
+                  }
                 } else if (!event.defaultPrevented) {
                   props.navigation.navigate(route.name);
                 }
@@ -810,19 +826,29 @@ const MainTabs = () => {
               const isFocused = props.state.index === index;
 
               const onPress = () => {
-                const event = props.navigation.emit({
-                  type: 'tabPress',
-                  target: route.key,
-                  canPreventDefault: true,
-                });
+                        const now = Date.now();
+                        const DOUBLE_TAP_DELAY = 300;
+                        const lastTap = lastTapRef.current[route.name] || 0;
 
-                if (isFocused) {
-                  // Same tab pressed - emit scroll to top
-                  emitScrollToTop(route.name);
-                } else if (!event.defaultPrevented) {
-                  props.navigation.navigate(route.name);
-                }
-              };
+                        // DOUBLE TAP LOGIC: If search is pressed twice quickly
+                        if (route.name === 'Search' && now - lastTap < DOUBLE_TAP_DELAY) {
+                          DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                        }
+
+                        lastTapRef.current[route.name] = now;
+
+                        const event = props.navigation.emit({
+                          type: 'tabPress',
+                          target: route.key,
+                          canPreventDefault: true,
+                        });
+
+                        if (isFocused) {
+                          emitScrollToTop(route.name);
+                        } else if (!event.defaultPrevented) {
+                          props.navigation.navigate(route.name);
+                        }
+                      };
 
               let iconName: IconNameType = 'home';
               let iconLibrary: 'material' | 'feather' | 'ionicons' = 'material';
@@ -1080,8 +1106,29 @@ const MainTabs = () => {
           options={{
             tabBarLabel: t('navigation.search'),
             tabBarIcon: ({ color, size }) => (
-              <MaterialCommunityIcons name={'magnify'} size={size} color={color} />
+              <Feather name="search" size={size} color={color} />
             ),
+            tabBarButton: (props) => {
+              const lastTap = useRef(0);
+              return (
+                <TouchableOpacity
+                  {...props}
+                  activeOpacity={0.7}
+                  onPress={(e) => {
+                    const now = Date.now();
+                    const DOUBLE_TAP_DELAY = 300;
+
+                    // Check for double tap
+                    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+                      DeviceEventEmitter.emit('FOCUS_SEARCH_INPUT');
+                    } else {
+                      props.onPress?.(e);
+                    }
+                    lastTap.current = now;
+                  }}
+                />
+              );
+            },
           }}
         />
         {appSettings?.enableDownloads !== false && (
