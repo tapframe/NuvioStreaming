@@ -1214,6 +1214,59 @@ class LocalScraperService {
         }
       };
 
+      // Polyfilled fetch that properly handles redirect: 'manual'
+      // React Native's native fetch may or may not support redirect: 'manual' properly
+      const polyfilledFetch = async (url: string, options: any = {}): Promise<Response> => {
+        // If not using redirect: manual, use native fetch directly
+        if (options.redirect !== 'manual') {
+          return fetch(url, options);
+        }
+
+        // Try native fetch with redirect: 'manual' first
+        try {
+          logger.log('[PolyfilledFetch] Attempting native fetch with redirect: manual for:', url.substring(0, 50));
+          const nativeResponse = await fetch(url, options);
+
+          // Log what native fetch returns
+          const locationHeader = nativeResponse.headers.get('location');
+          logger.log('[PolyfilledFetch] Native fetch result - Status:', nativeResponse.status, 'URL:', nativeResponse.url?.substring(0, 60), 'Location:', locationHeader || 'none');
+
+          // Check if redirect happened - compare URLs
+          if (nativeResponse.url && nativeResponse.url !== url) {
+            // Fetch followed the redirect! Let's try to get the redirect location
+            // by making a HEAD request or checking if there's any pattern
+            logger.log('[PolyfilledFetch] REDIRECT DETECTED - Original:', url.substring(0, 50), 'Final:', nativeResponse.url.substring(0, 50));
+
+            // Create a mock 302 response with the final URL as location
+            const mockHeaders = new Headers(nativeResponse.headers);
+            mockHeaders.set('location', nativeResponse.url);
+
+            return {
+              ok: false,
+              status: 302,  // Mock as 302
+              statusText: 'Found',
+              headers: mockHeaders,
+              url: url,
+              text: nativeResponse.text.bind(nativeResponse),
+              json: nativeResponse.json.bind(nativeResponse),
+              blob: nativeResponse.blob.bind(nativeResponse),
+              arrayBuffer: nativeResponse.arrayBuffer.bind(nativeResponse),
+              clone: nativeResponse.clone.bind(nativeResponse),
+              body: nativeResponse.body,
+              bodyUsed: nativeResponse.bodyUsed,
+              redirected: true,
+              type: nativeResponse.type,
+              formData: nativeResponse.formData.bind(nativeResponse),
+            } as Response;
+          }
+
+          return nativeResponse;
+        } catch (error: any) {
+          logger.error('[PolyfilledFetch] Native fetch error:', error.message);
+          throw error;
+        }
+      };
+
       // Execution timeout (1 minute)
       const PLUGIN_TIMEOUT_MS = 60000;
 
@@ -1230,6 +1283,7 @@ class LocalScraperService {
             'CryptoJS',
             'cheerio',
             'logger',
+            'console',
             'params',
             'PRIMARY_KEY',
             'TMDB_API_KEY',
@@ -1268,10 +1322,11 @@ class LocalScraperService {
             moduleExports,
             pluginRequire,
             axios,
-            fetch,
+            polyfilledFetch,  // Use polyfilled fetch for redirect: manual support
             CryptoJS,
             cheerio,
             logger,
+            console,  // Expose console to plugins for debugging
             params,
             MOVIEBOX_PRIMARY_KEY,
             MOVIEBOX_TMDB_API_KEY,
