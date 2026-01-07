@@ -10,7 +10,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { introService, IntroTimestamps } from '../../../services/introService';
+import { introService, SkipInterval, SkipType } from '../../../services/introService';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { logger } from '../../../utils/logger';
 
@@ -19,6 +19,8 @@ interface SkipIntroButtonProps {
     type: 'movie' | 'series' | string;
     season?: number;
     episode?: number;
+    malId?: string;
+    kitsuId?: string;
     currentTime: number;
     onSkip: (endTime: number) => void;
     controlsVisible?: boolean;
@@ -30,6 +32,8 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     type,
     season,
     episode,
+    malId,
+    kitsuId,
     currentTime,
     onSkip,
     controlsVisible = false,
@@ -37,10 +41,15 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
 }) => {
     const { currentTheme } = useTheme();
     const insets = useSafeAreaInsets();
-    const [introData, setIntroData] = useState<IntroTimestamps | null>(null);
+    
+    // State
+    const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
+    const [currentInterval, setCurrentInterval] = useState<SkipInterval | null>(null);
     const [isVisible, setIsVisible] = useState(false);
-    const [hasSkipped, setHasSkipped] = useState(false);
+    const [hasSkippedCurrent, setHasSkippedCurrent] = useState(false);
     const [autoHidden, setAutoHidden] = useState(false);
+    
+    // Refs
     const fetchedRef = useRef(false);
     const lastEpisodeRef = useRef<string>('');
     const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -50,14 +59,13 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     const scale = useSharedValue(0.8);
     const translateY = useSharedValue(0);
 
-    // Fetch intro data when episode changes
+    // Fetch skip data when episode changes
     useEffect(() => {
-        const episodeKey = `${imdbId}-${season}-${episode}`;
+        const episodeKey = `${imdbId}-${season}-${episode}-${malId}-${kitsuId}`;
 
-        // Skip if not a series or missing required data
-        if (type !== 'series' || !imdbId || !season || !episode) {
-            logger.log(`[SkipIntroButton] Skipping fetch - type: ${type}, imdbId: ${imdbId}, season: ${season}, episode: ${episode}`);
-            setIntroData(null);
+        // Skip if not a series or missing required data (though MAL/Kitsu ID might be enough for some cases, usually need season/ep)
+        if (type !== 'series' || (!imdbId && !malId && !kitsuId) || !season || !episode) {
+            setSkipIntervals([]);
             fetchedRef.current = false;
             return;
         }
@@ -69,45 +77,76 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
 
         lastEpisodeRef.current = episodeKey;
         fetchedRef.current = true;
-        setHasSkipped(false);
+        setHasSkippedCurrent(false);
         setAutoHidden(false);
+        setSkipIntervals([]);
 
-        const fetchIntroData = async () => {
-            logger.log(`[SkipIntroButton] Fetching intro data for ${imdbId} S${season}E${episode}...`);
+        const fetchSkipData = async () => {
+            logger.log(`[SkipIntroButton] Fetching skip data for S${season}E${episode} (IMDB: ${imdbId}, MAL: ${malId}, Kitsu: ${kitsuId})...`);
             try {
-                const data = await introService.getIntroTimestamps(imdbId, season, episode);
-                setIntroData(data);
+                const intervals = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId);
+                setSkipIntervals(intervals);
 
-                if (data) {
-                    logger.log(`[SkipIntroButton] ✓ Found intro: ${data.start_sec}s - ${data.end_sec}s (confidence: ${data.confidence})`);
+                if (intervals.length > 0) {
+                    logger.log(`[SkipIntroButton] ✓ Found ${intervals.length} skip intervals:`, intervals);
                 } else {
-                    logger.log(`[SkipIntroButton] ✗ No intro data available for this episode`);
+                    logger.log(`[SkipIntroButton] ✗ No skip data available for this episode`);
                 }
             } catch (error) {
-                logger.error('[SkipIntroButton] Error fetching intro data:', error);
-                setIntroData(null);
+                logger.error('[SkipIntroButton] Error fetching skip data:', error);
+                setSkipIntervals([]);
             }
         };
 
-        fetchIntroData();
-    }, [imdbId, type, season, episode]);
+        fetchSkipData();
+    }, [imdbId, type, season, episode, malId, kitsuId]);
 
-    // Determine if button should show based on current playback position
+    // Determine active interval based on current playback position
+    useEffect(() => {
+        if (skipIntervals.length === 0) {
+            setCurrentInterval(null);
+            return;
+        }
+
+        // Find an interval that contains the current time
+        const active = skipIntervals.find(
+            interval => currentTime >= interval.startTime && currentTime < (interval.endTime - 0.5)
+        );
+
+        if (active) {
+            // If we found a new active interval that is different from the previous one
+            if (!currentInterval || 
+                active.startTime !== currentInterval.startTime || 
+                active.type !== currentInterval.type) {
+                logger.log(`[SkipIntroButton] Entering interval: ${active.type} (${active.startTime}-${active.endTime})`);
+                setCurrentInterval(active);
+                setHasSkippedCurrent(false); // Reset skipped state for new interval
+                setAutoHidden(false); // Reset auto-hide for new interval
+            }
+        } else {
+            // No active interval
+            if (currentInterval) {
+                logger.log('[SkipIntroButton] Exiting interval');
+                setCurrentInterval(null);
+            }
+        }
+    }, [currentTime, skipIntervals]);
+
+    // Determine if button should show
     const shouldShowButton = useCallback(() => {
-        if (!introData || hasSkipped) return false;
-        // Show when within intro range, with a small buffer at the end
-        const inIntroRange = currentTime >= introData.start_sec && currentTime < (introData.end_sec - 0.5);
+        if (!currentInterval || hasSkippedCurrent) return false;
+        
         // If auto-hidden, only show when controls are visible
         if (autoHidden && !controlsVisible) return false;
-        return inIntroRange;
-    }, [introData, currentTime, hasSkipped, autoHidden, controlsVisible]);
+        
+        return true;
+    }, [currentInterval, hasSkippedCurrent, autoHidden, controlsVisible]);
 
     // Handle visibility animations
     useEffect(() => {
         const shouldShow = shouldShowButton();
 
         if (shouldShow && !isVisible) {
-            logger.log(`[SkipIntroButton] Showing button - currentTime: ${currentTime.toFixed(1)}s, intro: ${introData?.start_sec}s - ${introData?.end_sec}s`);
             setIsVisible(true);
             opacity.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
             scale.value = withSpring(1, { damping: 15, stiffness: 150 });
@@ -115,8 +154,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
             // Start 15-second auto-hide timer
             if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
             autoHideTimerRef.current = setTimeout(() => {
-                if (!hasSkipped) {
-                    logger.log('[SkipIntroButton] Auto-hiding after 15 seconds');
+                if (!hasSkippedCurrent) {
                     setAutoHidden(true);
                     opacity.value = withTiming(0, { duration: 200 });
                     scale.value = withTiming(0.8, { duration: 200 });
@@ -124,25 +162,20 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
                 }
             }, 15000);
         } else if (!shouldShow && isVisible) {
-            logger.log(`[SkipIntroButton] Hiding button - currentTime: ${currentTime.toFixed(1)}s, hasSkipped: ${hasSkipped}`);
             if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
             opacity.value = withTiming(0, { duration: 200 });
             scale.value = withTiming(0.8, { duration: 200 });
             // Delay hiding to allow animation to complete
             setTimeout(() => setIsVisible(false), 250);
         }
-    }, [shouldShowButton, isVisible]);
+    }, [shouldShowButton, isVisible, hasSkippedCurrent]);
 
-    // Re-show when controls become visible (if still in intro range and was auto-hidden)
+    // Re-show when controls become visible (if still in interval and was auto-hidden)
     useEffect(() => {
-        if (controlsVisible && autoHidden && introData && !hasSkipped) {
-            const inIntroRange = currentTime >= introData.start_sec && currentTime < (introData.end_sec - 0.5);
-            if (inIntroRange) {
-                logger.log('[SkipIntroButton] Re-showing button because controls became visible');
-                setAutoHidden(false);
-            }
+        if (controlsVisible && autoHidden && currentInterval && !hasSkippedCurrent) {
+            setAutoHidden(false);
         }
-    }, [controlsVisible, autoHidden, introData, hasSkipped, currentTime]);
+    }, [controlsVisible, autoHidden, currentInterval, hasSkippedCurrent]);
 
     // Cleanup timer on unmount
     useEffect(() => {
@@ -162,12 +195,32 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
 
     // Handle skip action
     const handleSkip = useCallback(() => {
-        if (!introData) return;
+        if (!currentInterval) return;
 
-        logger.log(`[SkipIntroButton] User pressed Skip Intro - seeking to ${introData.end_sec}s (from ${currentTime.toFixed(1)}s)`);
-        setHasSkipped(true);
-        onSkip(introData.end_sec);
-    }, [introData, onSkip, currentTime]);
+        logger.log(`[SkipIntroButton] User pressed Skip - seeking to ${currentInterval.endTime}s`);
+        setHasSkippedCurrent(true);
+        onSkip(currentInterval.endTime);
+    }, [currentInterval, onSkip]);
+
+    // Get display text based on skip type
+    const getButtonText = () => {
+        if (!currentInterval) return 'Skip';
+        
+        switch (currentInterval.type) {
+            case 'op':
+            case 'mixed-op':
+            case 'intro':
+                return 'Skip Intro';
+            case 'ed':
+            case 'mixed-ed':
+            case 'outro':
+                return 'Skip Ending';
+            case 'recap':
+                return 'Skip Recap';
+            default:
+                return 'Skip';
+        }
+    };
 
     // Animated styles
     const containerStyle = useAnimatedStyle(() => ({
@@ -175,8 +228,8 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         transform: [{ scale: scale.value }, { translateY: translateY.value }],
     }));
 
-    // Don't render if not visible or no intro data
-    if (!isVisible || !introData) {
+    // Don't render if not visible (and animation complete)
+    if (!isVisible && opacity.value === 0) {
         return null;
     }
 
@@ -208,7 +261,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
                         color="#FFFFFF"
                         style={styles.icon}
                     />
-                    <Text style={styles.text}>Skip Intro</Text>
+                    <Text style={styles.text}>{getButtonText()}</Text>
                     <Animated.View
                         style={[
                             styles.accentBar,
