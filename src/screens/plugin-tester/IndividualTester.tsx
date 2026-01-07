@@ -18,13 +18,14 @@ import { pluginService } from '../../services/pluginService';
 import axios from 'axios';
 import { getPluginTesterStyles, useIsLargeScreen } from './styles';
 import { Header, MainTabBar } from './components';
+import type { RootStackNavigationProp } from '../../navigation/AppNavigator';
 
 interface IndividualTesterProps {
     onSwitchTab: (tab: 'individual' | 'repo') => void;
 }
 
 export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
-    const navigation = useNavigation();
+    const navigation = useNavigation<RootStackNavigationProp>();
     const insets = useSafeAreaInsets();
     const { currentTheme } = useTheme();
     const isLargeScreen = useIsLargeScreen();
@@ -563,42 +564,93 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
         </ScrollView>
     );
 
+    const playStream = (stream: any) => {
+        if (!stream.url) {
+            Alert.alert('Error', 'No URL found for this stream');
+            return;
+        }
+
+        const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
+        const streamName = stream.name || stream.title || 'Test Stream';
+        const quality = (stream.title?.match(/(\d+)p/) || stream.name?.match(/(\d+)p/) || [])[1] || undefined;
+
+        // Build headers from stream object if present
+        const headers = stream.headers || stream.behaviorHints?.proxyHeaders?.request || {};
+
+        navigation.navigate(playerRoute as any, {
+            uri: stream.url,
+            title: `Plugin Tester - ${streamName}`,
+            streamName,
+            quality,
+            headers,
+            // Pass any additional stream properties
+            videoType: stream.videoType || undefined,
+        } as any);
+    };
+
     const renderResultsTab = () => (
-        <ScrollView style={styles.content}>
+        <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
             {streams.length === 0 ? (
                 <View style={styles.emptyState}>
                     <Ionicons name="list-outline" size={48} color={currentTheme.colors.mediumGray} />
                     <Text style={styles.emptyText}>No streams found yet.</Text>
                 </View>
             ) : (
-                streams.map((stream, i) => (
-                    <View key={i} style={styles.resultItem}>
-                        <Text style={styles.resultTitle}>{stream.title || stream.name}</Text>
-                        <Text style={styles.resultMeta}>Quality: {stream.quality || 'Unknown'}</Text>
-                        <Text style={styles.resultMeta}>Size: {stream.description || 'Unknown'}</Text>
-                        <Text style={styles.resultUrl} numberOfLines={2}>URL: {stream.url}</Text>
-
-                        <Text
-                            style={[
-                                styles.logItem,
-                                {
-                                    marginTop: 10,
-                                    marginBottom: 0,
-                                    color: currentTheme.colors.highEmphasis,
-                                },
-                            ]}
-                            selectable
-                        >
-                            {(() => {
-                                try {
-                                    return JSON.stringify(stream, null, 2);
-                                } catch {
-                                    return String(stream);
-                                }
-                            })()}
-                        </Text>
+                <>
+                    <View style={[styles.card, { marginBottom: 12 }]}>
+                        <Text style={styles.cardTitle}>{streams.length} Stream{streams.length !== 1 ? 's' : ''} Found</Text>
+                        <Text style={styles.helperText}>Tap Play to test a stream in the native player.</Text>
                     </View>
-                ))
+                    {streams.map((stream, i) => (
+                        <TouchableOpacity
+                            key={i}
+                            style={styles.resultItem}
+                            onPress={() => playStream(stream)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <View style={{ flex: 1, marginRight: 12 }}>
+                                    <Text style={styles.resultTitle}>{stream.title || stream.name || 'Unnamed Stream'}</Text>
+                                    <Text style={styles.resultMeta}>Quality: {stream.quality || (stream.title?.match(/(\d+)p/) || [])[1] || 'Unknown'}</Text>
+                                    {stream.description && <Text style={styles.resultMeta}>Size: {stream.description}</Text>}
+                                    <Text style={styles.resultUrl} numberOfLines={1}>URL: {stream.url}</Text>
+                                    {stream.headers && Object.keys(stream.headers).length > 0 && (
+                                        <Text style={[styles.resultMeta, { color: currentTheme.colors.info }]}>
+                                            Headers: {Object.keys(stream.headers).length} custom header(s)
+                                        </Text>
+                                    )}
+                                </View>
+                                <TouchableOpacity
+                                    style={[styles.button, { paddingVertical: 10, paddingHorizontal: 16 }]}
+                                    onPress={() => playStream(stream)}
+                                >
+                                    <Ionicons name="play" size={18} color={currentTheme.colors.white} />
+                                    <Text style={[styles.buttonText, { fontSize: 13 }]}>Play</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text
+                                style={[
+                                    styles.logItem,
+                                    {
+                                        marginTop: 10,
+                                        marginBottom: 0,
+                                        color: currentTheme.colors.highEmphasis,
+                                    },
+                                ]}
+                                selectable
+                            >
+                                {(() => {
+                                    try {
+                                        return JSON.stringify(stream, null, 2);
+                                    } catch {
+                                        return String(stream);
+                                    }
+                                })()}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </>
             )}
         </ScrollView>
     );
