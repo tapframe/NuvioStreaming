@@ -1159,5 +1159,35 @@
         "repo_format_hint": "Formato: https://raw.githubusercontent.com/username/repo/refs/heads/branch",
         "cancel": "Cancelar",
         "add": "Adicionar"
+    },
+    "theme": {
+        "title": "Temas do App",
+        "select_theme": "SELECIONAR TEMA",
+        "create_custom": "Criar Tema Personalizado",
+        "options": "OPÇÕES",
+        "use_dominant_color": "Usar Cor Dominante da Arte",
+        "categories": {
+            "all": "Todos os Temas",
+            "dark": "Temas Escuros",
+            "colorful": "Coloridos",
+            "custom": "Meus Temas"
+        },
+        "editor": {
+            "theme_name_placeholder": "Nome do tema",
+            "save": "Salvar",
+            "primary": "Primário",
+            "secondary": "Secundário",
+            "background": "Fundo",
+            "invalid_name_title": "Nome Inválido",
+            "invalid_name_msg": "Por favor insira um nome válido"
+        },
+        "alerts": {
+            "delete_title": "Excluir Tema",
+            "delete_msg": "Tem certeza que deseja excluir \"{{name}}\"?",
+            "ok": "OK",
+            "delete": "Excluir",
+            "cancel": "Cancelar",
+            "back": "Configurações"
+        }
     }
 }

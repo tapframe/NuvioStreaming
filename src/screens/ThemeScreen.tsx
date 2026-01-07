@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -45,9 +46,9 @@ interface ThemeCardProps {
   onDelete?: () => void;
 }
 
-const ThemeCard: React.FC<ThemeCardProps> = ({ 
-  theme, 
-  isSelected, 
+const ThemeCard: React.FC<ThemeCardProps> = ({
+  theme,
+  isSelected,
   onSelect,
   onEdit,
   onDelete
@@ -57,10 +58,10 @@ const ThemeCard: React.FC<ThemeCardProps> = ({
       style={[
         styles.themeCard,
         isSelected && styles.selectedThemeCard,
-        { 
+        {
           borderColor: isSelected ? theme.colors.primary : 'transparent',
-          backgroundColor: Platform.OS === 'ios' 
-            ? `${theme.colors.darkBackground}60` 
+          backgroundColor: Platform.OS === 'ios'
+            ? `${theme.colors.darkBackground}60`
             : 'rgba(255, 255, 255, 0.07)'
         }
       ]}
@@ -75,26 +76,26 @@ const ThemeCard: React.FC<ThemeCardProps> = ({
           <MaterialIcons name="check-circle" size={18} color={theme.colors.primary} />
         )}
       </View>
-      
+
       <View style={styles.colorPreviewContainer}>
         <View style={[styles.colorPreview, { backgroundColor: theme.colors.primary }, styles.colorPreviewShadow]} />
         <View style={[styles.colorPreview, { backgroundColor: theme.colors.secondary }, styles.colorPreviewShadow]} />
         <View style={[styles.colorPreview, { backgroundColor: theme.colors.darkBackground }, styles.colorPreviewShadow]} />
       </View>
-      
+
       {theme.isEditable && (
         <View style={styles.themeCardActions}>
           {onEdit && (
-            <TouchableOpacity 
-              style={[styles.themeCardAction, styles.buttonShadow]} 
+            <TouchableOpacity
+              style={[styles.themeCardAction, styles.buttonShadow]}
               onPress={onEdit}
             >
               <MaterialIcons name="edit" size={16} color={theme.colors.primary} />
             </TouchableOpacity>
           )}
           {onDelete && (
-            <TouchableOpacity 
-              style={[styles.themeCardAction, styles.buttonShadow]} 
+            <TouchableOpacity
+              style={[styles.themeCardAction, styles.buttonShadow]}
               onPress={onDelete}
             >
               <MaterialIcons name="delete" size={16} color={theme.colors.error} />
@@ -114,11 +115,11 @@ interface FilterTabProps {
   primaryColor: string;
 }
 
-const FilterTab: React.FC<FilterTabProps> = ({ 
-  category, 
-  isActive, 
+const FilterTab: React.FC<FilterTabProps> = ({
+  category,
+  isActive,
   onPress,
-  primaryColor 
+  primaryColor
 }) => (
   <TouchableOpacity
     style={[
@@ -128,9 +129,9 @@ const FilterTab: React.FC<FilterTabProps> = ({
     ]}
     onPress={onPress}
   >
-    <Text 
+    <Text
       style={[
-        styles.filterTabText, 
+        styles.filterTabText,
         isActive && { color: '#FFFFFF' }
       ]}
     >
@@ -171,152 +172,157 @@ const ThemeColorEditor: React.FC<ThemeColorEditorProps & {
   setAlertActions,
   setAlertVisible
 }) => {
-  const [themeName, setThemeName] = useState('Custom Theme');
-  const [selectedColorKey, setSelectedColorKey] = useState<ColorKey>('primary');
-  const [themeColors, setThemeColors] = useState({
-    primary: initialColors.primary,
-    secondary: initialColors.secondary,
-    darkBackground: initialColors.darkBackground,
-  });
-
-  const handleColorChange = useCallback((color: string) => {
-    setThemeColors(prev => ({
-      ...prev,
-      [selectedColorKey]: color,
-    }));
-  }, [selectedColorKey]);
-
-  const handleSave = () => {
-    if (!themeName.trim()) {
-      setAlertTitle('Invalid Name');
-      setAlertMessage('Please enter a valid theme name');
-      setAlertActions([{ label: 'OK', onPress: () => {} }]);
-      setAlertVisible(true);
-      return;
-    }
-    onSave({ 
-      ...themeColors,
-      name: themeName 
+    const { t } = useTranslation();
+    const [themeName, setThemeName] = useState(t('theme.editor.theme_name_placeholder') || 'Custom Theme');
+    const [selectedColorKey, setSelectedColorKey] = useState<ColorKey>('primary');
+    const [themeColors, setThemeColors] = useState({
+      primary: initialColors.primary,
+      secondary: initialColors.secondary,
+      darkBackground: initialColors.darkBackground,
     });
-  };
 
-  // Compact preview component
-  const ThemePreview = () => (
-    <View style={[styles.previewContainer, { backgroundColor: themeColors.darkBackground }]}>
-      <View style={styles.previewContent}>
-        {/* App header */}
-        <View style={styles.previewHeader}>
-          <View style={styles.previewHeaderTitle} />
-          <View style={styles.previewIconGroup}>
-            <View style={styles.previewIcon} />
-            <View style={styles.previewIcon} />
-          </View>
-        </View>
-        
-        {/* Content area */}
-        <View style={styles.previewBody}>
-          {/* Featured content poster */}
-          <View style={styles.previewFeatured}>
-            <View style={styles.previewPosterGradient} />
-            <View style={styles.previewTitle} />
-            <View style={styles.previewButtonRow}>
-              <View style={[styles.previewPlayButton, { backgroundColor: themeColors.primary }]} />
-              <View style={styles.previewActionButton} />
+    const handleColorChange = useCallback((color: string) => {
+      setThemeColors(prev => ({
+        ...prev,
+        [selectedColorKey]: color,
+      }));
+    }, [selectedColorKey]);
+
+    const handleSave = () => {
+      if (!themeName.trim()) {
+        if (!themeName.trim()) {
+          setAlertTitle(t('theme.editor.invalid_name_title'));
+          setAlertMessage(t('theme.editor.invalid_name_msg'));
+          setAlertActions([{ label: 'OK', onPress: () => { } }]);
+          setAlertVisible(true);
+          return;
+        }
+        setAlertVisible(true);
+        return;
+      }
+      onSave({
+        ...themeColors,
+        name: themeName
+      });
+    };
+
+    // Compact preview component
+    const ThemePreview = () => (
+      <View style={[styles.previewContainer, { backgroundColor: themeColors.darkBackground }]}>
+        <View style={styles.previewContent}>
+          {/* App header */}
+          <View style={styles.previewHeader}>
+            <View style={styles.previewHeaderTitle} />
+            <View style={styles.previewIconGroup}>
+              <View style={styles.previewIcon} />
+              <View style={styles.previewIcon} />
             </View>
           </View>
-          
-          {/* Content row */}
-          <View style={styles.previewSectionHeader}>
-            <View style={styles.previewSectionTitle} />
-          </View>
-          <View style={styles.previewPosterRow}>
-            <View style={styles.previewPoster} />
-            <View style={styles.previewPoster} />
-            <View style={styles.previewPoster} />
-          </View>
-        </View>
-      </View>
-    </View>
-  );
 
-  return (
-    <View style={styles.editorContainer}>
-      <View style={styles.editorHeader}>
-        <TouchableOpacity
-          style={styles.editorBackButton}
-          onPress={onCancel}
-        >
-          <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-        <TextInput
-          style={styles.editorTitleInput}
-          value={themeName}
-          onChangeText={setThemeName}
-          placeholder="Theme name"
-          placeholderTextColor="rgba(255,255,255,0.5)"
-        />
-        <TouchableOpacity
-          style={styles.editorSaveButton}
-          onPress={handleSave}
-        >
-          <Text style={styles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.editorBody}>
-        <View style={styles.colorSectionRow}>
-          <ThemePreview />
-          
-          <View style={styles.colorButtonsColumn}>
-            <TouchableOpacity
-              style={[
-                styles.colorSelectorButton,
-                selectedColorKey === 'primary' && styles.selectedColorButton,
-                { backgroundColor: themeColors.primary }
-              ]}
-              onPress={() => setSelectedColorKey('primary')}
-            >
-              <Text style={styles.colorButtonText}>Primary</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.colorSelectorButton,
-                selectedColorKey === 'secondary' && styles.selectedColorButton,
-                { backgroundColor: themeColors.secondary }
-              ]}
-              onPress={() => setSelectedColorKey('secondary')}
-            >
-              <Text style={styles.colorButtonText}>Secondary</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[
-                styles.colorSelectorButton,
-                selectedColorKey === 'darkBackground' && styles.selectedColorButton,
-                { backgroundColor: themeColors.darkBackground }
-              ]}
-              onPress={() => setSelectedColorKey('darkBackground')}
-            >
-              <Text style={styles.colorButtonText}>Background</Text>
-            </TouchableOpacity>
+          {/* Content area */}
+          <View style={styles.previewBody}>
+            {/* Featured content poster */}
+            <View style={styles.previewFeatured}>
+              <View style={styles.previewPosterGradient} />
+              <View style={styles.previewTitle} />
+              <View style={styles.previewButtonRow}>
+                <View style={[styles.previewPlayButton, { backgroundColor: themeColors.primary }]} />
+                <View style={styles.previewActionButton} />
+              </View>
+            </View>
+
+            {/* Content row */}
+            <View style={styles.previewSectionHeader}>
+              <View style={styles.previewSectionTitle} />
+            </View>
+            <View style={styles.previewPosterRow}>
+              <View style={styles.previewPoster} />
+              <View style={styles.previewPoster} />
+              <View style={styles.previewPoster} />
+            </View>
           </View>
         </View>
-        
-        <View style={styles.colorPickerContainer}>
-          <ColorPicker
-            color={themeColors[selectedColorKey]}
-            onColorChange={handleColorChange}
-            thumbSize={22}
-            sliderSize={22}
-            noSnap={true}
-            row={false}
+      </View>
+    );
+
+    return (
+      <View style={styles.editorContainer}>
+        <View style={styles.editorHeader}>
+          <TouchableOpacity
+            style={styles.editorBackButton}
+            onPress={onCancel}
+          >
+            <MaterialIcons name="arrow-back" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.editorTitleInput}
+            value={themeName}
+            onChangeText={setThemeName}
+            placeholder={t('theme.editor.theme_name_placeholder')}
+            placeholderTextColor="rgba(255,255,255,0.5)"
           />
+          <TouchableOpacity
+            style={styles.editorSaveButton}
+            onPress={handleSave}
+          >
+            <Text style={styles.saveButtonText}>{t('theme.editor.save')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.editorBody}>
+          <View style={styles.colorSectionRow}>
+            <ThemePreview />
+
+            <View style={styles.colorButtonsColumn}>
+              <TouchableOpacity
+                style={[
+                  styles.colorSelectorButton,
+                  selectedColorKey === 'primary' && styles.selectedColorButton,
+                  { backgroundColor: themeColors.primary }
+                ]}
+                onPress={() => setSelectedColorKey('primary')}
+              >
+                <Text style={styles.colorButtonText}>{t('theme.editor.primary')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.colorSelectorButton,
+                  selectedColorKey === 'secondary' && styles.selectedColorButton,
+                  { backgroundColor: themeColors.secondary }
+                ]}
+                onPress={() => setSelectedColorKey('secondary')}
+              >
+                <Text style={styles.colorButtonText}>{t('theme.editor.secondary')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.colorSelectorButton,
+                  selectedColorKey === 'darkBackground' && styles.selectedColorButton,
+                  { backgroundColor: themeColors.darkBackground }
+                ]}
+                onPress={() => setSelectedColorKey('darkBackground')}
+              >
+                <Text style={styles.colorButtonText}>{t('theme.editor.background')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.colorPickerContainer}>
+            <ColorPicker
+              color={themeColors[selectedColorKey]}
+              onColorChange={handleColorChange}
+              thumbSize={22}
+              sliderSize={22}
+              noSnap={true}
+              row={false}
+            />
+          </View>
         </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
 
 const ThemeScreen: React.FC = () => {
   const {
@@ -327,6 +333,7 @@ const ThemeScreen: React.FC = () => {
     updateCustomTheme,
     deleteCustomTheme
   } = useTheme();
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { settings, updateSetting } = useSettings();
@@ -335,7 +342,15 @@ const ThemeScreen: React.FC = () => {
   const headerTopPadding = Platform.OS === 'android'
     ? ANDROID_STATUSBAR_HEIGHT + 8
     : 8;
-  
+
+  // Theme categories for organization
+  const THEME_CATEGORIES = [
+    { id: 'all', name: t('theme.categories.all') },
+    { id: 'dark', name: t('theme.categories.dark') },
+    { id: 'colorful', name: t('theme.categories.colorful') },
+    { id: 'custom', name: t('theme.categories.custom') },
+  ];
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
   const [activeFilter, setActiveFilter] = useState('all');
@@ -352,9 +367,9 @@ const ThemeScreen: React.FC = () => {
         StatusBar.setBackgroundColor('transparent');
       }
     };
-    
+
     applyStatusBarConfig();
-    
+
     // Re-apply on focus
     const unsubscribe = navigation.addListener('focus', applyStatusBarConfig);
     return unsubscribe;
@@ -365,19 +380,19 @@ const ThemeScreen: React.FC = () => {
     switch (activeFilter) {
       case 'dark':
         // Themes with darker colors
-        return availableThemes.filter(theme => 
-          !theme.isEditable && 
-          theme.id !== 'neon' && 
+        return availableThemes.filter(theme =>
+          !theme.isEditable &&
+          theme.id !== 'neon' &&
           theme.id !== 'retro'
         );
       case 'colorful':
         // Themes with vibrant colors
-        return availableThemes.filter(theme => 
-          !theme.isEditable && 
-          (theme.id === 'neon' || 
-           theme.id === 'retro' || 
-           theme.id === 'sunset' || 
-           theme.id === 'amber')
+        return availableThemes.filter(theme =>
+          !theme.isEditable &&
+          (theme.id === 'neon' ||
+            theme.id === 'retro' ||
+            theme.id === 'sunset' ||
+            theme.id === 'amber')
         );
       case 'custom':
         // User's custom themes
@@ -398,18 +413,18 @@ const ThemeScreen: React.FC = () => {
   }, []);
 
   const handleDeleteTheme = useCallback((theme: Theme) => {
-    setAlertTitle('Delete Theme');
-    setAlertMessage(`Are you sure you want to delete "${theme.name}"?`);
+    setAlertTitle(t('theme.alerts.delete_title'));
+    setAlertMessage(t('theme.alerts.delete_msg', { name: theme.name }));
     setAlertActions([
-      { label: 'Cancel', style: { color: '#888' }, onPress: () => {} },
+      { label: t('theme.alerts.cancel'), style: { color: '#888' }, onPress: () => { } },
       {
-        label: 'Delete',
+        label: t('theme.alerts.delete'),
         style: { color: currentTheme.colors.error },
         onPress: () => deleteCustomTheme(theme.id),
       },
     ]);
     setAlertVisible(true);
-  }, [deleteCustomTheme, currentTheme.colors.error]);
+  }, [deleteCustomTheme, currentTheme.colors.error, t]);
 
   const handleCreateTheme = useCallback(() => {
     setEditingTheme(null);
@@ -432,7 +447,7 @@ const ThemeScreen: React.FC = () => {
     } else {
       // Create new theme
       addCustomTheme({
-        name: themeData.name || 'Custom Theme',
+        name: themeData.name || t('theme.create_custom'),
         colors: {
           ...currentTheme.colors,
           primary: themeData.primary,
@@ -441,7 +456,7 @@ const ThemeScreen: React.FC = () => {
         }
       });
     }
-    
+
     setIsEditMode(false);
     setEditingTheme(null);
   }, [editingTheme, updateCustomTheme, addCustomTheme, currentTheme]);
@@ -467,9 +482,9 @@ const ThemeScreen: React.FC = () => {
   const ThemeColorEditorWithAlert = (props: any) => {
     const handleSave = (themeName: string, themeColors: any, onSave: any) => {
       if (!themeName.trim()) {
-        setAlertTitle('Invalid Name');
-        setAlertMessage('Please enter a valid theme name');
-        setAlertActions([{ label: 'OK', onPress: () => {} }]);
+        setAlertTitle(t('theme.editor.invalid_name_title'));
+        setAlertMessage(t('theme.editor.invalid_name_msg'));
+        setAlertActions([{ label: 'OK', onPress: () => { } }]);
         setAlertVisible(true);
         return false;
       }
@@ -503,7 +518,7 @@ const ThemeScreen: React.FC = () => {
 
     return (
       <SafeAreaView style={[
-        styles.container, 
+        styles.container,
         { backgroundColor: currentTheme.colors.darkBackground }
       ]}>
         <StatusBar barStyle="light-content" />
@@ -529,31 +544,31 @@ const ThemeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[
-      styles.container, 
+      styles.container,
       { backgroundColor: currentTheme.colors.darkBackground }
     ]}>
       <StatusBar barStyle="light-content" />
-      
+
       <View style={[styles.header, { paddingTop: headerTopPadding }]}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
           <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
-            Settings
+            {t('theme.alerts.back') || t('settings.app_settings_label').split(' ')[0] || 'Settings'}
           </Text>
         </TouchableOpacity>
-        
+
         <View style={styles.headerActions}>
           {/* Empty for now, but ready for future actions */}
         </View>
       </View>
-      
+
       <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-        App Themes
+        {t('theme.title')}
       </Text>
-      
+
       {/* Category filter */}
       <View style={styles.filterContainer}>
         <FlatList
@@ -572,16 +587,16 @@ const ThemeScreen: React.FC = () => {
           contentContainerStyle={styles.filterList}
         />
       </View>
-      
-      <ScrollView 
-        style={styles.content} 
+
+      <ScrollView
+        style={styles.content}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.textMuted }]}>
-          SELECT THEME
+          {t('theme.select_theme')}
         </Text>
-        
+
         <View style={styles.themeGrid}>
           {filteredThemes.map(theme => (
             <ThemeCard
@@ -594,26 +609,26 @@ const ThemeScreen: React.FC = () => {
             />
           ))}
         </View>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[
-            styles.createButton, 
+            styles.createButton,
             { backgroundColor: currentTheme.colors.primary },
             styles.buttonShadow
-          ]} 
+          ]}
           onPress={handleCreateTheme}
         >
           <MaterialIcons name="add" size={20} color="#FFFFFF" />
-          <Text style={styles.createButtonText}>Create Custom Theme</Text>
+          <Text style={styles.createButtonText}>{t('theme.create_custom')}</Text>
         </TouchableOpacity>
 
         <Text style={[styles.sectionTitle, { color: currentTheme.colors.textMuted, marginTop: 24 }]}>
-          OPTIONS
+          {t('theme.options')}
         </Text>
 
         <View style={styles.optionRow}>
           <Text style={[styles.optionLabel, { color: currentTheme.colors.text }]}>
-            Use Dominant Color from Artwork
+            {t('theme.use_dominant_color')}
           </Text>
           <Switch
             value={settings.useDominantBackgroundColor}
@@ -631,7 +646,7 @@ const ThemeScreen: React.FC = () => {
         actions={alertActions}
         onClose={() => setAlertVisible(false)}
       />
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 
@@ -801,7 +816,7 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 14,
   },
-  
+
   // Editor styles
   editorContainer: {
     flex: 1,
@@ -977,7 +992,7 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 10,
   },
-  
+
   // Legacy styles - keep for backward compatibility
   editorTitle: {
     fontSize: 18,

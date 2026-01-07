@@ -1193,5 +1193,35 @@
         "repo_format_hint": "التنسيق: https://raw.githubusercontent.com/username/repo/refs/heads/branch",
         "cancel": "إلغاء",
         "add": "إضافة"
+    },
+    "theme": {
+        "title": "سمات التطبيق",
+        "select_theme": "اختر السمة",
+        "create_custom": "إنشاء سمة مخصصة",
+        "options": "خيارات",
+        "use_dominant_color": "استخدام اللون المهيمن من العمل الفني",
+        "categories": {
+            "all": "كل السمات",
+            "dark": "سمات داكنة",
+            "colorful": "ملونة",
+            "custom": "سماتي"
+        },
+        "editor": {
+            "theme_name_placeholder": "اسم السمة",
+            "save": "حفظ",
+            "primary": "أساسي",
+            "secondary": "ثانوي",
+            "background": "خلفية",
+            "invalid_name_title": "اسم غير صالح",
+            "invalid_name_msg": "يرجى إدخال اسم سمة صالح"
+        },
+        "alerts": {
+            "delete_title": "حذف السمة",
+            "delete_msg": "هل أنت متأكد أنك تريد حذف \"{{name}}\"؟",
+            "ok": "حسناً",
+            "delete": "حذف",
+            "cancel": "إلغاء",
+            "back": "إعدادات"
+        }
     }
 }

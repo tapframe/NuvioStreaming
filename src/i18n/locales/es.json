@@ -1193,5 +1193,35 @@
         "repo_format_hint": "Formato: https://raw.githubusercontent.com/usuario/repo/rama",
         "cancel": "Cancelar",
         "add": "Añadir"
+    },
+    "theme": {
+        "title": "Temas de la App",
+        "select_theme": "SELECCIONAR TEMA",
+        "create_custom": "Crear Tema Personalizado",
+        "options": "OPCIONES",
+        "use_dominant_color": "Usar Color Dominante del Arte",
+        "categories": {
+            "all": "Todos los Temas",
+            "dark": "Temas Oscuros",
+            "colorful": "Coloridos",
+            "custom": "Mis Temas"
+        },
+        "editor": {
+            "theme_name_placeholder": "Nombre del tema",
+            "save": "Guardar",
+            "primary": "Primario",
+            "secondary": "Secundario",
+            "background": "Fondo",
+            "invalid_name_title": "Nombre Inválido",
+            "invalid_name_msg": "Por favor ingresa un nombre válido"
+        },
+        "alerts": {
+            "delete_title": "Eliminar Tema",
+            "delete_msg": "¿Estás seguro de que quieres eliminar \"{{name}}\"?",
+            "ok": "OK",
+            "delete": "Eliminar",
+            "cancel": "Cancelar",
+            "back": "Ajustes"
+        }
     }
 }
