@@ -33,6 +33,8 @@ import ScreenHeader from '../components/common/ScreenHeader';
 import { useScrollToTop } from '../contexts/ScrollToTopContext';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { useSettings } from '../hooks/useSettings';
+import { useTraktContext } from '../contexts/TraktContext';
+import { useToast } from '../contexts/ToastContext';
 
 // Import extracted search components
 import {
@@ -56,6 +58,8 @@ const SearchScreen = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, isInWatchlist, isInCollection } = useTraktContext();
+  const { showSuccess, showInfo } = useToast();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GroupedSearchResults>({ byAddon: [], allResults: [] });
   const [searching, setSearching] = useState(false);
@@ -711,19 +715,44 @@ const SearchScreen = () => {
                 } catch (e) { }
                 break;
               }
-              case 'save':
+              case 'library':
                 if (isSaved) {
                   await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
+                  showInfo(t('library.removed_from_library'), t('library.item_removed'));
                 } else {
                   await catalogService.addToLibrary(selectedItem);
+                  showSuccess(t('library.added_to_library'), t('library.item_added'));
                 }
                 setIsSaved(!isSaved);
                 break;
-              case 'watched':
+              case 'watched': {
                 const newWatchedState = !isWatched;
                 await mmkvStorage.setItem(`watched:${selectedItem.type}:${selectedItem.id}`, newWatchedState ? 'true' : 'false');
                 setIsWatched(newWatchedState);
+                showInfo(
+                  newWatchedState ? t('library.marked_watched') : t('library.marked_unwatched'),
+                  newWatchedState ? t('library.item_marked_watched') : t('library.item_marked_unwatched')
+                );
                 DeviceEventEmitter.emit('watchedStatusChanged');
+                break;
+              }
+              case 'trakt-watchlist':
+                if (isInWatchlist(selectedItem.id, selectedItem.type as 'movie' | 'show')) {
+                  await removeFromWatchlist(selectedItem.id, selectedItem.type as 'movie' | 'show');
+                  showInfo(t('library.removed_from_watchlist'), t('library.removed_from_watchlist_desc'));
+                } else {
+                  await addToWatchlist(selectedItem.id, selectedItem.type as 'movie' | 'show');
+                  showSuccess(t('library.added_to_watchlist'), t('library.added_to_watchlist_desc'));
+                }
+                break;
+              case 'trakt-collection':
+                if (isInCollection(selectedItem.id, selectedItem.type as 'movie' | 'show')) {
+                  await removeFromCollection(selectedItem.id, selectedItem.type as 'movie' | 'show');
+                  showInfo(t('library.removed_from_collection'), t('library.removed_from_collection_desc'));
+                } else {
+                  await addToCollection(selectedItem.id, selectedItem.type as 'movie' | 'show');
+                  showSuccess(t('library.added_to_collection'), t('library.added_to_collection_desc'));
+                }
                 break;
             }
             setMenuVisible(false);
