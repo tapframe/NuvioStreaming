@@ -1163,7 +1163,7 @@ class LocalScraperService {
 
 
   // Execute scraper code with full access to app environment (non-sandboxed)
-  private async executePlugin(code: string, params: any): Promise<LocalScraperResult[]> {
+  private async executePlugin(code: string, params: any, consoleOverride?: any): Promise<LocalScraperResult[]> {
     try {
       // Get URL validation setting from storage
       const settingsData = await mmkvStorage.getItem('app_settings');
@@ -1326,7 +1326,7 @@ class LocalScraperService {
             CryptoJS,
             cheerio,
             logger,
-            console,  // Expose console to plugins for debugging
+            consoleOverride || console,  // Expose console (or override) to plugins for debugging
             params,
             MOVIEBOX_PRIMARY_KEY,
             MOVIEBOX_TMDB_API_KEY,
@@ -1539,6 +1539,73 @@ class LocalScraperService {
     } catch (error) {
       logger.error('[LocalScraperService] Error getting user scraper settings:', error);
       return { enableLocalScrapers: false };
+    }
+  }
+
+  // Test a plugin independently with log capturing.
+  // If onLog is provided, each formatted log line is emitted as it happens.
+  async testPlugin(
+    code: string,
+    params: { tmdbId: string; mediaType: string; season?: number; episode?: number },
+    options?: { onLog?: (line: string) => void }
+  ): Promise<{ streams: Stream[]; logs: string[] }> {
+    const logs: string[] = [];
+    const emit = (line: string) => {
+      logs.push(line);
+      options?.onLog?.(line);
+    };
+
+    // Create a console proxy to capture logs
+    const consoleProxy = {
+      log: (...args: any[]) => {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        emit(`[LOG] ${msg}`);
+        console.log('[PluginTest]', msg);
+      },
+      error: (...args: any[]) => {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        emit(`[ERROR] ${msg}`);
+        console.error('[PluginTest]', msg);
+      },
+      warn: (...args: any[]) => {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        emit(`[WARN] ${msg}`);
+        console.warn('[PluginTest]', msg);
+      },
+      info: (...args: any[]) => {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        emit(`[INFO] ${msg}`);
+        console.info('[PluginTest]', msg);
+      },
+      debug: (...args: any[]) => {
+        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+        emit(`[DEBUG] ${msg}`);
+        console.debug('[PluginTest]', msg);
+      }
+    };
+
+    try {
+      const results = await this.executePlugin(code, params, consoleProxy);
+
+      // Convert results using a dummy scraper info since we don't have one for ad-hoc tests
+      const dummyScraperInfo: ScraperInfo = {
+        id: 'test-plugin',
+        name: 'Test Plugin',
+        version: '1.0.0',
+        description: 'Test',
+        filename: 'test.js',
+        supportedTypes: ['movie', 'tv'],
+        enabled: true
+      };
+
+      const streams = this.convertToStreams(results, dummyScraperInfo);
+      return { streams, logs };
+    } catch (error: any) {
+      emit(`[FATAL ERROR] ${error.message || String(error)}`);
+      if (error.stack) {
+        emit(`[STACK] ${error.stack}`);
+      }
+      return { streams: [], logs };
     }
   }
 

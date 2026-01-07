@@ -1602,6 +1602,7 @@ const PluginsScreen: React.FC = () => {
           >
             <Text style={styles.buttonText}>{t('plugins.add_new_repo')}</Text>
           </TouchableOpacity>
+
         </CollapsibleSection>
 
         {/* Available Plugins */}

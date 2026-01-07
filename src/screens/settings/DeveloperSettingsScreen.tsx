@@ -95,6 +95,13 @@ const DeveloperSettingsScreen: React.FC = () => {
             >
                 <SettingsCard title={t('settings.sections.testing')}>
                     <SettingItem
+                        title={'Plugin Tester'}
+                        description={'Run a plugin and inspect logs/streams'}
+                        icon="terminal"
+                        onPress={() => navigation.navigate('PluginTester')}
+                        renderControl={() => <ChevronRight />}
+                    />
+                    <SettingItem
                         title={t('settings.items.test_onboarding')}
                         icon="play-circle"
                         onPress={() => navigation.navigate('Onboarding')}

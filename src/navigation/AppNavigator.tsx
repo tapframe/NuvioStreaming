@@ -63,6 +63,7 @@ import AccountManageScreen from '../screens/AccountManageScreen';
 import { useAccount } from '../contexts/AccountContext';
 import { LoadingProvider, useLoading } from '../contexts/LoadingContext';
 import PluginsScreen from '../screens/PluginsScreen';
+import PluginTesterScreen from '../screens/PluginTesterScreen';
 import CastMoviesScreen from '../screens/CastMoviesScreen';
 import UpdateScreen from '../screens/UpdateScreen';
 import AISettingsScreen from '../screens/AISettingsScreen';
@@ -127,6 +128,7 @@ export type RootStackParamList = {
     duration?: number;
     addonId?: string;
   };
+  PluginTester: undefined;
   PlayerIOS: {
     uri: string;
     title?: string;
@@ -1616,6 +1618,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen
               name="ScraperSettings"
               component={PluginsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="PluginTester"
+              component={PluginTesterScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

@@ -80,7 +80,7 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
 
     return (
         <>
-            {hasVisibleItems(['addons', 'debrid', 'plugins']) && (
+            {hasVisibleItems(['addons', 'debrid']) && (
                 <SettingsCard title={t('settings.sections.sources')} isTablet={isTablet}>
                     {isItemVisible('addons') && (
                         <SettingItem
@@ -89,6 +89,7 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
                             icon="layers"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('Addons')}
+                            isLast={!isItemVisible('debrid')}
                             isTablet={isTablet}
                         />
                     )}
@@ -99,16 +100,6 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
                             icon="link"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('DebridIntegration')}
-                            isTablet={isTablet}
-                        />
-                    )}
-                    {isItemVisible('plugins') && (
-                        <SettingItem
-                            title={t('settings.items.plugins')}
-                            description={t('settings.items.plugins_desc')}
-                            customIcon={<PluginIcon size={isTablet ? 22 : 18} color={currentTheme.colors.primary} />}
-                            renderControl={() => <ChevronRight />}
-                            onPress={() => navigation.navigate('ScraperSettings')}
                             isLast
                             isTablet={isTablet}
                         />
