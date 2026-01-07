@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
+import { useTranslation } from 'react-i18next';
 import { styles } from '../utils/playerStyles'; // Updated styles
 import { getTrackDisplayName } from '../utils/playerUtils';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -99,6 +100,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   useExoPlayer,
 }) => {
   const { currentTheme } = useTheme();
+  const { t } = useTranslation();
 
 
   /* Responsive Spacing */
@@ -287,7 +289,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           }}
           minimumValue={0}
           maximumValue={duration || 1}
-          
+
           value={previewTime}
 
           onValueChange={(v) => setPreviewTime(v)}
@@ -338,7 +340,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               {/* Show year and provider (quality chip removed) */}
               <View style={styles.metadataRow}>
                 {year && <Text style={styles.metadataText}>{year}</Text>}
-                {streamName && <Text style={styles.providerText}>via {streamName}</Text>}
+                {streamName && <Text style={styles.providerText}>{t('player_ui.via', { name: streamName })}</Text>}
               </View>
               {playerBackend && (
                 <View style={styles.metadataRow}>

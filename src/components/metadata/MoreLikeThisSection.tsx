@@ -9,6 +9,7 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import FastImage from '@d11/react-native-fast-image';
 import { useNavigation, StackActions } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -39,6 +40,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
   recommendations,
   loadingRecommendations
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -112,9 +114,9 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
       }
     } catch (error) {
       if (__DEV__) console.error('Error navigating to recommendation:', error);
-      setAlertTitle('Error');
-      setAlertMessage('Unable to load this content. Please try again later.');
-      setAlertActions([{ label: 'OK', onPress: () => { } }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('metadata.something_went_wrong'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => { } }]);
       setAlertVisible(true);
     }
   };
@@ -149,7 +151,7 @@ export const MoreLikeThisSection: React.FC<MoreLikeThisSectionProps> = ({
 
   return (
     <View style={[styles.container, { paddingLeft: 0 }]}>
-      <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis, fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20, paddingHorizontal: horizontalPadding }]}>More Like This</Text>
+      <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis, fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20, paddingHorizontal: horizontalPadding }]}>{t('metadata.more_like_this')}</Text>
       <FlatList
         data={recommendations}
         renderItem={renderItem}

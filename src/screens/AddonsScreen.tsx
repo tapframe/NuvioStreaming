@@ -30,6 +30,7 @@ import { logger } from '../utils/logger';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { BlurView as ExpoBlurView } from 'expo-blur';
 import CustomAlert from '../components/CustomAlert';
+import { useTranslation } from 'react-i18next';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for AddonsScreen
 let GlassViewComp: any = null;
@@ -536,6 +537,7 @@ const createStyles = (colors: any) => StyleSheet.create({
 
 
 const AddonsScreen = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [addons, setAddons] = useState<ExtendedManifest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -603,9 +605,9 @@ const AddonsScreen = () => {
       }
     } catch (error) {
       logger.error('Failed to load addons:', error);
-      setAlertTitle('Error');
-      setAlertMessage('Failed to load addons');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('addons.load_error'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     } finally {
       setLoading(false);
@@ -617,9 +619,9 @@ const AddonsScreen = () => {
   const handleAddAddon = async (url?: string) => {
     let urlToInstall = url || addonUrl;
     if (!urlToInstall) {
-      setAlertTitle('Error');
-      setAlertMessage('Please enter an addon URL');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('addons.invalid_url'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
       return;
     }
@@ -637,9 +639,9 @@ const AddonsScreen = () => {
       setShowConfirmModal(true);
     } catch (error) {
       logger.error('Failed to fetch addon details:', error);
-      setAlertTitle('Error');
-      setAlertMessage(`Failed to fetch addon details from ${urlToInstall}`);
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(`${t('addons.fetch_error')} ${urlToInstall}`);
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     } finally {
       setInstalling(false);
@@ -656,15 +658,15 @@ const AddonsScreen = () => {
       setShowConfirmModal(false);
       setAddonDetails(null);
       loadAddons();
-      setAlertTitle('Success');
-      setAlertMessage('Addon installed successfully');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.success'));
+      setAlertMessage(t('addons.install_success'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     } catch (error) {
       logger.error('Failed to install addon:', error);
-      setAlertTitle('Error');
-      setAlertMessage('Failed to install addon');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('addons.install_error'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     } finally {
       setInstalling(false);
@@ -691,12 +693,12 @@ const AddonsScreen = () => {
   };
 
   const handleRemoveAddon = (addon: ExtendedManifest) => {
-    setAlertTitle('Uninstall Addon');
-    setAlertMessage(`Are you sure you want to uninstall ${addon.name}?`);
+    setAlertTitle(t('addons.uninstall_title'));
+    setAlertMessage(t('addons.uninstall_message', { name: addon.name }));
     setAlertActions([
-      { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
+      { label: t('common.cancel'), onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
       {
-        label: 'Uninstall',
+        label: t('addons.uninstall_button'),
         onPress: async () => {
           await stremioService.removeAddon(addon.id);
           setAddons(prev => prev.filter(a => a.id !== addon.id));
@@ -804,9 +806,9 @@ const AddonsScreen = () => {
     // If we couldn't determine a config URL, show an error
     if (!configUrl) {
       logger.error(`Failed to determine config URL for addon: ${addon.name}, ID: ${addon.id}`);
-      setAlertTitle('Configuration Unavailable');
-      setAlertMessage('Could not determine configuration URL for this addon.');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('addons.config_unavailable_title'));
+      setAlertMessage(t('addons.config_unavailable_msg'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
       return;
     }
@@ -820,16 +822,16 @@ const AddonsScreen = () => {
         Linking.openURL(configUrl);
       } else {
         logger.error(`URL cannot be opened: ${configUrl}`);
-        setAlertTitle('Cannot Open Configuration');
-        setAlertMessage(`The configuration URL (${configUrl}) cannot be opened. The addon may not have a configuration page.`);
-        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+        setAlertTitle(t('addons.cannot_open_config_title'));
+        setAlertMessage(t('addons.cannot_open_config_msg', { url: configUrl }));
+        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
         setAlertVisible(true);
       }
     }).catch(err => {
       logger.error(`Error checking if URL can be opened: ${configUrl}`, err);
-      setAlertTitle('Error');
-      setAlertMessage('Could not open configuration page.');
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('addons.cannot_open_config_msg', { url: configUrl }));
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     });
   };
@@ -851,7 +853,7 @@ const AddonsScreen = () => {
     // Format the types into a simple category text
     const categoryText = types.length > 0
       ? types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ')
-      : 'No categories';
+      : t('addons.no_categories');
 
     const isFirstItem = index === 0;
     const isLastItem = index === addons.length - 1;
@@ -902,12 +904,12 @@ const AddonsScreen = () => {
               <Text style={styles.addonName}>{item.name}</Text>
               {isPreInstalled && (
                 <View style={[styles.priorityBadge, { marginLeft: 8, backgroundColor: colors.success }]}>
-                  <Text style={[styles.priorityText, { fontSize: 10 }]}>PRE-INSTALLED</Text>
+                  <Text style={[styles.priorityText, { fontSize: 10 }]}>{t('addons.pre_installed')}</Text>
                 </View>
               )}
             </View>
             <View style={styles.addonMetaContainer}>
-              <Text style={styles.addonVersion}>v{item.version || '1.0.0'}</Text>
+              <Text style={styles.addonVersion}>{t('addons.version', { version: item.version || '1.0.0' })}</Text>
               <Text style={styles.addonDot}>•</Text>
               <Text style={styles.addonCategory}>{categoryText}</Text>
             </View>
@@ -965,7 +967,7 @@ const AddonsScreen = () => {
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="chevron-left" size={28} color={colors.white} />
-          <Text style={styles.backText}>Settings</Text>
+          <Text style={styles.backText}>{t('settings.settings_title')}</Text>
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
@@ -997,15 +999,15 @@ const AddonsScreen = () => {
       </View>
 
       <Text style={styles.headerTitle}>
-        Addons
-        {reorderMode && <Text style={styles.reorderModeText}> (Reorder Mode)</Text>}
+        {t('addons.title')}
+        {reorderMode && <Text style={styles.reorderModeText}>{t('addons.reorder_mode')}</Text>}
       </Text>
 
       {reorderMode && (
         <View style={styles.reorderInfoBanner}>
           <MaterialIcons name="info-outline" size={18} color={colors.primary} />
           <Text style={styles.reorderInfoText}>
-            Addons at the top have higher priority when loading content
+            {t('addons.reorder_info')}
           </Text>
         </View>
       )}
@@ -1023,24 +1025,24 @@ const AddonsScreen = () => {
 
           {/* Overview Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>OVERVIEW</Text>
+            <Text style={styles.sectionTitle}>{t('addons.overview')}</Text>
             <View style={styles.statsContainer}>
-              <StatsCard value={addons.length} label="Addons" />
+              <StatsCard value={addons.length} label={t('addons.title')} />
               <View style={styles.statsDivider} />
-              <StatsCard value={addons.length} label="Active" />
+              <StatsCard value={addons.length} label={t('settings.items.active')} />
               <View style={styles.statsDivider} />
-              <StatsCard value={catalogCount} label="Catalogs" />
+              <StatsCard value={catalogCount} label={t('settings.items.catalogs')} />
             </View>
           </View>
 
           {/* Hide Add Addon Section in reorder mode */}
           {!reorderMode && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>ADD NEW ADDON</Text>
+              <Text style={styles.sectionTitle}>{t('addons.add_button').toUpperCase()}</Text>
               <View style={styles.addAddonContainer}>
                 <TextInput
                   style={styles.addonInput}
-                  placeholder="Addon URL"
+                  placeholder={t('addons.add_addon_placeholder')}
                   placeholderTextColor={colors.mediumGray}
                   value={addonUrl}
                   onChangeText={setAddonUrl}
@@ -1053,7 +1055,7 @@ const AddonsScreen = () => {
                   disabled={installing || !addonUrl}
                 >
                   <Text style={styles.addButtonText}>
-                    {installing ? 'Loading...' : 'Add Addon'}
+                    {installing ? t('common.loading') : t('addons.add_button')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1063,13 +1065,13 @@ const AddonsScreen = () => {
           {/* Installed Addons Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              {reorderMode ? "DRAG ADDONS TO REORDER" : "INSTALLED ADDONS"}
+              {reorderMode ? t('addons.reorder_drag_title') : t('addons.installed_addons')}
             </Text>
             <View style={styles.addonList}>
               {addons.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <MaterialIcons name="extension-off" size={32} color={colors.mediumGray} />
-                  <Text style={styles.emptyText}>No addons installed</Text>
+                  <Text style={styles.emptyText}>{t('addons.no_addons')}</Text>
                 </View>
               ) : (
                 addons.map((addon, index) => (
@@ -1083,7 +1085,8 @@ const AddonsScreen = () => {
               )}
             </View>
           </View>
-        </ScrollView>
+
+        </ScrollView >
       )}
 
       {/* Addon Details Confirmation Modal */}
@@ -1112,7 +1115,7 @@ const AddonsScreen = () => {
             {addonDetails && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Install Addon</Text>
+                  <Text style={styles.modalTitle}>{t('addons.install')}</Text>
                   <TouchableOpacity
                     onPress={() => {
                       setShowConfirmModal(false);
@@ -1142,19 +1145,19 @@ const AddonsScreen = () => {
                       </View>
                     )}
                     <Text style={styles.addonDetailName}>{addonDetails.name}</Text>
-                    <Text style={styles.addonDetailVersion}>v{addonDetails.version || '1.0.0'}</Text>
+                    <Text style={styles.addonDetailVersion}>{t('addons.version', { version: addonDetails.version || '1.0.0' })}</Text>
                   </View>
 
                   <View style={styles.addonDetailSection}>
-                    <Text style={styles.addonDetailSectionTitle}>Description</Text>
+                    <Text style={styles.addonDetailSectionTitle}>{t('addons.description')}</Text>
                     <Text style={styles.addonDetailDescription}>
-                      {addonDetails.description || 'No description available'}
+                      {addonDetails.description || t('addons.no_description')}
                     </Text>
                   </View>
 
                   {addonDetails.types && addonDetails.types.length > 0 && (
                     <View style={styles.addonDetailSection}>
-                      <Text style={styles.addonDetailSectionTitle}>Supported Types</Text>
+                      <Text style={styles.addonDetailSectionTitle}>{t('addons.supported_types')}</Text>
                       <View style={styles.addonDetailChips}>
                         {addonDetails.types.map((type, index) => (
                           <View key={index} style={styles.addonDetailChip}>
@@ -1167,7 +1170,7 @@ const AddonsScreen = () => {
 
                   {addonDetails.catalogs && addonDetails.catalogs.length > 0 && (
                     <View style={styles.addonDetailSection}>
-                      <Text style={styles.addonDetailSectionTitle}>Catalogs</Text>
+                      <Text style={styles.addonDetailSectionTitle}>{t('addons.catalogs')}</Text>
                       <View style={styles.addonDetailChips}>
                         {addonDetails.catalogs.map((catalog, index) => (
                           <View key={index} style={styles.addonDetailChip}>
@@ -1189,7 +1192,7 @@ const AddonsScreen = () => {
                       setAddonDetails(null);
                     }}
                   >
-                    <Text style={styles.modalButtonText}>Cancel</Text>
+                    <Text style={styles.modalButtonText}>{t('common.cancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.modalButton, styles.installButton]}
@@ -1199,7 +1202,7 @@ const AddonsScreen = () => {
                     {installing ? (
                       <ActivityIndicator size="small" color={colors.white} />
                     ) : (
-                      <Text style={styles.modalButtonText}>Install</Text>
+                      <Text style={styles.modalButtonText}>{t('addons.install')}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -1216,7 +1219,7 @@ const AddonsScreen = () => {
         onClose={() => setAlertVisible(false)}
         actions={alertActions}
       />
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 

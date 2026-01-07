@@ -13,6 +13,7 @@ import {
   Platform
 } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
@@ -52,6 +53,7 @@ const nowMs = () => Date.now();
 const since = (start: number) => `${(nowMs() - start).toFixed(0)}ms`;
 
 const NoFeaturedContent = ({ onRetry }: { onRetry?: () => void }) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
 
@@ -103,11 +105,11 @@ const NoFeaturedContent = ({ onRetry }: { onRetry?: () => void }) => {
   return (
     <View style={styles.noContentContainer}>
       <MaterialIcons name="theaters" size={48} color={currentTheme.colors.mediumEmphasis} />
-      <Text style={styles.noContentTitle}>{onRetry ? 'Couldn\'t load featured content' : 'No Featured Content'}</Text>
+      <Text style={styles.noContentTitle}>{onRetry ? t('home.couldnt_load_featured') : t('home.no_featured_content')}</Text>
       <Text style={styles.noContentText}>
         {onRetry
-          ? 'There was a problem fetching featured content. Please check your connection and try again.'
-          : 'Install addons with catalogs or change the content source in your settings.'}
+          ? t('home.load_error_desc')
+          : t('home.no_featured_desc')}
       </Text>
       <View style={styles.noContentButtons}>
         {onRetry ? (
@@ -115,7 +117,7 @@ const NoFeaturedContent = ({ onRetry }: { onRetry?: () => void }) => {
             style={[styles.noContentButton, { backgroundColor: currentTheme.colors.primary }]}
             onPress={onRetry}
           >
-            <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>Retry</Text>
+            <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>{t('home.retry')}</Text>
           </TouchableOpacity>
         ) : (
           <>
@@ -123,13 +125,13 @@ const NoFeaturedContent = ({ onRetry }: { onRetry?: () => void }) => {
               style={[styles.noContentButton, { backgroundColor: currentTheme.colors.primary }]}
               onPress={() => navigation.navigate('Addons')}
             >
-              <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>Install Addons</Text>
+              <Text style={[styles.noContentButtonText, { color: currentTheme.colors.white }]}>{t('home.install_addons')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.noContentButton}
               onPress={() => navigation.navigate('HomeScreenSettings')}
             >
-              <Text style={styles.noContentButtonText}>Settings</Text>
+              <Text style={styles.noContentButtonText}>{t('home.settings')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -139,6 +141,7 @@ const NoFeaturedContent = ({ onRetry }: { onRetry?: () => void }) => {
 };
 
 const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loading, onRetry }: FeaturedContentProps) => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
@@ -509,7 +512,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             >
               <MaterialIcons name="play-arrow" size={28} color={currentTheme.colors.black} />
               <Text style={[styles.tabletPlayButtonText as TextStyle, { color: currentTheme.colors.black }]}>
-                Play Now
+                {t('home.play_now')}
               </Text>
             </TouchableOpacity>
 
@@ -520,7 +523,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             >
               <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={20} color={currentTheme.colors.white} />
               <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                {isSaved ? "Saved" : "My List"}
+                {isSaved ? t('home.saved') : t('home.my_list')}
               </Text>
             </TouchableOpacity>
 
@@ -531,7 +534,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
             >
               <MaterialIcons name="info-outline" size={20} color={currentTheme.colors.white} />
               <Text style={[styles.tabletSecondaryButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                More Info
+                {t('home.more_info')}
               </Text>
             </TouchableOpacity>
           </Animated.View>
@@ -626,7 +629,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                   >
                     <MaterialIcons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={currentTheme.colors.white} />
                     <Text style={[styles.myListButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                      {isSaved ? "Saved" : "Save"}
+                      {isSaved ? t('home.saved') : t('home.save')}
                     </Text>
                   </TouchableOpacity>
 
@@ -644,7 +647,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                   >
                     <MaterialIcons name="play-arrow" size={24} color={currentTheme.colors.black} />
                     <Text style={[styles.playButtonText as TextStyle, { color: currentTheme.colors.black }]}>
-                      Play
+                      {t('home.play')}
                     </Text>
                   </TouchableOpacity>
 
@@ -655,7 +658,7 @@ const FeaturedContent = ({ featuredContent, isSaved, handleSaveToLibrary, loadin
                   >
                     <MaterialIcons name="info-outline" size={24} color={currentTheme.colors.white} />
                     <Text style={[styles.infoButtonText as TextStyle, { color: currentTheme.colors.white }]}>
-                      Info
+                      {t('home.info')}
                     </Text>
                   </TouchableOpacity>
                 </Animated.View>

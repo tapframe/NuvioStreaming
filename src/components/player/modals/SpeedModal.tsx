@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -55,6 +56,7 @@ const SpeedModal: React.FC<SpeedModalProps> = ({
   holdToSpeedValue,
   setHoldToSpeedValue,
 }) => {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const speedPresets = [0.5, 1.0, 1.25, 1.5, 2.0, 2.5];
   const holdSpeedOptions = [1.0, 2.0, 3.0];
@@ -85,7 +87,7 @@ const SpeedModal: React.FC<SpeedModalProps> = ({
           }}
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, alignItems: 'center' }}>
-            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Playback Speed</Text>
+            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>{t('player_ui.playback_speed')}</Text>
           </View>
 
           {/* Speed Selection Row */}
@@ -108,7 +110,7 @@ const SpeedModal: React.FC<SpeedModalProps> = ({
               onPress={() => setHoldToSpeedEnabled(!holdToSpeedEnabled)}
               style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: holdToSpeedEnabled ? 15 : 0 }}
             >
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>On Hold</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>{t('player_ui.on_hold')}</Text>
               <View style={{
                 width: 34, height: 18, borderRadius: 10,
                 backgroundColor: holdToSpeedEnabled ? 'white' : 'rgba(255,255,255,0.2)',

@@ -13,6 +13,7 @@ import { fetchTotalDownloads } from '../../services/githubReleaseService';
 import { getDisplayedAppVersion } from '../../utils/version';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { SettingsCard, SettingItem, ChevronRight } from './SettingsComponents';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +30,7 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
     isTablet = false,
     displayDownloads: externalDisplayDownloads
 }) => {
+    const { t } = useTranslation();
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
 
@@ -52,30 +54,30 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
 
     return (
         <>
-            <SettingsCard title="INFORMATION" isTablet={isTablet}>
+            <SettingsCard title={t('settings.sections.information')} isTablet={isTablet}>
                 <SettingItem
-                    title="Privacy Policy"
+                    title={t('settings.items.privacy_policy')}
                     icon="lock"
                     onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
                     renderControl={() => <ChevronRight />}
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title="Report Issue"
+                    title={t('settings.items.report_issue')}
                     icon="alert-triangle"
                     onPress={() => Sentry.showFeedbackWidget()}
                     renderControl={() => <ChevronRight />}
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title="Version"
+                    title={t('settings.items.version')}
                     description={getDisplayedAppVersion()}
                     icon="info"
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title="Contributors"
-                    description="View all contributors"
+                    title={t('settings.items.contributors')}
+                    description={t('settings.items.view_contributors')}
                     icon="users"
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('Contributors')}
@@ -92,6 +94,7 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
  */
 export const AboutFooter: React.FC<{ displayDownloads: number | null }> = ({ displayDownloads }) => {
     const { currentTheme } = useTheme();
+    const { t } = useTranslation();
 
     return (
         <>
@@ -101,7 +104,7 @@ export const AboutFooter: React.FC<{ displayDownloads: number | null }> = ({ dis
                         {displayDownloads.toLocaleString()}
                     </Text>
                     <Text style={[styles.downloadsLabel, { color: currentTheme.colors.mediumEmphasis }]}>
-                        downloads and counting
+                        {t('settings.downloads_counter')}
                     </Text>
                 </View>
             )}
@@ -179,7 +182,7 @@ export const AboutFooter: React.FC<{ displayDownloads: number | null }> = ({ dis
 
             <View style={styles.footer}>
                 <Text style={[styles.footerText, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Made with ❤️ by Tapframe and Friends
+                    {t('settings.made_with_love')}
                 </Text>
             </View>
         </>
@@ -192,13 +195,14 @@ export const AboutFooter: React.FC<{ displayDownloads: number | null }> = ({ dis
 const AboutSettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const screenIsTablet = width >= 768;
 
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
             <StatusBar barStyle="light-content" />
-            <ScreenHeader title="About" showBackButton onBackPress={() => navigation.goBack()} />
+            <ScreenHeader title={t('settings.about')} showBackButton onBackPress={() => navigation.goBack()} />
 
             <ScrollView
                 style={styles.scrollView}

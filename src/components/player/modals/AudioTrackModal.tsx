@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, useWindowDimensions, StyleSheet, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -25,6 +26,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
   selectedAudioTrack,
   selectAudioTrack,
 }) => {
+  const { t } = useTranslation();
   const { width, height } = useWindowDimensions();
 
   // Size constants matching SubtitleModal aesthetics
@@ -67,7 +69,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
         >
           {/* Header with shared aesthetics */}
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, position: 'relative' }}>
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>Audio Tracks</Text>
+            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>{t('player_ui.audio_tracks')}</Text>
           </View>
 
           <ScrollView
@@ -111,7 +113,7 @@ export const AudioTrackModal: React.FC<AudioTrackModalProps> = ({
               {ksAudioTracks.length === 0 && (
                 <View style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
                   <MaterialIcons name="volume-off" size={32} color="white" />
-                  <Text style={{ color: 'white', marginTop: 10 }}>No audio tracks available</Text>
+                  <Text style={{ color: 'white', marginTop: 10 }}>{t('player_ui.no_audio_tracks')}</Text>
                 </View>
               )}
             </View>

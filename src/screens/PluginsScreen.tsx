@@ -25,6 +25,7 @@ import { useSettings } from '../hooks/useSettings';
 import { localScraperService, pluginService, ScraperInfo, RepositoryInfo } from '../services/pluginService';
 import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -902,6 +903,7 @@ const PluginsScreen: React.FC = () => {
   const navigation = useNavigation();
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
+  const { t } = useTranslation();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
 
@@ -1025,10 +1027,10 @@ const PluginsScreen: React.FC = () => {
       );
       await Promise.all(promises);
       await loadPlugins();
-      openAlert('Success', `${enabled ? 'Enabled' : 'Disabled'} ${filteredPlugins.length} plugins`);
+      openAlert(t('plugins.success'), `${enabled ? t('plugins.enabled') : t('plugins.disabled')} ${filteredPlugins.length} plugins`);
     } catch (error) {
       logger.error('[PluginSettings] Failed to bulk toggle:', error);
-      openAlert('Error', 'Failed to update plugins');
+      openAlert(t('plugins.error'), 'Failed to update plugins');
     } finally {
       setIsRefreshing(false);
     }
@@ -1048,7 +1050,7 @@ const PluginsScreen: React.FC = () => {
     const url = newRepositoryUrl.trim();
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
       openAlert(
-        'Invalid URL Format',
+        t('plugins.alert_invalid_url'),
         'Please use a valid GitHub raw URL format:\n\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch\n\nor include manifest.json:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch/manifest.json\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/master'
       );
       return;
@@ -1089,10 +1091,10 @@ const PluginsScreen: React.FC = () => {
 
       setNewRepositoryUrl('');
       setShowAddRepositoryModal(false);
-      openAlert('Success', 'Repository added and plugins loaded successfully');
+      openAlert(t('plugins.success'), t('plugins.alert_repo_added'));
     } catch (error) {
       logger.error('[PluginsScreen] Failed to add repository:', error);
-      openAlert('Error', 'Failed to add repository');
+      openAlert(t('plugins.error'), 'Failed to add repository');
     } finally {
       setIsLoading(false);
     }
@@ -1113,10 +1115,10 @@ const PluginsScreen: React.FC = () => {
       await loadPlugins();
 
       const repo = repositories.find(r => r.id === repoId);
-      openAlert('Success', `Repository "${repo?.name || 'Unknown'}" ${enabled ? 'enabled' : 'disabled'} successfully`);
+      openAlert(t('plugins.success'), `Repository "${repo?.name || t('plugins.unknown')}" ${enabled ? t('plugins.enabled').toLowerCase() : t('plugins.disabled').toLowerCase()} successfully`);
     } catch (error) {
       logger.error('[PluginSettings] Failed to toggle repository:', error);
-      openAlert('Error', 'Failed to update repository');
+      openAlert(t('plugins.error'), 'Failed to update repository');
     } finally {
       setSwitchingRepository(null);
     }
@@ -1249,10 +1251,10 @@ const PluginsScreen: React.FC = () => {
       await pluginService.setRepositoryUrl(url);
       await updateSetting('scraperRepositoryUrl', url);
       setHasRepository(true);
-      openAlert('Success', 'Repository URL saved successfully');
+      openAlert(t('plugins.success'), t('plugins.alert_repo_saved'));
     } catch (error) {
       logger.error('[PluginSettings] Failed to save repository:', error);
-      openAlert('Error', 'Failed to save repository URL');
+      openAlert(t('plugins.error'), 'Failed to save repository URL');
     } finally {
       setIsLoading(false);
     }
@@ -1274,7 +1276,7 @@ const PluginsScreen: React.FC = () => {
       // Load fresh plugins from the updated repository
       await loadPlugins();
 
-      openAlert('Success', 'Repository refreshed successfully with latest files');
+      openAlert(t('plugins.success'), t('plugins.alert_repo_refreshed'));
     } catch (error) {
       logger.error('[PluginsScreen] Failed to refresh repository:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1306,15 +1308,15 @@ const PluginsScreen: React.FC = () => {
       await loadPlugins();
     } catch (error) {
       logger.error('[PluginSettings] Failed to toggle plugin:', error);
-      openAlert('Error', 'Failed to update plugin status');
+      openAlert(t('plugins.error'), 'Failed to update plugin status');
       setIsRefreshing(false);
     }
   };
 
   const handleClearPlugins = () => {
     openAlert(
-      'Clear All Plugins',
-      'Are you sure you want to remove all installed plugins? This action cannot be undone.',
+      t('plugins.clear_all'),
+      t('plugins.clear_all_desc'),
       [
         { label: 'Cancel', onPress: () => { } },
         {
@@ -1323,10 +1325,10 @@ const PluginsScreen: React.FC = () => {
             try {
               await pluginService.clearScrapers();
               await loadPlugins();
-              openAlert('Success', 'All plugins have been removed');
+              openAlert(t('plugins.success'), t('plugins.alert_plugins_cleared'));
             } catch (error) {
               logger.error('[PluginSettings] Failed to clear plugins:', error);
-              openAlert('Error', 'Failed to clear plugins');
+              openAlert(t('plugins.error'), 'Failed to clear plugins');
             }
           },
         },
@@ -1336,8 +1338,8 @@ const PluginsScreen: React.FC = () => {
 
   const handleClearPluginCache = () => {
     openAlert(
-      'Clear Repository Cache',
-      'This will remove the saved repository URL and clear all cached plugin data. You will need to re-enter your repository URL.',
+      t('plugins.clear_cache'),
+      t('plugins.clear_cache_desc'),
       [
         { label: 'Cancel', onPress: () => { } },
         {
@@ -1350,10 +1352,10 @@ const PluginsScreen: React.FC = () => {
               setRepositoryUrl('');
               setHasRepository(false);
               await loadPlugins();
-              openAlert('Success', 'Repository cache cleared successfully');
+              openAlert(t('plugins.success'), t('plugins.alert_cache_cleared'));
             } catch (error) {
               logger.error('[PluginSettings] Failed to clear cache:', error);
-              openAlert('Error', 'Failed to clear repository cache');
+              openAlert(t('plugins.error'), 'Failed to clear repository cache');
             }
           },
         },
@@ -1446,7 +1448,7 @@ const PluginsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
-          <Text style={styles.backText}>Settings</Text>
+          <Text style={styles.backText}>{t('settings.title')}</Text>
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
@@ -1460,7 +1462,7 @@ const PluginsScreen: React.FC = () => {
         </View>
       </View>
 
-      <Text style={styles.headerTitle}>Plugins</Text>
+      <Text style={styles.headerTitle}>{t('plugins.title')}</Text>
 
       <ScrollView
         style={styles.scrollView}
@@ -1490,7 +1492,7 @@ const PluginsScreen: React.FC = () => {
 
         {/* Enable Plugins */}
         <CollapsibleSection
-          title="Enable Plugins"
+          title={t('plugins.enable_title')}
           isExpanded={expandedSections.repository}
           onToggle={() => toggleSection('repository')}
           colors={colors}
@@ -1498,9 +1500,9 @@ const PluginsScreen: React.FC = () => {
         >
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Enable Plugins</Text>
+              <Text style={styles.settingTitle}>{t('plugins.enable_title')}</Text>
               <Text style={styles.settingDescription}>
-                Allow the app to use installed plugins for finding streams
+                {t('plugins.enable_desc')}
               </Text>
             </View>
             <Switch
@@ -1514,22 +1516,22 @@ const PluginsScreen: React.FC = () => {
 
         {/* Repository Configuration */}
         <CollapsibleSection
-          title="Repository Configuration"
+          title={t('plugins.repo_config_title')}
           isExpanded={expandedSections.repository}
           onToggle={() => toggleSection('repository')}
           colors={colors}
           styles={styles}
         >
           <Text style={styles.sectionDescription}>
-            Enable multiple repositories to combine plugins from different sources. Toggle each repository on or off below.
+            {t('plugins.repo_config_desc')}
           </Text>
 
           {/* Repository List */}
           {repositories.length > 0 && (
             <View style={styles.repositoriesList}>
-              <Text style={[styles.settingTitle, { marginBottom: 8 }]}>Your Repositories</Text>
+              <Text style={[styles.settingTitle, { marginBottom: 8 }]}>{t('plugins.your_repos')}</Text>
               <Text style={[styles.settingDescription, { marginBottom: 12 }]}>
-                Enable multiple repositories to combine plugins from different sources.
+                {t('plugins.your_repos_desc')}
               </Text>
               {repositories.map((repo) => (
                 <View key={repo.id} style={[styles.repositoryItem, repo.enabled === false && { opacity: 0.6 }]}>
@@ -1539,13 +1541,13 @@ const PluginsScreen: React.FC = () => {
                       {repo.enabled !== false && (
                         <View style={[styles.statusBadge, { backgroundColor: '#34C759' }]}>
                           <Ionicons name="checkmark-circle" size={12} color="white" />
-                          <Text style={styles.statusBadgeText}>Enabled</Text>
+                          <Text style={styles.statusBadgeText}>{t('plugins.enabled')}</Text>
                         </View>
                       )}
                       {switchingRepository === repo.id && (
                         <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
                           <ActivityIndicator size={12} color="white" />
-                          <Text style={styles.statusBadgeText}>Updating...</Text>
+                          <Text style={styles.statusBadgeText}>{t('plugins.updating')}</Text>
                         </View>
                       )}
                     </View>
@@ -1575,7 +1577,7 @@ const PluginsScreen: React.FC = () => {
                       {isRefreshing ? (
                         <ActivityIndicator size="small" color={colors.mediumGray} />
                       ) : (
-                        <Text style={styles.repositoryActionButtonText}>Refresh</Text>
+                        <Text style={styles.repositoryActionButtonText}>{t('plugins.refresh')}</Text>
                       )}
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1583,7 +1585,7 @@ const PluginsScreen: React.FC = () => {
                       onPress={() => handleRemoveRepository(repo.id)}
                       disabled={switchingRepository !== null}
                     >
-                      <Text style={styles.repositoryActionButtonText}>Remove</Text>
+                      <Text style={styles.repositoryActionButtonText}>{t('plugins.remove')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1598,13 +1600,13 @@ const PluginsScreen: React.FC = () => {
             onPress={() => setShowAddRepositoryModal(true)}
             disabled={!settings.enableLocalScrapers || switchingRepository !== null}
           >
-            <Text style={styles.buttonText}>Add New Repository</Text>
+            <Text style={styles.buttonText}>{t('plugins.add_new_repo')}</Text>
           </TouchableOpacity>
         </CollapsibleSection>
 
         {/* Available Plugins */}
         <CollapsibleSection
-          title={`Available Plugins (${filteredPlugins.length})`}
+          title={t('plugins.available_plugins', { count: filteredPlugins.length })}
           isExpanded={expandedSections.plugins}
           onToggle={() => toggleSection('plugins')}
           colors={colors}
@@ -1619,7 +1621,7 @@ const PluginsScreen: React.FC = () => {
                   style={styles.searchInput}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Search plugins..."
+                  placeholder={t('plugins.search_placeholder')}
                   placeholderTextColor={colors.mediumGray}
                 />
                 {searchQuery.length > 0 && (
@@ -1649,7 +1651,7 @@ const PluginsScreen: React.FC = () => {
                         styles.repositoryTabText,
                         selectedRepositoryTab === 'all' && styles.repositoryTabTextSelected
                       ]}>
-                        All
+                        {t('plugins.all')}
                       </Text>
                       <Text style={[
                         styles.repositoryTabCount,
@@ -1708,7 +1710,7 @@ const PluginsScreen: React.FC = () => {
                       styles.filterChipText,
                       selectedFilter === filter && styles.filterChipTextSelected
                     ]}>
-                      {filter === 'all' ? 'All Types' : filter === 'movie' ? 'Movies' : 'TV Shows'}
+                      {filter === 'all' ? t('plugins.filter_all') : filter === 'movie' ? t('plugins.filter_movies') : t('plugins.filter_tv')}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -1722,14 +1724,14 @@ const PluginsScreen: React.FC = () => {
                     onPress={() => handleBulkToggle(true)}
                     disabled={isRefreshing}
                   >
-                    <Text style={[styles.bulkActionButtonText, { color: '#34C759' }]}>Enable All</Text>
+                    <Text style={[styles.bulkActionButtonText, { color: '#34C759' }]}>{t('plugins.enable_all')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.bulkActionButton, styles.bulkActionButtonDisabled]}
                     onPress={() => handleBulkToggle(false)}
                     disabled={isRefreshing}
                   >
-                    <Text style={[styles.bulkActionButtonText, { color: colors.mediumGray }]}>Disable All</Text>
+                    <Text style={[styles.bulkActionButtonText, { color: colors.mediumGray }]}>{t('plugins.disable_all')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1745,12 +1747,12 @@ const PluginsScreen: React.FC = () => {
                 style={styles.emptyStateIcon}
               />
               <Text style={styles.emptyStateTitle}>
-                {searchQuery ? 'No Plugins Found' : 'No Plugins Available'}
+                {searchQuery ? t('plugins.no_plugins_found') : t('plugins.no_plugins_available')}
               </Text>
               <Text style={styles.emptyStateDescription}>
                 {searchQuery
-                  ? `No plugins match "${searchQuery}". Try a different search term.`
-                  : 'Configure a repository above to view available plugins.'
+                  ? t('plugins.no_match_desc', { query: searchQuery })
+                  : t('plugins.configure_repo_desc')
                 }
               </Text>
               {searchQuery && (
@@ -1758,7 +1760,7 @@ const PluginsScreen: React.FC = () => {
                   style={[styles.button, styles.secondaryButton]}
                   onPress={() => setSearchQuery('')}
                 >
-                  <Text style={styles.secondaryButtonText}>Clear Search</Text>
+                  <Text style={styles.secondaryButtonText}>{t('plugins.clear_search')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1823,7 +1825,7 @@ const PluginsScreen: React.FC = () => {
                       <View style={styles.pluginCardMetaItem}>
                         <Ionicons name="play-circle" size={12} color={colors.mediumGray} />
                         <Text style={styles.pluginCardMetaText}>
-                          No external player
+                          {t('plugins.no_external_player')}
                         </Text>
                       </View>
                     )}
@@ -1840,13 +1842,13 @@ const PluginsScreen: React.FC = () => {
                   {/* ShowBox Settings - only visible when ShowBox plugin is available */}
                   {showboxScraperId && plugin.id === showboxScraperId && settings.enableLocalScrapers && (
                     <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.elevation3 }}>
-                      <Text style={[styles.settingTitle, { marginBottom: 8 }]}>ShowBox UI Token</Text>
+                      <Text style={[styles.settingTitle, { marginBottom: 8 }]}>{t('plugins.showbox_token')}</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                         <TextInput
                           style={[styles.textInput, { flex: 1, marginBottom: 0 }]}
                           value={showboxUiToken}
                           onChangeText={setShowboxUiToken}
-                          placeholder="Paste your ShowBox UI token"
+                          placeholder={t('plugins.showbox_placeholder')}
                           placeholderTextColor={colors.mediumGray}
                           autoCapitalize="none"
                           autoCorrect={false}
@@ -1872,7 +1874,7 @@ const PluginsScreen: React.FC = () => {
                               openAlert('Saved', 'ShowBox settings updated');
                             }}
                           >
-                            <Text style={styles.buttonText}>Save</Text>
+                            <Text style={styles.buttonText}>{t('plugins.save')}</Text>
                           </TouchableOpacity>
                         )}
                         <TouchableOpacity
@@ -1885,7 +1887,7 @@ const PluginsScreen: React.FC = () => {
                             }
                           }}
                         >
-                          <Text style={styles.secondaryButtonText}>Clear</Text>
+                          <Text style={styles.secondaryButtonText}>{t('plugins.clear')}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1898,7 +1900,7 @@ const PluginsScreen: React.FC = () => {
 
         {/* Additional Settings */}
         <CollapsibleSection
-          title="Additional Settings"
+          title={t('plugins.additional_settings')}
           isExpanded={expandedSections.settings}
           onToggle={() => toggleSection('settings')}
           colors={colors}
@@ -1906,9 +1908,9 @@ const PluginsScreen: React.FC = () => {
         >
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Enable URL Validation</Text>
+              <Text style={styles.settingTitle}>{t('plugins.enable_url_validation')}</Text>
               <Text style={styles.settingDescription}>
-                Validate streaming URLs before returning them (may slow down results but improves reliability)
+                {t('plugins.url_validation_desc')}
               </Text>
             </View>
             <Switch
@@ -1922,9 +1924,9 @@ const PluginsScreen: React.FC = () => {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Group Plugin Streams</Text>
+              <Text style={styles.settingTitle}>{t('plugins.group_streams')}</Text>
               <Text style={styles.settingDescription}>
-                When enabled, plugin streams are grouped by repository. When disabled, each plugin shows as a separate provider.
+                {t('plugins.group_streams_desc')}
               </Text>
             </View>
             <Switch
@@ -1944,9 +1946,9 @@ const PluginsScreen: React.FC = () => {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Sort by Quality First</Text>
+              <Text style={styles.settingTitle}>{t('plugins.sort_quality')}</Text>
               <Text style={styles.settingDescription}>
-                When enabled, streams are sorted by quality first, then by plugin. When disabled, streams are sorted by plugin first, then by quality. Only available when grouping is enabled.
+                {t('plugins.sort_quality_desc')}
               </Text>
             </View>
             <Switch
@@ -1960,9 +1962,9 @@ const PluginsScreen: React.FC = () => {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Show Plugin Logos</Text>
+              <Text style={styles.settingTitle}>{t('plugins.show_logos')}</Text>
               <Text style={styles.settingDescription}>
-                Display plugin logos next to streaming links on the streams screen.
+                {t('plugins.show_logos_desc')}
               </Text>
             </View>
             <Switch
@@ -1977,14 +1979,14 @@ const PluginsScreen: React.FC = () => {
 
         {/* Quality Filtering */}
         <CollapsibleSection
-          title="Quality Filtering"
+          title={t('plugins.quality_filtering')}
           isExpanded={expandedSections.quality}
           onToggle={() => toggleSection('quality')}
           colors={colors}
           styles={styles}
         >
           <Text style={styles.sectionDescription}>
-            Exclude specific video qualities from search results. Tap on a quality to exclude it from plugin results.
+            {t('plugins.quality_filtering_desc')}
           </Text>
 
           <View style={styles.qualityChipsContainer}>
@@ -2015,25 +2017,25 @@ const PluginsScreen: React.FC = () => {
 
           {(settings.excludedQualities || []).length > 0 && (
             <Text style={[styles.infoText, { marginTop: 12 }, !settings.enableLocalScrapers && styles.disabledText]}>
-              Excluded qualities: {(settings.excludedQualities || []).join(', ')}
+              {t('plugins.excluded_qualities')} {(settings.excludedQualities || []).join(', ')}
             </Text>
           )}
         </CollapsibleSection>
 
         {/* Language Filtering */}
         <CollapsibleSection
-          title="Language Filtering"
+          title={t('plugins.language_filtering')}
           isExpanded={expandedSections.quality}
           onToggle={() => toggleSection('quality')}
           colors={colors}
           styles={styles}
         >
           <Text style={styles.sectionDescription}>
-            Exclude specific languages from search results. Tap on a language to exclude it from plugin results.
+            {t('plugins.language_filtering_desc')}
           </Text>
 
           <Text style={[styles.infoText, { marginTop: 8, fontSize: 13, color: colors.mediumEmphasis }]}>
-            <Text style={{ fontWeight: '600' }}>Note:</Text> This filter only applies to providers that include language information in their stream names. It does not affect other providers.
+            <Text style={{ fontWeight: '600' }}>{t('plugins.note')}</Text> {t('plugins.language_filtering_note')}
           </Text>
 
           <View style={styles.qualityChipsContainer}>
@@ -2064,21 +2066,20 @@ const PluginsScreen: React.FC = () => {
 
           {(settings.excludedLanguages || []).length > 0 && (
             <Text style={[styles.infoText, { marginTop: 12 }, !settings.enableLocalScrapers && styles.disabledText]}>
-              Excluded languages: {(settings.excludedLanguages || []).join(', ')}
+              {t('plugins.excluded_languages')} {(settings.excludedLanguages || []).join(', ')}
             </Text>
           )}
         </CollapsibleSection>
 
         {/* About */}
         <View style={[styles.section, styles.lastSection]}>
-          <Text style={styles.sectionTitle}>About Plugins</Text>
+          <Text style={styles.sectionTitle}>{t('plugins.about_title')}</Text>
           <Text style={styles.infoText}>
-            Plugins are JavaScript modules that can search for streaming links from various sources.
-            They run locally on your device and can be installed from trusted repositories.
+            {t('plugins.about_desc_1')}
           </Text>
 
           <Text style={[styles.infoText, { marginTop: 8, fontSize: 13, color: colors.mediumEmphasis }]}>
-            <Text style={{ fontWeight: '600' }}>Note:</Text> Providers marked as "Limited" depend on external APIs that may stop working without notice.
+            <Text style={{ fontWeight: '600' }}>{t('plugins.note')}</Text> {t('plugins.about_desc_2')}
           </Text>
         </View>
       </ScrollView>
@@ -2093,24 +2094,24 @@ const PluginsScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Getting Started with Plugins</Text>
+            <Text style={styles.modalTitle}>{t('plugins.help_title')}</Text>
             <Text style={styles.modalText}>
-              1. <Text style={{ fontWeight: '600' }}>Enable Plugins</Text> - Turn on the main switch to allow plugins
+              <Text>{t('plugins.help_step_1')}</Text>
             </Text>
             <Text style={styles.modalText}>
-              2. <Text style={{ fontWeight: '600' }}>Add Repository</Text> - Add a GitHub raw URL or use the default repository
+              <Text>{t('plugins.help_step_2')}</Text>
             </Text>
             <Text style={styles.modalText}>
-              3. <Text style={{ fontWeight: '600' }}>Refresh Repository</Text> - Download available plugins from the repository
+              <Text>{t('plugins.help_step_3')}</Text>
             </Text>
             <Text style={styles.modalText}>
-              4. <Text style={{ fontWeight: '600' }}>Enable Plugins</Text> - Turn on the plugins you want to use for streaming
+              <Text>{t('plugins.help_step_4')}</Text>
             </Text>
             <TouchableOpacity
               style={styles.modalButton}
               onPress={() => setShowHelpModal(false)}
             >
-              <Text style={styles.modalButtonText}>Got it!</Text>
+              <Text style={styles.modalButtonText}>{t('plugins.got_it')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -2148,7 +2149,7 @@ const PluginsScreen: React.FC = () => {
 
               {/* Format Hint */}
               <Text style={styles.formatHint}>
-                Format: https://raw.githubusercontent.com/username/repo/refs/heads/branch
+                {t('plugins.repo_format_hint')}
               </Text>
 
               {/* Action Buttons */}
@@ -2160,7 +2161,7 @@ const PluginsScreen: React.FC = () => {
                     setNewRepositoryUrl('');
                   }}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{t('plugins.cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -2171,7 +2172,7 @@ const PluginsScreen: React.FC = () => {
                   {isLoading ? (
                     <ActivityIndicator size="small" color={colors.white} />
                   ) : (
-                    <Text style={styles.addButtonText}>Add</Text>
+                    <Text style={styles.addButtonText}>{t('plugins.add')}</Text>
                   )}
                 </TouchableOpacity>
               </View>

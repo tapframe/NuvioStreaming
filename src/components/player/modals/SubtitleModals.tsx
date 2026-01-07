@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { WyzieSubtitle, SubtitleCue } from '../utils/playerTypes';
 import { getTrackDisplayName, formatLanguage } from '../utils/playerUtils';
 
@@ -96,6 +97,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   selectedExternalSubtitleId,
   onOpenSyncModal,
 }) => {
+  const { t } = useTranslation();
   const { width, height } = useWindowDimensions();
   const isIos = Platform.OS === 'ios';
   const isLandscape = width > height;
@@ -151,14 +153,14 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
         >
           {/* Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 20, position: 'relative' }}>
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>Subtitles</Text>
+            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>{t('player_ui.subtitles')}</Text>
           </View>
 
           {/* Tab Bar */}
           <View style={{ flexDirection: 'row', gap: 15, paddingHorizontal: 70, marginBottom: 20 }}>
-            <MorphingTab label="Built-in" isSelected={activeTab === 'built-in'} onPress={() => setActiveTab('built-in')} />
-            <MorphingTab label="Addons" isSelected={activeTab === 'addon'} onPress={() => setActiveTab('addon')} />
-            <MorphingTab label="Style" isSelected={activeTab === 'appearance'} onPress={() => setActiveTab('appearance')} />
+            <MorphingTab label={t('player_ui.built_in')} isSelected={activeTab === 'built-in'} onPress={() => setActiveTab('built-in')} />
+            <MorphingTab label={t('player_ui.addons')} isSelected={activeTab === 'addon'} onPress={() => setActiveTab('addon')} />
+            <MorphingTab label={t('player_ui.style')} isSelected={activeTab === 'appearance'} onPress={() => setActiveTab('appearance')} />
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -174,7 +176,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     }}
                     style={{ padding: 10, borderRadius: 12, backgroundColor: selectedTextTrack === -1 ? 'white' : 'rgba(242, 184, 181)' }}
                   >
-                    <Text style={{ color: selectedTextTrack === -1 ? 'black' : 'rgba(96, 20, 16)', fontWeight: '600' }}>None</Text>
+                    <Text style={{ color: selectedTextTrack === -1 ? 'black' : 'rgba(96, 20, 16)', fontWeight: '600' }}>{t('player_ui.none')}</Text>
                   </TouchableOpacity>
                   {ksTextTracks.map((track) => (
                     <TouchableOpacity
@@ -199,7 +201,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   {availableSubtitles.length === 0 ? (
                     <TouchableOpacity onPress={fetchAvailableSubtitles} style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
                       <MaterialIcons name="cloud-download" size={32} color="white" />
-                      <Text style={{ color: 'white', marginTop: 10 }}>Search Online Subtitles</Text>
+                      <Text style={{ color: 'white', marginTop: 10 }}>{t('player_ui.search_online_subtitles')}</Text>
                     </TouchableOpacity>
                   ) : (
                     availableSubtitles.map((sub) => (
@@ -230,7 +232,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                       <MaterialIcons name="visibility" size={16} color="rgba(255,255,255,0.7)" />
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>Preview</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{t('player_ui.preview')}</Text>
                     </View>
                     <View style={{ height: previewHeight, justifyContent: 'flex-end' }}>
                       <View style={{ alignItems: subtitleAlign === 'center' ? 'center' : subtitleAlign === 'left' ? 'flex-start' : 'flex-end', marginBottom: Math.min(80, subtitleBottomOffset) }}>
@@ -262,7 +264,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                         <MaterialIcons name="star" size={16} color="rgba(255,255,255,0.7)" />
-                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>Quick Presets</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{t('player_ui.quick_presets')}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                         <TouchableOpacity
@@ -274,7 +276,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           }}
                           style={{ paddingHorizontal: chipPadH, paddingVertical: chipPadV, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
                         >
-                          <Text style={{ color: '#fff', fontWeight: '600', fontSize: isCompact ? 11 : 12 }}>Default</Text>
+                          <Text style={{ color: '#fff', fontWeight: '600', fontSize: isCompact ? 11 : 12 }}>{t('player_ui.default')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => {
@@ -282,7 +284,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           }}
                           style={{ paddingHorizontal: chipPadH, paddingVertical: chipPadV, borderRadius: 20, backgroundColor: 'rgba(255,215,0,0.12)', borderWidth: 1, borderColor: 'rgba(255,215,0,0.35)' }}
                         >
-                          <Text style={{ color: '#FFD700', fontWeight: '700', fontSize: isCompact ? 11 : 12 }}>Yellow</Text>
+                          <Text style={{ color: '#FFD700', fontWeight: '700', fontSize: isCompact ? 11 : 12 }}>{t('player_ui.yellow')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => {
@@ -290,7 +292,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           }}
                           style={{ paddingHorizontal: chipPadH, paddingVertical: chipPadV, borderRadius: 20, backgroundColor: 'rgba(34,197,94,0.12)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.35)' }}
                         >
-                          <Text style={{ color: '#22C55E', fontWeight: '700', fontSize: isCompact ? 11 : 12 }}>High Contrast</Text>
+                          <Text style={{ color: '#22C55E', fontWeight: '700', fontSize: isCompact ? 11 : 12 }}>{t('player_ui.high_contrast')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => {
@@ -298,7 +300,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           }}
                           style={{ paddingHorizontal: chipPadH, paddingVertical: chipPadV, borderRadius: 20, backgroundColor: 'rgba(59,130,246,0.12)', borderWidth: 1, borderColor: 'rgba(59,130,246,0.35)' }}
                         >
-                          <Text style={{ color: '#3B82F6', fontWeight: '700', fontSize: isCompact ? 11 : 12 }}>Large</Text>
+                          <Text style={{ color: '#3B82F6', fontWeight: '700', fontSize: isCompact ? 11 : 12 }}>{t('player_ui.large')}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -308,12 +310,12 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad, gap: isCompact ? 10 : 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
                       <MaterialIcons name="tune" size={16} color="rgba(255,255,255,0.7)" />
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>Core</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{t('player_ui.core')}</Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <MaterialIcons name="format-size" size={16} color="rgba(255,255,255,0.7)" />
-                        <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Font Size</Text>
+                        <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>{t('player_ui.font_size')}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <TouchableOpacity onPress={decreaseSubtitleSize} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' }}>
@@ -332,7 +334,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <MaterialIcons name="layers" size={16} color="rgba(255,255,255,0.7)" />
-                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>Show Background</Text>
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>{t('player_ui.show_background')}</Text>
                         </View>
                         <TouchableOpacity
                           style={{ width: isCompact ? 48 : 54, height: isCompact ? 28 : 30, backgroundColor: subtitleBackground ? 'white' : 'rgba(255,255,255,0.25)', borderRadius: 15, justifyContent: 'center', alignItems: subtitleBackground ? 'flex-end' : 'flex-start', paddingHorizontal: 3 }}
@@ -348,14 +350,14 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad, gap: isCompact ? 10 : 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <MaterialIcons name="build" size={16} color="rgba(255,255,255,0.7)" />
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{isExoPlayerInternal ? 'Position' : 'Advanced'}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{isExoPlayerInternal ? t('player_ui.position') : t('player_ui.advanced')}</Text>
                     </View>
                     {/* Text Color - Not supported on ExoPlayer internal subtitles */}
                     {!isExoPlayerInternal && (
                       <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <MaterialIcons name="palette" size={16} color="rgba(255,255,255,0.7)" />
-                          <Text style={{ color: 'white', marginLeft: 8, fontWeight: '600' }}>Text Color</Text>
+                          <Text style={{ color: 'white', marginLeft: 8, fontWeight: '600' }}>{t('player_ui.text_color')}</Text>
                         </View>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
                           {['#FFFFFF', '#FFD700', '#00E5FF', '#FF5C5C', '#00FF88', '#9b59b6', '#f97316'].map(c => (
@@ -367,7 +369,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     {/* Align - Not supported on ExoPlayer internal subtitles */}
                     {!isExoPlayerInternal && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ color: 'white', fontWeight: '600' }}>Align</Text>
+                        <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.align')}</Text>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           {([{ key: 'left', icon: 'format-align-left' }, { key: 'center', icon: 'format-align-center' }, { key: 'right', icon: 'format-align-right' }] as const).map(a => (
                             <TouchableOpacity key={a.key} onPress={() => setSubtitleAlign(a.key)} style={{ paddingHorizontal: isCompact ? 8 : 10, paddingVertical: isCompact ? 4 : 6, borderRadius: 8, backgroundColor: subtitleAlign === a.key ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}>
@@ -378,7 +380,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       </View>
                     )}
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: 'white', fontWeight: '600' }}>Bottom Offset</Text>
+                      <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.bottom_offset')}</Text>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                         <TouchableOpacity onPress={() => setSubtitleBottomOffset(Math.max(0, subtitleBottomOffset - 5))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                           <MaterialIcons name="keyboard-arrow-down" color="#fff" size={20} />
@@ -394,7 +396,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     {/* Background Opacity - Not supported on ExoPlayer internal subtitles */}
                     {!isExoPlayerInternal && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ color: 'white', fontWeight: '600' }}>Background Opacity</Text>
+                        <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.background_opacity')}</Text>
                         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                           <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.max(0, +(subtitleBgOpacity - 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                             <MaterialIcons name="remove" color="#fff" size={18} />
@@ -410,16 +412,16 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     )}
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ color: 'white', fontWeight: '600' }}>Text Shadow</Text>
+                        <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.text_shadow')}</Text>
                         <TouchableOpacity onPress={() => setSubtitleTextShadow(!subtitleTextShadow)} style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleTextShadow ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}>
-                          <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleTextShadow ? 'On' : 'Off'}</Text>
+                          <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleTextShadow ? t('player_ui.on') : t('player_ui.off')}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
                     {!isUsingInternalSubtitle && (
                       <>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ color: 'white' }}>Outline Color</Text>
+                          <Text style={{ color: 'white' }}>{t('player_ui.outline_color')}</Text>
                           <View style={{ flexDirection: 'row', gap: 8 }}>
                             {['#000000', '#FFFFFF', '#00E5FF', '#FF5C5C'].map(c => (
                               <TouchableOpacity key={c} onPress={() => setSubtitleOutlineColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 2, borderColor: subtitleOutlineColor === c ? '#fff' : 'rgba(255,255,255,0.3)' }} />
@@ -427,7 +429,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           </View>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ color: 'white' }}>Outline Width</Text>
+                          <Text style={{ color: 'white' }}>{t('player_ui.outline_width')}</Text>
                           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                             <TouchableOpacity onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                               <MaterialIcons name="remove" color="#fff" size={18} />
@@ -445,7 +447,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: isCompact ? 'column' : 'row', justifyContent: 'space-between', gap: 12 }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ color: 'white', fontWeight: '600' }}>Letter Spacing</Text>
+                          <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.letter_spacing')}</Text>
                           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
                             <TouchableOpacity onPress={() => setSubtitleLetterSpacing(Math.max(0, +(subtitleLetterSpacing - 0.5).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                               <MaterialIcons name="remove" color="#fff" size={18} />
@@ -459,7 +461,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                           </View>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ color: 'white', fontWeight: '600' }}>Line Height</Text>
+                          <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.line_height')}</Text>
                           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
                             <TouchableOpacity onPress={() => setSubtitleLineHeightMultiplier(Math.max(1, +(subtitleLineHeightMultiplier - 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                               <MaterialIcons name="remove" color="#fff" size={18} />
@@ -478,7 +480,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     {!isExoPlayerInternal && (
                       <View style={{ marginTop: 4 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ color: 'white', fontWeight: '600' }}>Timing Offset (s)</Text>
+                          <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.timing_offset')}</Text>
                           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                             <TouchableOpacity onPress={() => setSubtitleOffsetSec(+(subtitleOffsetSec - 0.1).toFixed(1))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                               <MaterialIcons name="remove" color="#fff" size={18} />
@@ -511,10 +513,10 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                             }}
                           >
                             <MaterialIcons name="sync" color="#fff" size={18} style={{ marginRight: 8 }} />
-                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Visual Sync</Text>
+                            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>{t('player_ui.visual_sync')}</Text>
                           </TouchableOpacity>
                         )}
-                        <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 6 }}>Nudge subtitles earlier (-) or later (+) to sync if needed.</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 6 }}>{t('player_ui.timing_hint')}</Text>
                       </View>
                     )}
                     <View style={{ alignItems: 'flex-end', marginTop: 8 }}>
@@ -527,7 +529,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         }}
                         style={{ paddingHorizontal: chipPadH, paddingVertical: chipPadV, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
                       >
-                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: isCompact ? 12 : 14 }}>Reset to defaults</Text>
+                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: isCompact ? 12 : 14 }}>{t('player_ui.reset_defaults')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>

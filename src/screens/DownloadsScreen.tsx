@@ -30,6 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import FastImage from '@d11/react-native-fast-image';
 import { useDownloads } from '../contexts/DownloadsContext';
 import { useSettings } from '../hooks/useSettings';
+import { useTranslation } from 'react-i18next';
 import { VideoPlayerService } from '../services/videoPlayerService';
 import type { DownloadItem } from '../contexts/DownloadsContext';
 import { useToast } from '../contexts/ToastContext';
@@ -65,6 +66,7 @@ const optimizePosterUrl = (poster: string | undefined | null): string => {
 // Empty state component
 const EmptyDownloadsState: React.FC<{ navigation: NavigationProp<RootStackParamList> }> = ({ navigation }) => {
   const { currentTheme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.emptyContainer}>
@@ -76,10 +78,10 @@ const EmptyDownloadsState: React.FC<{ navigation: NavigationProp<RootStackParamL
         />
       </View>
       <Text style={[styles.emptyTitle, { color: currentTheme.colors.text }]}>
-        No Downloads Yet
+        {t('downloads.no_downloads')}
       </Text>
       <Text style={[styles.emptySubtitle, { color: currentTheme.colors.mediumEmphasis }]}>
-        Downloaded content will appear here for offline viewing
+        {t('downloads.no_downloads_desc')}
       </Text>
       <TouchableOpacity
         style={[styles.exploreButton, { backgroundColor: currentTheme.colors.primary }]}
@@ -88,7 +90,7 @@ const EmptyDownloadsState: React.FC<{ navigation: NavigationProp<RootStackParamL
         }}
       >
         <Text style={[styles.exploreButtonText, { color: currentTheme.colors.background }]}>
-          Explore Content
+          {t('downloads.explore')}
         </Text>
       </TouchableOpacity>
     </View>
@@ -105,6 +107,7 @@ const DownloadItemComponent: React.FC<{
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const { showSuccess, showInfo } = useToast();
+  const { t } = useTranslation();
   const [posterUrl, setPosterUrl] = useState<string | null>(item.posterUrl || null);
   const borderRadius = settings.posterBorderRadius ?? 12;
 
@@ -121,15 +124,15 @@ const DownloadItemComponent: React.FC<{
     if (item.status === 'completed' && item.fileUri) {
       Clipboard.setString(item.fileUri);
       if (Platform.OS === 'android') {
-        showSuccess('Path Copied', 'Local file path copied to clipboard');
+        showSuccess(t('downloads.path_copied'), t('downloads.path_copied_desc'));
       } else {
-        Alert.alert('Copied', 'Local file path copied to clipboard');
+        Alert.alert(t('downloads.copied'), t('downloads.path_copied_desc'));
       }
     } else if (item.status !== 'completed') {
       if (Platform.OS === 'android') {
-        showInfo('Download Incomplete', 'Download is not complete yet');
+        showInfo(t('downloads.incomplete'), t('downloads.incomplete_desc'));
       } else {
-        Alert.alert('Not Available', 'The local file path is available only after the download is complete.');
+        Alert.alert(t('downloads.not_available'), t('downloads.not_available_desc'));
       }
     }
   }, [item.status, item.fileUri, showSuccess, showInfo]);
@@ -163,17 +166,17 @@ const DownloadItemComponent: React.FC<{
     switch (item.status) {
       case 'downloading':
         const eta = item.etaSeconds ? `${Math.ceil(item.etaSeconds / 60)}m` : undefined;
-        return eta ? `Downloading • ${eta}` : 'Downloading';
+        return eta ? `${t('downloads.status_downloading')} • ${eta}` : t('downloads.status_downloading');
       case 'completed':
-        return 'Completed';
+        return t('downloads.status_completed');
       case 'paused':
-        return 'Paused';
+        return t('downloads.status_paused');
       case 'error':
-        return 'Error';
+        return t('downloads.status_error');
       case 'queued':
-        return 'Queued';
+        return t('downloads.status_queued');
       default:
-        return 'Unknown';
+        return t('downloads.status_unknown');
     }
   };
 
@@ -257,7 +260,7 @@ const DownloadItemComponent: React.FC<{
           {/* Provider + quality row */}
           <View style={styles.providerRow}>
             <Text style={[styles.providerText, { color: currentTheme.colors.mediumEmphasis }]}>
-              {item.providerName || 'Provider'}
+              {item.providerName || t('downloads.provider')}
             </Text>
           </View>
           {/* Status row */}
@@ -283,7 +286,7 @@ const DownloadItemComponent: React.FC<{
                 color={currentTheme.colors.warning || '#FF9500'}
               />
               <Text style={[styles.warningText, { color: currentTheme.colors.warning || '#FF9500' }]}>
-                May not play - streaming playlist
+                {t('downloads.streaming_playlist_warning')}
               </Text>
             </View>
           )}
@@ -307,7 +310,7 @@ const DownloadItemComponent: React.FC<{
             </Text>
             {item.etaSeconds && item.status === 'downloading' && (
               <Text style={[styles.etaText, { color: currentTheme.colors.mediumEmphasis }]}>
-                {Math.ceil(item.etaSeconds / 60)}m remaining
+                {Math.ceil(item.etaSeconds / 60)}m {t('downloads.remaining')}
               </Text>
             )}
           </View>
@@ -350,6 +353,7 @@ const DownloadsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
+  const { t } = useTranslation();
   const { downloads, pauseDownload, resumeDownload, cancelDownload } = useDownloads();
   const { showSuccess, showInfo } = useToast();
 
@@ -409,7 +413,7 @@ const DownloadsScreen: React.FC = () => {
   const handleDownloadPress = useCallback(async (item: DownloadItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.status !== 'completed') {
-      Alert.alert('Download not ready', 'Please wait until the download completes.');
+      Alert.alert(t('downloads.not_ready'), t('downloads.not_ready_desc'));
       return;
     }
     const uri = (item as any).fileUri || (item as any).sourceUrl;
@@ -636,7 +640,7 @@ const DownloadsScreen: React.FC = () => {
 
       {/* ScreenHeader Component */}
       <ScreenHeader
-        title="Downloads"
+        title={t('downloads.title')}
         rightActionComponent={
           <TouchableOpacity
             style={styles.helpButton}
@@ -654,10 +658,10 @@ const DownloadsScreen: React.FC = () => {
       >
         {downloads.length > 0 && (
           <View style={styles.filterContainer}>
-            {renderFilterButton('all', 'All', stats.total)}
-            {renderFilterButton('downloading', 'Active', stats.downloading)}
-            {renderFilterButton('completed', 'Done', stats.completed)}
-            {renderFilterButton('paused', 'Paused', stats.paused)}
+            {renderFilterButton('all', t('downloads.filter_all'), stats.total)}
+            {renderFilterButton('downloading', t('downloads.filter_active'), stats.downloading)}
+            {renderFilterButton('completed', t('downloads.filter_done'), stats.completed)}
+            {renderFilterButton('paused', t('downloads.filter_paused'), stats.paused)}
           </View>
         )}
       </ScreenHeader>
@@ -697,10 +701,10 @@ const DownloadsScreen: React.FC = () => {
                 color={currentTheme.colors.mediumEmphasis}
               />
               <Text style={[styles.emptyFilterTitle, { color: currentTheme.colors.text }]}>
-                No {selectedFilter} downloads
+                {t('downloads.no_filter_results', { filter: selectedFilter })}
               </Text>
               <Text style={[styles.emptyFilterSubtitle, { color: currentTheme.colors.mediumEmphasis }]}>
-                Try selecting a different filter
+                {t('downloads.try_different_filter')}
               </Text>
             </View>
           )}
@@ -710,19 +714,22 @@ const DownloadsScreen: React.FC = () => {
       {/* Help Alert */}
       <CustomAlert
         visible={showHelpAlert}
-        title="Download Limitations"
-        message="• Files smaller than 1MB are typically M3U8 streaming playlists and cannot be downloaded for offline viewing. These only work with online streaming and contain links to video segments, not the actual video content."
+        title={t('downloads.limitations_title')}
+        message={t('downloads.limitations_msg')}
         onClose={() => setShowHelpAlert(false)}
       />
 
       {/* Remove Download Confirmation */}
       <CustomAlert
         visible={showRemoveAlert}
-        title="Remove Download"
-        message={pendingRemoveItem ? `Remove \"${pendingRemoveItem.title}\"${pendingRemoveItem.type === 'series' && pendingRemoveItem.season && pendingRemoveItem.episode ? ` S${String(pendingRemoveItem.season).padStart(2, '0')}E${String(pendingRemoveItem.episode).padStart(2, '0')}` : ''}?` : 'Remove this download?'}
+        title={t('downloads.remove_title')}
+        message={pendingRemoveItem ? t('downloads.remove_confirm', {
+          title: pendingRemoveItem.title,
+          season_episode: pendingRemoveItem.type === 'series' && pendingRemoveItem.season && pendingRemoveItem.episode ? ` S${String(pendingRemoveItem.season).padStart(2, '0')}E${String(pendingRemoveItem.episode).padStart(2, '0')}` : ''
+        }) : t('downloads.remove_confirm', { title: 'this download', season_episode: '' })}
         actions={[
-          { label: 'Cancel', onPress: () => setShowRemoveAlert(false) },
-          { label: 'Remove', onPress: () => { if (pendingRemoveItem) { cancelDownload(pendingRemoveItem.id); } setShowRemoveAlert(false); setPendingRemoveItem(null); }, style: {} },
+          { label: t('downloads.cancel'), onPress: () => setShowRemoveAlert(false) },
+          { label: t('downloads.remove'), onPress: () => { if (pendingRemoveItem) { cancelDownload(pendingRemoveItem.id); } setShowRemoveAlert(false); setPendingRemoveItem(null); }, style: {} },
         ]}
         onClose={() => { setShowRemoveAlert(false); setPendingRemoveItem(null); }}
       />

@@ -20,6 +20,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../styles/colors';
 import { catalogService, StreamingAddon } from '../services/catalogService';
 import { useCustomCatalogNames } from '../hooks/useCustomCatalogNames';
+import { useTranslation } from 'react-i18next';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -31,6 +32,7 @@ interface CatalogItem {
 }
 
 const HeroCatalogsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { settings, updateSetting } = useSettings();
   const systemColorScheme = useColorScheme();
   const isDarkMode = systemColorScheme === 'dark' || settings.enableDarkMode;
@@ -60,7 +62,7 @@ const HeroCatalogsScreen: React.FC = () => {
       // Refresh selected catalogs when settings change
       setSelectedCatalogs(settings.selectedHeroCatalogs || []);
     });
-    
+
     return unsubscribe;
   }, [settings.selectedHeroCatalogs]);
 
@@ -86,10 +88,10 @@ const HeroCatalogsScreen: React.FC = () => {
   const handleSave = useCallback(() => {
     // First update the settings
     updateSetting('selectedHeroCatalogs', selectedCatalogs);
-    
+
     // Show the confirmation indicator
     setShowSavedIndicator(true);
-    
+
     // Short delay before navigating back to allow settings to save
     // and the user to see the confirmation message
     setTimeout(() => {
@@ -108,7 +110,7 @@ const HeroCatalogsScreen: React.FC = () => {
       try {
         const addons = await catalogService.getAllAddons();
         const catalogItems: CatalogItem[] = [];
-        
+
         addons.forEach(addon => {
           if (addon.catalogs && addon.catalogs.length > 0) {
             addon.catalogs.forEach(catalog => {
@@ -121,19 +123,19 @@ const HeroCatalogsScreen: React.FC = () => {
             });
           }
         });
-        
+
         setCatalogs(catalogItems);
       } catch (error) {
         if (__DEV__) console.error('Failed to load catalogs:', error);
-        setAlertTitle('Error');
-        setAlertMessage('Failed to load catalogs');
-        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+        setAlertTitle(t('common.error'));
+        setAlertMessage(t('home_screen.hero_catalogs.error_load'));
+        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
         setAlertVisible(true);
       } finally {
         setLoading(false);
       }
     };
-    
+
     loadCatalogs();
   }, []);
 
@@ -172,22 +174,22 @@ const HeroCatalogsScreen: React.FC = () => {
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <MaterialIcons 
-            name="arrow-back" 
-            size={24} 
-            color={isDarkMode ? colors.highEmphasis : colors.textDark} 
+          <MaterialIcons
+            name="arrow-back"
+            size={24}
+            color={isDarkMode ? colors.highEmphasis : colors.textDark}
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-          Hero Section Catalogs
+          {t('home_screen.hero_catalogs.title')}
         </Text>
       </View>
 
       {/* Saved indicator */}
-      <Animated.View 
+      <Animated.View
         style={[
-          styles.savedIndicator, 
-          { 
+          styles.savedIndicator,
+          {
             opacity: fadeAnim,
             backgroundColor: isDarkMode ? 'rgba(0, 180, 150, 0.9)' : 'rgba(0, 180, 150, 0.9)'
           }
@@ -195,47 +197,47 @@ const HeroCatalogsScreen: React.FC = () => {
         pointerEvents="none"
       >
         <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
-        <Text style={styles.savedIndicatorText}>Settings Saved</Text>
+        <Text style={styles.savedIndicatorText}>{t('home_screen.hero_catalogs.settings_saved')}</Text>
       </Animated.View>
 
       {loading || isLoadingCustomNames ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-            Loading catalogs...
+            {t('common.loading')}
           </Text>
         </View>
       ) : (
         <>
           <View style={styles.actionBar}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]} 
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
               onPress={handleSelectAll}
             >
-              <Text style={[styles.actionButtonText, { color: colors.primary }]}>Select All</Text>
+              <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t('home_screen.hero_catalogs.select_all')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]} 
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: isDarkMode ? colors.elevation2 : colors.white }]}
               onPress={handleSelectNone}
             >
-              <Text style={[styles.actionButtonText, { color: colors.primary }]}>Clear All</Text>
+              <Text style={[styles.actionButtonText, { color: colors.primary }]}>{t('home_screen.hero_catalogs.clear_all')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.saveButton, { backgroundColor: colors.primary }]} 
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: colors.primary }]}
               onPress={handleSave}
             >
               <MaterialIcons name="save" size={16} color={colors.white} style={styles.saveIcon} />
-              <Text style={styles.saveButtonText}>Save</Text>
+              <Text style={styles.saveButtonText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.infoCard}>
             <Text style={[styles.infoText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-              Select which catalogs to display in the hero section. If none are selected, all catalogs will be used. Don't forget to press Save when you're done.
+              {t('home_screen.hero_catalogs.info')}
             </Text>
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
@@ -246,13 +248,13 @@ const HeroCatalogsScreen: React.FC = () => {
                   {addonName}
                 </Text>
                 <View style={[
-                  styles.catalogsContainer, 
+                  styles.catalogsContainer,
                   { backgroundColor: isDarkMode ? colors.elevation1 : colors.white }
                 ]}>
                   {addonCatalogs.map(catalog => {
                     const [addonId, type, catalogId] = catalog.id.split(':');
                     const displayName = getCustomName(addonId, type, catalogId, catalog.name);
-                    
+
                     return (
                       <TouchableOpacity
                         key={catalog.id}
@@ -267,7 +269,7 @@ const HeroCatalogsScreen: React.FC = () => {
                             {displayName}
                           </Text>
                           <Text style={[styles.catalogType, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-                            {catalog.type === 'movie' ? 'Movies' : 'TV Shows'}
+                            {catalog.type === 'movie' ? t('home_screen.hero_catalogs.movies') : t('home_screen.hero_catalogs.tv_shows')}
                           </Text>
                         </View>
                         <MaterialIcons
@@ -284,14 +286,14 @@ const HeroCatalogsScreen: React.FC = () => {
           </ScrollView>
         </>
       )}
-    <CustomAlert
-      visible={alertVisible}
-      title={alertTitle}
-      message={alertMessage}
-      onClose={() => setAlertVisible(false)}
-      actions={alertActions}
-    />
-  </SafeAreaView>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
+    </SafeAreaView>
   );
 };
 

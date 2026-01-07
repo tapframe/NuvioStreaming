@@ -15,6 +15,7 @@ import { useSettings, AppSettings } from '../hooks/useSettings';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useTheme } from '../contexts/ThemeContext';
 import CustomAlert from '../components/CustomAlert';
+import { useTranslation } from 'react-i18next';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -95,6 +96,7 @@ const PlayerSettingsScreen: React.FC = () => {
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
   const navigation = useNavigation();
+  const { t } = useTranslation();
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -110,46 +112,46 @@ const PlayerSettingsScreen: React.FC = () => {
   const playerOptions = [
     {
       id: 'internal',
-      title: 'Built-in Player',
-      description: 'Use the app\'s default video player',
+      title: t('player.internal_title'),
+      description: t('player.internal_desc'),
       icon: 'play-circle-outline',
     },
     ...(Platform.OS === 'ios' ? [
       {
         id: 'vlc',
-        title: 'VLC',
-        description: 'Open streams in VLC media player',
+        title: t('player.vlc_title'),
+        description: t('player.vlc_desc'),
         icon: 'video-library',
       },
       {
         id: 'infuse',
-        title: 'Infuse',
-        description: 'Open streams in Infuse player',
+        title: t('player.infuse_title'),
+        description: t('player.infuse_desc'),
         icon: 'smart-display',
       },
       {
         id: 'outplayer',
-        title: 'OutPlayer',
-        description: 'Open streams in OutPlayer',
+        title: t('player.outplayer_title'),
+        description: t('player.outplayer_desc'),
         icon: 'slideshow',
       },
       {
         id: 'vidhub',
-        title: 'VidHub',
-        description: 'Open streams in VidHub player',
+        title: t('player.vidhub_title'),
+        description: t('player.vidhub_desc'),
         icon: 'ondemand-video',
       },
       {
         id: 'infuse_livecontainer',
-        title: 'Infuse Livecontainer',
-        description: 'Open streams in Infuse player LiveContainer',
+        title: t('player.infuse_live_title'),
+        description: t('player.infuse_live_desc'),
         icon: 'smart-display',
       },
     ] : [
       {
         id: 'external',
-        title: 'External Player',
-        description: 'Open streams in your preferred video player',
+        title: t('player.external_title'),
+        description: t('player.external_desc'),
         icon: 'open-in-new',
       },
     ]),
@@ -184,7 +186,7 @@ const PlayerSettingsScreen: React.FC = () => {
             color={currentTheme.colors.text}
           />
           <Text style={[styles.backText, { color: currentTheme.colors.text }]}>
-            Settings
+            {t('common.settings') || 'Settings'}
           </Text>
         </TouchableOpacity>
 
@@ -194,7 +196,7 @@ const PlayerSettingsScreen: React.FC = () => {
       </View>
 
       <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-        Video Player
+        {t('player.title')}
       </Text>
 
       <ScrollView
@@ -208,7 +210,7 @@ const PlayerSettingsScreen: React.FC = () => {
               { color: currentTheme.colors.textMuted },
             ]}
           >
-            PLAYER SELECTION
+            {t('player.section_selection')}
           </Text>
           <View
             style={[
@@ -249,7 +251,7 @@ const PlayerSettingsScreen: React.FC = () => {
               { color: currentTheme.colors.textMuted },
             ]}
           >
-            PLAYBACK OPTIONS
+            {t('player.section_playback')}
           </Text>
           <View
             style={[
@@ -278,7 +280,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       { color: currentTheme.colors.text },
                     ]}
                   >
-                    Auto-play Best Stream
+                    {t('player.autoplay_title')}
                   </Text>
                   <Text
                     style={[
@@ -286,7 +288,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       { color: currentTheme.colors.textMuted },
                     ]}
                   >
-                    Automatically start the highest quality stream available.
+                    {t('player.autoplay_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -316,7 +318,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       { color: currentTheme.colors.text },
                     ]}
                   >
-                    Always Resume
+                    {t('player.resume_title')}
                   </Text>
                   <Text
                     style={[
@@ -324,7 +326,7 @@ const PlayerSettingsScreen: React.FC = () => {
                       { color: currentTheme.colors.textMuted },
                     ]}
                   >
-                    Skip the resume prompt and automatically continue where you left off (if less than 85% watched).
+                    {t('player.resume_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -357,7 +359,7 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.text },
                         ]}
                       >
-                        Video Player Engine
+                        {t('player.engine_title')}
                       </Text>
                       <Text
                         style={[
@@ -365,14 +367,14 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.textMuted },
                         ]}
                       >
-                        Auto uses ExoPlayer with MPV fallback. Some formats like Dolby Vision and HDR may not be supported by MPV, so Auto is recommended for best compatibility.
+                        {t('player.engine_desc')}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.optionButtonsRow}>
                     {([
-                      { id: 'auto', label: 'Auto', desc: 'ExoPlayer + MPV fallback' },
-                      { id: 'mpv', label: 'MPV', desc: 'MPV only' },
+                      { id: 'auto', label: t('player.option_auto'), desc: t('player.option_auto_desc_engine') },
+                      { id: 'mpv', label: t('player.option_mpv'), desc: t('player.option_mpv_desc') },
                     ] as const).map((option) => (
                       <TouchableOpacity
                         key={option.id}
@@ -416,7 +418,7 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.text },
                         ]}
                       >
-                        Decoder Mode
+                        {t('player.decoder_title')}
                       </Text>
                       <Text
                         style={[
@@ -424,24 +426,24 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.textMuted },
                         ]}
                       >
-                        How video is decoded. Auto is recommended for best balance.
+                        {t('player.decoder_desc')}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.optionButtonsRow}>
                     {([
-                      { id: 'auto', label: 'Auto', desc: 'Best balance' },
-                      { id: 'sw', label: 'SW', desc: 'Software' },
-                      { id: 'hw', label: 'HW', desc: 'Hardware' },
-                      { id: 'hw+', label: 'HW+', desc: 'Full HW' },
+                      { id: 'auto', label: t('player.option_auto'), desc: t('player.option_auto_desc_decoder') },
+                      { id: 'sw', label: t('player.option_sw'), desc: t('player.option_sw_desc') },
+                      { id: 'hw', label: t('player.option_hw'), desc: t('player.option_hw_desc') },
+                      { id: 'hw+', label: t('player.option_hw_plus'), desc: t('player.option_hw_plus_desc') },
                     ] as const).map((option) => (
                       <TouchableOpacity
                         key={option.id}
                         onPress={() => {
                           updateSetting('decoderMode', option.id);
                           openAlert(
-                            'Restart Required',
-                            'Please restart the app for the decoder change to take effect.'
+                            t('player.restart_required'),
+                            t('player.restart_msg_decoder')
                           );
                         }}
                         style={[
@@ -482,7 +484,7 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.text },
                         ]}
                       >
-                        GPU Rendering
+                        {t('player.gpu_title')}
                       </Text>
                       <Text
                         style={[
@@ -490,22 +492,22 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.textMuted },
                         ]}
                       >
-                        GPU-Next offers better HDR and color management.
+                        {t('player.gpu_desc')}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.optionButtonsRow}>
                     {([
-                      { id: 'gpu', label: 'GPU', desc: 'Standard' },
-                      { id: 'gpu-next', label: 'GPU-Next', desc: 'Advanced' },
+                      { id: 'gpu', label: t('player.option_gpu_desc') },
+                      { id: 'gpu-next', label: t('player.option_gpu_next_desc') },
                     ] as const).map((option) => (
                       <TouchableOpacity
                         key={option.id}
                         onPress={() => {
                           updateSetting('gpuMode', option.id);
                           openAlert(
-                            'Restart Required',
-                            'Please restart the app for the GPU mode change to take effect.'
+                            t('player.restart_required'),
+                            t('player.restart_msg_gpu')
                           );
                         }}
                         style={[
@@ -551,7 +553,7 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.text },
                         ]}
                       >
-                        External Player for Downloads
+                        {t('player.external_downloads_title')}
                       </Text>
                       <Text
                         style={[
@@ -559,7 +561,7 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.textMuted },
                         ]}
                       >
-                        Play downloaded content in your preferred external player.
+                        {t('player.external_downloads_desc')}
                       </Text>
                     </View>
                     <Switch
@@ -580,7 +582,7 @@ const PlayerSettingsScreen: React.FC = () => {
         message={alertMessage}
         onClose={() => setAlertVisible(false)}
       />
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 

@@ -11,6 +11,7 @@ import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './Setting
 import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
@@ -69,6 +70,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const { settings, updateSetting } = useSettings();
+    const { t } = useTranslation();
     const config = useRealtimeConfig();
 
     // Bottom sheet refs
@@ -116,8 +118,10 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
     };
 
     const getSourceLabel = (value: string) => {
-        const option = SUBTITLE_SOURCE_OPTIONS.find(o => o.value === value);
-        return option ? option.label : 'Internal First';
+        if (value === 'internal') return t('settings.options.internal_first');
+        if (value === 'external') return t('settings.options.external_first');
+        if (value === 'any') return t('settings.options.any_available');
+        return t('settings.options.internal_first');
     };
 
     // Render backdrop for bottom sheets
@@ -151,13 +155,13 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
     return (
         <>
             {hasVisibleItems(['video_player']) && (
-                <SettingsCard title="VIDEO PLAYER" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.video_player')} isTablet={isTablet}>
                     {isItemVisible('video_player') && (
                         <SettingItem
-                            title="Video Player"
+                            title={t('settings.items.video_player')}
                             description={Platform.OS === 'ios'
-                                ? (settings?.preferredPlayer === 'internal' ? 'Built-in' : settings?.preferredPlayer?.toUpperCase() || 'Built-in')
-                                : (settings?.useExternalPlayer ? 'External' : 'Built-in')
+                                ? (settings?.preferredPlayer === 'internal' ? t('settings.items.built_in') : settings?.preferredPlayer?.toUpperCase() || t('settings.items.built_in'))
+                                : (settings?.useExternalPlayer ? t('settings.items.external') : t('settings.items.built_in'))
                             }
                             icon="play-circle"
                             renderControl={() => <ChevronRight />}
@@ -170,9 +174,9 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
             )}
 
             {/* Audio & Subtitle Preferences */}
-            <SettingsCard title="AUDIO & SUBTITLES" isTablet={isTablet}>
+            <SettingsCard title={t('settings.sections.audio_subtitles')} isTablet={isTablet}>
                 <SettingItem
-                    title="Preferred Audio Language"
+                    title={t('settings.items.preferred_audio')}
                     description={getLanguageName(settings?.preferredAudioLanguage || 'en')}
                     icon="volume-2"
                     renderControl={() => <ChevronRight />}
@@ -180,7 +184,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title="Preferred Subtitle Language"
+                    title={t('settings.items.preferred_subtitle')}
                     description={getLanguageName(settings?.preferredSubtitleLanguage || 'en')}
                     icon="type"
                     renderControl={() => <ChevronRight />}
@@ -188,7 +192,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title="Subtitle Source Priority"
+                    title={t('settings.items.subtitle_source')}
                     description={getSourceLabel(settings?.subtitleSourcePreference || 'internal')}
                     icon="layers"
                     renderControl={() => <ChevronRight />}
@@ -196,8 +200,8 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title="Auto-Select Subtitles"
-                    description="Automatically select subtitles matching your preferences"
+                    title={t('settings.items.auto_select_subs')}
+                    description={t('settings.items.auto_select_subs_desc')}
                     icon="zap"
                     renderControl={() => (
                         <CustomSwitch
@@ -211,11 +215,11 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
             </SettingsCard>
 
             {hasVisibleItems(['show_trailers', 'enable_downloads']) && (
-                <SettingsCard title="MEDIA" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.media')} isTablet={isTablet}>
                     {isItemVisible('show_trailers') && (
                         <SettingItem
-                            title="Show Trailers"
-                            description="Display trailers in hero section"
+                            title={t('settings.items.show_trailers')}
+                            description={t('settings.items.show_trailers_desc')}
                             icon="film"
                             renderControl={() => (
                                 <CustomSwitch
@@ -228,8 +232,8 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                     )}
                     {isItemVisible('enable_downloads') && (
                         <SettingItem
-                            title="Enable Downloads (Beta)"
-                            description="Show Downloads tab and enable saving streams"
+                            title={t('settings.items.enable_downloads')}
+                            description={t('settings.items.enable_downloads_desc')}
                             icon="download"
                             renderControl={() => (
                                 <CustomSwitch
@@ -245,11 +249,11 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
             )}
 
             {hasVisibleItems(['notifications']) && (
-                <SettingsCard title="NOTIFICATIONS" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.notifications')} isTablet={isTablet}>
                     {isItemVisible('notifications') && (
                         <SettingItem
-                            title="Notifications"
-                            description="Episode reminders"
+                            title={t('settings.items.notifications')}
+                            description={t('settings.items.notifications_desc')}
                             icon="bell"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('NotificationSettings')}
@@ -272,7 +276,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                 handleIndicatorStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
             >
                 <View style={styles.sheetHeader}>
-                    <Text style={styles.sheetTitle}>Preferred Audio Language</Text>
+                    <Text style={styles.sheetTitle}>{t('settings.items.preferred_audio')}</Text>
                 </View>
                 <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
                     {AVAILABLE_LANGUAGES.map((lang) => {
@@ -313,7 +317,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                 handleIndicatorStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
             >
                 <View style={styles.sheetHeader}>
-                    <Text style={styles.sheetTitle}>Preferred Subtitle Language</Text>
+                    <Text style={styles.sheetTitle}>{t('settings.items.preferred_subtitle')}</Text>
                 </View>
                 <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
                     {AVAILABLE_LANGUAGES.map((lang) => {
@@ -354,7 +358,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                 handleIndicatorStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
             >
                 <View style={styles.sheetHeader}>
-                    <Text style={styles.sheetTitle}>Subtitle Source Priority</Text>
+                    <Text style={styles.sheetTitle}>{t('settings.items.subtitle_source')}</Text>
                 </View>
                 <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
                     {SUBTITLE_SOURCE_OPTIONS.map((option) => {
@@ -370,10 +374,12 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                             >
                                 <View style={styles.sourceItemContent}>
                                     <Text style={[styles.sourceLabel, { color: isSelected ? currentTheme.colors.primary : '#fff' }]}>
-                                        {option.label}
+                                        {getSourceLabel(option.value)}
                                     </Text>
                                     <Text style={styles.sourceDescription}>
-                                        {option.description}
+                                        {option.value === 'internal' && t('settings.options.internal_first_desc')}
+                                        {option.value === 'external' && t('settings.options.external_first_desc')}
+                                        {option.value === 'any' && t('settings.options.any_available_desc')}
                                     </Text>
                                 </View>
                                 {isSelected && (
@@ -395,13 +401,14 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
 const PlaybackSettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const screenIsTablet = width >= 768;
 
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
             <StatusBar barStyle="light-content" />
-            <ScreenHeader title="Playback" showBackButton onBackPress={() => navigation.goBack()} />
+            <ScreenHeader title={t('settings.playback')} showBackButton onBackPress={() => navigation.goBack()} />
 
             <ScrollView
                 style={styles.scrollView}

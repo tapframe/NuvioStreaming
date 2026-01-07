@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { LegendList } from '@legendapp/list';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -59,6 +60,7 @@ const StreamsList = memo(
     id,
     imdbId,
   }: StreamsListProps) => {
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const styles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -91,7 +93,7 @@ const StreamsList = memo(
                   <View style={styles.sectionLoadingIndicator}>
                     <ActivityIndicator size="small" color={colors.primary} />
                     <Text style={[styles.sectionLoadingText, { color: colors.primary }]}>
-                      Loading...
+                      {t('common.loading')}
                     </Text>
                   </View>
                 )}
@@ -157,21 +159,21 @@ const StreamsList = memo(
         <View style={styles.autoplayOverlay}>
           <View style={styles.autoplayIndicator}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.autoplayText}>Starting best stream...</Text>
+            <Text style={styles.autoplayText}>{t('streams.starting_best_stream')}</Text>
           </View>
         </View>
       );
-    }, [isAutoplayWaiting, autoplayTriggered, styles, colors.primary]);
+    }, [isAutoplayWaiting, autoplayTriggered, styles, colors.primary, t]);
 
     const ListFooterComponent = useMemo(() => {
       if (!(loadingStreams || loadingEpisodeStreams) || !hasStremioStreamProviders) return null;
       return (
         <View style={styles.footerLoading}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={styles.footerLoadingText}>Loading more sources...</Text>
+          <Text style={styles.footerLoadingText}>{t('streams.loading_more_sources')}</Text>
         </View>
       );
-    }, [loadingStreams, loadingEpisodeStreams, hasStremioStreamProviders, styles, colors.primary]);
+    }, [loadingStreams, loadingEpisodeStreams, hasStremioStreamProviders, styles, colors.primary, t]);
 
     return (
       <View collapsable={false} style={{ flex: 1 }}>

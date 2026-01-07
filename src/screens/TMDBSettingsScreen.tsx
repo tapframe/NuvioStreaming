@@ -28,6 +28,7 @@ import { logger } from '../utils/logger';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CustomAlert from '../components/CustomAlert';
+import { useTranslation } from 'react-i18next';
 // (duplicate import removed)
 
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
@@ -63,6 +64,7 @@ const EXAMPLE_SHOWS = [
 ];
 
 const TMDBSettingsScreen = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +76,7 @@ const TMDBSettingsScreen = () => {
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
   const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
-    { label: 'OK', onPress: () => setAlertVisible(false) },
+    { label: t('common.ok'), onPress: () => setAlertVisible(false) },
   ]);
   const apiKeyInputRef = useRef<TextInput>(null);
   const { currentTheme } = useTheme();
@@ -108,7 +110,7 @@ const TMDBSettingsScreen = () => {
         }))
       );
     } else {
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
     }
     setAlertVisible(true);
   };
@@ -154,25 +156,25 @@ const TMDBSettingsScreen = () => {
 
   const handleClearCache = () => {
     openAlert(
-      'Clear TMDB Cache',
-      `This will clear all cached TMDB data (${cacheSize}). This may temporarily slow down loading until cache rebuilds.`,
+      t('tmdb_settings.clear_cache_title'),
+      t('tmdb_settings.clear_cache_msg', { size: cacheSize }),
       [
         {
-          label: 'Cancel',
+          label: t('common.cancel'),
           onPress: () => logger.log('[TMDBSettingsScreen] Clear cache cancelled'),
         },
         {
-          label: 'Clear',
+          label: t('tmdb_settings.clear_cache'),
           onPress: async () => {
             logger.log('[TMDBSettingsScreen] Proceeding with cache clear');
             try {
               await tmdbService.clearAllCache();
               setCacheSize('0 KB');
               logger.log('[TMDBSettingsScreen] Cache cleared successfully');
-              openAlert('Success', 'TMDB cache cleared successfully.');
+              openAlert(t('common.success'), t('tmdb_settings.clear_cache_success'));
             } catch (error) {
               logger.error('[TMDBSettingsScreen] Failed to clear cache:', error);
-              openAlert('Error', 'Failed to clear cache.');
+              openAlert(t('common.error'), t('tmdb_settings.clear_cache_error'));
             }
           },
         },
@@ -217,7 +219,7 @@ const TMDBSettingsScreen = () => {
       const trimmedKey = apiKey.trim();
       if (!trimmedKey) {
         logger.warn('[TMDBSettingsScreen] Empty API key provided');
-        setTestResult({ success: false, message: 'API Key cannot be empty.' });
+        setTestResult({ success: false, message: t('tmdb_settings.empty_api_key') });
         return;
       }
 
@@ -228,17 +230,17 @@ const TMDBSettingsScreen = () => {
         await mmkvStorage.setItem(USE_CUSTOM_TMDB_API_KEY, 'true');
         setIsKeySet(true);
         setUseCustomKey(true);
-        setTestResult({ success: true, message: 'API key verified and saved successfully.' });
+        setTestResult({ success: true, message: t('tmdb_settings.key_verified') });
         logger.log('[TMDBSettingsScreen] API key saved successfully');
       } else {
         logger.warn('[TMDBSettingsScreen] API key test failed');
-        setTestResult({ success: false, message: 'Invalid API key. Please check and try again.' });
+        setTestResult({ success: false, message: t('tmdb_settings.invalid_api_key') });
       }
     } catch (error) {
       logger.error('[TMDBSettingsScreen] Error saving API key:', error);
       setTestResult({
         success: false,
-        message: 'An error occurred while saving. Please try again.'
+        message: t('tmdb_settings.save_error')
       });
     }
   };
@@ -265,15 +267,15 @@ const TMDBSettingsScreen = () => {
   const clearApiKey = async () => {
     logger.log('[TMDBSettingsScreen] Clear API key requested');
     openAlert(
-      'Clear API Key',
-      'Are you sure you want to remove your custom API key and revert to the default?',
+      t('tmdb_settings.clear_api_key_title'),
+      t('tmdb_settings.clear_api_key_msg'),
       [
         {
-          label: 'Cancel',
+          label: t('common.cancel'),
           onPress: () => logger.log('[TMDBSettingsScreen] Clear API key cancelled'),
         },
         {
-          label: 'Clear',
+          label: t('mdblist.clear'),
           onPress: async () => {
             logger.log('[TMDBSettingsScreen] Proceeding with API key clear');
             try {
@@ -286,7 +288,7 @@ const TMDBSettingsScreen = () => {
               logger.log('[TMDBSettingsScreen] API key cleared successfully');
             } catch (error) {
               logger.error('[TMDBSettingsScreen] Failed to clear API key:', error);
-              openAlert('Error', 'Failed to clear API key');
+              openAlert(t('common.error'), t('tmdb_settings.clear_api_key_error'));
             }
           },
         },
@@ -305,21 +307,21 @@ const TMDBSettingsScreen = () => {
         logger.log('[TMDBSettingsScreen] Switching to built-in API key');
         setTestResult({
           success: true,
-          message: 'Now using the built-in TMDb API key.'
+          message: t('tmdb_settings.using_builtin_key')
         });
       } else if (apiKey && isKeySet) {
         // If switching to custom key and we have a key
         logger.log('[TMDBSettingsScreen] Switching to custom API key');
         setTestResult({
           success: true,
-          message: 'Now using your custom TMDb API key.'
+          message: t('tmdb_settings.using_custom_key')
         });
       } else {
         // If switching to custom key but don't have a key yet
         logger.log('[TMDBSettingsScreen] No custom key available yet');
         setTestResult({
           success: false,
-          message: 'Please enter and save your custom TMDb API key.'
+          message: t('tmdb_settings.enter_custom_key')
         });
       }
     } catch (error) {
@@ -462,7 +464,7 @@ const TMDBSettingsScreen = () => {
         )}
         {!logo && (
           <View style={styles.noLogoContainer}>
-            <Text style={styles.noLogoText}>No logo available</Text>
+            <Text style={styles.noLogoText}>{t('tmdb_settings.no_logo')}</Text>
           </View>
         )}
       </View>
@@ -505,7 +507,7 @@ const TMDBSettingsScreen = () => {
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={[styles.loadingText, { color: currentTheme.colors.text }]}>Loading Settings...</Text>
+          <Text style={[styles.loadingText, { color: currentTheme.colors.text }]}>{t('common.loading')}</Text>
         </View>
       </View>
     );
@@ -521,11 +523,11 @@ const TMDBSettingsScreen = () => {
             onPress={() => navigation.goBack()}
           >
             <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.primary} />
-            <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+            <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>{t('settings.settings_title')}</Text>
           </TouchableOpacity>
         </View>
         <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>
-          TMDb Settings
+          {t('tmdb_settings.title')}
         </Text>
       </View>
 
@@ -539,17 +541,17 @@ const TMDBSettingsScreen = () => {
         <View style={[styles.sectionCard, { backgroundColor: currentTheme.colors.elevation2 }]}>
           <View style={styles.sectionHeader}>
             <MaterialIcons name="movie" size={20} color={currentTheme.colors.primary} />
-            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>Metadata Enrichment</Text>
+            <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.metadata_enrichment')}</Text>
           </View>
           <Text style={[styles.sectionDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-            Enhance your content metadata with TMDb data for better details and information.
+            {t('tmdb_settings.metadata_enrichment_desc')}
           </Text>
 
           <View style={styles.settingRow}>
             <View style={styles.settingTextContainer}>
-              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Enable Enrichment</Text>
+              <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.enable_enrichment')}</Text>
               <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                Augments addon metadata with TMDb for cast, certification, logos/posters, and episode fallback.
+                {t('tmdb_settings.enable_enrichment_desc')}
               </Text>
             </View>
             <Switch
@@ -567,9 +569,9 @@ const TMDBSettingsScreen = () => {
 
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Localized Text</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.localized_text')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Fetch titles and descriptions in your preferred language from TMDb.
+                    {t('tmdb_settings.localized_text_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -587,7 +589,7 @@ const TMDBSettingsScreen = () => {
 
                   <View style={styles.settingRow}>
                     <View style={styles.settingTextContainer}>
-                      <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Language</Text>
+                      <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.language')}</Text>
                       <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
                         Current: {(settings.tmdbLanguagePreference || 'en').toUpperCase()}
                       </Text>
@@ -596,20 +598,20 @@ const TMDBSettingsScreen = () => {
                       onPress={() => setLanguagePickerVisible(true)}
                       style={[styles.languageButton, { backgroundColor: currentTheme.colors.primary }]}
                     >
-                      <Text style={[styles.languageButtonText, { color: currentTheme.colors.white }]}>Change</Text>
+                      <Text style={[styles.languageButtonText, { color: currentTheme.colors.white }]}>{t('tmdb_settings.change')}</Text>
                     </TouchableOpacity>
                   </View>
 
                   {/* Logo Preview */}
                   <View style={styles.divider} />
 
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 8 }]}>Logo Preview</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 8 }]}>{t('tmdb_settings.logo_preview')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, marginBottom: 12 }]}>
-                    Preview shows how localized logos will appear in the selected language.
+                    {t('tmdb_settings.logo_preview_desc')}
                   </Text>
 
                   {/* Show selector */}
-                  <Text style={[styles.selectorLabel, { color: currentTheme.colors.mediumEmphasis }]}>Example:</Text>
+                  <Text style={[styles.selectorLabel, { color: currentTheme.colors.mediumEmphasis }]}>{t('tmdb_settings.example')}</Text>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -655,17 +657,17 @@ const TMDBSettingsScreen = () => {
               {/* Granular Enrichment Options */}
               <View style={styles.divider} />
 
-              <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 4 }]}>Enrichment Options</Text>
+              <Text style={[styles.settingTitle, { color: currentTheme.colors.text, marginBottom: 4 }]}>{t('tmdb_settings.enrichment_options')}</Text>
               <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis, marginBottom: 16 }]}>
-                Control which data is fetched from TMDb. Disabled options will use addon data if available.
+                {t('tmdb_settings.enrichment_options_desc')}
               </Text>
 
               {/* Cast & Crew */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Cast & Crew</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.cast_crew')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Actors, directors, writers with profile photos
+                    {t('tmdb_settings.cast_crew_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -680,9 +682,9 @@ const TMDBSettingsScreen = () => {
               {/* Title & Description */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Title & Description</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.title_description')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Use TMDb localized title and overview text
+                    {t('tmdb_settings.title_description_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -697,9 +699,9 @@ const TMDBSettingsScreen = () => {
               {/* Title Logos */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Title Logos</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.title_logos')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    High-quality title treatment images
+                    {t('tmdb_settings.title_logos_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -714,9 +716,9 @@ const TMDBSettingsScreen = () => {
               {/* Banners/Backdrops */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Banners & Backdrops</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.banners_backdrops')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    High-resolution backdrop images
+                    {t('tmdb_settings.banners_backdrops_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -731,9 +733,9 @@ const TMDBSettingsScreen = () => {
               {/* Certification */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Content Certification</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.certification')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Age ratings (PG-13, R, TV-MA, etc.)
+                    {t('tmdb_settings.certification_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -748,9 +750,9 @@ const TMDBSettingsScreen = () => {
               {/* Recommendations */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Recommendations</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.recommendations')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Similar content suggestions
+                    {t('tmdb_settings.recommendations_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -765,9 +767,9 @@ const TMDBSettingsScreen = () => {
               {/* Episode Data */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Episode Data</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.episode_data')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Episode thumbnails, info & fallbacks for TV shows
+                    {t('tmdb_settings.episode_data_desc')}
                   </Text>
                 </View>
                 <Switch
@@ -782,9 +784,9 @@ const TMDBSettingsScreen = () => {
               {/* Season Posters */}
               <View style={styles.settingRow}>
                 <View style={styles.settingTextContainer}>
-                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>Season Posters</Text>
+                  <Text style={[styles.settingTitle, { color: currentTheme.colors.text }]}>{t('tmdb_settings.season_posters')}</Text>
                   <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                    Season-specific poster images
+                    {t('tmdb_settings.season_posters_desc')}
                   </Text>
                 </View>
                 <Switch

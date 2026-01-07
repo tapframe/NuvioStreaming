@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import FastImage from '@d11/react-native-fast-image';
 import Animated, {
   FadeIn,
@@ -35,6 +36,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
   onSelectCastMember,
   isTmdbEnrichmentEnabled = true,
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
 
   // Enhanced responsive sizing for tablets and TV screens
@@ -137,7 +139,7 @@ export const CastSection: React.FC<CastSectionProps> = ({
             fontSize: isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 18,
             marginBottom: isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12
           }
-        ]}>Cast</Text>
+        ]}>{t('metadata.cast')}</Text>
       </View>
       <FlatList
         horizontal

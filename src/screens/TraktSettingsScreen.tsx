@@ -25,6 +25,7 @@ import { useTraktIntegration } from '../hooks/useTraktIntegration';
 import { useTraktAutosyncSettings } from '../hooks/useTraktAutosyncSettings';
 import { colors } from '../styles';
 import CustomAlert from '../components/CustomAlert';
+import { useTranslation } from 'react-i18next';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -46,6 +47,7 @@ const redirectUri = makeRedirectUri({
 });
 
 const TraktSettingsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { settings, updateSetting } = useSettings();
   const isDarkMode = settings.enableDarkMode;
   const navigation = useNavigation();
@@ -72,7 +74,7 @@ const TraktSettingsScreen: React.FC = () => {
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
   const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void; style?: object }>>([
-    { label: 'OK', onPress: () => setAlertVisible(false) },
+    { label: t('common.ok'), onPress: () => setAlertVisible(false) },
   ]);
 
   const openAlert = (
@@ -91,7 +93,7 @@ const TraktSettingsScreen: React.FC = () => {
         }))
       );
     } else {
-      setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+      setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
     }
     setAlertVisible(true);
   };
@@ -148,11 +150,11 @@ const TraktSettingsScreen: React.FC = () => {
               checkAuthStatus().then(() => {
                 // Show success message
                 openAlert(
-                  'Successfully Connected',
-                  'Your Trakt account has been connected successfully.',
+                  t('trakt.auth_success_title'),
+                  t('trakt.auth_success_msg'),
                   [
                     {
-                      label: 'OK',
+                      label: t('common.ok'),
                       onPress: () => navigation.goBack(),
                     }
                   ]
@@ -160,19 +162,19 @@ const TraktSettingsScreen: React.FC = () => {
               });
             } else {
               logger.error('[TraktSettingsScreen] Token exchange failed');
-              openAlert('Authentication Error', 'Failed to complete authentication with Trakt.');
+              openAlert(t('trakt.auth_error_title'), t('trakt.auth_error_msg'));
             }
           })
           .catch(error => {
             logger.error('[TraktSettingsScreen] Token exchange error:', error);
-            openAlert('Authentication Error', 'An error occurred during authentication.');
+            openAlert(t('trakt.auth_error_title'), t('trakt.auth_error_generic'));
           })
           .finally(() => {
             setIsExchangingCode(false);
           });
       } else if (response.type === 'error') {
         logger.error('[TraktSettingsScreen] Authentication error:', response.error);
-        openAlert('Authentication Error', response.error?.message || 'An error occurred during authentication.');
+        openAlert(t('trakt.auth_error_title'), response.error?.message || t('trakt.auth_error_generic'));
         setIsExchangingCode(false);
       } else {
         logger.log('[TraktSettingsScreen] Auth response type:', response.type);
@@ -187,12 +189,12 @@ const TraktSettingsScreen: React.FC = () => {
 
   const handleSignOut = async () => {
     openAlert(
-      'Sign Out',
-      'Are you sure you want to sign out of your Trakt account?',
+      t('trakt.sign_out'),
+      t('trakt.sign_out_confirm'),
       [
-        { label: 'Cancel', onPress: () => { } },
+        { label: t('common.cancel'), onPress: () => { } },
         {
-          label: 'Sign Out',
+          label: t('trakt.sign_out'),
           onPress: async () => {
             setIsLoading(true);
             try {
@@ -203,7 +205,7 @@ const TraktSettingsScreen: React.FC = () => {
               await refreshAuthStatus();
             } catch (error) {
               logger.error('[TraktSettingsScreen] Error signing out:', error);
-              openAlert('Error', 'Failed to sign out of Trakt.');
+              openAlert(t('common.error'), t('trakt.sign_out_error'));
             } finally {
               setIsLoading(false);
             }
@@ -230,7 +232,7 @@ const TraktSettingsScreen: React.FC = () => {
             color={isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark}
           />
           <Text style={[styles.backText, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
-            Settings
+            {t('settings.title')}
           </Text>
         </TouchableOpacity>
 
@@ -240,7 +242,7 @@ const TraktSettingsScreen: React.FC = () => {
       </View>
 
       <Text style={[styles.headerTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
-        Trakt Settings
+        {t('trakt.settings_title')}
       </Text>
 
       {/* Maintenance Mode Banner */}
@@ -248,7 +250,7 @@ const TraktSettingsScreen: React.FC = () => {
         <View style={styles.maintenanceBanner}>
           <MaterialIcons name="engineering" size={24} color="#FFF" />
           <View style={styles.maintenanceBannerTextContainer}>
-            <Text style={styles.maintenanceBannerTitle}>Under Maintenance</Text>
+            <Text style={styles.maintenanceBannerTitle}>{t('trakt.maintenance_title')}</Text>
             <Text style={styles.maintenanceBannerMessage}>
               {traktService.getMaintenanceMessage()}
             </Text>
@@ -279,13 +281,13 @@ const TraktSettingsScreen: React.FC = () => {
                 styles.signInTitle,
                 { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
               ]}>
-                Trakt Unavailable
+                {t('trakt.maintenance_unavailable')}
               </Text>
               <Text style={[
                 styles.signInDescription,
                 { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
               ]}>
-                The Trakt integration is temporarily paused for maintenance. All syncing and authentication is disabled until maintenance is complete.
+                {t('trakt.maintenance_desc')}
               </Text>
               <TouchableOpacity
                 style={[
@@ -296,7 +298,7 @@ const TraktSettingsScreen: React.FC = () => {
               >
                 <MaterialIcons name="engineering" size={20} color={currentTheme.colors.mediumEmphasis} style={{ marginRight: 8 }} />
                 <Text style={[styles.buttonText, { color: currentTheme.colors.mediumEmphasis }]}>
-                  Service Under Maintenance
+                  {t('trakt.maintenance_button')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -343,7 +345,7 @@ const TraktSettingsScreen: React.FC = () => {
                   styles.joinedDate,
                   { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
                 ]}>
-                  Joined {new Date(userProfile.joined_at).toLocaleDateString()}
+                  {t('trakt.joined', { date: new Date(userProfile.joined_at).toLocaleDateString() })}
                 </Text>
               </View>
 
@@ -355,7 +357,7 @@ const TraktSettingsScreen: React.FC = () => {
                 ]}
                 onPress={handleSignOut}
               >
-                <Text style={styles.buttonText}>Sign Out</Text>
+                <Text style={styles.buttonText}>{t('trakt.sign_out')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -369,13 +371,13 @@ const TraktSettingsScreen: React.FC = () => {
                 styles.signInTitle,
                 { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }
               ]}>
-                Connect with Trakt
+                {t('trakt.connect_title')}
               </Text>
               <Text style={[
                 styles.signInDescription,
                 { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }
               ]}>
-                Sync your watch history, watchlist, and collection with Trakt.tv
+                {t('trakt.connect_desc')}
               </Text>
               <TouchableOpacity
                 style={[
@@ -389,7 +391,7 @@ const TraktSettingsScreen: React.FC = () => {
                   <ActivityIndicator size="small" color="white" />
                 ) : (
                   <Text style={styles.buttonText}>
-                    Sign In with Trakt
+                    {t('trakt.sign_in')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -407,7 +409,7 @@ const TraktSettingsScreen: React.FC = () => {
                 styles.sectionTitle,
                 { color: currentTheme.colors.highEmphasis }
               ]}>
-                Sync Settings
+                {t('trakt.sync_settings_title')}
               </Text>
               <View style={[
                 styles.infoBox,
@@ -417,7 +419,7 @@ const TraktSettingsScreen: React.FC = () => {
                   styles.infoText,
                   { color: currentTheme.colors.mediumEmphasis }
                 ]}>
-                  When connected to Trakt, full history is synced directly from the API and is not written to local storage. Your Continue Watching list reflects your global Trakt progress.
+                  {t('trakt.sync_info')}
                 </Text>
               </View>
               <View style={styles.settingItem}>
@@ -427,13 +429,13 @@ const TraktSettingsScreen: React.FC = () => {
                       styles.settingLabel,
                       { color: currentTheme.colors.highEmphasis }
                     ]}>
-                      Auto-sync playback progress
+                      {t('trakt.auto_sync_label')}
                     </Text>
                     <Text style={[
                       styles.settingDescription,
                       { color: currentTheme.colors.mediumEmphasis }
                     ]}>
-                      Automatically sync watch progress to Trakt
+                      {t('trakt.auto_sync_desc')}
                     </Text>
                   </View>
                   <View style={styles.settingToggleContainer}>
@@ -456,13 +458,13 @@ const TraktSettingsScreen: React.FC = () => {
                       styles.settingLabel,
                       { color: currentTheme.colors.highEmphasis }
                     ]}>
-                      Import watched history
+                      {t('trakt.import_history_label')}
                     </Text>
                     <Text style={[
                       styles.settingDescription,
                       { color: currentTheme.colors.mediumEmphasis }
                     ]}>
-                      Use "Sync Now" to import your watch history and progress from Trakt
+                      {t('trakt.import_history_desc')}
                     </Text>
                   </View>
                 </View>
@@ -479,8 +481,8 @@ const TraktSettingsScreen: React.FC = () => {
                 onPress={async () => {
                   const success = await performManualSync();
                   openAlert(
-                    'Sync Complete',
-                    success ? 'Successfully synced your watch progress with Trakt.' : 'Sync failed. Please try again.'
+                    t('trakt.sync_complete_title'),
+                    success ? t('trakt.sync_success_msg') : t('trakt.sync_error_msg')
                   );
                 }}
               >
@@ -494,7 +496,7 @@ const TraktSettingsScreen: React.FC = () => {
                     styles.buttonText,
                     { color: currentTheme.colors.primary }
                   ]}>
-                    Sync Now
+                    {t('trakt.sync_now_button')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -504,7 +506,7 @@ const TraktSettingsScreen: React.FC = () => {
                 styles.sectionTitle,
                 { color: currentTheme.colors.highEmphasis, marginTop: 24 }
               ]}>
-                Display Settings
+                {t('trakt.display_settings_title')}
               </Text>
 
               <View style={styles.settingItem}>
@@ -514,13 +516,13 @@ const TraktSettingsScreen: React.FC = () => {
                       styles.settingLabel,
                       { color: currentTheme.colors.highEmphasis }
                     ]}>
-                      Show Trakt Comments
+                      {t('trakt.show_comments_label')}
                     </Text>
                     <Text style={[
                       styles.settingDescription,
                       { color: currentTheme.colors.mediumEmphasis }
                     ]}>
-                      Display Trakt comments in metadata screens when available
+                      {t('trakt.show_comments_desc')}
                     </Text>
                   </View>
                   <View style={styles.settingToggleContainer}>

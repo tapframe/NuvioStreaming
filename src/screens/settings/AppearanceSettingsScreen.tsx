@@ -9,6 +9,7 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './SettingsComponents';
 import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ export const AppearanceSettingsContent: React.FC<AppearanceSettingsContentProps>
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const { settings, updateSetting } = useSettings();
+    const { t } = useTranslation();
     const config = useRealtimeConfig();
 
     const isItemVisible = (itemId: string) => {
@@ -43,10 +45,10 @@ export const AppearanceSettingsContent: React.FC<AppearanceSettingsContentProps>
     return (
         <>
             {hasVisibleItems(['theme']) && (
-                <SettingsCard title="THEME" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.theme')} isTablet={isTablet}>
                     {isItemVisible('theme') && (
                         <SettingItem
-                            title="Theme"
+                            title={t('settings.items.theme')}
                             description={currentTheme.name}
                             icon="sliders"
                             renderControl={() => <ChevronRight />}
@@ -59,11 +61,11 @@ export const AppearanceSettingsContent: React.FC<AppearanceSettingsContentProps>
             )}
 
             {hasVisibleItems(['episode_layout', 'streams_backdrop']) && (
-                <SettingsCard title="LAYOUT" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.layout')} isTablet={isTablet}>
                     {isItemVisible('episode_layout') && (
                         <SettingItem
-                            title="Episode Layout"
-                            description={settings?.episodeLayoutStyle === 'horizontal' ? 'Horizontal' : 'Vertical'}
+                            title={t('settings.items.episode_layout')}
+                            description={settings?.episodeLayoutStyle === 'horizontal' ? t('settings.options.horizontal') : t('settings.options.vertical')}
                             icon="grid"
                             renderControl={() => (
                                 <CustomSwitch
@@ -77,8 +79,8 @@ export const AppearanceSettingsContent: React.FC<AppearanceSettingsContentProps>
                     )}
                     {!isTablet && isItemVisible('streams_backdrop') && (
                         <SettingItem
-                            title="Streams Backdrop"
-                            description="Show blurred backdrop on mobile streams"
+                            title={t('settings.items.streams_backdrop')}
+                            description={t('settings.items.streams_backdrop_desc')}
                             icon="image"
                             renderControl={() => (
                                 <CustomSwitch
@@ -102,13 +104,14 @@ export const AppearanceSettingsContent: React.FC<AppearanceSettingsContentProps>
 const AppearanceSettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const screenIsTablet = width >= 768;
 
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
             <StatusBar barStyle="light-content" />
-            <ScreenHeader title="Appearance" showBackButton onBackPress={() => navigation.goBack()} />
+            <ScreenHeader title={t('settings.appearance')} showBackButton onBackPress={() => navigation.goBack()} />
 
             <ScrollView
                 style={styles.scrollView}

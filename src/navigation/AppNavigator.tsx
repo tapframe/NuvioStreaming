@@ -17,6 +17,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { useTheme } from '../contexts/ThemeContext';
 import { PostHogProvider } from 'posthog-react-native';
 import { ScrollToTopProvider, useScrollToTopEmitter } from '../contexts/ScrollToTopContext';
+import { useTranslation } from 'react-i18next';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback
 let GlassViewComp: any = null;
@@ -545,6 +546,7 @@ const WrappedScreen: React.FC<{ Screen: React.ComponentType<any> }> = ({ Screen 
 
 // Tab Navigator
 const MainTabs = () => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const { settings } = require('../hooks/useSettings');
   const { useSettings: useSettingsHook } = require('../hooks/useSettings');
@@ -915,7 +917,7 @@ const MainTabs = () => {
             name="Home"
             component={HomeScreen}
             options={{
-              title: 'Home',
+              title: t('navigation.home'),
               tabBarIcon: () => ({ sfSymbol: 'house' }),
               freezeOnBlur: true,
             }}
@@ -931,7 +933,7 @@ const MainTabs = () => {
             name="Library"
             component={LibraryScreen}
             options={{
-              title: 'Library',
+              title: t('navigation.library'),
               tabBarIcon: () => ({ sfSymbol: 'heart' }),
             }}
             listeners={({ navigation }: { navigation: any }) => ({
@@ -946,7 +948,7 @@ const MainTabs = () => {
             name="Search"
             component={SearchScreen}
             options={{
-              title: 'Search',
+              title: t('navigation.search'),
               tabBarIcon: () => ({ sfSymbol: 'magnifyingglass' }),
             }}
             listeners={({ navigation }: { navigation: any }) => ({
@@ -962,7 +964,7 @@ const MainTabs = () => {
               name="Downloads"
               component={DownloadsScreen}
               options={{
-                title: 'Downloads',
+                title: t('navigation.downloads'),
                 tabBarIcon: () => ({ sfSymbol: 'arrow.down.circle' }),
               }}
               listeners={({ navigation }: { navigation: any }) => ({
@@ -978,7 +980,7 @@ const MainTabs = () => {
             name="Settings"
             component={SettingsScreen}
             options={{
-              title: 'Settings',
+              title: t('navigation.settings'),
               tabBarIcon: () => ({ sfSymbol: 'gear' }),
             }}
             listeners={({ navigation }: { navigation: any }) => ({
@@ -1053,7 +1055,7 @@ const MainTabs = () => {
           name="Home"
           component={HomeScreen}
           options={{
-            tabBarLabel: 'Home',
+            tabBarLabel: t('navigation.home'),
             tabBarIcon: ({ color, size, focused }) => (
               <MaterialCommunityIcons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
             ),
@@ -1064,7 +1066,7 @@ const MainTabs = () => {
           name="Library"
           component={LibraryScreen}
           options={{
-            tabBarLabel: 'Library',
+            tabBarLabel: t('navigation.library'),
             tabBarIcon: ({ color, size, focused }) => (
               <MaterialCommunityIcons name={focused ? 'heart' : 'heart-outline'} size={size} color={color} />
             ),
@@ -1074,7 +1076,7 @@ const MainTabs = () => {
           name="Search"
           component={SearchScreen}
           options={{
-            tabBarLabel: 'Search',
+            tabBarLabel: t('navigation.search'),
             tabBarIcon: ({ color, size }) => (
               <MaterialCommunityIcons name={'magnify'} size={size} color={color} />
             ),
@@ -1085,7 +1087,7 @@ const MainTabs = () => {
             name="Downloads"
             component={DownloadsScreen}
             options={{
-              tabBarLabel: 'Downloads',
+              tabBarLabel: t('navigation.downloads'),
               tabBarIcon: ({ color, size, focused }) => (
                 <MaterialCommunityIcons name={focused ? 'download' : 'download-outline'} size={size} color={color} />
               ),
@@ -1096,7 +1098,7 @@ const MainTabs = () => {
           name="Settings"
           component={SettingsScreen}
           options={{
-            tabBarLabel: 'Settings',
+            tabBarLabel: t('navigation.settings'),
             tabBarIcon: ({ color, size, focused }) => (
               <MaterialCommunityIcons name={focused ? 'cog' : 'cog-outline'} size={size} color={color} />
             ),

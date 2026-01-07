@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Dimensions, FlatList } from 'react-native';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CatalogContent, StreamingContent } from '../../services/catalogService';
@@ -8,6 +9,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import ContentItem from './ContentItem';
 import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { RootStackParamList } from '../../navigation/AppNavigator';
+import { getFormattedCatalogName, getCatalogDisplayName } from '../../utils/catalogNameUtils';
 
 interface CatalogSectionProps {
   catalog: CatalogContent;
@@ -73,8 +75,43 @@ const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
 const CatalogSection = ({ catalog }: CatalogSectionProps) => {
+  const { t, i18n } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
+
+  // Use state for the display name to handle async custom name resolution
+  const [displayName, setDisplayName] = React.useState(catalog.name);
+
+  // Re-resolve and format the name when language or catalog data changes
+  React.useEffect(() => {
+    const resolveName = async () => {
+      // 1. Check for user-defined custom name
+      const customName = await getCatalogDisplayName(
+        catalog.addon,
+        catalog.type,
+        catalog.id,
+        catalog.originalName || catalog.name
+      );
+
+      // 2. If it's a user setting, use it as is
+      if (customName !== (catalog.originalName || catalog.name)) {
+        setDisplayName(customName);
+        return;
+      }
+
+      // 3. Otherwise, use localized formatting
+      const formatted = getFormattedCatalogName(
+        customName,
+        catalog.type,
+        t('home.movies'),
+        t('home.tv_shows'),
+        t('home.channels')
+      );
+      setDisplayName(formatted);
+    };
+
+    resolveName();
+  }, [catalog.addon, catalog.id, catalog.type, catalog.name, catalog.originalName, i18n.language, t]);
 
   const handleContentPress = useCallback((id: string, type: string) => {
     navigation.navigate('Metadata', { id, type, addonId: catalog.addon });
@@ -117,7 +154,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
             ]}
             numberOfLines={1}
           >
-            {catalog.name}
+            {displayName}
           </Text>
           <View
             style={[
@@ -154,7 +191,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
               fontSize: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
               marginRight: isTV ? 6 : isLargeTablet ? 5 : 4,
             }
-          ]}>View All</Text>
+          ]}>{t('home.view_all')}</Text>
           <MaterialIcons
             name="chevron-right"
             size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}

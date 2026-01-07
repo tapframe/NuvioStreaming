@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.3.4",
+          "buildVersion": "32",
+          "date": "2026-01-06",
+          "localizedDescription": "## Update Notes\n\n### Player & Playback\n- Fixed **Android player crashes with large files** when using ExoPlayer  \n  - Merged PR **#361** by **@chrisk325**\n\n### Trakt Improvements\n- Improved **Trakt Continue Watching** section for better accuracy and reliability\n\n### Internationalization\n- Added **multi-language support** across the app using **i18n**  \n  - More languages will be added through **community contributions**  \n  - ⚠️ **Arabic UI does not use RTL yet**. RTL support will be added in a future update\n\n### Stability & Fixes\n- Crash optimizations and internal stability improvements\n\nThis update focuses on improving playback stability, Trakt experience, and expanding language support.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/v1.3.4/app-release.apk",
+          "size": 25700000
+        },
+        {
           "version": "1.3.3",
           "buildVersion": "31",
           "date": "2026-01-01",

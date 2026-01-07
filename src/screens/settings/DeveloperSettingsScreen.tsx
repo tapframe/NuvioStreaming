@@ -10,10 +10,12 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import CustomAlert from '../../components/CustomAlert';
 import { SettingsCard, SettingItem, ChevronRight } from './SettingsComponents';
+import { useTranslation } from 'react-i18next';
 
 const DeveloperSettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
 
     const [alertVisible, setAlertVisible] = useState(false);
@@ -84,36 +86,36 @@ const DeveloperSettingsScreen: React.FC = () => {
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
             <StatusBar barStyle="light-content" />
-            <ScreenHeader title="Developer" showBackButton onBackPress={() => navigation.goBack()} />
+            <ScreenHeader title={t('settings.developer')} showBackButton onBackPress={() => navigation.goBack()} />
 
             <ScrollView
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
             >
-                <SettingsCard title="TESTING">
+                <SettingsCard title={t('settings.sections.testing')}>
                     <SettingItem
-                        title="Test Onboarding"
+                        title={t('settings.items.test_onboarding')}
                         icon="play-circle"
                         onPress={() => navigation.navigate('Onboarding')}
                         renderControl={() => <ChevronRight />}
                     />
                     <SettingItem
-                        title="Reset Onboarding"
+                        title={t('settings.items.reset_onboarding')}
                         icon="refresh-ccw"
                         onPress={handleResetOnboarding}
                         renderControl={() => <ChevronRight />}
                     />
                     <SettingItem
-                        title="Test Announcement"
+                        title={t('settings.items.test_announcement')}
                         icon="bell"
-                        description="Show what's new overlay"
+                        description={t('settings.items.test_announcement_desc')}
                         onPress={handleResetAnnouncement}
                         renderControl={() => <ChevronRight />}
                     />
                     <SettingItem
-                        title="Reset Campaigns"
-                        description="Clear campaign impressions"
+                        title={t('settings.items.reset_campaigns')}
+                        description={t('settings.items.reset_campaigns_desc')}
                         icon="refresh-cw"
                         onPress={handleResetCampaigns}
                         renderControl={() => <ChevronRight />}
@@ -121,10 +123,10 @@ const DeveloperSettingsScreen: React.FC = () => {
                     />
                 </SettingsCard>
 
-                <SettingsCard title="DANGER ZONE">
+                <SettingsCard title={t('settings.sections.danger_zone')}>
                     <SettingItem
-                        title="Clear All Data"
-                        description="Reset all settings and cached data"
+                        title={t('settings.items.clear_all_data')}
+                        description={t('settings.items.clear_all_data_desc')}
                         icon="trash-2"
                         onPress={handleClearAllData}
                         isLast

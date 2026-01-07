@@ -21,6 +21,7 @@ import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchContributors, GitHubContributor } from '../services/githubReleaseService';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -58,21 +59,21 @@ interface SpecialMention extends SpecialMentionConfig {
   isLoading: boolean;
 }
 
-const SPECIAL_MENTIONS_CONFIG: SpecialMentionConfig[] = [
+const getSpecialMentionsConfig = (t: any) => [
   {
     discordId: '709281623866081300',
-    role: 'Community Manager',
-    description: 'Manages the Discord & Reddit communities for Nuvio',
+    role: t('contributors.manager_role'),
+    description: t('contributors.manager_desc'),
   },
   {
     discordId: '777773947071758336',
-    role: 'Server Sponsor',
-    description: 'Sponsored the server infrastructure for Nuvio',
+    role: t('contributors.sponsor_role'),
+    description: t('contributors.sponsor_desc'),
   },
   {
     discordId: '1395843374241546362',
-    role: 'Discord Mod',
-    description: 'Helps moderate the Nuvio Discord community',
+    role: t('contributors.mod_role'),
+    description: t('contributors.mod_desc'),
   },
 ];
 
@@ -86,6 +87,7 @@ interface ContributorCardProps {
 }
 
 const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, currentTheme, isTablet, isLargeTablet }) => {
+  const { t } = useTranslation();
   const handlePress = useCallback(() => {
     Linking.openURL(contributor.html_url);
   }, [contributor.html_url]);
@@ -121,7 +123,7 @@ const ContributorCard: React.FC<ContributorCardProps> = ({ contributor, currentT
           { color: currentTheme.colors.mediumEmphasis },
           isTablet && styles.tabletContributions
         ]}>
-          {contributor.contributions} contributions
+          {contributor.contributions} {t('contributors.contributions')}
         </Text>
       </View>
       <Feather
@@ -143,6 +145,7 @@ interface SpecialMentionCardProps {
 }
 
 const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, currentTheme, isTablet, isLargeTablet }) => {
+  const { t } = useTranslation();
   const handlePress = useCallback(() => {
     // Try to open Discord profile
     const discordUrl = `discord://-/users/${mention.discordId}`;
@@ -153,7 +156,7 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
         // Fallback: show alert with Discord info
         Alert.alert(
           mention.name,
-          `Discord: @${mention.username}\n\nOpen Discord and search for this user to connect with them.`,
+          `Discord: @${mention.username}\n\nDo you want to open Discord and search for this user?`,
           [{ text: 'OK' }]
         );
       }
@@ -205,7 +208,7 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
           { color: currentTheme.colors.highEmphasis },
           isTablet && styles.tabletUsername
         ]}>
-          {mention.isLoading ? 'Loading...' : mention.name}
+          {mention.isLoading ? t('contributors.loading') : mention.name}
         </Text>
         {!mention.isLoading && mention.username && (
           <Text style={[
@@ -235,9 +238,12 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
 };
 
 const ContributorsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
+
+  const SPECIAL_MENTIONS_CONFIG = getSpecialMentionsConfig(t);
 
   const [activeTab, setActiveTab] = useState<TabType>('contributors');
   const [contributors, setContributors] = useState<GitHubContributor[]>([]);
@@ -254,7 +260,7 @@ const ContributorsScreen: React.FC = () => {
     // Initialize with loading state
     const initialMentions: SpecialMention[] = SPECIAL_MENTIONS_CONFIG.map(config => ({
       ...config,
-      name: 'Loading...',
+      name: t('contributors.loading'),
       username: '',
       avatarUrl: '',
       isLoading: true,
@@ -283,7 +289,7 @@ const ContributorsScreen: React.FC = () => {
           // Return fallback data
           return {
             ...config,
-            name: 'Discord User',
+            name: t('contributors.discord_user'),
             username: config.discordId,
             avatarUrl: '',
             isLoading: false,
@@ -363,10 +369,10 @@ const ContributorsScreen: React.FC = () => {
           await mmkvStorage.removeItem('github_contributors');
           await mmkvStorage.removeItem('github_contributors_timestamp');
         } catch { }
-        setError('Unable to load contributors. This might be due to GitHub API rate limits.');
+        setError(t('contributors.error_rate_limit'));
       }
     } catch (err) {
-      setError('Failed to load contributors. Please check your internet connection.');
+      setError(t('contributors.error_failed'));
       if (__DEV__) console.error('Error loading contributors:', err);
     } finally {
       setLoading(false);
@@ -427,7 +433,7 @@ const ContributorsScreen: React.FC = () => {
               onPress={() => navigation.goBack()}
             >
               <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
-              <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+              <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>{t('common.settings')}</Text>
             </TouchableOpacity>
           </View>
           <Text style={[
@@ -435,13 +441,13 @@ const ContributorsScreen: React.FC = () => {
             { color: currentTheme.colors.text },
             isTablet && styles.tabletHeaderTitle
           ]}>
-            Contributors
+            {t('contributors.title')}
           </Text>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={currentTheme.colors.primary} />
           <Text style={[styles.loadingText, { color: currentTheme.colors.mediumEmphasis }]}>
-            Loading contributors...
+            {t('contributors.loading_contributors')}
           </Text>
         </View>
       </View>
@@ -462,7 +468,7 @@ const ContributorsScreen: React.FC = () => {
             onPress={() => navigation.goBack()}
           >
             <Feather name="chevron-left" size={24} color={currentTheme.colors.primary} />
-            <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+            <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>{t('common.settings')}</Text>
           </TouchableOpacity>
         </View>
         <Text style={[
@@ -470,7 +476,7 @@ const ContributorsScreen: React.FC = () => {
           { color: currentTheme.colors.text },
           isTablet && styles.tabletHeaderTitle
         ]}>
-          Contributors
+          {t('contributors.title')}
         </Text>
       </View>
 
@@ -494,7 +500,7 @@ const ContributorsScreen: React.FC = () => {
             { color: activeTab === 'contributors' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis },
             isTablet && styles.tabletTabText
           ]}>
-            Contributors
+            {t('contributors.tab_contributors')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -511,7 +517,7 @@ const ContributorsScreen: React.FC = () => {
             { color: activeTab === 'special' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis },
             isTablet && styles.tabletTabText
           ]}>
-            Special Mentions
+            {t('contributors.tab_special')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -528,14 +534,14 @@ const ContributorsScreen: React.FC = () => {
                     {error}
                   </Text>
                   <Text style={[styles.errorSubtext, { color: currentTheme.colors.mediumEmphasis }]}>
-                    GitHub API rate limit exceeded. Please try again later or pull to refresh.
+                    {t('contributors.error_rate_limit')}
                   </Text>
                   <TouchableOpacity
                     style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
                     onPress={() => loadContributors()}
                   >
                     <Text style={[styles.retryText, { color: currentTheme.colors.white }]}>
-                      Try Again
+                      {t('contributors.retry')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -543,7 +549,7 @@ const ContributorsScreen: React.FC = () => {
                 <View style={styles.emptyContainer}>
                   <Feather name="users" size={48} color={currentTheme.colors.mediumEmphasis} />
                   <Text style={[styles.emptyText, { color: currentTheme.colors.mediumEmphasis }]}>
-                    No contributors found
+                    {t('contributors.no_contributors')}
                   </Text>
                 </View>
               ) : (
@@ -575,14 +581,14 @@ const ContributorsScreen: React.FC = () => {
                         { color: currentTheme.colors.highEmphasis },
                         isTablet && styles.tabletGratitudeText
                       ]}>
-                        We're grateful for every contribution
+                        {t('contributors.gratitude_title')}
                       </Text>
                       <Text style={[
                         styles.gratitudeSubtext,
                         { color: currentTheme.colors.mediumEmphasis },
                         isTablet && styles.tabletGratitudeSubtext
                       ]}>
-                        Each line of code, bug report, and suggestion helps make Nuvio better for everyone
+                        {t('contributors.gratitude_desc')}
                       </Text>
                     </View>
                   </View>
@@ -622,14 +628,14 @@ const ContributorsScreen: React.FC = () => {
                     { color: currentTheme.colors.highEmphasis },
                     isTablet && styles.tabletGratitudeText
                   ]}>
-                    Special Thanks
+                    {t('contributors.special_thanks_title')}
                   </Text>
                   <Text style={[
                     styles.gratitudeSubtext,
                     { color: currentTheme.colors.mediumEmphasis },
                     isTablet && styles.tabletGratitudeSubtext
                   ]}>
-                    These amazing people help keep the Nuvio community running and the servers online
+                    {t('contributors.special_thanks_desc')}
                   </Text>
                 </View>
               </View>

@@ -11,6 +11,7 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -59,6 +60,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   contentId,
   contentTitle
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const { pauseTrailer } = useTrailer();
@@ -414,22 +416,22 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
   };
 
   // Format trailer type for display
-  const formatTrailerType = (type: string): string => {
+  const formatTrailerType = useCallback((type: string): string => {
     switch (type) {
       case 'Trailer':
-        return 'Official Trailers';
+        return t('trailers.official_trailers');
       case 'Teaser':
-        return 'Teasers';
+        return t('trailers.teasers');
       case 'Clip':
-        return 'Clips & Scenes';
+        return t('trailers.clips_scenes');
       case 'Featurette':
-        return 'Featurettes';
+        return t('trailers.featurettes');
       case 'Behind the Scenes':
-        return 'Behind the Scenes';
+        return t('trailers.behind_the_scenes');
       default:
         return type;
     }
-  };
+  }, [t]);
 
   // Get icon for trailer type
   const getTrailerTypeIcon = (type: string): string => {
@@ -483,12 +485,12 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
           <View style={styles.header}>
             <MaterialIcons name="movie" size={20} color={currentTheme.colors.primary} />
             <Text style={[styles.headerTitle, { color: currentTheme.colors.highEmphasis }]}>
-              Trailers
+              {t('trailers.title')}
             </Text>
           </View>
           <View style={styles.noTrailersContainer}>
             <Text style={[styles.noTrailersText, { color: currentTheme.colors.textMuted }]}>
-              No trailers available
+              {t('trailers.no_trailers')}
             </Text>
           </View>
         </View>
@@ -512,7 +514,7 @@ const TrailersSection: React.FC<TrailersSectionProps> = memo(({
             fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 20
           }
         ]}>
-          Trailers & Videos
+          {t('trailers.title')}
         </Text>
 
         {/* Category Selector - Right Aligned */}
