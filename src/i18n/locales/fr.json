@@ -601,6 +601,7 @@
         "arabic": "Arabe",
         "spanish": "Espagnol",
         "french": "Français",
+        "italian": "Italien",
         "account": "Compte",
         "content_discovery": "Contenu et découverte",
         "appearance": "Apparence",
@@ -1192,5 +1193,35 @@
         "repo_format_hint": "Format : https://raw.githubusercontent.com/utilisateur/repo/refs/heads/branche",
         "cancel": "Annuler",
         "add": "Ajouter"
+    },
+    "theme": {
+        "title": "Thèmes de l'App",
+        "select_theme": "SÉLECTIONNER UN THÈME",
+        "create_custom": "Créer un Thème Personnalisé",
+        "options": "OPTIONS",
+        "use_dominant_color": "Utiliser la Couleur Dominante de l'Image",
+        "categories": {
+            "all": "Tous les Thèmes",
+            "dark": "Thèmes Sombres",
+            "colorful": "Colorés",
+            "custom": "Mes Thèmes"
+        },
+        "editor": {
+            "theme_name_placeholder": "Nom du thème",
+            "save": "Enregistrer",
+            "primary": "Primaire",
+            "secondary": "Secondaire",
+            "background": "Arrière-plan",
+            "invalid_name_title": "Nom Invalide",
+            "invalid_name_msg": "Veuillez entrer un nom de thème valide"
+        },
+        "alerts": {
+            "delete_title": "Supprimer le Thème",
+            "delete_msg": "Êtes-vous sûr de vouloir supprimer \"{{name}}\" ?",
+            "ok": "OK",
+            "delete": "Supprimer",
+            "cancel": "Annuler",
+            "back": "Paramètres"
+        }
     }
 }

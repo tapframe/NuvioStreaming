@@ -601,6 +601,7 @@
         "arabic": "Arabic",
         "spanish": "Spanish",
         "french": "French",
+        "italian": "Italian",
         "account": "Account",
         "content_discovery": "Content & Discovery",
         "appearance": "Appearance",
@@ -1192,5 +1193,35 @@
         "repo_format_hint": "Format: https://raw.githubusercontent.com/username/repo/refs/heads/branch",
         "cancel": "Cancel",
         "add": "Add"
+    },
+    "theme": {
+        "title": "App Themes",
+        "select_theme": "SELECT THEME",
+        "create_custom": "Create Custom Theme",
+        "options": "OPTIONS",
+        "use_dominant_color": "Use Dominant Color from Artwork",
+        "categories": {
+            "all": "All Themes",
+            "dark": "Dark Themes",
+            "colorful": "Colorful",
+            "custom": "My Themes"
+        },
+        "editor": {
+            "theme_name_placeholder": "Theme name",
+            "save": "Save",
+            "primary": "Primary",
+            "secondary": "Secondary",
+            "background": "Background",
+            "invalid_name_title": "Invalid Name",
+            "invalid_name_msg": "Please enter a valid theme name"
+        },
+        "alerts": {
+            "delete_title": "Delete Theme",
+            "delete_msg": "Are you sure you want to delete \"{{name}}\"?",
+            "ok": "OK",
+            "delete": "Delete",
+            "cancel": "Cancel",
+            "back": "Settings"
+        }
     }
 }
