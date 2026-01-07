@@ -913,6 +913,67 @@
         </div>
     </section>
 
+    <!-- Legal Section -->
+    <section id="legal" class="privacy-policy">
+        <div class="container">
+            <div class="privacy-content">
+                <button class="privacy-back-btn" onclick="hideAllDetailSections()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                    Back
+                </button>
+                <h1>Legal & Disclaimer</h1>
+                <p class="last-updated">Last updated: January 2026</p>
+
+                <div class="privacy-section">
+                    <h2>Nature of the Application</h2>
+                    <p>Nuvio is a media player and metadata management application. It acts solely as a client-side
+                        interface for browsing publicly available metadata (movies, TV shows, etc.) and playing media
+                        files
+                        provided by the user or third-party extensions. Nuvio itself does not host, store, distribute,
+                        or
+                        index any media content.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>Third-Party Extensions</h2>
+                    <p>Nuvio uses an extensible architecture that allows users to install third-party plugins
+                        (extensions).
+                        These extensions are developed and maintained by independent developers not affiliated with
+                        Nuvio.
+                        We have no control over, and assume no responsibility for, the content, legality, or
+                        functionality
+                        of any third-party extension.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>User Responsibility</h2>
+                    <p>Users are solely responsible for the extensions they install and the content they access. By
+                        using
+                        this application, you agree to ensure that you have the legal right to access any content you
+                        view
+                        using Nuvio. The developers of Nuvio do not endorse or encourage copyright infringement.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>Copyright & DMCA</h2>
+                    <p>We respect the intellectual property rights of others. Since Nuvio does not host any content, we
+                        cannot remove content from the internet. However, if you believe that the application interface
+                        itself infringes on your rights, please contact us.</p>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>No Warranty</h2>
+                    <p>This software is provided "as is", without warranty of any kind, express or implied. In no event
+                        shall the authors or copyright holders be liable for any claim, damages, or other liability
+                        arising
+                        from the use of this software.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
@@ -945,8 +1006,11 @@
                         <img src="https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png" alt="GitHub">
                         GitHub
                     </a>
-                    <a href="#privacy-policy" class="footer-link" onclick="showPrivacyPolicy()">
+                    <a href="#privacy-policy" class="footer-link" onclick="showSection('privacy-policy')">
                         Privacy
+                    </a>
+                    <a href="#legal" class="footer-link" onclick="showSection('legal')">
+                        Legal
                     </a>
                 </div>
 
@@ -1035,26 +1099,42 @@
             });
         });
 
-        // Privacy Policy
-        function showPrivacyPolicy() {
-            document.querySelectorAll('body > *:not(#privacy-policy)').forEach(el => el.style.display = 'none');
-            document.getElementById('privacy-policy').style.display = 'block';
+        // Detail Sections (Privacy, Legal)
+        const detailSections = ['privacy-policy', 'legal'];
+
+        function showSection(sectionId) {
+            // Hide everything except the requested section
+            document.querySelectorAll('body > *:not(#' + sectionId + ')').forEach(el => el.style.display = 'none');
+            document.getElementById(sectionId).style.display = 'block';
             window.scrollTo(0, 0);
         }
 
-        function hidePrivacyPolicy() {
-            document.getElementById('privacy-policy').style.display = 'none';
-            document.querySelectorAll('body > *:not(#privacy-policy)').forEach(el => el.style.display = '');
+        function hideAllDetailSections() {
+            detailSections.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            });
+            // Show main content
+            document.querySelectorAll('body > *').forEach(el => {
+                if (!detailSections.includes(el.id)) el.style.display = '';
+            });
             window.scrollTo(0, 0);
         }
 
         window.addEventListener('popstate', function () {
-            if (window.location.hash === '#privacy-policy') showPrivacyPolicy();
-            else hidePrivacyPolicy();
+            const hash = window.location.hash.substring(1); // remove #
+            if (detailSections.includes(hash)) {
+                showSection(hash);
+            } else {
+                hideAllDetailSections();
+            }
         });
 
         document.addEventListener('DOMContentLoaded', function () {
-            if (window.location.hash === '#privacy-policy') showPrivacyPolicy();
+            const hash = window.location.hash.substring(1);
+            if (detailSections.includes(hash)) {
+                showSection(hash);
+            }
         });
     </script>
 </body>

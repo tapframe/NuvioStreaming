@@ -643,6 +643,7 @@
             "danger_zone": "DANGER ZONE"
         },
         "items": {
+            "legal": "Legal & Disclaimer",
             "privacy_policy": "Privacy Policy",
             "report_issue": "Report Issue",
             "version": "Version",
@@ -1224,5 +1225,18 @@
             "cancel": "Cancel",
             "back": "Settings"
         }
+    },
+    "legal": {
+        "title": "Legal & Disclaimer",
+        "intro_title": "Nature of the Application",
+        "intro_text": "Nuvio is a media player and metadata management application. It acts solely as a client-side interface for browsing publicly available metadata (movies, TV shows, etc.) and playing media files provided by the user or third-party extensions. Nuvio itself does not host, store, distribute, or index any media content.",
+        "extensions_title": "Third-Party Extensions",
+        "extensions_text": "Nuvio uses an extensible architecture that allows users to install third-party plugins (extensions). These extensions are developed and maintained by independent developers not affiliated with Nuvio. We have no control over, and assume no responsibility for, the content, legality, or functionality of any third-party extension.",
+        "user_resp_title": "User Responsibility",
+        "user_resp_text": "Users are solely responsible for the extensions they install and the content they access. By using this application, you agree to ensure that you have the legal right to access any content you view using Nuvio. The developers of Nuvio do not endorse or encourage copyright infringement.",
+        "dmca_title": "Copyright & DMCA",
+        "dmca_text": "We respect the intellectual property rights of others. Since Nuvio does not host any content, we cannot remove content from the internet. However, if you believe that the application interface itself infringes on your rights, please contact us.",
+        "warranty_title": "No Warranty",
+        "warranty_text": "This software is provided \"as is\", without warranty of any kind, express or implied. In no event shall the authors or copyright holders be liable for any claim, damages, or other liability arising from the use of this software."
     }
 }

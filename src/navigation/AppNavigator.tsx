@@ -79,6 +79,7 @@ import {
   PlaybackSettingsScreen,
   AboutSettingsScreen,
   DeveloperSettingsScreen,
+  LegalScreen,
 } from '../screens/settings';
 
 
@@ -217,6 +218,7 @@ export type RootStackParamList = {
   PlaybackSettings: undefined;
   AboutSettings: undefined;
   DeveloperSettings: undefined;
+  Legal: undefined;
 };
 
 
@@ -1739,6 +1741,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen
               name="DeveloperSettings"
               component={DeveloperSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="Legal"
+              component={LegalScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,

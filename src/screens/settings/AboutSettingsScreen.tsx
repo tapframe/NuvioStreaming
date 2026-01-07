@@ -56,6 +56,13 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
         <>
             <SettingsCard title={t('settings.sections.information')} isTablet={isTablet}>
                 <SettingItem
+                    title={t('settings.items.legal')}
+                    icon="file-text"
+                    onPress={() => navigation.navigate('Legal')}
+                    renderControl={() => <ChevronRight />}
+                    isTablet={isTablet}
+                />
+                <SettingItem
                     title={t('settings.items.privacy_policy')}
                     icon="lock"
                     onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
