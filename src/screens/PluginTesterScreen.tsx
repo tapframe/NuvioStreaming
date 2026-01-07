@@ -6,14 +6,15 @@ import { useTheme } from '../contexts/ThemeContext';
 import { RepoTester } from './plugin-tester/RepoTester';
 import { IndividualTester } from './plugin-tester/IndividualTester';
 import { Header, MainTabBar } from './plugin-tester/components';
-import { getPluginTesterStyles } from './plugin-tester/styles';
+import { getPluginTesterStyles, useIsLargeScreen } from './plugin-tester/styles';
 
 const PluginTesterScreen = () => {
     const [mainTab, setMainTab] = useState<'individual' | 'repo'>('individual');
     const { currentTheme } = useTheme();
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
-    const styles = getPluginTesterStyles(currentTheme);
+    const isLargeScreen = useIsLargeScreen();
+    const styles = getPluginTesterStyles(currentTheme, isLargeScreen);
 
     if (mainTab === 'individual') {
         return <IndividualTester onSwitchTab={setMainTab} />;

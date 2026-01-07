@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { pluginService } from '../../services/pluginService';
 import axios from 'axios';
-import { getPluginTesterStyles } from './styles';
+import { getPluginTesterStyles, useIsLargeScreen } from './styles';
 import { RepoManifest, RepoScraper, RepoTestResult, RepoTestStatus } from './types';
 
 const extractRepositoryName = (url: string) => {
@@ -96,7 +96,8 @@ const buildScraperCandidates = (baseRepoUrl: string, filename: string) => {
 
 export const RepoTester = () => {
     const { currentTheme } = useTheme();
-    const styles = getPluginTesterStyles(currentTheme);
+    const isLargeScreen = useIsLargeScreen();
+    const styles = getPluginTesterStyles(currentTheme, isLargeScreen);
 
     // Repo tester state
     const [repoUrl, setRepoUrl] = useState('');

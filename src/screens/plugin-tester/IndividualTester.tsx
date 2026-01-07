@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { pluginService } from '../../services/pluginService';
 import axios from 'axios';
-import { getPluginTesterStyles } from './styles';
+import { getPluginTesterStyles, useIsLargeScreen } from './styles';
 import { Header, MainTabBar } from './components';
 
 interface IndividualTesterProps {
@@ -27,7 +27,8 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const { currentTheme } = useTheme();
-    const styles = getPluginTesterStyles(currentTheme);
+    const isLargeScreen = useIsLargeScreen();
+    const styles = getPluginTesterStyles(currentTheme, isLargeScreen);
 
     // State
     const [code, setCode] = useState('');
@@ -171,141 +172,361 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
         }
     };
 
-    const renderCodeTab = () => (
-        <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-        >
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
-                <View style={styles.card}>
-                    <View style={styles.cardTitleRow}>
-                        <Text style={styles.cardTitle}>Load from URL</Text>
-                        <Ionicons name="link-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
+    const renderCodeTab = () => {
+        // On large screens, show code + logs/results side by side
+        if (isLargeScreen) {
+            return (
+                <View style={styles.largeScreenWrapper}>
+                    <View style={styles.twoColumnContainer}>
+                        <View style={styles.leftColumn}>
+                            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
+                                <View style={styles.card}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Text style={styles.cardTitle}>Load from URL</Text>
+                                        <Ionicons name="link-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
+                                    </View>
+                                    <Text style={styles.helperText}>
+                                        Paste a raw GitHub URL or local IP and tap download.
+                                    </Text>
+                                    <View style={[styles.row, { marginTop: 10 }]}>
+                                        <TextInput
+                                            style={[styles.input, { flex: 1 }]}
+                                            value={url}
+                                            onChangeText={setUrl}
+                                            placeholder="http://192.168.1.5:8000/provider.js"
+                                            placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                        />
+                                        <TouchableOpacity
+                                            style={[styles.button, styles.secondaryButton, { paddingHorizontal: 12, minHeight: 48 }]}
+                                            onPress={fetchFromUrl}
+                                        >
+                                            <Ionicons name="download-outline" size={20} color={currentTheme.colors.white} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <View style={[styles.card, { flex: 1, minHeight: 400 }]}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Text style={styles.cardTitle}>Plugin Code</Text>
+                                        <View style={styles.cardActionsRow}>
+                                            <TouchableOpacity
+                                                style={styles.cardActionButton}
+                                                onPress={() => setIsEditorFocused(true)}
+                                                accessibilityLabel="Focus code editor"
+                                            >
+                                                <Ionicons name="expand-outline" size={18} color={currentTheme.colors.highEmphasis} />
+                                            </TouchableOpacity>
+                                            <Ionicons name="code-slash-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
+                                        </View>
+                                    </View>
+                                    <TextInput
+                                        style={[styles.codeInput, { minHeight: 350 }]}
+                                        value={code}
+                                        onChangeText={setCode}
+                                        multiline
+                                        placeholder="// Paste plugin code here..."
+                                        placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </View>
+
+                                {/* Test parameters on large screen */}
+                                <View style={styles.card}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Text style={styles.cardTitle}>Test Parameters</Text>
+                                        <Ionicons name="options-outline" size={16} color={currentTheme.colors.mediumEmphasis} />
+                                    </View>
+
+                                    <View style={styles.segment}>
+                                        <TouchableOpacity
+                                            style={[styles.segmentItem, mediaType === 'movie' && styles.segmentItemActive]}
+                                            onPress={() => setMediaType('movie')}
+                                        >
+                                            <Ionicons name="film-outline" size={18} color={mediaType === 'movie' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
+                                            <Text style={[styles.segmentText, mediaType === 'movie' && styles.segmentTextActive]}>Movie</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.segmentItem, mediaType === 'tv' && styles.segmentItemActive]}
+                                            onPress={() => setMediaType('tv')}
+                                        >
+                                            <Ionicons name="tv-outline" size={18} color={mediaType === 'tv' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
+                                            <Text style={[styles.segmentText, mediaType === 'tv' && styles.segmentTextActive]}>TV</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={[styles.row, { marginTop: 10, alignItems: 'flex-start' }]}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.fieldLabel}>TMDB ID</Text>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={tmdbId}
+                                                onChangeText={setTmdbId}
+                                                keyboardType="numeric"
+                                            />
+                                        </View>
+
+                                        {mediaType === 'tv' && (
+                                            <>
+                                                <View style={{ width: 110 }}>
+                                                    <Text style={styles.fieldLabel}>Season</Text>
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        value={season}
+                                                        onChangeText={setSeason}
+                                                        keyboardType="numeric"
+                                                    />
+                                                </View>
+                                                <View style={{ width: 110 }}>
+                                                    <Text style={styles.fieldLabel}>Episode</Text>
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        value={episode}
+                                                        onChangeText={setEpisode}
+                                                        keyboardType="numeric"
+                                                    />
+                                                </View>
+                                            </>
+                                        )}
+                                    </View>
+
+                                    <TouchableOpacity
+                                        style={[styles.button, { marginTop: 12, opacity: isRunning ? 0.85 : 1 }]}
+                                        onPress={runTest}
+                                        disabled={isRunning}
+                                    >
+                                        {isRunning ? (
+                                            <ActivityIndicator color={currentTheme.colors.white} />
+                                        ) : (
+                                            <Ionicons name="play" size={20} color={currentTheme.colors.white} />
+                                        )}
+                                        <Text style={styles.buttonText}>{isRunning ? 'Running…' : 'Run Test'}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </ScrollView>
+                        </View>
+
+                        <View style={styles.rightColumn}>
+                            {/* Right side: Logs and Results */}
+                            <View style={[styles.content, { flex: 1 }]}>
+                                <View style={{ flexDirection: 'row', marginBottom: 12, gap: 8 }}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.tab,
+                                            activeTab === 'logs' && styles.activeTab,
+                                            { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
+                                        ]}
+                                        onPress={() => setActiveTab('logs')}
+                                    >
+                                        <Text style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>Logs</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.tab,
+                                            activeTab === 'results' && styles.activeTab,
+                                            { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
+                                        ]}
+                                        onPress={() => setActiveTab('results')}
+                                    >
+                                        <Text style={[styles.tabText, activeTab === 'results' && styles.activeTabText]}>Results ({streams.length})</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                {activeTab === 'logs' || activeTab === 'code' ? (
+                                    <ScrollView
+                                        ref={(r) => (logsScrollRef.current = r)}
+                                        style={[styles.logContainer, { flex: 1, minHeight: 400 }]}
+                                        contentContainerStyle={{ paddingBottom: 20 }}
+                                        onContentSizeChange={() => {
+                                            logsScrollRef.current?.scrollToEnd({ animated: true });
+                                        }}
+                                    >
+                                        {logs.length === 0 ? (
+                                            <View style={styles.emptyState}>
+                                                <Ionicons name="terminal-outline" size={48} color={currentTheme.colors.mediumGray} />
+                                                <Text style={styles.emptyText}>No logs yet. Run a test to see output.</Text>
+                                            </View>
+                                        ) : (
+                                            logs.map((log, i) => {
+                                                let style = styles.logItem;
+                                                if (log.includes('[ERROR]') || log.includes('[FATAL')) style = { ...style, ...styles.logError };
+                                                else if (log.includes('[WARN]')) style = { ...style, ...styles.logWarn };
+                                                else if (log.includes('[INFO]')) style = { ...style, ...styles.logInfo };
+                                                else if (log.includes('[DEBUG]')) style = { ...style, ...styles.logDebug };
+
+                                                return (
+                                                    <Text key={i} style={style}>
+                                                        {log}
+                                                    </Text>
+                                                );
+                                            })
+                                        )}
+                                    </ScrollView>
+                                ) : (
+                                    <ScrollView style={{ flex: 1, minHeight: 400 }} contentContainerStyle={{ paddingBottom: 20 }}>
+                                        {streams.length === 0 ? (
+                                            <View style={styles.emptyState}>
+                                                <Ionicons name="list-outline" size={48} color={currentTheme.colors.mediumGray} />
+                                                <Text style={styles.emptyText}>No streams found yet.</Text>
+                                            </View>
+                                        ) : (
+                                            streams.map((stream, i) => (
+                                                <View key={i} style={styles.resultItem}>
+                                                    <Text style={styles.resultTitle}>{stream.title || stream.name}</Text>
+                                                    <Text style={styles.resultMeta}>Quality: {stream.quality || 'Unknown'}</Text>
+                                                    <Text style={styles.resultMeta}>Size: {stream.description || 'Unknown'}</Text>
+                                                    <Text style={styles.resultUrl} numberOfLines={2}>URL: {stream.url}</Text>
+                                                </View>
+                                            ))
+                                        )}
+                                    </ScrollView>
+                                )}
+                            </View>
+                        </View>
                     </View>
-                    <Text style={styles.helperText}>
-                        Paste a raw GitHub URL or local IP and tap download.
-                    </Text>
-                    <View style={[styles.row, { marginTop: 10 }]}>
+                </View>
+            );
+        }
+
+        // Original mobile layout
+        return (
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+            >
+                <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
+                    <View style={styles.card}>
+                        <View style={styles.cardTitleRow}>
+                            <Text style={styles.cardTitle}>Load from URL</Text>
+                            <Ionicons name="link-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
+                        </View>
+                        <Text style={styles.helperText}>
+                            Paste a raw GitHub URL or local IP and tap download.
+                        </Text>
+                        <View style={[styles.row, { marginTop: 10 }]}>
+                            <TextInput
+                                style={[styles.input, { flex: 1 }]}
+                                value={url}
+                                onChangeText={setUrl}
+                                placeholder="http://192.168.1.5:8000/provider.js"
+                                placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                            />
+                            <TouchableOpacity
+                                style={[styles.button, styles.secondaryButton, { paddingHorizontal: 12, minHeight: 48 }]}
+                                onPress={fetchFromUrl}
+                            >
+                                <Ionicons name="download-outline" size={20} color={currentTheme.colors.white} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={styles.card}>
+                        <View style={styles.cardTitleRow}>
+                            <Text style={styles.cardTitle}>Plugin Code</Text>
+                            <View style={styles.cardActionsRow}>
+                                <TouchableOpacity
+                                    style={styles.cardActionButton}
+                                    onPress={() => setIsEditorFocused(true)}
+                                    accessibilityLabel="Focus code editor"
+                                >
+                                    <Ionicons name="expand-outline" size={18} color={currentTheme.colors.highEmphasis} />
+                                </TouchableOpacity>
+                                <Ionicons name="code-slash-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
+                            </View>
+                        </View>
                         <TextInput
-                            style={[styles.input, { flex: 1 }]}
-                            value={url}
-                            onChangeText={setUrl}
-                            placeholder="http://192.168.1.5:8000/provider.js"
+                            style={styles.codeInput}
+                            value={code}
+                            onChangeText={setCode}
+                            multiline
+                            placeholder="// Paste plugin code here..."
                             placeholderTextColor={currentTheme.colors.mediumEmphasis}
                             autoCapitalize="none"
                             autoCorrect={false}
                         />
-                        <TouchableOpacity
-                            style={[styles.button, styles.secondaryButton, { paddingHorizontal: 12, minHeight: 48 }]}
-                            onPress={fetchFromUrl}
-                        >
-                            <Ionicons name="download-outline" size={20} color={currentTheme.colors.white} />
-                        </TouchableOpacity>
                     </View>
-                </View>
+                </ScrollView>
 
-                <View style={styles.card}>
-                    <View style={styles.cardTitleRow}>
-                        <Text style={styles.cardTitle}>Plugin Code</Text>
-                        <View style={styles.cardActionsRow}>
+                <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 14) }]}>
+                    <View style={styles.footerCard}>
+                        <View style={styles.footerTitleRow}>
+                            <Text style={styles.footerTitle}>Test Parameters</Text>
+                            <Ionicons name="options-outline" size={16} color={currentTheme.colors.mediumEmphasis} />
+                        </View>
+
+                        <View style={styles.segment}>
                             <TouchableOpacity
-                                style={styles.cardActionButton}
-                                onPress={() => setIsEditorFocused(true)}
-                                accessibilityLabel="Focus code editor"
+                                style={[styles.segmentItem, mediaType === 'movie' && styles.segmentItemActive]}
+                                onPress={() => setMediaType('movie')}
                             >
-                                <Ionicons name="expand-outline" size={18} color={currentTheme.colors.highEmphasis} />
+                                <Ionicons name="film-outline" size={18} color={mediaType === 'movie' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
+                                <Text style={[styles.segmentText, mediaType === 'movie' && styles.segmentTextActive]}>Movie</Text>
                             </TouchableOpacity>
-                            <Ionicons name="code-slash-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
-                        </View>
-                    </View>
-                    <TextInput
-                        style={styles.codeInput}
-                        value={code}
-                        onChangeText={setCode}
-                        multiline
-                        placeholder="// Paste plugin code here..."
-                        placeholderTextColor={currentTheme.colors.mediumEmphasis}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                    />
-                </View>
-            </ScrollView>
-
-            <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 14) }]}>
-                <View style={styles.footerCard}>
-                    <View style={styles.footerTitleRow}>
-                        <Text style={styles.footerTitle}>Test Parameters</Text>
-                        <Ionicons name="options-outline" size={16} color={currentTheme.colors.mediumEmphasis} />
-                    </View>
-
-                    <View style={styles.segment}>
-                        <TouchableOpacity
-                            style={[styles.segmentItem, mediaType === 'movie' && styles.segmentItemActive]}
-                            onPress={() => setMediaType('movie')}
-                        >
-                            <Ionicons name="film-outline" size={18} color={mediaType === 'movie' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
-                            <Text style={[styles.segmentText, mediaType === 'movie' && styles.segmentTextActive]}>Movie</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.segmentItem, mediaType === 'tv' && styles.segmentItemActive]}
-                            onPress={() => setMediaType('tv')}
-                        >
-                            <Ionicons name="tv-outline" size={18} color={mediaType === 'tv' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
-                            <Text style={[styles.segmentText, mediaType === 'tv' && styles.segmentTextActive]}>TV</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={[styles.row, { marginTop: 10, alignItems: 'flex-start' }]}>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.fieldLabel}>TMDB ID</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={tmdbId}
-                                onChangeText={setTmdbId}
-                                keyboardType="numeric"
-                            />
+                            <TouchableOpacity
+                                style={[styles.segmentItem, mediaType === 'tv' && styles.segmentItemActive]}
+                                onPress={() => setMediaType('tv')}
+                            >
+                                <Ionicons name="tv-outline" size={18} color={mediaType === 'tv' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
+                                <Text style={[styles.segmentText, mediaType === 'tv' && styles.segmentTextActive]}>TV</Text>
+                            </TouchableOpacity>
                         </View>
 
-                        {mediaType === 'tv' && (
-                            <>
-                                <View style={{ width: 110 }}>
-                                    <Text style={styles.fieldLabel}>Season</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={season}
-                                        onChangeText={setSeason}
-                                        keyboardType="numeric"
-                                    />
-                                </View>
-                                <View style={{ width: 110 }}>
-                                    <Text style={styles.fieldLabel}>Episode</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={episode}
-                                        onChangeText={setEpisode}
-                                        keyboardType="numeric"
-                                    />
-                                </View>
-                            </>
+                        <View style={[styles.row, { marginTop: 10, alignItems: 'flex-start' }]}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.fieldLabel}>TMDB ID</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={tmdbId}
+                                    onChangeText={setTmdbId}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+
+                            {mediaType === 'tv' && (
+                                <>
+                                    <View style={{ width: 110 }}>
+                                        <Text style={styles.fieldLabel}>Season</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={season}
+                                            onChangeText={setSeason}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                    <View style={{ width: 110 }}>
+                                        <Text style={styles.fieldLabel}>Episode</Text>
+                                        <TextInput
+                                            style={styles.input}
+                                            value={episode}
+                                            onChangeText={setEpisode}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                </>
+                            )}
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        style={[styles.button, { opacity: isRunning ? 0.85 : 1 }]}
+                        onPress={runTest}
+                        disabled={isRunning}
+                    >
+                        {isRunning ? (
+                            <ActivityIndicator color={currentTheme.colors.white} />
+                        ) : (
+                            <Ionicons name="play" size={20} color={currentTheme.colors.white} />
                         )}
-                    </View>
+                        <Text style={styles.buttonText}>{isRunning ? 'Running…' : 'Run Test'}</Text>
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                    style={[styles.button, { opacity: isRunning ? 0.85 : 1 }]}
-                    onPress={runTest}
-                    disabled={isRunning}
-                >
-                    {isRunning ? (
-                        <ActivityIndicator color={currentTheme.colors.white} />
-                    ) : (
-                        <Ionicons name="play" size={20} color={currentTheme.colors.white} />
-                    )}
-                    <Text style={styles.buttonText}>{isRunning ? 'Running…' : 'Run Test'}</Text>
-                </TouchableOpacity>
-            </View>
-        </KeyboardAvoidingView>
-    );
+            </KeyboardAvoidingView>
+        );
+    };
 
     const renderLogsTab = () => (
         <ScrollView

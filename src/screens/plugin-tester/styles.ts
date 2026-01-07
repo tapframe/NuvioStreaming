@@ -1,9 +1,36 @@
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, useWindowDimensions } from 'react-native';
 
-export const getPluginTesterStyles = (theme: any) => StyleSheet.create({
+// Breakpoint for larger screens (tablets, iPads)
+export const LARGE_SCREEN_BREAKPOINT = 768;
+
+export const useIsLargeScreen = () => {
+    const { width } = useWindowDimensions();
+    return width >= LARGE_SCREEN_BREAKPOINT;
+};
+
+export const getPluginTesterStyles = (theme: any, isLargeScreen: boolean = false) => StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: theme.colors.darkBackground,
+    },
+    // Large screen wrapper for centering content
+    largeScreenWrapper: {
+        flex: 1,
+        maxWidth: isLargeScreen ? 900 : undefined,
+        alignSelf: isLargeScreen ? 'center' : undefined,
+        width: isLargeScreen ? '100%' : undefined,
+        paddingHorizontal: isLargeScreen ? 24 : 0,
+    },
+    // Two-column layout for large screens
+    twoColumnContainer: {
+        flexDirection: isLargeScreen ? 'row' : 'column',
+        gap: isLargeScreen ? 16 : 0,
+    },
+    leftColumn: {
+        flex: isLargeScreen ? 1 : undefined,
+    },
+    rightColumn: {
+        flex: isLargeScreen ? 1 : undefined,
     },
     header: {
         flexDirection: 'row',

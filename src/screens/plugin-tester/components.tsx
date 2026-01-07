@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getPluginTesterStyles } from './styles';
+import { getPluginTesterStyles, useIsLargeScreen } from './styles';
 
 interface HeaderProps {
     title: string;
@@ -14,7 +14,8 @@ interface HeaderProps {
 
 export const Header = ({ title, subtitle, onBack, backIcon = 'arrow-back', rightElement }: HeaderProps) => {
     const { currentTheme } = useTheme();
-    const styles = getPluginTesterStyles(currentTheme);
+    const isLargeScreen = useIsLargeScreen();
+    const styles = getPluginTesterStyles(currentTheme, isLargeScreen);
 
     return (
         <View style={styles.header}>
@@ -39,7 +40,8 @@ interface MainTabBarProps {
 
 export const MainTabBar = ({ activeTab, onTabChange }: MainTabBarProps) => {
     const { currentTheme } = useTheme();
-    const styles = getPluginTesterStyles(currentTheme);
+    const isLargeScreen = useIsLargeScreen();
+    const styles = getPluginTesterStyles(currentTheme, isLargeScreen);
 
     return (
         <View style={styles.tabBar}>
