@@ -1027,10 +1027,10 @@ const PluginsScreen: React.FC = () => {
       );
       await Promise.all(promises);
       await loadPlugins();
-      openAlert(t('plugins.success'), `${enabled ? t('plugins.enabled') : t('plugins.disabled')} ${filteredPlugins.length} plugins`);
+      openAlert(t('plugins.success'), `${enabled ? t('plugins.enabled') : t('plugins.disabled')} ${filteredPlugins.length} extensions`);
     } catch (error) {
       logger.error('[PluginSettings] Failed to bulk toggle:', error);
-      openAlert(t('plugins.error'), 'Failed to update plugins');
+      openAlert(t('plugins.error'), 'Failed to update extensions');
     } finally {
       setIsRefreshing(false);
     }
@@ -1133,8 +1133,8 @@ const PluginsScreen: React.FC = () => {
 
     const alertTitle = isLastRepository ? 'Remove Last Repository' : 'Remove Repository';
     const alertMessage = isLastRepository
-      ? `Are you sure you want to remove "${repo.name}"? This is your only repository, so you'll have no plugins available until you add a new repository.`
-      : `Are you sure you want to remove "${repo.name}"? This will also remove all plugins from this repository.`;
+      ? `Are you sure you want to remove "${repo.name}"? This is your only repository, so you'll have no extensions available until you add a new repository.`
+      : `Are you sure you want to remove "${repo.name}"? This will also remove all extensions from this repository.`;
 
     openAlert(
       alertTitle,
@@ -1308,7 +1308,7 @@ const PluginsScreen: React.FC = () => {
       await loadPlugins();
     } catch (error) {
       logger.error('[PluginSettings] Failed to toggle plugin:', error);
-      openAlert(t('plugins.error'), 'Failed to update plugin status');
+      openAlert(t('plugins.error'), 'Failed to update extension status');
       setIsRefreshing(false);
     }
   };
@@ -1328,7 +1328,7 @@ const PluginsScreen: React.FC = () => {
               openAlert(t('plugins.success'), t('plugins.alert_plugins_cleared'));
             } catch (error) {
               logger.error('[PluginSettings] Failed to clear plugins:', error);
-              openAlert(t('plugins.error'), 'Failed to clear plugins');
+              openAlert(t('plugins.error'), 'Failed to clear extensions');
             }
           },
         },
