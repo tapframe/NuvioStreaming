@@ -41,14 +41,14 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
 }) => {
     const { currentTheme } = useTheme();
     const insets = useSafeAreaInsets();
-    
+
     // State
     const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
     const [currentInterval, setCurrentInterval] = useState<SkipInterval | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [hasSkippedCurrent, setHasSkippedCurrent] = useState(false);
     const [autoHidden, setAutoHidden] = useState(false);
-    
+
     // Refs
     const fetchedRef = useRef(false);
     const lastEpisodeRef = useRef<string>('');
@@ -115,8 +115,8 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
 
         if (active) {
             // If we found a new active interval that is different from the previous one
-            if (!currentInterval || 
-                active.startTime !== currentInterval.startTime || 
+            if (!currentInterval ||
+                active.startTime !== currentInterval.startTime ||
                 active.type !== currentInterval.type) {
                 logger.log(`[SkipIntroButton] Entering interval: ${active.type} (${active.startTime}-${active.endTime})`);
                 setCurrentInterval(active);
@@ -135,10 +135,10 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     // Determine if button should show
     const shouldShowButton = useCallback(() => {
         if (!currentInterval || hasSkippedCurrent) return false;
-        
+
         // If auto-hidden, only show when controls are visible
         if (autoHidden && !controlsVisible) return false;
-        
+
         return true;
     }, [currentInterval, hasSkippedCurrent, autoHidden, controlsVisible]);
 
@@ -205,7 +205,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     // Get display text based on skip type
     const getButtonText = () => {
         if (!currentInterval) return 'Skip';
-        
+
         switch (currentInterval.type) {
             case 'op':
             case 'mixed-op':
@@ -228,8 +228,8 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         transform: [{ scale: scale.value }, { translateY: translateY.value }],
     }));
 
-    // Don't render if not visible (and animation complete)
-    if (!isVisible && opacity.value === 0) {
+    // Don't render if not visible
+    if (!isVisible) {
         return null;
     }
 
