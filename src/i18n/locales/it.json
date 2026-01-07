@@ -643,6 +643,7 @@
 			"danger_zone": "ZONA PERICOLOSA"
 		},
 		"items": {
+			"legal": "Note Legali & Disclaimer",
 			"privacy_policy": "Informativa sulla privacy",
 			"report_issue": "Segnala un problema",
 			"version": "Versione",
@@ -1222,5 +1223,18 @@
 			"cancel": "Annulla",
 			"back": "Impostazioni"
 		}
+	},
+	"legal": {
+		"title": "Note Legali & Disclaimer",
+		"intro_title": "Natura dell'Applicazione",
+		"intro_text": "Nuvio è un lettore multimediale e un'applicazione per la gestione dei metadati. Agisce unicamente come interfaccia lato client per sfogliare metadati pubblicamente disponibili (film, serie TV, ecc.) e riprodurre file multimediali forniti dall'utente o da estensioni di terze parti. Nuvio non ospita, archivia, distribuisce né indicizza alcun contenuto multimediale autonomamente.",
+		"extensions_title": "Estensioni di Terze Parti",
+		"extensions_text": "Nuvio utilizza un'architettura estensibile che consente agli utenti di installare plugin di terze parti (estensioni). Queste estensioni sono sviluppate e mantenute da sviluppatori indipendenti non affiliati a Nuvio. Non abbiamo alcun controllo su, e non ci assumiamo alcuna responsabilità per, il contenuto, la legalità o la funzionalità di qualsiasi estensione di terze parti.",
+		"user_resp_title": "Responsabilità dell'Utente",
+		"user_resp_text": "Gli utenti sono gli unici responsabili delle estensioni che installano e dei contenuti a cui accedono. Utilizzando questa applicazione, accetti di garantire di avere il diritto legale di accedere a qualsiasi contenuto visualizzato utilizzando Nuvio. Gli sviluppatori di Nuvio non sostengono né incoraggiano la violazione del copyright.",
+		"dmca_title": "Copyright e DMCA",
+		"dmca_text": "Rispettiamo i diritti di proprietà intellettuale altrui. Poiché Nuvio non ospita alcun contenuto, non possiamo rimuovere contenuti da Internet. Tuttavia, se ritieni che l'interfaccia stessa dell'applicazione violi i tuoi diritti, ti preghiamo di contattarci.",
+		"warranty_title": "Nessuna Garanzia",
+		"warranty_text": "Questo software è fornito \"così com'è\", senza garanzia di alcun tipo, espressa o implicita. In nessun caso gli autori o i detentori del copyright saranno responsabili per qualsiasi reclamo, danno o altra responsabilità derivante dall'uso di questo software."
 	}
 }

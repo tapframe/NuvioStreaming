@@ -187,12 +187,25 @@
         }
 
         .screenshots-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
+            column-count: 1;
+            column-gap: 2rem;
+        }
+
+        @media (min-width: 640px) {
+            .screenshots-grid {
+                column-count: 2;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .screenshots-grid {
+                column-count: 3;
+            }
         }
 
         .screenshot {
+            break-inside: avoid;
+            margin-bottom: 2rem;
             position: relative;
             border-radius: 16px;
             overflow: hidden;

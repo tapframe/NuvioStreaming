@@ -621,6 +621,7 @@
             "danger_zone": "AREA DE PERIGO"
         },
         "items": {
+            "legal": "Aviso Legal",
             "privacy_policy": "Política de Privacidade",
             "report_issue": "Reportar Problema",
             "version": "Versão",
@@ -1190,5 +1191,18 @@
             "cancel": "Cancelar",
             "back": "Configurações"
         }
+    },
+    "legal": {
+        "title": "Aviso Legal",
+        "intro_title": "Natureza da Aplicação",
+        "intro_text": "O Nuvio é um reprodutor de mídia e aplicativo de gerenciamento de metadados. Atua apenas como uma interface do lado do cliente para navegar por metadados disponíveis publicamente (filmes, programas de TV, etc.) e reproduzir arquivos de mídia fornecidos pelo usuário ou extensões de terceiros. O Nuvio em si não hospeda, armazena, distribui ou indexa qualquer conteúdo de mídia.",
+        "extensions_title": "Extensões de Terceiros",
+        "extensions_text": "O Nuvio usa uma arquitetura extensível que permite aos usuários instalar plugins de terceiros (extensões). Essas extensões são desenvolvidas e mantidas por desenvolvedores independentes não afiliados ao Nuvio. Não temos controle sobre, e não assumimos responsabilidade por, o conteúdo, legalidade ou funcionalidade de qualquer extensão de terceiros.",
+        "user_resp_title": "Responsabilidade do Usuário",
+        "user_resp_text": "Os usuários são os únicos responsáveis pelas extensões que instalam e pelo conteúdo que acessam. Ao usar este aplicativo, você concorda em garantir que tem o direito legal de acessar qualquer conteúdo que visualizar usando o Nuvio. Os desenvolvedores do Nuvio não endossam ou incentivam a violação de direitos autorais.",
+        "dmca_title": "Direitos Autorais e DMCA",
+        "dmca_text": "Respeitamos os direitos de propriedade intelectual de terceiros. Como o Nuvio não hospeda nenhum conteúdo, não podemos remover conteúdo da internet. No entanto, se você acredita que a interface do aplicativo em si infringe seus direitos, entre em contato conosco.",
+        "warranty_title": "Sem Garantia",
+        "warranty_text": "Este software é fornecido \"como está\", sem garantia de qualquer tipo, expressa ou implícita. Em nenhum caso os autores ou detentores de direitos autorais serão responsáveis por qualquer reclamação, danos ou outra responsabilidade decorrente do uso deste software."
     }
 }

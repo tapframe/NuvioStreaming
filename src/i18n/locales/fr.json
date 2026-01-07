@@ -643,6 +643,7 @@
             "danger_zone": "ZONE DE DANGER"
         },
         "items": {
+            "legal": "Mentions Légales",
             "privacy_policy": "Politique de confidentialité",
             "report_issue": "Signaler un problème",
             "version": "Version",
@@ -1224,5 +1225,18 @@
             "cancel": "Annuler",
             "back": "Paramètres"
         }
+    },
+    "legal": {
+        "title": "Mentions Légales",
+        "intro_title": "Nature de l'Application",
+        "intro_text": "Nuvio est un lecteur multimédia et une application de gestion de métadonnées. Il agit uniquement comme une interface côté client pour parcourir des métadonnées accessibles au public (films, émissions de télévision, etc.) et lire des fichiers multimédias fournis par l'utilisateur ou des extensions tierces. Nuvio n'héberge, ne stocke, ne distribue ni n'indexe aucun contenu multimédia de lui-même.",
+        "extensions_title": "Extensions Tierces",
+        "extensions_text": "Nuvio utilise une architecture extensible qui permet aux utilisateurs d'installer des plugins tiers (extensions). Ces extensions sont développées et maintenues par des développeurs indépendants non affiliés à Nuvio. Nous n'avons aucun contrôle sur, et n'assumons aucune responsabilité pour, le contenu, la légalité ou la fonctionnalité de toute extension tierce.",
+        "user_resp_title": "Responsabilité de l'Utilisateur",
+        "user_resp_text": "Les utilisateurs sont seuls responsables des extensions qu'ils installent et du contenu auquel ils accèdent. En utilisant cette application, vous acceptez de vous assurer que vous disposez du droit légal d'accéder à tout contenu que vous visualisez en utilisant Nuvio. Les développeurs de Nuvio ne cautionnent ni n'encouragent la violation du droit d'auteur.",
+        "dmca_title": "Droits d'Auteur et DMCA",
+        "dmca_text": "Nous respectons les droits de propriété intellectuelle d'autrui. Étant donné que Nuvio n'héberge aucun contenu, nous ne pouvons pas supprimer de contenu d'Internet. Toutefois, si vous pensez que l'interface de l'application elle-même enfreint vos droits, veuillez nous contacter.",
+        "warranty_title": "Aucune Garantie",
+        "warranty_text": "Ce logiciel est fourni \"tel quel\", sans garantie d'aucune sorte, expresse ou implicite. En aucun cas, les auteurs ou titulaires de droits d'auteur ne pourront être tenus responsables de toute réclamation, dommage ou autre responsabilité découlant de l'utilisation de ce logiciel."
     }
 }

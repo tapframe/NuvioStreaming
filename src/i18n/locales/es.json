@@ -643,6 +643,7 @@
             "danger_zone": "ZONA DE PELIGRO"
         },
         "items": {
+            "legal": "Legal y Descargo",
             "privacy_policy": "Política de privacidad",
             "report_issue": "Informar de un problema",
             "version": "Versión",
@@ -1224,5 +1225,18 @@
             "cancel": "Cancelar",
             "back": "Ajustes"
         }
+    },
+    "legal": {
+        "title": "Legal y Descargo",
+        "intro_title": "Naturaleza de la Aplicación",
+        "intro_text": "Nuvio es una aplicación de reproducción de medios y gestión de metadatos. Actúa únicamente como una interfaz del lado del cliente para navegar por metadatos disponibles públicamente (películas, series de TV, etc.) y reproducir archivos multimedia proporcionados por el usuario o extensiones de terceros. Nuvio no aloja, almacena, distribuye ni indexa ningún contenido multimedia.",
+        "extensions_title": "Extensiones de terceros",
+        "extensions_text": "Nuvio utiliza una arquitectura extensible que permite a los usuarios instalar complementos de terceros (extensiones). Estas extensiones son desarrolladas y mantenidas por desarrolladores independientes no afiliados a Nuvio. No tenemos control sobre, y no asumimos ninguna responsabilidad por, el contenido, la legalidad o la funcionalidad de cualquier extensión de terceros.",
+        "user_resp_title": "Responsabilidad del usuario",
+        "user_resp_text": "Los usuarios son los únicos responsables de las extensiones que instalan y del contenido al que acceden. Al utilizar esta aplicación, aceptas asegurarte de que tienes el derecho legal de acceder a cualquier contenido que veas utilizando Nuvio. Los desarrolladores de Nuvio no respaldan ni fomentan la infracción de derechos de autor.",
+        "dmca_title": "Derechos de autor y DMCA",
+        "dmca_text": "Respetamos los derechos de propiedad intelectual de otros. Dado que Nuvio no aloja ningún contenido, no podemos eliminar contenido de Internet. Sin embargo, si crees que la interfaz de la aplicación en sí infringe tus derechos, por favor contáctanos.",
+        "warranty_title": "Sin garantía",
+        "warranty_text": "Este software se proporciona \"tal cual\", sin garantía de ningún tipo, expresa o implícita. En ningún caso los autores o titulares de los derechos de autor serán responsables de ninguna reclamación, daños u otra responsabilidad derivada del uso de este software."
     }
 }
