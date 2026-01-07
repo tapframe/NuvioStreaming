@@ -1104,7 +1104,7 @@ const MainTabs = () => {
           name="Search"
           component={SearchScreen}
           options={{
-            tabBarLabel: t('tabs.search'),
+            tabBarLabel: t('navigation.search'),
             tabBarIcon: ({ color, size }) => (
               <Feather name="search" size={size} color={color} />
             ),

@@ -25,6 +25,7 @@ import { logger } from '../utils/logger';
 import { clearCustomNameCache } from '../utils/catalogNameUtils';
 import { BlurView } from 'expo-blur';
 import CustomAlert from '../components/CustomAlert';
+import { useTranslation } from 'react-i18next';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback for CatalogSettingsScreen
 let GlassViewComp: any = null;
@@ -275,6 +276,7 @@ const CatalogSettingsScreen = () => {
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
   const isDarkMode = true; // Force dark mode
+  const { t } = useTranslation();
 
   // Modal State
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
@@ -489,9 +491,9 @@ const CatalogSettingsScreen = () => {
 
     } catch (error) {
       logger.error('Failed to save custom catalog name:', error);
-      setAlertTitle('Error');
-      setAlertMessage('Could not save the custom name.');
-      setAlertActions([{ label: 'OK', onPress: () => { } }]);
+      setAlertTitle(t('common.error'));
+      setAlertMessage(t('catalog_settings.error_save_name'));
+      setAlertActions([{ label: t('common.ok'), onPress: () => { } }]);
       setAlertVisible(true);
     } finally {
       setIsRenameModalVisible(false);
@@ -514,10 +516,10 @@ const CatalogSettingsScreen = () => {
             onPress={() => navigation.goBack()}
           >
             <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
-            <Text style={styles.backText}>Settings</Text>
+            <Text style={styles.backText}>{t('settings.settings_title')}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>Catalogs</Text>
+        <Text style={styles.headerTitle}>{t('catalog_settings.title')}</Text>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -534,19 +536,19 @@ const CatalogSettingsScreen = () => {
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
-          <Text style={styles.backText}>Settings</Text>
+          <Text style={styles.backText}>{t('settings.settings_title')}</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.headerTitle}>Catalogs</Text>
+      <Text style={styles.headerTitle}>{t('catalog_settings.title')}</Text>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Layout (Mobile only) */}
         {Platform.OS && (
           <View style={styles.addonSection}>
-            <Text style={styles.addonTitle}>LAYOUT CATALOGSCREEN (PHONE)</Text>
+            <Text style={styles.addonTitle}>{t('catalog_settings.layout_phone')}</Text>
             <View style={styles.card}>
               <View style={styles.groupHeader}>
-                <Text style={styles.groupTitle}>Posters per row</Text>
+                <Text style={styles.groupTitle}>{t('catalog_settings.posters_per_row')}</Text>
                 <View style={styles.groupHeaderRight} />
               </View>
               {/* Only show on phones (approx width < 600) */}
@@ -561,7 +563,7 @@ const CatalogSettingsScreen = () => {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.optionChipText, mobileColumns === 'auto' && styles.optionChipTextSelected]}>Auto</Text>
+                  <Text style={[styles.optionChipText, mobileColumns === 'auto' && styles.optionChipTextSelected]}>{t('catalog_settings.auto')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.optionChip, mobileColumns === 2 && styles.optionChipSelected]}
@@ -590,14 +592,14 @@ const CatalogSettingsScreen = () => {
               </View>
               <View style={styles.hintRow}>
                 <MaterialIcons name="info-outline" size={14} color={colors.mediumGray} />
-                <Text style={styles.hintText}>Applies to phones only. Tablets keep adaptive layout.</Text>
+                <Text style={styles.hintText}>{t('catalog_settings.phone_only_hint')}</Text>
               </View>
 
               {/* Show Titles Toggle */}
               <View style={[styles.catalogItem, { borderBottomWidth: 0 }]}>
                 <View style={styles.catalogInfo}>
-                  <Text style={styles.catalogName}>Show Poster Titles</Text>
-                  <Text style={styles.catalogType}>Display title text below each poster</Text>
+                  <Text style={styles.catalogName}>{t('catalog_settings.show_titles')}</Text>
+                  <Text style={styles.catalogType}>{t('catalog_settings.show_titles_desc')}</Text>
                 </View>
                 <Switch
                   value={showTitles}
@@ -628,10 +630,10 @@ const CatalogSettingsScreen = () => {
                 onPress={() => toggleExpansion(addonId)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.groupTitle}>Catalogs</Text>
+                <Text style={styles.groupTitle}>{t('catalog_settings.catalogs_group')}</Text>
                 <View style={styles.groupHeaderRight}>
                   <Text style={styles.enabledCount}>
-                    {group.enabledCount} of {group.catalogs.length} enabled
+                    {t('catalog_settings.enabled_count', { enabled: group.enabledCount, total: group.catalogs.length })}
                   </Text>
                   <MaterialIcons
                     name={group.expanded ? "keyboard-arrow-down" : "keyboard-arrow-right"}
@@ -645,7 +647,7 @@ const CatalogSettingsScreen = () => {
                 <>
                   <View style={styles.hintRow}>
                     <MaterialIcons name="edit" size={14} color={colors.mediumGray} />
-                    <Text style={styles.hintText}>Long-press a catalog to rename</Text>
+                    <Text style={styles.hintText}>{t('catalog_settings.rename_hint')}</Text>
                   </View>
                   {group.catalogs.map((setting, index) => (
                     <Pressable
@@ -696,36 +698,36 @@ const CatalogSettingsScreen = () => {
             {GlassViewComp && liquidGlassAvailable ? (
               <GlassViewComp style={styles.modalContent} glassEffectStyle="regular">
                 <Pressable onPress={(e) => e.stopPropagation()}>
-                  <Text style={styles.modalTitle}>Rename Catalog</Text>
+                  <Text style={styles.modalTitle}>{t('catalog_settings.rename_modal_title')}</Text>
                   <TextInput
                     style={styles.modalInput}
                     value={currentRenameValue}
                     onChangeText={setCurrentRenameValue}
-                    placeholder="Enter new catalog name"
+                    placeholder={t('catalog_settings.rename_placeholder')}
                     placeholderTextColor={colors.mediumGray}
                     autoFocus={true}
                   />
                   <View style={styles.modalButtons}>
-                    <Button title="Cancel" onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
-                    <Button title="Save" onPress={handleSaveRename} color={colors.primary} />
+                    <Button title={t('common.cancel')} onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
+                    <Button title={t('common.save')} onPress={handleSaveRename} color={colors.primary} />
                   </View>
                 </Pressable>
               </GlassViewComp>
             ) : (
               <BlurView style={styles.modalContent} intensity={90} tint="default">
                 <Pressable onPress={(e) => e.stopPropagation()}>
-                  <Text style={styles.modalTitle}>Rename Catalog</Text>
+                  <Text style={styles.modalTitle}>{t('catalog_settings.rename_modal_title')}</Text>
                   <TextInput
                     style={styles.modalInput}
                     value={currentRenameValue}
                     onChangeText={setCurrentRenameValue}
-                    placeholder="Enter new catalog name"
+                    placeholder={t('catalog_settings.rename_placeholder')}
                     placeholderTextColor={colors.mediumGray}
                     autoFocus={true}
                   />
                   <View style={styles.modalButtons}>
-                    <Button title="Cancel" onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
-                    <Button title="Save" onPress={handleSaveRename} color={colors.primary} />
+                    <Button title={t('common.cancel')} onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
+                    <Button title={t('common.save')} onPress={handleSaveRename} color={colors.primary} />
                   </View>
                 </Pressable>
               </BlurView>
@@ -734,18 +736,18 @@ const CatalogSettingsScreen = () => {
         ) : (
           <Pressable style={styles.modalOverlay} onPress={() => setIsRenameModalVisible(false)}>
             <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-              <Text style={styles.modalTitle}>Rename Catalog</Text>
+              <Text style={styles.modalTitle}>{t('catalog_settings.rename_modal_title')}</Text>
               <TextInput
                 style={styles.modalInput}
                 value={currentRenameValue}
                 onChangeText={setCurrentRenameValue}
-                placeholder="Enter new catalog name"
+                placeholder={t('catalog_settings.rename_placeholder')}
                 placeholderTextColor={colors.mediumGray}
                 autoFocus={true}
               />
               <View style={styles.modalButtons}>
-                <Button title="Cancel" onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
-                <Button title="Save" onPress={handleSaveRename} color={colors.primary} />
+                <Button title={t('common.cancel')} onPress={() => setIsRenameModalVisible(false)} color={colors.mediumGray} />
+                <Button title={t('common.save')} onPress={handleSaveRename} color={colors.primary} />
               </View>
             </Pressable>
           </Pressable>

@@ -5,6 +5,7 @@ export { default as IntegrationsSettingsScreen } from './IntegrationsSettingsScr
 export { default as PlaybackSettingsScreen } from './PlaybackSettingsScreen';
 export { default as AboutSettingsScreen } from './AboutSettingsScreen';
 export { default as DeveloperSettingsScreen } from './DeveloperSettingsScreen';
+export { default as LegalScreen } from './LegalScreen';
 
 // Reusable content component exports (for inline use on tablets)
 export { ContentDiscoverySettingsContent } from './ContentDiscoverySettingsScreen';

@@ -39,8 +39,65 @@ export async function getCatalogDisplayName(addonId: string, type: string, catal
 }
 
 // Function to clear the cache if settings are updated elsewhere
+// Function to clear the cache if settings are updated elsewhere
 export function clearCustomNameCache() {
     customNamesCache = {}; // Reset to empty object
     cacheTimestamp = 0; // Invalidate timestamp
     logger.info('Custom catalog name cache cleared.');
+}
+
+/**
+ * Formats a catalog name by de-duplicating words, removing redundant English suffixes, 
+ * and appending localized content type
+ */
+export function getFormattedCatalogName(
+    originalName: string,
+    type: string,
+    localizedMovie: string,
+    localizedSeries: string,
+    localizedChannels?: string
+): string {
+    if (!originalName) return '';
+
+    // 1. De-duplicate repeated words (case-insensitive)
+    const words = originalName.split(' ').filter(Boolean);
+    const uniqueWords: string[] = [];
+    const seen = new Set<string>();
+    for (const w of words) {
+        const lw = w.toLowerCase();
+        if (!seen.has(lw)) {
+            uniqueWords.push(w);
+            seen.add(lw);
+        }
+    }
+    let processedName = uniqueWords.join(' ');
+
+    // 2. Remove redundant English suffixes if they exist
+    const redundantSuffixes = [' movies', ' movie', ' series', ' tv shows', ' tv show', ' shows', ' show', ' channels', ' channel'];
+    const lowerName = processedName.toLowerCase();
+    for (const suffix of redundantSuffixes) {
+        if (lowerName.endsWith(suffix)) {
+            processedName = processedName.substring(0, processedName.length - suffix.length).trim();
+            break;
+        }
+    }
+
+    // 3. Determine the localized content type suffix
+    let contentType = '';
+    if (type === 'movie') {
+        contentType = localizedMovie;
+    } else if (type === 'series' || type === 'tv') {
+        contentType = localizedSeries;
+    } else if (type === 'channel' && localizedChannels) {
+        contentType = localizedChannels;
+    }
+
+    if (!contentType) return processedName;
+
+    // 4. If the processed name already contains the localized content type, return it
+    if (processedName.toLowerCase().includes(contentType.toLowerCase())) {
+        return processedName;
+    }
+
+    return `${processedName} ${contentType}`;
 } 

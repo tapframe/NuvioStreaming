@@ -7,6 +7,7 @@ import Animated, {
   SlideInRight,
   SlideOutRight,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { Stream } from '../../../types/streams';
 
 interface SourcesModalProps {
@@ -57,6 +58,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
   onSelectStream,
   isChangingSource = false,
 }) => {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const MENU_WIDTH = Math.min(width * 0.85, 400);
 
@@ -123,7 +125,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
           alignItems: 'center'
         }}>
           <Text style={{ color: 'white', fontSize: 20, fontWeight: '700' }}>
-            Change Source
+            {t('player_ui.change_source')}
           </Text>
         </View>
 
@@ -142,7 +144,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
             }}>
               <ActivityIndicator size="small" color="#22C55E" />
               <Text style={{ color: '#22C55E', fontSize: 14, fontWeight: '600', marginLeft: 10 }}>
-                Switching source...
+                {t('player_ui.switching_source')}
               </Text>
             </View>
           )}
@@ -191,7 +193,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
                                 fontSize: 14,
                                 flex: 1,
                               }} numberOfLines={1}>
-                                {stream.title || stream.name || `Stream ${index + 1}`}
+                                {stream.title || stream.name || t('player_ui.stream', { number: index + 1 })}
                               </Text>
                               <QualityBadge quality={quality} />
                             </View>
@@ -237,7 +239,7 @@ export const SourcesModal: React.FC<SourcesModalProps> = ({
             <View style={{ padding: 40, alignItems: 'center', opacity: 0.5 }}>
               <MaterialIcons name="cloud-off" size={48} color="white" />
               <Text style={{ color: 'white', marginTop: 16, textAlign: 'center', fontWeight: '600' }}>
-                No sources found
+                {t('player_ui.no_sources_found')}
               </Text>
             </View>
           )}

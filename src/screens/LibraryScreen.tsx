@@ -38,6 +38,7 @@ import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { traktService, TraktService, TraktImages } from '../services/traktService';
 import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
 import { useSettings } from '../hooks/useSettings';
+import { useTranslation } from 'react-i18next';
 import { useScrollToTop } from '../contexts/ScrollToTopContext';
 
 interface LibraryItem extends StreamingContent {
@@ -211,6 +212,7 @@ const SkeletonLoader = () => {
 };
 
 const LibraryScreen = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isDarkMode = useColorScheme() === 'dark';
   const { width, height } = useWindowDimensions();
@@ -361,31 +363,31 @@ const LibraryScreen = () => {
     const folders: TraktFolder[] = [
       {
         id: 'watched',
-        name: 'Watched',
+        name: t('library.watched'),
         icon: 'visibility',
         itemCount: (watchedMovies?.length || 0) + (watchedShows?.length || 0),
       },
       {
         id: 'continue-watching',
-        name: 'Continue',
+        name: t('library.continue'),
         icon: 'play-circle-outline',
         itemCount: continueWatching?.length || 0,
       },
       {
         id: 'watchlist',
-        name: 'Watchlist',
+        name: t('library.watchlist'),
         icon: 'bookmark',
         itemCount: (watchlistMovies?.length || 0) + (watchlistShows?.length || 0),
       },
       {
         id: 'collection',
-        name: 'Collection',
+        name: t('library.collection'),
         icon: 'library-add',
         itemCount: (collectionMovies?.length || 0) + (collectionShows?.length || 0),
       },
       {
         id: 'ratings',
-        name: 'Rated',
+        name: t('library.rated'),
         icon: 'star',
         itemCount: ratedContent?.length || 0,
       }
@@ -457,7 +459,7 @@ const LibraryScreen = () => {
             {folder.name}
           </Text>
           <Text style={styles.folderCount}>
-            {folder.itemCount} items
+            {folder.itemCount} {t('library.items')}
           </Text>
         </View>
       </View>
@@ -487,14 +489,14 @@ const LibraryScreen = () => {
             </Text>
             {traktAuthenticated && traktFolders.length > 0 && (
               <Text style={styles.folderCount}>
-                {traktFolders.length} items
+                {traktFolders.length} {t('library.items')}
               </Text>
             )}
           </View>
         </View>
         {settings.showPosterTitles && (
           <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-            Trakt collections
+            {t('library.trakt_collections')}
           </Text>
         )}
       </View>
@@ -720,9 +722,9 @@ const LibraryScreen = () => {
         return (
           <View style={styles.emptyContainer}>
             <TraktIcon width={80} height={80} style={{ opacity: 0.7, marginBottom: 16 }} />
-            <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>No Trakt collections</Text>
+            <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>{t('library.no_trakt')}</Text>
             <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
-              Your Trakt collections will appear here once you start using Trakt
+              {t('library.no_trakt_desc')}
             </Text>
             <TouchableOpacity
               style={[styles.exploreButton, {
@@ -734,7 +736,7 @@ const LibraryScreen = () => {
               }}
               activeOpacity={0.7}
             >
-              <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Load Collections</Text>
+              <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>{t('library.load_collections')}</Text>
             </TouchableOpacity>
           </View>
         );
@@ -758,13 +760,13 @@ const LibraryScreen = () => {
     const folderItems = getTraktFolderItems(selectedTraktFolder);
 
     if (folderItems.length === 0) {
-      const folderName = traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection';
+      const folderName = traktFolders.find(f => f.id === selectedTraktFolder)?.name || t('library.collection');
       return (
         <View style={styles.emptyContainer}>
           <TraktIcon width={80} height={80} style={{ opacity: 0.7, marginBottom: 16 }} />
-          <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>No content in {folderName}</Text>
+          <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>{t('library.empty_folder', { folder: folderName })}</Text>
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
-            This collection is empty
+            {t('library.empty_folder_desc')}
           </Text>
           <TouchableOpacity
             style={[styles.exploreButton, {
@@ -854,8 +856,8 @@ const LibraryScreen = () => {
     }
 
     if (filteredItems.length === 0) {
-      const emptyTitle = filter === 'movies' ? 'No movies yet' : filter === 'series' ? 'No TV shows yet' : 'No content yet';
-      const emptySubtitle = 'Add some content to your library to see it here';
+      const emptyTitle = filter === 'movies' ? t('library.no_movies') : filter === 'series' ? t('library.no_series') : t('library.no_content');
+      const emptySubtitle = t('library.add_content_desc');
       return (
         <View style={styles.emptyContainer}>
           <MaterialIcons
@@ -877,7 +879,7 @@ const LibraryScreen = () => {
             onPress={() => navigation.navigate('Search')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Find something to watch</Text>
+            <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>{t('library.find_something')}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -908,9 +910,9 @@ const LibraryScreen = () => {
       <ScreenHeader
         title={showTraktContent
           ? (selectedTraktFolder
-            ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || 'Collection'
-            : 'Trakt Collection')
-          : 'Library'
+            ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || t('library.collection')
+            : t('library.trakt_collection'))
+          : t('library.title')
         }
         showBackButton={showTraktContent}
         onBackPress={showTraktContent ? () => {
@@ -930,8 +932,8 @@ const LibraryScreen = () => {
         {!showTraktContent && (
           <View style={styles.filtersContainer}>
             {renderFilter('trakt', 'Trakt', 'pan-tool')}
-            {renderFilter('movies', 'Movies', 'movie')}
-            {renderFilter('series', 'TV Shows', 'live-tv')}
+            {renderFilter('movies', t('search.movies'), 'movie')}
+            {renderFilter('series', t('search.tv_shows'), 'live-tv')}
           </View>
         )}
 
@@ -951,11 +953,11 @@ const LibraryScreen = () => {
               case 'library': {
                 try {
                   await catalogService.removeFromLibrary(selectedItem.type, selectedItem.id);
-                  showInfo('Removed from Library', 'Item removed from your library');
+                  showInfo(t('library.removed_from_library'), t('library.item_removed'));
                   setLibraryItems(prev => prev.filter(item => !(item.id === selectedItem.id && item.type === selectedItem.type)));
                   setMenuVisible(false);
                 } catch (error) {
-                  showError('Failed to update Library', 'Unable to remove item from library');
+                  showError(t('library.failed_update_library'), t('library.unable_remove'));
                 }
                 break;
               }
@@ -964,14 +966,14 @@ const LibraryScreen = () => {
                   const key = `watched:${selectedItem.type}:${selectedItem.id}`;
                   const newWatched = !selectedItem.watched;
                   await mmkvStorage.setItem(key, newWatched ? 'true' : 'false');
-                  showInfo(newWatched ? 'Marked as Watched' : 'Marked as Unwatched', newWatched ? 'Item marked as watched' : 'Item marked as unwatched');
+                  showInfo(newWatched ? t('library.marked_watched') : t('library.marked_unwatched'), newWatched ? t('library.item_marked_watched') : t('library.item_marked_unwatched'));
                   setLibraryItems(prev => prev.map(item =>
                     item.id === selectedItem.id && item.type === selectedItem.type
                       ? { ...item, watched: newWatched }
                       : item
                   ));
                 } catch (error) {
-                  showError('Failed to update watched status', 'Unable to update watched status');
+                  showError(t('library.failed_update_watched'), t('library.unable_update_watched'));
                 }
                 break;
               }

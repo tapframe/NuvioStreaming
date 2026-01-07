@@ -21,6 +21,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import { Feather, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { stremioService } from '../services/stremioService';
 import { logger } from '../utils/logger';
@@ -160,13 +161,13 @@ const DEFAULT_TORRENTIO_CONFIG: TorrentioConfig = {
     isInstalled: false,
 };
 
-const getPlanName = (plan: number): string => {
+const getPlanName = (plan: number, t: any): string => {
     switch (plan) {
-        case 0: return 'Free';
-        case 1: return 'Essential ($3/mo)';
-        case 2: return 'Pro ($10/mo)';
-        case 3: return 'Standard ($5/mo)';
-        default: return 'Unknown';
+        case 0: return t('debrid.plan_free');
+        case 1: return t('debrid.plan_essential');
+        case 2: return t('debrid.plan_pro');
+        case 3: return t('debrid.plan_standard');
+        default: return t('debrid.plan_unknown');
     }
 };
 
@@ -687,6 +688,7 @@ const createStyles = (colors: any) => StyleSheet.create({
 });
 
 const DebridIntegrationScreen = () => {
+    const { t } = useTranslation();
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const colors = currentTheme.colors;
@@ -831,9 +833,9 @@ const DebridIntegrationScreen = () => {
     // Torbox handlers
     const handleConnect = async () => {
         if (!apiKey.trim()) {
-            setAlertTitle('Error');
-            setAlertMessage('Please enter a valid API Key');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('common.error'));
+            setAlertMessage(t('debrid.error_api_required'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
             return;
         }
@@ -860,15 +862,15 @@ const DebridIntegrationScreen = () => {
             setConfig(newConfig);
             setApiKey('');
 
-            setAlertTitle('Success');
-            setAlertMessage('Torbox addon connected successfully!');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('common.success'));
+            setAlertMessage(t('debrid.connected_title'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } catch (error) {
             logger.error('Failed to install Torbox addon:', error);
-            setAlertTitle('Error');
-            setAlertMessage('Failed to connect addon. Please check your API Key and try again.');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('common.error'));
+            setAlertMessage(t('addons.install_error'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } finally {
             setLoading(false);
@@ -888,12 +890,12 @@ const DebridIntegrationScreen = () => {
     };
 
     const handleDisconnect = async () => {
-        setAlertTitle('Disconnect Torbox');
-        setAlertMessage('Are you sure you want to disconnect Torbox? This will remove the addon and clear your saved API key.');
+        setAlertTitle(t('debrid.alert_disconnect_title'));
+        setAlertMessage(t('debrid.alert_disconnect_msg'));
         setAlertActions([
-            { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
+            { label: t('common.cancel'), onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
             {
-                label: 'Disconnect',
+                label: t('debrid.disconnect_button'),
                 onPress: async () => {
                     setAlertVisible(false);
                     setLoading(true);
@@ -913,15 +915,15 @@ const DebridIntegrationScreen = () => {
                         setConfig(null);
                         setUserData(null);
 
-                        setAlertTitle('Success');
-                        setAlertMessage('Torbox disconnected successfully');
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertTitle(t('common.success'));
+                        setAlertMessage(t('debrid.alert_disconnect_success', 'Torbox disconnected successfully'));
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } catch (error) {
                         logger.error('Failed to disconnect Torbox:', error);
-                        setAlertTitle('Error');
-                        setAlertMessage('Failed to disconnect Torbox');
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertTitle(t('common.error'));
+                        setAlertMessage(t('debrid.alert_disconnect_error', 'Failed to disconnect Torbox'));
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } finally {
                         setLoading(false);
@@ -1007,9 +1009,9 @@ const DebridIntegrationScreen = () => {
     const handleInstallTorrentio = async () => {
         // Check if API key is provided
         if (!torrentioConfig.debridApiKey.trim()) {
-            setAlertTitle('API Key Required');
-            setAlertMessage('Please enter your debrid service API key to install Torrentio.');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('debrid.error_api_required'));
+            setAlertMessage(t('debrid.error_api_required_desc'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
             return;
         }
@@ -1042,15 +1044,15 @@ const DebridIntegrationScreen = () => {
             await mmkvStorage.setItem(TORRENTIO_CONFIG_KEY, JSON.stringify(newConfig));
             setTorrentioConfig(newConfig);
 
-            setAlertTitle('Success');
-            setAlertMessage('Torrentio addon installed successfully!');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('common.success'));
+            setAlertMessage(t('debrid.success_installed'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } catch (error) {
             logger.error('Failed to install Torrentio addon:', error);
-            setAlertTitle('Error');
-            setAlertMessage('Failed to install Torrentio addon. Please try again.');
-            setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+            setAlertTitle(t('common.error'));
+            setAlertMessage(t('addons.install_error'));
+            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } finally {
             setTorrentioLoading(false);
@@ -1058,12 +1060,12 @@ const DebridIntegrationScreen = () => {
     };
 
     const handleRemoveTorrentio = async () => {
-        setAlertTitle('Remove Torrentio');
-        setAlertMessage('Are you sure you want to remove the Torrentio addon?');
+        setAlertTitle(t('debrid.remove_button'));
+        setAlertMessage(t('addons.uninstall_message', { name: 'Torrentio' }));
         setAlertActions([
-            { label: 'Cancel', onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
+            { label: t('common.cancel'), onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
             {
-                label: 'Remove',
+                label: t('debrid.remove_button'),
                 onPress: async () => {
                     setAlertVisible(false);
                     setTorrentioLoading(true);
@@ -1087,15 +1089,15 @@ const DebridIntegrationScreen = () => {
                         await mmkvStorage.setItem(TORRENTIO_CONFIG_KEY, JSON.stringify(newConfig));
                         setTorrentioConfig(newConfig);
 
-                        setAlertTitle('Success');
-                        setAlertMessage('Torrentio addon removed successfully');
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertTitle(t('common.success'));
+                        setAlertMessage(t('debrid.success_removed'));
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } catch (error) {
                         logger.error('Failed to remove Torrentio:', error);
-                        setAlertTitle('Error');
-                        setAlertMessage('Failed to remove Torrentio addon');
-                        setAlertActions([{ label: 'OK', onPress: () => setAlertVisible(false) }]);
+                        setAlertTitle(t('common.error'));
+                        setAlertMessage(t('addons.uninstall_error', 'Failed to remove Torrentio addon'));
+                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
                         setAlertVisible(true);
                     } finally {
                         setTorrentioLoading(false);
@@ -1114,14 +1116,14 @@ const DebridIntegrationScreen = () => {
                 <>
                     <View style={styles.statusCard}>
                         <View style={styles.statusRow}>
-                            <Text style={styles.statusLabel}>Status</Text>
-                            <Text style={[styles.statusValue, styles.statusConnected]}>Connected</Text>
+                            <Text style={styles.statusLabel}>{t('common.status')}</Text>
+                            <Text style={[styles.statusValue, styles.statusConnected]}>{t('debrid.status_connected')}</Text>
                         </View>
 
                         <View style={styles.divider} />
 
                         <View style={styles.statusRow}>
-                            <Text style={styles.statusLabel}>Enable Addon</Text>
+                            <Text style={styles.statusLabel}>{t('debrid.enable_addon')}</Text>
                             <Switch
                                 value={config.isEnabled}
                                 onValueChange={handleToggleEnabled}
@@ -1138,28 +1140,28 @@ const DebridIntegrationScreen = () => {
                         disabled={loading}
                     >
                         <Text style={styles.buttonText}>
-                            {loading ? 'Disconnecting...' : 'Disconnect & Remove'}
+                            {loading ? t('debrid.disconnect_loading') : t('debrid.disconnect_button')}
                         </Text>
                     </TouchableOpacity>
 
                     {userData && (
                         <View style={styles.userDataCard}>
                             <View style={styles.userDataHeader}>
-                                <Text style={styles.userDataTitle}>Account Information</Text>
+                                <Text style={styles.userDataTitle}>{t('debrid.account_info')}</Text>
                                 {userDataLoading && (
                                     <ActivityIndicator size="small" color={colors.primary} />
                                 )}
                             </View>
 
                             <View style={styles.userDataRow}>
-                                <Text style={styles.userDataLabel}>Email</Text>
+                                <Text style={styles.userDataLabel}>{t('common.email')}</Text>
                                 <Text style={styles.userDataValue} numberOfLines={1}>
                                     {userData.base_email || userData.email}
                                 </Text>
                             </View>
 
                             <View style={styles.userDataRow}>
-                                <Text style={styles.userDataLabel}>Plan</Text>
+                                <Text style={styles.userDataLabel}>{t('debrid.plan')}</Text>
                                 <View style={[
                                     styles.planBadge,
                                     userData.plan === 0 ? styles.planBadgeFree : styles.planBadgePaid
@@ -1168,24 +1170,24 @@ const DebridIntegrationScreen = () => {
                                         styles.planBadgeText,
                                         userData.plan === 0 ? styles.planBadgeTextFree : styles.planBadgeTextPaid
                                     ]}>
-                                        {getPlanName(userData.plan)}
+                                        {getPlanName(userData.plan, t)}
                                     </Text>
                                 </View>
                             </View>
 
                             <View style={styles.userDataRow}>
-                                <Text style={styles.userDataLabel}>Status</Text>
+                                <Text style={styles.userDataLabel}>{t('common.status')}</Text>
                                 <Text style={[
                                     styles.userDataValue,
                                     { color: userData.is_subscribed ? (colors.success || '#4CAF50') : colors.mediumEmphasis }
                                 ]}>
-                                    {userData.is_subscribed ? 'Active' : 'Free'}
+                                    {userData.is_subscribed ? t('debrid.status_active') : t('debrid.plan_free')}
                                 </Text>
                             </View>
 
                             {userData.premium_expires_at && (
                                 <View style={styles.userDataRow}>
-                                    <Text style={styles.userDataLabel}>Expires</Text>
+                                    <Text style={styles.userDataLabel}>{t('debrid.expires')}</Text>
                                     <Text style={styles.userDataValue}>
                                         {new Date(userData.premium_expires_at).toLocaleDateString()}
                                     </Text>
@@ -1193,7 +1195,7 @@ const DebridIntegrationScreen = () => {
                             )}
 
                             <View style={styles.userDataRow}>
-                                <Text style={styles.userDataLabel}>Downloaded</Text>
+                                <Text style={styles.userDataLabel}>{t('debrid.downloaded')}</Text>
                                 <Text style={styles.userDataValue}>
                                     {(userData.total_downloaded / (1024 * 1024 * 1024)).toFixed(2)} GB
                                 </Text>
@@ -1202,40 +1204,40 @@ const DebridIntegrationScreen = () => {
                     )}
 
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>✓ Connected to TorBox</Text>
+                        <Text style={styles.sectionTitle}>{t('debrid.connected_title')}</Text>
                         <Text style={styles.sectionText}>
-                            Your TorBox addon is active and providing premium streams.{config.isEnabled ? '' : ' (Currently disabled)'}
+                            {t('debrid.connected_desc')}
                         </Text>
                     </View>
 
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Configure Addon</Text>
+                        <Text style={styles.sectionTitle}>{t('debrid.configure_title')}</Text>
                         <Text style={styles.sectionText}>
-                            Customize your streaming experience. Sort by quality, filter file sizes, and manage other integration settings.
+                            {t('debrid.configure_desc')}
                         </Text>
                         <TouchableOpacity
                             style={styles.subscribeButton}
                             onPress={() => Linking.openURL('https://torbox.app/settings?section=integration-settings')}
                         >
-                            <Text style={styles.subscribeButtonText}>Open Settings</Text>
+                            <Text style={styles.subscribeButtonText}>{t('debrid.open_settings')}</Text>
                         </TouchableOpacity>
                     </View>
                 </>
             ) : (
                 <>
                     <Text style={styles.description}>
-                        Unlock 4K high-quality streams and lightning-fast speeds by integrating Torbox. Enter your API Key below to instantly upgrade your streaming experience.
+                        {t('debrid.description_torbox')}
                     </Text>
 
                     <TouchableOpacity onPress={() => Linking.openURL('https://guides.viren070.me/stremio/technical-details#debrid-services')} style={styles.guideLink}>
-                        <Text style={styles.guideLinkText}>What is a Debrid Service?</Text>
+                        <Text style={styles.guideLinkText}>{t('debrid.what_is_debrid')}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.inputContainer}>
-                        <Text style={styles.label}>Torbox API Key</Text>
+                        <Text style={styles.label}>{t('debrid.api_key_label')}</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="Enter your API Key"
+                            placeholder={t('debrid.enter_api_key')}
                             placeholderTextColor={colors.mediumGray}
                             value={apiKey}
                             onChangeText={setApiKey}
@@ -1251,24 +1253,24 @@ const DebridIntegrationScreen = () => {
                         disabled={loading}
                     >
                         <Text style={styles.connectButtonText}>
-                            {loading ? 'Connecting...' : 'Connect & Install'}
+                            {loading ? t('debrid.connecting') : t('debrid.connect_button')}
                         </Text>
                     </TouchableOpacity>
 
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Unlock Premium Speeds</Text>
+                        <Text style={styles.sectionTitle}>{t('debrid.unlock_speeds_title')}</Text>
                         <Text style={styles.sectionText}>
-                            Get a Torbox subscription to access cached high-quality streams with zero buffering.
+                            {t('debrid.unlock_speeds_desc')}
                         </Text>
                         <TouchableOpacity style={styles.subscribeButton} onPress={openSubscription}>
-                            <Text style={styles.subscribeButtonText}>Get Subscription</Text>
+                            <Text style={styles.subscribeButtonText}>{t('debrid.get_subscription')}</Text>
                         </TouchableOpacity>
                     </View>
                 </>
             )}
 
             <View style={[styles.logoContainer, { marginTop: 60 }]}>
-                <Text style={styles.poweredBy}>Powered by</Text>
+                <Text style={styles.poweredBy}>{t('debrid.powered_by')}</Text>
                 <View style={styles.logoRow}>
                     <Image
                         source={{ uri: 'https://torbox.app/assets/logo-bb7a9579.svg' }}
@@ -1277,7 +1279,7 @@ const DebridIntegrationScreen = () => {
                     />
                     <Text style={styles.logoText}>TorBox</Text>
                 </View>
-                <Text style={styles.disclaimer}>Nuvio is not affiliated with Torbox in any way.</Text>
+                <Text style={styles.disclaimer}>{t('debrid.disclaimer_torbox')}</Text>
             </View>
         </>
     );
@@ -1290,34 +1292,34 @@ const DebridIntegrationScreen = () => {
     const renderTorrentioTab = () => (
         <>
             <Text style={styles.description}>
-                Configure Torrentio to get torrent streams for movies and TV shows. A debrid service is required to stream content.
+                {t('debrid.description_torrentio')}
             </Text>
 
             {torrentioConfig.isInstalled && (
                 <View style={styles.installedBadge}>
-                    <Text style={styles.installedBadgeText}>✓ INSTALLED</Text>
+                    <Text style={styles.installedBadgeText}>{t('debrid.installed_badge')}</Text>
                 </View>
             )}
 
             {/* TorBox Promotion Card */}
             {!torrentioConfig.debridApiKey && (
                 <View style={styles.promoCard}>
-                    <Text style={styles.promoTitle}>⚡ Need a Debrid Service?</Text>
+                    <Text style={styles.promoTitle}>{t('debrid.promo_title')}</Text>
                     <Text style={styles.promoText}>
-                        Get TorBox for lightning-fast 4K streaming with zero buffering. Premium cached torrents and instant downloads.
+                        {t('debrid.promo_desc')}
                     </Text>
                     <TouchableOpacity
                         style={styles.promoButton}
                         onPress={() => Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7')}
                     >
-                        <Text style={styles.promoButtonText}>Get TorBox Subscription</Text>
+                        <Text style={styles.promoButtonText}>{t('debrid.promo_button')}</Text>
                     </TouchableOpacity>
                 </View>
             )}
 
             {/* Debrid Service Selection */}
             <View style={styles.configSection}>
-                <Text style={styles.configSectionTitle}>Debrid Service *</Text>
+                <Text style={styles.configSectionTitle}>{t('debrid.service_label')}</Text>
                 <View style={styles.pickerContainer}>
                     {TORRENTIO_DEBRID_SERVICES.map((service: any) => (
                         <TouchableOpacity
@@ -1341,7 +1343,7 @@ const DebridIntegrationScreen = () => {
 
             {/* Debrid API Key */}
             <View style={styles.configSection}>
-                <Text style={styles.configSectionTitle}>API Key *</Text>
+                <Text style={styles.configSectionTitle}>{t('debrid.api_key_label')}</Text>
                 <TextInput
                     style={styles.input}
                     placeholder={`Enter your ${TORRENTIO_DEBRID_SERVICES.find((d: any) => d.id === torrentioConfig.debridService)?.name || 'Debrid'} API Key`}
@@ -1360,9 +1362,9 @@ const DebridIntegrationScreen = () => {
                 onPress={() => toggleSection('sorting')}
             >
                 <View>
-                    <Text style={styles.accordionHeaderText}>Sorting</Text>
+                    <Text style={styles.accordionHeaderText}>{t('debrid.sorting_label')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || 'By quality'}
+                        {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || t('debrid.by_quality', 'By quality')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1391,9 +1393,9 @@ const DebridIntegrationScreen = () => {
                 onPress={() => toggleSection('qualityFilter')}
             >
                 <View>
-                    <Text style={styles.accordionHeaderText}>Exclude Qualities</Text>
+                    <Text style={styles.accordionHeaderText}>{t('debrid.exclude_qualities')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.qualityFilter.length > 0 ? `${torrentioConfig.qualityFilter.length} excluded` : 'None excluded'}
+                        {torrentioConfig.qualityFilter.length > 0 ? t('debrid.excluded_count', { count: torrentioConfig.qualityFilter.length, defaultValue: '{{count}} excluded' }) : t('debrid.none_excluded', 'None excluded')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1422,9 +1424,9 @@ const DebridIntegrationScreen = () => {
                 onPress={() => toggleSection('languages')}
             >
                 <View>
-                    <Text style={styles.accordionHeaderText}>Priority Languages</Text>
+                    <Text style={styles.accordionHeaderText}>{t('debrid.priority_languages')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} selected` : 'No preference'}
+                        {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} ${t('home_screen.selected')}` : t('debrid.no_preference', 'No preference')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1453,9 +1455,9 @@ const DebridIntegrationScreen = () => {
                 onPress={() => toggleSection('maxResults')}
             >
                 <View>
-                    <Text style={styles.accordionHeaderText}>Max Results</Text>
+                    <Text style={styles.accordionHeaderText}>{t('debrid.max_results')}</Text>
                     <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || 'All results'}
+                        {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || t('debrid.all_results', 'All results')}
                     </Text>
                 </View>
                 <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
@@ -1484,15 +1486,15 @@ const DebridIntegrationScreen = () => {
                 onPress={() => toggleSection('options')}
             >
                 <View>
-                    <Text style={styles.accordionHeaderText}>Additional Options</Text>
-                    <Text style={styles.accordionSubtext}>Catalog & download settings</Text>
+                    <Text style={styles.accordionHeaderText}>{t('debrid.additional_options')}</Text>
+                    <Text style={styles.accordionSubtext}>{t('debrid.catalog_download_settings', 'Catalog & download settings')}</Text>
                 </View>
                 <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
             </TouchableOpacity>
             {expandedSections.options && (
                 <View style={styles.accordionContent}>
                     <View style={styles.switchRow}>
-                        <Text style={styles.switchLabel}>Don't show download links</Text>
+                        <Text style={styles.switchLabel}>{t('debrid.no_download_links')}</Text>
                         <Switch
                             value={torrentioConfig.noDownloadLinks}
                             onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noDownloadLinks: val }))}
@@ -1501,7 +1503,7 @@ const DebridIntegrationScreen = () => {
                         />
                     </View>
                     <View style={styles.switchRow}>
-                        <Text style={styles.switchLabel}>Don't show debrid catalog</Text>
+                        <Text style={styles.switchLabel}>{t('debrid.no_debrid_catalog')}</Text>
                         <Switch
                             value={torrentioConfig.noCatalog}
                             onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noCatalog: val }))}
@@ -1532,7 +1534,7 @@ const DebridIntegrationScreen = () => {
                             disabled={torrentioLoading}
                         >
                             <Text style={styles.connectButtonText}>
-                                {torrentioLoading ? 'Updating...' : 'Update Configuration'}
+                                {torrentioLoading ? t('debrid.updating') : t('debrid.update_button')}
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -1540,7 +1542,7 @@ const DebridIntegrationScreen = () => {
                             onPress={handleRemoveTorrentio}
                             disabled={torrentioLoading}
                         >
-                            <Text style={styles.buttonText}>Remove Torrentio</Text>
+                            <Text style={styles.buttonText}>{t('debrid.remove_button')}</Text>
                         </TouchableOpacity>
                     </>
                 ) : (
@@ -1550,14 +1552,14 @@ const DebridIntegrationScreen = () => {
                         disabled={torrentioLoading}
                     >
                         <Text style={styles.connectButtonText}>
-                            {torrentioLoading ? 'Installing...' : 'Install Torrentio'}
+                            {torrentioLoading ? t('debrid.installing') : t('debrid.install_button')}
                         </Text>
                     </TouchableOpacity>
                 )}
             </View>
 
             <Text style={[styles.disclaimer, { marginTop: 24, marginBottom: 40 }]}>
-                Nuvio is not affiliated with Torrentio in any way.
+                {t('debrid.disclaimer_torrentio')}
             </Text>
         </>
     );
@@ -1584,7 +1586,7 @@ const DebridIntegrationScreen = () => {
                 >
                     <Feather name="arrow-left" size={24} color={colors.white} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Debrid Integration</Text>
+                <Text style={styles.headerTitle}>{t('debrid.title')}</Text>
             </View>
 
             {/* Tab Selector */}
@@ -1594,7 +1596,7 @@ const DebridIntegrationScreen = () => {
                     onPress={() => setActiveTab('torbox')}
                 >
                     <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText]}>
-                        TorBox
+                        {t('debrid.tab_torbox')}
                     </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1602,7 +1604,7 @@ const DebridIntegrationScreen = () => {
                     onPress={() => setActiveTab('torrentio')}
                 >
                     <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText]}>
-                        Torrentio
+                        {t('debrid.tab_torrentio')}
                     </Text>
                 </TouchableOpacity>
             </View>

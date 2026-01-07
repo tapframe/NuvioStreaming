@@ -14,9 +14,11 @@ import {
   Dimensions
 } from 'react-native';
 import { useSettings } from '../hooks/useSettings';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -107,6 +109,7 @@ const SectionHeader: React.FC<{ title: string; isDarkMode: boolean; colors: any 
 );
 
 const HomeScreenSettings: React.FC = () => {
+  const { t } = useTranslation();
   const { settings, updateSetting } = useSettings();
   const systemColorScheme = useColorScheme();
   const { currentTheme } = useTheme();
@@ -247,11 +250,11 @@ const HomeScreenSettings: React.FC = () => {
   // Format selected catalogs text
   const getSelectedCatalogsText = useCallback(() => {
     if (!settings.selectedHeroCatalogs || settings.selectedHeroCatalogs.length === 0) {
-      return "All catalogs";
+      return t("home_screen.all_catalogs");
     } else {
-      return `${settings.selectedHeroCatalogs.length} selected`;
+      return `${settings.selectedHeroCatalogs.length} ${t("home_screen.selected")}`;
     }
-  }, [settings.selectedHeroCatalogs]);
+  }, [settings.selectedHeroCatalogs, t]);
 
   const ChevronRight = () => (
     <MaterialIcons
@@ -268,14 +271,10 @@ const HomeScreenSettings: React.FC = () => {
     ]}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <MaterialIcons
-            name="arrow-back"
-            size={24}
-            color={isDarkMode ? colors.highEmphasis : colors.textDark}
-          />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Feather name="arrow-left" size={24} color={currentTheme.colors.text} />
           <Text style={[styles.backText, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-            Settings
+            {t('settings.title')}
           </Text>
         </TouchableOpacity>
 
@@ -285,7 +284,7 @@ const HomeScreenSettings: React.FC = () => {
       </View>
 
       <Text style={[styles.headerTitle, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>
-        Home Screen Settings
+        {t('home_screen.title')}
       </Text>
 
       {/* Saved indicator */}
@@ -300,7 +299,7 @@ const HomeScreenSettings: React.FC = () => {
         pointerEvents="none"
       >
         <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
-        <Text style={styles.savedIndicatorText}>Changes Applied</Text>
+        <Text style={styles.savedIndicatorText}>{t('home_screen.changes_applied')}</Text>
       </Animated.View>
 
       <ScrollView
@@ -308,11 +307,11 @@ const HomeScreenSettings: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <SectionHeader title="DISPLAY OPTIONS" isDarkMode={isDarkMode} colors={colors} />
+        <SectionHeader title={t("home_screen.display_options")} isDarkMode={isDarkMode} colors={colors} />
         <SettingsCard isDarkMode={isDarkMode} colors={colors}>
           <SettingItem
-            title="Show Hero Section"
-            description="Featured content at the top"
+            title={t("home_screen.show_hero")}
+            description={t("home_screen.show_hero_desc")}
             icon="movie-filter"
             isDarkMode={isDarkMode}
             colors={colors}
@@ -324,8 +323,8 @@ const HomeScreenSettings: React.FC = () => {
             )}
           />
           <SettingItem
-            title="Show This Week Section"
-            description="New episodes from current week"
+            title={t("home_screen.show_this_week")}
+            description={t("home_screen.show_this_week_desc")}
             icon="date-range"
             isDarkMode={isDarkMode}
             colors={colors}
@@ -338,7 +337,7 @@ const HomeScreenSettings: React.FC = () => {
           />
           {settings.showHeroSection && (
             <SettingItem
-              title="Select Catalogs"
+              title={t("home_screen.select_catalogs")}
               description={getSelectedCatalogsText()}
               icon="list"
               isDarkMode={isDarkMode}
@@ -354,29 +353,29 @@ const HomeScreenSettings: React.FC = () => {
           <>
             {!isTabletDevice && (
               <View style={styles.segmentCard}>
-                <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Hero Layout</Text>
+                <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>{t('home_screen.hero_layout')}</Text>
                 <SegmentedControl
                   options={[
-                    { label: 'Legacy', value: 'legacy' },
-                    { label: 'Carousel', value: 'carousel' },
-                    { label: 'Apple TV', value: 'appletv' }
+                    { label: t('home_screen.layout_legacy'), value: 'legacy' },
+                    { label: t('home_screen.layout_carousel'), value: 'carousel' },
+                    { label: t('home_screen.layout_appletv'), value: 'appletv' }
                   ]}
                   value={settings.heroStyle}
                   onChange={(val) => handleUpdateSetting('heroStyle', val as any)}
                 />
-                <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Full-width banner, swipeable cards, or Apple TV style</Text>
+                <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>{t('home_screen.layout_desc')}</Text>
               </View>
             )}
 
             <View style={styles.segmentCard}>
-              <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Featured Source</Text>
-              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Using Catalogs</Text>
+              <Text style={[styles.segmentTitle, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>{t('home_screen.featured_source')}</Text>
+              <Text style={[styles.segmentHint, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>{t('home_screen.using_catalogs')}</Text>
               <TouchableOpacity
                 onPress={() => navigation.navigate('HeroCatalogs')}
                 style={[styles.manageLink, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.04)' }]}
                 activeOpacity={0.8}
               >
-                <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>Manage selected catalogs</Text>
+                <Text style={{ color: isDarkMode ? colors.highEmphasis : colors.textDark, fontWeight: '600' }}>{t('home_screen.manage_selected_catalogs')}</Text>
                 <MaterialIcons name="chevron-right" size={20} color={isDarkMode ? colors.mediumEmphasis : colors.textMutedDark} />
               </TouchableOpacity>
             </View>
@@ -384,8 +383,8 @@ const HomeScreenSettings: React.FC = () => {
             {settings.heroStyle === 'carousel' && (
               <SettingsCard isDarkMode={isDarkMode} colors={colors}>
                 <SettingItem
-                  title="Dynamic Hero Background"
-                  description="Blurred banner behind carousel"
+                  title={t("home_screen.dynamic_bg")}
+                  description={t("home_screen.dynamic_bg_desc")}
                   icon="wallpaper"
                   isDarkMode={isDarkMode}
                   colors={colors}
@@ -396,44 +395,44 @@ const HomeScreenSettings: React.FC = () => {
                     />
                   )}
                 />
-                <Text style={[styles.settingInlineNote, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>May impact performance on low-end devices.</Text>
+                <Text style={[styles.settingInlineNote, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>{t('home_screen.performance_note')}</Text>
               </SettingsCard>
             )}
           </>
         )}
 
         <SettingsCard isDarkMode={isDarkMode} colors={colors}>
-          <Text style={[styles.cardHeader, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>Posters</Text>
+          <Text style={[styles.cardHeader, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>{t('home_screen.posters')}</Text>
           <View style={styles.settingsRowInline}>
-            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Show Titles</Text>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>{t('home_screen.show_titles')}</Text>
             <CustomSwitch
               value={settings.showPosterTitles}
               onValueChange={(value) => handleUpdateSetting('showPosterTitles', value)}
             />
           </View>
           <View style={styles.settingsRow}>
-            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Poster Size</Text>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>{t('home_screen.poster_size')}</Text>
             <SegmentedControl
-              options={[{ label: 'Small', value: 'small' }, { label: 'Medium', value: 'medium' }, { label: 'Large', value: 'large' }]}
+              options={[{ label: t('home_screen.size_small'), value: 'small' }, { label: t('home_screen.size_medium'), value: 'medium' }, { label: t('home_screen.size_large'), value: 'large' }]}
               value={settings.posterSize}
               onChange={(val) => handleUpdateSetting('posterSize', val as any)}
             />
           </View>
 
           <View style={styles.settingsRow}>
-            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>Poster Corners</Text>
+            <Text style={[styles.rowLabel, { color: isDarkMode ? colors.highEmphasis : colors.textDark }]}>{t('home_screen.poster_corners')}</Text>
             <SegmentedControl
-              options={[{ label: 'Square', value: '0' }, { label: 'Rounded', value: '12' }, { label: 'Pill', value: '20' }]}
+              options={[{ label: t('home_screen.corners_square'), value: '0' }, { label: t('home_screen.corners_rounded'), value: '12' }, { label: t('home_screen.corners_pill'), value: '20' }]}
               value={String(settings.posterBorderRadius)}
               onChange={(val) => handleUpdateSetting('posterBorderRadius', Number(val) as any)}
             />
           </View>
         </SettingsCard>
 
-        <SectionHeader title="ABOUT THESE SETTINGS" isDarkMode={isDarkMode} colors={colors} />
+        <SectionHeader title={t("home_screen.about_these_settings")} isDarkMode={isDarkMode} colors={colors} />
         <View style={[styles.infoCard, { backgroundColor: isDarkMode ? colors.elevation1 : 'rgba(0,0,0,0.03)' }]}>
           <Text style={[styles.infoText, { color: isDarkMode ? colors.mediumEmphasis : colors.textMutedDark }]}>
-            These settings control how content is displayed on your Home screen. Changes are applied immediately without requiring an app restart.
+            {t('home_screen.about_desc')}
           </Text>
         </View>
       </ScrollView>

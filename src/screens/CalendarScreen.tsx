@@ -16,6 +16,7 @@ import {
 import { InteractionManager } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -55,6 +56,7 @@ interface CalendarSection {
 }
 
 const CalendarScreen = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { libraryItems, loading: libraryLoading } = useLibrary();
   const { currentTheme } = useTheme();
@@ -189,7 +191,7 @@ const CalendarScreen = () => {
             ) : (
               <>
                 <Text style={[styles.noEpisodesText, { color: currentTheme.colors.text }]}>
-                  No scheduled episodes
+                  {t('calendar.no_scheduled_episodes')}
                 </Text>
                 <View style={styles.dateContainer}>
                   <MaterialIcons 
@@ -197,7 +199,7 @@ const CalendarScreen = () => {
                     size={16} 
                     color={currentTheme.colors.lightGray} 
                   />
-                  <Text style={[styles.date, { color: currentTheme.colors.lightGray }]}>Check back later</Text>
+                  <Text style={[styles.date, { color: currentTheme.colors.lightGray }]}>{t('calendar.check_back_later')}</Text>
                 </View>
               </>
             )}
@@ -207,16 +209,28 @@ const CalendarScreen = () => {
     );
   };
   
-  const renderSectionHeader = ({ section }: { section: CalendarSection }) => (
-    <View style={[styles.sectionHeader, { 
-      backgroundColor: currentTheme.colors.darkBackground,
-      borderBottomColor: currentTheme.colors.border 
-    }]}>
-      <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>
-        {section.title}
-      </Text>
-    </View>
-  );
+  const renderSectionHeader = ({ section }: { section: CalendarSection }) => {
+    // Map section titles to translation keys
+    const titleKeyMap: Record<string, string> = {
+      'This Week': 'home.this_week',
+      'Upcoming': 'home.upcoming',
+      'Recently Released': 'home.recently_released',
+      'Series with No Scheduled Episodes': 'home.no_scheduled_episodes'
+    };
+    
+    const displayTitle = titleKeyMap[section.title] ? t(titleKeyMap[section.title]) : section.title;
+
+    return (
+      <View style={[styles.sectionHeader, { 
+        backgroundColor: currentTheme.colors.darkBackground,
+        borderBottomColor: currentTheme.colors.border 
+      }]}>
+        <Text style={[styles.sectionTitle, { color: currentTheme.colors.text }]}>
+          {displayTitle}
+        </Text>
+      </View>
+    );
+  };
   
   // Process all episodes once data is loaded - using memory-efficient approach
   const allEpisodes = React.useMemo(() => {
@@ -276,7 +290,7 @@ const CalendarScreen = () => {
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={styles.loadingText}>Loading calendar...</Text>
+          <Text style={[styles.loadingText, { color: currentTheme.colors.text }]}>{t('calendar.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -293,14 +307,14 @@ const CalendarScreen = () => {
         >
           <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>Calendar</Text>
+        <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>{t('calendar.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
       
       {selectedDate && filteredEpisodes.length > 0 && (
         <View style={[styles.filterInfoContainer, { borderBottomColor: currentTheme.colors.border }]}>
           <Text style={[styles.filterInfoText, { color: currentTheme.colors.text }]}>
-            Showing episodes for {format(selectedDate, 'MMMM d, yyyy')}
+            {t('calendar.showing_episodes_for', { date: format(selectedDate, 'MMMM d, yyyy') })}
           </Text>
           <TouchableOpacity onPress={clearDateFilter} style={styles.clearFilterButton}>
             <MaterialIcons name="close" size={18} color={currentTheme.colors.text} />
@@ -337,14 +351,14 @@ const CalendarScreen = () => {
         <View style={styles.emptyFilterContainer}>
           <MaterialIcons name="event-busy" size={48} color={currentTheme.colors.lightGray} />
           <Text style={[styles.emptyFilterText, { color: currentTheme.colors.text }]}>
-            No episodes for {format(selectedDate, 'MMMM d, yyyy')}
+            {t('calendar.no_episodes_for', { date: format(selectedDate, 'MMMM d, yyyy') })}
           </Text>
           <TouchableOpacity 
             style={[styles.clearFilterButtonLarge, { backgroundColor: currentTheme.colors.primary }]}
             onPress={clearDateFilter}
           >
-            <Text style={[styles.clearFilterButtonText, { color: currentTheme.colors.text }]}>
-              Show All Episodes
+            <Text style={[styles.clearFilterButtonText, { color: currentTheme.colors.white }]}>
+              {t('calendar.show_all_episodes')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -373,10 +387,10 @@ const CalendarScreen = () => {
         <View style={styles.emptyContainer}>
           <MaterialIcons name="calendar-today" size={64} color={currentTheme.colors.lightGray} />
           <Text style={[styles.emptyText, { color: currentTheme.colors.text }]}>
-            No upcoming episodes found
+            {t('calendar.no_upcoming_found')}
           </Text>
           <Text style={[styles.emptySubtext, { color: currentTheme.colors.lightGray }]}>
-            Add series to your library to see their upcoming episodes here
+            {t('calendar.add_series_desc')}
           </Text>
         </View>
       )}

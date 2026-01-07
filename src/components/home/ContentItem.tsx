@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useToast } from '../../contexts/ToastContext';
 import { DeviceEventEmitter } from 'react-native';
 import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, Platform, Text, Share } from 'react-native';
@@ -82,6 +83,7 @@ const posterLayout = calculatePosterLayout(width);
 const POSTER_WIDTH = posterLayout.posterWidth;
 
 const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, deferMs = 0 }: ContentItemProps) => {
+  const { t } = useTranslation();
   // Track inLibrary status locally to force re-render
   const [inLibrary, setInLibrary] = useState(!!item.inLibrary);
 
@@ -182,10 +184,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'library':
         if (inLibrary) {
           catalogService.removeFromLibrary(item.type, item.id);
-          showInfo('Removed from Library', 'Removed from your local library');
+          showInfo(t('library.removed_from_library'), t('library.item_removed'));
         } else {
           catalogService.addToLibrary(item);
-          showSuccess('Added to Library', 'Added to your local library');
+          showSuccess(t('library.added_to_library'), t('library.item_added'));
         }
         break;
       case 'watched': {
@@ -194,7 +196,7 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
         try {
           await mmkvStorage.setItem(`watched:${item.type}:${item.id}`, targetWatched ? 'true' : 'false');
         } catch { }
-        showInfo(targetWatched ? 'Marked as Watched' : 'Marked as Unwatched', targetWatched ? 'Item marked as watched' : 'Item marked as unwatched');
+        showInfo(targetWatched ? t('library.marked_watched') : t('library.marked_unwatched'), targetWatched ? t('library.item_marked_watched') : t('library.item_marked_unwatched'));
         setTimeout(() => {
           DeviceEventEmitter.emit('watchedStatusChanged');
         }, 100);
@@ -240,10 +242,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'trakt-watchlist': {
         if (isInWatchlist(item.id, item.type as 'movie' | 'show')) {
           await removeFromWatchlist(item.id, item.type as 'movie' | 'show');
-          showInfo('Removed from Watchlist', 'Removed from your Trakt watchlist');
+          showInfo(t('library.removed_from_watchlist'), t('library.removed_from_watchlist_desc'));
         } else {
           await addToWatchlist(item.id, item.type as 'movie' | 'show');
-          showSuccess('Added to Watchlist', 'Added to your Trakt watchlist');
+          showSuccess(t('library.added_to_watchlist'), t('library.added_to_watchlist_desc'));
         }
         setMenuVisible(false);
         break;
@@ -251,10 +253,10 @@ const ContentItem = ({ item, onPress, shouldLoadImage: shouldLoadImageProp, defe
       case 'trakt-collection': {
         if (isInCollection(item.id, item.type as 'movie' | 'show')) {
           await removeFromCollection(item.id, item.type as 'movie' | 'show');
-          showInfo('Removed from Collection', 'Removed from your Trakt collection');
+          showInfo(t('library.removed_from_collection'), t('library.removed_from_collection_desc'));
         } else {
           await addToCollection(item.id, item.type as 'movie' | 'show');
-          showSuccess('Added to Collection', 'Added to your Trakt collection');
+          showSuccess(t('library.added_to_collection'), t('library.added_to_collection_desc'));
         }
         setMenuVisible(false);
         break;

@@ -7,6 +7,7 @@ import Animated, {
   SlideInRight,
   SlideOutRight,
 } from 'react-native-reanimated';
+import { useTranslation } from 'react-i18next';
 import { Episode } from '../../../types/metadata';
 import { EpisodeCard } from '../cards/EpisodeCard';
 import { storageService } from '../../../services/storageService';
@@ -32,6 +33,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
   onSelectEpisode,
   tmdbEpisodeOverrides
 }) => {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const [selectedSeason, setSelectedSeason] = useState<number>(currentEpisode?.season || 1);
   const [episodeProgress, setEpisodeProgress] = useState<{ [key: string]: any }>({});
@@ -117,7 +119,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
       >
         <View style={{ paddingTop: Platform.OS === 'ios' ? 60 : 20, paddingHorizontal: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <Text style={{ color: 'white', fontSize: 22, fontWeight: '700' }}>Episodes</Text>
+            <Text style={{ color: 'white', fontSize: 22, fontWeight: '700' }}>{t('player_ui.episodes')}</Text>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 15, gap: 8 }}>
@@ -143,7 +145,7 @@ export const EpisodesModal: React.FC<EpisodesModalProps> = ({
                     color: selectedSeason === season ? 'black' : 'white',
                     fontWeight: selectedSeason === season ? '700' : '500'
                   }}>
-                    {season === 0 ? 'Specials' : `Season ${season}`}
+                    {season === 0 ? t('player_ui.specials') : t('player_ui.season', { season })}
                   </Text>
                 </TouchableOpacity>
               ))}

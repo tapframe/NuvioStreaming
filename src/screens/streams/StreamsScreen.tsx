@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Platform } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PaperProvider } from 'react-native-paper';
@@ -88,6 +89,7 @@ export const StreamsScreen = () => {
     gradientColors,
   } = useStreamsScreen();
 
+  const { t } = useTranslation();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   return (
@@ -106,8 +108,8 @@ export const StreamsScreen = () => {
               <MaterialIcons name="arrow-back" size={24} color={colors.white} />
               <Text style={styles.backButtonText}>
                 {metadata?.videos && metadata.videos.length > 1 && selectedEpisode
-                  ? 'Back to Episodes'
-                  : 'Back to Info'}
+                  ? t('streams.back_to_episodes')
+                  : t('streams.back_to_info')}
               </Text>
             </TouchableOpacity>
           </View>

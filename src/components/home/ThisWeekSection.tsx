@@ -9,6 +9,7 @@ import {
   Dimensions
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -58,6 +59,7 @@ interface ThisWeekEpisode {
 }
 
 export const ThisWeekSection = React.memo(() => {
+  const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { currentTheme } = useTheme();
   const { calendarData, loading } = useCalendarData();
@@ -176,7 +178,7 @@ export const ThisWeekSection = React.memo(() => {
         processedItems.push({
           ...firstEp,
           id: `group_${firstEp.seriesId}_${firstEp.releaseDate}`, // Unique ID for the group
-          title: `${group.length} New Episodes`,
+          title: t('home.new_episodes', { count: group.length }),
           isReleased,
           isGroup: true,
           episodeCount: group.length,
@@ -239,7 +241,7 @@ export const ThisWeekSection = React.memo(() => {
   const renderEpisodeItem = ({ item, index }: { item: ThisWeekEpisode, index: number }) => {
     // Handle episodes without release dates gracefully
     const releaseDate = item.releaseDate ? parseISO(item.releaseDate) : null;
-    const formattedDate = releaseDate ? format(releaseDate, 'MMM d') : 'TBA';
+    const formattedDate = releaseDate ? format(releaseDate, 'MMM d') : t('home.tba');
     const isReleased = item.isReleased;
 
     // Use episode still image if available, fallback to series poster
@@ -294,12 +296,12 @@ export const ThisWeekSection = React.memo(() => {
               locations={[0, 0.4, 0.7, 1]}
             >
               <View style={styles.cardHeader}>
-                <View style={[
+                <View style={[  
                   styles.statusBadge,
                   { backgroundColor: isReleased ? currentTheme.colors.primary : 'rgba(0,0,0,0.6)' }
                 ]}>
                   <Text style={styles.statusText}>
-                    {isReleased ? (item.isGroup ? 'Released' : 'New') : formattedDate}
+                    {isReleased ? (item.isGroup ? t('home.released') : t('home.new')) : formattedDate}
                   </Text>
                 </View>
               </View>
@@ -357,7 +359,7 @@ export const ThisWeekSection = React.memo(() => {
               color: currentTheme.colors.text,
               fontSize: isTV ? 32 : isLargeTablet ? 28 : isTablet ? 26 : 24
             }
-          ]}>This Week</Text>
+          ]}>{t('home.this_week')}</Text>
           <View style={[
             styles.titleUnderline,
             {
@@ -380,7 +382,7 @@ export const ThisWeekSection = React.memo(() => {
               color: currentTheme.colors.textMuted,
               fontSize: isTV ? 18 : isLargeTablet ? 16 : isTablet ? 15 : 14
             }
-          ]}>View All</Text>
+          ]}>{t('home.view_all')}</Text>
           <MaterialIcons
             name="chevron-right"
             size={isTV ? 24 : isLargeTablet ? 22 : isTablet ? 20 : 20}

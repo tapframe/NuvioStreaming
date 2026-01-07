@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTrailer } from '../../contexts/TrailerContext';
 import { logger } from '../../utils/logger';
@@ -18,24 +19,6 @@ import Video, { VideoRef, OnLoadData, OnProgressData } from 'react-native-video'
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
-
-// Helper function to format trailer type
-const formatTrailerType = (type: string): string => {
-  switch (type) {
-    case 'Trailer':
-      return 'Official Trailer';
-    case 'Teaser':
-      return 'Teaser';
-    case 'Clip':
-      return 'Clip';
-    case 'Featurette':
-      return 'Featurette';
-    case 'Behind the Scenes':
-      return 'Behind the Scenes';
-    default:
-      return type;
-  }
-};
 
 interface TrailerVideo {
   id: string;
@@ -61,8 +44,28 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
   trailer,
   contentTitle
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const { pauseTrailer, resumeTrailer } = useTrailer();
+
+  // Helper function to format trailer type with translations
+  const formatTrailerType = useCallback((type: string): string => {
+    switch (type) {
+      case 'Trailer':
+        return t('trailers.official_trailer');
+      case 'Teaser':
+        return t('trailers.teaser');
+      case 'Clip':
+        return t('trailers.clip');
+      case 'Featurette':
+        return t('trailers.featurette');
+      case 'Behind the Scenes':
+        return t('trailers.behind_the_scenes');
+      default:
+        return type;
+    }
+  }, [t]);
+
   const videoRef = React.useRef<VideoRef>(null);
   const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -126,9 +129,9 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
       logger.error('TrailerModal', 'Error loading trailer:', err);
 
       Alert.alert(
-        'Trailer Unavailable',
-        'This trailer could not be loaded at this time. Please try again later.',
-        [{ text: 'OK', style: 'default' }]
+        t('trailers.unavailable'),
+        t('trailers.unavailable_desc'),
+        [{ text: t('common.ok'), style: 'default' }]
       );
     }
   }, [trailer, contentTitle, pauseTrailer]);
@@ -232,7 +235,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
               hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
             >
               <Text style={[styles.closeButtonText, { color: currentTheme.colors.highEmphasis }]}>
-                Close
+                {t('common.close')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -257,7 +260,7 @@ const TrailerModal: React.FC<TrailerModalProps> = memo(({
                   style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
                   onPress={loadTrailer}
                 >
-                  <Text style={styles.retryButtonText}>Try Again</Text>
+                  <Text style={styles.retryButtonText}>{t('common.try_again')}</Text>
                 </TouchableOpacity>
               </View>
             )}

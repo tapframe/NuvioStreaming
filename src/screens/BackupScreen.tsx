@@ -23,12 +23,14 @@ import { useTheme } from '../contexts/ThemeContext';
 import { logger } from '../utils/logger';
 import CustomAlert from '../components/CustomAlert';
 import { useBackupOptions } from '../hooks/useBackupOptions';
+import { useTranslation } from 'react-i18next';
 
 const BackupScreen: React.FC = () => {
   const { currentTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation();
   const { preferences, updatePreference, getBackupOptions } = useBackupOptions();
+  const { t } = useTranslation();
 
   // Collapsible sections state
   const [expandedSections, setExpandedSections] = useState({
@@ -60,7 +62,7 @@ const BackupScreen: React.FC = () => {
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
-    setAlertActions(actions && actions.length > 0 ? actions : [{ label: 'OK', onPress: () => { } }]);
+    setAlertActions(actions && actions.length > 0 ? actions : [{ label: t('common.ok'), onPress: () => { } }]);
     setAlertVisible(true);
   };
 
@@ -71,9 +73,9 @@ const BackupScreen: React.FC = () => {
       logger.error('[BackupScreen] Failed to restart app:', error);
       // Fallback: show error message
       openAlert(
-        'Restart Failed',
-        'Failed to restart the app. Please manually close and reopen the app to see your restored data.',
-        [{ label: 'OK', onPress: () => { } }]
+        t('backup.alert_restart_failed_title'),
+        t('backup.alert_restart_failed_msg'),
+        [{ label: t('common.ok'), onPress: () => { } }]
       );
     }
   };
@@ -128,12 +130,12 @@ const BackupScreen: React.FC = () => {
       let total = 0;
 
       if (preferences.includeLibrary) {
-        items.push(`Library: ${preview.library} items`);
+        items.push(`${t('backup.library_label')}: ${preview.library} items`);
         total += preview.library;
       }
 
       if (preferences.includeWatchProgress) {
-        items.push(`Watch Progress: ${preview.watchProgress} entries`);
+        items.push(`${t('backup.watch_progress_label')}: ${preview.watchProgress} entries`);
         total += preview.watchProgress;
         // Include watched status with watch progress
         items.push(`Watched Status: ${preview.watchedStatus} items`);
@@ -141,28 +143,28 @@ const BackupScreen: React.FC = () => {
       }
 
       if (preferences.includeAddons) {
-        items.push(`Addons: ${preview.addons} installed`);
+        items.push(`${t('backup.addons_label')}: ${preview.addons} installed`);
         total += preview.addons;
       }
 
       if (preferences.includeLocalScrapers) {
-        items.push(`Plugins: ${preview.scrapers} configurations`);
+        items.push(`${t('backup.plugins_label')}: ${preview.scrapers} configurations`);
         total += preview.scrapers;
       }
 
       // Check if no items are selected
       const message = items.length > 0
         ? `Backup Contents:\n\n${items.join('\n')}\n\nTotal: ${total} items\n\nThis backup includes your selected app settings, themes, watched markers, and integration data.`
-        : `No content selected for backup.\n\nPlease enable at least one option in the Backup Options section above.`;
+        : t('backup.alert_no_content');
 
       openAlert(
-        'Create Backup',
+        t('backup.alert_create_title'),
         message,
         items.length > 0
           ? [
-            { label: 'Cancel', onPress: () => { } },
+            { label: t('common.cancel'), onPress: () => { } },
             {
-              label: 'Create Backup',
+              label: t('backup.action_create'),
               onPress: async () => {
                 try {
                   setIsLoading(true);
@@ -180,16 +182,16 @@ const BackupScreen: React.FC = () => {
                   }
 
                   openAlert(
-                    'Backup Created',
-                    'Your backup has been created and is ready to share.',
-                    [{ label: 'OK', onPress: () => { } }]
+                    t('backup.alert_backup_created_title'),
+                    t('backup.alert_backup_created_msg'),
+                    [{ label: t('common.ok'), onPress: () => { } }]
                   );
                 } catch (error) {
                   logger.error('[BackupScreen] Failed to create backup:', error);
                   openAlert(
-                    'Backup Failed',
+                    t('backup.alert_backup_failed_title'),
                     `Failed to create backup: ${error instanceof Error ? error.message : String(error)}`,
-                    [{ label: 'OK', onPress: () => { } }]
+                    [{ label: t('common.ok'), onPress: () => { } }]
                   );
                 } finally {
                   setIsLoading(false);
@@ -197,18 +199,18 @@ const BackupScreen: React.FC = () => {
               }
             }
           ]
-          : [{ label: 'OK', onPress: () => { } }]
+          : [{ label: t('common.ok'), onPress: () => { } }]
       );
     } catch (error) {
       logger.error('[BackupScreen] Failed to get backup preview:', error);
       openAlert(
-        'Error',
+        t('common.error'),
         'Failed to prepare backup information. Please try again.',
-        [{ label: 'OK', onPress: () => { } }]
+        [{ label: t('common.ok'), onPress: () => { } }]
       );
       setIsLoading(false);
     }
-  }, [openAlert, preferences, getBackupOptions]);
+  }, [openAlert, preferences, getBackupOptions, t]);
 
   // Restore backup
   const handleRestoreBackup = useCallback(async () => {
@@ -228,10 +230,12 @@ const BackupScreen: React.FC = () => {
       const backupInfo = await backupService.getBackupInfo(fileUri);
 
       openAlert(
-        'Confirm Restore',
-        `This will restore your data from a backup created on ${new Date(backupInfo.timestamp || 0).toLocaleDateString()}.\n\nThis action will overwrite your current data. Are you sure you want to continue?`,
+        t('backup.alert_restore_confirm_title'),
+        t('backup.alert_restore_confirm_msg', {
+          date: new Date(backupInfo.timestamp || 0).toLocaleDateString()
+        }),
         [
-          { label: 'Cancel', onPress: () => { } },
+          { label: t('common.cancel'), onPress: () => { } },
           {
             label: 'Restore',
             onPress: async () => {
@@ -243,12 +247,12 @@ const BackupScreen: React.FC = () => {
                 await backupService.restoreBackup(fileUri, restoreOptions);
 
                 openAlert(
-                  'Restore Complete',
-                  'Your data has been successfully restored. Please restart the app to see all changes.',
+                  t('backup.alert_restore_complete_title'),
+                  t('backup.alert_restore_complete_msg'),
                   [
-                    { label: 'Cancel', onPress: () => { } },
+                    { label: t('common.cancel'), onPress: () => { } },
                     {
-                      label: 'Restart App',
+                      label: t('backup.restart_app'),
                       onPress: restartApp,
                       style: { fontWeight: 'bold' }
                     }
@@ -257,9 +261,9 @@ const BackupScreen: React.FC = () => {
               } catch (error) {
                 logger.error('[BackupScreen] Failed to restore backup:', error);
                 openAlert(
-                  'Restore Failed',
+                  t('backup.alert_restore_failed_title'),
                   `Failed to restore backup: ${error instanceof Error ? error.message : String(error)}`,
-                  [{ label: 'OK', onPress: () => { } }]
+                  [{ label: t('common.ok'), onPress: () => { } }]
                 );
               } finally {
                 setIsLoading(false);
@@ -273,10 +277,10 @@ const BackupScreen: React.FC = () => {
       openAlert(
         'File Selection Failed',
         `Failed to select backup file: ${error instanceof Error ? error.message : String(error)}`,
-        [{ label: 'OK', onPress: () => { } }]
+        [{ label: t('common.ok'), onPress: () => { } }]
       );
     }
-  }, [openAlert]);
+  }, [openAlert, t]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
@@ -289,7 +293,7 @@ const BackupScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="chevron-left" size={28} color={currentTheme.colors.white} />
-          <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>Settings</Text>
+          <Text style={[styles.backText, { color: currentTheme.colors.primary }]}>{t('settings.settings_title')}</Text>
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
@@ -298,7 +302,7 @@ const BackupScreen: React.FC = () => {
       </View>
 
       <Text style={[styles.headerTitle, { color: currentTheme.colors.white }]}>
-        Backup & Restore
+        {t('backup.title')}
       </Text>
 
       {/* Content */}
@@ -319,10 +323,10 @@ const BackupScreen: React.FC = () => {
           {/* Backup Options Section */}
           <View style={[styles.section, { backgroundColor: currentTheme.colors.elevation1 }]}>
             <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
-              Backup Options
+              {t('backup.options_title')}
             </Text>
             <Text style={[styles.sectionDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-              Choose what to include in your backups
+              {t('backup.options_desc')}
             </Text>
 
             {/* Core Data Group */}
@@ -332,7 +336,7 @@ const BackupScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <Text style={[styles.groupLabel, { color: currentTheme.colors.highEmphasis }]}>
-                Core Data
+                {t('backup.section_core')}
               </Text>
               <Animated.View
                 style={{
@@ -358,15 +362,15 @@ const BackupScreen: React.FC = () => {
               }}
             >
               <OptionToggle
-                label="Library"
-                description="Your saved movies and TV shows"
+                label={t('backup.library_label')}
+                description={t('backup.library_desc')}
                 value={preferences.includeLibrary}
                 onValueChange={(v) => updatePreference('includeLibrary', v)}
                 theme={currentTheme}
               />
               <OptionToggle
-                label="Watch Progress"
-                description="Continue watching positions"
+                label={t('backup.watch_progress_label')}
+                description={t('backup.watch_progress_desc')}
                 value={preferences.includeWatchProgress}
                 onValueChange={(v) => updatePreference('includeWatchProgress', v)}
                 theme={currentTheme}
@@ -380,7 +384,7 @@ const BackupScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <Text style={[styles.groupLabel, { color: currentTheme.colors.highEmphasis }]}>
-                Addons & Integrations
+                {t('backup.section_addons')}
               </Text>
               <Animated.View
                 style={{
@@ -406,22 +410,22 @@ const BackupScreen: React.FC = () => {
               }}
             >
               <OptionToggle
-                label="Addons"
-                description="Installed Stremio addons"
+                label={t('backup.addons_label')}
+                description={t('backup.addons_desc')}
                 value={preferences.includeAddons}
                 onValueChange={(v) => updatePreference('includeAddons', v)}
                 theme={currentTheme}
               />
               <OptionToggle
-                label="Plugins"
-                description="Custom scraper configurations"
+                label={t('backup.plugins_label')}
+                description={t('backup.plugins_desc')}
                 value={preferences.includeLocalScrapers}
                 onValueChange={(v) => updatePreference('includeLocalScrapers', v)}
                 theme={currentTheme}
               />
               <OptionToggle
-                label="Trakt Integration"
-                description="Sync data and authentication tokens"
+                label={t('backup.trakt_label')}
+                description={t('backup.trakt_desc')}
                 value={preferences.includeTraktData}
                 onValueChange={(v) => updatePreference('includeTraktData', v)}
                 theme={currentTheme}
@@ -435,7 +439,7 @@ const BackupScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <Text style={[styles.groupLabel, { color: currentTheme.colors.highEmphasis }]}>
-                Settings & Preferences
+                {t('backup.section_settings')}
               </Text>
               <Animated.View
                 style={{
@@ -461,29 +465,29 @@ const BackupScreen: React.FC = () => {
               }}
             >
               <OptionToggle
-                label="App Settings"
-                description="Theme, preferences, and configurations"
+                label={t('backup.app_settings_label')}
+                description={t('backup.app_settings_desc')}
                 value={preferences.includeSettings}
                 onValueChange={(v) => updatePreference('includeSettings', v)}
                 theme={currentTheme}
               />
               <OptionToggle
-                label="User Preferences"
-                description="Addon order and UI settings"
+                label={t('backup.user_prefs_label')}
+                description={t('backup.user_prefs_desc')}
                 value={preferences.includeUserPreferences}
                 onValueChange={(v) => updatePreference('includeUserPreferences', v)}
                 theme={currentTheme}
               />
               <OptionToggle
-                label="Catalog Settings"
-                description="Catalog filters and preferences"
+                label={t('backup.catalog_settings_label')}
+                description={t('backup.catalog_settings_desc')}
                 value={preferences.includeCatalogSettings}
                 onValueChange={(v) => updatePreference('includeCatalogSettings', v)}
                 theme={currentTheme}
               />
               <OptionToggle
-                label="API Keys"
-                description="MDBList and OpenRouter keys"
+                label={t('backup.api_keys_label')}
+                description={t('backup.api_keys_desc')}
                 value={preferences.includeApiKeys}
                 onValueChange={(v) => updatePreference('includeApiKeys', v)}
                 theme={currentTheme}
@@ -494,7 +498,7 @@ const BackupScreen: React.FC = () => {
           {/* Backup Actions */}
           <View style={[styles.section, { backgroundColor: currentTheme.colors.elevation1 }]}>
             <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
-              Backup & Restore
+              {t('backup.title')}
             </Text>
 
             <TouchableOpacity
@@ -513,7 +517,7 @@ const BackupScreen: React.FC = () => {
               ) : (
                 <>
                   <MaterialIcons name="backup" size={20} color="white" />
-                  <Text style={styles.actionButtonText}>Create Backup</Text>
+                  <Text style={styles.actionButtonText}>{t('backup.action_create')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -530,20 +534,17 @@ const BackupScreen: React.FC = () => {
               disabled={isLoading}
             >
               <MaterialIcons name="restore" size={20} color="white" />
-              <Text style={styles.actionButtonText}>Restore from Backup</Text>
+              <Text style={styles.actionButtonText}>{t('backup.action_restore')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Info Section */}
           <View style={[styles.section, { backgroundColor: currentTheme.colors.elevation1 }]}>
             <Text style={[styles.sectionTitle, { color: currentTheme.colors.highEmphasis }]}>
-              About Backups
+              {t('backup.section_info')}
             </Text>
             <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
-              • Customize what gets backed up using the toggles above{'\n'}
-              • Backup files are stored locally on your device{'\n'}
-              • Share your backup to transfer data between devices{'\n'}
-              • Restoring will overwrite your current data
+              {t('backup.info_text')}
             </Text>
           </View>
         </View>

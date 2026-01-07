@@ -1,16 +1,15 @@
-<!-- Improved compatibility of back to top link -->
-<a id="readme-top"></a>
-
-<!-- PROJECT SHIELDS -->
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![License][license-shield]][license-url]
-
 <!-- PROJECT LOGO -->
-<br />
 <div align="center">
+  <a id="readme-top"></a>
+
+  [![Contributors][contributors-shield]][contributors-url]
+  [![Forks][forks-shield]][forks-url]
+  [![Stargazers][stars-shield]][stars-url]
+  [![Issues][issues-shield]][issues-url]
+  [![License][license-shield]][license-url]
+
+  <br />
+  <br />
   <img src="assets/titlelogo.png" alt="Nuvio Logo" width="120" />
   <h1 align="center">🎬 Nuvio Media Hub</h1>
   <p align="center">
@@ -41,7 +40,9 @@
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#support">Support</a></li>
+    <li><a href="#support">Support</a></li>
     <li><a href="#license">License</a></li>
+    <li><a href="#legal">Legal</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
     <li><a href="#built-with">Built With</a></li>
@@ -136,6 +137,14 @@ If you find Nuvio helpful, consider supporting development:
 ## License
 
 Distributed under the GNU GPLv3 License. See `LICENSE` for more information.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Legal
+
+For comprehensive legal information, including our full disclaimer, third-party extension policy, and DMCA/Copyright information, please visit our **[Legal & Disclaimer Page](https://tapframe.github.io/NuvioStreaming/#legal)**.
+
+**Disclaimer:** Nuvio functions solely as a client-side interface for browsing metadata and playing media files provided by user-installed extensions. It does not host, store, or distribute any media content.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

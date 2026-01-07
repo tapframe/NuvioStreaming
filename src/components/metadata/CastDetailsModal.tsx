@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -70,6 +71,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
   onClose,
   castMember,
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const [personDetails, setPersonDetails] = useState<PersonDetails | null>(null);
@@ -82,14 +84,14 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
     if (visible && castMember) {
       modalOpacity.value = withTiming(1, { duration: 250 });
       modalScale.value = withSpring(1, { damping: 20, stiffness: 200 });
-      
+
       if (!hasFetched || personDetails?.id !== castMember.id) {
         fetchPersonDetails();
       }
     } else {
       modalOpacity.value = withTiming(0, { duration: 200 });
       modalScale.value = withTiming(0.9, { duration: 200 });
-      
+
       if (!visible) {
         setHasFetched(false);
         setPersonDetails(null);
@@ -99,7 +101,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
 
   const fetchPersonDetails = async () => {
     if (!castMember || loading) return;
-    
+
     setLoading(true);
     try {
       const details = await tmdbService.getPersonDetails(castMember.id);
@@ -150,11 +152,11 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
     const birthDate = new Date(birthday);
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
+
     return age;
   };
 
@@ -196,8 +198,8 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
             height: MODAL_HEIGHT,
             overflow: 'hidden',
             borderRadius: isTablet ? 32 : 24,
-            backgroundColor: Platform.OS === 'android' 
-              ? 'rgba(20, 20, 20, 0.95)' 
+            backgroundColor: Platform.OS === 'android'
+              ? 'rgba(20, 20, 20, 0.95)'
               : 'transparent',
           },
           modalStyle,
@@ -280,7 +282,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                 </View>
               )}
             </View>
-            
+
             <View style={{ flex: 1 }}>
               <Text style={{
                 color: '#fff',
@@ -296,7 +298,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                   fontSize: isTablet ? 14 : 13,
                   fontWeight: '500',
                 }} numberOfLines={2}>
-                  as {castMember.character}
+                  {t('cast.as_character', { character: castMember.character })}
                 </Text>
               )}
             </View>
@@ -336,7 +338,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                 fontSize: 14,
                 marginTop: 12,
               }}>
-                Loading details...
+                {t('cast.loading_details')}
               </Text>
             </View>
           ) : (
@@ -352,8 +354,8 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                   borderColor: 'rgba(255, 255, 255, 0.06)',
                 }}>
                   {personDetails?.birthday && (
-                    <View style={{ 
-                      flexDirection: 'row', 
+                    <View style={{
+                      flexDirection: 'row',
                       alignItems: 'center',
                       marginBottom: personDetails?.place_of_birth ? 10 : 0
                     }}>
@@ -369,7 +371,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                         fontSize: 13,
                         fontWeight: '500',
                       }}>
-                        {calculateAge(personDetails.birthday)} years old
+                        {t('cast.years_old', { age: calculateAge(personDetails.birthday) })}
                       </Text>
                     </View>
                   )}
@@ -389,7 +391,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                         fontWeight: '500',
                         flex: 1,
                       }}>
-                        Born in {personDetails.place_of_birth}
+                        {t('cast.born_in', { place: personDetails.place_of_birth })}
                       </Text>
                     </View>
                   )}
@@ -420,7 +422,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                   fontWeight: '600',
                   letterSpacing: 0.3,
                 }}>
-                  View Filmography
+                  {t('cast.view_filmography')}
                 </Text>
               </TouchableOpacity>
 
@@ -454,7 +456,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                   }}>
-                    Also Known As
+                    {t('cast.also_known_as')}
                   </Text>
                   <Text style={{
                     color: 'rgba(255, 255, 255, 0.7)',
@@ -480,7 +482,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
                     textAlign: 'center',
                     fontWeight: '500',
                   }}>
-                    No additional information available
+                    {t('cast.no_info_available')}
                   </Text>
                 </View>
               )}

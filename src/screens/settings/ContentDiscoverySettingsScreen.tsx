@@ -12,6 +12,7 @@ import ScreenHeader from '../../components/common/ScreenHeader';
 import PluginIcon from '../../components/icons/PluginIcon';
 import { SettingsCard, SettingItem, CustomSwitch, ChevronRight } from './SettingsComponents';
 import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +28,7 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
     const { settings, updateSetting } = useSettings();
+    const { t } = useTranslation();
     const config = useRealtimeConfig();
 
     const [addonCount, setAddonCount] = useState<number>(0);
@@ -79,11 +81,11 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
     return (
         <>
             {hasVisibleItems(['addons', 'debrid', 'plugins']) && (
-                <SettingsCard title="SOURCES" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.sources')} isTablet={isTablet}>
                     {isItemVisible('addons') && (
                         <SettingItem
-                            title="Addons"
-                            description={`${addonCount} installed`}
+                            title={t('settings.items.addons')}
+                            description={`${addonCount} ${t('settings.items.installed')}`}
                             icon="layers"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('Addons')}
@@ -92,8 +94,8 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
                     )}
                     {isItemVisible('debrid') && (
                         <SettingItem
-                            title="Debrid Integration"
-                            description="Connect Torbox for premium streams"
+                            title={t('settings.items.debrid_integration')}
+                            description={t('settings.items.debrid_desc')}
                             icon="link"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('DebridIntegration')}
@@ -102,8 +104,8 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
                     )}
                     {isItemVisible('plugins') && (
                         <SettingItem
-                            title="Plugins"
-                            description="Manage plugins and repositories"
+                            title={t('settings.items.plugins')}
+                            description={t('settings.items.plugins_desc')}
                             customIcon={<PluginIcon size={isTablet ? 22 : 18} color={currentTheme.colors.primary} />}
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('ScraperSettings')}
@@ -115,11 +117,11 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
             )}
 
             {hasVisibleItems(['catalogs', 'home_screen', 'continue_watching']) && (
-                <SettingsCard title="CATALOGS" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.catalogs')} isTablet={isTablet}>
                     {isItemVisible('catalogs') && (
                         <SettingItem
-                            title="Catalogs"
-                            description={`${catalogCount} active`}
+                            title={t('settings.items.catalogs')}
+                            description={`${catalogCount} ${t('settings.items.active')}`}
                             icon="list"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('CatalogSettings')}
@@ -128,8 +130,8 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
                     )}
                     {isItemVisible('home_screen') && (
                         <SettingItem
-                            title="Home Screen"
-                            description="Layout and content"
+                            title={t('settings.items.home_screen')}
+                            description={t('settings.items.home_screen_desc')}
                             icon="home"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('HomeScreenSettings')}
@@ -138,8 +140,8 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
                     )}
                     {isItemVisible('continue_watching') && (
                         <SettingItem
-                            title="Continue Watching"
-                            description="Cache and playback behavior"
+                            title={t('settings.items.continue_watching')}
+                            description={t('settings.items.continue_watching_desc')}
                             icon="play-circle"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('ContinueWatchingSettings')}
@@ -151,11 +153,11 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
             )}
 
             {hasVisibleItems(['show_discover']) && (
-                <SettingsCard title="DISCOVERY" isTablet={isTablet}>
+                <SettingsCard title={t('settings.sections.discovery')} isTablet={isTablet}>
                     {isItemVisible('show_discover') && (
                         <SettingItem
-                            title="Show Discover Section"
-                            description="Display discover content in Search"
+                            title={t('settings.items.show_discover')}
+                            description={t('settings.items.show_discover_desc')}
                             icon="compass"
                             renderControl={() => (
                                 <CustomSwitch
@@ -179,13 +181,14 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
 const ContentDiscoverySettingsScreen: React.FC = () => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const screenIsTablet = width >= 768;
 
     return (
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
             <StatusBar barStyle="light-content" />
-            <ScreenHeader title="Content & Discovery" showBackButton onBackPress={() => navigation.goBack()} />
+            <ScreenHeader title={t('settings.content_discovery')} showBackButton onBackPress={() => navigation.goBack()} />
 
             <ScrollView
                 style={styles.scrollView}

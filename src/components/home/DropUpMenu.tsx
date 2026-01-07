@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import FastImage from '@d11/react-native-fast-image';
 import { useTraktContext } from '../../contexts/TraktContext';
@@ -39,6 +40,7 @@ interface DropUpMenuProps {
 }
 
 export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: isSavedProp, isWatched: isWatchedProp }: DropUpMenuProps) => {
+  const { t } = useTranslation();
   const translateY = useSharedValue(300);
   const opacity = useSharedValue(0);
   const isDarkMode = useColorScheme() === 'dark';
@@ -102,12 +104,12 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
   let menuOptions = [
     {
       icon: 'bookmark',
-      label: isSaved ? 'Remove from Library' : 'Add to Library',
+      label: isSaved ? t('library.remove_from_library') : t('library.add_to_library'),
       action: 'library'
     },
     {
       icon: 'check-circle',
-      label: isWatched ? 'Mark as Unwatched' : 'Mark as Watched',
+      label: isWatched ? t('library.mark_unwatched') : t('library.mark_watched'),
       action: 'watched'
     },
     /*
@@ -119,7 +121,7 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
     */
     {
       icon: 'share',
-      label: 'Share',
+      label: t('library.share'),
       action: 'share'
     }
   ];
@@ -129,12 +131,12 @@ export const DropUpMenu = ({ visible, onClose, item, onOptionSelect, isSaved: is
     menuOptions.push(
       {
         icon: 'playlist-add-check',
-        label: inTraktWatchlist ? 'Remove from Trakt Watchlist' : 'Add to Trakt Watchlist',
+        label: inTraktWatchlist ? t('library.remove_from_watchlist') : t('library.add_to_watchlist'),
         action: 'trakt-watchlist'
       },
       {
         icon: 'video-library',
-        label: inTraktCollection ? 'Remove from Trakt Collection' : 'Add to Trakt Collection',
+        label: inTraktCollection ? t('library.remove_from_collection') : t('library.add_to_collection'),
         action: 'trakt-collection'
       }
     );

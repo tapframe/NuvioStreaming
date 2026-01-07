@@ -12,6 +12,7 @@ import {
   Animated,
   Linking,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import TraktIcon from '../../../assets/rating-icons/trakt.svg';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -186,6 +187,7 @@ const CompactCommentCard: React.FC<{
   isSpoilerRevealed: boolean;
   onSpoilerPress: () => void;
 }> = ({ comment, theme, onPress, isSpoilerRevealed, onSpoilerPress }) => {
+  const { t } = useTranslation();
   const [isPressed, setIsPressed] = useState(false);
   const fadeInOpacity = useRef(new Animated.Value(0)).current;
 
@@ -262,7 +264,7 @@ const CompactCommentCard: React.FC<{
 
   // Handle missing user data gracefully
   const user = comment.user || {};
-  const username = user.name || user.username || 'Anonymous';
+  const username = user.name || user.username || t('common.anonymous_user');
 
   // Handle spoiler content
   const hasSpoiler = comment.spoiler;
@@ -280,10 +282,10 @@ const CompactCommentCard: React.FC<{
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-      if (diffMins < 1) return 'now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
+      if (diffMins < 1) return t('common.time.now');
+      if (diffMins < 60) return t('common.time.minutes_ago', { count: diffMins });
+      if (diffHours < 24) return t('common.time.hours_ago', { count: diffHours });
+      if (diffDays < 7) return t('common.time.days_ago', { count: diffDays });
 
       // For older dates, show month/day
       return commentDate.toLocaleDateString('en-US', {
@@ -725,6 +727,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   episode,
   onCommentPress,
 }) => {
+  const { t } = useTranslation();
   const { currentTheme } = useTheme();
   const { settings } = useSettings();
   const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false);
@@ -823,12 +826,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
       <View style={styles.emptyContainer}>
         <MaterialIcons name="chat-bubble-outline" size={48} color={currentTheme.colors.mediumEmphasis} />
         <Text style={[styles.emptyText, { color: currentTheme.colors.mediumEmphasis }]}>
-          {error ? 'Comments unavailable' : 'No comments on Trakt yet'}
+          {error ? t('comments.unavailable') : t('comments.no_comments')}
         </Text>
         <Text style={[styles.emptySubtext, { color: currentTheme.colors.disabled }]}>
           {error
-            ? 'This content may not be in Trakt\'s database yet'
-            : 'Be the first to comment on Trakt.tv'
+            ? t('comments.not_in_database')
+            : t('comments.check_trakt')
           }
         </Text>
       </View>
@@ -930,7 +933,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             fontSize: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 20
           }
         ]}>
-          Trakt Comments
+          {t('comments.title')}
         </Text>
       </View>
 
@@ -945,7 +948,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             onPress={refresh}
           >
             <Text style={[styles.retryButtonText, { color: currentTheme.colors.error }]}>
-              Retry
+              {t('common.retry')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -993,7 +996,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                   ) : (
                     <>
                       <Text style={[styles.loadMoreText, { color: currentTheme.colors.primary }]}>
-                        Load More
+                        {t('common.load_more')}
                       </Text>
                       <MaterialIcons name="chevron-right" size={20} color={currentTheme.colors.primary} />
                     </>
