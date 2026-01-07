@@ -543,6 +543,9 @@ const TraktSettingsScreen: React.FC = () => {
             </View>
           </View>
         )}
+        <Text style={[styles.disclaimer, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}>
+          This product uses the Trakt API but is not endorsed or certified by Trakt.
+        </Text>
       </ScrollView>
 
       <CustomAlert
@@ -775,6 +778,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#FFF',
     opacity: 0.9,
+  },
+  disclaimer: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginVertical: 20,
+    paddingHorizontal: 20,
   },
 });
 

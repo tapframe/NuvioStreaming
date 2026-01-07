@@ -4,7 +4,7 @@ import FastImage from '@d11/react-native-fast-image';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Episode } from '../../../types/metadata';
 
-
+const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
 const EPISODE_PLACEHOLDER = 'https://via.placeholder.com/500x280/1a1a1a/666666?text=No+Preview';
 
 interface EpisodeCardProps {
@@ -135,7 +135,12 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
           <View style={styles.episodeMetadata}>
             {effectiveVote > 0 && (
               <View style={styles.ratingContainer}>
-                <Text style={[styles.ratingText, { color: '#F5C518' }]}>
+                <FastImage
+                  source={{ uri: TMDB_LOGO }}
+                  style={styles.tmdbLogo}
+                  resizeMode={FastImage.resizeMode.contain}
+                />
+                <Text style={[styles.ratingText, { color: currentTheme.colors.textMuted }]}>
                   {effectiveVote.toFixed(1)}
                 </Text>
               </View>
@@ -229,7 +234,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-
+  tmdbLogo: {
+    width: 20,
+    height: 14,
+  },
   ratingText: {
     fontSize: 13,
     fontWeight: '700',
