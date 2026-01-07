@@ -1,15 +1,19 @@
 import en from './locales/en.json';
-import pt from './locales/pt.json';
+import ptBR from './locales/pt-BR.json';
+import ptPT from './locales/pt-PT.json';
 import ar from './locales/ar.json';
 import es from './locales/es.json';
 import fr from './locales/fr.json';
 import it from './locales/it.json';
+import de from './locales/de.json';
 
 export const resources = {
     en: { translation: en },
-    pt: { translation: pt },
+    'pt-BR': { translation: ptBR },
+    'pt-PT': { translation: ptPT },
     ar: { translation: ar },
     es: { translation: es },
     fr: { translation: fr },
     it: { translation: it },
+    de: { translation: de },
 };
