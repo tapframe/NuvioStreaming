@@ -14,7 +14,7 @@ const TRAKT_CLIENT_SECRET = process.env.EXPO_PUBLIC_TRAKT_CLIENT_SECRET as strin
 const TRAKT_REDIRECT_URI = process.env.EXPO_PUBLIC_TRAKT_REDIRECT_URI || 'nuvio://auth/trakt'; // Must match registered callback URL
 
 if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
-  throw new Error('Missing Trakt env vars. Set EXPO_PUBLIC_TRAKT_CLIENT_ID and EXPO_PUBLIC_TRAKT_CLIENT_SECRET');
+  logger.warn('[TraktService] Missing Trakt env vars. Trakt integration will be disabled.');
 }
 
 // Types

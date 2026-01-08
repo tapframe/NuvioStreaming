@@ -84,7 +84,7 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 <!-- GETTING STARTED -->
 ## Getting Started
 
-Follow the steps below to run the app locally for development.
+Follow the steps below to run the app locally for development. For detailed setup and troubleshooting, see [Project Documentation](docs/DOCUMENTATION.md).
 
 ### Development Build
 

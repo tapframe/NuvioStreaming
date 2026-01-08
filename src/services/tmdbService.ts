@@ -3,7 +3,7 @@ import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 
 // TMDB API configuration
-const DEFAULT_API_KEY = 'd131017ccc6e5462a81c9304d21476de';
+const DEFAULT_API_KEY = process.env.EXPO_PUBLIC_TMDB_API_KEY || 'd131017ccc6e5462a81c9304d21476de';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_API_KEY_STORAGE_KEY = 'tmdb_api_key';
 const USE_CUSTOM_TMDB_API_KEY = 'use_custom_tmdb_api_key';
