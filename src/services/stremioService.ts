@@ -998,9 +998,10 @@ class StremioService {
               });
 
 
-              if (response.data && response.data.meta) {
+              if (response.data && response.data.meta && response.data.meta.id) {
                 return response.data.meta;
               } else {
+                if (__DEV__) console.warn(`⚠️ [getMetaDetails] Preferred addon ${preferredAddon.name} returned empty/invalid meta`);
               }
             } catch (error: any) {
               // Continue trying other addons
@@ -1028,9 +1029,10 @@ class StremioService {
           });
 
 
-          if (response.data && response.data.meta) {
+          if (response.data && response.data.meta && response.data.meta.id) {
             return response.data.meta;
           } else {
+            if (__DEV__) console.log(`[getMetaDetails] Cinemeta URL ${baseUrl} returned empty/invalid meta`);
           }
         } catch (error: any) {
           continue; // Try next URL
@@ -1098,9 +1100,10 @@ class StremioService {
           });
 
 
-          if (response.data && response.data.meta) {
+          if (response.data && response.data.meta && response.data.meta.id) {
             return response.data.meta;
           } else {
+            if (__DEV__) console.log(`[getMetaDetails] Addon ${addon.name} returned empty/invalid meta`);
           }
         } catch (error: any) {
           continue; // Try next addon
