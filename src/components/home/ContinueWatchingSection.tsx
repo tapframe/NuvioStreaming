@@ -395,13 +395,18 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           return;
         }
 
-        // Group progress items by content ID
+        // Group progress items by content ID - process ONLY last 30 items
+        const sortedProgress = Object.entries(allProgress)
+          .sort(([, a], [, b]) => b.lastUpdated - a.lastUpdated)
+          .slice(0, 30);
+
         const contentGroups: Record<string, { type: string; id: string; episodes: Array<{ key: string; episodeId?: string; progress: any; progressPercent: number }> }> = {};
-        for (const key in allProgress) {
+
+        for (const [key, progress] of sortedProgress) {
           const keyParts = key.split(':');
           const [type, id, ...episodeIdParts] = keyParts;
           const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
-          const progress = allProgress[key];
+
           const progressPercent =
             progress.duration > 0
               ? (progress.currentTime / progress.duration) * 100
@@ -682,7 +687,13 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           // STEP 1: Process playback progress items (in-progress, paused)
           // These have actual progress percentage from Trakt
           const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-          for (const item of playbackItems) {
+
+          // Sort by paused_at descending and take top 30
+          const sortedPlaybackItems = playbackItems
+            .sort((a, b) => new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime())
+            .slice(0, 30);
+
+          for (const item of sortedPlaybackItems) {
             try {
               // Skip items with < 2% progress (accidental clicks)
               if (item.progress < 2) continue;
