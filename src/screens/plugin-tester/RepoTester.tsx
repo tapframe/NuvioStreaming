@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     View,
     Text,
@@ -98,6 +99,7 @@ export const RepoTester = () => {
     const { currentTheme } = useTheme();
     const isLargeScreen = useIsLargeScreen();
     const styles = getPluginTesterStyles(currentTheme, isLargeScreen);
+    const { t } = useTranslation();
 
     // Repo tester state
     const [repoUrl, setRepoUrl] = useState('');
@@ -120,14 +122,14 @@ export const RepoTester = () => {
     const fetchRepository = async () => {
         const input = repoUrl.trim();
         if (!input) {
-            Alert.alert('Error', 'Please enter a repository URL');
+            Alert.alert(t('plugin_tester.common.error'), t('plugin_tester.repo.enter_repo_url_error'));
             return;
         }
 
         if (!input.startsWith('https://raw.githubusercontent.com/') && !input.startsWith('http://') && !input.startsWith('https://')) {
             Alert.alert(
-                'Invalid URL',
-                'Use a GitHub raw URL or a local http(s) URL.\n\nExample:\nhttps://raw.githubusercontent.com/tapframe/nuvio-providers/refs/heads/main'
+                t('plugin_tester.repo.invalid_url_title'),
+                t('plugin_tester.repo.invalid_url_msg')
             );
             return;
         }
@@ -143,7 +145,7 @@ export const RepoTester = () => {
         try {
             const candidates = buildManifestCandidates(input);
             if (candidates.length === 0) {
-                throw new Error('Could not build a manifest URL from the input');
+                throw new Error(t('plugin_tester.repo.manifest_build_error'));
             }
 
             let response: any = null;
@@ -168,7 +170,7 @@ export const RepoTester = () => {
             }
 
             if (!response) {
-                throw lastError || new Error('Failed to fetch manifest');
+                throw lastError || new Error(t('plugin_tester.repo.manifest_fetch_error'));
             }
 
             const manifest: RepoManifest = response.data;
@@ -192,10 +194,10 @@ export const RepoTester = () => {
         } catch (error: any) {
             const status = error?.response?.status;
             const statusText = error?.response?.statusText;
-            const messageBase = error?.message ? String(error.message) : 'Failed to fetch repository manifest';
+            const messageBase = error?.message ? String(error.message) : t('plugin_tester.repo.repo_manifest_fetch_error');
             const message = status ? `${messageBase} (HTTP ${status}${statusText ? ` ${statusText}` : ''})` : messageBase;
             setRepoFetchError(message);
-            Alert.alert('Error', message);
+            Alert.alert(t('plugin_tester.common.error'), message);
         } finally {
             setRepoIsFetching(false);
         }
@@ -213,7 +215,7 @@ export const RepoTester = () => {
                 ...prev,
                 [scraper.id]: {
                     status: 'fail',
-                    error: 'Missing filename in manifest',
+                    error: t('plugin_tester.repo.missing_filename'),
                 },
             }));
             return;
@@ -234,7 +236,7 @@ export const RepoTester = () => {
 
         try {
             const candidates = buildScraperCandidates(effectiveBase, filename);
-            if (candidates.length === 0) throw new Error('Could not build a scraper URL');
+            if (candidates.length === 0) throw new Error(t('plugin_tester.repo.scraper_build_error'));
 
             let res: any = null;
             let usedUrl: string | null = null;
@@ -265,7 +267,7 @@ export const RepoTester = () => {
             }
 
             if (!res) {
-                throw lastError || new Error('Failed to download scraper');
+                throw lastError || new Error(t('plugin_tester.repo.download_scraper_error'));
             }
 
             const scraperCode = typeof res.data === 'string' ? res.data : JSON.stringify(res.data, null, 2);
@@ -311,7 +313,7 @@ export const RepoTester = () => {
         } catch (error: any) {
             const status = error?.response?.status;
             const statusText = error?.response?.statusText;
-            const messageBase = error?.message ? String(error.message) : 'Test failed';
+            const messageBase = error?.message ? String(error.message) : t('plugin_tester.repo.test_failed');
             const message = status ? `${messageBase} (HTTP ${status}${statusText ? ` ${statusText}` : ''})` : messageBase;
             setRepoResults(prev => ({
                 ...prev,
@@ -364,11 +366,11 @@ export const RepoTester = () => {
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
                 <View style={styles.card}>
                     <View style={styles.cardTitleRow}>
-                        <Text style={styles.cardTitle}>Repo Tester</Text>
+                        <Text style={styles.cardTitle}>{t('plugin_tester.repo.title')}</Text>
                         <Ionicons name="git-branch-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
                     </View>
                     <Text style={styles.helperText}>
-                        Fetch a repository (local URL or GitHub raw) and test each provider.
+                        {t('plugin_tester.repo.description')}
                     </Text>
 
                     <View style={[styles.row, { marginTop: 10 }]}>
@@ -402,17 +404,17 @@ export const RepoTester = () => {
 
                     {!!repoFetchTriedUrl && (
                         <Text style={[styles.helperText, { marginTop: 6 }]} numberOfLines={2}>
-                            Trying: {repoFetchTriedUrl}
+                            {t('plugin_tester.repo.tried_url', { url: repoFetchTriedUrl })}
                         </Text>
                     )}
                 </View>
 
                 <View style={styles.card}>
                     <View style={styles.cardTitleRow}>
-                        <Text style={styles.cardTitle}>Repo Test Parameters</Text>
+                        <Text style={styles.cardTitle}>{t('plugin_tester.repo.test_parameters')}</Text>
                         <Ionicons name="options-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
                     </View>
-                    <Text style={styles.helperText}>These parameters are used only for Repo Tester.</Text>
+                    <Text style={styles.helperText}>{t('plugin_tester.repo.test_parameters_desc')}</Text>
 
                     <View style={[styles.segment, { marginTop: 10 }]}>
                         <TouchableOpacity
@@ -420,20 +422,20 @@ export const RepoTester = () => {
                             onPress={() => setRepoMediaType('movie')}
                         >
                             <Ionicons name="film-outline" size={18} color={repoMediaType === 'movie' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
-                            <Text style={[styles.segmentText, repoMediaType === 'movie' && styles.segmentTextActive]}>Movie</Text>
+                            <Text style={[styles.segmentText, repoMediaType === 'movie' && styles.segmentTextActive]}>{t('plugin_tester.common.movie')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.segmentItem, repoMediaType === 'tv' && styles.segmentItemActive]}
                             onPress={() => setRepoMediaType('tv')}
                         >
                             <Ionicons name="tv-outline" size={18} color={repoMediaType === 'tv' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
-                            <Text style={[styles.segmentText, repoMediaType === 'tv' && styles.segmentTextActive]}>TV</Text>
+                            <Text style={[styles.segmentText, repoMediaType === 'tv' && styles.segmentTextActive]}>{t('plugin_tester.common.tv')}</Text>
                         </TouchableOpacity>
                     </View>
 
                     <View style={[styles.row, { marginTop: 10, alignItems: 'flex-start' }]}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.fieldLabel}>TMDB ID</Text>
+                            <Text style={styles.fieldLabel}>{t('plugin_tester.common.tmdb_id')}</Text>
                             <TextInput
                                 style={styles.input}
                                 value={repoTmdbId}
@@ -445,7 +447,7 @@ export const RepoTester = () => {
                         {repoMediaType === 'tv' && (
                             <>
                                 <View style={{ width: 110 }}>
-                                    <Text style={styles.fieldLabel}>Season</Text>
+                                    <Text style={styles.fieldLabel}>{t('plugin_tester.common.season')}</Text>
                                     <TextInput
                                         style={styles.input}
                                         value={repoSeason}
@@ -454,7 +456,7 @@ export const RepoTester = () => {
                                     />
                                 </View>
                                 <View style={{ width: 110 }}>
-                                    <Text style={styles.fieldLabel}>Episode</Text>
+                                    <Text style={styles.fieldLabel}>{t('plugin_tester.common.episode')}</Text>
                                     <TextInput
                                         style={styles.input}
                                         value={repoEpisode}
@@ -467,21 +469,23 @@ export const RepoTester = () => {
                     </View>
 
                     <Text style={[styles.helperText, { marginTop: 10 }]}>
-                        Using: {repoMediaType.toUpperCase()} • TMDB {repoTmdbId}{repoMediaType === 'tv' ? ` • S${repoSeason}E${repoEpisode}` : ''}
+                        {repoMediaType === 'tv'
+                            ? t('plugin_tester.repo.using_info_tv', { mediaType: repoMediaType.toUpperCase(), tmdbId: repoTmdbId, season: repoSeason, episode: repoEpisode })
+                            : t('plugin_tester.repo.using_info', { mediaType: repoMediaType.toUpperCase(), tmdbId: repoTmdbId })}
                     </Text>
                 </View>
 
                 <View style={styles.card}>
                     <View style={styles.cardTitleRow}>
-                        <Text style={styles.cardTitle}>Providers</Text>
+                        <Text style={styles.cardTitle}>{t('plugin_tester.repo.providers_title')}</Text>
                         <Ionicons name="list-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
                     </View>
                     {repoManifest ? (
                         <Text style={styles.helperText}>
-                            {repoManifest.name || 'Repository'} • {repoScrapers.length} providers
+                            {repoManifest.name || t('plugin_tester.repo.repository_default')} • {t('plugin_tester.repo.providers_count', { count: repoScrapers.length })}
                         </Text>
                     ) : (
-                        <Text style={styles.helperText}>Fetch a repo to list providers.</Text>
+                        <Text style={styles.helperText}>{t('plugin_tester.repo.fetch_hint')}</Text>
                     )}
 
                     {repoScrapers.length > 0 && (
@@ -496,7 +500,7 @@ export const RepoTester = () => {
                                 ) : (
                                     <Ionicons name="play" size={18} color={currentTheme.colors.white} />
                                 )}
-                                <Text style={styles.buttonText}>{repoIsTestingAll ? 'Testing…' : 'Test All'}</Text>
+                                <Text style={styles.buttonText}>{repoIsTestingAll ? t('plugin_tester.common.testing') : t('plugin_tester.repo.test_all')}</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -537,15 +541,15 @@ export const RepoTester = () => {
                         const getStatusText = () => {
                             switch (result.status) {
                                 case 'running':
-                                    return 'RUNNING';
+                                    return t('plugin_tester.repo.status_running');
                                 case 'ok':
-                                    return `OK (${result.streamsCount ?? 0})`;
+                                    return t('plugin_tester.repo.status_ok', { count: result.streamsCount ?? 0 });
                                 case 'ok-empty':
-                                    return 'OK (0)';
+                                    return t('plugin_tester.repo.status_ok_empty');
                                 case 'fail':
-                                    return 'FAILED';
+                                    return t('plugin_tester.repo.status_failed');
                                 default:
-                                    return 'IDLE';
+                                    return t('plugin_tester.repo.status_idle');
                             }
                         };
 
@@ -573,7 +577,7 @@ export const RepoTester = () => {
                                     </Text>
                                     {!!result.triedUrl && result.status === 'fail' && (
                                         <Text style={styles.repoRowSub} numberOfLines={1}>
-                                            Tried: {result.triedUrl}
+                                            {t('plugin_tester.repo.tried_url', { url: result.triedUrl })}
                                         </Text>
                                     )}
                                     {!!result.error && (
@@ -584,10 +588,10 @@ export const RepoTester = () => {
 
                                     {repoOpenLogsForId === scraper.id && (
                                         <View style={styles.repoLogsPanel}>
-                                            <Text style={styles.repoLogsTitle}>Provider Logs</Text>
+                                            <Text style={styles.repoLogsTitle}>{t('plugin_tester.repo.provider_logs')}</Text>
                                             <ScrollView style={{ maxHeight: 180 }}>
                                                 <Text style={styles.logItem} selectable>
-                                                    {(result.logs && result.logs.length > 0) ? result.logs.join('\n') : 'No logs captured.'}
+                                                    {(result.logs && result.logs.length > 0) ? result.logs.join('\n') : t('plugin_tester.repo.no_logs_captured')}
                                                 </Text>
                                             </ScrollView>
                                         </View>
@@ -604,14 +608,14 @@ export const RepoTester = () => {
                                             onPress={() => testRepoScraper(scraper)}
                                             disabled={result.status === 'running' || repoIsTestingAll}
                                         >
-                                            <Text style={styles.repoMiniButtonText}>Test</Text>
+                                            <Text style={styles.repoMiniButtonText}>{t('plugin_tester.common.test')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.repoMiniButton, { opacity: (result.status === 'idle' || result.status === 'running') ? 0.7 : 1 }]}
                                             onPress={() => setRepoOpenLogsForId(prev => (prev === scraper.id ? null : scraper.id))}
                                             disabled={result.status === 'idle' || result.status === 'running'}
                                         >
-                                            <Text style={styles.repoMiniButtonText}>Logs</Text>
+                                            <Text style={styles.repoMiniButtonText}>{t('plugin_tester.tabs.logs')}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>

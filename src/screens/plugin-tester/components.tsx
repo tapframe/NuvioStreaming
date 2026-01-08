@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -39,6 +40,7 @@ interface MainTabBarProps {
 }
 
 export const MainTabBar = ({ activeTab, onTabChange }: MainTabBarProps) => {
+    const { t } = useTranslation();
     const { currentTheme } = useTheme();
     const isLargeScreen = useIsLargeScreen();
     const styles = getPluginTesterStyles(currentTheme, isLargeScreen);
@@ -50,14 +52,14 @@ export const MainTabBar = ({ activeTab, onTabChange }: MainTabBarProps) => {
                 onPress={() => onTabChange('individual')}
             >
                 <Ionicons name="person-outline" size={16} color={activeTab === 'individual' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis} />
-                <Text style={[styles.tabText, activeTab === 'individual' && styles.activeTabText]}>Individual</Text>
+                <Text style={[styles.tabText, activeTab === 'individual' && styles.activeTabText]}>{t('plugin_tester.tabs.individual')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
                 style={[styles.tab, activeTab === 'repo' && styles.activeTab]}
                 onPress={() => onTabChange('repo')}
             >
                 <Ionicons name="git-branch-outline" size={16} color={activeTab === 'repo' ? currentTheme.colors.primary : currentTheme.colors.mediumEmphasis} />
-                <Text style={[styles.tabText, activeTab === 'repo' && styles.activeTabText]}>Repo Tester</Text>
+                <Text style={[styles.tabText, activeTab === 'repo' && styles.activeTabText]}>{t('plugin_tester.tabs.repo')}</Text>
             </TouchableOpacity>
         </View>
     );

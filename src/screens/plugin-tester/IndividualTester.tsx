@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     View,
     Text,
@@ -8,7 +9,9 @@ import {
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    Modal,
+    FlatList
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +29,7 @@ interface IndividualTesterProps {
 
 export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
     const navigation = useNavigation<RootStackNavigationProp>();
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const { currentTheme } = useTheme();
     const isLargeScreen = useIsLargeScreen();
@@ -42,6 +46,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
     const [streams, setStreams] = useState<any[]>([]);
     const [isRunning, setIsRunning] = useState(false);
     const [activeTab, setActiveTab] = useState<'code' | 'logs' | 'results'>('code');
+    const [rightPanelTab, setRightPanelTab] = useState<'logs' | 'results'>('logs');
     const [isEditorFocused, setIsEditorFocused] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
@@ -121,7 +126,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
 
     const fetchFromUrl = async () => {
         if (!url) {
-            Alert.alert('Error', 'Please enter a URL');
+            Alert.alert(t('plugin_tester.common.error'), t('plugin_tester.individual.enter_url_error'));
             return;
         }
 
@@ -129,22 +134,26 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
             const response = await axios.get(url, { headers: { 'Cache-Control': 'no-cache' } });
             const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data, null, 2);
             setCode(content);
-            Alert.alert('Success', 'Code loaded from URL');
+            Alert.alert(t('plugin_tester.common.success'), t('plugin_tester.individual.code_loaded'));
         } catch (error: any) {
-            Alert.alert('Error', `Failed to fetch: ${error.message}`);
+            Alert.alert(t('plugin_tester.common.error'), t('plugin_tester.individual.fetch_error', { message: error.message }));
         }
     };
 
     const runTest = async () => {
         if (!code.trim()) {
-            Alert.alert('Error', 'No code to run');
+            Alert.alert(t('plugin_tester.common.error'), t('plugin_tester.individual.no_code_error'));
             return;
         }
 
         setIsRunning(true);
         setLogs([]);
         setStreams([]);
-        setActiveTab('logs');
+        if (isLargeScreen) {
+            setRightPanelTab('logs');
+        } else {
+            setActiveTab('logs');
+        }
 
         try {
             const params = {
@@ -164,7 +173,11 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
             setStreams(result.streams);
 
             if (result.streams.length > 0) {
-                setActiveTab('results');
+                if (isLargeScreen) {
+                    setRightPanelTab('results');
+                } else {
+                    setActiveTab('results');
+                }
             }
         } catch (error: any) {
             setLogs(prev => [...prev, `[FATAL] ${error.message}`]);
@@ -183,11 +196,11 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
                                 <View style={styles.card}>
                                     <View style={styles.cardTitleRow}>
-                                        <Text style={styles.cardTitle}>Load from URL</Text>
+                                        <Text style={styles.cardTitle}>{t('plugin_tester.individual.load_from_url')}</Text>
                                         <Ionicons name="link-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
                                     </View>
                                     <Text style={styles.helperText}>
-                                        Paste a raw GitHub URL or local IP and tap download.
+                                        {t('plugin_tester.individual.load_from_url_desc')}
                                     </Text>
                                     <View style={[styles.row, { marginTop: 10 }]}>
                                         <TextInput
@@ -210,12 +223,12 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
 
                                 <View style={[styles.card, { flex: 1, minHeight: 400 }]}>
                                     <View style={styles.cardTitleRow}>
-                                        <Text style={styles.cardTitle}>Plugin Code</Text>
+                                        <Text style={styles.cardTitle}>{t('plugin_tester.individual.plugin_code')}</Text>
                                         <View style={styles.cardActionsRow}>
                                             <TouchableOpacity
                                                 style={styles.cardActionButton}
                                                 onPress={() => setIsEditorFocused(true)}
-                                                accessibilityLabel="Focus code editor"
+                                                accessibilityLabel={t('plugin_tester.individual.focus_editor')}
                                             >
                                                 <Ionicons name="expand-outline" size={18} color={currentTheme.colors.highEmphasis} />
                                             </TouchableOpacity>
@@ -227,7 +240,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                         value={code}
                                         onChangeText={setCode}
                                         multiline
-                                        placeholder="// Paste plugin code here..."
+                                        placeholder={t('plugin_tester.individual.code_placeholder')}
                                         placeholderTextColor={currentTheme.colors.mediumEmphasis}
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -237,7 +250,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                 {/* Test parameters on large screen */}
                                 <View style={styles.card}>
                                     <View style={styles.cardTitleRow}>
-                                        <Text style={styles.cardTitle}>Test Parameters</Text>
+                                        <Text style={styles.cardTitle}>{t('plugin_tester.individual.test_parameters')}</Text>
                                         <Ionicons name="options-outline" size={16} color={currentTheme.colors.mediumEmphasis} />
                                     </View>
 
@@ -247,20 +260,20 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                             onPress={() => setMediaType('movie')}
                                         >
                                             <Ionicons name="film-outline" size={18} color={mediaType === 'movie' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
-                                            <Text style={[styles.segmentText, mediaType === 'movie' && styles.segmentTextActive]}>Movie</Text>
+                                            <Text style={[styles.segmentText, mediaType === 'movie' && styles.segmentTextActive]}>{t('plugin_tester.common.movie')}</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.segmentItem, mediaType === 'tv' && styles.segmentItemActive]}
                                             onPress={() => setMediaType('tv')}
                                         >
                                             <Ionicons name="tv-outline" size={18} color={mediaType === 'tv' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
-                                            <Text style={[styles.segmentText, mediaType === 'tv' && styles.segmentTextActive]}>TV</Text>
+                                            <Text style={[styles.segmentText, mediaType === 'tv' && styles.segmentTextActive]}>{t('plugin_tester.common.tv')}</Text>
                                         </TouchableOpacity>
                                     </View>
 
                                     <View style={[styles.row, { marginTop: 10, alignItems: 'flex-start' }]}>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.fieldLabel}>TMDB ID</Text>
+                                            <Text style={styles.fieldLabel}>{t('plugin_tester.common.tmdb_id')}</Text>
                                             <TextInput
                                                 style={styles.input}
                                                 value={tmdbId}
@@ -272,7 +285,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                         {mediaType === 'tv' && (
                                             <>
                                                 <View style={{ width: 110 }}>
-                                                    <Text style={styles.fieldLabel}>Season</Text>
+                                                    <Text style={styles.fieldLabel}>{t('plugin_tester.common.season')}</Text>
                                                     <TextInput
                                                         style={styles.input}
                                                         value={season}
@@ -281,7 +294,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                                     />
                                                 </View>
                                                 <View style={{ width: 110 }}>
-                                                    <Text style={styles.fieldLabel}>Episode</Text>
+                                                    <Text style={styles.fieldLabel}>{t('plugin_tester.common.episode')}</Text>
                                                     <TextInput
                                                         style={styles.input}
                                                         value={episode}
@@ -303,7 +316,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                         ) : (
                                             <Ionicons name="play" size={20} color={currentTheme.colors.white} />
                                         )}
-                                        <Text style={styles.buttonText}>{isRunning ? 'Running…' : 'Run Test'}</Text>
+                                        <Text style={styles.buttonText}>{isRunning ? t('plugin_tester.common.running') : t('plugin_tester.common.run_test')}</Text>
                                     </TouchableOpacity>
                                 </View>
                             </ScrollView>
@@ -315,27 +328,22 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                 <View style={{ flexDirection: 'row', marginBottom: 12, gap: 8 }}>
                                     <TouchableOpacity
                                         style={[
-                                            styles.tab,
-                                            activeTab === 'logs' && styles.activeTab,
-                                            { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
+                                            styles.smallTab,
+                                            rightPanelTab === 'logs' && styles.smallTabActive,
                                         ]}
-                                        onPress={() => setActiveTab('logs')}
+                                        onPress={() => setRightPanelTab('logs')}
                                     >
-                                        <Text style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>Logs</Text>
+                                        <Text style={[styles.smallTabText, rightPanelTab === 'logs' && styles.smallTabTextActive]}>{t('plugin_tester.tabs.logs')}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
-                                        style={[
-                                            styles.tab,
-                                            activeTab === 'results' && styles.activeTab,
-                                            { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
-                                        ]}
-                                        onPress={() => setActiveTab('results')}
+                                        style={[styles.smallTab, rightPanelTab === 'results' && styles.smallTabActive]}
+                                        onPress={() => setRightPanelTab('results')}
                                     >
-                                        <Text style={[styles.tabText, activeTab === 'results' && styles.activeTabText]}>Results ({streams.length})</Text>
+                                        <Text style={[styles.smallTabText, rightPanelTab === 'results' && styles.smallTabTextActive]}>{t('plugin_tester.tabs.results')} ({streams.length})</Text>
                                     </TouchableOpacity>
                                 </View>
 
-                                {activeTab === 'logs' || activeTab === 'code' ? (
+                                {rightPanelTab === 'logs' ? (
                                     <ScrollView
                                         ref={(r) => (logsScrollRef.current = r)}
                                         style={[styles.logContainer, { flex: 1, minHeight: 400 }]}
@@ -347,7 +355,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                         {logs.length === 0 ? (
                                             <View style={styles.emptyState}>
                                                 <Ionicons name="terminal-outline" size={48} color={currentTheme.colors.mediumGray} />
-                                                <Text style={styles.emptyText}>No logs yet. Run a test to see output.</Text>
+                                                <Text style={styles.emptyText}>{t('plugin_tester.individual.no_logs')}</Text>
                                             </View>
                                         ) : (
                                             logs.map((log, i) => {
@@ -366,23 +374,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                         )}
                                     </ScrollView>
                                 ) : (
-                                    <ScrollView style={{ flex: 1, minHeight: 400 }} contentContainerStyle={{ paddingBottom: 20 }}>
-                                        {streams.length === 0 ? (
-                                            <View style={styles.emptyState}>
-                                                <Ionicons name="list-outline" size={48} color={currentTheme.colors.mediumGray} />
-                                                <Text style={styles.emptyText}>No streams found yet.</Text>
-                                            </View>
-                                        ) : (
-                                            streams.map((stream, i) => (
-                                                <View key={i} style={styles.resultItem}>
-                                                    <Text style={styles.resultTitle}>{stream.title || stream.name}</Text>
-                                                    <Text style={styles.resultMeta}>Quality: {stream.quality || 'Unknown'}</Text>
-                                                    <Text style={styles.resultMeta}>Size: {stream.description || 'Unknown'}</Text>
-                                                    <Text style={styles.resultUrl} numberOfLines={2}>URL: {stream.url}</Text>
-                                                </View>
-                                            ))
-                                        )}
-                                    </ScrollView>
+                                    renderResultsTab()
                                 )}
                             </View>
                         </View>
@@ -401,11 +393,11 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                 <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 10 }} keyboardShouldPersistTaps="handled">
                     <View style={styles.card}>
                         <View style={styles.cardTitleRow}>
-                            <Text style={styles.cardTitle}>Load from URL</Text>
+                            <Text style={styles.cardTitle}>{t('plugin_tester.individual.load_from_url')}</Text>
                             <Ionicons name="link-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
                         </View>
                         <Text style={styles.helperText}>
-                            Paste a raw GitHub URL or local IP and tap download.
+                            {t('plugin_tester.individual.load_from_url_desc')}
                         </Text>
                         <View style={[styles.row, { marginTop: 10 }]}>
                             <TextInput
@@ -428,12 +420,12 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
 
                     <View style={styles.card}>
                         <View style={styles.cardTitleRow}>
-                            <Text style={styles.cardTitle}>Plugin Code</Text>
+                            <Text style={styles.cardTitle}>{t('plugin_tester.individual.plugin_code')}</Text>
                             <View style={styles.cardActionsRow}>
                                 <TouchableOpacity
                                     style={styles.cardActionButton}
                                     onPress={() => setIsEditorFocused(true)}
-                                    accessibilityLabel="Focus code editor"
+                                    accessibilityLabel={t('plugin_tester.individual.focus_editor')}
                                 >
                                     <Ionicons name="expand-outline" size={18} color={currentTheme.colors.highEmphasis} />
                                 </TouchableOpacity>
@@ -445,7 +437,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                             value={code}
                             onChangeText={setCode}
                             multiline
-                            placeholder="// Paste plugin code here..."
+                            placeholder={t('plugin_tester.individual.code_placeholder')}
                             placeholderTextColor={currentTheme.colors.mediumEmphasis}
                             autoCapitalize="none"
                             autoCorrect={false}
@@ -456,7 +448,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                 <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, 14) }]}>
                     <View style={styles.footerCard}>
                         <View style={styles.footerTitleRow}>
-                            <Text style={styles.footerTitle}>Test Parameters</Text>
+                            <Text style={styles.footerTitle}>{t('plugin_tester.individual.test_parameters')}</Text>
                             <Ionicons name="options-outline" size={16} color={currentTheme.colors.mediumEmphasis} />
                         </View>
 
@@ -473,13 +465,13 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                 onPress={() => setMediaType('tv')}
                             >
                                 <Ionicons name="tv-outline" size={18} color={mediaType === 'tv' ? currentTheme.colors.primary : currentTheme.colors.highEmphasis} />
-                                <Text style={[styles.segmentText, mediaType === 'tv' && styles.segmentTextActive]}>TV</Text>
+                                <Text style={[styles.segmentText, mediaType === 'tv' && styles.segmentTextActive]}>{t('plugin_tester.common.tv')}</Text>
                             </TouchableOpacity>
                         </View>
 
                         <View style={[styles.row, { marginTop: 10, alignItems: 'flex-start' }]}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={styles.fieldLabel}>TMDB ID</Text>
+                            <View style={{ width: 110 }}>
+                                <Text style={styles.fieldLabel}>{t('plugin_tester.common.tmdb_id')}</Text>
                                 <TextInput
                                     style={styles.input}
                                     value={tmdbId}
@@ -491,7 +483,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                             {mediaType === 'tv' && (
                                 <>
                                     <View style={{ width: 110 }}>
-                                        <Text style={styles.fieldLabel}>Season</Text>
+                                        <Text style={styles.fieldLabel}>{t('plugin_tester.common.season')}</Text>
                                         <TextInput
                                             style={styles.input}
                                             value={season}
@@ -500,7 +492,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                                         />
                                     </View>
                                     <View style={{ width: 110 }}>
-                                        <Text style={styles.fieldLabel}>Episode</Text>
+                                        <Text style={styles.fieldLabel}>{t('plugin_tester.common.episode')}</Text>
                                         <TextInput
                                             style={styles.input}
                                             value={episode}
@@ -522,7 +514,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                         ) : (
                             <Ionicons name="play" size={20} color={currentTheme.colors.white} />
                         )}
-                        <Text style={styles.buttonText}>{isRunning ? 'Running…' : 'Run Test'}</Text>
+                        <Text style={styles.buttonText}>{isRunning ? t('plugin_tester.common.running') : t('plugin_tester.common.run_test')}</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -542,7 +534,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
             {logs.length === 0 ? (
                 <View style={styles.emptyState}>
                     <Ionicons name="terminal-outline" size={48} color={currentTheme.colors.mediumGray} />
-                    <Text style={styles.emptyText}>No logs yet. Run a test to see output.</Text>
+                    <Text style={styles.emptyText}>{t('plugin_tester.individual.no_logs')}</Text>
                 </View>
             ) : (
                 <View style={styles.logContainer}>
@@ -566,7 +558,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
 
     const playStream = (stream: any) => {
         if (!stream.url) {
-            Alert.alert('Error', 'No URL found for this stream');
+            Alert.alert(t('plugin_tester.common.error'), t('plugin_tester.individual.no_url_stream_error'));
             return;
         }
 
@@ -593,64 +585,63 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
             {streams.length === 0 ? (
                 <View style={styles.emptyState}>
                     <Ionicons name="list-outline" size={48} color={currentTheme.colors.mediumGray} />
-                    <Text style={styles.emptyText}>No streams found yet.</Text>
+                    <Text style={styles.emptyText}>{t('plugin_tester.individual.no_streams')}</Text>
                 </View>
             ) : (
-                <>
-                    <View style={[styles.card, { marginBottom: 12 }]}>
-                        <Text style={styles.cardTitle}>{streams.length} Stream{streams.length !== 1 ? 's' : ''} Found</Text>
-                        <Text style={styles.helperText}>Tap Play to test a stream in the native player.</Text>
-                    </View>
-                    {streams.map((stream, i) => (
-                        <TouchableOpacity
-                            key={i}
-                            style={styles.resultItem}
-                            onPress={() => playStream(stream)}
-                            activeOpacity={0.7}
-                        >
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <View style={{ flex: 1, marginRight: 12 }}>
-                                    <Text style={styles.resultTitle}>{stream.title || stream.name || 'Unnamed Stream'}</Text>
-                                    <Text style={styles.resultMeta}>Quality: {stream.quality || (stream.title?.match(/(\d+)p/) || [])[1] || 'Unknown'}</Text>
-                                    {stream.description && <Text style={styles.resultMeta}>Size: {stream.description}</Text>}
-                                    <Text style={styles.resultUrl} numberOfLines={1}>URL: {stream.url}</Text>
-                                    {stream.headers && Object.keys(stream.headers).length > 0 && (
-                                        <Text style={[styles.resultMeta, { color: currentTheme.colors.info }]}>
-                                            Headers: {Object.keys(stream.headers).length} custom header(s)
-                                        </Text>
-                                    )}
-                                </View>
-                                <TouchableOpacity
-                                    style={[styles.button, { paddingVertical: 10, paddingHorizontal: 16 }]}
-                                    onPress={() => playStream(stream)}
-                                >
-                                    <Ionicons name="play" size={18} color={currentTheme.colors.white} />
-                                    <Text style={[styles.buttonText, { fontSize: 13 }]}>Play</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <Text
-                                style={[
-                                    styles.logItem,
-                                    {
-                                        marginTop: 10,
-                                        marginBottom: 0,
-                                        color: currentTheme.colors.highEmphasis,
-                                    },
-                                ]}
-                                selectable
+                <View style={styles.listContainer}>
+                    <Text style={styles.sectionHeader}>{streams.length === 1 ? t('plugin_tester.individual.streams_found', { count: streams.length }) : t('plugin_tester.individual.streams_found_plural', { count: streams.length })}</Text>
+                    <Text style={styles.sectionSubHeader}>{t('plugin_tester.individual.tap_play_hint')}</Text>
+                    <FlatList
+                        data={streams}
+                        keyExtractor={(item, index) => item.url + index}
+                        renderItem={({ item: stream }) => (
+                            <TouchableOpacity
+                                style={styles.resultItem}
+                                onPress={() => playStream(stream)}
+                                activeOpacity={0.7}
                             >
-                                {(() => {
-                                    try {
-                                        return JSON.stringify(stream, null, 2);
-                                    } catch {
-                                        return String(stream);
-                                    }
-                                })()}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <View style={styles.streamInfo}>
+                                        <Text style={styles.streamName}>{stream.name || stream.title || t('plugin_tester.individual.unnamed_stream')}</Text>
+                                        <Text style={styles.streamMeta}>{t('plugin_tester.individual.quality', { quality: stream.quality || 'Unknown' })}</Text>
+                                        {stream.description ? <Text style={styles.streamMeta}>{t('plugin_tester.individual.size', { size: stream.description })}</Text> : null}
+                                        <Text style={styles.streamMeta} numberOfLines={1}>{t('plugin_tester.individual.url_label', { url: stream.url })}</Text>
+                                        {stream.headers && Object.keys(stream.headers).length > 0 && (
+                                            <Text style={styles.streamMeta}>{t('plugin_tester.individual.headers_info', { count: Object.keys(stream.headers).length })}</Text>
+                                        )}
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.playButton}
+                                        onPress={() => playStream(stream)}
+                                    >
+                                        <Ionicons name="play" size={16} color={currentTheme.colors.white} />
+                                        <Text style={styles.playButtonText}>{t('plugin_tester.common.play')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <Text
+                                    style={[
+                                        styles.logItem,
+                                        {
+                                            marginTop: 10,
+                                            marginBottom: 0,
+                                            color: currentTheme.colors.highEmphasis,
+                                        },
+                                    ]}
+                                    selectable
+                                >
+                                    {(() => {
+                                        try {
+                                            return JSON.stringify(stream, null, 2);
+                                        } catch {
+                                            return String(stream);
+                                        }
+                                    })()}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                    />
+                </View>
             )}
         </ScrollView>
     );
@@ -662,16 +653,19 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
             keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
         >
             <View style={styles.findToolbar}>
-                <TextInput
-                    style={styles.findInput}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    onSubmitEditing={() => jumpToMatch(currentMatchIndex)}
-                    placeholder="Find in code…"
-                    placeholderTextColor={currentTheme.colors.mediumEmphasis}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                />
+                <View style={styles.searchContainer}>
+                    <Ionicons name="search" size={18} color={currentTheme.colors.mediumEmphasis} style={styles.searchIcon} />
+                    <TextInput
+                        style={[styles.searchInput, { color: currentTheme.colors.highEmphasis }]}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        onSubmitEditing={() => jumpToMatch(currentMatchIndex)}
+                        placeholder={t('plugin_tester.individual.find_placeholder')}
+                        placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                    />
+                </View>
                 <Text style={styles.findCounter}>
                     {matches.length === 0 ? '–' : `${currentMatchIndex + 1}/${matches.length}`}
                 </Text>
@@ -739,7 +733,7 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
                         scrollEnabled={false}
                         autoFocus
                         selectionColor={currentTheme.colors.primary}
-                        placeholder="// Paste plugin code here..."
+                        placeholder={t('plugin_tester.individual.code_placeholder_focused')}
                         placeholderTextColor={currentTheme.colors.mediumEmphasis}
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -752,71 +746,74 @@ export const IndividualTester = ({ onSwitchTab }: IndividualTesterProps) => {
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>
             {isEditorFocused ? (
-                <>
-                    <Header
-                        title="Edit Code"
-                        backIcon="close"
-                        onBack={() => setIsEditorFocused(false)}
-                        rightElement={
-                            <TouchableOpacity style={styles.headerRightButton} onPress={() => {
-                                setIsEditorFocused(false);
-                                setSearchQuery('');
-                                setMatches([]);
-                                setCurrentMatchIndex(0);
-                            }}>
-                                <Text style={styles.headerRightButtonText}>Done</Text>
-                            </TouchableOpacity>
-                        }
-                    />
-                    {renderFocusedEditor()}
-                </>
+                <Modal
+                    visible={isEditorFocused}
+                    animationType="slide"
+                    presentationStyle="pageSheet"
+                    onRequestClose={() => setIsEditorFocused(false)}
+                >
+                    <View style={[styles.modalContainer, { backgroundColor: currentTheme.colors.elevation1 }]}>
+                        <Header
+                            title={t('plugin_tester.individual.edit_code_title')}
+                            onBack={() => setIsEditorFocused(false)}
+                            rightElement={
+                                <TouchableOpacity onPress={() => setIsEditorFocused(false)}>
+                                    <Text style={{ color: currentTheme.colors.primary, fontWeight: '600' }}>{t('plugin_tester.common.done')}</Text>
+                                </TouchableOpacity>
+                            }
+                        />
+                        {renderFocusedEditor()}
+                    </View>
+                </Modal>
             ) : (
                 <>
                     <Header
-                        title="Plugin Tester"
-                        subtitle="Run scrapers and inspect logs in real-time"
+                        title={t('plugin_tester.title')}
+                        subtitle={t('plugin_tester.subtitle')}
                         onBack={() => navigation.goBack()}
                     />
                     <MainTabBar activeTab="individual" onTabChange={onSwitchTab} />
 
-                    <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, gap: 8 }}>
-                        <TouchableOpacity
-                            style={[
-                                styles.tab,
-                                activeTab === 'code' && styles.activeTab,
-                                { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
-                            ]}
-                            onPress={() => setActiveTab('code')}
-                        >
-                            <Text style={[styles.tabText, activeTab === 'code' && styles.activeTabText]}>Code</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[
-                                styles.tab,
-                                activeTab === 'logs' && styles.activeTab,
-                                { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
-                            ]}
-                            onPress={() => setActiveTab('logs')}
-                        >
-                            <Text style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>Logs</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[
-                                styles.tab,
-                                activeTab === 'results' && styles.activeTab,
-                                { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
-                            ]}
-                            onPress={() => setActiveTab('results')}
-                        >
-                            <Text style={[styles.tabText, activeTab === 'results' && styles.activeTabText]}>Results</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {!isLargeScreen && (
+                        <View style={{ flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, gap: 8 }}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.tab,
+                                    activeTab === 'code' && styles.activeTab,
+                                    { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
+                                ]}
+                                onPress={() => setActiveTab('code')}
+                            >
+                                <Text style={[styles.tabText, activeTab === 'code' && styles.activeTabText]}>{t('plugin_tester.tabs.code')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.tab,
+                                    activeTab === 'logs' && styles.activeTab,
+                                    { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
+                                ]}
+                                onPress={() => setActiveTab('logs')}
+                            >
+                                <Text style={[styles.tabText, activeTab === 'logs' && styles.activeTabText]}>{t('plugin_tester.tabs.logs')}</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.tab,
+                                    activeTab === 'results' && styles.activeTab,
+                                    { paddingVertical: 8, borderWidth: 1, borderColor: currentTheme.colors.elevation3, borderRadius: 8, flex: 1 }
+                                ]}
+                                onPress={() => setActiveTab('results')}
+                            >
+                                <Text style={[styles.tabText, activeTab === 'results' && styles.activeTabText]}>{t('plugin_tester.tabs.results')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
                     {activeTab === 'code' && renderCodeTab()}
                     {activeTab === 'logs' && renderLogsTab()}
                     {activeTab === 'results' && renderResultsTab()}
                 </>
             )}
-        </View>
+        </View >
     );
 };

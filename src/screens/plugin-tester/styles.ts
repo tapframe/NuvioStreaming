@@ -56,7 +56,7 @@ export const getPluginTesterStyles = (theme: any, isLargeScreen: boolean = false
         backgroundColor: theme.colors.elevation1,
         padding: 6,
         marginHorizontal: 16,
-        marginTop: 12,
+        marginVertical: 12,
         borderRadius: 12,
         borderWidth: 1,
         borderColor: theme.colors.elevation3,
@@ -478,5 +478,117 @@ export const getPluginTesterStyles = (theme: any, isLargeScreen: boolean = false
     emptyText: {
         color: theme.colors.mediumGray,
         marginTop: 8,
+    },
+    // New styles added for i18n
+    smallTab: {
+        flex: 1,
+        paddingVertical: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.elevation3,
+        backgroundColor: theme.colors.elevation1,
+    },
+    smallTabActive: {
+        backgroundColor: theme.colors.primary + '20',
+        borderColor: theme.colors.primary,
+    },
+    smallTabText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: theme.colors.mediumEmphasis,
+    },
+    smallTabTextActive: {
+        color: theme.colors.primary,
+    },
+    listContainer: {
+        flex: 1,
+    },
+    sectionHeader: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: theme.colors.highEmphasis,
+        marginBottom: 4,
+    },
+    sectionSubHeader: {
+        fontSize: 12,
+        color: theme.colors.mediumEmphasis,
+        marginBottom: 10,
+    },
+    streamInfo: {
+        flex: 1,
+        marginRight: 10,
+    },
+    streamName: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: theme.colors.white,
+        marginBottom: 2,
+    },
+    streamMeta: {
+        fontSize: 12,
+        color: theme.colors.mediumEmphasis,
+        marginTop: 2,
+    },
+    playButton: {
+        backgroundColor: theme.colors.primary,
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    playButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: theme.colors.white,
+    },
+    searchContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.elevation1,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: theme.colors.elevation3,
+        paddingHorizontal: 10,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        paddingVertical: 8,
+        color: theme.colors.highEmphasis,
+        fontSize: 14,
+    },
+    modalContainer: {
+        flex: 1,
+    },
+    mobileTabBar: {
+        flexDirection: 'row',
+        backgroundColor: theme.colors.elevation2,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.elevation3,
+        paddingTop: 10,
+    },
+    mobileTabItem: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 6,
+        gap: 4,
+    },
+    mobileTabItemActive: {
+        // Active styles
+    },
+    mobileTabText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: theme.colors.mediumEmphasis,
+    },
+    mobileTabTextActive: {
+        color: theme.colors.primary,
     },
 });
