@@ -100,6 +100,16 @@ export const ContentDiscoverySettingsContent: React.FC<ContentDiscoverySettingsC
                             icon="link"
                             renderControl={() => <ChevronRight />}
                             onPress={() => navigation.navigate('DebridIntegration')}
+                            isTablet={isTablet}
+                        />
+                    )}
+                    {isItemVisible('scrapers') && (
+                        <SettingItem
+                            title={t('settings.items.plugins')}
+                            description={t('settings.items.plugins_desc')}
+                            customIcon={<PluginIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+                            renderControl={() => <ChevronRight />}
+                            onPress={() => navigation.navigate('ScraperSettings')}
                             isLast
                             isTablet={isTablet}
                         />

@@ -718,7 +718,7 @@ const SettingsScreen: React.FC = () => {
               <SettingsCard title={t('settings.sections.testing')}>
                 <SettingItem
                   title={t('settings.items.developer_tools')}
-                  description={t('settings.developer_tools')}
+                  description={t('settings.items.developer_tools_desc')}
                   icon="code"
                   renderControl={() => <ChevronRight />}
                   onPress={() => navigation.navigate('DeveloperSettings')}
