@@ -824,9 +824,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         // Store addon logo before TMDB enrichment overwrites it
         const addonLogo = (finalMetadata as any).logo;
 
-        // If localization is enabled AND title/description enrichment is enabled, merge TMDB localized text (name/overview) before first render
+
         try {
-          if (settings.enrichMetadataWithTMDB && settings.useTmdbLocalizedMetadata && settings.tmdbEnrichTitleDescription) {
+          if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichTitleDescription) {
             const tmdbSvc = TMDBService.getInstance();
             let finalTmdbId: number | null = tmdbId;
             if (!finalTmdbId) {
@@ -835,7 +835,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             }
 
             if (finalTmdbId) {
-              const lang = settings.tmdbLanguagePreference || 'en';
+              const lang = settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en';
               if (type === 'movie') {
                 const localized = await tmdbSvc.getMovieDetails(String(finalTmdbId), lang);
                 if (localized) {
@@ -904,7 +904,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             }
           }
         } catch (e) {
-          if (__DEV__) console.log('[useMetadata] failed to merge localized TMDB text', e);
+          if (__DEV__) console.log('[useMetadata] failed to merge TMDB title/description', e);
         }
 
         // Centralized logo fetching logic
@@ -1149,13 +1149,11 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           if (__DEV__) logger.log('[loadSeriesData] TMDB season poster enrichment disabled; skipping season poster fetch');
         }
 
-        // If localized TMDB text is enabled AND episode enrichment is enabled, merge episode names/overviews per language
-        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichEpisodes && settings.useTmdbLocalizedMetadata) {
+        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichEpisodes) {
           try {
             const tmdbIdToUse = tmdbId || (id.startsWith('tt') ? await tmdbService.findTMDBIdByIMDB(id) : null);
             if (tmdbIdToUse) {
-              // Use just the language code (e.g., 'ar', not 'ar-US') for TMDB API
-              const lang = settings.tmdbLanguagePreference || 'en';
+              const lang = settings.useTmdbLocalizedMetadata ? (settings.tmdbLanguagePreference || 'en') : 'en';
               const seasons = Object.keys(groupedAddonEpisodes).map(Number);
 
               // Fetch all seasons in parallel (much faster than fetching each episode individually)
@@ -1187,10 +1185,10 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               });
 
               await Promise.all(seasonPromises);
-              if (__DEV__) logger.log('[useMetadata] merged localized episode names/overviews from TMDB (batch)');
+              if (__DEV__) logger.log('[useMetadata] merged episode names/overviews from TMDB (batch)');
             }
           } catch (e) {
-            if (__DEV__) console.log('[useMetadata] failed to merge localized episode text', e);
+            if (__DEV__) console.log('[useMetadata] failed to merge episode text from TMDB', e);
           }
         }
 

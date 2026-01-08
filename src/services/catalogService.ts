@@ -1159,7 +1159,11 @@ class CatalogService {
             const metas = await stremioService.getCatalog(manifest, type, catalog.id, 1, filters);
 
             if (metas && metas.length > 0) {
-              const items = metas.slice(0, limit).map(meta => this.convertMetaToStreamingContent(meta));
+              const items = metas.slice(0, limit).map(meta => {
+                const content = this.convertMetaToStreamingContent(meta);
+                content.addonId = addon.id;
+                return content;
+              });
               return {
                 addonName: addon.name,
                 items
@@ -1226,7 +1230,11 @@ class CatalogService {
       const metas = await stremioService.getCatalog(manifest, type, catalogId, page, filters);
 
       if (metas && metas.length > 0) {
-        return metas.map(meta => this.convertMetaToStreamingContent(meta));
+        return metas.map(meta => {
+          const content = this.convertMetaToStreamingContent(meta);
+          content.addonId = addonId;
+          return content;
+        });
       }
       return [];
     } catch (error) {
@@ -1257,7 +1265,11 @@ class CatalogService {
               const metas = await stremioService.getCatalog(manifest, catalog.type, catalog.id, 1, filters);
 
               if (metas && metas.length > 0) {
-                const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+                const items = metas.map(meta => {
+                  const content = this.convertMetaToStreamingContent(meta);
+                  content.addonId = addon.id;
+                  return content;
+                });
                 results.push(...items);
               }
             } catch (error) {
@@ -1519,7 +1531,11 @@ class CatalogService {
       const metas = response.data?.metas || [];
 
       if (metas.length > 0) {
-        const items = metas.map(meta => this.convertMetaToStreamingContent(meta));
+        const items = metas.map(meta => {
+          const content = this.convertMetaToStreamingContent(meta);
+          content.addonId = addon.id;
+          return content;
+        });
         logger.log(`Found ${items.length} results from ${addon.name}`);
         return items;
       }
