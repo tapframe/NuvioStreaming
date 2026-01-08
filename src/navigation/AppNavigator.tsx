@@ -695,8 +695,6 @@ const MainTabs = () => {
 
               const isFocused = props.state.index === index;
 
-              const lastTapRef = useRef<Record<string, number>>({}); // Add this ref at the top of MainTabs component
-
               const onPress = () => {
                 const now = Date.now();
                 const DOUBLE_TAP_DELAY = 300;

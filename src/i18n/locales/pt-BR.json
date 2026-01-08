@@ -34,7 +34,9 @@
             "thu": "Qui",
             "fri": "Sex",
             "sat": "Sáb"
-        }
+        },
+        "email": "E-mail",
+        "status": "Status"
     },
     "home": {
         "categories": {
@@ -636,7 +638,7 @@
             "addons": "Addons",
             "installed": "instalados",
             "debrid_integration": "Integração Debrid",
-            "debrid_desc": "Conectar Torbox para streams premium",
+            "debrid_desc": "Conectar Torbox",
             "plugins": "Plugins",
             "plugins_desc": "Gerenciar plugins e repositórios",
             "catalogs": "Catálogos",

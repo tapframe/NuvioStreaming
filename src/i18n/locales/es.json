@@ -34,7 +34,9 @@
             "thu": "Jue",
             "fri": "Vie",
             "sat": "Sáb"
-        }
+        },
+        "email": "Email",
+        "status": "Estado"
     },
     "home": {
         "categories": {
@@ -655,7 +657,7 @@
             "addons": "Complementos",
             "installed": "instalados",
             "debrid_integration": "Integración de Debrid",
-            "debrid_desc": "Conectar Torbox para fuentes premium",
+            "debrid_desc": "Conectar Torbox",
             "plugins": "Plugins",
             "plugins_desc": "Gestionar plugins y repositorios",
             "catalogs": "Catálogos",

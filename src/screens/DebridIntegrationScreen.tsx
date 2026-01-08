@@ -32,7 +32,7 @@ import axios from 'axios';
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 const TORBOX_STORAGE_KEY = 'torbox_debrid_config';
 const TORBOX_API_BASE = 'https://api.torbox.app/v1';
-const TORRENTIO_CONFIG_KEY = 'torrentio_config';
+
 
 interface TorboxConfig {
     apiKey: string;
@@ -51,115 +51,7 @@ interface TorboxUserData {
     base_email: string;
 }
 
-// Torrentio Configuration Types
-interface TorrentioConfig {
-    providers: string[];
-    sort: string;
-    qualityFilter: string[];
-    priorityLanguages: string[];
-    maxResults: string;
-    debridService: string;
-    debridApiKey: string;
-    noDownloadLinks: boolean;
-    noCatalog: boolean;
-    isInstalled: boolean;
-    manifestUrl?: string;
-}
 
-// Torrentio Options Data
-const TORRENTIO_PROVIDERS = [
-    { id: 'yts', name: 'YTS' },
-    { id: 'eztv', name: 'EZTV' },
-    { id: 'rarbg', name: 'RARBG' },
-    { id: '1337x', name: '1337x' },
-    { id: 'thepiratebay', name: 'ThePirateBay' },
-    { id: 'kickasstorrents', name: 'KickassTorrents' },
-    { id: 'torrentgalaxy', name: 'TorrentGalaxy' },
-    { id: 'magnetdl', name: 'MagnetDL' },
-    { id: 'horriblesubs', name: 'HorribleSubs' },
-    { id: 'nyaasi', name: 'NyaaSi' },
-    { id: 'tokyotosho', name: 'TokyoTosho' },
-    { id: 'anidex', name: 'AniDex' },
-    { id: 'rutor', name: '🇷🇺 Rutor' },
-    { id: 'rutracker', name: '🇷🇺 Rutracker' },
-    { id: 'comando', name: '🇵🇹 Comando' },
-    { id: 'bludv', name: '🇧🇷 BluDV' },
-    { id: 'torrent9', name: '🇫🇷 Torrent9' },
-    { id: 'ilcorsaronero', name: '🇮🇹 ilCorSaRoNeRo' },
-    { id: 'mejortorrent', name: '🇪🇸 MejorTorrent' },
-    { id: 'wolfmax4k', name: '🇪🇸 Wolfmax4k' },
-    { id: 'cinecalidad', name: '🇲🇽 Cinecalidad' },
-];
-
-const TORRENTIO_SORT_OPTIONS = [
-    { id: 'quality', name: 'By quality then seeders' },
-    { id: 'qualitysize', name: 'By quality then size' },
-    { id: 'seeders', name: 'By seeders' },
-    { id: 'size', name: 'By size' },
-];
-
-const TORRENTIO_QUALITY_FILTERS = [
-    { id: 'brremux', name: 'BluRay REMUX' },
-    { id: 'hdrall', name: 'HDR/HDR10+/Dolby Vision' },
-    { id: 'dolbyvision', name: 'Dolby Vision' },
-    { id: '4k', name: '4K' },
-    { id: '1080p', name: '1080p' },
-    { id: '720p', name: '720p' },
-    { id: '480p', name: '480p' },
-    { id: 'scr', name: 'Screener' },
-    { id: 'cam', name: 'CAM' },
-    { id: 'unknown', name: 'Unknown' },
-];
-
-const TORRENTIO_LANGUAGES = [
-    { id: 'english', name: '🇬🇧 English' },
-    { id: 'russian', name: '🇷🇺 Russian' },
-    { id: 'italian', name: '🇮🇹 Italian' },
-    { id: 'portuguese', name: '🇵🇹 Portuguese' },
-    { id: 'spanish', name: '🇪🇸 Spanish' },
-    { id: 'latino', name: '🇲🇽 Latino' },
-    { id: 'korean', name: '🇰🇷 Korean' },
-    { id: 'chinese', name: '🇨🇳 Chinese' },
-    { id: 'french', name: '🇫🇷 French' },
-    { id: 'german', name: '🇩🇪 German' },
-    { id: 'dutch', name: '🇳🇱 Dutch' },
-    { id: 'hindi', name: '🇮🇳 Hindi' },
-    { id: 'japanese', name: '🇯🇵 Japanese' },
-    { id: 'polish', name: '🇵🇱 Polish' },
-    { id: 'arabic', name: '🇸🇦 Arabic' },
-    { id: 'turkish', name: '🇹🇷 Turkish' },
-];
-
-const TORRENTIO_DEBRID_SERVICES = [
-    { id: 'torbox', name: 'TorBox', keyParam: 'torbox' },
-    { id: 'realdebrid', name: 'RealDebrid', keyParam: 'realdebrid' },
-    { id: 'alldebrid', name: 'AllDebrid', keyParam: 'alldebrid' },
-    { id: 'premiumize', name: 'Premiumize', keyParam: 'premiumize' },
-    { id: 'debridlink', name: 'DebridLink', keyParam: 'debridlink' },
-    { id: 'offcloud', name: 'Offcloud', keyParam: 'offcloud' },
-];
-
-const TORRENTIO_MAX_RESULTS = [
-    { id: '', name: 'All results' },
-    { id: '1', name: '1 per quality' },
-    { id: '2', name: '2 per quality' },
-    { id: '3', name: '3 per quality' },
-    { id: '5', name: '5 per quality' },
-    { id: '10', name: '10 per quality' },
-];
-
-const DEFAULT_TORRENTIO_CONFIG: TorrentioConfig = {
-    providers: TORRENTIO_PROVIDERS.map(p => p.id), // All providers by default
-    sort: 'quality',
-    qualityFilter: ['scr', 'cam'],
-    priorityLanguages: [],
-    maxResults: '',
-    debridService: 'torbox', // Default to TorBox
-    debridApiKey: '',
-    noDownloadLinks: false,
-    noCatalog: false,
-    isInstalled: false,
-};
 
 const getPlanName = (plan: number, t: any): string => {
     switch (plan) {
@@ -694,8 +586,7 @@ const DebridIntegrationScreen = () => {
     const colors = currentTheme.colors;
     const styles = createStyles(colors);
 
-    // Tab state
-    const [activeTab, setActiveTab] = useState<'torbox' | 'torrentio'>('torbox');
+
 
     // Torbox state
     const [apiKey, setApiKey] = useState('');
@@ -705,19 +596,6 @@ const DebridIntegrationScreen = () => {
     const [userData, setUserData] = useState<TorboxUserData | null>(null);
     const [userDataLoading, setUserDataLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
-
-    // Torrentio state
-    const [torrentioConfig, setTorrentioConfig] = useState<TorrentioConfig>(DEFAULT_TORRENTIO_CONFIG);
-    const [torrentioLoading, setTorrentioLoading] = useState(false);
-
-    // Accordion states for collapsible sections
-    const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
-        sorting: false,
-        qualityFilter: false,
-        languages: false,
-        maxResults: false,
-        options: false,
-    });
 
     // Alert state
     const [alertVisible, setAlertVisible] = useState(false);
@@ -758,34 +636,7 @@ const DebridIntegrationScreen = () => {
         }
     }, []);
 
-    // Load Torrentio config
-    const loadTorrentioConfig = useCallback(async () => {
-        try {
-            const storedConfig = await mmkvStorage.getItem(TORRENTIO_CONFIG_KEY);
-            if (storedConfig) {
-                const parsedConfig = JSON.parse(storedConfig);
-                setTorrentioConfig(parsedConfig);
-            }
 
-            // Check if Torrentio addon is installed
-            const addons = await stremioService.getInstalledAddonsAsync();
-            const torrentioAddon = addons.find(addon =>
-                addon.id?.includes('torrentio') ||
-                addon.url?.includes('torrentio.strem.fun') ||
-                (addon as any).transport?.includes('torrentio.strem.fun')
-            );
-
-            if (torrentioAddon) {
-                setTorrentioConfig(prev => ({
-                    ...prev,
-                    isInstalled: true,
-                    manifestUrl: (torrentioAddon as any).transport || torrentioAddon.url
-                }));
-            }
-        } catch (error) {
-            logger.error('Failed to load Torrentio config:', error);
-        }
-    }, []);
 
     const fetchUserData = useCallback(async () => {
         if (!config?.apiKey || !config?.isConnected) return;
@@ -814,8 +665,7 @@ const DebridIntegrationScreen = () => {
     useFocusEffect(
         useCallback(() => {
             loadConfig();
-            loadTorrentioConfig();
-        }, [loadConfig, loadTorrentioConfig])
+        }, [loadConfig])
     );
 
     useEffect(() => {
@@ -826,9 +676,9 @@ const DebridIntegrationScreen = () => {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await Promise.all([loadConfig(), loadTorrentioConfig(), fetchUserData()]);
+        await Promise.all([loadConfig(), fetchUserData()]);
         setRefreshing(false);
-    }, [loadConfig, loadTorrentioConfig, fetchUserData]);
+    }, [loadConfig, fetchUserData]);
 
     // Torbox handlers
     const handleConnect = async () => {
@@ -937,176 +787,6 @@ const DebridIntegrationScreen = () => {
 
     const openSubscription = () => {
         Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7');
-    };
-
-    // Torrentio handlers
-    const generateTorrentioManifestUrl = useCallback((): string => {
-        const parts: string[] = [];
-
-        // Providers (only if not all selected)
-        if (torrentioConfig.providers.length > 0 && torrentioConfig.providers.length < TORRENTIO_PROVIDERS.length) {
-            parts.push(`providers=${torrentioConfig.providers.join(',')}`);
-        }
-
-        // Sort (only if not default)
-        if (torrentioConfig.sort && torrentioConfig.sort !== 'quality') {
-            parts.push(`sort=${torrentioConfig.sort}`);
-        }
-
-        // Quality filter
-        if (torrentioConfig.qualityFilter.length > 0) {
-            parts.push(`qualityfilter=${torrentioConfig.qualityFilter.join(',')}`);
-        }
-
-        // Priority languages
-        if (torrentioConfig.priorityLanguages.length > 0) {
-            parts.push(`language=${torrentioConfig.priorityLanguages.join(',')}`);
-        }
-
-        // Max results
-        if (torrentioConfig.maxResults) {
-            parts.push(`limit=${torrentioConfig.maxResults}`);
-        }
-
-        // Debrid service and API key
-        if (torrentioConfig.debridService !== 'none' && torrentioConfig.debridApiKey) {
-            const debridInfo = TORRENTIO_DEBRID_SERVICES.find(d => d.id === torrentioConfig.debridService);
-            if (debridInfo) {
-                parts.push(`${debridInfo.keyParam}=${torrentioConfig.debridApiKey}`);
-            }
-        }
-
-        // Options
-        if (torrentioConfig.noDownloadLinks) {
-            parts.push('nodownloadlinks=true');
-        }
-        if (torrentioConfig.noCatalog) {
-            parts.push('nocatalog=true');
-        }
-
-        const configString = parts.length > 0 ? parts.join('|') + '/' : '';
-        return `https://torrentio.strem.fun/${configString}manifest.json`;
-    }, [torrentioConfig]);
-
-    const toggleQualityFilter = (qualityId: string) => {
-        setTorrentioConfig(prev => {
-            const newFilters = prev.qualityFilter.includes(qualityId)
-                ? prev.qualityFilter.filter(q => q !== qualityId)
-                : [...prev.qualityFilter, qualityId];
-            return { ...prev, qualityFilter: newFilters };
-        });
-    };
-
-    const toggleLanguage = (langId: string) => {
-        setTorrentioConfig(prev => {
-            const newLangs = prev.priorityLanguages.includes(langId)
-                ? prev.priorityLanguages.filter(l => l !== langId)
-                : [...prev.priorityLanguages, langId];
-            return { ...prev, priorityLanguages: newLangs };
-        });
-    };
-
-    const handleInstallTorrentio = async () => {
-        // Check if API key is provided
-        if (!torrentioConfig.debridApiKey.trim()) {
-            setAlertTitle(t('debrid.error_api_required'));
-            setAlertMessage(t('debrid.error_api_required_desc'));
-            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
-            setAlertVisible(true);
-            return;
-        }
-
-        setTorrentioLoading(true);
-        try {
-            const manifestUrl = generateTorrentioManifestUrl();
-
-            // Check if already installed
-            const addons = await stremioService.getInstalledAddonsAsync();
-            const existingTorrentio = addons.find(addon =>
-                addon.id?.includes('torrentio') ||
-                addon.url?.includes('torrentio.strem.fun') ||
-                (addon as any).transport?.includes('torrentio.strem.fun')
-            );
-
-            if (existingTorrentio) {
-                // Remove existing and reinstall with new config
-                await stremioService.removeAddon(existingTorrentio.id);
-            }
-
-            await stremioService.installAddon(manifestUrl);
-
-            // Save config
-            const newConfig = {
-                ...torrentioConfig,
-                isInstalled: true,
-                manifestUrl
-            };
-            await mmkvStorage.setItem(TORRENTIO_CONFIG_KEY, JSON.stringify(newConfig));
-            setTorrentioConfig(newConfig);
-
-            setAlertTitle(t('common.success'));
-            setAlertMessage(t('debrid.success_installed'));
-            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
-            setAlertVisible(true);
-        } catch (error) {
-            logger.error('Failed to install Torrentio addon:', error);
-            setAlertTitle(t('common.error'));
-            setAlertMessage(t('addons.install_error'));
-            setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
-            setAlertVisible(true);
-        } finally {
-            setTorrentioLoading(false);
-        }
-    };
-
-    const handleRemoveTorrentio = async () => {
-        setAlertTitle(t('debrid.remove_button'));
-        setAlertMessage(t('addons.uninstall_message', { name: 'Torrentio' }));
-        setAlertActions([
-            { label: t('common.cancel'), onPress: () => setAlertVisible(false), style: { color: colors.mediumGray } },
-            {
-                label: t('debrid.remove_button'),
-                onPress: async () => {
-                    setAlertVisible(false);
-                    setTorrentioLoading(true);
-                    try {
-                        const addons = await stremioService.getInstalledAddonsAsync();
-                        const torrentioAddon = addons.find(addon =>
-                            addon.id?.includes('torrentio') ||
-                            addon.url?.includes('torrentio.strem.fun') ||
-                            (addon as any).transport?.includes('torrentio.strem.fun')
-                        );
-
-                        if (torrentioAddon) {
-                            await stremioService.removeAddon(torrentioAddon.id);
-                        }
-
-                        const newConfig = {
-                            ...torrentioConfig,
-                            isInstalled: false,
-                            manifestUrl: undefined
-                        };
-                        await mmkvStorage.setItem(TORRENTIO_CONFIG_KEY, JSON.stringify(newConfig));
-                        setTorrentioConfig(newConfig);
-
-                        setAlertTitle(t('common.success'));
-                        setAlertMessage(t('debrid.success_removed'));
-                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
-                        setAlertVisible(true);
-                    } catch (error) {
-                        logger.error('Failed to remove Torrentio:', error);
-                        setAlertTitle(t('common.error'));
-                        setAlertMessage(t('addons.uninstall_error', 'Failed to remove Torrentio addon'));
-                        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
-                        setAlertVisible(true);
-                    } finally {
-                        setTorrentioLoading(false);
-                    }
-                },
-                style: { color: colors.error || '#F44336' }
-            }
-        ]);
-        setAlertVisible(true);
     };
 
     // Render Torbox Tab
@@ -1284,286 +964,6 @@ const DebridIntegrationScreen = () => {
         </>
     );
 
-    // Render Torrentio Tab
-    const toggleSection = (section: string) => {
-        setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-    };
-
-    const renderTorrentioTab = () => (
-        <>
-            <Text style={styles.description}>
-                {t('debrid.description_torrentio')}
-            </Text>
-
-            {torrentioConfig.isInstalled && (
-                <View style={styles.installedBadge}>
-                    <Text style={styles.installedBadgeText}>{t('debrid.installed_badge')}</Text>
-                </View>
-            )}
-
-            {/* TorBox Promotion Card */}
-            {!torrentioConfig.debridApiKey && (
-                <View style={styles.promoCard}>
-                    <Text style={styles.promoTitle}>{t('debrid.promo_title')}</Text>
-                    <Text style={styles.promoText}>
-                        {t('debrid.promo_desc')}
-                    </Text>
-                    <TouchableOpacity
-                        style={styles.promoButton}
-                        onPress={() => Linking.openURL('https://torbox.app/subscription?referral=493192f2-6403-440f-b414-768f72222ec7')}
-                    >
-                        <Text style={styles.promoButtonText}>{t('debrid.promo_button')}</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-
-            {/* Debrid Service Selection */}
-            <View style={styles.configSection}>
-                <Text style={styles.configSectionTitle}>{t('debrid.service_label')}</Text>
-                <View style={styles.pickerContainer}>
-                    {TORRENTIO_DEBRID_SERVICES.map((service: any) => (
-                        <TouchableOpacity
-                            key={service.id}
-                            style={[
-                                styles.pickerItem,
-                                torrentioConfig.debridService === service.id && styles.pickerItemSelected
-                            ]}
-                            onPress={() => setTorrentioConfig(prev => ({ ...prev, debridService: service.id }))}
-                        >
-                            <Text style={[
-                                styles.pickerItemText,
-                                torrentioConfig.debridService === service.id && styles.pickerItemTextSelected
-                            ]}>
-                                {service.name}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
-
-            {/* Debrid API Key */}
-            <View style={styles.configSection}>
-                <Text style={styles.configSectionTitle}>{t('debrid.api_key_label')}</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder={`Enter your ${TORRENTIO_DEBRID_SERVICES.find((d: any) => d.id === torrentioConfig.debridService)?.name || 'Debrid'} API Key`}
-                    placeholderTextColor={colors.mediumGray}
-                    value={torrentioConfig.debridApiKey}
-                    onChangeText={(text) => setTorrentioConfig(prev => ({ ...prev, debridApiKey: text }))}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    secureTextEntry
-                />
-            </View>
-
-            {/* Sorting - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.sorting && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('sorting')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>{t('debrid.sorting_label')}</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_SORT_OPTIONS.find(o => o.id === torrentioConfig.sort)?.name || t('debrid.by_quality', 'By quality')}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.sorting ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
-            {expandedSections.sorting && (
-                <View style={styles.accordionContent}>
-                    <View style={styles.pickerContainer}>
-                        {TORRENTIO_SORT_OPTIONS.map(option => (
-                            <TouchableOpacity
-                                key={option.id}
-                                style={[styles.pickerItem, torrentioConfig.sort === option.id && styles.pickerItemSelected]}
-                                onPress={() => setTorrentioConfig(prev => ({ ...prev, sort: option.id }))}
-                            >
-                                <Text style={[styles.pickerItemText, torrentioConfig.sort === option.id && styles.pickerItemTextSelected]}>
-                                    {option.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            )}
-
-            {/* Quality Filter - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.qualityFilter && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('qualityFilter')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>{t('debrid.exclude_qualities')}</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.qualityFilter.length > 0 ? t('debrid.excluded_count', { count: torrentioConfig.qualityFilter.length, defaultValue: '{{count}} excluded' }) : t('debrid.none_excluded', 'None excluded')}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.qualityFilter ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
-            {expandedSections.qualityFilter && (
-                <View style={styles.accordionContent}>
-                    <View style={styles.chipContainer}>
-                        {TORRENTIO_QUALITY_FILTERS.map(quality => (
-                            <TouchableOpacity
-                                key={quality.id}
-                                style={[styles.chip, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipSelected]}
-                                onPress={() => toggleQualityFilter(quality.id)}
-                            >
-                                <Text style={[styles.chipText, torrentioConfig.qualityFilter.includes(quality.id) && styles.chipTextSelected]}>
-                                    {quality.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            )}
-
-            {/* Priority Languages - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.languages && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('languages')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>{t('debrid.priority_languages')}</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {torrentioConfig.priorityLanguages.length > 0 ? `${torrentioConfig.priorityLanguages.length} ${t('home_screen.selected')}` : t('debrid.no_preference', 'No preference')}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.languages ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
-            {expandedSections.languages && (
-                <View style={styles.accordionContent}>
-                    <View style={styles.chipContainer}>
-                        {TORRENTIO_LANGUAGES.map(lang => (
-                            <TouchableOpacity
-                                key={lang.id}
-                                style={[styles.chip, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipSelected]}
-                                onPress={() => toggleLanguage(lang.id)}
-                            >
-                                <Text style={[styles.chipText, torrentioConfig.priorityLanguages.includes(lang.id) && styles.chipTextSelected]}>
-                                    {lang.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            )}
-
-            {/* Max Results - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.maxResults && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('maxResults')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>{t('debrid.max_results')}</Text>
-                    <Text style={styles.accordionSubtext}>
-                        {TORRENTIO_MAX_RESULTS.find(o => o.id === torrentioConfig.maxResults)?.name || t('debrid.all_results', 'All results')}
-                    </Text>
-                </View>
-                <Feather name={expandedSections.maxResults ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
-            {expandedSections.maxResults && (
-                <View style={styles.accordionContent}>
-                    <View style={styles.pickerContainer}>
-                        {TORRENTIO_MAX_RESULTS.map(option => (
-                            <TouchableOpacity
-                                key={option.id || 'all'}
-                                style={[styles.pickerItem, torrentioConfig.maxResults === option.id && styles.pickerItemSelected]}
-                                onPress={() => setTorrentioConfig(prev => ({ ...prev, maxResults: option.id }))}
-                            >
-                                <Text style={[styles.pickerItemText, torrentioConfig.maxResults === option.id && styles.pickerItemTextSelected]}>
-                                    {option.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            )}
-
-            {/* Additional Options - Accordion */}
-            <TouchableOpacity
-                style={[styles.accordionHeader, expandedSections.options && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 }]}
-                onPress={() => toggleSection('options')}
-            >
-                <View>
-                    <Text style={styles.accordionHeaderText}>{t('debrid.additional_options')}</Text>
-                    <Text style={styles.accordionSubtext}>{t('debrid.catalog_download_settings', 'Catalog & download settings')}</Text>
-                </View>
-                <Feather name={expandedSections.options ? 'chevron-up' : 'chevron-down'} size={20} color={colors.mediumEmphasis} />
-            </TouchableOpacity>
-            {expandedSections.options && (
-                <View style={styles.accordionContent}>
-                    <View style={styles.switchRow}>
-                        <Text style={styles.switchLabel}>{t('debrid.no_download_links')}</Text>
-                        <Switch
-                            value={torrentioConfig.noDownloadLinks}
-                            onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noDownloadLinks: val }))}
-                            trackColor={{ false: colors.elevation3, true: colors.primary }}
-                            thumbColor={colors.white}
-                        />
-                    </View>
-                    <View style={styles.switchRow}>
-                        <Text style={styles.switchLabel}>{t('debrid.no_debrid_catalog')}</Text>
-                        <Switch
-                            value={torrentioConfig.noCatalog}
-                            onValueChange={(val) => setTorrentioConfig(prev => ({ ...prev, noCatalog: val }))}
-                            trackColor={{ false: colors.elevation3, true: colors.primary }}
-                            thumbColor={colors.white}
-                        />
-                    </View>
-                </View>
-            )}
-
-            {/* Manifest URL Preview */}
-            <View style={styles.configSection}>
-                <Text style={styles.configSectionTitle}>Manifest URL</Text>
-                <View style={styles.manifestPreview}>
-                    <Text style={styles.manifestUrl} numberOfLines={3}>
-                        {generateTorrentioManifestUrl()}
-                    </Text>
-                </View>
-            </View>
-
-            {/* Install/Update/Remove Buttons */}
-            <View style={{ marginTop: 8 }}>
-                {torrentioConfig.isInstalled ? (
-                    <>
-                        <TouchableOpacity
-                            style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
-                            onPress={handleInstallTorrentio}
-                            disabled={torrentioLoading}
-                        >
-                            <Text style={styles.connectButtonText}>
-                                {torrentioLoading ? t('debrid.updating') : t('debrid.update_button')}
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.dangerButton, torrentioLoading && styles.disabledButton]}
-                            onPress={handleRemoveTorrentio}
-                            disabled={torrentioLoading}
-                        >
-                            <Text style={styles.buttonText}>{t('debrid.remove_button')}</Text>
-                        </TouchableOpacity>
-                    </>
-                ) : (
-                    <TouchableOpacity
-                        style={[styles.connectButton, torrentioLoading && styles.disabledButton]}
-                        onPress={handleInstallTorrentio}
-                        disabled={torrentioLoading}
-                    >
-                        <Text style={styles.connectButtonText}>
-                            {torrentioLoading ? t('debrid.installing') : t('debrid.install_button')}
-                        </Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-
-            <Text style={[styles.disclaimer, { marginTop: 24, marginBottom: 40 }]}>
-                {t('debrid.disclaimer_torrentio')}
-            </Text>
-        </>
-    );
-
     if (initialLoading) {
         return (
             <SafeAreaView style={styles.container}>
@@ -1589,26 +989,6 @@ const DebridIntegrationScreen = () => {
                 <Text style={styles.headerTitle}>{t('debrid.title')}</Text>
             </View>
 
-            {/* Tab Selector */}
-            <View style={styles.tabContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'torbox' && styles.activeTab]}
-                    onPress={() => setActiveTab('torbox')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'torbox' && styles.activeTabText]}>
-                        {t('debrid.tab_torbox')}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, activeTab === 'torrentio' && styles.activeTab]}
-                    onPress={() => setActiveTab('torrentio')}
-                >
-                    <Text style={[styles.tabText, activeTab === 'torrentio' && styles.activeTabText]}>
-                        {t('debrid.tab_torrentio')}
-                    </Text>
-                </TouchableOpacity>
-            </View>
-
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
@@ -1625,7 +1005,7 @@ const DebridIntegrationScreen = () => {
                         />
                     }
                 >
-                    {activeTab === 'torbox' ? renderTorboxTab() : renderTorrentioTab()}
+                    {renderTorboxTab()}
                 </ScrollView>
             </KeyboardAvoidingView>
 

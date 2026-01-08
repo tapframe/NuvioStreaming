@@ -569,20 +569,10 @@ const AddonsScreen = () => {
       // Use the regular method without disabled state
       const installedAddons = await stremioService.getInstalledAddonsAsync();
 
-      // Filter out Torbox addons (managed via DebridIntegrationScreen)
-      // Filter out only the official Torbox integration addon (managed via DebridIntegrationScreen)
-      // but allow other addons (like Torrentio, MediaFusion) that may be configured with Torbox
-      const filteredAddons = installedAddons.filter(addon => {
-        const isOfficialTorboxAddon =
-          addon.url?.includes('stremio.torbox.app') ||
-          (addon as any).transport?.includes('stremio.torbox.app') ||
-          // Check for ID but be careful not to catch others if possible, though ID usually comes from URL in stremioService
-          (addon.id?.includes('stremio.torbox.app'));
+      setAddons(installedAddons as ExtendedManifest[]);
 
-        return !isOfficialTorboxAddon;
-      });
-
-      setAddons(filteredAddons as ExtendedManifest[]);
+      // Kept variable for compatibility with existing counting logic below
+      const filteredAddons = installedAddons;
 
       // Count catalogs
       let totalCatalogs = 0;

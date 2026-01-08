@@ -34,7 +34,9 @@
             "thu": "الخميس",
             "fri": "الجمعة",
             "sat": "السبت"
-        }
+        },
+        "email": "البريد الإلكتروني",
+        "status": "الحالة"
     },
     "home": {
         "categories": {
@@ -655,7 +657,7 @@
             "addons": "الإضافات",
             "installed": "مثبتة",
             "debrid_integration": "تكامل Debrid",
-            "debrid_desc": "توصيل Torbox للبث المميز",
+            "debrid_desc": "توصيل Torbox",
             "plugins": "البلاجنز",
             "plugins_desc": "إدارة البلاجنز والمستودعات",
             "catalogs": "الكتالوجات",
