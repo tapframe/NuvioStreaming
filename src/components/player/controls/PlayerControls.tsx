@@ -401,12 +401,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 transform: [{ scale: backwardScaleAnim }]
               }
             ]}>
-              <Ionicons
-                name="reload-outline"
-                size={seekIconSize}
-                color="white"
-                style={{ transform: [{ scaleX: -1 }] }}
-              />
+              <View style={{ transform: [{ scaleX: -1 }] }}>
+                <Ionicons
+                  name="reload-outline"
+                  size={seekIconSize}
+                  color="white"
+                />
+              </View>
               <Animated.View style={[
                 styles.buttonCircle,
                 {
