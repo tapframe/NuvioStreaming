@@ -1253,31 +1253,13 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               headerShown: false,
               // Freeze non-focused stack screens to prevent background re-renders (e.g., SeriesContent behind player)
               freezeOnBlur: true,
-              // Use slide_from_right for consistency and smooth transitions
-              animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+              // Use default animation for Android (consistent non-slide transition), slide_from_right for iOS
+              animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
               animationDuration: Platform.OS === 'android' ? 250 : 300,
               // Ensure consistent background during transitions
               contentStyle: {
                 backgroundColor: currentTheme.colors.darkBackground,
               },
-              // Improve Android performance with custom interpolator
-              ...(Platform.OS === 'android' && {
-                cardStyleInterpolator: ({ current, layouts }: any) => {
-                  return {
-                    cardStyle: {
-                      transform: [
-                        {
-                          translateX: current.progress.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [layouts.screen.width, 0],
-                          }),
-                        },
-                      ],
-                      backgroundColor: currentTheme.colors.darkBackground,
-                    },
-                  };
-                },
-              }),
             }}
           >
             <Stack.Screen
@@ -1315,7 +1297,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               component={AccountManageScreen as any}
               options={{
                 headerShown: false,
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 contentStyle: {
                   backgroundColor: currentTheme.colors.darkBackground,
@@ -1447,7 +1429,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="HomeScreenSettings"
               component={HomeScreenSettings}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animation: Platform.OS === 'android' ? 'default' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1462,7 +1444,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="ContinueWatchingSettings"
               component={ContinueWatchingSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animation: Platform.OS === 'android' ? 'default' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1477,7 +1459,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="Contributors"
               component={ContributorsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animation: Platform.OS === 'android' ? 'default' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1492,7 +1474,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="HeroCatalogs"
               component={HeroCatalogsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                animation: Platform.OS === 'android' ? 'default' : 'default',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1544,7 +1526,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="MDBListSettings"
               component={MDBListSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1559,7 +1541,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="TMDBSettings"
               component={TMDBSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1574,7 +1556,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="TraktSettings"
               component={TraktSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1589,7 +1571,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="PlayerSettings"
               component={PlayerSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1604,7 +1586,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="ThemeSettings"
               component={ThemeScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1619,7 +1601,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="ScraperSettings"
               component={PluginsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1634,7 +1616,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="PluginTester"
               component={PluginTesterScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1649,7 +1631,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="CastMovies"
               component={CastMoviesScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'fade',
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1664,7 +1646,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="Update"
               component={UpdateScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1679,7 +1661,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="AISettings"
               component={AISettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1695,7 +1677,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="Backup"
               component={BackupScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1736,7 +1718,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="DebridIntegration"
               component={DebridIntegrationScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1751,7 +1733,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="ContentDiscoverySettings"
               component={ContentDiscoverySettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1766,7 +1748,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="AppearanceSettings"
               component={AppearanceSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1781,7 +1763,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="IntegrationsSettings"
               component={IntegrationsSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1796,7 +1778,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="PlaybackSettings"
               component={PlaybackSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1811,7 +1793,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="AboutSettings"
               component={AboutSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1826,7 +1808,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="DeveloperSettings"
               component={DeveloperSettingsScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
@@ -1841,7 +1823,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               name="Legal"
               component={LegalScreen}
               options={{
-                animation: Platform.OS === 'android' ? 'slide_from_right' : 'slide_from_right',
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
                 animationDuration: Platform.OS === 'android' ? 250 : 300,
                 presentation: 'card',
                 gestureEnabled: true,
