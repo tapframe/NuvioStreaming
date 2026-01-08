@@ -20,7 +20,8 @@ import CustomAlert from '../components/CustomAlert';
 import FastImage from '@d11/react-native-fast-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { useSettings } from '../hooks/useSettings';
 import { localScraperService, pluginService, ScraperInfo, RepositoryInfo } from '../services/pluginService';
 import { logger } from '../utils/logger';
@@ -901,11 +902,40 @@ const StatusBadge: React.FC<{
 
 const PluginsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<RootStackParamList, 'ScraperSettings'>>();
   const { settings, updateSetting } = useSettings();
   const { currentTheme } = useTheme();
   const { t } = useTranslation();
   const colors = currentTheme.colors;
   const styles = createStyles(colors);
+
+  // Deep Link Handler
+  useEffect(() => {
+    // Check if opened via deep link with URL param
+    if (route.params && (route.params as any).url) {
+      const url = (route.params as any).url;
+      // Small delay to ensure UI is ready
+      setTimeout(() => {
+        openAlert(
+          'Add Repository',
+          `Do you want to add the repository from:\n${url}`,
+          [
+            {
+              label: 'Cancel',
+              onPress: () => { },
+              style: { color: colors.error }
+            },
+            {
+              label: 'Add',
+              onPress: () => {
+                handleAddRepository(url);
+              }
+            }
+          ]
+        );
+      }, 500);
+    }
+  }, [route.params]);
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -1040,14 +1070,18 @@ const PluginsScreen: React.FC = () => {
     setNewRepositoryUrl(url);
   };
 
-  const handleAddRepository = async () => {
-    if (!newRepositoryUrl.trim()) {
+  const handleAddRepository = async (urlOverride?: string | any) => {
+    // Check if urlOverride is a string (to avoid event objects)
+    const validUrlOverride = typeof urlOverride === 'string' ? urlOverride : undefined;
+    const inputUrl = validUrlOverride || newRepositoryUrl;
+
+    if (!inputUrl.trim()) {
       openAlert('Error', 'Please enter a valid repository URL');
       return;
     }
 
     // Validate URL format
-    const url = newRepositoryUrl.trim();
+    const url = inputUrl.trim();
     if (!url.startsWith('https://raw.githubusercontent.com/') && !url.startsWith('http://')) {
       openAlert(
         t('plugins.alert_invalid_url'),

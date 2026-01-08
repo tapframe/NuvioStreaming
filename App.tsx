@@ -205,7 +205,16 @@ const ThemedApp = () => {
         <NavigationContainer
           ref={navigationRef}
           theme={customNavigationTheme}
-          linking={undefined}
+          linking={{
+            prefixes: ['nuvio://'],
+            config: {
+              screens: {
+                ScraperSettings: {
+                  path: 'repo',
+                },
+              },
+            },
+          }}
         >
           <DownloadsProvider>
             <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
