@@ -1100,17 +1100,30 @@ const PluginsScreen: React.FC = () => {
       logger.log('[PluginsScreen] Detected manifest URL, extracting base repository URL:', normalizedUrl);
     }
 
-    // Additional validation for normalized URL
-    if (!normalizedUrl.endsWith('/refs/heads/') && !normalizedUrl.includes('/refs/heads/')) {
+    // Check for duplicates
+    // Fetch latest repositories directly to ensure we have up-to-date state
+    // The state 'repositories' might be stale if the screen was just opened or in background
+    const latestRepos = await pluginService.getRepositories();
+
+    // We normalize the input URL to compare against existing repositories
+    const existingRepo = latestRepos.find(r => {
+      // Simple exact match or normalized match
+      return r.url === normalizedUrl || r.url === url || r.url.replace('/manifest.json', '') === normalizedUrl;
+    });
+
+    if (existingRepo) {
       openAlert(
-        'Invalid Repository Structure',
-        'The URL should point to a GitHub repository branch.\n\nExpected format:\nhttps://raw.githubusercontent.com/username/repo/refs/heads/branch'
+        t('plugins.error'),
+        `Repository already installed:\n${existingRepo.name}\n(${existingRepo.url})`
       );
       return;
     }
 
     try {
       setIsLoading(true);
+      // Optional: You could show a specialized 'Adding...' UI here if you had a separate state for it
+      // But isLoading is generally used for the spinner.
+
       const repoId = await pluginService.addRepository({
         name: '', // Let the service fetch from manifest
         url: normalizedUrl, // Use normalized URL (without manifest.json)
@@ -1128,7 +1141,8 @@ const PluginsScreen: React.FC = () => {
       openAlert(t('plugins.success'), t('plugins.alert_repo_added'));
     } catch (error) {
       logger.error('[PluginsScreen] Failed to add repository:', error);
-      openAlert(t('plugins.error'), 'Failed to add repository');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      openAlert(t('plugins.error'), `Failed to add repository: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -1479,7 +1493,16 @@ const PluginsScreen: React.FC = () => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainTabs' }],
+              } as any);
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
           <Text style={styles.backText}>{t('settings.title')}</Text>
@@ -2152,9 +2175,23 @@ const PluginsScreen: React.FC = () => {
         </View>
       </Modal>
 
+      <Modal
+        visible={isLoading}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { alignItems: 'center', paddingVertical: 32 }]}>
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 16 }} />
+            <Text style={styles.modalTitle}>Installing Repository...</Text>
+            <Text style={styles.modalText}>Please wait while we fetch and install the repository.</Text>
+          </View>
+        </View>
+      </Modal>
+
       {/* Add Repository Modal */}
       <Modal
-        visible={showAddRepositoryModal}
+        visible={showAddRepositoryModal && !isLoading}
         transparent={true}
         animationType="fade"
         supportedOrientations={['portrait', 'landscape']}
