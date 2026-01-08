@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -18,10 +18,24 @@ const DeveloperSettingsScreen: React.FC = () => {
     const { t } = useTranslation();
     const insets = useSafeAreaInsets();
 
+    const [developerModeEnabled, setDeveloperModeEnabled] = useState(__DEV__);
     const [alertVisible, setAlertVisible] = useState(false);
     const [alertTitle, setAlertTitle] = useState('');
     const [alertMessage, setAlertMessage] = useState('');
     const [alertActions, setAlertActions] = useState<Array<{ label: string; onPress: () => void }>>([]);
+
+    // Load developer mode state on mount
+    useEffect(() => {
+        const loadDevModeState = async () => {
+            try {
+                const devModeEnabled = await mmkvStorage.getItem('developer_mode_enabled');
+                setDeveloperModeEnabled(__DEV__ || devModeEnabled === 'true');
+            } catch (error) {
+                console.error('Failed to load developer mode state:', error);
+            }
+        };
+        loadDevModeState();
+    }, []);
 
     const openAlert = (
         title: string,
@@ -78,8 +92,8 @@ const DeveloperSettingsScreen: React.FC = () => {
         );
     };
 
-    // Only show in development mode
-    if (!__DEV__) {
+    // Only show if developer mode is enabled (via __DEV__ or manually unlocked)
+    if (!developerModeEnabled) {
         return null;
     }
 

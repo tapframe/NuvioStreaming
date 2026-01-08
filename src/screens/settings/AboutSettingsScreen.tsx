@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, Platform, Linking, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, Platform, Linking, Dimensions, Alert, TextInput, Modal, KeyboardAvoidingView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,12 +14,15 @@ import { getDisplayedAppVersion } from '../../utils/version';
 import ScreenHeader from '../../components/common/ScreenHeader';
 import { SettingsCard, SettingItem, ChevronRight } from './SettingsComponents';
 import { useTranslation } from 'react-i18next';
+import { mmkvStorage } from '../../services/mmkvStorage';
+import CustomAlert from '../../components/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
 interface AboutSettingsContentProps {
     isTablet?: boolean;
     displayDownloads?: number | null;
+    onDevModeChange?: (enabled: boolean) => void;
 }
 
 /**
@@ -28,16 +31,59 @@ interface AboutSettingsContentProps {
  */
 export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
     isTablet = false,
-    displayDownloads: externalDisplayDownloads
+    displayDownloads: externalDisplayDownloads,
+    onDevModeChange
 }) => {
     const { t } = useTranslation();
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const { currentTheme } = useTheme();
 
     const [internalDisplayDownloads, setInternalDisplayDownloads] = useState<number | null>(null);
+    const [developerModeEnabled, setDeveloperModeEnabled] = useState(false);
+    const [tapCount, setTapCount] = useState(0);
+    const tapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Developer code entry modal state
+    const [showCodeModal, setShowCodeModal] = useState(false);
+    const [codeInput, setCodeInput] = useState('');
+
+    // CustomAlert state
+    const [alertState, setAlertState] = useState<{
+        visible: boolean;
+        title: string;
+        message: string;
+        actions: Array<{ label: string; onPress: () => void; style?: object }>;
+    }>({
+        visible: false,
+        title: '',
+        message: '',
+        actions: [{ label: 'OK', onPress: () => { } }]
+    });
+
+    const showAlert = (title: string, message: string, actions?: Array<{ label: string; onPress: () => void; style?: object }>) => {
+        setAlertState({
+            visible: true,
+            title,
+            message,
+            actions: actions || [{ label: 'OK', onPress: () => { } }]
+        });
+    };
 
     // Use external downloads if provided (for tablet inline use), otherwise load internally
     const displayDownloads = externalDisplayDownloads ?? internalDisplayDownloads;
+
+    // Load developer mode state on mount
+    useEffect(() => {
+        const loadDevModeState = async () => {
+            try {
+                const devModeEnabled = await mmkvStorage.getItem('developer_mode_enabled');
+                setDeveloperModeEnabled(devModeEnabled === 'true');
+            } catch (error) {
+                console.error('Failed to load developer mode state:', error);
+            }
+        };
+        loadDevModeState();
+    }, []);
 
     useEffect(() => {
         // Only load downloads internally if not provided externally
@@ -51,6 +97,88 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
             loadDownloads();
         }
     }, [externalDisplayDownloads]);
+
+    const handleVersionTap = () => {
+        // If already in developer mode, do nothing on tap
+        if (developerModeEnabled) return;
+
+        // Clear previous timeout
+        if (tapTimeoutRef.current) {
+            clearTimeout(tapTimeoutRef.current);
+        }
+
+        const newTapCount = tapCount + 1;
+        setTapCount(newTapCount);
+
+        // Reset tap count after 2 seconds of no tapping
+        tapTimeoutRef.current = setTimeout(() => {
+            setTapCount(0);
+        }, 2000);
+
+        // Trigger developer mode unlock after 5 taps
+        if (newTapCount >= 5) {
+            setTapCount(0);
+            promptForDeveloperCode();
+        }
+    };
+
+    const promptForDeveloperCode = () => {
+        setCodeInput('');
+        setShowCodeModal(true);
+    };
+
+    const verifyDeveloperCode = async () => {
+        setShowCodeModal(false);
+        const expectedCode = process.env.EXPO_PUBLIC_DEV_MODE_CODE || '815787';
+        if (codeInput === expectedCode) {
+            try {
+                await mmkvStorage.setItem('developer_mode_enabled', 'true');
+                setDeveloperModeEnabled(true);
+                onDevModeChange?.(true);
+                showAlert(
+                    t('settings.developer_mode.enabled_title', 'Developer Mode Enabled'),
+                    t('settings.developer_mode.enabled_message', 'Developer tools are now available in Settings.')
+                );
+            } catch (error) {
+                console.error('Failed to save developer mode state:', error);
+            }
+        } else {
+            showAlert(
+                t('settings.developer_mode.invalid_code_title', 'Invalid Code'),
+                t('settings.developer_mode.invalid_code_message', 'The code you entered is incorrect.')
+            );
+        }
+        setCodeInput('');
+    };
+
+    const handleDisableDeveloperMode = () => {
+        showAlert(
+            t('settings.developer_mode.disable_title', 'Disable Developer Mode'),
+            t('settings.developer_mode.disable_message', 'Are you sure you want to disable developer mode?'),
+            [
+                {
+                    label: t('common.cancel', 'Cancel'),
+                    onPress: () => { },
+                },
+                {
+                    label: t('common.disable', 'Disable'),
+                    onPress: async () => {
+                        try {
+                            await mmkvStorage.setItem('developer_mode_enabled', 'false');
+                            setDeveloperModeEnabled(false);
+                            onDevModeChange?.(false);
+                            showAlert(
+                                t('settings.developer_mode.disabled_title', 'Developer Mode Disabled'),
+                                t('settings.developer_mode.disabled_message', 'Developer tools are now hidden.')
+                            );
+                        } catch (error) {
+                            console.error('Failed to save developer mode state:', error);
+                        }
+                    },
+                },
+            ]
+        );
+    };
 
     return (
         <>
@@ -80,6 +208,7 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
                     title={t('settings.items.version')}
                     description={getDisplayedAppVersion()}
                     icon="info"
+                    onPress={handleVersionTap}
                     isTablet={isTablet}
                 />
                 <SettingItem
@@ -88,10 +217,90 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
                     icon="users"
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('Contributors')}
-                    isLast
+                    isLast={!developerModeEnabled}
                     isTablet={isTablet}
                 />
+                {developerModeEnabled && (
+                    <SettingItem
+                        title={t('settings.developer_mode.title', 'Developer Mode')}
+                        description={t('settings.developer_mode.enabled_desc', 'Tap to disable developer mode')}
+                        icon="code"
+                        onPress={handleDisableDeveloperMode}
+                        renderControl={() => <ChevronRight />}
+                        isLast
+                        isTablet={isTablet}
+                    />
+                )}
             </SettingsCard>
+
+            {/* Developer Code Entry Modal */}
+            <Modal
+                visible={showCodeModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowCodeModal(false)}
+                statusBarTranslucent
+            >
+                <KeyboardAvoidingView
+                    style={modalStyles.overlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <TouchableOpacity
+                        style={modalStyles.backdrop}
+                        activeOpacity={1}
+                        onPress={() => setShowCodeModal(false)}
+                    />
+                    <View style={modalStyles.container}>
+                        <Text style={modalStyles.title}>
+                            {t('settings.developer_mode.enter_code_title', 'Enable Developer Mode')}
+                        </Text>
+                        <Text style={modalStyles.message}>
+                            {t('settings.developer_mode.enter_code_message', 'Enter the developer code to enable developer mode:')}
+                        </Text>
+                        <TextInput
+                            style={modalStyles.input}
+                            value={codeInput}
+                            onChangeText={setCodeInput}
+                            placeholder="Enter code"
+                            placeholderTextColor="#888"
+                            secureTextEntry
+                            keyboardType="number-pad"
+                            autoFocus
+                            maxLength={10}
+                        />
+                        <View style={modalStyles.buttonRow}>
+                            <TouchableOpacity
+                                style={modalStyles.cancelButton}
+                                onPress={() => {
+                                    setShowCodeModal(false);
+                                    setCodeInput('');
+                                }}
+                            >
+                                <Text style={modalStyles.cancelButtonText}>
+                                    {t('common.cancel', 'Cancel')}
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[modalStyles.confirmButton, { backgroundColor: currentTheme.colors.primary }]}
+                                onPress={verifyDeveloperCode}
+                            >
+                                <Text style={modalStyles.confirmButtonText}>
+                                    {t('common.confirm', 'Confirm')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
+            {/* Custom Alert */}
+            <CustomAlert
+                visible={alertState.visible}
+                title={alertState.title}
+                message={alertState.message}
+                actions={alertState.actions}
+                onClose={() => setAlertState(prev => ({ ...prev, visible: false }))}
+            />
         </>
     );
 };
@@ -305,6 +514,80 @@ const styles = StyleSheet.create({
     },
     footerText: {
         fontSize: 14,
+    },
+});
+
+// Styles for the developer code entry modal
+const modalStyles = StyleSheet.create({
+    overlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    },
+    backdrop: {
+        ...StyleSheet.absoluteFillObject,
+    },
+    container: {
+        width: '85%',
+        maxWidth: 400,
+        backgroundColor: '#1E1E1E',
+        borderRadius: 16,
+        padding: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
+    title: {
+        color: '#FFFFFF',
+        fontSize: 20,
+        fontWeight: '700',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    message: {
+        color: '#AAAAAA',
+        fontSize: 15,
+        marginBottom: 20,
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    input: {
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 18,
+        color: '#FFFFFF',
+        textAlign: 'center',
+        marginBottom: 20,
+        letterSpacing: 4,
+    },
+    buttonRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    cancelButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        alignItems: 'center',
+    },
+    cancelButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    confirmButton: {
+        flex: 1,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    confirmButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
 

@@ -205,11 +205,25 @@ const SettingsScreen: React.FC = () => {
 
   // States for dynamic content
   const [mdblistKeySet, setMdblistKeySet] = useState<boolean>(false);
+  const [developerModeEnabled, setDeveloperModeEnabled] = useState<boolean>(false);
   const [totalDownloads, setTotalDownloads] = useState<number>(0);
   const [displayDownloads, setDisplayDownloads] = useState<number | null>(null);
 
   // Use Realtime Config Hook
   const settingsConfig = useRealtimeConfig();
+
+  // Load developer mode state
+  useEffect(() => {
+    const loadDevModeState = async () => {
+      try {
+        const devModeEnabled = await mmkvStorage.getItem('developer_mode_enabled');
+        setDeveloperModeEnabled(devModeEnabled === 'true');
+      } catch (error) {
+        if (__DEV__) console.error('Failed to load developer mode state:', error);
+      }
+    };
+    loadDevModeState();
+  }, []);
 
   // Scroll to top ref and handler
   const mobileScrollViewRef = useRef<ScrollView>(null);
@@ -235,6 +249,10 @@ const SettingsScreen: React.FC = () => {
       // Check MDBList API key status
       const mdblistKey = await mmkvStorage.getItem('mdblist_api_key');
       setMdblistKeySet(!!mdblistKey);
+
+      // Check developer mode status
+      const devModeEnabled = await mmkvStorage.getItem('developer_mode_enabled');
+      setDeveloperModeEnabled(devModeEnabled === 'true');
 
       // Load GitHub total downloads
       const downloads = await fetchTotalDownloads();
@@ -339,7 +357,7 @@ const SettingsScreen: React.FC = () => {
   // Filter categories based on conditions
   const visibleCategories = SETTINGS_CATEGORIES.filter(category => {
     if (settingsConfig?.categories?.[category.id]?.visible === false) return false;
-    if (category.id === 'developer' && !__DEV__) return false;
+    if (category.id === 'developer' && !__DEV__ && !developerModeEnabled) return false;
     if (category.id === 'cache' && !mdblistKeySet) return false;
     return true;
   });
@@ -380,7 +398,7 @@ const SettingsScreen: React.FC = () => {
         return <AboutSettingsContent isTablet={isTablet} displayDownloads={displayDownloads} />;
 
       case 'developer':
-        return __DEV__ ? (
+        return (__DEV__ || developerModeEnabled) ? (
           <SettingsCard title={t('settings.sections.testing')} isTablet={isTablet}>
             <SettingItem
               title={t('settings.items.test_onboarding')}
@@ -721,8 +739,8 @@ const SettingsScreen: React.FC = () => {
               />
             </SettingsCard>
 
-            {/* Developer - only in DEV mode */}
-            {__DEV__ && (
+            {/* Developer - visible in DEV mode or when developer mode is enabled */}
+            {(__DEV__ || developerModeEnabled) && (
               <SettingsCard title={t('settings.sections.testing')}>
                 <SettingItem
                   title={t('settings.items.developer_tools')}
