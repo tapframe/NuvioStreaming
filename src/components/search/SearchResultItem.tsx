@@ -190,7 +190,15 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 2,
     },
-    libraryBadge: {},
+    libraryBadge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        borderRadius: 8,
+        padding: 4,
+        zIndex: 2,
+        backgroundColor: 'transparent',
+    },
     watchedIndicator: {},
 });
 
