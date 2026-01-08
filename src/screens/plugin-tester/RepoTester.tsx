@@ -363,8 +363,9 @@ export const RepoTester = () => {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
         >
-            <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
-                <View style={styles.card}>
+            <View style={isLargeScreen ? styles.largeScreenWrapper : { flex: 1 }}>
+                <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled">
+                    <View style={styles.card}>
                     <View style={styles.cardTitleRow}>
                         <Text style={styles.cardTitle}>{t('plugin_tester.repo.title')}</Text>
                         <Ionicons name="git-branch-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
@@ -409,7 +410,7 @@ export const RepoTester = () => {
                     )}
                 </View>
 
-                <View style={styles.card}>
+                    <View style={styles.card}>
                     <View style={styles.cardTitleRow}>
                         <Text style={styles.cardTitle}>{t('plugin_tester.repo.test_parameters')}</Text>
                         <Ionicons name="options-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
@@ -475,7 +476,7 @@ export const RepoTester = () => {
                     </Text>
                 </View>
 
-                <View style={styles.card}>
+                    <View style={styles.card}>
                     <View style={styles.cardTitleRow}>
                         <Text style={styles.cardTitle}>{t('plugin_tester.repo.providers_title')}</Text>
                         <Ionicons name="list-outline" size={18} color={currentTheme.colors.mediumEmphasis} />
@@ -622,8 +623,9 @@ export const RepoTester = () => {
                             </View>
                         );
                     })}
-                </View>
-            </ScrollView>
+                    </View>
+                </ScrollView>
+            </View>
         </KeyboardAvoidingView>
     );
 };

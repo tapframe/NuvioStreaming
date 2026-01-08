@@ -1,7 +1,9 @@
 import { StyleSheet, Platform, useWindowDimensions } from 'react-native';
 
-// Breakpoint for larger screens (tablets, iPads)
-export const LARGE_SCREEN_BREAKPOINT = 768;
+// Breakpoint for the two-column "large screen" layout.
+// 768px wide tablets in portrait are usually too narrow for side-by-side columns,
+// so we enable the large layout only on wider screens (e.g., tablet landscape).
+export const LARGE_SCREEN_BREAKPOINT = 900;
 
 export const useIsLargeScreen = () => {
     const { width } = useWindowDimensions();
@@ -16,13 +18,16 @@ export const getPluginTesterStyles = (theme: any, isLargeScreen: boolean = false
     // Large screen wrapper for centering content
     largeScreenWrapper: {
         flex: 1,
-        maxWidth: isLargeScreen ? 900 : undefined,
+        // Allow tablet/desktop to use more horizontal space while still
+        // keeping content comfortably contained.
+        maxWidth: isLargeScreen ? 1200 : undefined,
         alignSelf: isLargeScreen ? 'center' : undefined,
         width: isLargeScreen ? '100%' : undefined,
         paddingHorizontal: isLargeScreen ? 24 : 0,
     },
     // Two-column layout for large screens
     twoColumnContainer: {
+        flex: isLargeScreen ? 1 : undefined,
         flexDirection: isLargeScreen ? 'row' : 'column',
         gap: isLargeScreen ? 16 : 0,
     },
@@ -94,7 +99,9 @@ export const getPluginTesterStyles = (theme: any, isLargeScreen: boolean = false
     },
     content: {
         flex: 1,
-        paddingHorizontal: 16,
+        // On large screens the wrapper already adds horizontal padding.
+        // Avoid "double padding" that makes columns feel cramped.
+        paddingHorizontal: isLargeScreen ? 0 : 16,
         paddingTop: 12,
     },
     card: {

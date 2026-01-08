@@ -390,6 +390,14 @@ const SettingsScreen: React.FC = () => {
               isTablet={isTablet}
             />
             <SettingItem
+              title={'Plugin Tester'}
+              description={'Run a plugin and inspect logs/streams'}
+              icon="terminal"
+              onPress={() => navigation.navigate('PluginTester')}
+              renderControl={() => <ChevronRight />}
+              isTablet={isTablet}
+            />
+            <SettingItem
               title={t('settings.items.reset_onboarding')}
               icon="refresh-ccw"
               onPress={async () => {
