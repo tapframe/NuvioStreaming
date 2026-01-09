@@ -75,7 +75,7 @@ interface TraktFolder {
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
 function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: number } {
-  const horizontalPadding = 16;
+  const horizontalPadding = 26;
   const gutter = 12;
   let numColumns = 3;
   if (screenWidth >= 1200) numColumns = 5;
@@ -1042,7 +1042,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
-    paddingHorizontal: 8,
+    paddingLeft: 12,
     paddingVertical: 16,
     paddingBottom: 90,
   },
@@ -1058,7 +1058,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   itemContainer: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   posterContainer: {
     borderRadius: 12,

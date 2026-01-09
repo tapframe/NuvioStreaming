@@ -190,6 +190,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    paddingHorizontal:4,
   },
   poster: {
     width: '100%',
@@ -1059,7 +1060,7 @@ const CatalogScreen: React.FC<CatalogScreenProps> = ({ route, navigation }) => {
           keyExtractor={(item) => `${item.id}-${item.type}`}
           numColumns={effectiveNumColumns}
           key={effectiveNumColumns}
-          ItemSeparatorComponent={() => <View style={{ height: ((screenData as any).itemSpacing ?? SPACING.sm) }} />}
+          ItemSeparatorComponent={() => <View style={{ height: ((screenData as any).itemSpacing ?? SPACING.sm) - 20 }} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
