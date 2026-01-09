@@ -102,6 +102,7 @@ export const AVPlayerSurface: React.FC<AVPlayerSurfaceProps> = ({
           volume={volume}
           rate={playbackSpeed}
           resizeMode={resizeMode as any}
+          allowsExternalPlayback={true}
           selectedAudioTrack={selectedAudioTrack}
           selectedTextTrack={selectedTextTrack}
           onLoad={handleLoad}

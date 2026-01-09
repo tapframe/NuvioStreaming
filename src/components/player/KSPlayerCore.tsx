@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StatusBar, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+import { View, StatusBar, StyleSheet, Animated, Dimensions, Platform, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -502,6 +502,13 @@ const KSPlayerCore: React.FC = () => {
     modals.setShowErrorModal(true);
   };
 
+  // Confirm and execute the switch to MPV (iOS manual switch)
+  const confirmSwitchToMPV = useCallback(() => {
+    lastPlaybackTimeRef.current = currentTime || lastPlaybackTimeRef.current || 0;
+    hasAviOSFailed.current = true; // reuse the resume-on-load path
+    setUseMpvFallback(true);
+  }, [currentTime]);
+
   const handleClose = useCallback(() => {
     if (isSyncingBeforeClose.current) return;
     isSyncingBeforeClose.current = true;
@@ -816,10 +823,23 @@ const KSPlayerCore: React.FC = () => {
             onSwitchToMPV={
               (!shouldUseMpvOnly && !useMpvFallback)
                 ? () => {
-                  // Manual switch (like Android): go to MPV for this session and resume at current time.
-                  lastPlaybackTimeRef.current = currentTime || lastPlaybackTimeRef.current || 0;
-                  hasAviOSFailed.current = true; // reuse the resume-on-load path
-                  setUseMpvFallback(true);
+                  // Manual switch should confirm (like Android)
+                  Alert.alert(
+                    'Switch to MPV Player?',
+                    'This will switch from AVPlayer to MPV player. Use this if you\'re facing playback issues. The switch cannot be undone during this playback session.',
+                    [
+                      {
+                        text: 'Cancel',
+                        style: 'cancel',
+                      },
+                      {
+                        text: 'Switch to MPV',
+                        onPress: confirmSwitchToMPV,
+                        style: 'default',
+                      },
+                    ],
+                    { cancelable: true }
+                  );
                 }
                 : undefined
             }
@@ -1028,6 +1048,7 @@ const KSPlayerCore: React.FC = () => {
         onSelectStream={handleEpisodeStreamSelect}
         metadata={{ id: id, name: title }}
       />
+
     </View>
   );
 };

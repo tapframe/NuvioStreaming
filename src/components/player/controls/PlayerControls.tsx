@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { styles } from '../utils/playerStyles'; // Updated styles
 import { getTrackDisplayName } from '../utils/playerUtils';
 import { useTheme } from '../../../contexts/ThemeContext';
+import AirPlayRoutePicker from '../ios/components/AirPlayRoutePicker';
 
 interface PlayerControlsProps {
   showControls: boolean;
@@ -350,8 +351,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 (Platform.OS === 'ios' && onSwitchToMPV && playerBackend === 'AVPlayer')
               ) && (
                 <TouchableOpacity
-                  style={{ padding: 8 }}
+                  style={[styles.topButton, { zIndex: 2 }]}
                   onPress={onSwitchToMPV}
+                  hitSlop={{ top: 10, left: 10, right: 10, bottom: 10 }}
+                  activeOpacity={0.8}
                 >
                   <Ionicons
                     name="swap-horizontal"
@@ -359,6 +362,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                     color="white"
                   />
                 </TouchableOpacity>
+              )}
+
+              {/* AirPlay picker (iOS + AVPlayer) */}
+              {Platform.OS === 'ios' && playerBackend === 'AVPlayer' && (
+                <View style={{ width: closeIconSize + 16, height: closeIconSize + 16, zIndex: 1 }}>
+                  <AirPlayRoutePicker style={{ width: '100%', height: '100%' }} />
+                </View>
               )}
               <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
                 <Ionicons name="close" size={closeIconSize} color="white" />
