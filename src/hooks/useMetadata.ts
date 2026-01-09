@@ -1604,22 +1604,26 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         });
 
         // Add local scrapers if enabled
-        localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
-          initialStatuses.push({
-            id: scraper.id,
-            name: scraper.name,
-            isLoading: true,
-            hasCompleted: false,
-            error: null,
-            startTime: Date.now(),
-            endTime: null
+        const currentSettings = await mmkvStorage.getItem('app_settings');
+        const enableLocalScrapersNow = currentSettings ? JSON.parse(currentSettings).enableLocalScrapers !== false : true;
+
+        if (enableLocalScrapersNow) {
+          localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
+            initialStatuses.push({
+              id: scraper.id,
+              name: scraper.name,
+              isLoading: true,
+              hasCompleted: false,
+              error: null,
+              startTime: Date.now(),
+              endTime: null
+            });
+            initialActiveFetching.push(scraper.name);
           });
-          initialActiveFetching.push(scraper.name);
-        });
+        }
 
         setScraperStatuses(initialStatuses);
         setActiveFetchingScrapers(initialActiveFetching);
-        console.log('🔍 [loadStreams] Initialized activeFetchingScrapers:', initialActiveFetching);
 
         // If no scrapers are available, stop loading immediately
         if (initialStatuses.length === 0) {
@@ -1740,23 +1744,27 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
           initialActiveFetching.push(addon.name);
         });
 
-        // Add local scrapers if enabled
-        localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
-          initialStatuses.push({
-            id: scraper.id,
-            name: scraper.name,
-            isLoading: true,
-            hasCompleted: false,
-            error: null,
-            startTime: Date.now(),
-            endTime: null
+        // Add local scrapers if enabled (read from storage to avoid stale closure)
+        const currentSettings = await mmkvStorage.getItem('app_settings');
+        const enableLocalScrapersNow = currentSettings ? JSON.parse(currentSettings).enableLocalScrapers !== false : true;
+
+        if (enableLocalScrapersNow) {
+          localScrapers.filter((scraper: ScraperInfo) => scraper.enabled).forEach((scraper: ScraperInfo) => {
+            initialStatuses.push({
+              id: scraper.id,
+              name: scraper.name,
+              isLoading: true,
+              hasCompleted: false,
+              error: null,
+              startTime: Date.now(),
+              endTime: null
+            });
+            initialActiveFetching.push(scraper.name);
           });
-          initialActiveFetching.push(scraper.name);
-        });
+        }
 
         setScraperStatuses(initialStatuses);
         setActiveFetchingScrapers(initialActiveFetching);
-        console.log('🔍 [loadEpisodeStreams] Initialized activeFetchingScrapers:', initialActiveFetching);
 
         // If no scrapers are available, stop loading immediately
         if (initialStatuses.length === 0) {

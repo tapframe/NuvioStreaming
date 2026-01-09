@@ -294,48 +294,14 @@ const PlayerSettingsScreen: React.FC = () => {
                 <Switch
                   value={settings.autoplayBestStream}
                   onValueChange={(value) => updateSetting('autoplayBestStream', value)}
-                  thumbColor={settings.autoplayBestStream ? currentTheme.colors.primary : undefined}
+                  trackColor={{ false: '#767577', true: currentTheme.colors.primary }}
+                  thumbColor={settings.autoplayBestStream ? '#ffffff' : '#f4f3f4'}
+                  ios_backgroundColor="#3e3e3e"
                 />
               </View>
             </View>
 
-            <View style={styles.settingItem}>
-              <View style={styles.settingContent}>
-                <View style={[
-                  styles.settingIconContainer,
-                  { backgroundColor: 'rgba(255,255,255,0.1)' }
-                ]}>
-                  <MaterialIcons
-                    name="restore"
-                    size={20}
-                    color={currentTheme.colors.primary}
-                  />
-                </View>
-                <View style={styles.settingText}>
-                  <Text
-                    style={[
-                      styles.settingTitle,
-                      { color: currentTheme.colors.text },
-                    ]}
-                  >
-                    {t('player.resume_title')}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.settingDescription,
-                      { color: currentTheme.colors.textMuted },
-                    ]}
-                  >
-                    {t('player.resume_desc')}
-                  </Text>
-                </View>
-                <Switch
-                  value={settings.alwaysResume}
-                  onValueChange={(value) => updateSetting('alwaysResume', value)}
-                  thumbColor={settings.alwaysResume ? currentTheme.colors.primary : undefined}
-                />
-              </View>
-            </View>
+
 
             {/* Video Player Engine for Android */}
             {Platform.OS === 'android' && !settings.useExternalPlayer && (

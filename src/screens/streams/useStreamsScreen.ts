@@ -48,7 +48,7 @@ export const useStreamsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'Streams'>>();
   const navigation = useNavigation<RootStackNavigationProp>();
   const { id, type, episodeId, episodeThumbnail, fromPlayer } = route.params;
-  const { settings } = useSettings();
+  const { settings, isLoaded: settingsLoaded } = useSettings();
   const { currentTheme } = useTheme();
   const { colors } = currentTheme;
   const { pauseTrailer, resumeTrailer } = useTrailer();
@@ -586,6 +586,16 @@ export const useStreamsScreen = () => {
     setAutoplayTriggered(false);
   }, [selectedEpisode]);
 
+  // Initialize autoplay waiting state when settings are loaded
+  // This runs after settings are fully loaded to avoid race conditions
+  useEffect(() => {
+    if (!settingsLoaded) return; // Wait for settings to load
+
+    if (settings.autoplayBestStream && !fromPlayer && !autoplayTriggered) {
+      setIsAutoplayWaiting(true);
+    }
+  }, [settingsLoaded, settings.autoplayBestStream, fromPlayer, autoplayTriggered]);
+
   // Reset provider if no longer available
   useEffect(() => {
     const isSpecialFilter =
@@ -659,11 +669,7 @@ export const useStreamsScreen = () => {
           }
 
           setAutoplayTriggered(false);
-          if (settings.autoplayBestStream && !fromPlayer) {
-            setIsAutoplayWaiting(true);
-          } else {
-            setIsAutoplayWaiting(false);
-          }
+          // Note: isAutoplayWaiting is now handled by a separate effect that waits for settings to load
         }
       } finally {
         isLoadingStreamsRef.current = false;
@@ -678,6 +684,8 @@ export const useStreamsScreen = () => {
   useEffect(() => {
     if (settings.autoplayBestStream && !autoplayTriggered && isAutoplayWaiting) {
       const streams = selectedEpisode ? episodeStreams : groupedStreams;
+      const hasLoadingStarted = streamsLoadStart !== null;
+      const isStillLoading = !hasLoadingStarted || loadingStreams || loadingEpisodeStreams || activeFetchingScrapers.length > 0;
 
       if (Object.keys(streams).length > 0) {
         const bestStream = getBestStream(streams);
@@ -687,9 +695,11 @@ export const useStreamsScreen = () => {
           setAutoplayTriggered(true);
           setIsAutoplayWaiting(false);
           handleStreamPress(bestStream);
-        } else {
+        } else if (!isStillLoading) {
           setIsAutoplayWaiting(false);
         }
+      } else if (!isStillLoading) {
+        setIsAutoplayWaiting(false);
       }
     }
   }, [
@@ -703,6 +713,10 @@ export const useStreamsScreen = () => {
     handleStreamPress,
     metadata,
     selectedEpisode,
+    loadingStreams,
+    loadingEpisodeStreams,
+    activeFetchingScrapers.length,
+    streamsLoadStart,
   ]);
 
   // Cleanup on unmount
