@@ -1,10 +1,12 @@
 import React, { useRef } from 'react';
 import { Animated } from 'react-native';
 import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
-import KSPlayerComponent, { KSPlayerRef, KSPlayerSource } from '../../KSPlayerComponent';
+import MPVPlayerComponent from '../../MPVPlayerComponent';
+import { MPVPlayerRef } from '../../MPVPlayerComponent';
+
 
 interface KSPlayerSurfaceProps {
-    ksPlayerRef: React.RefObject<KSPlayerRef>;
+    ksPlayerRef: React.RefObject<any>;
     uri: string;
     headers?: Record<string, string>;
     paused: boolean;
@@ -91,12 +93,6 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
         }
     };
 
-    // Create source object for KSPlayerComponent
-    const source: KSPlayerSource = {
-        uri,
-        headers
-    };
-
     // Debug: log textTrack prop changes
     React.useEffect(() => {
         console.log('[KSPlayerSurface] textTrack prop changed to:', textTrack);
@@ -133,26 +129,20 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
                 justifyContent: 'center',
                 transform: [{ scale: zoomScale }]
             }}>
-                <KSPlayerComponent
-                    ref={ksPlayerRef}
-                    source={source}
+                <MPVPlayerComponent
+                    ref={ksPlayerRef as any}
+                    source={{ uri, headers }}
                     paused={paused}
                     volume={volume}
                     rate={playbackSpeed}
-                    resizeMode={resizeMode}
-                    audioTrack={audioTrack}
-                    textTrack={textTrack}
-                    subtitleTextColor={subtitleTextColor}
-                    subtitleBackgroundColor={subtitleBackgroundColor}
-                    subtitleFontSize={subtitleFontSize}
-                    subtitleBottomOffset={subtitleBottomOffset}
+                    style={customVideoStyles.width ? customVideoStyles : { width: screenWidth, height: screenHeight }}
+
                     onLoad={handleLoad}
                     onProgress={onProgress}
-                    onBuffering={handleBuffering}
                     onEnd={onEnd}
                     onError={onError}
-                    style={customVideoStyles.width ? customVideoStyles : { width: screenWidth, height: screenHeight }}
                 />
+
             </Animated.View>
         </PinchGestureHandler>
     );

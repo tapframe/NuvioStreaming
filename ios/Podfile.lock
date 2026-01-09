@@ -1,5 +1,4 @@
 PODS:
-  - DisplayCriteria (1.1.0)
   - EASClient (1.0.8):
     - ExpoModulesCore
   - EXApplication (7.0.8):
@@ -323,46 +322,12 @@ PODS:
   - EXUpdatesInterface (2.0.0):
     - ExpoModulesCore
   - FBLazyVector (0.81.4)
-  - FFmpegKit (6.1.0):
-    - FFmpegKit/FFmpegKit (= 6.1.0)
-  - FFmpegKit/FFmpegKit (6.1.0):
-    - Libass
   - google-cast-sdk (4.8.4)
   - hermes-engine (0.81.4):
     - hermes-engine/Pre-built (= 0.81.4)
   - hermes-engine/Pre-built (0.81.4)
   - ImageColors (2.5.1):
     - ExpoModulesCore
-  - KSPlayer (1.1.0):
-    - KSPlayer/Audio (= 1.1.0)
-    - KSPlayer/AVPlayer (= 1.1.0)
-    - KSPlayer/Core (= 1.1.0)
-    - KSPlayer/MEPlayer (= 1.1.0)
-    - KSPlayer/Metal (= 1.1.0)
-    - KSPlayer/Subtitle (= 1.1.0)
-    - KSPlayer/SwiftUI (= 1.1.0)
-    - KSPlayer/Video (= 1.1.0)
-  - KSPlayer/Audio (1.1.0):
-    - KSPlayer/Core
-  - KSPlayer/AVPlayer (1.1.0):
-    - DisplayCriteria
-  - KSPlayer/Core (1.1.0):
-    - KSPlayer/AVPlayer
-  - KSPlayer/MEPlayer (1.1.0):
-    - FFmpegKit
-    - KSPlayer/AVPlayer
-    - KSPlayer/Metal
-    - KSPlayer/Subtitle
-  - KSPlayer/Metal (1.1.0)
-  - KSPlayer/Subtitle (1.1.0)
-  - KSPlayer/SwiftUI (1.1.0):
-    - KSPlayer/AVPlayer
-  - KSPlayer/Video (1.1.0):
-    - KSPlayer/Core
-    - KSPlayer/Subtitle
-  - Libass (0.17.1):
-    - Libass/Libass (= 0.17.1)
-  - Libass/Libass (0.17.1)
   - libavif/core (0.11.1)
   - libavif/libdav1d (0.11.1):
     - libavif/core
@@ -405,6 +370,8 @@ PODS:
     - ReactNativeDependencies
     - Yoga
   - MMKVCore (2.2.4)
+  - MPVKit (0.0.1):
+    - React-Core
   - NitroMmkv (4.1.0):
     - hermes-engine
     - MMKVCore (= 2.2.4)
@@ -2760,7 +2727,6 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
-  - DisplayCriteria (from `https://github.com/kingslay/KSPlayer.git`, branch `main`)
   - EASClient (from `../node_modules/expo-eas-client/ios`)
   - EXApplication (from `../node_modules/expo-application/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
@@ -2797,12 +2763,10 @@ DEPENDENCIES:
   - EXUpdates (from `../node_modules/expo-updates/ios`)
   - EXUpdatesInterface (from `../node_modules/expo-updates-interface/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
-  - FFmpegKit (from `https://github.com/kingslay/FFmpegKit.git`, branch `main`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - ImageColors (from `../node_modules/react-native-image-colors/ios`)
-  - KSPlayer (from `https://github.com/kingslay/KSPlayer.git`, branch `main`)
-  - Libass (from `https://github.com/kingslay/FFmpegKit.git`, branch `main`)
   - lottie-react-native (from `../node_modules/lottie-react-native`)
+  - MPVKit (from `../MPVKit`)
   - NitroMmkv (from `../node_modules/react-native-mmkv`)
   - NitroModules (from `../node_modules/react-native-nitro-modules`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2909,9 +2873,6 @@ SPEC REPOS:
     - SwiftUIIntrospect
 
 EXTERNAL SOURCES:
-  DisplayCriteria:
-    :branch: main
-    :git: https://github.com/kingslay/KSPlayer.git
   EASClient:
     :path: "../node_modules/expo-eas-client/ios"
   EXApplication:
@@ -2984,22 +2945,15 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-updates-interface/ios"
   FBLazyVector:
     :path: "../node_modules/react-native/Libraries/FBLazyVector"
-  FFmpegKit:
-    :branch: main
-    :git: https://github.com/kingslay/FFmpegKit.git
   hermes-engine:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2025-07-07-RNv0.81.0-e0fc67142ec0763c6b6153ca2bf96df815539782
   ImageColors:
     :path: "../node_modules/react-native-image-colors/ios"
-  KSPlayer:
-    :branch: main
-    :git: https://github.com/kingslay/KSPlayer.git
-  Libass:
-    :branch: main
-    :git: https://github.com/kingslay/FFmpegKit.git
   lottie-react-native:
     :path: "../node_modules/lottie-react-native"
+  MPVKit:
+    :path: "../MPVKit"
   NitroMmkv:
     :path: "../node_modules/react-native-mmkv"
   NitroModules:
@@ -3173,22 +3127,7 @@ EXTERNAL SOURCES:
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
-CHECKOUT OPTIONS:
-  DisplayCriteria:
-    :commit: a7cddd878f557afa6a1f2faad9d756949406adde
-    :git: https://github.com/kingslay/KSPlayer.git
-  FFmpegKit:
-    :commit: d7048037a2eb94a3b08113fbf43aa92bdcb332d9
-    :git: https://github.com/kingslay/FFmpegKit.git
-  KSPlayer:
-    :commit: a7cddd878f557afa6a1f2faad9d756949406adde
-    :git: https://github.com/kingslay/KSPlayer.git
-  Libass:
-    :commit: d7048037a2eb94a3b08113fbf43aa92bdcb332d9
-    :git: https://github.com/kingslay/FFmpegKit.git
-
 SPEC CHECKSUMS:
-  DisplayCriteria: bb0a90faf14b30848bc50ac0516340ce50164187
   EASClient: 40dd9e740684782610c49becab2643782ea1a20c
   EXApplication: 1e98d4b1dccdf30627f92917f4b2c5a53c330e5f
   EXConstants: 805f35b1b295c542ca6acce836f21a1f9ee104d5
@@ -3225,18 +3164,16 @@ SPEC CHECKSUMS:
   EXUpdates: f20abbc8a9f4e150656fe88126d52f52d4e7793f
   EXUpdatesInterface: 5adf50cb41e079c861da6d9b4b954c3db9a50734
   FBLazyVector: 9e0cd874afd81d9a4d36679daca991b58b260d42
-  FFmpegKit: 3885085fbbc320745838ee4c8a1f9c5e5953dab2
   google-cast-sdk: 32f65af50d164e3c475e79ad123db3cc26fbcd37
   hermes-engine: 35c763d57c9832d0eef764316ca1c4d043581394
   ImageColors: e12eb73e29bc1feaa3c228db8c174a1b25acb59d
-  KSPlayer: f163ac6195f240b6fa5b8225aeb39ec811a70c62
-  Libass: e88af2324e1217e3a4c8bdc675f6f23a9dfc7677
   libavif: 84bbb62fb232c3018d6f1bab79beea87e35de7b7
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   lottie-ios: a881093fab623c467d3bce374367755c272bdd59
   lottie-react-native: cbe3d931a7c24f7891a8e8032c2bb9b2373c4b9c
   MMKVCore: f2dd4c9befea04277a55e84e7812f930537993df
+  MPVKit: 25ac17c12586bbd3aab014c6a281f6981c3fb6cf
   NitroMmkv: 4af10c70043b4c3cded3f16547627c7d9d8e3b8b
   NitroModules: a71a5ab2911caf79e45170e6e12475b5260a12d0
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
@@ -3332,6 +3269,6 @@ SPEC CHECKSUMS:
   SwiftUIIntrospect: fee9aa07293ee280373a591e1824e8ddc869ba5d
   Yoga: 051f086b5ccf465ff2ed38a2cf5a558ae01aaaa1
 
-PODFILE CHECKSUM: 7c74c9cd2c7f3df7ab68b4284d9f324282e54542
+PODFILE CHECKSUM: c5d7e008c41725ad58da009620905f13109dc39a
 
 COCOAPODS: 1.16.2
