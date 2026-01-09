@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StatusBar, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, StatusBar, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -24,6 +24,7 @@ import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './componen
 
 // Platform-specific components
 import { KSPlayerSurface } from './ios/components/KSPlayerSurface';
+import AVPlayerSurface from './ios/components/AVPlayerSurface';
 
 import {
   usePlayerState,
@@ -55,6 +56,7 @@ import { parseSRT } from './utils/subtitleParser';
 import { findBestSubtitleTrack, autoSelectAudioTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import { useSettings } from '../../hooks/useSettings';
 import { useTheme } from '../../contexts/ThemeContext';
+import type { VideoRef, SelectedTrack } from 'react-native-video';
 
 // Player route params interface
 interface PlayerRouteParams {
@@ -135,6 +137,13 @@ const KSPlayerCore: React.FC = () => {
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
 
+  // iOS Auto engine switching: AVPlayer (react-native-video) primary, MPV fallback
+  const avPlayerRef = useRef<VideoRef>(null);
+  const shouldUseMpvOnly = Platform.OS === 'ios' && settings.iosVideoPlayerEngine === 'mpv';
+  const [useMpvFallback, setUseMpvFallback] = useState<boolean>(shouldUseMpvOnly);
+  const hasAviOSFailed = useRef(false);
+  const lastPlaybackTimeRef = useRef<number>(0);
+
   // Subtitle sync modal state
   const [showSyncModal, setShowSyncModal] = useState(false);
 
@@ -170,7 +179,7 @@ const KSPlayerCore: React.FC = () => {
   });
 
   const controls = usePlayerControls({
-    playerRef: mpvPlayerRef,
+    playerRef: (shouldUseMpvOnly || useMpvFallback) ? mpvPlayerRef : avPlayerRef,
     paused,
     setPaused,
     currentTime,
@@ -411,8 +420,8 @@ const KSPlayerCore: React.FC = () => {
       if (bestAudioTrack !== null) {
         logger.debug(`[KSPlayerCore] Auto-selecting audio track ${bestAudioTrack} for language: ${settings.preferredAudioLanguage}`);
         tracks.selectAudioTrack(bestAudioTrack);
-        if (ksPlayerRef.current) {
-          ksPlayerRef.current.setAudioTrack(bestAudioTrack);
+        if (shouldUseMpvOnly || useMpvFallback) {
+          mpvPlayerRef.current?.setAudioTrack(bestAudioTrack);
         }
       }
     }
@@ -448,9 +457,11 @@ const KSPlayerCore: React.FC = () => {
     const resumeTarget = routeInitialPosition || watchProgress.initialPosition || watchProgress.initialSeekTargetRef?.current;
     if (resumeTarget && resumeTarget > 0 && !watchProgress.showResumeOverlay && data.duration > 0) {
       setTimeout(() => {
-        if (ksPlayerRef.current) {
-          logger.debug(`[KSPlayerCore] Auto-resuming to ${resumeTarget}`);
-          ksPlayerRef.current.seek(resumeTarget);
+        logger.debug(`[KSPlayerCore] Auto-resuming to ${resumeTarget}`);
+        if (shouldUseMpvOnly || useMpvFallback) {
+          mpvPlayerRef.current?.seek(resumeTarget);
+        } else {
+          avPlayerRef.current?.seek(resumeTarget);
         }
       }, 500);
     }
@@ -462,6 +473,13 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const handleError = (error: any) => {
+    // Auto mode: if AVPlayer fails, silently switch to MPV for this session.
+    if (!shouldUseMpvOnly && !useMpvFallback) {
+      hasAviOSFailed.current = true;
+      setUseMpvFallback(true);
+      return;
+    }
+
     let msg = 'Unknown Error';
     try {
       if (typeof error === 'string') {
@@ -512,8 +530,10 @@ const KSPlayerCore: React.FC = () => {
 
   const handleSelectAudioTrack = useCallback((trackId: number) => {
     tracks.selectAudioTrack(trackId);
-    mpvPlayerRef.current?.setAudioTrack(trackId);
-  }, [tracks, mpvPlayerRef]);
+    if (shouldUseMpvOnly || useMpvFallback) {
+      mpvPlayerRef.current?.setAudioTrack(trackId);
+    }
+  }, [tracks, mpvPlayerRef, shouldUseMpvOnly, useMpvFallback]);
 
   // Stream selection handler
   const handleSelectStream = async (newStream: any) => {
@@ -612,50 +632,109 @@ const KSPlayerCore: React.FC = () => {
       />
 
       {/* Video Surface & Pinch Zoom */}
-      <KSPlayerSurface
-        ksPlayerRef={mpvPlayerRef}
-        uri={uri}
-        headers={headers}
-        paused={paused}
-        volume={volume}
-        playbackSpeed={speedControl.playbackSpeed}
-        resizeMode={resizeMode}
-        zoomScale={zoomScale}
-        setZoomScale={setZoomScale}
-        lastZoomScale={lastZoomScale}
-        setLastZoomScale={setLastZoomScale}
-        audioTrack={tracks.selectedAudioTrack ?? undefined}
-        textTrack={customSubs.useCustomSubtitles ? -1 : tracks.selectedTextTrack}
-        onAudioTracks={(d) => tracks.setKsAudioTracks(d.audioTracks || [])}
-        onTextTracks={(d) => tracks.setKsTextTracks(d.textTracks || [])}
-        onLoad={onLoad}
-        onProgress={(d) => {
-          if (!isSliderDragging) {
-            setCurrentTime(d.currentTime);
+      {(shouldUseMpvOnly || useMpvFallback) ? (
+        <KSPlayerSurface
+          ksPlayerRef={mpvPlayerRef}
+          uri={uri}
+          headers={headers}
+          paused={paused}
+          volume={volume}
+          playbackSpeed={speedControl.playbackSpeed}
+          resizeMode={resizeMode}
+          zoomScale={zoomScale}
+          setZoomScale={setZoomScale}
+          lastZoomScale={lastZoomScale}
+          setLastZoomScale={setLastZoomScale}
+          audioTrack={tracks.selectedAudioTrack ?? undefined}
+          textTrack={customSubs.useCustomSubtitles ? -1 : tracks.selectedTextTrack}
+          onAudioTracks={(d) => tracks.setKsAudioTracks(d.audioTracks || [])}
+          onTextTracks={(d) => tracks.setKsTextTracks(d.textTracks || [])}
+          onLoad={(d) => {
+            onLoad(d);
+            // If we fell back from AVPlayer, continue from last time once MPV is ready.
+            if (!shouldUseMpvOnly && hasAviOSFailed.current) {
+              const target = lastPlaybackTimeRef.current || 0;
+              if (target > 0) {
+                setTimeout(() => mpvPlayerRef.current?.seek(target), 200);
+              }
+              hasAviOSFailed.current = false;
+            }
+          }}
+          onProgress={(d) => {
+            if (!isSliderDragging) {
+              setCurrentTime(d.currentTime);
+            }
+            lastPlaybackTimeRef.current = d.currentTime || 0;
+            // Only update buffered if it changed by more than 0.5s to reduce re-renders
+            const newBuffered = d.buffered || 0;
+            if (Math.abs(newBuffered - buffered) > 0.5) {
+              setBuffered(newBuffered);
+            }
+          }}
+          onEnd={async () => {
+            setCurrentTime(duration);
+            await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');
+          }}
+          onError={handleError}
+          onBuffer={setIsBuffering}
+          onReadyForDisplay={() => setIsPlayerReady(true)}
+          onPlaybackStalled={() => setIsBuffering(true)}
+          onPlaybackResume={() => setIsBuffering(false)}
+          screenWidth={screenDimensions.width}
+          screenHeight={screenDimensions.height}
+          customVideoStyles={{ width: '100%', height: '100%' }}
+          subtitleTextColor={customSubs.subtitleTextColor}
+          subtitleBackgroundColor={customSubs.subtitleBackground ? `rgba(0,0,0,${customSubs.subtitleBgOpacity})` : 'transparent'}
+          subtitleFontSize={customSubs.subtitleSize}
+          subtitleBottomOffset={customSubs.subtitleBottomOffset}
+        />
+      ) : (
+        <AVPlayerSurface
+          videoRef={avPlayerRef}
+          uri={uri}
+          headers={headers}
+          paused={paused}
+          volume={volume}
+          playbackSpeed={speedControl.playbackSpeed}
+          resizeMode={resizeMode}
+          zoomScale={zoomScale}
+          setZoomScale={setZoomScale}
+          lastZoomScale={lastZoomScale}
+          setLastZoomScale={setLastZoomScale}
+          selectedAudioTrack={
+            tracks.selectedAudioTrack != null
+              ? ({ type: 'index', value: tracks.selectedAudioTrack } as SelectedTrack)
+              : undefined
           }
-          // Only update buffered if it changed by more than 0.5s to reduce re-renders
-          const newBuffered = d.buffered || 0;
-          if (Math.abs(newBuffered - buffered) > 0.5) {
-            setBuffered(newBuffered);
+          selectedTextTrack={
+            customSubs.useCustomSubtitles
+              ? ({ type: 'disabled' } as SelectedTrack)
+              : (tracks.selectedTextTrack >= 0
+                ? ({ type: 'index', value: tracks.selectedTextTrack } as SelectedTrack)
+                : ({ type: 'disabled' } as SelectedTrack))
           }
-        }}
-        onEnd={async () => {
-          setCurrentTime(duration);
-          await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');
-        }}
-        onError={handleError}
-        onBuffer={setIsBuffering}
-        onReadyForDisplay={() => setIsPlayerReady(true)}
-        onPlaybackStalled={() => setIsBuffering(true)}
-        onPlaybackResume={() => setIsBuffering(false)}
-        screenWidth={screenDimensions.width}
-        screenHeight={screenDimensions.height}
-        customVideoStyles={{ width: '100%', height: '100%' }}
-        subtitleTextColor={customSubs.subtitleTextColor}
-        subtitleBackgroundColor={customSubs.subtitleBackground ? `rgba(0,0,0,${customSubs.subtitleBgOpacity})` : 'transparent'}
-        subtitleFontSize={customSubs.subtitleSize}
-        subtitleBottomOffset={customSubs.subtitleBottomOffset}
-      />
+          onLoad={onLoad}
+          onProgress={(d) => {
+            if (!isSliderDragging) {
+              setCurrentTime(d.currentTime);
+            }
+            lastPlaybackTimeRef.current = d.currentTime || 0;
+            const newBuffered = d.buffered || 0;
+            if (Math.abs(newBuffered - buffered) > 0.5) {
+              setBuffered(newBuffered);
+            }
+          }}
+          onEnd={async () => {
+            setCurrentTime(duration);
+            await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');
+          }}
+          onError={handleError}
+          onBuffer={setIsBuffering}
+          screenWidth={screenDimensions.width}
+          screenHeight={screenDimensions.height}
+          customVideoStyles={{ width: '100%', height: '100%' }}
+        />
+      )}
 
       {/* Custom Subtitles Overlay */}
       <CustomSubtitles
@@ -733,7 +812,17 @@ const KSPlayerCore: React.FC = () => {
             onSlidingComplete={onSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
-            playerBackend="MPV"
+            playerBackend={(shouldUseMpvOnly || useMpvFallback) ? 'MPV' : 'AVPlayer'}
+            onSwitchToMPV={
+              (!shouldUseMpvOnly && !useMpvFallback)
+                ? () => {
+                  // Manual switch (like Android): go to MPV for this session and resume at current time.
+                  lastPlaybackTimeRef.current = currentTime || lastPlaybackTimeRef.current || 0;
+                  hasAviOSFailed.current = true; // reuse the resume-on-load path
+                  setUseMpvFallback(true);
+                }
+                : undefined
+            }
           />
         </View>
       )}

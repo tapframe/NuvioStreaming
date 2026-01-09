@@ -342,8 +342,13 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {/* Switch to MPV Button - Android only, when using ExoPlayer */}
-              {Platform.OS === 'android' && onSwitchToMPV && useExoPlayer && (
+              {/* Switch to MPV Button */}
+              {(
+                // Android: only show when ExoPlayer is active
+                (Platform.OS === 'android' && onSwitchToMPV && useExoPlayer) ||
+                // iOS: show when AVPlayer is active
+                (Platform.OS === 'ios' && onSwitchToMPV && playerBackend === 'AVPlayer')
+              ) && (
                 <TouchableOpacity
                   style={{ padding: 8 }}
                   onPress={onSwitchToMPV}

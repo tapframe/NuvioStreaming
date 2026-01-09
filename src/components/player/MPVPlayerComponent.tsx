@@ -11,6 +11,7 @@ interface MPVPlayerProps {
     rate?: number;
     audioTrack?: number;
     textTrack?: number;
+    resizeMode?: 'contain' | 'cover' | 'stretch';
     subtitleTextColor?: string;
     subtitleBackgroundColor?: string;
     subtitleFontSize?: number;

@@ -136,6 +136,7 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
                     rate={playbackSpeed}
                     audioTrack={audioTrack}
                     textTrack={textTrack}
+                    resizeMode={resizeMode}
                     subtitleTextColor={subtitleTextColor}
                     subtitleBackgroundColor={subtitleBackgroundColor}
                     subtitleFontSize={subtitleFontSize}

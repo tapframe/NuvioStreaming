@@ -333,7 +333,7 @@ const PlayerSettingsScreen: React.FC = () => {
                           { color: currentTheme.colors.textMuted },
                         ]}
                       >
-                        {t('player.engine_desc')}
+                        {t('player.engine_desc_android')}
                       </Text>
                     </View>
                   </View>
@@ -495,6 +495,67 @@ const PlayerSettingsScreen: React.FC = () => {
                   </View>
                 </View>
               </>
+            )}
+
+            {/* Video Player Engine for iOS Internal Player */}
+            {Platform.OS === 'ios' && settings.preferredPlayer === 'internal' && (
+              <View style={[styles.settingItem, styles.settingItemBorder, { borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1 }]}>
+                <View style={styles.settingContent}>
+                  <View style={[
+                    styles.settingIconContainer,
+                    { backgroundColor: 'rgba(255,255,255,0.1)' }
+                  ]}>
+                    <MaterialIcons
+                      name="play-circle-filled"
+                      size={20}
+                      color={currentTheme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingText}>
+                    <Text
+                      style={[
+                        styles.settingTitle,
+                        { color: currentTheme.colors.text },
+                      ]}
+                    >
+                      {t('player.engine_title')}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.settingDescription,
+                        { color: currentTheme.colors.textMuted },
+                      ]}
+                    >
+                      {t('player.engine_desc_ios')}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.optionButtonsRow}>
+                  {([
+                    { id: 'auto', label: t('player.option_auto') },
+                    { id: 'mpv', label: t('player.option_mpv') },
+                  ] as const).map((option) => (
+                    <TouchableOpacity
+                      key={option.id}
+                      onPress={() => updateSetting('iosVideoPlayerEngine', option.id)}
+                      style={[
+                        styles.optionButton,
+                        styles.optionButtonWide,
+                        settings.iosVideoPlayerEngine === option.id && { backgroundColor: currentTheme.colors.primary },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.optionButtonText,
+                          { color: settings.iosVideoPlayerEngine === option.id ? '#fff' : currentTheme.colors.text },
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             )}
 
             {/* External Player for Downloads */}
