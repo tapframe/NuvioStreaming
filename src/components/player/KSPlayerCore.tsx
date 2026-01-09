@@ -149,9 +149,12 @@ const KSPlayerCore: React.FC = () => {
 
   // Track auto-selection refs to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
+  // Guard to prevent auto-select useEffect from running during manual subtitle loading
+  const isManuallyLoadingSubtitle = useRef(false);
 
   // Track previous video session to reset subtitle offset only when video actually changes
   const previousVideoRef = useRef<{ uri?: string; episodeId?: string }>({});
+  
 
   // Reset subtitle offset when starting a new video session
   useEffect(() => {
@@ -315,6 +318,14 @@ const KSPlayerCore: React.FC = () => {
   };
 
   const loadWyzieSubtitle = async (subtitle: WyzieSubtitle) => {
+    // Prevent concurrent calls - return early if already loading
+    if (isManuallyLoadingSubtitle.current) {
+      return;
+    }
+    
+    // Set guard to prevent auto-select useEffect and concurrent calls from interfering
+    isManuallyLoadingSubtitle.current = true;
+    
     modals.setShowSubtitleLanguageModal(false);
     customSubs.setIsLoadingSubtitles(true);
     try {
@@ -327,9 +338,11 @@ const KSPlayerCore: React.FC = () => {
         srtContent = await resp.text();
       }
       const parsedCues = parseSRT(srtContent);
+      
+      // Update all state together - the guards prevent interference from other effects
       customSubs.setCustomSubtitles(parsedCues);
       customSubs.setUseCustomSubtitles(true);
-      customSubs.setSelectedExternalSubtitleId(subtitle.id); // Track the selected external subtitle
+      customSubs.setSelectedExternalSubtitleId(subtitle.id);
       tracks.selectTextTrack(-1);
 
       const adjustedTime = currentTime + (customSubs.subtitleOffsetSec || 0);
@@ -340,6 +353,10 @@ const KSPlayerCore: React.FC = () => {
       logger.error('[VideoPlayer] Error loading wyzie', e);
     } finally {
       customSubs.setIsLoadingSubtitles(false);
+      // Clear guard after a short delay to allow state to settle
+      setTimeout(() => {
+        isManuallyLoadingSubtitle.current = false;
+      }, 500);
     }
   };
 
@@ -353,7 +370,7 @@ const KSPlayerCore: React.FC = () => {
   // Auto-select subtitles when both internal tracks and video are loaded
   // This ensures we wait for internal tracks before falling back to external
   useEffect(() => {
-    if (!isVideoLoaded || hasAutoSelectedTracks.current || !settings?.enableSubtitleAutoSelect) {
+    if (!isVideoLoaded || hasAutoSelectedTracks.current || !settings?.enableSubtitleAutoSelect || isManuallyLoadingSubtitle.current) {
       return;
     }
 
@@ -523,7 +540,10 @@ const KSPlayerCore: React.FC = () => {
 
   // Track selection handlers - update state, prop change triggers native update
   const handleSelectTextTrack = useCallback((trackId: number) => {
-    console.log('[KSPlayerCore] handleSelectTextTrack called with trackId:', trackId);
+    // Prevent interference during manual subtitle loading
+    if (isManuallyLoadingSubtitle.current && trackId === -1) {
+      return;
+    }
 
     // Disable custom subtitles when selecting a built-in track
     // This ensures the textTrack prop is actually passed to the native player
@@ -655,7 +675,13 @@ const KSPlayerCore: React.FC = () => {
           audioTrack={tracks.selectedAudioTrack ?? undefined}
           textTrack={customSubs.useCustomSubtitles ? -1 : tracks.selectedTextTrack}
           onAudioTracks={(d) => tracks.setKsAudioTracks(d.audioTracks || [])}
-          onTextTracks={(d) => tracks.setKsTextTracks(d.textTracks || [])}
+          onTextTracks={(d) => {
+            // Prevent textTracks updates during manual subtitle loading to avoid infinite loops
+            if (isManuallyLoadingSubtitle.current) {
+              return;
+            }
+            tracks.setKsTextTracks(d.textTracks || []);
+          }}
           onLoad={(d) => {
             onLoad(d);
             // If we fell back from AVPlayer, continue from last time once MPV is ready.

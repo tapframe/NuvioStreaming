@@ -103,6 +103,9 @@ export const AVPlayerSurface: React.FC<AVPlayerSurfaceProps> = ({
           rate={playbackSpeed}
           resizeMode={resizeMode as any}
           allowsExternalPlayback={true}
+          // iOS PiP: enter PiP automatically when user leaves the app (home/app switcher)
+          // Docs: https://docs.thewidlarzgroup.com/react-native-video/docs/v6/component/props/#enterpictureinpictureonleave
+          enterPictureInPictureOnLeave={true}
           selectedAudioTrack={selectedAudioTrack}
           selectedTextTrack={selectedTextTrack}
           onLoad={handleLoad}
@@ -113,7 +116,7 @@ export const AVPlayerSurface: React.FC<AVPlayerSurfaceProps> = ({
           progressUpdateInterval={250}
           // Keep background behavior consistent with the rest of the player logic
           playInBackground={false}
-          playWhenInactive={false}
+          playWhenInactive={true}
           ignoreSilentSwitch="ignore"
         />
       </Animated.View>

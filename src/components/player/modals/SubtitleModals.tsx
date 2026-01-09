@@ -122,7 +122,9 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   const menuMaxHeight = height * 0.95;
 
   React.useEffect(() => {
-    if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) fetchAvailableSubtitles();
+    if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
+      fetchAvailableSubtitles();
+    }
   }, [showSubtitleModal]);
 
   const handleClose = () => setShowSubtitleModal(false);

@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Animated } from 'react-native';
 import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import MPVPlayerComponent from '../../MPVPlayerComponent';
@@ -78,6 +78,11 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
     subtitleBottomOffset
 }) => {
     const pinchRef = useRef<PinchGestureHandler>(null);
+    const memoSource = useMemo(() => {
+        const h = headers ?? undefined;
+        return h ? { uri, headers: h } : { uri };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [uri, headers ? JSON.stringify(headers) : '']);
 
     const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
         const { scale } = event.nativeEvent;
@@ -130,7 +135,7 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
             }}>
                 <MPVPlayerComponent
                     ref={ksPlayerRef as any}
-                    source={{ uri, headers }}
+                    source={memoSource as any}
                     paused={paused}
                     volume={volume}
                     rate={playbackSpeed}
