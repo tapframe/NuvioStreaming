@@ -51,10 +51,11 @@ The app is designed to run "out of the box" without a `.env` file. Features requ
    - Set up your `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) environment variable pointing to your SDK location.
 
 ### For iOS Development (macOS only)
+
 1. **Xcode**: Install the latest version of Xcode from the Mac App Store.
 2. **Xcode Command Line Tools**:
    ```bash
-  xcode-select --install
+   xcode-select --install
    ```
 3. **CocoaPods**: Required for managing iOS dependencies.
    ```bash
