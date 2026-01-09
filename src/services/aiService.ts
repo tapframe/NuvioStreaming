@@ -25,6 +25,18 @@ export interface MovieContext {
   runtime?: number;
   tagline?: string;
   keywords?: string[];
+  voteAverage?: number;
+  voteCount?: number;
+  popularity?: number;
+  budget?: number;
+  revenue?: number;
+  productionCompanies?: string[];
+  productionCountries?: string[];
+  spokenLanguages?: string[];
+  originalLanguage?: string;
+  status?: string;
+  contentRating?: string;
+  imdbId?: string;
 }
 
 export interface EpisodeContext {
@@ -50,6 +62,12 @@ export interface EpisodeContext {
     name: string;
     character: string;
   }>;
+  // New enhanced fields
+  voteAverage?: number;
+  showGenres?: string[];
+  showNetworks?: string[];
+  showStatus?: string;
+  contentRating?: string;
 }
 
 export interface SeriesContext {
@@ -76,7 +94,19 @@ export interface SeriesContext {
     airDate: string;
     released: boolean;
     overview?: string;
+    voteAverage?: number;
   }>>;
+  // New enhanced fields
+  networks?: string[];
+  status?: string;
+  originalLanguage?: string;
+  popularity?: number;
+  voteAverage?: number;
+  voteCount?: number;
+  createdBy?: string[];
+  contentRating?: string;
+  productionCompanies?: string[];
+  type?: string; // "Scripted", "Documentary", etc.
 }
 
 export type ContentContext = MovieContext | EpisodeContext | SeriesContext;
@@ -101,7 +131,7 @@ class AIService {
   private apiKey: string | null = null;
   private baseUrl = 'https://openrouter.ai/api/v1';
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): AIService {
     if (!AIService.instance) {
@@ -130,7 +160,7 @@ class AIService {
   private createSystemPrompt(context: ContentContext): string {
     const isSeries = 'episodesBySeason' in (context as any);
     const isEpisode = !isSeries && 'showTitle' in (context as any);
-    
+
     if (isSeries) {
       const series = context as SeriesContext;
       const currentDate = new Date().toISOString().split('T')[0];
@@ -148,11 +178,19 @@ CRITICAL: Today's date is ${currentDate}. Use ONLY the verified information prov
 
 VERIFIED CURRENT SERIES INFORMATION FROM DATABASE:
 - Title: ${series.title}
+- Original Language: ${series.originalLanguage || 'Unknown'}
+- Status: ${series.status || 'Unknown'}
 - First Air Date: ${series.firstAirDate || 'Unknown'}
 - Last Air Date: ${series.lastAirDate || 'Unknown'}
 - Seasons: ${series.totalSeasons}
 - Episodes: ${series.totalEpisodes}
+- Classification: ${series.type || 'Scripted'}
+- Content Rating: ${series.contentRating || 'Not Rated'}
 - Genres: ${series.genres.join(', ') || 'Unknown'}
+- TMDB Rating: ${series.voteAverage ? `${series.voteAverage}/10 (${series.voteCount} votes)` : 'N/A'}
+- Popularity Score: ${series.popularity || 'N/A'}
+- Created By: ${series.createdBy?.join(', ') || 'Unknown'}
+- Production: ${series.productionCompanies?.join(', ') || 'Unknown'}
 - Synopsis: ${series.overview || 'No synopsis available'}
 
 Cast:
@@ -192,6 +230,11 @@ VERIFIED CURRENT INFORMATION FROM DATABASE:
 - Air Date: ${ep.airDate || 'Unknown'}
 - Release Status: ${ep.released ? 'RELEASED AND AVAILABLE FOR VIEWING' : 'Not Yet Released'}
 - Runtime: ${ep.runtime ? `${ep.runtime} minutes` : 'Unknown'}
+- TMDB Rating: ${ep.voteAverage ? `${ep.voteAverage}/10` : 'N/A'}
+- Show Content Rating: ${ep.contentRating || 'Not Rated'}
+- Show Genres: ${ep.showGenres?.join(', ') || 'Unknown'}
+- Network: ${ep.showNetworks?.join(', ') || 'Unknown'}
+- Show Status: ${ep.showStatus || 'Unknown'}
 - Synopsis: ${ep.overview || 'No synopsis available'}
 
 Cast:
@@ -227,11 +270,22 @@ CRITICAL: Today's date is ${currentDate}. Use ONLY the verified information prov
 
 VERIFIED CURRENT MOVIE INFORMATION FROM DATABASE:
 - Title: ${movie.title}
+- Original Language: ${movie.originalLanguage || 'Unknown'}
+- Status: ${movie.status || 'Unknown'}
 - Release Date: ${movie.releaseDate || 'Unknown'}
+- Content Rating: ${movie.contentRating || 'Not Rated'}
 - Runtime: ${movie.runtime ? `${movie.runtime} minutes` : 'Unknown'}
 - Genres: ${movie.genres.join(', ') || 'Unknown'}
+- TMDB Rating: ${movie.voteAverage ? `${movie.voteAverage}/10 (${movie.voteCount} votes)` : 'N/A'}
+- Popularity Score: ${movie.popularity || 'N/A'}
+- Budget: ${movie.budget && movie.budget > 0 ? `$${movie.budget.toLocaleString()}` : 'Unknown'}
+- Revenue: ${movie.revenue && movie.revenue > 0 ? `$${movie.revenue.toLocaleString()}` : 'Unknown'}
+- Production: ${movie.productionCompanies?.join(', ') || 'Unknown'}
+- Countries: ${movie.productionCountries?.join(', ') || 'Unknown'}
+- Spoken Languages: ${movie.spokenLanguages?.join(', ') || 'Unknown'}
 - Tagline: ${movie.tagline || 'N/A'}
 - Synopsis: ${movie.overview || 'No synopsis available'}
+- IMDb ID: ${movie.imdbId || 'N/A'}
 
 Cast:
 ${movie.cast.map(c => `- ${c.name} as ${c.character}`).join('\n')}
@@ -261,8 +315,8 @@ Answer questions about this movie using only the verified database information a
   }
 
   async sendMessage(
-    message: string, 
-    context: ContentContext, 
+    message: string,
+    context: ContentContext,
     conversationHistory: ChatMessage[] = []
   ): Promise<string> {
     if (!await this.isConfigured()) {
@@ -271,7 +325,7 @@ Answer questions about this movie using only the verified database information a
 
     try {
       const systemPrompt = this.createSystemPrompt(context);
-      
+
       // Prepare messages for API
       const messages = [
         { role: 'system', content: systemPrompt },
@@ -288,7 +342,7 @@ Answer questions about this movie using only the verified database information a
       if (__DEV__) {
         console.log('[AIService] Sending request to OpenRouter with context:', {
           contentType: 'showTitle' in context ? 'episode' : 'movie',
-          title: 'showTitle' in context ? 
+          title: 'showTitle' in context ?
             `${(context as EpisodeContext).showTitle} S${(context as EpisodeContext).seasonNumber}E${(context as EpisodeContext).episodeNumber}` :
             (context as MovieContext).title,
           messageCount: messages.length
@@ -304,7 +358,7 @@ Answer questions about this movie using only the verified database information a
           'X-Title': 'Nuvio - AI Chat',
         },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-20b:free',
+          model: 'xiaomi/mimo-v2-flash:free',
           messages,
           max_tokens: 1000,
           temperature: 0.7,
@@ -321,13 +375,13 @@ Answer questions about this movie using only the verified database information a
       }
 
       const data: OpenRouterResponse = await response.json();
-      
+
       if (!data.choices || data.choices.length === 0) {
         throw new Error('No response received from AI service');
       }
 
       const responseContent = data.choices[0].message.content;
-      
+
       if (__DEV__ && data.usage) {
         console.log('[AIService] Token usage:', data.usage);
       }
@@ -368,7 +422,7 @@ Answer questions about this movie using only the verified database information a
         // TMDB returns full ISO timestamps; keep only date part
         releaseDate = String(anyDate).split('T')[0];
       }
-    } catch {}
+    } catch { }
     const statusText: string = (movieData.status || '').toString().toLowerCase();
     let released = statusText === 'released';
     if (!released && releaseDate) {
@@ -408,16 +462,36 @@ Answer questions about this movie using only the verified database information a
       })) || [],
       runtime: movieData.runtime,
       tagline: movieData.tagline,
-      keywords: movieData.keywords?.keywords?.map((k: any) => k.name) || 
-               movieData.keywords?.results?.map((k: any) => k.name) || []
+      keywords: movieData.keywords?.keywords?.map((k: any) => k.name) ||
+        movieData.keywords?.results?.map((k: any) => k.name) || [],
+      // Enhanced fields
+      voteAverage: movieData.vote_average,
+      voteCount: movieData.vote_count,
+      popularity: movieData.popularity,
+      budget: movieData.budget,
+      revenue: movieData.revenue,
+      productionCompanies: movieData.production_companies?.map((c: any) => c.name) || [],
+      productionCountries: movieData.production_countries?.map((c: any) => c.name) || [],
+      spokenLanguages: movieData.spoken_languages?.map((l: any) => l.english_name || l.name) || [],
+      originalLanguage: movieData.original_language,
+      status: movieData.status,
+      contentRating: (() => {
+        // Extract US content rating from release_dates
+        try {
+          const usRelease = movieData.release_dates?.results?.find((r: any) => r.iso_3166_1 === 'US');
+          const certification = usRelease?.release_dates?.find((d: any) => d.certification)?.certification;
+          return certification || undefined;
+        } catch { return undefined; }
+      })(),
+      imdbId: movieData.external_ids?.imdb_id || movieData.imdb_id,
     };
   }
 
   // Helper method to create context from TMDB episode data
   static createEpisodeContext(
-    episodeData: any, 
-    showData: any, 
-    seasonNumber: number, 
+    episodeData: any,
+    showData: any,
+    seasonNumber: number,
     episodeNumber: number
   ): EpisodeContext {
     // Compute release status from TMDB air date
@@ -428,7 +502,7 @@ Answer questions about this movie using only the verified database information a
         const parsed = new Date(airDate);
         if (!isNaN(parsed.getTime())) released = parsed.getTime() <= Date.now();
       }
-    } catch {}
+    } catch { }
     // Heuristics: if TMDB provides meaningful content, treat as released
     if (!released) {
       const hasOverview = typeof episodeData.overview === 'string' && episodeData.overview.trim().length > 40;
@@ -479,7 +553,19 @@ Answer questions about this movie using only the verified database information a
       guestStars: episodeData.credits?.guest_stars?.map((g: any) => ({
         name: g.name,
         character: g.character
-      })) || []
+      })) || [],
+      // Enhanced fields
+      voteAverage: episodeData.vote_average,
+      showGenres: showData.genres?.map((g: any) => g.name) || [],
+      showNetworks: showData.networks?.map((n: any) => n.name) || [],
+      showStatus: showData.status,
+      contentRating: (() => {
+        // Extract US content rating from show's content_ratings
+        try {
+          const usRating = showData.content_ratings?.results?.find((r: any) => r.iso_3166_1 === 'US');
+          return usRating?.rating || undefined;
+        } catch { return undefined; }
+      })(),
     };
   }
 
@@ -507,7 +593,7 @@ Answer questions about this movie using only the verified database information a
             const parsed = new Date(airDate);
             if (!isNaN(parsed.getTime())) released = parsed.getTime() <= Date.now();
           }
-        } catch {}
+        } catch { }
         if (!released) {
           const hasOverview = typeof ep.overview === 'string' && ep.overview.trim().length > 40;
           const hasRuntime = typeof ep.runtime === 'number' && ep.runtime > 0;
@@ -520,7 +606,8 @@ Answer questions about this movie using only the verified database information a
           title: ep.name || `Episode ${ep.episode_number}`,
           airDate,
           released,
-          overview: ep.overview || ''
+          overview: ep.overview || '',
+          voteAverage: ep.vote_average,
         };
       });
     });
@@ -542,6 +629,23 @@ Answer questions about this movie using only the verified database information a
       cast,
       crew,
       episodesBySeason: normalized,
+      // Enhanced fields
+      networks: showData.networks?.map((n: any) => n.name) || [],
+      status: showData.status,
+      originalLanguage: showData.original_language,
+      popularity: showData.popularity,
+      voteAverage: showData.vote_average,
+      voteCount: showData.vote_count,
+      createdBy: showData.created_by?.map((c: any) => c.name) || [],
+      contentRating: (() => {
+        // Extract US content rating
+        try {
+          const usRating = showData.content_ratings?.results?.find((r: any) => r.iso_3166_1 === 'US');
+          return usRating?.rating || undefined;
+        } catch { return undefined; }
+      })(),
+      productionCompanies: showData.production_companies?.map((c: any) => c.name) || [],
+      type: showData.type,
     };
   }
 

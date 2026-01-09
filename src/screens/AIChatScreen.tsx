@@ -14,12 +14,12 @@ import {
   Keyboard,
 } from 'react-native';
 import CustomAlert from '../components/CustomAlert';
-// Removed duplicate AIChatScreen definition and alert state at the top. The correct component is defined after SuggestionChip.
 import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import FastImage from '@d11/react-native-fast-image';
 import { BlurView as ExpoBlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 // Lazy-safe community blur import (avoid bundling issues on web)
 let AndroidBlurView: any = null;
 if (Platform.OS === 'android') {
@@ -49,11 +49,14 @@ import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { aiService, ChatMessage, ContentContext, createMovieContext, createEpisodeContext, createSeriesContext, generateConversationStarters } from '../services/aiService';
 import { tmdbService } from '../services/tmdbService';
 import Markdown from 'react-native-markdown-display';
-import Animated, { 
-  useAnimatedStyle, 
-  useSharedValue, 
-  withSpring, 
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
   withTiming,
+  withRepeat,
+  withSequence,
+  withDelay,
   interpolate,
   Extrapolate,
   runOnJS
@@ -80,16 +83,56 @@ interface ChatBubbleProps {
   isLast: boolean;
 }
 
+// Animated typing dot component
+const TypingDot: React.FC<{ delay: number; color: string }> = ({ delay, color }) => {
+  const opacity = useSharedValue(0.3);
+  const scale = useSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 400 }),
+          withTiming(0.3, { duration: 400 })
+        ),
+        -1,
+        false
+      )
+    );
+    scale.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1.2, { duration: 400 }),
+          withTiming(1, { duration: 400 })
+        ),
+        -1,
+        false
+      )
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View style={[styles.typingDot, { backgroundColor: color }, animatedStyle]} />
+  );
+};
+
 const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) => {
   const { currentTheme } = useTheme();
   const isUser = message.role === 'user';
-  
+
   const bubbleAnimation = useSharedValue(0);
-  
+
   useEffect(() => {
-    bubbleAnimation.value = withSpring(1, { damping: 15, stiffness: 120 });
+    bubbleAnimation.value = withSpring(1, { damping: 18, stiffness: 100 });
   }, []);
-  
+
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: bubbleAnimation.value,
     transform: [
@@ -97,7 +140,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) =
         translateY: interpolate(
           bubbleAnimation.value,
           [0, 1],
-          [20, 0],
+          [16, 0],
           Extrapolate.CLAMP
         )
       },
@@ -105,7 +148,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) =
         scale: interpolate(
           bubbleAnimation.value,
           [0, 1],
-          [0.8, 1],
+          [0.95, 1],
           Extrapolate.CLAMP
         )
       }
@@ -120,16 +163,30 @@ const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) =
       animatedStyle
     ]}>
       {!isUser && (
-        <View style={[styles.avatarContainer, { backgroundColor: currentTheme.colors.primary }]}>
-          <MaterialIcons name="smart-toy" size={16} color="white" />
+        <View style={styles.avatarWrapper}>
+          <LinearGradient
+            colors={[currentTheme.colors.primary, `${currentTheme.colors.primary}99`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatarContainer}
+          >
+            <MaterialIcons name="auto-awesome" size={14} color="white" />
+          </LinearGradient>
         </View>
       )}
-      
+
       <View style={[
         styles.messageBubble,
         isUser ? [
-          styles.userBubble, 
-          { backgroundColor: currentTheme.colors.primary }
+          styles.userBubble,
+          {
+            backgroundColor: currentTheme.colors.primary,
+            shadowColor: currentTheme.colors.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            elevation: 6,
+          }
         ] : [
           styles.assistantBubble,
           { backgroundColor: 'transparent' }
@@ -138,147 +195,166 @@ const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) =
         {!isUser && (
           <View style={styles.assistantBlurBackdrop} pointerEvents="none">
             {Platform.OS === 'android' && AndroidBlurView
-              ? <AndroidBlurView blurAmount={16} blurRadius={8} style={StyleSheet.absoluteFill} />
+              ? <AndroidBlurView blurAmount={18} blurRadius={10} style={StyleSheet.absoluteFill} />
               : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
-              ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
-              : <ExpoBlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.50)' }]} />
+                ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
+                : <ExpoBlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
           </View>
         )}
-         {isUser ? (
-           <Text style={[styles.messageText, { color: 'white' }]}>
-             {message.content}
-           </Text>
-         ) : (
-           <Markdown
-             style={{
-               body: { 
-                 color: currentTheme.colors.highEmphasis, 
-                 fontSize: 16, 
-                 lineHeight: 22,
-                 margin: 0,
-                 padding: 0
-               },
-               paragraph: { 
-                 marginBottom: 8,
-                 marginTop: 0,
-                 color: currentTheme.colors.highEmphasis
-               },
-               heading1: {
-                 fontSize: 20,
-                 fontWeight: '700',
-                 color: currentTheme.colors.highEmphasis,
-                 marginBottom: 8,
-                 marginTop: 0
-               },
-               heading2: {
-                 fontSize: 18,
-                 fontWeight: '600',
-                 color: currentTheme.colors.highEmphasis,
-                 marginBottom: 6,
-                 marginTop: 0
-               },
-               link: { 
-                 color: currentTheme.colors.primary,
-                 textDecorationLine: 'underline'
-               },
-               code_inline: {
-                 backgroundColor: currentTheme.colors.elevation2,
-                 paddingHorizontal: 6,
-                 paddingVertical: 2,
-                 borderRadius: 4,
-                 fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                 fontSize: 14,
-                 color: currentTheme.colors.highEmphasis,
-               },
-               code_block: {
-                 backgroundColor: currentTheme.colors.elevation2,
-                 borderRadius: 8,
-                 padding: 12,
-                 marginVertical: 8,
-                 color: currentTheme.colors.highEmphasis,
-                 fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                 fontSize: 14,
-               },
-               fence: {
-                 backgroundColor: currentTheme.colors.elevation2,
-                 borderRadius: 8,
-                 padding: 12,
-                 marginVertical: 8,
-                 color: currentTheme.colors.highEmphasis,
-                 fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                 fontSize: 14,
-               },
-               bullet_list: { 
-                 marginBottom: 8,
-                 marginTop: 0
-               },
-               ordered_list: { 
-                 marginBottom: 8,
-                 marginTop: 0
-               },
-               list_item: {
-                 marginBottom: 4,
-                 color: currentTheme.colors.highEmphasis
-               },
-               strong: {
-                 fontWeight: '700',
-                 color: currentTheme.colors.highEmphasis
-               },
-               em: {
-                 fontStyle: 'italic',
-                 color: currentTheme.colors.highEmphasis
-               },
-               blockquote: {
-                 backgroundColor: currentTheme.colors.elevation1,
-                 borderLeftWidth: 4,
-                 borderLeftColor: currentTheme.colors.primary,
-                 paddingLeft: 12,
-                 paddingVertical: 8,
-                 marginVertical: 8,
-                 borderRadius: 4,
-               },
-               table: {
-                 borderWidth: 1,
-                 borderColor: currentTheme.colors.elevation2,
-                 borderRadius: 8,
-                 marginVertical: 8,
-               },
-               thead: {
-                 backgroundColor: currentTheme.colors.elevation1,
-               },
-               th: {
-                 padding: 8,
-                 fontWeight: '600',
-                 color: currentTheme.colors.highEmphasis,
-                 borderBottomWidth: 1,
-                 borderBottomColor: currentTheme.colors.elevation2,
-               },
-               td: {
-                 padding: 8,
-                 color: currentTheme.colors.highEmphasis,
-                 borderBottomWidth: 1,
-                 borderBottomColor: currentTheme.colors.elevation2,
-               },
-             }}
-           >
-             {message.content}
-           </Markdown>
-         )}
+        {isUser ? (
+          <Text style={[styles.messageText, styles.userMessageText]}>
+            {message.content}
+          </Text>
+        ) : (
+          <Markdown
+            style={{
+              body: {
+                color: currentTheme.colors.highEmphasis,
+                fontSize: 15.5,
+                lineHeight: 24,
+                margin: 0,
+                padding: 0,
+                letterSpacing: 0.15,
+              },
+              paragraph: {
+                marginBottom: 12,
+                marginTop: 0,
+                color: currentTheme.colors.highEmphasis
+              },
+              heading1: {
+                fontSize: 22,
+                fontWeight: '700',
+                color: currentTheme.colors.highEmphasis,
+                marginBottom: 12,
+                marginTop: 4,
+                letterSpacing: -0.3,
+              },
+              heading2: {
+                fontSize: 19,
+                fontWeight: '600',
+                color: currentTheme.colors.highEmphasis,
+                marginBottom: 10,
+                marginTop: 4,
+                letterSpacing: -0.2,
+              },
+              heading3: {
+                fontSize: 17,
+                fontWeight: '600',
+                color: currentTheme.colors.highEmphasis,
+                marginBottom: 8,
+                marginTop: 2,
+              },
+              link: {
+                color: currentTheme.colors.primary,
+                textDecorationLine: 'underline'
+              },
+              code_inline: {
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 6,
+                fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                fontSize: 13.5,
+                color: currentTheme.colors.primary,
+              },
+              code_block: {
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                borderRadius: 12,
+                padding: 14,
+                marginVertical: 10,
+                color: currentTheme.colors.highEmphasis,
+                fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                fontSize: 13.5,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.08)',
+              },
+              fence: {
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                borderRadius: 12,
+                padding: 14,
+                marginVertical: 10,
+                color: currentTheme.colors.highEmphasis,
+                fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                fontSize: 13.5,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.08)',
+              },
+              bullet_list: {
+                marginBottom: 10,
+                marginTop: 0
+              },
+              ordered_list: {
+                marginBottom: 10,
+                marginTop: 0
+              },
+              list_item: {
+                marginBottom: 6,
+                color: currentTheme.colors.highEmphasis
+              },
+              strong: {
+                fontWeight: '700',
+                color: currentTheme.colors.highEmphasis
+              },
+              em: {
+                fontStyle: 'italic',
+                color: currentTheme.colors.mediumEmphasis
+              },
+              blockquote: {
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderLeftWidth: 3,
+                borderLeftColor: currentTheme.colors.primary,
+                paddingLeft: 14,
+                paddingVertical: 10,
+                marginVertical: 10,
+                borderRadius: 6,
+              },
+              table: {
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderRadius: 10,
+                marginVertical: 10,
+                overflow: 'hidden',
+              },
+              thead: {
+                backgroundColor: 'rgba(255,255,255,0.06)',
+              },
+              th: {
+                padding: 10,
+                fontWeight: '600',
+                color: currentTheme.colors.highEmphasis,
+                borderBottomWidth: 1,
+                borderBottomColor: 'rgba(255,255,255,0.1)',
+              },
+              td: {
+                padding: 10,
+                color: currentTheme.colors.highEmphasis,
+                borderBottomWidth: 1,
+                borderBottomColor: 'rgba(255,255,255,0.06)',
+              },
+            }}
+          >
+            {message.content}
+          </Markdown>
+        )}
         <Text style={[
           styles.messageTime,
-          { color: isUser ? 'rgba(255,255,255,0.7)' : currentTheme.colors.mediumEmphasis }
+          { color: isUser ? 'rgba(255,255,255,0.65)' : currentTheme.colors.disabled }
         ]}>
-          {new Date(message.timestamp).toLocaleTimeString([], { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+          {new Date(message.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
           })}
         </Text>
       </View>
-      
+
       {isUser && (
-        <View style={[styles.userAvatarContainer, { backgroundColor: currentTheme.colors.elevation2 }]}>
-          <MaterialIcons name="person" size={16} color={currentTheme.colors.primary} />
+        <View style={[styles.userAvatarContainer, {
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.12)',
+        }]}>
+          <MaterialIcons name="person" size={14} color={currentTheme.colors.primary} />
         </View>
       )}
     </Animated.View>
@@ -296,23 +372,60 @@ const ChatBubble: React.FC<ChatBubbleProps> = React.memo(({ message, isLast }) =
 interface SuggestionChipProps {
   text: string;
   onPress: () => void;
+  index: number;
 }
 
-const SuggestionChip: React.FC<SuggestionChipProps> = React.memo(({ text, onPress }) => {
+const SuggestionChip: React.FC<SuggestionChipProps> = React.memo(({ text, onPress, index }) => {
   const { currentTheme } = useTheme();
-  
+  const animValue = useSharedValue(0);
+
+  useEffect(() => {
+    animValue.value = withDelay(
+      index * 80,
+      withSpring(1, { damping: 18, stiffness: 120 })
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: animValue.value,
+    transform: [
+      { translateY: interpolate(animValue.value, [0, 1], [12, 0], Extrapolate.CLAMP) },
+      { scale: interpolate(animValue.value, [0, 1], [0.95, 1], Extrapolate.CLAMP) },
+    ],
+  }));
+
   return (
-    <TouchableOpacity
-      style={[styles.suggestionChip, { backgroundColor: currentTheme.colors.elevation1 }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.suggestionText, { color: currentTheme.colors.primary }]}>
-        {text}
-      </Text>
-    </TouchableOpacity>
+    <Animated.View style={animatedStyle}>
+      <TouchableOpacity
+        style={[
+          styles.suggestionChip,
+          {
+            backgroundColor: 'rgba(255,255,255,0.04)',
+            borderWidth: 1,
+            borderColor: `${currentTheme.colors.primary}40`,
+          }
+        ]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <MaterialIcons
+          name="lightbulb-outline"
+          size={16}
+          color={currentTheme.colors.primary}
+          style={styles.suggestionIcon}
+        />
+        <Text style={[styles.suggestionText, { color: currentTheme.colors.highEmphasis }]}>
+          {text}
+        </Text>
+        <MaterialIcons
+          name="arrow-forward"
+          size={14}
+          color={currentTheme.colors.mediumEmphasis}
+        />
+      </TouchableOpacity>
+    </Animated.View>
   );
-}, (prev, next) => prev.text === next.text && prev.onPress === next.onPress);
+}, (prev, next) => prev.text === next.text && prev.onPress === next.onPress && prev.index === next.index);
 
 const AIChatScreen: React.FC = () => {
   // CustomAlert state
@@ -347,9 +460,9 @@ const AIChatScreen: React.FC = () => {
   const navigation = useNavigation();
   const { currentTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  
+
   const { contentId, contentType, episodeId, seasonNumber, episodeNumber, title } = route.params;
-  
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -369,10 +482,10 @@ const AIChatScreen: React.FC = () => {
       };
     }, [])
   );
-  
+
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
-  
+
   // Animation values
   const headerOpacity = useSharedValue(1);
   const inputContainerY = useSharedValue(0);
@@ -432,7 +545,7 @@ const AIChatScreen: React.FC = () => {
   const loadContext = async () => {
     try {
       setIsLoadingContext(true);
-      
+
       if (contentType === 'movie') {
         // Movies: contentId may be TMDB id string or IMDb id (tt...)
         let movieData = await tmdbService.getMovieDetails(contentId);
@@ -451,7 +564,7 @@ const AIChatScreen: React.FC = () => {
         try {
           const path = movieData.backdrop_path || movieData.poster_path || null;
           if (path) setBackdropUrl(`https://image.tmdb.org/t/p/w780${path}`);
-        } catch {}
+        } catch { }
       } else {
         // Series: resolve TMDB numeric id first (contentId may be IMDb/stremio id)
         let tmdbNumericId: number | null = null;
@@ -476,25 +589,25 @@ const AIChatScreen: React.FC = () => {
         try {
           const path = showData.backdrop_path || showData.poster_path || null;
           if (path) setBackdropUrl(`https://image.tmdb.org/t/p/w780${path}`);
-        } catch {}
-        
+        } catch { }
+
         if (!showData) throw new Error('Unable to load TV show details');
         const seriesContext = createSeriesContext(showData, allEpisodes || {});
         setContext(seriesContext);
       }
     } catch (error) {
       if (__DEV__) console.error('Error loading context:', error);
-  openAlert('Error', 'Failed to load content details for AI chat');
+      openAlert('Error', 'Failed to load content details for AI chat');
     } finally {
       setIsLoadingContext(false);
-          {/* CustomAlert at root */}
-          <CustomAlert
-            visible={alertVisible}
-            title={alertTitle}
-            message={alertMessage}
-            onClose={() => setAlertVisible(false)}
-            actions={alertActions}
-          />
+      {/* CustomAlert at root */ }
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
     }
   };
 
@@ -527,10 +640,10 @@ const AIChatScreen: React.FC = () => {
         const sxe = messageText.match(/s(\d+)e(\d+)/i);
         const words = messageText.match(/season\s+(\d+)[^\d]+episode\s+(\d+)/i);
         const seasonOnly = messageText.match(/s(\d+)(?!e)/i) || messageText.match(/season\s+(\d+)/i);
-        
+
         let season = sxe ? parseInt(sxe[1], 10) : (words ? parseInt(words[1], 10) : undefined);
         let episode = sxe ? parseInt(sxe[2], 10) : (words ? parseInt(words[2], 10) : undefined);
-        
+
         // If only season mentioned (like "s2" or "season 2"), default to episode 1
         if (!season && seasonOnly) {
           season = parseInt(seasonOnly[1], 10);
@@ -558,7 +671,7 @@ const AIChatScreen: React.FC = () => {
                 requestContext = createEpisodeContext(episodeData, showData, season, episode);
               }
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -578,7 +691,7 @@ const AIChatScreen: React.FC = () => {
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       if (__DEV__) console.error('Error sending message:', error);
-      
+
       let errorMessage = 'Sorry, I encountered an error. Please try again.';
       if (error instanceof Error) {
         if (error.message.includes('not configured')) {
@@ -623,7 +736,7 @@ const AIChatScreen: React.FC = () => {
 
   const getDisplayTitle = () => {
     if (!context) return title;
-    
+
     if ('episodesBySeason' in (context as any)) {
       // Always show just the series title
       return (context as any).title;
@@ -656,200 +769,219 @@ const AIChatScreen: React.FC = () => {
 
   return (
     <Animated.View style={{ flex: 1, opacity: modalOpacity }}>
-    <SafeAreaView edges={['top','bottom']} style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
-      {backdropUrl && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <FastImage
-            source={{ uri: backdropUrl }}
-            style={StyleSheet.absoluteFill}
-            resizeMode={FastImage.resizeMode.cover}
-          />
-          {Platform.OS === 'android' && AndroidBlurView
-            ? <AndroidBlurView blurAmount={12} blurRadius={6} style={StyleSheet.absoluteFill} />
-            : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
-            ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
-            : <ExpoBlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />}
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.45)' }]} />
-        </View>
-      )}
-      <StatusBar barStyle="light-content" />
-      
-      {/* Header */}
-      <Animated.View style={[
-        styles.header,
-        { 
-          backgroundColor: 'transparent',
-          paddingTop: Platform.OS === 'ios' ? insets.top : insets.top 
-        },
-        headerAnimatedStyle
-      ]}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            onPress={() => {
-              if (Platform.OS === 'android') {
-                modalOpacity.value = withSpring(0, { damping: 18, stiffness: 160 }, (finished) => {
-                  if (finished) runOnJS(navigation.goBack)();
-                });
-              } else {
-                navigation.goBack();
-              }
-            }}
-            style={styles.backButton}
-          >
-            <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
-          </TouchableOpacity>
-          
-          <View style={styles.headerInfo}>
-            <Text style={[styles.headerTitle, { color: currentTheme.colors.highEmphasis }]}>
-              AI Chat
-            </Text>
-            <Text style={[styles.headerSubtitle, { color: currentTheme.colors.mediumEmphasis }]}>
-              {getDisplayTitle()}
-            </Text>
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
+        {backdropUrl && (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <FastImage
+              source={{ uri: backdropUrl }}
+              style={StyleSheet.absoluteFill}
+              resizeMode={FastImage.resizeMode.cover}
+            />
+            {Platform.OS === 'android' && AndroidBlurView
+              ? <AndroidBlurView blurAmount={12} blurRadius={6} style={StyleSheet.absoluteFill} />
+              : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
+                ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
+                : <ExpoBlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.28)' : 'rgba(0,0,0,0.45)' }]} />
           </View>
-          
-          <View style={[styles.aiIndicator, { backgroundColor: currentTheme.colors.primary }]}>
-            <MaterialIcons name="smart-toy" size={20} color="white" />
-          </View>
-        </View>
-      </Animated.View>
+        )}
+        <StatusBar barStyle="light-content" />
 
-      {/* Chat Messages */}
-      <KeyboardAvoidingView 
-        style={styles.chatContainer} 
-        behavior={Platform.OS === 'ios' ? undefined : undefined}
-        keyboardVerticalOffset={0}
-      >
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={[
-            styles.messagesContent,
-            { paddingBottom: isKeyboardVisible ? 20 : (56 + (isLoading ? 20 : 0)) }
-          ]}
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          {messages.length === 0 && suggestions.length > 0 && (
-            <View style={styles.welcomeContainer}>
-              <View style={[styles.welcomeIcon, { backgroundColor: currentTheme.colors.primary }]}>
-                <MaterialIcons name="smart-toy" size={32} color="white" />
-              </View>
-              <Text style={[styles.welcomeTitle, { color: currentTheme.colors.highEmphasis }]}>
-                Ask me anything about
+        {/* Header */}
+        <Animated.View style={[
+          styles.header,
+          {
+            backgroundColor: 'transparent',
+            paddingTop: Platform.OS === 'ios' ? insets.top : insets.top
+          },
+          headerAnimatedStyle
+        ]}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS === 'android') {
+                  modalOpacity.value = withSpring(0, { damping: 18, stiffness: 160 }, (finished) => {
+                    if (finished) runOnJS(navigation.goBack)();
+                  });
+                } else {
+                  navigation.goBack();
+                }
+              }}
+              style={styles.backButton}
+            >
+              <MaterialIcons name="arrow-back" size={24} color={currentTheme.colors.text} />
+            </TouchableOpacity>
+
+            <View style={styles.headerInfo}>
+              <Text style={[styles.headerTitle, { color: currentTheme.colors.highEmphasis }]}>
+                AI Chat
               </Text>
-              <Text style={[styles.welcomeSubtitle, { color: currentTheme.colors.primary }]}>
+              <Text style={[styles.headerSubtitle, { color: currentTheme.colors.mediumEmphasis }]}>
                 {getDisplayTitle()}
               </Text>
-              <Text style={[styles.welcomeDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                I have detailed knowledge about this content and can answer questions about plot, characters, themes, and more.
-              </Text>
-              
-              <View style={styles.suggestionsContainer}>
-                <Text style={[styles.suggestionsTitle, { color: currentTheme.colors.mediumEmphasis }]}>
-                  Try asking:
-                </Text>
-                <View style={styles.suggestionsGrid}>
-                  {suggestions.map((suggestion, index) => (
-                    <SuggestionChip
-                      key={index}
-                      text={suggestion}
-                      onPress={() => handleSuggestionPress(suggestion)}
-                    />
-                  ))}
-                </View>
-              </View>
             </View>
-          )}
-          
-          {messages.map((message, index) => (
-            <ChatBubble
-              key={message.id}
-              message={message}
-              isLast={index === messages.length - 1}
-            />
-          ))}
-          
-          {isLoading && (
-            <View style={styles.typingIndicator}>
-              <View style={[styles.typingBubble, { backgroundColor: currentTheme.colors.elevation2 }]}>
-                <View style={styles.typingDots}>
-                  <View style={[styles.typingDot, { backgroundColor: currentTheme.colors.mediumEmphasis }]} />
-                  <View style={[styles.typingDot, { backgroundColor: currentTheme.colors.mediumEmphasis }]} />
-                  <View style={[styles.typingDot, { backgroundColor: currentTheme.colors.mediumEmphasis }]} />
-                </View>
-              </View>
-            </View>
-          )}
-        </ScrollView>
 
-        {/* Input Container */}
-        <SafeAreaView edges={['bottom']} style={{ backgroundColor: 'transparent' }}>
-        <Animated.View style={[
-          styles.inputContainer,
-          { 
-            backgroundColor: 'transparent',
-            paddingBottom: 12
-          },
-          inputAnimatedStyle
-        ]}>
-          <View style={[styles.inputWrapper, { backgroundColor: 'transparent' }]}>
-            <View style={styles.inputBlurBackdrop} pointerEvents="none">
-              {Platform.OS === 'android' && AndroidBlurView
-                ? <AndroidBlurView blurAmount={10} blurRadius={4} style={StyleSheet.absoluteFill} />
-                : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
-                ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
-                : <ExpoBlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />}
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.25)' }]} />
-            </View>
-            <TextInput
-              ref={inputRef}
-              style={[
-                styles.textInput,
-                { color: currentTheme.colors.highEmphasis }
-              ]}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Ask about this content..."
-              placeholderTextColor={currentTheme.colors.mediumEmphasis}
-              multiline
-              maxLength={500}
-              editable={!isLoading}
-              onSubmitEditing={handleSendPress}
-              blurOnSubmit={false}
-            />
-            
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                { 
-                  backgroundColor: inputText.trim() ? currentTheme.colors.primary : currentTheme.colors.elevation2 
-                }
-              ]}
-              onPress={handleSendPress}
-              disabled={!inputText.trim() || isLoading}
-              activeOpacity={0.7}
+            <LinearGradient
+              colors={[currentTheme.colors.primary, `${currentTheme.colors.primary}CC`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.aiIndicator}
             >
-              <MaterialIcons 
-                name="send" 
-                size={20} 
-                color={inputText.trim() ? 'white' : currentTheme.colors.mediumEmphasis} 
-              />
-            </TouchableOpacity>
+              <MaterialIcons name="auto-awesome" size={22} color="white" />
+            </LinearGradient>
           </View>
         </Animated.View>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-    <CustomAlert
-      visible={alertVisible}
-      title={alertTitle}
-      message={alertMessage}
-      onClose={() => setAlertVisible(false)}
-      actions={alertActions}
-    />
+
+        {/* Chat Messages */}
+        <KeyboardAvoidingView
+          style={styles.chatContainer}
+          behavior={Platform.OS === 'ios' ? undefined : undefined}
+          keyboardVerticalOffset={0}
+        >
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.messagesContainer}
+            contentContainerStyle={[
+              styles.messagesContent,
+              { paddingBottom: isKeyboardVisible ? 20 : (56 + (isLoading ? 20 : 0)) }
+            ]}
+            showsVerticalScrollIndicator={false}
+            removeClippedSubviews
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {messages.length === 0 && suggestions.length > 0 && (
+              <View style={styles.welcomeContainer}>
+                <LinearGradient
+                  colors={[currentTheme.colors.primary, `${currentTheme.colors.primary}99`]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.welcomeIcon}
+                >
+                  <MaterialIcons name="auto-awesome" size={34} color="white" />
+                </LinearGradient>
+                <Text style={[styles.welcomeTitle, { color: currentTheme.colors.highEmphasis }]}>
+                  Ask me anything about
+                </Text>
+                <Text style={[styles.welcomeSubtitle, { color: currentTheme.colors.primary }]}>
+                  {getDisplayTitle()}
+                </Text>
+                <Text style={[styles.welcomeDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                  I have detailed knowledge about this content and can answer questions about plot, characters, themes, and more.
+                </Text>
+
+                <View style={styles.suggestionsContainer}>
+                  <Text style={[styles.suggestionsTitle, { color: currentTheme.colors.mediumEmphasis }]}>
+                    Try asking:
+                  </Text>
+                  <View style={styles.suggestionsGrid}>
+                    {suggestions.map((suggestion, index) => (
+                      <SuggestionChip
+                        key={index}
+                        text={suggestion}
+                        onPress={() => handleSuggestionPress(suggestion)}
+                        index={index}
+                      />
+                    ))}
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {messages.map((message, index) => (
+              <ChatBubble
+                key={message.id}
+                message={message}
+                isLast={index === messages.length - 1}
+              />
+            ))}
+
+            {isLoading && (
+              <View style={styles.typingIndicator}>
+                <View style={[styles.typingBubble, { backgroundColor: 'rgba(255,255,255,0.06)' }]}>
+                  <View style={styles.typingDots}>
+                    <TypingDot delay={0} color={currentTheme.colors.primary} />
+                    <TypingDot delay={150} color={currentTheme.colors.primary} />
+                    <TypingDot delay={300} color={currentTheme.colors.primary} />
+                  </View>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Input Container */}
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: 'transparent' }}>
+            <Animated.View style={[
+              styles.inputContainer,
+              {
+                backgroundColor: 'transparent',
+                paddingBottom: 12
+              },
+              inputAnimatedStyle
+            ]}>
+              <View style={[styles.inputWrapper, { backgroundColor: 'transparent' }]}>
+                <View style={styles.inputBlurBackdrop} pointerEvents="none">
+                  {Platform.OS === 'android' && AndroidBlurView
+                    ? <AndroidBlurView blurAmount={10} blurRadius={4} style={StyleSheet.absoluteFill} />
+                    : Platform.OS === 'ios' && GlassViewComp && liquidGlassAvailable
+                      ? <GlassViewComp style={StyleSheet.absoluteFill} glassEffectStyle="regular" />
+                      : <ExpoBlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />}
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.25)' }]} />
+                </View>
+                <TextInput
+                  ref={inputRef}
+                  style={[
+                    styles.textInput,
+                    { color: currentTheme.colors.highEmphasis }
+                  ]}
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="Ask about this content..."
+                  placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                  multiline
+                  maxLength={500}
+                  editable={!isLoading}
+                  onSubmitEditing={handleSendPress}
+                  blurOnSubmit={false}
+                />
+
+                <TouchableOpacity
+                  onPress={handleSendPress}
+                  disabled={!inputText.trim() || isLoading}
+                  activeOpacity={0.7}
+                  style={styles.sendButtonWrapper}
+                >
+                  {inputText.trim() ? (
+                    <LinearGradient
+                      colors={[currentTheme.colors.primary, `${currentTheme.colors.primary}DD`]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.sendButton}
+                    >
+                      <MaterialIcons name="arrow-upward" size={22} color="white" />
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.sendButton, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                      <MaterialIcons
+                        name="arrow-upward"
+                        size={22}
+                        color={currentTheme.colors.disabled}
+                      />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onClose={() => setAlertVisible(false)}
+        actions={alertActions}
+      />
     </Animated.View>
   );
 };
@@ -862,41 +994,49 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    gap: 20,
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: '500',
+    letterSpacing: 0.3,
     textAlign: 'center',
   },
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   backButton: {
-    padding: 8,
+    padding: 10,
+    marginLeft: -6,
+    borderRadius: 12,
   },
   headerInfo: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
     fontSize: 14,
-    marginTop: 2,
+    fontWeight: '500',
+    marginTop: 3,
+    opacity: 0.7,
+    letterSpacing: 0.1,
   },
   aiIndicator: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -907,65 +1047,80 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContent: {
-    padding: 16,
-    paddingBottom: 8,
+    padding: 20,
+    paddingBottom: 12,
   },
   welcomeContainer: {
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 24,
+    paddingVertical: 40,
+    paddingHorizontal: 28,
   },
   welcomeIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   welcomeTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '500',
     textAlign: 'center',
+    letterSpacing: 0.2,
+    opacity: 0.85,
   },
   welcomeSubtitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 12,
+    marginTop: 6,
+    marginBottom: 16,
+    letterSpacing: -0.4,
   },
   welcomeDescription: {
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 23,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 36,
+    opacity: 0.7,
+    letterSpacing: 0.15,
+    maxWidth: 320,
   },
   suggestionsContainer: {
     width: '100%',
   },
   suggestionsTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 14,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    opacity: 0.6,
   },
   suggestionsGrid: {
-    gap: 8,
+    gap: 10,
   },
   suggestionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 0,
+  },
+  suggestionIcon: {
+    marginRight: 10,
   },
   suggestionText: {
-    fontSize: 15,
+    flex: 1,
+    fontSize: 14.5,
     fontWeight: '500',
+    letterSpacing: 0.1,
   },
   messageContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
@@ -976,100 +1131,115 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   lastMessageContainer: {
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  avatarWrapper: {
+    marginRight: 10,
   },
   avatarContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
   },
   userAvatarContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: 10,
   },
   messageBubble: {
-    maxWidth: width * 0.75,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
+    maxWidth: width * 0.78,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 22,
     overflow: 'hidden',
   },
   userBubble: {
-    borderBottomRightRadius: 20,
+    borderBottomRightRadius: 6,
   },
   assistantBubble: {
-    borderBottomLeftRadius: 20,
+    borderBottomLeftRadius: 6,
   },
   assistantBlurBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: 22,
   },
   messageText: {
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15.5,
+    lineHeight: 23,
+    letterSpacing: 0.15,
+  },
+  userMessageText: {
+    color: 'white',
+    fontWeight: '400',
   },
   messageTime: {
-    fontSize: 12,
-    marginTop: 4,
-    opacity: 0.8,
+    fontSize: 11,
+    marginTop: 8,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   typingIndicator: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   typingBubble: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderBottomLeftRadius: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 22,
+    borderBottomLeftRadius: 6,
     marginLeft: 40,
   },
   typingDots: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
+    alignItems: 'center',
   },
   typingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   inputContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingBottom: 18,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 12,
-    overflow: 'hidden'
+    borderRadius: 26,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    gap: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   inputBlurBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 24,
+    borderRadius: 26,
   },
   textInput: {
     flex: 1,
     fontSize: 16,
-    lineHeight: 22,
-    maxHeight: 100,
-    paddingVertical: 8,
+    lineHeight: 23,
+    maxHeight: 120,
+    paddingVertical: 10,
+    letterSpacing: 0.15,
+  },
+  sendButtonWrapper: {
+    marginLeft: 2,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
