@@ -39,7 +39,7 @@ import {
 } from './hooks';
 
 // Platform-specific hooks
-import { useKSPlayer } from './ios/hooks/useKSPlayer';
+import { useMPVPlayer } from './ios/hooks/useMPVPlayer';
 
 // App-level Hooks
 import { useTraktAutosync } from '../../hooks/useTraktAutosync';
@@ -107,8 +107,6 @@ const KSPlayerCore: React.FC = () => {
     screenDimensions, setScreenDimensions,
     zoomScale, setZoomScale,
     lastZoomScale, setLastZoomScale,
-    isAirPlayActive,
-    allowsAirPlay,
     isSeeking,
     isMounted,
   } = playerState;
@@ -132,7 +130,7 @@ const KSPlayerCore: React.FC = () => {
 
   const openingAnim = useOpeningAnimation(backdrop, metadata);
   const tracks = usePlayerTracks();
-  const { ksPlayerRef, seek } = useKSPlayer();
+  const { mpvPlayerRef, seek } = useMPVPlayer();
   const customSubs = useCustomSubtitles();
   const { settings } = useSettings();
   const { currentTheme } = useTheme();
@@ -172,7 +170,7 @@ const KSPlayerCore: React.FC = () => {
   });
 
   const controls = usePlayerControls({
-    playerRef: ksPlayerRef,
+    playerRef: mpvPlayerRef,
     paused,
     setPaused,
     currentTime,
@@ -514,10 +512,8 @@ const KSPlayerCore: React.FC = () => {
 
   const handleSelectAudioTrack = useCallback((trackId: number) => {
     tracks.selectAudioTrack(trackId);
-    if (ksPlayerRef.current) {
-      ksPlayerRef.current.setAudioTrack(trackId);
-    }
-  }, [tracks, ksPlayerRef]);
+    mpvPlayerRef.current?.setAudioTrack(trackId);
+  }, [tracks, mpvPlayerRef]);
 
   // Stream selection handler
   const handleSelectStream = async (newStream: any) => {
@@ -617,7 +613,7 @@ const KSPlayerCore: React.FC = () => {
 
       {/* Video Surface & Pinch Zoom */}
       <KSPlayerSurface
-        ksPlayerRef={ksPlayerRef}
+        ksPlayerRef={mpvPlayerRef}
         uri={uri}
         headers={headers}
         paused={paused}
@@ -737,10 +733,7 @@ const KSPlayerCore: React.FC = () => {
             onSlidingComplete={onSlidingComplete}
             buffered={buffered}
             formatTime={formatTime}
-            playerBackend="KSAVPlayer"
-            isAirPlayActive={isAirPlayActive}
-            allowsAirPlay={allowsAirPlay}
-            onAirPlayPress={() => ksPlayerRef.current?.showAirPlayPicker()}
+            playerBackend="MPV"
           />
         </View>
       )}

@@ -47,10 +47,6 @@ interface PlayerControlsProps {
   buffered: number;
   formatTime: (seconds: number) => string;
   playerBackend?: string;
-  // AirPlay props
-  isAirPlayActive?: boolean;
-  allowsAirPlay?: boolean;
-  onAirPlayPress?: () => void;
   // MPV Switch (Android only)
   onSwitchToMPV?: () => void;
   useExoPlayer?: boolean;
@@ -93,9 +89,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   buffered,
   formatTime,
   playerBackend,
-  isAirPlayActive,
-  allowsAirPlay,
-  onAirPlayPress,
   onSwitchToMPV,
   useExoPlayer,
 }) => {
@@ -349,19 +342,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {/* AirPlay Button - iOS only, KSAVPlayer only */}
-              {Platform.OS === 'ios' && onAirPlayPress && playerBackend === 'KSAVPlayer' && (
-                <TouchableOpacity
-                  style={{ padding: 8 }}
-                  onPress={onAirPlayPress}
-                >
-                  <Feather
-                    name="airplay"
-                    size={closeIconSize}
-                    color={isAirPlayActive ? currentTheme.colors.primary : "white"}
-                  />
-                </TouchableOpacity>
-              )}
               {/* Switch to MPV Button - Android only, when using ExoPlayer */}
               {Platform.OS === 'android' && onSwitchToMPV && useExoPlayer && (
                 <TouchableOpacity

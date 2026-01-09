@@ -2,7 +2,6 @@ import React, { useRef } from 'react';
 import { Animated } from 'react-native';
 import { PinchGestureHandler, State, PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler';
 import MPVPlayerComponent from '../../MPVPlayerComponent';
-import { MPVPlayerRef } from '../../MPVPlayerComponent';
 
 
 interface KSPlayerSurfaceProps {
@@ -98,7 +97,7 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
         console.log('[KSPlayerSurface] textTrack prop changed to:', textTrack);
     }, [textTrack]);
 
-    // Handle buffering - KSPlayerComponent uses onBuffering callback
+    // Handle buffering - MPVPlayerComponent exposes buffering only via events we wire up
     const handleBuffering = (data: any) => {
         onBuffer(data?.isBuffering ?? false);
     };
@@ -135,12 +134,20 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
                     paused={paused}
                     volume={volume}
                     rate={playbackSpeed}
+                    audioTrack={audioTrack}
+                    textTrack={textTrack}
+                    subtitleTextColor={subtitleTextColor}
+                    subtitleBackgroundColor={subtitleBackgroundColor}
+                    subtitleFontSize={subtitleFontSize}
+                    subtitleBottomOffset={subtitleBottomOffset}
                     style={customVideoStyles.width ? customVideoStyles : { width: screenWidth, height: screenHeight }}
 
                     onLoad={handleLoad}
                     onProgress={onProgress}
                     onEnd={onEnd}
                     onError={onError}
+                    onAudioTracks={onAudioTracks}
+                    onTextTracks={onTextTracks}
                 />
 
             </Animated.View>
