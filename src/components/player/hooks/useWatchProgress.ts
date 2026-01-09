@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { storageService } from '../../../services/storageService';
 import { logger } from '../../../utils/logger';
 import { useSettings } from '../../../hooks/useSettings';
@@ -34,6 +35,44 @@ export const useWatchProgress = (
     useEffect(() => {
         durationRef.current = duration;
     }, [duration]);
+
+    // Keep latest traktAutosync ref to avoid dependency cycles in listeners
+    const traktAutosyncRef = useRef(traktAutosync);
+    useEffect(() => {
+        traktAutosyncRef.current = traktAutosync;
+    }, [traktAutosync]);
+
+    // AppState Listener for background save
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', async (nextAppState) => {
+            if (nextAppState.match(/inactive|background/)) {
+                if (id && type && durationRef.current > 0) {
+                    logger.log('[useWatchProgress] App backgrounded, saving progress');
+
+                    // Local save
+                    const progress = {
+                        currentTime: currentTimeRef.current,
+                        duration: durationRef.current,
+                        lastUpdated: Date.now(),
+                        addonId: addonId
+                    };
+                    try {
+                        await storageService.setWatchProgress(id, type, progress, episodeId);
+
+                        // Trakt sync (end session)
+                        // Use 'user_close' to force immediate sync
+                        await traktAutosyncRef.current.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'user_close');
+                    } catch (error) {
+                        logger.error('[useWatchProgress] Error saving background progress:', error);
+                    }
+                }
+            }
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, [id, type, episodeId, addonId]);
 
     // Load Watch Progress
     useEffect(() => {
