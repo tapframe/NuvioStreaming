@@ -31,6 +31,7 @@ import { TraktService } from '../../services/traktService';
 import { stremioService } from '../../services/stremioService';
 import { streamCacheService } from '../../services/streamCacheService';
 import { useSettings } from '../../hooks/useSettings';
+import { useBottomSheetBackHandler } from '../../hooks/useBottomSheetBackHandler';
 
 
 // Define interface for continue watching items
@@ -122,6 +123,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
   // Bottom sheet for item actions
   const actionSheetRef = useRef<BottomSheetModal>(null);
+  const { onChange, onDismiss } = useBottomSheetBackHandler();
   const [selectedItem, setSelectedItem] = useState<ContinueWatchingItem | null>(null);
 
   // Enhanced responsive sizing for tablets and TV screens
@@ -1620,7 +1622,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }}
         onDismiss={() => {
           setSelectedItem(null);
+          onDismiss(actionSheetRef);
         }}
+        onChange={onChange(actionSheetRef)}
       >
         <BottomSheetView style={[styles.actionSheetContent, { paddingBottom: insets.bottom + 16 }]}>
           {selectedItem && (
