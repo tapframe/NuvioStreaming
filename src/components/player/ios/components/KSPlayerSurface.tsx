@@ -42,6 +42,7 @@ interface KSPlayerSurfaceProps {
     subtitleBackgroundColor?: string;
     subtitleFontSize?: number;
     subtitleBottomOffset?: number;
+    subtitleOutlineEnabled?: boolean;
 }
 
 export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
@@ -74,7 +75,8 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
     subtitleTextColor,
     subtitleBackgroundColor,
     subtitleFontSize,
-    subtitleBottomOffset
+    subtitleBottomOffset,
+    subtitleOutlineEnabled
 }) => {
     const pinchRef = useRef<PinchGestureHandler>(null);
 
@@ -146,6 +148,7 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
                     subtitleBackgroundColor={subtitleBackgroundColor}
                     subtitleFontSize={subtitleFontSize}
                     subtitleBottomOffset={subtitleBottomOffset}
+                    subtitleOutlineEnabled={subtitleOutlineEnabled}
                     onLoad={handleLoad}
                     onProgress={onProgress}
                     onBuffering={handleBuffering}

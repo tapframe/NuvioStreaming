@@ -410,6 +410,7 @@
         "on": "Activé",
         "off": "Désactivé",
         "outline_color": "Couleur du contour",
+        "outline": "Contour",
         "outline_width": "Largeur du contour",
         "letter_spacing": "Espacement des lettres",
         "line_height": "Hauteur de ligne",

@@ -410,6 +410,7 @@
         "on": "Ligado",
         "off": "Desligado",
         "outline_color": "Cor do Contorno",
+        "outline": "Contorno",
         "outline_width": "Largura do Contorno",
         "letter_spacing": "Espaçamento de Letras",
         "line_height": "Altura da Linha",

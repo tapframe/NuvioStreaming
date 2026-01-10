@@ -616,6 +616,10 @@ const KSPlayerCore: React.FC = () => {
       />
 
       {/* Video Surface & Pinch Zoom */}
+      {/*
+        For KSPlayer built-in subtitles (internal text tracks), we intentionally force background OFF.
+        Background styling is only supported/used for custom (external/addon) subtitles overlay.
+      */}
       <KSPlayerSurface
         ksPlayerRef={ksPlayerRef}
         uri={uri}
@@ -656,7 +660,20 @@ const KSPlayerCore: React.FC = () => {
         screenHeight={screenDimensions.height}
         customVideoStyles={{ width: '100%', height: '100%' }}
         subtitleTextColor={customSubs.subtitleTextColor}
-        subtitleBackgroundColor={customSubs.subtitleBackground ? `rgba(0,0,0,${customSubs.subtitleBgOpacity})` : 'transparent'}
+        subtitleBackgroundColor={
+          tracks.selectedTextTrack !== null &&
+            tracks.selectedTextTrack >= 0 &&
+            !customSubs.useCustomSubtitles
+            ? 'rgba(0,0,0,0)'
+            : (customSubs.subtitleBackground ? `rgba(0,0,0,${customSubs.subtitleBgOpacity})` : 'transparent')
+        }
+        subtitleOutlineEnabled={
+          tracks.selectedTextTrack !== null &&
+            tracks.selectedTextTrack >= 0 &&
+            !customSubs.useCustomSubtitles
+            ? customSubs.subtitleOutline
+            : false
+        }
         subtitleFontSize={customSubs.subtitleSize}
         subtitleBottomOffset={customSubs.subtitleBottomOffset}
       />

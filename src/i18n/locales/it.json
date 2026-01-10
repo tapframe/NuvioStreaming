@@ -410,6 +410,7 @@
 		"on": "Attivo",
 		"off": "Disattivo",
 		"outline_color": "Colore contorno",
+		"outline": "Contorno",
 		"outline_width": "Larghezza contorno",
 		"letter_spacing": "Spaziatura lettere",
 		"line_height": "Altezza riga",

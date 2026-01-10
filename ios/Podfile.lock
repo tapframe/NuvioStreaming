@@ -2760,7 +2760,7 @@ PODS:
   - Yoga (0.0.0)
 
 DEPENDENCIES:
-  - DisplayCriteria (from `https://github.com/kingslay/KSPlayer.git`, branch `main`)
+  - DisplayCriteria (from `../KSPlayer`)
   - EASClient (from `../node_modules/expo-eas-client/ios`)
   - EXApplication (from `../node_modules/expo-application/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
@@ -2800,7 +2800,7 @@ DEPENDENCIES:
   - FFmpegKit (from `https://github.com/kingslay/FFmpegKit.git`, branch `main`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - ImageColors (from `../node_modules/react-native-image-colors/ios`)
-  - KSPlayer (from `https://github.com/kingslay/KSPlayer.git`, branch `main`)
+  - KSPlayer (from `../KSPlayer`)
   - Libass (from `https://github.com/kingslay/FFmpegKit.git`, branch `main`)
   - lottie-react-native (from `../node_modules/lottie-react-native`)
   - NitroMmkv (from `../node_modules/react-native-mmkv`)
@@ -2910,8 +2910,7 @@ SPEC REPOS:
 
 EXTERNAL SOURCES:
   DisplayCriteria:
-    :branch: main
-    :git: https://github.com/kingslay/KSPlayer.git
+    :path: "../KSPlayer"
   EASClient:
     :path: "../node_modules/expo-eas-client/ios"
   EXApplication:
@@ -2993,8 +2992,7 @@ EXTERNAL SOURCES:
   ImageColors:
     :path: "../node_modules/react-native-image-colors/ios"
   KSPlayer:
-    :branch: main
-    :git: https://github.com/kingslay/KSPlayer.git
+    :path: "../KSPlayer"
   Libass:
     :branch: main
     :git: https://github.com/kingslay/FFmpegKit.git
@@ -3174,15 +3172,9 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 CHECKOUT OPTIONS:
-  DisplayCriteria:
-    :commit: a7cddd878f557afa6a1f2faad9d756949406adde
-    :git: https://github.com/kingslay/KSPlayer.git
   FFmpegKit:
     :commit: d7048037a2eb94a3b08113fbf43aa92bdcb332d9
     :git: https://github.com/kingslay/FFmpegKit.git
-  KSPlayer:
-    :commit: a7cddd878f557afa6a1f2faad9d756949406adde
-    :git: https://github.com/kingslay/KSPlayer.git
   Libass:
     :commit: d7048037a2eb94a3b08113fbf43aa92bdcb332d9
     :git: https://github.com/kingslay/FFmpegKit.git
@@ -3332,6 +3324,6 @@ SPEC CHECKSUMS:
   SwiftUIIntrospect: fee9aa07293ee280373a591e1824e8ddc869ba5d
   Yoga: 051f086b5ccf465ff2ed38a2cf5a558ae01aaaa1
 
-PODFILE CHECKSUM: 7c74c9cd2c7f3df7ab68b4284d9f324282e54542
+PODFILE CHECKSUM: b884d1ff07ac4a43323bce2e2e1342592513858c
 
 COCOAPODS: 1.16.2

@@ -410,6 +410,7 @@
         "on": "On",
         "off": "Off",
         "outline_color": "Outline Color",
+        "outline": "Outline",
         "outline_width": "Outline Width",
         "letter_spacing": "Letter Spacing",
         "line_height": "Line Height",

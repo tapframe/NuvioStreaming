@@ -19,6 +19,7 @@ interface KSPlayerViewProps {
   subtitleFontSize?: number;
   subtitleTextColor?: string;
   subtitleBackgroundColor?: string;
+  subtitleOutlineEnabled?: boolean;
   resizeMode?: 'contain' | 'cover' | 'stretch';
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
@@ -60,6 +61,7 @@ export interface KSPlayerProps {
   subtitleFontSize?: number;
   subtitleTextColor?: string;
   subtitleBackgroundColor?: string;
+  subtitleOutlineEnabled?: boolean;
   resizeMode?: 'contain' | 'cover' | 'stretch';
   onLoad?: (data: any) => void;
   onProgress?: (data: any) => void;
@@ -210,6 +212,7 @@ const KSPlayer = forwardRef<KSPlayerRef, KSPlayerProps>((props, ref) => {
       subtitleFontSize={props.subtitleFontSize}
       subtitleTextColor={props.subtitleTextColor}
       subtitleBackgroundColor={props.subtitleBackgroundColor}
+      subtitleOutlineEnabled={props.subtitleOutlineEnabled}
       resizeMode={props.resizeMode}
       onLoad={(e: any) => props.onLoad?.(e?.nativeEvent ?? e)}
       onProgress={(e: any) => props.onProgress?.(e?.nativeEvent ?? e)}

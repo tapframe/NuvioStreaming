@@ -410,6 +410,7 @@
         "on": "Ein",
         "off": "Aus",
         "outline_color": "Umrandungsfarbe",
+        "outline": "Umrandung",
         "outline_width": "Umrandungsbreite",
         "letter_spacing": "Zeichenabstand",
         "line_height": "Zeilenhöhe",

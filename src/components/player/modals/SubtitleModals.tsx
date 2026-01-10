@@ -239,7 +239,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     <View style={{ height: previewHeight, justifyContent: 'flex-end' }}>
                       <View style={{ alignItems: subtitleAlign === 'center' ? 'center' : subtitleAlign === 'left' ? 'flex-start' : 'flex-end', marginBottom: Math.min(80, subtitleBottomOffset) }}>
                         <View style={{
-                          backgroundColor: subtitleBackground ? `rgba(0,0,0,${subtitleBgOpacity})` : 'transparent',
+                          // Built-in (KSPlayer internal) subtitles: force background off in UI preview.
+                          backgroundColor: isUsingInternalSubtitle ? 'transparent' : (subtitleBackground ? `rgba(0,0,0,${subtitleBgOpacity})` : 'transparent'),
                           borderRadius: 8,
                           paddingHorizontal: isCompact ? 10 : 12,
                           paddingVertical: isCompact ? 6 : 8,
@@ -331,19 +332,21 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     </View>
-                    {/* Show Background */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <MaterialIcons name="layers" size={16} color="rgba(255,255,255,0.7)" />
-                        <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>{t('player_ui.show_background')}</Text>
+                    {/* Background is only for CustomSubtitles (external/addon). Built-in subtitles force background OFF. */}
+                    {!isUsingInternalSubtitle && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <MaterialIcons name="layers" size={16} color="rgba(255,255,255,0.7)" />
+                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>{t('player_ui.show_background')}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={{ width: isCompact ? 48 : 54, height: isCompact ? 28 : 30, backgroundColor: subtitleBackground ? 'white' : 'rgba(255,255,255,0.25)', borderRadius: 15, justifyContent: 'center', alignItems: subtitleBackground ? 'flex-end' : 'flex-start', paddingHorizontal: 3 }}
+                          onPress={toggleSubtitleBackground}
+                        >
+                          <View style={{ width: 24, height: 24, backgroundColor: subtitleBackground ? 'black' : 'white', borderRadius: 12 }} />
+                        </TouchableOpacity>
                       </View>
-                      <TouchableOpacity
-                        style={{ width: isCompact ? 48 : 54, height: isCompact ? 28 : 30, backgroundColor: subtitleBackground ? 'white' : 'rgba(255,255,255,0.25)', borderRadius: 15, justifyContent: 'center', alignItems: subtitleBackground ? 'flex-end' : 'flex-start', paddingHorizontal: 3 }}
-                        onPress={toggleSubtitleBackground}
-                      >
-                        <View style={{ width: 24, height: 24, backgroundColor: subtitleBackground ? 'black' : 'white', borderRadius: 12 }} />
-                      </TouchableOpacity>
-                    </View>
+                    )}
                   </View>
 
                   {/* Advanced controls */}
@@ -392,21 +395,23 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     </View>
-                    {/* Background Opacity */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.background_opacity')}</Text>
-                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                        <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.max(0, +(subtitleBgOpacity - 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                          <MaterialIcons name="remove" color="#fff" size={18} />
-                        </TouchableOpacity>
-                        <View style={{ minWidth: 48, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
-                          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleBgOpacity.toFixed(1)}</Text>
+                    {/* Background Opacity (CustomSubtitles only) */}
+                    {!isUsingInternalSubtitle && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.background_opacity')}</Text>
+                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                          <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.max(0, +(subtitleBgOpacity - 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+                            <MaterialIcons name="remove" color="#fff" size={18} />
+                          </TouchableOpacity>
+                          <View style={{ minWidth: 48, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleBgOpacity.toFixed(1)}</Text>
+                          </View>
+                          <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.min(1, +(subtitleBgOpacity + 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+                            <MaterialIcons name="add" color="#fff" size={18} />
+                          </TouchableOpacity>
                         </View>
-                        <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.min(1, +(subtitleBgOpacity + 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                          <MaterialIcons name="add" color="#fff" size={18} />
-                        </TouchableOpacity>
                       </View>
-                    </View>
+                    )}
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.text_shadow')}</Text>
@@ -416,28 +421,43 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                       </View>
                     )}
                     {/* Outline controls (now supported for ExoPlayer internal via native patch) */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: 'white' }}>{t('player_ui.outline_color')}</Text>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        {['#000000', '#FFFFFF', '#00E5FF', '#FF5C5C'].map(c => (
-                          <TouchableOpacity key={c} onPress={() => setSubtitleOutlineColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 2, borderColor: subtitleOutlineColor === c ? '#fff' : 'rgba(255,255,255,0.3)' }} />
-                        ))}
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text style={{ color: 'white' }}>{t('player_ui.outline_width')}</Text>
-                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                        <TouchableOpacity onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                          <MaterialIcons name="remove" color="#fff" size={18} />
+                    {isUsingInternalSubtitle ? (
+                      // KSPlayer built-in subtitles: only expose an Outline on/off toggle (no width control).
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.outline')}</Text>
+                        <TouchableOpacity
+                          onPress={() => setSubtitleOutline(!subtitleOutline)}
+                          style={{ paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: subtitleOutline ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', alignItems: 'center' }}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '700' }}>{subtitleOutline ? t('player_ui.on') : t('player_ui.off')}</Text>
                         </TouchableOpacity>
-                        <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
-                          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleOutlineWidth}</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={{ color: 'white' }}>{t('player_ui.outline_color')}</Text>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {['#000000', '#FFFFFF', '#00E5FF', '#FF5C5C'].map(c => (
+                              <TouchableOpacity key={c} onPress={() => setSubtitleOutlineColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 2, borderColor: subtitleOutlineColor === c ? '#fff' : 'rgba(255,255,255,0.3)' }} />
+                            ))}
+                          </View>
                         </View>
-                        <TouchableOpacity onPress={() => setSubtitleOutlineWidth(subtitleOutlineWidth + 1)} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                          <MaterialIcons name="add" color="#fff" size={18} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Text style={{ color: 'white' }}>{t('player_ui.outline_width')}</Text>
+                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                            <TouchableOpacity onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+                              <MaterialIcons name="remove" color="#fff" size={18} />
+                            </TouchableOpacity>
+                            <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                              <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleOutlineWidth}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setSubtitleOutlineWidth(subtitleOutlineWidth + 1)} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+                              <MaterialIcons name="add" color="#fff" size={18} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </>
+                    )}
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: isCompact ? 'column' : 'row', justifyContent: 'space-between', gap: 12 }}>
                         <View style={{ flex: 1 }}>
