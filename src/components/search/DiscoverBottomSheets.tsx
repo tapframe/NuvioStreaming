@@ -1,10 +1,11 @@
-import React, { useMemo, useCallback, forwardRef, RefObject } from 'react';
+import React, { useMemo, useCallback, forwardRef, RefObject, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { DiscoverCatalog } from './searchUtils';
 import { searchStyles as styles } from './searchStyles';
+import { useBottomSheetBackHandler } from '../../hooks/useBottomSheetBackHandler';
 
 interface DiscoverBottomSheetsProps {
     typeSheetRef: RefObject<BottomSheetModal>;
@@ -40,6 +41,8 @@ export const DiscoverBottomSheets = ({
     const typeSnapPoints = useMemo(() => ['25%'], []);
     const catalogSnapPoints = useMemo(() => ['50%'], []);
     const genreSnapPoints = useMemo(() => ['50%'], []);
+    const [activeBottomSheetRef, setActiveBottomSheetRef] = useState(null);
+    const {onDismiss, onChange} = useBottomSheetBackHandler();
 
     const renderBackdrop = useCallback(
         (props: any) => (
@@ -71,6 +74,8 @@ export const DiscoverBottomSheets = ({
                 handleIndicatorStyle={{
                     backgroundColor: currentTheme.colors.mediumGray,
                 }}
+                onDismiss={onDismiss(catalogSheetRef)}
+                onChange={onChange(catalogSheetRef)}
             >
                 <View style={[styles.bottomSheetHeader, { backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }]}>
                     <Text style={[styles.bottomSheetTitle, { color: currentTheme.colors.white }]}>
@@ -130,6 +135,8 @@ export const DiscoverBottomSheets = ({
                 handleIndicatorStyle={{
                     backgroundColor: currentTheme.colors.mediumGray,
                 }}
+                onDismiss={onDismiss(genreSheetRef)}
+                onChange={onChange(genreSheetRef)}
             >
                 <View style={[styles.bottomSheetHeader, { backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }]}>
                     <Text style={[styles.bottomSheetTitle, { color: currentTheme.colors.white }]}>
@@ -203,6 +210,8 @@ export const DiscoverBottomSheets = ({
                 handleIndicatorStyle={{
                     backgroundColor: currentTheme.colors.mediumGray,
                 }}
+                onDismiss={onDismiss(typeSheetRef)}
+                onChange={onChange(typeSheetRef)}
             >
                 <View style={[styles.bottomSheetHeader, { backgroundColor: currentTheme.colors.darkGray || '#0A0C0C' }]}>
                     <Text style={[styles.bottomSheetTitle, { color: currentTheme.colors.white }]}>
