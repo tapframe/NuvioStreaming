@@ -8,6 +8,9 @@ import android.view.Surface
 import android.view.TextureView
 import dev.jdtech.mpv.MPVLib
 
+import com.facebook.react.bridge.LifecycleEventListener
+import com.facebook.react.bridge.ReactContext
+
 class MPVView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -40,9 +43,27 @@ class MPVView @JvmOverloads constructor(
     var onErrorCallback: ((message: String) -> Unit)? = null
     var onTracksChangedCallback: ((audioTracks: List<Map<String, Any>>, subtitleTracks: List<Map<String, Any>>) -> Unit)? = null
 
+    private var resumeOnForeground = false
+    private val lifeCycleListener = object : LifecycleEventListener {
+        override fun onHostPause() {
+                resumeOnForeground = !isPaused;
+                if(resumeOnForeground) {
+                Log.d(TAG, "App backgrounded — pausing MPV")
+                setPaused(true)
+                }
+            }
+            override fun onHostResume() {
+                if(resumeOnForeground) {
+                    setPaused(false)
+                    resumeOnForeground = false
+                }
+            }
+            override fun onHostDestroy() {}
+    }
     init {
         surfaceTextureListener = this
         isOpaque = false
+        (context as? ReactContext)?.addLifecycleEventListener(lifeCycleListener)
     }
 
     override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
@@ -80,6 +101,7 @@ class MPVView @JvmOverloads constructor(
 
     override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
         Log.d(TAG, "Surface texture destroyed")
+        (context as? ReactContext)?.removeLifecycleEventListener(lifeCycleListener)
         if (isMpvInitialized) {
             MPVLib.removeObserver(this)
             MPVLib.detachSurface()
