@@ -77,8 +77,6 @@ interface VideoSurfaceProps {
     subtitleBorderColor?: string;
     subtitleShadowEnabled?: boolean;
     subtitlePosition?: number;
-    // Raw bottom offset from UI (pixels). ExoPlayer positioning works best when driven directly from px.
-    subtitleBottomOffsetPx?: number;
     subtitleDelay?: number;
     subtitleAlignment?: 'left' | 'center' | 'right';
 }
@@ -130,7 +128,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     subtitleBorderColor,
     subtitleShadowEnabled,
     subtitlePosition,
-    subtitleBottomOffsetPx,
     subtitleDelay,
     subtitleAlignment,
 }) => {
@@ -333,11 +330,9 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                         // Convert MPV-scaled size back to ExoPlayer scale (~1.5x conversion was applied)
                         fontSize: subtitleSize ? Math.round(subtitleSize / 1.5) : 18,
                         paddingTop: 0,
-                        // Drive ExoPlayer subtitle placement directly via px offset.
-                        // Native will convert this into bottomPaddingFraction after layout.
-                        paddingBottom: typeof subtitleBottomOffsetPx === 'number'
-                            ? Math.max(0, Math.round(subtitleBottomOffsetPx))
-                            : 0,
+                        // Convert MPV position (0=top, 100=bottom) to paddingBottom
+                        // Higher MPV position = less padding from bottom
+                        paddingBottom: subtitlePosition ? Math.max(20, Math.round((100 - subtitlePosition) * 2)) : 60,
                         paddingLeft: 16,
                         paddingRight: 16,
                         // Opacity controls entire subtitle view visibility

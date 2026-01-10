@@ -427,30 +427,17 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ color: 'white' }}>{t('player_ui.outline_width')}</Text>
                       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                        <TouchableOpacity
-                          disabled={isExoPlayerInternal}
-                          onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))}
-                          style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', opacity: isExoPlayerInternal ? 0.4 : 1 }}
-                        >
+                        <TouchableOpacity onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                           <MaterialIcons name="remove" color="#fff" size={18} />
                         </TouchableOpacity>
                         <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
                           <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleOutlineWidth}</Text>
                         </View>
-                        <TouchableOpacity
-                          disabled={isExoPlayerInternal}
-                          onPress={() => setSubtitleOutlineWidth(subtitleOutlineWidth + 1)}
-                          style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', opacity: isExoPlayerInternal ? 0.4 : 1 }}
-                        >
+                        <TouchableOpacity onPress={() => setSubtitleOutlineWidth(subtitleOutlineWidth + 1)} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
                           <MaterialIcons name="add" color="#fff" size={18} />
                         </TouchableOpacity>
                       </View>
                     </View>
-                    {isExoPlayerInternal && (
-                      <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 6 }}>
-                        Outline thickness isn’t supported on Android ExoPlayer subtitles. Use outline on/off + color.
-                      </Text>
-                    )}
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: isCompact ? 'column' : 'row', justifyContent: 'space-between', gap: 12 }}>
                         <View style={{ flex: 1 }}>
