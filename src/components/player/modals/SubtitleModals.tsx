@@ -110,7 +110,7 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   const isCompact = width < 360 || height < 640;
   // Internal subtitle is active when a built-in track is selected AND not using custom/addon subtitles
   const isUsingInternalSubtitle = selectedTextTrack >= 0 && !useCustomSubtitles;
-  // ExoPlayer has limited styling support - hide unsupported options when using ExoPlayer with internal subs
+  // ExoPlayer internal subtitles have limited styling support
   const isExoPlayerInternal = useExoPlayer && isUsingInternalSubtitle;
   const sectionPad = isCompact ? 12 : 16;
   const chipPadH = isCompact ? 8 : 12;
@@ -122,7 +122,9 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
   const menuMaxHeight = height * 0.95;
 
   React.useEffect(() => {
-    if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) fetchAvailableSubtitles();
+    if (showSubtitleModal && !isLoadingSubtitleList && availableSubtitles.length === 0) {
+      fetchAvailableSubtitles();
+    }
   }, [showSubtitleModal]);
 
   const handleClose = () => setShowSubtitleModal(false);
@@ -259,8 +261,8 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                     </View>
                   </View>
 
-                  {/* Quick Presets - Hidden for ExoPlayer internal subtitles */}
-                  {!isExoPlayerInternal && (
+                  {/* Quick Presets - only for CustomSubtitles overlay */}
+                  {!isUsingInternalSubtitle && (
                     <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
                         <MaterialIcons name="star" size={16} color="rgba(255,255,255,0.7)" />
@@ -329,45 +331,42 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     </View>
-                    {/* Show Background - Not supported on ExoPlayer internal subtitles */}
-                    {!isExoPlayerInternal && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <MaterialIcons name="layers" size={16} color="rgba(255,255,255,0.7)" />
-                          <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>{t('player_ui.show_background')}</Text>
-                        </View>
-                        <TouchableOpacity
-                          style={{ width: isCompact ? 48 : 54, height: isCompact ? 28 : 30, backgroundColor: subtitleBackground ? 'white' : 'rgba(255,255,255,0.25)', borderRadius: 15, justifyContent: 'center', alignItems: subtitleBackground ? 'flex-end' : 'flex-start', paddingHorizontal: 3 }}
-                          onPress={toggleSubtitleBackground}
-                        >
-                          <View style={{ width: 24, height: 24, backgroundColor: subtitleBackground ? 'black' : 'white', borderRadius: 12 }} />
-                        </TouchableOpacity>
+                    {/* Show Background */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <MaterialIcons name="layers" size={16} color="rgba(255,255,255,0.7)" />
+                        <Text style={{ color: '#fff', fontWeight: '600', marginLeft: 8 }}>{t('player_ui.show_background')}</Text>
                       </View>
-                    )}
+                      <TouchableOpacity
+                        style={{ width: isCompact ? 48 : 54, height: isCompact ? 28 : 30, backgroundColor: subtitleBackground ? 'white' : 'rgba(255,255,255,0.25)', borderRadius: 15, justifyContent: 'center', alignItems: subtitleBackground ? 'flex-end' : 'flex-start', paddingHorizontal: 3 }}
+                        onPress={toggleSubtitleBackground}
+                      >
+                        <View style={{ width: 24, height: 24, backgroundColor: subtitleBackground ? 'black' : 'white', borderRadius: 12 }} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
-                  {/* Advanced controls - Limited for ExoPlayer */}
+                  {/* Advanced controls */}
                   <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: sectionPad, gap: isCompact ? 10 : 14 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <MaterialIcons name="build" size={16} color="rgba(255,255,255,0.7)" />
-                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{isExoPlayerInternal ? t('player_ui.position') : t('player_ui.advanced')}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, marginLeft: 6, fontWeight: '600' }}>{isUsingInternalSubtitle ? t('player_ui.position') : t('player_ui.advanced')}</Text>
                     </View>
-                    {/* Text Color - Not supported on ExoPlayer internal subtitles */}
-                    {!isExoPlayerInternal && (
-                      <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                          <MaterialIcons name="palette" size={16} color="rgba(255,255,255,0.7)" />
-                          <Text style={{ color: 'white', marginLeft: 8, fontWeight: '600' }}>{t('player_ui.text_color')}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
-                          {['#FFFFFF', '#FFD700', '#00E5FF', '#FF5C5C', '#00FF88', '#9b59b6', '#f97316'].map(c => (
-                            <TouchableOpacity key={c} onPress={() => setSubtitleTextColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 2, borderColor: subtitleTextColor === c ? '#fff' : 'rgba(255,255,255,0.3)' }} />
-                          ))}
-                        </View>
+                    {/* Text Color - supported for MPV built-in, and for CustomSubtitles */}
+                    <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <MaterialIcons name="palette" size={16} color="rgba(255,255,255,0.7)" />
+                        <Text style={{ color: 'white', marginLeft: 8, fontWeight: '600' }}>{t('player_ui.text_color')}</Text>
                       </View>
-                    )}
-                    {/* Align - Not supported on ExoPlayer internal subtitles */}
-                    {!isExoPlayerInternal && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' }}>
+                        {['#FFFFFF', '#FFD700', '#00E5FF', '#FF5C5C', '#00FF88', '#9b59b6', '#f97316'].map(c => (
+                          <TouchableOpacity key={c} onPress={() => setSubtitleTextColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 2, borderColor: subtitleTextColor === c ? '#fff' : 'rgba(255,255,255,0.3)' }} />
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Align - only supported for CustomSubtitles overlay */}
+                    {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.align')}</Text>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -393,23 +392,21 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     </View>
-                    {/* Background Opacity - Not supported on ExoPlayer internal subtitles */}
-                    {!isExoPlayerInternal && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.background_opacity')}</Text>
-                        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                          <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.max(0, +(subtitleBgOpacity - 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                            <MaterialIcons name="remove" color="#fff" size={18} />
-                          </TouchableOpacity>
-                          <View style={{ minWidth: 48, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
-                            <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleBgOpacity.toFixed(1)}</Text>
-                          </View>
-                          <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.min(1, +(subtitleBgOpacity + 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                            <MaterialIcons name="add" color="#fff" size={18} />
-                          </TouchableOpacity>
+                    {/* Background Opacity */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.background_opacity')}</Text>
+                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                        <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.max(0, +(subtitleBgOpacity - 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+                          <MaterialIcons name="remove" color="#fff" size={18} />
+                        </TouchableOpacity>
+                        <View style={{ minWidth: 48, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleBgOpacity.toFixed(1)}</Text>
                         </View>
+                        <TouchableOpacity onPress={() => setSubtitleBgOpacity(Math.min(1, +(subtitleBgOpacity + 0.1).toFixed(1)))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+                          <MaterialIcons name="add" color="#fff" size={18} />
+                        </TouchableOpacity>
                       </View>
-                    )}
+                    </View>
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={{ color: 'white', fontWeight: '600' }}>{t('player_ui.text_shadow')}</Text>
@@ -418,31 +415,41 @@ export const SubtitleModals: React.FC<SubtitleModalsProps> = ({
                         </TouchableOpacity>
                       </View>
                     )}
-                    {!isUsingInternalSubtitle && (
-                      <>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ color: 'white' }}>{t('player_ui.outline_color')}</Text>
-                          <View style={{ flexDirection: 'row', gap: 8 }}>
-                            {['#000000', '#FFFFFF', '#00E5FF', '#FF5C5C'].map(c => (
-                              <TouchableOpacity key={c} onPress={() => setSubtitleOutlineColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 2, borderColor: subtitleOutlineColor === c ? '#fff' : 'rgba(255,255,255,0.3)' }} />
-                            ))}
-                          </View>
+                    {/* Outline controls (now supported for ExoPlayer internal via native patch) */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ color: 'white' }}>{t('player_ui.outline_color')}</Text>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        {['#000000', '#FFFFFF', '#00E5FF', '#FF5C5C'].map(c => (
+                          <TouchableOpacity key={c} onPress={() => setSubtitleOutlineColor(c)} style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: c, borderWidth: 2, borderColor: subtitleOutlineColor === c ? '#fff' : 'rgba(255,255,255,0.3)' }} />
+                        ))}
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ color: 'white' }}>{t('player_ui.outline_width')}</Text>
+                      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                        <TouchableOpacity
+                          disabled={isExoPlayerInternal}
+                          onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))}
+                          style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', opacity: isExoPlayerInternal ? 0.4 : 1 }}
+                        >
+                          <MaterialIcons name="remove" color="#fff" size={18} />
+                        </TouchableOpacity>
+                        <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
+                          <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleOutlineWidth}</Text>
                         </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Text style={{ color: 'white' }}>{t('player_ui.outline_width')}</Text>
-                          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                            <TouchableOpacity onPress={() => setSubtitleOutlineWidth(Math.max(0, subtitleOutlineWidth - 1))} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                              <MaterialIcons name="remove" color="#fff" size={18} />
-                            </TouchableOpacity>
-                            <View style={{ minWidth: 42, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' }}>
-                              <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>{subtitleOutlineWidth}</Text>
-                            </View>
-                            <TouchableOpacity onPress={() => setSubtitleOutlineWidth(subtitleOutlineWidth + 1)} style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' }}>
-                              <MaterialIcons name="add" color="#fff" size={18} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </>
+                        <TouchableOpacity
+                          disabled={isExoPlayerInternal}
+                          onPress={() => setSubtitleOutlineWidth(subtitleOutlineWidth + 1)}
+                          style={{ width: controlBtn.size, height: controlBtn.size, borderRadius: controlBtn.radius, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', opacity: isExoPlayerInternal ? 0.4 : 1 }}
+                        >
+                          <MaterialIcons name="add" color="#fff" size={18} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    {isExoPlayerInternal && (
+                      <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 6 }}>
+                        Outline thickness isn’t supported on Android ExoPlayer subtitles. Use outline on/off + color.
+                      </Text>
                     )}
                     {!isUsingInternalSubtitle && (
                       <View style={{ flexDirection: isCompact ? 'column' : 'row', justifyContent: 'space-between', gap: 12 }}>

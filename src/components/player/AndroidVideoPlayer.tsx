@@ -339,7 +339,8 @@ const AndroidVideoPlayer: React.FC = () => {
 
     if (data.audioTracks) {
       const formatted = data.audioTracks.map((t: any, i: number) => ({
-        id: t.index !== undefined ? t.index : i,
+        // react-native-video selectedAudioTrack {type:'index'} uses 0-based list index.
+        id: i,
         name: t.title || t.name || `Track ${i + 1}`,
         language: t.language
       }));
@@ -347,7 +348,9 @@ const AndroidVideoPlayer: React.FC = () => {
     }
     if (data.textTracks) {
       const formatted = data.textTracks.map((t: any, i: number) => ({
-        id: t.index !== undefined ? t.index : i,
+        // react-native-video selectedTextTrack {type:'index'} uses 0-based list index.
+        // Using `t.index` can be non-unique/misaligned and breaks selection/rendering.
+        id: i,
         name: t.title || t.name || `Track ${i + 1}`,
         language: t.language
       }));
@@ -360,7 +363,7 @@ const AndroidVideoPlayer: React.FC = () => {
     // Auto-select audio track based on preferences
     if (data.audioTracks && data.audioTracks.length > 0 && settings?.preferredAudioLanguage) {
       const formatted = data.audioTracks.map((t: any, i: number) => ({
-        id: t.index !== undefined ? t.index : i,
+        id: i,
         name: t.title || t.name || `Track ${i + 1}`,
         language: t.language
       }));
@@ -380,7 +383,7 @@ const AndroidVideoPlayer: React.FC = () => {
       // Only pre-select internal if preference is internal or any
       if (sourcePreference === 'internal' || sourcePreference === 'any') {
         const formatted = data.textTracks.map((t: any, i: number) => ({
-          id: t.index !== undefined ? t.index : i,
+          id: i,
           name: t.title || t.name || `Track ${i + 1}`,
           language: t.language
         }));
@@ -479,11 +482,11 @@ const AndroidVideoPlayer: React.FC = () => {
   useEffect(() => {
     if (!useCustomSubtitles || customSubtitles.length === 0) return;
 
-    const cueNow = customSubtitles.find(
-      cue => playerState.currentTime >= cue.start && playerState.currentTime <= cue.end
-    );
+    // Apply timing offset for custom/addon subtitles (ExoPlayer internal subtitles do not support offset)
+    const adjustedTime = playerState.currentTime + (subtitleOffsetSec || 0);
+    const cueNow = customSubtitles.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end);
     setCurrentSubtitle(cueNow ? cueNow.text : '');
-  }, [playerState.currentTime, useCustomSubtitles, customSubtitles]);
+  }, [playerState.currentTime, subtitleOffsetSec, useCustomSubtitles, customSubtitles]);
 
   const toggleControls = useCallback(() => {
     playerState.setShowControls(prev => {
@@ -678,8 +681,8 @@ const AndroidVideoPlayer: React.FC = () => {
         mpvPlayerRef.current.setSubtitleTrack(-1);
       }
 
-      // Set initial subtitle based on current time
-      const adjustedTime = playerState.currentTime;
+      // Set initial subtitle based on current time (+ any timing offset)
+      const adjustedTime = playerState.currentTime + (subtitleOffsetSec || 0);
       const cueNow = parsedCues.find(cue => adjustedTime >= cue.start && adjustedTime <= cue.end);
       setCurrentSubtitle(cueNow ? cueNow.text : '');
 
@@ -691,7 +694,7 @@ const AndroidVideoPlayer: React.FC = () => {
     } finally {
       setIsLoadingSubtitles(false);
     }
-  }, [modals, playerState.currentTime, tracksHook]);
+  }, [modals, playerState.currentTime, subtitleOffsetSec, tracksHook]);
 
   const disableCustomSubtitles = useCallback(() => {
     setUseCustomSubtitles(false);
@@ -817,6 +820,7 @@ const AndroidVideoPlayer: React.FC = () => {
             subtitleBorderColor={subtitleOutlineColor}
             subtitleShadowEnabled={subtitleTextShadow}
             subtitlePosition={Math.max(50, 100 - Math.floor(subtitleBottomOffset * 0.3))} // Scale offset to MPV range
+            subtitleBottomOffsetPx={subtitleBottomOffset}
             subtitleDelay={subtitleOffsetSec}
             subtitleAlignment={subtitleAlign}
           />

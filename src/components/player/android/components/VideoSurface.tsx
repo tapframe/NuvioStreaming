@@ -77,6 +77,8 @@ interface VideoSurfaceProps {
     subtitleBorderColor?: string;
     subtitleShadowEnabled?: boolean;
     subtitlePosition?: number;
+    // Raw bottom offset from UI (pixels). ExoPlayer positioning works best when driven directly from px.
+    subtitleBottomOffsetPx?: number;
     subtitleDelay?: number;
     subtitleAlignment?: 'left' | 'center' | 'right';
 }
@@ -128,6 +130,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     subtitleBorderColor,
     subtitleShadowEnabled,
     subtitlePosition,
+    subtitleBottomOffsetPx,
     subtitleDelay,
     subtitleAlignment,
 }) => {
@@ -173,15 +176,19 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
         console.log('[VideoSurface] ExoPlayer textTracks raw:', JSON.stringify(data.textTracks, null, 2));
 
         // Extract track information
+        // IMPORTANT:
+        // react-native-video expects selected*Track with { type: 'index', value: <0-based array index> }.
+        // Some RNVideo/Exo track objects expose `index`, but it is not guaranteed to be unique or
+        // aligned with the list index. Using it can cause only the first item to render/select.
         const audioTracks = data.audioTracks?.map((t: any, i: number) => ({
-            id: t.index ?? i,
+            id: i,
             name: t.title || t.language || `Track ${i + 1}`,
             language: t.language,
         })) ?? [];
 
         const subtitleTracks = data.textTracks?.map((t: any, i: number) => {
             const track = {
-                id: t.index ?? i,
+                id: i,
                 name: t.title || t.language || `Track ${i + 1}`,
                 language: t.language,
             };
@@ -281,6 +288,11 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
         }
     };
 
+    const alphaHex = (opacity01: number) => {
+        const a = Math.max(0, Math.min(1, opacity01));
+        return Math.round(a * 255).toString(16).padStart(2, '0').toUpperCase();
+    };
+
     return (
         <View style={[styles.videoContainer, {
             width: screenDimensions.width,
@@ -314,21 +326,40 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     automaticallyWaitsToMinimizeStalling={true}
                     useTextureView={true}
                     // Subtitle Styling for ExoPlayer
-                    // ExoPlayer supports: fontSize, paddingTop/Bottom/Left/Right, opacity, subtitlesFollowVideo
+                    // ExoPlayer (via our patched react-native-video) supports:
+                    // - fontSize, paddingTop/Bottom/Left/Right, opacity, subtitlesFollowVideo
+                    // - PLUS: textColor, backgroundColor, edgeType, edgeColor (outline/shadow)
                     subtitleStyle={{
                         // Convert MPV-scaled size back to ExoPlayer scale (~1.5x conversion was applied)
                         fontSize: subtitleSize ? Math.round(subtitleSize / 1.5) : 18,
                         paddingTop: 0,
-                        // Convert MPV position (0=top, 100=bottom) to paddingBottom
-                        // Higher MPV position = less padding from bottom
-                        paddingBottom: subtitlePosition ? Math.max(20, Math.round((100 - subtitlePosition) * 2)) : 60,
+                        // Drive ExoPlayer subtitle placement directly via px offset.
+                        // Native will convert this into bottomPaddingFraction after layout.
+                        paddingBottom: typeof subtitleBottomOffsetPx === 'number'
+                            ? Math.max(0, Math.round(subtitleBottomOffsetPx))
+                            : 0,
                         paddingLeft: 16,
                         paddingRight: 16,
                         // Opacity controls entire subtitle view visibility
                         // Always keep text visible (opacity 1), background control is limited in ExoPlayer
                         opacity: 1,
                         subtitlesFollowVideo: false,
-                    }}
+                        // Extended styling (requires our patched RNVideo on Android)
+                        textColor: subtitleColor || '#FFFFFFFF',
+                        // Android Color.parseColor doesn't accept rgba(...). Use #AARRGGBB.
+                        backgroundColor:
+                            subtitleBackgroundOpacity && subtitleBackgroundOpacity > 0
+                                ? `#${alphaHex(subtitleBackgroundOpacity)}000000`
+                                : '#00000000',
+                        edgeType:
+                            subtitleBorderSize && subtitleBorderSize > 0
+                                ? 'outline'
+                                : (subtitleShadowEnabled ? 'shadow' : 'none'),
+                        edgeColor:
+                            (subtitleBorderSize && subtitleBorderSize > 0 && subtitleBorderColor)
+                                ? subtitleBorderColor
+                                : (subtitleShadowEnabled ? '#FF000000' : 'transparent'),
+                    } as any}
                 />
             ) : (
                 /* MPV Player fallback */
