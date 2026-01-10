@@ -53,7 +53,7 @@ interface PlayerControlsProps {
   useExoPlayer?: boolean;
 }
 
-export const PlayerControls: React.FC<PlayerControlsProps> = ({
+const PlayerControlsInner: React.FC<PlayerControlsProps> = ({
   showControls,
   fadeAnim,
   paused,
@@ -624,5 +624,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     </Animated.View>
   );
 };
+
+// Key optimization:
+// When controls are hidden, we don't need to re-render this tree on every progress tick.
+// This removes a large chunk of unnecessary work (and heat) during playback.
+export const PlayerControls = React.memo(
+  PlayerControlsInner,
+  (prev, next) => {
+    if (!prev.showControls && !next.showControls) return true;
+    return false; // when visible, allow normal updates
+  }
+);
 
 export default PlayerControls;

@@ -19,7 +19,7 @@ export const useWatchProgress = (
     const [savedDuration, setSavedDuration] = useState<number | null>(null);
     const [initialPosition, setInitialPosition] = useState<number | null>(null);
     const [showResumeOverlay, setShowResumeOverlay] = useState(false);
-    const [progressSaveInterval, setProgressSaveInterval] = useState<NodeJS.Timeout | null>(null);
+    const progressSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     const { settings: appSettings } = useSettings();
     const initialSeekTargetRef = useRef<number | null>(null);
@@ -119,7 +119,7 @@ export const useWatchProgress = (
             };
             try {
                 await storageService.setWatchProgress(id, type, progress, episodeId);
-                await traktAutosync.handleProgressUpdate(currentTimeRef.current, durationRef.current);
+                await traktAutosyncRef.current.handleProgressUpdate(currentTimeRef.current, durationRef.current);
             } catch (error) {
                 logger.error('[useWatchProgress] Error saving watch progress:', error);
             }
@@ -128,20 +128,26 @@ export const useWatchProgress = (
 
     // Save Interval
     useEffect(() => {
-        if (id && type && !paused && duration > 0) {
-            if (progressSaveInterval) clearInterval(progressSaveInterval);
+        // Important: do NOT depend on currentTime here; we use refs for currentTime/duration.
+        // Otherwise we recreate the interval on every progress tick, causing heavy re-renders.
+        if (progressSaveIntervalRef.current) {
+            clearInterval(progressSaveIntervalRef.current);
+            progressSaveIntervalRef.current = null;
+        }
 
-            const interval = setInterval(() => {
+        if (id && type && !paused && duration > 0) {
+            progressSaveIntervalRef.current = setInterval(() => {
                 saveWatchProgress();
             }, 10000);
-
-            setProgressSaveInterval(interval);
-            return () => {
-                clearInterval(interval);
-                setProgressSaveInterval(null);
-            };
         }
-    }, [id, type, paused, currentTime, duration]);
+
+        return () => {
+            if (progressSaveIntervalRef.current) {
+                clearInterval(progressSaveIntervalRef.current);
+                progressSaveIntervalRef.current = null;
+            }
+        };
+    }, [id, type, paused, duration, episodeId, addonId]);
 
     // Unmount Save - deferred to allow navigation to complete first
     useEffect(() => {
@@ -151,7 +157,7 @@ export const useWatchProgress = (
             setTimeout(() => {
                 if (id && type && durationRef.current > 0) {
                     saveWatchProgress();
-                    traktAutosync.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'unmount');
+                    traktAutosyncRef.current.handlePlaybackEnd(currentTimeRef.current, durationRef.current, 'unmount');
                 }
             }, 0);
         };

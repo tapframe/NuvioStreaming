@@ -643,6 +643,46 @@ const KSPlayerCore: React.FC = () => {
     controls.seekToTime(value);
   };
 
+  // Progress update throttling:
+  // - Always keep a ref updated (cheap, no re-render)
+  // - Only push to React state at a lower frequency (prevents full-tree re-render storms)
+  const currentTimeRef = useRef<number>(currentTime);
+  const bufferedRef = useRef<number>(buffered);
+  const lastUiProgressUpdateAtRef = useRef<number>(0);
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+  useEffect(() => {
+    bufferedRef.current = buffered;
+  }, [buffered]);
+
+  const handleProgress = useCallback((d: any) => {
+    const t = d?.currentTime ?? 0;
+    const newBuffered = d?.buffered ?? 0;
+
+    currentTimeRef.current = t;
+    lastPlaybackTimeRef.current = t || 0;
+
+    // Keep buffered updates coarse to avoid churn
+    if (Math.abs(newBuffered - bufferedRef.current) > 1) {
+      bufferedRef.current = newBuffered;
+      setBuffered(newBuffered);
+    }
+
+    // Don't fight the slider while the user is dragging it
+    if (isSliderDragging) return;
+
+    const now = Date.now();
+    const needsTightUi =
+      showControls || paused || customSubs.useCustomSubtitles;
+    const minIntervalMs = needsTightUi ? 250 : 1000;
+
+    if (now - lastUiProgressUpdateAtRef.current < minIntervalMs) return;
+    lastUiProgressUpdateAtRef.current = now;
+
+    setCurrentTime(t);
+  }, [isSliderDragging, paused, showControls, customSubs.useCustomSubtitles, setBuffered, setCurrentTime]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
       <StatusBar hidden={true} />
@@ -695,17 +735,7 @@ const KSPlayerCore: React.FC = () => {
               hasAviOSFailed.current = false;
             }
           }}
-          onProgress={(d) => {
-            if (!isSliderDragging) {
-              setCurrentTime(d.currentTime);
-            }
-            lastPlaybackTimeRef.current = d.currentTime || 0;
-            // Only update buffered if it changed by more than 0.5s to reduce re-renders
-            const newBuffered = d.buffered || 0;
-            if (Math.abs(newBuffered - buffered) > 0.5) {
-              setBuffered(newBuffered);
-            }
-          }}
+          onProgress={handleProgress}
           onEnd={async () => {
             setCurrentTime(duration);
             await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');
@@ -749,16 +779,7 @@ const KSPlayerCore: React.FC = () => {
                 : ({ type: 'disabled' } as SelectedTrack))
           }
           onLoad={onLoad}
-          onProgress={(d) => {
-            if (!isSliderDragging) {
-              setCurrentTime(d.currentTime);
-            }
-            lastPlaybackTimeRef.current = d.currentTime || 0;
-            const newBuffered = d.buffered || 0;
-            if (Math.abs(newBuffered - buffered) > 0.5) {
-              setBuffered(newBuffered);
-            }
-          }}
+          onProgress={handleProgress}
           onEnd={async () => {
             setCurrentTime(duration);
             await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');

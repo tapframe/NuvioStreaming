@@ -113,7 +113,9 @@ export const AVPlayerSurface: React.FC<AVPlayerSurfaceProps> = ({
           onEnd={onEnd}
           onError={onError}
           onBuffer={(b: any) => onBuffer(!!b?.isBuffering)}
-          progressUpdateInterval={250}
+          // 250ms progress updates can cause excessive JS work and device heating.
+          // We throttle UI updates in JS anyway; a slightly higher interval reduces event pressure.
+          progressUpdateInterval={500}
           // Keep background behavior consistent with the rest of the player logic
           playInBackground={false}
           playWhenInactive={true}

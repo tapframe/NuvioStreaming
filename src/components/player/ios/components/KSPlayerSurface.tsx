@@ -97,10 +97,7 @@ export const KSPlayerSurface: React.FC<KSPlayerSurfaceProps> = ({
         }
     };
 
-    // Debug: log textTrack prop changes
-    React.useEffect(() => {
-        console.log('[KSPlayerSurface] textTrack prop changed to:', textTrack);
-    }, [textTrack]);
+    // Note: avoid debug logging here; this component receives frequent updates during playback.
 
     // Handle buffering - MPVPlayerComponent exposes buffering only via events we wire up
     const handleBuffering = (data: any) => {
