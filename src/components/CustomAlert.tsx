@@ -27,6 +27,7 @@ interface CustomAlertProps {
     onPress: () => void;
     style?: object;
   }>;
+  inline?: boolean;
 }
 
 export const CustomAlert = ({
@@ -37,6 +38,7 @@ export const CustomAlert = ({
   actions = [
     { label: 'OK', onPress: onClose }
   ],
+  ...props
 }: CustomAlertProps) => {
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.95);
@@ -77,6 +79,84 @@ export const CustomAlert = ({
     }
   }, [onClose]);
 
+  const content = (
+    <Animated.View
+      style={[
+        styles.overlay,
+        { backgroundColor: 'rgba(0, 0, 0, 0.85)' },
+        overlayStyle
+      ]}
+    >
+      <Pressable style={styles.overlayPressable} onPress={onClose} />
+      <View style={styles.centered}>
+        <Animated.View style={[
+          styles.alertContainer,
+          alertStyle,
+        ]}>
+          {/* Title */}
+          <Text style={styles.title}>
+            {title}
+          </Text>
+
+          {/* Message */}
+          <Text style={styles.message}>
+            {message}
+          </Text>
+
+          {/* Actions */}
+          <View style={[
+            styles.actionsRow,
+            actions.length === 1 && { justifyContent: 'center' }
+          ]}>
+            {actions.map((action, idx) => {
+              const isPrimary = idx === actions.length - 1;
+              return (
+                <TouchableOpacity
+                  key={action.label}
+                  style={[
+                    styles.actionButton,
+                    isPrimary
+                      ? { backgroundColor: themeColors.primary }
+                      : styles.secondaryButton,
+                    action.style,
+                    actions.length === 1 && { minWidth: 120, maxWidth: '100%' }
+                  ]}
+                  onPress={() => handleActionPress(action)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.actionText,
+                    isPrimary
+                      ? { color: '#FFFFFF' }
+                      : { color: '#FFFFFF' }
+                  ]}>
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Animated.View>
+      </View>
+    </Animated.View>
+  );
+
+  if (!visible && !props.inline) return null;
+  if (!visible && props.inline) {
+    // For inline, we might still want to return null if not visible, 
+    // but Animated might handle opacity. 
+    // However, to be safe and save resources:
+    return null;
+  }
+
+  if (props.inline) {
+    return (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 99999 }]}>
+        {content}
+      </View>
+    );
+  }
+
   // Use Portal with Modal for proper rendering and animations
   return (
     <Portal>
@@ -89,65 +169,7 @@ export const CustomAlert = ({
         hardwareAccelerated={true}
         supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}
       >
-        <Animated.View
-          style={[
-            styles.overlay,
-            { backgroundColor: 'rgba(0, 0, 0, 0.85)' },
-            overlayStyle
-          ]}
-        >
-          <Pressable style={styles.overlayPressable} onPress={onClose} />
-          <View style={styles.centered}>
-            <Animated.View style={[
-              styles.alertContainer,
-              alertStyle,
-            ]}>
-              {/* Title */}
-              <Text style={styles.title}>
-                {title}
-              </Text>
-
-              {/* Message */}
-              <Text style={styles.message}>
-                {message}
-              </Text>
-
-              {/* Actions */}
-              <View style={[
-                styles.actionsRow,
-                actions.length === 1 && { justifyContent: 'center' }
-              ]}>
-                {actions.map((action, idx) => {
-                  const isPrimary = idx === actions.length - 1;
-                  return (
-                    <TouchableOpacity
-                      key={action.label}
-                      style={[
-                        styles.actionButton,
-                        isPrimary
-                          ? { backgroundColor: themeColors.primary }
-                          : styles.secondaryButton,
-                        action.style,
-                        actions.length === 1 && { minWidth: 120, maxWidth: '100%' }
-                      ]}
-                      onPress={() => handleActionPress(action)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[
-                        styles.actionText,
-                        isPrimary
-                          ? { color: '#FFFFFF' }
-                          : { color: '#FFFFFF' }
-                      ]}>
-                        {action.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </Animated.View>
-          </View>
-        </Animated.View>
+        {content}
       </Modal>
     </Portal>
   );

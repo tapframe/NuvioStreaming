@@ -21,6 +21,7 @@ import ResumeOverlay from './modals/ResumeOverlay';
 import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import SkipIntroButton from './overlays/SkipIntroButton';
 import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './components';
+import { CustomAlert } from '../CustomAlert';
 
 // Platform-specific components
 import { KSPlayerSurface } from './ios/components/KSPlayerSurface';
@@ -146,6 +147,7 @@ const KSPlayerCore: React.FC = () => {
 
   // Subtitle sync modal state
   const [showSyncModal, setShowSyncModal] = useState(false);
+  const [showMpvSwitchAlert, setShowMpvSwitchAlert] = useState(false);
 
   // Track auto-selection refs to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
@@ -154,7 +156,7 @@ const KSPlayerCore: React.FC = () => {
 
   // Track previous video session to reset subtitle offset only when video actually changes
   const previousVideoRef = useRef<{ uri?: string; episodeId?: string }>({});
-  
+
 
   // Reset subtitle offset when starting a new video session
   useEffect(() => {
@@ -322,10 +324,10 @@ const KSPlayerCore: React.FC = () => {
     if (isManuallyLoadingSubtitle.current) {
       return;
     }
-    
+
     // Set guard to prevent auto-select useEffect and concurrent calls from interfering
     isManuallyLoadingSubtitle.current = true;
-    
+
     modals.setShowSubtitleLanguageModal(false);
     customSubs.setIsLoadingSubtitles(true);
     try {
@@ -338,7 +340,7 @@ const KSPlayerCore: React.FC = () => {
         srtContent = await resp.text();
       }
       const parsedCues = parseSRT(srtContent);
-      
+
       // Update all state together - the guards prevent interference from other effects
       customSubs.setCustomSubtitles(parsedCues);
       customSubs.setUseCustomSubtitles(true);
@@ -848,25 +850,7 @@ const KSPlayerCore: React.FC = () => {
             playerBackend={(shouldUseMpvOnly || useMpvFallback) ? 'MPV' : 'AVPlayer'}
             onSwitchToMPV={
               (!shouldUseMpvOnly && !useMpvFallback)
-                ? () => {
-                  // Manual switch should confirm (like Android)
-                  Alert.alert(
-                    'Switch to MPV Player?',
-                    'This will switch from AVPlayer to MPV player. Use this if you\'re facing playback issues. The switch cannot be undone during this playback session.',
-                    [
-                      {
-                        text: 'Cancel',
-                        style: 'cancel',
-                      },
-                      {
-                        text: 'Switch to MPV',
-                        onPress: confirmSwitchToMPV,
-                        style: 'default',
-                      },
-                    ],
-                    { cancelable: true }
-                  );
-                }
+                ? () => setShowMpvSwitchAlert(true)
                 : undefined
             }
           />
@@ -1073,6 +1057,28 @@ const KSPlayerCore: React.FC = () => {
         episode={modals.selectedEpisodeForStreams}
         onSelectStream={handleEpisodeStreamSelect}
         metadata={{ id: id, name: title }}
+      />
+
+      {/* MPV Switch Confirmation Alert */}
+      <CustomAlert
+        visible={showMpvSwitchAlert}
+        inline
+        title="Switch to MPV Player?"
+        message="This will switch from AVPlayer to MPV player. Use this if you're facing playback issues. The switch cannot be undone during this playback session."
+        onClose={() => setShowMpvSwitchAlert(false)}
+        actions={[
+          {
+            label: 'Cancel',
+            onPress: () => setShowMpvSwitchAlert(false),
+          },
+          {
+            label: 'Switch to MPV',
+            onPress: () => {
+              setShowMpvSwitchAlert(false);
+              confirmSwitchToMPV();
+            },
+          },
+        ]}
       />
 
     </View>
