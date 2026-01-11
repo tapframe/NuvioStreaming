@@ -54,9 +54,14 @@ import { DiscoverBottomSheets } from '../components/search/DiscoverBottomSheets'
 const { width } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
+// Add constants for saved settings keys
+const DISCOVER_TYPE_KEY = 'discover_selected_type';
+const DISCOVER_CATALOG_KEY = 'discover_selected_catalog';
+const DISCOVER_GENRE_KEY = 'discover_selected_genre';
+
 const SearchScreen = () => {
   const { t } = useTranslation();
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, isInWatchlist, isInCollection } = useTraktContext();
   const { showSuccess, showInfo } = useToast();
@@ -115,6 +120,103 @@ const SearchScreen = () => {
     return () => { isMounted.current = false; };
   }, []);
 
+  // Load saved discover settings on mount
+  useEffect(() => {
+    const loadSavedDiscoverSettings = async () => {
+      try {
+        // Load saved type
+        const savedType = await mmkvStorage.getItem(DISCOVER_TYPE_KEY);
+        if (savedType && (savedType === 'movie' || savedType === 'series')) {
+          setSelectedDiscoverType(savedType);
+        }
+
+        // Note: We'll load catalog and genre after discoverCatalogs are loaded
+      } catch (error) {
+        logger.error('Failed to load saved discover settings:', error);
+      }
+    };
+
+    loadSavedDiscoverSettings();
+  }, []);
+
+  // Save discover settings when they change
+  const saveDiscoverSettings = useCallback(async (type: 'movie' | 'series', catalog: DiscoverCatalog | null, genre: string | null) => {
+    try {
+      // Save type
+      await mmkvStorage.setItem(DISCOVER_TYPE_KEY, type);
+
+      // Save catalog if available
+      if (catalog) {
+        const catalogData = {
+          addonId: catalog.addonId,
+          catalogId: catalog.catalogId,
+          type: catalog.type,
+        };
+        await mmkvStorage.setItem(DISCOVER_CATALOG_KEY, JSON.stringify(catalogData));
+      }
+
+      // Save genre
+      if (genre) {
+        await mmkvStorage.setItem(DISCOVER_GENRE_KEY, genre);
+      } else {
+        await mmkvStorage.removeItem(DISCOVER_GENRE_KEY);
+      }
+    } catch (error) {
+      logger.error('Failed to save discover settings:', error);
+    }
+  }, []);
+
+  // Load saved catalog and genre after discoverCatalogs are loaded
+  useEffect(() => {
+    const loadSavedCatalogAndGenre = async () => {
+      if (discoverCatalogs.length === 0) return;
+
+      try {
+        // Load saved catalog
+        const savedCatalogData = await mmkvStorage.getItem(DISCOVER_CATALOG_KEY);
+        if (savedCatalogData) {
+          try {
+            const parsedCatalog = JSON.parse(savedCatalogData);
+            const foundCatalog = discoverCatalogs.find(catalog =>
+              catalog.addonId === parsedCatalog.addonId &&
+              catalog.catalogId === parsedCatalog.catalogId &&
+              catalog.type === parsedCatalog.type
+            );
+
+            if (foundCatalog) {
+              setSelectedCatalog(foundCatalog);
+
+              // Load saved genre
+              const savedGenre = await mmkvStorage.getItem(DISCOVER_GENRE_KEY);
+              if (savedGenre && foundCatalog.genres.includes(savedGenre)) {
+                setSelectedDiscoverGenre(savedGenre);
+              } else if (foundCatalog.genres.length > 0) {
+                // Set first genre as default if saved genre not available
+                setSelectedDiscoverGenre(foundCatalog.genres[0]);
+              }
+              return;
+            }
+          } catch (parseError) {
+            logger.error('Failed to parse saved catalog data:', parseError);
+          }
+        }
+
+        // Default behavior if no saved catalog found
+        if (discoverCatalogs.length > 0) {
+          const firstCatalog = discoverCatalogs[0];
+          setSelectedCatalog(firstCatalog);
+          if (firstCatalog.genres.length > 0) {
+            setSelectedDiscoverGenre(firstCatalog.genres[0]);
+          }
+        }
+      } catch (error) {
+        logger.error('Failed to load saved catalog and genre:', error);
+      }
+    };
+
+    loadSavedCatalogAndGenre();
+  }, [discoverCatalogs]);
+
   useEffect(() => {
     const focusSubscription = DeviceEventEmitter.addListener('FOCUS_SEARCH_INPUT', () => {
       // Optional: Reset search state if user double taps while on search
@@ -171,9 +273,6 @@ const SearchScreen = () => {
             }
           }
           setDiscoverCatalogs(allCatalogs);
-          if (allCatalogs.length > 0) {
-            setSelectedCatalog(allCatalogs[0]);
-          }
           setDiscoverInitialized(true);
         }
       } catch (error) {
@@ -533,6 +632,10 @@ const SearchScreen = () => {
 
   const handleTypeSelect = (type: 'movie' | 'series') => {
     setSelectedDiscoverType(type);
+
+    // Save type setting
+    saveDiscoverSettings(type, selectedCatalog, selectedDiscoverGenre);
+
     const catalogsForType = discoverCatalogs.filter(c => c.type === type);
 
     // Try to find the same catalog in the new type
@@ -554,16 +657,20 @@ const SearchScreen = () => {
 
       // Try to preserve genre
       if (selectedDiscoverGenre && newCatalog.genres.includes(selectedDiscoverGenre)) {
-        // Keep current genre
+        // Keep current genre - already saved
       } else if (newCatalog.genres.length > 0) {
         // Fallback to first genre if current not available
-        setSelectedDiscoverGenre(newCatalog.genres[0]);
+        const firstGenre = newCatalog.genres[0];
+        setSelectedDiscoverGenre(firstGenre);
+        saveDiscoverSettings(type, newCatalog, firstGenre);
       } else {
         setSelectedDiscoverGenre(null);
+        saveDiscoverSettings(type, newCatalog, null);
       }
     } else {
       setSelectedCatalog(null);
       setSelectedDiscoverGenre(null);
+      saveDiscoverSettings(type, null, null);
     }
     typeSheetRef.current?.dismiss();
   };
@@ -571,11 +678,19 @@ const SearchScreen = () => {
   const handleCatalogSelect = (catalog: DiscoverCatalog) => {
     setSelectedCatalog(catalog);
     setSelectedDiscoverGenre(null);
+
+    // Save catalog setting
+    saveDiscoverSettings(selectedDiscoverType, catalog, null);
+
     catalogSheetRef.current?.dismiss();
   };
 
   const handleGenreSelect = (genre: string | null) => {
     setSelectedDiscoverGenre(genre);
+
+    // Save genre setting
+    saveDiscoverSettings(selectedDiscoverType, selectedCatalog, genre);
+
     genreSheetRef.current?.dismiss();
   };
 
