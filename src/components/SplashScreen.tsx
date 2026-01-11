@@ -10,7 +10,7 @@ const SplashScreen = ({ onFinish }: SplashScreenProps) => {
   // TEMPORARILY DISABLED
   useEffect(() => {
     // Immediately call onFinish to skip splash screen
-    onFinish();
+        onFinish();
   }, [onFinish]);
 
   return null;

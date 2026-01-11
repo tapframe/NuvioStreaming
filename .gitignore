@@ -2,6 +2,9 @@
 
 # dependencies
 node_modules/
+# Un-ignore specific react-native-video source files we patch
+!node_modules/react-native-video/android/src/main/java/com/brentvatne/common/api/SubtitleStyle.kt
+!node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
 !node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 
 # Expo
