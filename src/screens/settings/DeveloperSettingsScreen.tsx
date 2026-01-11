@@ -57,15 +57,6 @@ const DeveloperSettingsScreen: React.FC = () => {
         }
     };
 
-    const handleResetAnnouncement = async () => {
-        try {
-            await mmkvStorage.removeItem('announcement_v1.0.0_shown');
-            openAlert('Success', 'Announcement reset. Restart the app to see the announcement overlay.');
-        } catch (error) {
-            openAlert('Error', 'Failed to reset announcement.');
-        }
-    };
-
     const handleResetCampaigns = async () => {
         await campaignService.resetCampaigns();
         openAlert('Success', 'Campaign history reset. Restart app to see posters again.');
@@ -125,13 +116,6 @@ const DeveloperSettingsScreen: React.FC = () => {
                         title={t('settings.items.reset_onboarding')}
                         icon="refresh-ccw"
                         onPress={handleResetOnboarding}
-                        renderControl={() => <ChevronRight />}
-                    />
-                    <SettingItem
-                        title={t('settings.items.test_announcement')}
-                        icon="bell"
-                        description={t('settings.items.test_announcement_desc')}
-                        onPress={handleResetAnnouncement}
                         renderControl={() => <ChevronRight />}
                     />
                     <SettingItem

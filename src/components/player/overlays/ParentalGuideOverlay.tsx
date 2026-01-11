@@ -74,6 +74,7 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
     const hasShownRef = useRef(false);
     const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const prevShouldShowRef = useRef<boolean>(false);
 
     // Animation values
     const lineHeight = useSharedValue(0);
@@ -130,9 +131,51 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
         fetchData();
     }, [imdbId, type, season, episode]);
 
-    // Trigger animation when shouldShow becomes true
+    // Handle show/hide based on shouldShow (controls visibility)
     useEffect(() => {
-        if (shouldShow && warnings.length > 0 && !hasShownRef.current) {
+        // When controls are shown (shouldShow becomes false), immediately hide overlay
+        if (!shouldShow && isVisible) {
+            // Clear any pending timeouts
+            if (hideTimeoutRef.current) {
+                clearTimeout(hideTimeoutRef.current);
+                hideTimeoutRef.current = null;
+            }
+            if (fadeTimeoutRef.current) {
+                clearTimeout(fadeTimeoutRef.current);
+                fadeTimeoutRef.current = null;
+            }
+
+            // Immediately hide overlay with quick fade out
+            const count = warnings.length;
+            // FADE OUT: Items fade out in reverse order (bottom to top)
+            for (let i = count - 1; i >= 0; i--) {
+                const reverseDelay = (count - 1 - i) * 40;
+                itemOpacities[i].value = withDelay(
+                    reverseDelay,
+                    withTiming(0, { duration: 100 })
+                );
+            }
+
+            // Line shrinks after items are gone
+            const lineDelay = count * 40 + 50;
+            lineHeight.value = withDelay(lineDelay, withTiming(0, {
+                duration: 200,
+                easing: Easing.in(Easing.cubic),
+            }));
+
+            // Container fades out last
+            containerOpacity.value = withDelay(lineDelay + 100, withTiming(0, { duration: 150 }));
+
+            // Set invisible after all animations complete
+            fadeTimeoutRef.current = setTimeout(() => {
+                setIsVisible(false);
+                // Don't reset hasShownRef here - only reset on content change
+            }, lineDelay + 300);
+        }
+        
+        // When controls are hidden (shouldShow becomes true), show overlay if not already shown for this content
+        // Only show if transitioning from false to true (controls just hidden)
+        if (shouldShow && !prevShouldShowRef.current && warnings.length > 0 && !hasShownRef.current) {
             hasShownRef.current = true;
             setIsVisible(true);
 
@@ -182,10 +225,14 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
                 // Set invisible after all animations complete
                 fadeTimeoutRef.current = setTimeout(() => {
                     setIsVisible(false);
+                    // Don't reset hasShownRef - only reset on content change
                 }, lineDelay + 500);
             }, 5000);
         }
-    }, [shouldShow, warnings.length]);
+
+        // Update previous shouldShow value
+        prevShouldShowRef.current = shouldShow;
+    }, [shouldShow, isVisible, warnings.length]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -198,6 +245,7 @@ export const ParentalGuideOverlay: React.FC<ParentalGuideOverlayProps> = ({
     // Reset when content changes
     useEffect(() => {
         hasShownRef.current = false;
+        prevShouldShowRef.current = false;
         setWarnings([]);
         setIsVisible(false);
         lineHeight.value = 0;

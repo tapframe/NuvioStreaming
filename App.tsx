@@ -43,7 +43,6 @@ import { aiService } from './src/services/aiService';
 import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { mmkvStorage } from './src/services/mmkvStorage';
-import AnnouncementOverlay from './src/components/AnnouncementOverlay';
 import { CampaignManager } from './src/components/promotions/CampaignManager';
 
 Sentry.init({
@@ -91,7 +90,6 @@ const ThemedApp = () => {
   const { currentTheme } = useTheme();
   const [isAppReady, setIsAppReady] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
-  const [showAnnouncement, setShowAnnouncement] = useState(false);
 
   // Update popup functionality
   const {
@@ -105,16 +103,6 @@ const ThemedApp = () => {
 
   // GitHub major/minor release overlay
   const githubUpdate = useGithubMajorUpdate();
-
-  // Announcement data
-  const announcements = [
-    {
-      icon: 'zap',
-      title: 'Debrid Integration',
-      description: 'Unlock 4K high-quality streams with lightning-fast speeds. Connect your TorBox account to access cached premium content with zero buffering.',
-      tag: 'NEW',
-    },
-  ];
 
   // Check onboarding status and initialize services
   useEffect(() => {
@@ -134,15 +122,6 @@ const ThemedApp = () => {
         // Initialize AI service
         await aiService.initialize();
         console.log('AI service initialized');
-
-        // Check if announcement should be shown (version 1.0.0)
-        const announcementShown = await mmkvStorage.getItem('announcement_v1.0.0_shown');
-        if (!announcementShown && onboardingCompleted === 'true') {
-          // Show announcement only after app is ready
-          setTimeout(() => {
-            setShowAnnouncement(true);
-          }, 1000);
-        }
 
       } catch (error) {
         console.error('Error initializing app:', error);
@@ -180,20 +159,6 @@ const ThemedApp = () => {
 
   // Navigation reference
   const navigationRef = React.useRef<any>(null);
-
-  // Handler for navigating to debrid integration
-  const handleNavigateToDebrid = () => {
-    if (navigationRef.current) {
-      navigationRef.current.navigate('DebridIntegration');
-    }
-  };
-
-  // Handler for announcement close
-  const handleAnnouncementClose = async () => {
-    setShowAnnouncement(false);
-    // Mark announcement as shown
-    await mmkvStorage.setItem('announcement_v1.0.0_shown', 'true');
-  };
 
   // Don't render anything until we know the onboarding status
   const shouldShowApp = isAppReady && hasCompletedOnboarding !== null;
@@ -236,13 +201,6 @@ const ThemedApp = () => {
                 releaseUrl={githubUpdate.releaseUrl}
                 onDismiss={githubUpdate.onDismiss}
                 onLater={githubUpdate.onLater}
-              />
-              <AnnouncementOverlay
-                visible={showAnnouncement}
-                announcements={announcements}
-                onClose={handleAnnouncementClose}
-                onActionPress={handleNavigateToDebrid}
-                actionButtonText="Connect Now"
               />
               <CampaignManager />
             </View>
