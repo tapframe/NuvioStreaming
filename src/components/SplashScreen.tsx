@@ -7,34 +7,42 @@ interface SplashScreenProps {
 }
 
 const SplashScreen = ({ onFinish }: SplashScreenProps) => {
-  // Animation value for opacity
-  const fadeAnim = new Animated.Value(1);
-
+  // TEMPORARILY DISABLED
   useEffect(() => {
-    // Wait for a short period then start fade out animation
-    const timer = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(() => {
-        // Call onFinish when animation completes
-        onFinish();
-      });
-    }, 300); // Show splash for 0.8 seconds
+    // Immediately call onFinish to skip splash screen
+    onFinish();
+  }, [onFinish]);
 
-    return () => clearTimeout(timer);
-  }, [fadeAnim, onFinish]);
+  return null;
 
-  return (
-    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <Image
-        source={require('../assets/splash-icon-new.png')}
-        style={styles.image}
-        resizeMode="contain"
-      />
-    </Animated.View>
-  );
+  // Animation value for opacity
+  // const fadeAnim = new Animated.Value(1);
+
+  // useEffect(() => {
+  //   // Wait for a short period then start fade out animation
+  //   const timer = setTimeout(() => {
+  //     Animated.timing(fadeAnim, {
+  //       toValue: 0,
+  //       duration: 400,
+  //       useNativeDriver: true,
+  //     }).start(() => {
+  //       // Call onFinish when animation completes
+  //       onFinish();
+  //     });
+  //   }, 300); // Show splash for 0.8 seconds
+
+  //   return () => clearTimeout(timer);
+  // }, [fadeAnim, onFinish]);
+
+  // return (
+  //   <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+  //     <Image
+  //       source={require('../assets/splash-icon-new.png')}
+  //       style={styles.image}
+  //       resizeMode="contain"
+  //     />
+  //   </Animated.View>
+  // );
 };
 
 const styles = StyleSheet.create({
