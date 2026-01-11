@@ -61,7 +61,7 @@ const DISCOVER_GENRE_KEY = 'discover_selected_genre';
 
 const SearchScreen = () => {
   const { t } = useTranslation();
-  const { settings, updateSettings } = useSettings();
+  const { settings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, isInWatchlist, isInCollection } = useTraktContext();
   const { showSuccess, showInfo } = useToast();

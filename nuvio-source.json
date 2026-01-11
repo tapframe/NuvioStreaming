@@ -31,6 +31,14 @@
       ],
       "versions": [
         {
+          "version": "1.3.5",
+          "buildVersion": "33",
+          "date": "2026-01-09",
+          "localizedDescription": "## Update Notes\n\n### ExoPlayer Subtitle Fixes\nThis update mainly focuses on fixing multiple subtitle-related issues in ExoPlayer:\n- Fixed issue where **only the first subtitle index** was being rendered  \n- Fixed subtitles **always showing background** due to Android native caption settings  \n- Fixed subtitles being **rendered inside the player view**  \n- Fixed **subtitle bottom offset** issues  \n- Merged PR **#391** by **@saifshaikh1805**  \n  - Fixes issue **#301**\n\n### KSPlayer Improvements\n- Improved **subtitle behavior** in KSPlayer  \n- Merged PR **#394** by **@AdityasahuX07**\n\n### Settings & Persistence\n- Implemented **save and load** functionality for **Discover settings**\n\nThis release improves subtitle rendering accuracy across players and adds better persistence for user preferences.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/v1.3.5/app-release.apk",
+          "size": 25700000
+        },
+        {
           "version": "1.3.4",
           "buildVersion": "32",
           "date": "2026-01-06",
