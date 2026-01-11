@@ -77,6 +77,7 @@ interface VideoSurfaceProps {
     subtitleBorderColor?: string;
     subtitleShadowEnabled?: boolean;
     subtitlePosition?: number;
+    subtitleBottomOffset?: number;
     subtitleDelay?: number;
     subtitleAlignment?: 'left' | 'center' | 'right';
 }
@@ -128,6 +129,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     subtitleBorderColor,
     subtitleShadowEnabled,
     subtitlePosition,
+    subtitleBottomOffset,
     subtitleDelay,
     subtitleAlignment,
 }) => {
@@ -327,12 +329,13 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     // - fontSize, paddingTop/Bottom/Left/Right, opacity, subtitlesFollowVideo
                     // - PLUS: textColor, backgroundColor, edgeType, edgeColor (outline/shadow)
                     subtitleStyle={{
-                        // Convert MPV-scaled size back to ExoPlayer scale (~1.5x conversion was applied)
-                        fontSize: subtitleSize ? Math.round(subtitleSize / 1.5) : 18,
+                        // Convert MPV-scaled size back to UI size (AndroidVideoPlayer passes MPV-scaled values here)
+                        fontSize: subtitleSize ? Math.round(subtitleSize / 1.5) : 28,
                         paddingTop: 0,
-                        // Convert MPV position (0=top, 100=bottom) to paddingBottom
-                        // Higher MPV position = less padding from bottom
-                        paddingBottom: subtitlePosition ? Math.max(20, Math.round((100 - subtitlePosition) * 2)) : 60,
+                        // IMPORTANT:
+                        // Use the same unit as external subtitles (RN CustomSubtitles uses dp bottomOffset directly).
+                        // Using MPV's subtitlePosition mapping makes internal/external offsets feel inconsistent.
+                        paddingBottom: Math.max(0, Math.round(subtitleBottomOffset ?? 0)),
                         paddingLeft: 16,
                         paddingRight: 16,
                         // Opacity controls entire subtitle view visibility

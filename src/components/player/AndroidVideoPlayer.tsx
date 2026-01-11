@@ -820,6 +820,7 @@ const AndroidVideoPlayer: React.FC = () => {
             subtitleBorderColor={subtitleOutlineColor}
             subtitleShadowEnabled={subtitleTextShadow}
             subtitlePosition={Math.max(50, 100 - Math.floor(subtitleBottomOffset * 0.3))} // Scale offset to MPV range
+            subtitleBottomOffset={subtitleBottomOffset}
             subtitleDelay={subtitleOffsetSec}
             subtitleAlignment={subtitleAlign}
           />

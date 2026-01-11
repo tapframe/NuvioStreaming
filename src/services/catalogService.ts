@@ -1311,6 +1311,10 @@ class CatalogService {
     const addons = await this.getAllAddons();
     const byAddon: AddonSearchResults[] = [];
 
+    // Get manifests separately to ensure we have correct URLs
+    const manifests = await stremioService.getInstalledAddonsAsync();
+    const manifestMap = new Map(manifests.map(m => [m.id, m]));
+
     // Find all addons that support search
     const searchableAddons = addons.filter(addon => {
       if (!addon.catalogs) return false;
@@ -1330,6 +1334,13 @@ class CatalogService {
 
     // Search each addon and keep results grouped
     for (const addon of searchableAddons) {
+      // Get the manifest to ensure we have the correct URL
+      const manifest = manifestMap.get(addon.id);
+      if (!manifest) {
+        logger.warn(`Manifest not found for addon ${addon.name} (${addon.id})`);
+        continue;
+      }
+
       const searchableCatalogs = (addon.catalogs || []).filter(catalog => {
         const extraSupported = catalog.extraSupported || [];
         const extra = catalog.extra || [];
@@ -1339,7 +1350,7 @@ class CatalogService {
 
       // Search all catalogs for this addon in parallel
       const catalogPromises = searchableCatalogs.map(catalog =>
-        this.searchAddonCatalog(addon, catalog.type, catalog.id, trimmedQuery)
+        this.searchAddonCatalog(manifest, catalog.type, catalog.id, trimmedQuery)
       );
 
       const catalogResults = await Promise.allSettled(catalogPromises);
@@ -1409,6 +1420,11 @@ class CatalogService {
       logger.log('Live search across addons for:', trimmedQuery);
 
       const addons = await this.getAllAddons();
+      logger.log(`Total addons available: ${addons.length}`);
+
+      // Get manifests separately to ensure we have correct URLs
+      const manifests = await stremioService.getInstalledAddonsAsync();
+      const manifestMap = new Map(manifests.map(m => [m.id, m]));
 
       // Determine searchable addons
       const searchableAddons = addons.filter(addon =>
@@ -1418,6 +1434,13 @@ class CatalogService {
         )
       );
 
+      logger.log(`Found ${searchableAddons.length} searchable addons:`, searchableAddons.map(a => `${a.name} (${a.id})`).join(', '));
+
+      if (searchableAddons.length === 0) {
+        logger.warn('No searchable addons found. Make sure you have addons installed that support search functionality.');
+        return;
+      }
+
       // Global dedupe across emitted results
       const globalSeen = new Set<string>();
 
@@ -1425,14 +1448,23 @@ class CatalogService {
         searchableAddons.map(async (addon) => {
           if (controller.cancelled) return;
           try {
+            // Get the manifest to ensure we have the correct URL
+            const manifest = manifestMap.get(addon.id);
+            if (!manifest) {
+              logger.warn(`Manifest not found for addon ${addon.name} (${addon.id})`);
+              return;
+            }
+
             const searchableCatalogs = (addon.catalogs || []).filter(c =>
               (c.extraSupported && c.extraSupported.includes('search')) ||
               (c.extra && c.extra.some(e => e.name === 'search'))
             );
 
+            logger.log(`Searching ${addon.name} (${addon.id}) with ${searchableCatalogs.length} searchable catalogs`);
+
             // Fetch all catalogs for this addon in parallel
             const settled = await Promise.allSettled(
-              searchableCatalogs.map(c => this.searchAddonCatalog(addon, c.type, c.id, trimmedQuery))
+              searchableCatalogs.map(c => this.searchAddonCatalog(manifest, c.type, c.id, trimmedQuery))
             );
             if (controller.cancelled) return;
 
@@ -1440,9 +1472,15 @@ class CatalogService {
             for (const s of settled) {
               if (s.status === 'fulfilled' && Array.isArray(s.value)) {
                 addonResults.push(...s.value);
+              } else if (s.status === 'rejected') {
+                logger.warn(`Search failed for catalog in ${addon.name}:`, s.reason);
               }
             }
-            if (addonResults.length === 0) return;
+            
+            if (addonResults.length === 0) {
+              logger.log(`No results from ${addon.name}`);
+              return;
+            }
 
             // Dedupe within addon and against global
             const localSeen = new Set<string>();
@@ -1455,10 +1493,11 @@ class CatalogService {
             });
 
             if (unique.length > 0 && !controller.cancelled) {
+              logger.log(`Emitting ${unique.length} results from ${addon.name}`);
               onAddonResults({ addonId: addon.id, addonName: addon.name, results: unique });
             }
           } catch (e) {
-            // ignore individual addon errors
+            logger.error(`Error searching addon ${addon.name} (${addon.id}):`, e);
           }
         })
       );
@@ -1474,14 +1513,14 @@ class CatalogService {
    * Search a specific catalog from a specific addon.
    * Handles URL construction for both Cinemeta (hardcoded) and other addons (dynamic).
    * 
-   * @param addon - The addon manifest containing id, name, and url
+   * @param manifest - The addon manifest containing id, name, and url
    * @param type - Content type (movie, series, anime, etc.)
    * @param catalogId - The catalog ID to search within
    * @param query - The search query string
    * @returns Promise<StreamingContent[]> - Search results from this specific addon catalog
    */
   private async searchAddonCatalog(
-    addon: any,
+    manifest: Manifest,
     type: string,
     catalogId: string,
     query: string
@@ -1490,7 +1529,7 @@ class CatalogService {
       let url: string;
 
       // Special handling for Cinemeta (hardcoded URL)
-      if (addon.id === 'com.linvo.cinemeta') {
+      if (manifest.id === 'com.linvo.cinemeta') {
         const encodedCatalogId = encodeURIComponent(catalogId);
         const encodedQuery = encodeURIComponent(query);
         url = `https://v3-cinemeta.strem.io/catalog/${type}/${encodedCatalogId}/search=${encodedQuery}.json`;
@@ -1498,12 +1537,13 @@ class CatalogService {
       // Handle other addons
       else {
         // Choose best available URL
-        const chosenUrl: string | undefined = addon.url || addon.originalUrl || addon.transportUrl;
+        const chosenUrl: string | undefined = manifest.url || manifest.originalUrl;
         if (!chosenUrl) {
-          logger.warn(`Addon ${addon.name} has no URL, skipping search`);
+          logger.warn(`Addon ${manifest.name} (${manifest.id}) has no URL, skipping search`);
           return [];
         }
-        // Extract base URL and preserve query params
+        
+        // Extract base URL and preserve query params (same logic as stremioService.getAddonBaseURL)
         const [baseUrlPart, queryParams] = chosenUrl.split('?');
         let cleanBaseUrl = baseUrlPart.replace(/manifest\.json$/, '').replace(/\/$/, '');
 
@@ -1514,6 +1554,8 @@ class CatalogService {
 
         const encodedCatalogId = encodeURIComponent(catalogId);
         const encodedQuery = encodeURIComponent(query);
+        
+        // Try path-style URL first (per Stremio protocol)
         url = `${cleanBaseUrl}/catalog/${type}/${encodedCatalogId}/search=${encodedQuery}.json`;
 
         // Append original query params if they existed
@@ -1522,7 +1564,7 @@ class CatalogService {
         }
       }
 
-      logger.log(`Searching ${addon.name} (${type}/${catalogId}):`, url);
+      logger.log(`Searching ${manifest.name} (${type}/${catalogId}):`, url);
 
       const response = await axios.get<{ metas: any[] }>(url, {
         timeout: 10000, // 10 second timeout per addon
@@ -1533,10 +1575,10 @@ class CatalogService {
       if (metas.length > 0) {
         const items = metas.map(meta => {
           const content = this.convertMetaToStreamingContent(meta);
-          content.addonId = addon.id;
+          content.addonId = manifest.id;
           return content;
         });
-        logger.log(`Found ${items.length} results from ${addon.name}`);
+        logger.log(`Found ${items.length} results from ${manifest.name}`);
         return items;
       }
 
@@ -1546,7 +1588,11 @@ class CatalogService {
       const errorMsg = error?.response?.status
         ? `HTTP ${error.response.status}`
         : error?.message || 'Unknown error';
-      logger.error(`Search failed for ${addon.name} (${type}/${catalogId}): ${errorMsg}`);
+      const errorUrl = error?.config?.url || 'unknown URL';
+      logger.error(`Search failed for ${manifest.name} (${type}/${catalogId}) at ${errorUrl}: ${errorMsg}`);
+      if (error?.response?.data) {
+        logger.error(`Response data:`, error.response.data);
+      }
       return [];
     }
   }
