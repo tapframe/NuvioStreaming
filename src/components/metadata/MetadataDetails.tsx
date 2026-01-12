@@ -233,13 +233,24 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
         )}
         {metadata.imdbRating && !isMDBEnabled && (
           <View style={styles.ratingContainer}>
+            <FastImage
+              source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg' }}
+              style={[
+                styles.imdbLogo,
+                {
+                  width: isTV ? 42 : isLargeTablet ? 38 : isTablet ? 35 : 35,
+                  height: isTV ? 22 : isLargeTablet ? 20 : isTablet ? 18 : 22
+                }
+              ]}
+              resizeMode={FastImage.resizeMode.contain}
+            />
             <Text style={[
               styles.ratingText,
               {
-                color: '#F5C518',
+                color: currentTheme.colors.text,
                 fontSize: isTV ? 18 : isLargeTablet ? 17 : isTablet ? 16 : 15
               }
-            ]}>{metadata.imdbRating}</Text>
+            ]}> {metadata.imdbRating}</Text>
           </View>
         )}
       </View>
@@ -463,7 +474,7 @@ const styles = StyleSheet.create({
   imdbLogo: {
     width: 35,
     height: 18,
-    marginRight: 4,
+    paddingHorizontal: 24,
   },
   ratingText: {
     fontWeight: '700',
