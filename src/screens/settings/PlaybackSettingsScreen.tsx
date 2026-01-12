@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
@@ -12,8 +12,11 @@ import { useRealtimeConfig } from '../../hooks/useRealtimeConfig';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useTranslation } from 'react-i18next';
+import { SvgXml } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
+
+const INTRODB_LOGO_URI = 'https://introdb.app/images/logo-vector.svg';
 
 // Available languages for audio/subtitle selection
 const AVAILABLE_LANGUAGES = [
@@ -72,6 +75,39 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
     const { settings, updateSetting } = useSettings();
     const { t } = useTranslation();
     const config = useRealtimeConfig();
+
+    const [introDbLogoXml, setIntroDbLogoXml] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            try {
+                const res = await fetch(INTRODB_LOGO_URI);
+                let xml = await res.text();
+                // Inline CSS class-based styles because react-native-svg doesn't support <style> class selectors
+                // Map known classes from the IntroDB logo to equivalent inline attributes
+                xml = xml.replace(/class="cls-4"/g, 'fill="url(#linear-gradient)"');
+                xml = xml.replace(/class="cls-3"/g, 'fill="#141414" opacity=".38"');
+                xml = xml.replace(/class="cls-1"/g, 'fill="url(#linear-gradient-2)" opacity=".53"');
+                xml = xml.replace(/class="cls-2"/g, 'fill="url(#linear-gradient-3)" opacity=".53"');
+                // Remove the <style> block to avoid unsupported CSS
+                xml = xml.replace(/<style>[\s\S]*?<\/style>/, '');
+                if (!cancelled) setIntroDbLogoXml(xml);
+            } catch {
+                if (!cancelled) setIntroDbLogoXml(null);
+            }
+        };
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const introDbLogoIcon = introDbLogoXml ? (
+        <SvgXml xml={introDbLogoXml} width={28} height={18} />
+    ) : (
+        <MaterialIcons name="skip-next" size={18} color={currentTheme.colors.primary} />
+    );
 
     // Bottom sheet refs
     const audioLanguageSheetRef = useRef<BottomSheetModal>(null);
@@ -172,6 +208,22 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                     )}
                 </SettingsCard>
             )}
+
+            <SettingsCard title={t('player.section_playback', { defaultValue: 'Playback' })} isTablet={isTablet}>
+                <SettingItem
+                    title={t('player.skip_intro_settings_title', { defaultValue: 'Skip Intro' })}
+                    description={t('player.powered_by_introdb', { defaultValue: 'Powered by IntroDB' })}
+                    customIcon={introDbLogoIcon}
+                    renderControl={() => (
+                        <CustomSwitch
+                            value={settings?.skipIntroEnabled ?? true}
+                            onValueChange={(value) => updateSetting('skipIntroEnabled', value)}
+                        />
+                    )}
+                    isLast
+                    isTablet={isTablet}
+                />
+            </SettingsCard>
 
             {/* Audio & Subtitle Preferences */}
             <SettingsCard title={t('settings.sections.audio_subtitles')} isTablet={isTablet}>

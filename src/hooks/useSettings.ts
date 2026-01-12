@@ -59,6 +59,7 @@ export interface AppSettings {
   excludedLanguages: string[]; // Array of language strings to exclude (e.g., ['Spanish', 'German', 'French'])
   // Playback behavior
   alwaysResume: boolean; // If true, resume automatically without prompt when progress < 85%
+  skipIntroEnabled: boolean; // Enable/disable Skip Intro overlay (IntroDB)
   // Downloads
   enableDownloads: boolean; // Show Downloads tab and enable saving streams
   // Theme settings
@@ -147,6 +148,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   excludedLanguages: [], // No languages excluded by default
   // Playback behavior defaults
   alwaysResume: true,
+  skipIntroEnabled: true,
   // Downloads
   enableDownloads: false,
   useExternalPlayerForDownloads: false,

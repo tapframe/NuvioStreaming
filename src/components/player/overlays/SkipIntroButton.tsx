@@ -13,6 +13,7 @@ import { BlurView } from 'expo-blur';
 import { introService, SkipInterval, SkipType } from '../../../services/introService';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { logger } from '../../../utils/logger';
+import { useSettings } from '../../../hooks/useSettings';
 
 interface SkipIntroButtonProps {
     imdbId: string | undefined;
@@ -40,7 +41,10 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     controlsFixedOffset = 100,
 }) => {
     const { currentTheme } = useTheme();
+    const { settings } = useSettings();
     const insets = useSafeAreaInsets();
+
+    const skipIntroEnabled = settings.skipIntroEnabled;
 
     // State
     const [skipIntervals, setSkipIntervals] = useState<SkipInterval[]>([]);
@@ -62,6 +66,14 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     // Fetch skip data when episode changes
     useEffect(() => {
         const episodeKey = `${imdbId}-${season}-${episode}-${malId}-${kitsuId}`;
+
+        if (!skipIntroEnabled) {
+            setSkipIntervals([]);
+            setCurrentInterval(null);
+            setIsVisible(false);
+            fetchedRef.current = false;
+            return;
+        }
 
         // Skip if not a series or missing required data (though MAL/Kitsu ID might be enough for some cases, usually need season/ep)
         if (type !== 'series' || (!imdbId && !malId && !kitsuId) || !season || !episode) {
@@ -99,7 +111,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         };
 
         fetchSkipData();
-    }, [imdbId, type, season, episode, malId, kitsuId]);
+    }, [imdbId, type, season, episode, malId, kitsuId, skipIntroEnabled]);
 
     // Determine active interval based on current playback position
     useEffect(() => {
@@ -227,6 +239,10 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         opacity: opacity.value,
         transform: [{ scale: scale.value }, { translateY: translateY.value }],
     }));
+
+    if (!skipIntroEnabled) {
+        return null;
+    }
 
     // Don't render if not visible
     if (!isVisible) {
