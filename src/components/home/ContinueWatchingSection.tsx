@@ -219,7 +219,14 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
   // Track last Trakt sync to prevent excessive API calls
   const lastTraktSyncRef = useRef<number>(0);
-  const TRAKT_SYNC_COOLDOWN = 60 * 1000; // 1 minute between Trakt syncs
+  const TRAKT_SYNC_COOLDOWN = 0; // disabled (always fetch Trakt playback)
+
+  // Track last Trakt reconcile per item (local -> Trakt catch-up)
+  const lastTraktReconcileRef = useRef<Map<string, number>>(new Map());
+  const TRAKT_RECONCILE_COOLDOWN = 0; // 2 minutes between reconcile attempts per item
+
+  // Debug: avoid logging the same order repeatedly
+  const lastOrderLogSigRef = useRef<string>('');
 
   // Cache for metadata to avoid redundant API calls
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
@@ -322,6 +329,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
     isRefreshingRef.current = true;
 
+    logger.log(`[CW] loadContinueWatching start (background=${isBackgroundRefresh})`);
+
     const shouldPreferCandidate = (candidate: ContinueWatchingItem, existing: ContinueWatchingItem): boolean => {
       const candidateUpdated = candidate.lastUpdated ?? 0;
       const existingUpdated = existing.lastUpdated ?? 0;
@@ -360,6 +369,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       episode?: number;
       progressPercent: number;
       lastUpdated: number;
+      currentTime: number;
+      duration: number;
     };
 
     const getIdVariants = (id: string): string[] => {
@@ -490,6 +501,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               episode: parsed?.episode,
               progressPercent,
               lastUpdated: progress?.lastUpdated ?? 0,
+              currentTime: progress?.currentTime ?? 0,
+              duration: progress?.duration ?? 0,
             };
 
             for (const idVariant of getIdVariants(id)) {
@@ -782,7 +795,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
           // Check Trakt sync cooldown to prevent excessive API calls
           const now = Date.now();
-          if (now - lastTraktSyncRef.current < TRAKT_SYNC_COOLDOWN) {
+          if (TRAKT_SYNC_COOLDOWN > 0 && (now - lastTraktSyncRef.current) < TRAKT_SYNC_COOLDOWN) {
             logger.log(`[TraktSync] Skipping Trakt sync - cooldown active (${Math.round((TRAKT_SYNC_COOLDOWN - (now - lastTraktSyncRef.current)) / 1000)}s remaining)`);
             return;
           }
@@ -792,6 +805,24 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           // Fetch only playback progress (paused items with actual progress %)
           // Removed: history items and watched shows - redundant with local logic
           const playbackItems = await traktService.getPlaybackProgress();
+
+          try {
+            const top = [...playbackItems]
+              .sort((a, b) => new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime())
+              .slice(0, 10)
+              .map((x) => ({
+                id: x.id,
+                type: x.type,
+                progress: x.progress,
+                pausedAt: x.paused_at,
+                imdb: x.type === 'movie' ? x.movie?.ids?.imdb : x.show?.ids?.imdb,
+                season: x.type === 'episode' ? x.episode?.season : undefined,
+                episode: x.type === 'episode' ? x.episode?.number : undefined,
+              }));
+            logger.log('[CW][Trakt] top playback items:', top);
+          } catch {
+            // ignore
+          }
 
 
 
@@ -1021,46 +1052,198 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
               if (!isRemoved) filteredItems.push(item);
             }
 
-            const getLocalOverride = (item: ContinueWatchingItem): LocalProgressEntry | null => {
-              if (!localProgressIndex) return null;
+            const getLocalMatches = (item: ContinueWatchingItem): LocalProgressEntry[] => {
+              if (!localProgressIndex) return [];
 
               const typeKey = item.type;
-              let best: LocalProgressEntry | null = null;
+              const matches: LocalProgressEntry[] = [];
 
               for (const idVariant of getIdVariants(item.id)) {
                 const entries = localProgressIndex.get(`${typeKey}:${idVariant}`);
                 if (!entries || entries.length === 0) continue;
 
                 if (item.type === 'movie') {
-                  for (const e of entries) {
-                    if (!best || e.progressPercent > best.progressPercent) best = e;
-                  }
+                  matches.push(...entries);
                 } else {
                   // series: only match same season/episode
                   if (item.season === undefined || item.episode === undefined) continue;
                   for (const e of entries) {
                     if (e.season === item.season && e.episode === item.episode) {
-                      if (!best || e.progressPercent > best.progressPercent) best = e;
+                      matches.push(e);
                     }
                   }
                 }
               }
 
-              return best;
+              return matches;
             };
 
+            const toYearNumber = (value: any): number | undefined => {
+              if (typeof value === 'number' && isFinite(value)) return value;
+              if (typeof value === 'string') {
+                const parsed = parseInt(value, 10);
+                if (isFinite(parsed)) return parsed;
+              }
+              return undefined;
+            };
+
+            const buildTraktContentData = (item: ContinueWatchingItem): import('../../services/traktService').TraktContentData | null => {
+              if (item.type === 'movie') {
+                return {
+                  type: 'movie',
+                  imdbId: item.id,
+                  title: item.name,
+                  year: toYearNumber((item as any).year),
+                };
+              }
+
+              if (item.type === 'series' && item.season && item.episode) {
+                return {
+                  type: 'episode',
+                  imdbId: item.id,
+                  title: item.episodeTitle || `S${item.season}E${item.episode}`,
+                  season: item.season,
+                  episode: item.episode,
+                  showTitle: item.name,
+                  showYear: toYearNumber((item as any).year),
+                  showImdbId: item.id,
+                };
+              }
+
+              return null;
+            };
+
+            const reconcilePromises: Promise<any>[] = [];
+            const reconcileLocalPromises: Promise<any>[] = [];
+
             const adjustedItems = filteredItems.map((it) => {
-              const local = getLocalOverride(it);
-              if (!local) return it;
+              const matches = getLocalMatches(it);
+              if (matches.length === 0) return it;
 
-              const mergedLastUpdated = Math.max(it.lastUpdated ?? 0, local.lastUpdated ?? 0);
+              const mostRecentLocal = matches.reduce<LocalProgressEntry | null>((acc, cur) => {
+                if (!acc) return cur;
+                return (cur.lastUpdated ?? 0) > (acc.lastUpdated ?? 0) ? cur : acc;
+              }, null);
 
-              // Always treat local lastUpdated as the recency source so items move to the front
-              // immediately after playback, even if Trakt progress isn't updated yet.
-              if (local.progressPercent > (it.progress ?? 0) + 0.5) {
+              const highestLocal = matches.reduce<LocalProgressEntry | null>((acc, cur) => {
+                if (!acc) return cur;
+                return (cur.progressPercent ?? 0) > (acc.progressPercent ?? 0) ? cur : acc;
+              }, null);
+
+              if (!mostRecentLocal || !highestLocal) return it;
+
+              // IMPORTANT:
+              // In Trakt-auth mode, the "most recently watched" ordering should reflect local playback,
+              // not Trakt's paused_at (which can be stale or even appear newer than local).
+              // So: if we have any local match, use its timestamp for ordering.
+              const mergedLastUpdated = (mostRecentLocal.lastUpdated ?? 0) > 0
+                ? (mostRecentLocal.lastUpdated ?? 0)
+                : (it.lastUpdated ?? 0);
+
+              try {
+                logger.log('[CW][Trakt][Overlay] item/local summary', {
+                  key: `${it.type}:${it.id}:${it.season ?? ''}:${it.episode ?? ''}`,
+                  traktProgress: it.progress,
+                  traktLastUpdated: it.lastUpdated,
+                  localMostRecent: { progress: mostRecentLocal.progressPercent, lastUpdated: mostRecentLocal.lastUpdated },
+                  localHighest: { progress: highestLocal.progressPercent, lastUpdated: highestLocal.lastUpdated },
+                  mergedLastUpdated,
+                });
+              } catch {
+                // ignore
+              }
+
+              // Background reconcile: if local progress is ahead of Trakt OR local is newer than Trakt,
+              // scrobble local progress to Trakt.
+              // This handles missed scrobbles (local ahead) and intentional seek-back/rewatch (local newer but lower).
+              const localProgress = mostRecentLocal.progressPercent;
+              const traktProgress = it.progress ?? 0;
+              const traktTs = it.lastUpdated ?? 0;
+              const localTs = mostRecentLocal.lastUpdated ?? 0;
+
+              const isAhead = isFinite(localProgress) && localProgress > traktProgress + 0.5;
+              const isLocalNewer = localTs > traktTs + 5000; // 5s guard against clock jitter
+              const isLocalRecent = localTs > 0 && (Date.now() - localTs) < (5 * 60 * 1000); // 5 minutes
+              const isDifferent = Math.abs((localProgress || 0) - (traktProgress || 0)) > 0.5;
+
+              const isTraktAhead = isFinite(traktProgress) && traktProgress > localProgress + 0.5;
+              // If the user just interacted locally (seek-back/rewatch), do NOT overwrite local with Trakt.
+              if (isTraktAhead && !isLocalRecent && mostRecentLocal.duration > 0) {
+                const reconcileKey = `local:${it.type}:${it.id}:${it.season ?? ''}:${it.episode ?? ''}`;
+                const last = lastTraktReconcileRef.current.get(reconcileKey) ?? 0;
+                const now = Date.now();
+
+                if (now - last >= TRAKT_RECONCILE_COOLDOWN) {
+                  lastTraktReconcileRef.current.set(reconcileKey, now);
+
+                  // Sync Trakt -> local so resume/progress UI uses the higher value.
+                  // Only possible when we have a local duration.
+                  const targetEpisodeId =
+                    it.type === 'series'
+                      ? (mostRecentLocal.episodeId || (it.season && it.episode ? `${it.id}:${it.season}:${it.episode}` : undefined))
+                      : undefined;
+
+                  const newCurrentTime = (traktProgress / 100) * mostRecentLocal.duration;
+
+                  reconcileLocalPromises.push(
+                    (async () => {
+                      try {
+                        const existing = await storageService.getWatchProgress(it.id, it.type, targetEpisodeId);
+                        if (!existing || !existing.duration || existing.duration <= 0) return;
+
+                        await storageService.setWatchProgress(
+                          it.id,
+                          it.type,
+                          {
+                            ...existing,
+                            currentTime: Math.max(existing.currentTime ?? 0, newCurrentTime),
+                            duration: existing.duration,
+                            traktSynced: true,
+                            traktLastSynced: Date.now(),
+                            traktProgress: Math.max(existing.traktProgress ?? 0, traktProgress),
+                            // Do NOT update lastUpdated here; this is a background state sync and
+                            // should not affect "recent" ordering.
+                            lastUpdated: existing.lastUpdated,
+                          } as any,
+                          targetEpisodeId,
+                          { preserveTimestamp: true, forceWrite: true }
+                        );
+                      } catch {
+                        // ignore
+                      }
+                    })()
+                  );
+                }
+              }
+
+              if ((isAhead || ((isLocalNewer || isLocalRecent) && isDifferent)) && localProgress >= 2) {
+                const reconcileKey = `${it.type}:${it.id}:${it.season ?? ''}:${it.episode ?? ''}`;
+                const last = lastTraktReconcileRef.current.get(reconcileKey) ?? 0;
+                const now = Date.now();
+                if (now - last >= TRAKT_RECONCILE_COOLDOWN) {
+                  lastTraktReconcileRef.current.set(reconcileKey, now);
+
+                  const contentData = buildTraktContentData(it);
+                  if (contentData) {
+                    // Trakt treats >=80% on /scrobble/stop as "watched".
+                    // Keep in-progress items under 80 unless the user truly completed it in-app (>=85%).
+                    const progressToSend = localProgress >= 85 ? Math.min(localProgress, 100) : Math.min(localProgress, 79.9);
+
+                    reconcilePromises.push(
+                      traktService
+                        .pauseWatching(contentData, progressToSend)
+                        .catch(() => null)
+                    );
+                  }
+                }
+              }
+
+              // If local is newer/recent, prefer local progress immediately (covers seek-back/rewatch).
+              // Otherwise, only prefer local progress when it is ahead.
+              if (((isLocalNewer || isLocalRecent) && isDifferent) || localProgress > (it.progress ?? 0) + 0.5) {
                 return {
                   ...it,
-                  progress: local.progressPercent,
+                  progress: ((isLocalNewer || isLocalRecent) && isDifferent) ? localProgress : localProgress,
                   lastUpdated: mergedLastUpdated,
                 };
               }
@@ -1079,7 +1262,38 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
             // Sort by lastUpdated descending and set directly
             adjustedItems.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
+
+            // Debug final order (only if changed)
+            try {
+              const sig = adjustedItems
+                .slice(0, 12)
+                .map((x) => `${x.type}:${x.id}:${x.season ?? ''}:${x.episode ?? ''}@${Math.round(x.lastUpdated ?? 0)}:${Math.round(x.progress ?? 0)}`)
+                .join('|');
+              if (sig !== lastOrderLogSigRef.current) {
+                lastOrderLogSigRef.current = sig;
+                logger.log('[CW][Trakt] final CW order (top 12):',
+                  adjustedItems.slice(0, 12).map((x) => ({
+                    key: `${x.type}:${x.id}:${x.season ?? ''}:${x.episode ?? ''}`,
+                    progress: x.progress,
+                    lastUpdated: x.lastUpdated,
+                  }))
+                );
+              }
+            } catch {
+              // ignore
+            }
+
             setContinueWatchingItems(adjustedItems);
+
+            // Fire-and-forget reconcile (don't block UI)
+            if (reconcilePromises.length > 0) {
+              Promise.allSettled(reconcilePromises).catch(() => null);
+            }
+
+            // Fire-and-forget local sync (Trakt -> local)
+            if (reconcileLocalPromises.length > 0) {
+              Promise.allSettled(reconcileLocalPromises).catch(() => null);
+            }
           }
         } catch (err) {
           logger.error('[TraktSync] Error in Trakt merge:', err);
