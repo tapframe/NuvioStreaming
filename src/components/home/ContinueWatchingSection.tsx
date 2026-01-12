@@ -219,7 +219,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
 
   // Track last Trakt sync to prevent excessive API calls
   const lastTraktSyncRef = useRef<number>(0);
-  const TRAKT_SYNC_COOLDOWN = 5 * 60 * 1000; // 5 minutes between Trakt syncs
+  const TRAKT_SYNC_COOLDOWN = 60 * 1000; // 1 minute between Trakt syncs
 
   // Cache for metadata to avoid redundant API calls
   const metadataCache = useRef<Record<string, { metadata: any; basicContent: StreamingContent | null; timestamp: number }>>({});
@@ -322,6 +322,84 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     }
     isRefreshingRef.current = true;
 
+    const shouldPreferCandidate = (candidate: ContinueWatchingItem, existing: ContinueWatchingItem): boolean => {
+      const candidateUpdated = candidate.lastUpdated ?? 0;
+      const existingUpdated = existing.lastUpdated ?? 0;
+      const candidateProgress = candidate.progress ?? 0;
+      const existingProgress = existing.progress ?? 0;
+
+      const sameEpisode =
+        candidate.type === 'movie' ||
+        (
+          candidate.type === 'series' &&
+          existing.type === 'series' &&
+          candidate.season !== undefined &&
+          candidate.episode !== undefined &&
+          existing.season !== undefined &&
+          existing.episode !== undefined &&
+          candidate.season === existing.season &&
+          candidate.episode === existing.episode
+        );
+
+      // If it's the same episode/movie, prefer the higher progress (local often leads Trakt)
+      if (sameEpisode) {
+        if (candidateProgress > existingProgress + 0.5) return true;
+        if (existingProgress > candidateProgress + 0.5) return false;
+      }
+
+      // Otherwise, prefer the most recently watched item
+      if (candidateUpdated !== existingUpdated) return candidateUpdated > existingUpdated;
+
+      // Final tiebreaker
+      return candidateProgress > existingProgress;
+    };
+
+    type LocalProgressEntry = {
+      episodeId?: string;
+      season?: number;
+      episode?: number;
+      progressPercent: number;
+      lastUpdated: number;
+    };
+
+    const getIdVariants = (id: string): string[] => {
+      const variants = new Set<string>();
+      if (typeof id !== 'string' || id.length === 0) return [];
+
+      variants.add(id);
+
+      if (id.startsWith('tt')) {
+        variants.add(id.replace(/^tt/, ''));
+      } else {
+        // Only add a tt-variant when the id looks like a bare imdb numeric id.
+        if (/^\d+$/.test(id)) {
+          variants.add(`tt${id}`);
+        }
+      }
+
+      return Array.from(variants);
+    };
+
+    const parseEpisodeId = (episodeId?: string): { season: number; episode: number } | null => {
+      if (!episodeId) return null;
+
+      const match = episodeId.match(/s(\d+)e(\d+)/i);
+      if (match) {
+        const season = parseInt(match[1], 10);
+        const episode = parseInt(match[2], 10);
+        if (!isNaN(season) && !isNaN(episode)) return { season, episode };
+      }
+
+      const parts = episodeId.split(':');
+      if (parts.length >= 3) {
+        const seasonNum = parseInt(parts[parts.length - 2], 10);
+        const episodeNum = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(seasonNum) && !isNaN(episodeNum)) return { season: seasonNum, episode: episodeNum };
+      }
+
+      return null;
+    };
+
     // Helper to merge a batch of items into state (dedupe by type:id, keep newest)
     const mergeBatchIntoState = async (batch: ContinueWatchingItem[]) => {
       if (!batch || batch.length === 0) return;
@@ -365,8 +443,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         for (const it of validItems) {
           const key = `${it.type}:${it.id}`;
           const existing = map.get(key);
-          // Only update if newer or doesn't exist
-          if (!existing || (it.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
+          // Prefer local when it is ahead; otherwise, prefer newer
+          if (!existing || shouldPreferCandidate(it, existing)) {
             map.set(key, it);
           }
         }
@@ -379,18 +457,57 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
     };
 
     try {
-      // If Trakt is authenticated, skip local storage and only use Trakt playback
       const traktService = TraktService.getInstance();
       const isTraktAuthed = await traktService.isAuthenticated();
 
-      // Declare groupPromises outside the if/else block
+      // Declare groupPromises outside the if block
       let groupPromises: Promise<void>[] = [];
 
+      // In Trakt mode, CW is sourced from Trakt only, but we still want to overlay local progress
+      // when local is ahead (scrobble lag/offline playback).
+      let localProgressIndex: Map<string, LocalProgressEntry[]> | null = null;
       if (isTraktAuthed) {
-        // Just skip local storage - Trakt will populate with correct timestamps
-        // Don't clear existing items to avoid flicker
-      } else {
-        // Non-Trakt: use local storage
+        try {
+          const allProgress = await storageService.getAllWatchProgress();
+          const index = new Map<string, LocalProgressEntry[]>();
+
+          for (const [key, progress] of Object.entries(allProgress)) {
+            const keyParts = key.split(':');
+            const [type, id, ...episodeIdParts] = keyParts;
+            const episodeId = episodeIdParts.length > 0 ? episodeIdParts.join(':') : undefined;
+
+            const progressPercent =
+              progress?.duration > 0
+                ? (progress.currentTime / progress.duration) * 100
+                : 0;
+
+            if (!isFinite(progressPercent) || progressPercent <= 0) continue;
+
+            const parsed = parseEpisodeId(episodeId);
+            const entry: LocalProgressEntry = {
+              episodeId,
+              season: parsed?.season,
+              episode: parsed?.episode,
+              progressPercent,
+              lastUpdated: progress?.lastUpdated ?? 0,
+            };
+
+            for (const idVariant of getIdVariants(id)) {
+              const idxKey = `${type}:${idVariant}`;
+              const list = index.get(idxKey);
+              if (list) list.push(entry);
+              else index.set(idxKey, [entry]);
+            }
+          }
+
+          localProgressIndex = index;
+        } catch {
+          localProgressIndex = null;
+        }
+      }
+
+      // Non-Trakt: use local storage
+      if (!isTraktAuthed) {
         const allProgress = await storageService.getAllWatchProgress();
         if (Object.keys(allProgress).length === 0) {
           setContinueWatchingItems([]);
@@ -425,9 +542,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         // Fetch Trakt watched movies once and reuse
         const traktMoviesSetPromise = (async () => {
           try {
-            const traktService = TraktService.getInstance();
-            const isAuthed = await traktService.isAuthenticated();
-            if (!isAuthed) return new Set<string>();
+            if (!isTraktAuthed) return new Set<string>();
             if (typeof (traktService as any).getWatchedMovies === 'function') {
               const watched = await (traktService as any).getWatchedMovies();
               const watchedSet = new Set<string>();
@@ -457,9 +572,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         // Fetch Trakt watched shows once and reuse
         const traktShowsSetPromise = (async () => {
           try {
-            const traktService = TraktService.getInstance();
-            const isAuthed = await traktService.isAuthenticated();
-            if (!isAuthed) return new Set<string>();
+            if (!isTraktAuthed) return new Set<string>();
 
             if (typeof (traktService as any).getWatchedShows === 'function') {
               const watched = await (traktService as any).getWatchedShows();
@@ -660,14 +773,12 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             // Continue processing other groups even if one fails
           }
         });
-      } // End of else block for non-Trakt users
+      }
 
       // TRAKT: fetch playback progress (in-progress items) and history, merge incrementally
       const traktMergePromise = (async () => {
         try {
-          const traktService = TraktService.getInstance();
-          const isAuthed = await traktService.isAuthenticated();
-          if (!isAuthed) return;
+          if (!isTraktAuthed) return;
 
           // Check Trakt sync cooldown to prevent excessive API calls
           const now = Date.now();
@@ -883,9 +994,9 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
             logger.warn('[TraktSync] Error fetching watched shows for Up Next:', err);
           }
 
-          // Set Trakt playback items as state (replace, don't merge with local storage)
+          // Trakt mode: show ONLY Trakt items, but override progress with local if local is higher.
           if (traktBatch.length > 0) {
-            // Dedupe: for series, keep only the latest episode per show
+            // Dedupe (keep most recent per show/movie)
             const deduped = new Map<string, ContinueWatchingItem>();
             for (const item of traktBatch) {
               const key = `${item.type}:${item.id}`;
@@ -894,25 +1005,81 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
                 deduped.set(key, item);
               }
             }
-            const uniqueItems = Array.from(deduped.values());
 
-            // Filter out removed items
+            // Filter removed items
             const filteredItems: ContinueWatchingItem[] = [];
-            for (const item of uniqueItems) {
-              // Check episode-specific removal for series
+            for (const item of deduped.values()) {
+              const key = item.type === 'series' && item.season && item.episode
+                ? `${item.type}:${item.id}:${item.season}:${item.episode}`
+                : `${item.type}:${item.id}`;
+              if (recentlyRemovedRef.current.has(key)) continue;
+
               const removeId = item.type === 'series' && item.season && item.episode
                 ? `${item.id}:${item.season}:${item.episode}`
                 : item.id;
               const isRemoved = await storageService.isContinueWatchingRemoved(removeId, item.type);
-              if (!isRemoved) {
-                filteredItems.push(item);
-              }
+              if (!isRemoved) filteredItems.push(item);
             }
 
-            logger.log(`📋 [TraktSync] Setting ${filteredItems.length} items from Trakt playback (deduped from ${traktBatch.length})`);
+            const getLocalOverride = (item: ContinueWatchingItem): LocalProgressEntry | null => {
+              if (!localProgressIndex) return null;
+
+              const typeKey = item.type;
+              let best: LocalProgressEntry | null = null;
+
+              for (const idVariant of getIdVariants(item.id)) {
+                const entries = localProgressIndex.get(`${typeKey}:${idVariant}`);
+                if (!entries || entries.length === 0) continue;
+
+                if (item.type === 'movie') {
+                  for (const e of entries) {
+                    if (!best || e.progressPercent > best.progressPercent) best = e;
+                  }
+                } else {
+                  // series: only match same season/episode
+                  if (item.season === undefined || item.episode === undefined) continue;
+                  for (const e of entries) {
+                    if (e.season === item.season && e.episode === item.episode) {
+                      if (!best || e.progressPercent > best.progressPercent) best = e;
+                    }
+                  }
+                }
+              }
+
+              return best;
+            };
+
+            const adjustedItems = filteredItems.map((it) => {
+              const local = getLocalOverride(it);
+              if (!local) return it;
+
+              const mergedLastUpdated = Math.max(it.lastUpdated ?? 0, local.lastUpdated ?? 0);
+
+              // Always treat local lastUpdated as the recency source so items move to the front
+              // immediately after playback, even if Trakt progress isn't updated yet.
+              if (local.progressPercent > (it.progress ?? 0) + 0.5) {
+                return {
+                  ...it,
+                  progress: local.progressPercent,
+                  lastUpdated: mergedLastUpdated,
+                };
+              }
+
+              return {
+                ...it,
+                lastUpdated: mergedLastUpdated,
+              };
+            }).filter((it) => {
+              // Never show completed items in Continue Watching
+              const p = it.progress ?? 0;
+              if (it.type === 'movie' && p >= 85) return false;
+              if (it.type === 'series' && p >= 85) return false;
+              return true;
+            });
+
             // Sort by lastUpdated descending and set directly
-            const sortedBatch = filteredItems.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
-            setContinueWatchingItems(sortedBatch);
+            adjustedItems.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
+            setContinueWatchingItems(adjustedItems);
           }
         } catch (err) {
           logger.error('[TraktSync] Error in Trakt merge:', err);
