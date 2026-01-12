@@ -1162,20 +1162,32 @@ class LocalScraperService {
   }
 
 
-  // Execute scraper code with full access to app environment (non-sandboxed)
   private async executePlugin(code: string, params: any, consoleOverride?: any): Promise<LocalScraperResult[]> {
     try {
-      // Get URL validation setting from storage
       const settingsData = await mmkvStorage.getItem('app_settings');
       const settings = settingsData ? JSON.parse(settingsData) : {};
       const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
 
-      // Load per-scraper settings for this run
       const allScraperSettingsRaw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
       const allScraperSettings = allScraperSettingsRaw ? JSON.parse(allScraperSettingsRaw) : {};
-      const perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId])
+      let perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId])
         ? allScraperSettings[params.scraperId]
         : (params?.settings || {});
+
+      if (params?.scraperId?.toLowerCase().includes('showbox')) {
+        const token = perScraperSettings.uiToken || perScraperSettings.cookie || perScraperSettings.token;
+        if (token) {
+          perScraperSettings = {
+            ...perScraperSettings,
+            uiToken: token,
+            cookie: token,
+            token: token
+          };
+          if (params) {
+            params.settings = perScraperSettings;
+          }
+        }
+      }
 
       // Module exports for CommonJS compatibility
       const moduleExports: any = {};
@@ -1292,12 +1304,16 @@ class LocalScraperService {
             'SCRAPER_ID',
             `
             // Make env vars available globally for backward compatibility
-            if (typeof global !== 'undefined') {
-              global.PRIMARY_KEY = PRIMARY_KEY;
-              global.TMDB_API_KEY = TMDB_API_KEY;
-              global.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
-              global.SCRAPER_ID = SCRAPER_ID;
-              global.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
+            const globalScope = typeof global !== 'undefined' ? global : (typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : this));
+            
+            if (globalScope) {
+              globalScope.PRIMARY_KEY = PRIMARY_KEY;
+              globalScope.TMDB_API_KEY = TMDB_API_KEY;
+              globalScope.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
+              globalScope.SCRAPER_ID = SCRAPER_ID;
+              globalScope.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
+            } else {
+               logger.error('[Plugin Sandbox] Could not find global scope to inject settings');
             }
 
             // Plugin code

@@ -5,5 +5,6 @@ export const LOCALES = [
     { code: 'de', key: 'german' },
     { code: 'ar', key: 'arabic' },
     { code: 'fr', key: 'french' },
-    { code: 'it', key: 'italian' }
+    { code: 'it', key: 'italian' },
+    { code: 'es', key: 'spanish' }
 ];

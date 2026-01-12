@@ -1231,8 +1231,10 @@ const PluginsScreen: React.FC = () => {
       if (sb) {
         setShowboxScraperId(sb.id);
         const s = await pluginService.getScraperSettings(sb.id);
-        setShowboxUiToken(s.uiToken || '');
-        setShowboxSavedToken(s.uiToken || '');
+        // Check for multiple possible key names for the token
+        const token = s.uiToken || s.cookie || s.token || '';
+        setShowboxUiToken(token);
+        setShowboxSavedToken(token);
         setShowboxTokenVisible(false);
       } else {
         setShowboxScraperId(null);
@@ -1926,7 +1928,12 @@ const PluginsScreen: React.FC = () => {
                             style={[styles.button, styles.primaryButton]}
                             onPress={async () => {
                               if (showboxScraperId) {
-                                await pluginService.setScraperSettings(showboxScraperId, { uiToken: showboxUiToken });
+                                // Save with multiple keys to ensure the scraper finds it regardless of what key it checks
+                                await pluginService.setScraperSettings(showboxScraperId, {
+                                  uiToken: showboxUiToken,
+                                  cookie: showboxUiToken,
+                                  token: showboxUiToken
+                                });
                               }
                               setShowboxSavedToken(showboxUiToken);
                               openAlert('Saved', 'ShowBox settings updated');

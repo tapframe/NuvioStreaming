@@ -1,3 +1,5 @@
+# 🎬 Nuvio Media Hub
+
 <!-- PROJECT LOGO -->
 <div align="center">
   <a id="readme-top"></a>
@@ -8,10 +10,7 @@
   [![Issues][issues-shield]][issues-url]
   [![License][license-shield]][license-url]
 
-  <br />
-  <br />
   <img src="assets/titlelogo.png" alt="Nuvio Logo" width="120" />
-  <h1 align="center">🎬 Nuvio Media Hub</h1>
   <p align="center">
     A modern media hub built with React Native and Expo
     <br />
@@ -31,6 +30,7 @@
 <!-- TABLE OF CONTENTS -->
 <details>
   <summary>Table of Contents</summary>
+
   <ol>
     <li>
       <a href="#about-the-project">About The Project</a>
@@ -40,26 +40,24 @@
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#support">Support</a></li>
-    <li><a href="#support">Support</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#legal">Legal</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
     <li><a href="#built-with">Built With</a></li>
   </ol>
-  </details>
+</details>
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
 Nuvio Media Hub is a cross‑platform app for managing, discovering, and streaming your media via a flexible addon ecosystem. Built with React Native + Expo, it integrates providers and sync services while keeping a simple, fast UI.
 
- 
-
 <!-- INSTALLATION -->
 ## Installation
 
 ### Android
+
 [![Download APK](https://img.shields.io/badge/Download-APK-green?style=for-the-badge)](https://github.com/tapframe/NuvioStreaming/releases/latest)
 
 Download the latest APK from [GitHub Releases](https://github.com/tapframe/NuvioStreaming/releases/latest)
@@ -67,19 +65,20 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 ### iOS
 
 #### TestFlight (Recommended)
-<img src="https://upload.wikimedia.org/wikipedia/fr/b/bc/TestFlight-icon.png" width="24" height="24" align="left"> [![Join TestFlight](https://img.shields.io/badge/Join-TestFlight-blue?style=for-the-badge)](https://testflight.apple.com/join/QkKMGRqp)
+
+<img src="https://upload.wikimedia.org/wikipedia/fr/b/bc/TestFlight-icon.png" width="24" height="24" align="left" alt="TestFlight Icon"> [![Join TestFlight](https://img.shields.io/badge/Join-TestFlight-blue?style=for-the-badge)](https://testflight.apple.com/join/QkKMGRqp)
 
 #### AltStore
-<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="24" height="24" align="left"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
+
+<img src="https://upload.wikimedia.org/wikipedia/commons/2/20/AltStore_logo.png" width="24" height="24" align="left" alt="AltStore Logo"> [![Add to AltStore](https://img.shields.io/badge/Add%20to-AltStore-blue?style=for-the-badge)](https://tinyurl.com/NuvioAltstore)
 
 #### SideStore
-<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="24" height="24" align="left"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
+
+<img src="https://github.com/SideStore/assets/blob/main/icon.png?raw=true" width="24" height="24" align="left" alt="SideStore Logo"> [![Add to SideStore](https://img.shields.io/badge/Add%20to-SideStore-green?style=for-the-badge)](https://tinyurl.com/NuvioSidestore)
 
 **Manual URL:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- GETTING STARTED -->
 ## Getting Started
@@ -89,28 +88,22 @@ Follow the steps below to run the app locally for development. For detailed setu
 ### Development Build
 
 <details>
-  <summary>Build from Source</summary>
+    <summary>Build from Source</summary>
 
-```bash
-git clone https://github.com/tapframe/NuvioStreaming.git
-cd NuvioStreaming
-npm install
-# If you hit peer dependency conflicts:
-# npm install --legacy-peer-deps
-npx expo start
-```
+    git clone https://github.com/tapframe/NuvioStreaming.git
+    cd NuvioStreaming
+    npm install
+    # If you hit peer dependency conflicts:
+    # npm install --legacy-peer-deps
+    npx expo start
 
-```bash
-npx expo prebuild
-npx expo run:android  # Android
-npx expo run:ios      # iOS
-```
+    npx expo prebuild
+    npx expo run:android  # Android
+    npx expo run:ios      # iOS
 
 </details>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
- 
 
 ## Contributing
 
@@ -151,6 +144,7 @@ For comprehensive legal information, including our full disclaimer, third-party 
 ## Contact
 
 **Project Links:**
+
 * GitHub: `https://github.com/tapframe`
 * Issues: `https://github.com/tapframe/NuvioStreaming/issues`
 
@@ -171,13 +165,13 @@ For comprehensive legal information, including our full disclaimer, third-party 
 
 <p align="left">
   <a href="https://skillicons.dev">
-    <img src="https://skillicons.dev/icons?i=react,typescript,nodejs,expo,github,githubactions&theme=light&perline=6" />
+    <img src="https://skillicons.dev/icons?i=react,typescript,nodejs,expo,github,githubactions&theme=light&perline=6" alt="Skills Icons" />
   </a>
   <br/>
   React Native • Expo • TypeScript
-  </p>
+</p>
 
-  ## Star History
+## Star History
 
 <a href="https://www.star-history.com/#tapframe/NuvioStreaming&type=date&legend=top-left">
  <picture>
