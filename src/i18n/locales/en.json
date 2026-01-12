@@ -1094,6 +1094,8 @@
         "external_title": "External Player",
         "external_desc": "Open streams in your preferred video player",
         "section_playback": "PLAYBACK OPTIONS",
+        "skip_intro_settings_title": "Skip Intro",
+        "powered_by_introdb": "Powered by IntroDB",
         "autoplay_title": "Auto-play First Stream",
         "autoplay_desc": "Automatically start the first stream shown in the list.",
         "resume_title": "Always Resume",
