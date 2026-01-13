@@ -112,10 +112,14 @@ export const usePlayerSetup = (
             subscription?.remove();
             disableImmersiveMode();
 
-            // Restore brightness on unmount
-            if (Platform.OS === 'android' && originalSystemBrightnessRef.current !== null) {
-                // restoration logic normally happens here or in a separate effect
+            async function restoreBrightness() {
+                logger.log('yobrrrrrrrrrrrrrr');
+                await Brightness.setBrightnessAsync(originalSystemBrightnessRef.current!).then();
+                setBrightness(originalSystemBrightnessRef.current!);
             }
+            // Restore brightness on unmount
+            if (Platform.OS === 'android' && originalSystemBrightnessRef.current !== null)
+                restoreBrightness();
         };
     }, []);
 
