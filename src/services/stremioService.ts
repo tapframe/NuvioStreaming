@@ -1836,6 +1836,8 @@ class StremioService {
   // Check if any installed addons can provide streams (including embedded streams in metadata)
   async hasStreamProviders(type?: string): Promise<boolean> {
     await this.ensureInitialized();
+    // App-level content type "tv" maps to Stremio "series"
+    const normalizedType = type === 'tv' ? 'series' : type;
     const addons = Array.from(this.installedAddons.values());
 
     for (const addon of addons) {
@@ -1849,12 +1851,12 @@ class StremioService {
 
         if (hasStreamResource) {
           // If type specified, also check if addon supports this type
-          if (type) {
-            const supportsType = addon.types?.includes(type) ||
+          if (normalizedType) {
+            const supportsType = addon.types?.includes(normalizedType) ||
               addon.resources.some(resource =>
                 typeof resource === 'object' &&
                 (resource as any).name === 'stream' &&
-                (resource as any).types?.includes(type)
+                (resource as any).types?.includes(normalizedType)
               );
             if (supportsType) return true;
           } else {
@@ -1864,14 +1866,14 @@ class StremioService {
 
         // Also check for addons with meta resource that support the type
         // These addons might provide embedded streams within metadata
-        if (type) {
+        if (normalizedType) {
           const hasMetaResource = addon.resources.some(resource =>
             typeof resource === 'string'
               ? resource === 'meta'
               : (resource as any).name === 'meta'
           );
 
-          if (hasMetaResource && addon.types?.includes(type)) {
+          if (hasMetaResource && addon.types?.includes(normalizedType)) {
             // This addon provides meta for the type - might have embedded streams
             return true;
           }

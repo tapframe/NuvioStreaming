@@ -1537,6 +1537,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const allStremioAddons = await stremioService.getInstalledAddons();
         const localScrapers = await localScraperService.getInstalledScrapers();
 
+        // Map app-level "tv" type to Stremio "series" for addon capability checks
+        const stremioType = type === 'tv' ? 'series' : type;
+
         // Filter Stremio addons to only include those that provide streams for this content type
         const streamAddons = allStremioAddons.filter(addon => {
           if (!addon.resources || !Array.isArray(addon.resources)) {
@@ -1552,7 +1555,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               const typedResource = resource as any;
               if (typedResource.name === 'stream' &&
                 Array.isArray(typedResource.types) &&
-                typedResource.types.includes(type)) {
+                typedResource.types.includes(stremioType)) {
                 hasStreamResource = true;
 
                 // Check if this addon supports the ID prefix generically: any prefix must match start of id
@@ -1567,7 +1570,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             }
             // Check if the element is the simple string "stream" AND the addon has a top-level types array
             else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
-              if (Array.isArray(addon.types) && addon.types.includes(type)) {
+              if (Array.isArray(addon.types) && addon.types.includes(stremioType)) {
                 hasStreamResource = true;
                 // For simple string resources, check addon-level idPrefixes generically
                 if (addon.idPrefixes && Array.isArray(addon.idPrefixes) && addon.idPrefixes.length > 0) {
@@ -1635,7 +1638,9 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       // Start Stremio request using the converted ID format
       if (__DEV__) console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
-      processStremioSource(type, stremioId, false);
+      // Map app-level "tv" type to Stremio "series" when requesting streams
+      const stremioContentType = type === 'tv' ? 'series' : type;
+      processStremioSource(stremioContentType, stremioId, false);
 
       // Also extract any embedded streams from metadata (PPV-style addons)
       extractEmbeddedStreams();
@@ -1913,7 +1918,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       // For collections, treat episodes as individual movies, not series
       // For other types (e.g. StreamsPPV), preserve the original type unless it's explicitly 'series' logic we want
-      const contentType = isCollection ? 'movie' : type;
+      // Map app-level "tv" type to Stremio "series" for addon stream endpoint
+      const contentType = isCollection ? 'movie' : (type === 'tv' ? 'series' : type);
       if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Using content type: ${contentType} for ${isCollection ? 'collection' : type}`);
 
       processStremioSource(contentType, stremioEpisodeId, true);
