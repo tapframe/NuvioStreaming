@@ -153,13 +153,18 @@ const SearchScreen = () => {
           type: catalog.type,
         };
         await mmkvStorage.setItem(DISCOVER_CATALOG_KEY, JSON.stringify(catalogData));
+      } else {
+        // Clear catalog if null
+        await mmkvStorage.removeItem(DISCOVER_CATALOG_KEY);
       }
 
-      // Save genre
+      // Save genre - use empty string to indicate "All genres"
+      // This way we distinguish between "not set" and "All genres"
       if (genre) {
         await mmkvStorage.setItem(DISCOVER_GENRE_KEY, genre);
       } else {
-        await mmkvStorage.removeItem(DISCOVER_GENRE_KEY);
+        // Save empty string to indicate "All genres" is selected
+        await mmkvStorage.setItem(DISCOVER_GENRE_KEY, '');
       }
     } catch (error) {
       logger.error('Failed to save discover settings:', error);
@@ -188,11 +193,21 @@ const SearchScreen = () => {
 
               // Load saved genre
               const savedGenre = await mmkvStorage.getItem(DISCOVER_GENRE_KEY);
-              if (savedGenre && foundCatalog.genres.includes(savedGenre)) {
-                setSelectedDiscoverGenre(savedGenre);
-              } else if (foundCatalog.genres.length > 0) {
-                // Set first genre as default if saved genre not available
-                setSelectedDiscoverGenre(foundCatalog.genres[0]);
+              if (savedGenre !== null) {
+                if (savedGenre === '') {
+                  // Empty string means "All genres" was selected
+                  setSelectedDiscoverGenre(null);
+                } else if (foundCatalog.genres.includes(savedGenre)) {
+                  setSelectedDiscoverGenre(savedGenre);
+                } else if (foundCatalog.genres.length > 0) {
+                  // Set first genre as default if saved genre not available
+                  setSelectedDiscoverGenre(foundCatalog.genres[0]);
+                }
+              } else {
+                // No saved genre, default to first genre
+                if (foundCatalog.genres.length > 0) {
+                  setSelectedDiscoverGenre(foundCatalog.genres[0]);
+                }
               }
               return;
             }
@@ -688,7 +703,7 @@ const SearchScreen = () => {
   const handleGenreSelect = (genre: string | null) => {
     setSelectedDiscoverGenre(genre);
 
-    // Save genre setting
+    // Save genre setting - this will save empty string for null (All genres)
     saveDiscoverSettings(selectedDiscoverType, selectedCatalog, genre);
 
     genreSheetRef.current?.dismiss();
