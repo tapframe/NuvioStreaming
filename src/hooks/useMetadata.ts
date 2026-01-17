@@ -823,9 +823,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Store addon logo before TMDB enrichment overwrites it
         const addonLogo = (finalMetadata as any).logo;
-        const addonName = finalMetadata.name;
-        const addonDescription = finalMetadata.description;
-        const addonBanner = finalMetadata.banner;
 
 
         try {
@@ -860,8 +857,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: (addonName && addonName.trim()) ? addonName : (localized.title || finalMetadata.name),
-                    description: (addonDescription && addonDescription.trim()) ? addonDescription : (localized.overview || finalMetadata.description),
+                    name: localized.title || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     movieDetails: movieDetailsObj,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -897,8 +894,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: (addonName && addonName.trim()) ? addonName : (localized.name || finalMetadata.name),
-                    description: (addonDescription && addonDescription.trim()) ? addonDescription : (localized.overview || finalMetadata.description),
+                    name: localized.name || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     tvDetails,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -930,7 +927,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             if (tmdbIdForLogo) {
               const logoUrl = await tmdbService.getContentLogo(contentType, tmdbIdForLogo, preferredLanguage);
               // Use TMDB logo if found, otherwise fall back to addon logo
-              finalMetadata.logo = addonLogo || logoUrl || undefined;
+              finalMetadata.logo = logoUrl || addonLogo || undefined;
               if (__DEV__) {
                 console.log('[useMetadata] Logo fetch result:', {
                   contentType,
@@ -970,15 +967,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
 
         // Clear banner field if TMDB banner enrichment is enabled to prevent flash
-        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichBanners) {
-          if (!addonBanner && !finalMetadata.banner) {
-            finalMetadata = {
-              ...finalMetadata,
-              banner: undefined,
-        // Let useMetadataAssets handle banner via TMDB
+        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichBanners && !finalMetadata.banner) {
+          finalMetadata = {
+            ...finalMetadata,
+            banner: undefined, // Let useMetadataAssets handle banner via TMDB
           };
         }
-      }
 
         // Preserve existing collection if it was set by fetchProductionInfo
         setMetadata((prev) => {
