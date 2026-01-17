@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { storageService } from '../../../services/storageService';
 import { logger } from '../../../utils/logger';
 import { useSettings } from '../../../hooks/useSettings';
+import { watchedService } from '../../../services/watchedService';
 
 export const useWatchProgress = (
     id: string | undefined,
@@ -13,7 +14,12 @@ export const useWatchProgress = (
     paused: boolean,
     traktAutosync: any,
     seekToTime: (time: number) => void,
-    addonId?: string
+    addonId?: string,
+    // New parameters for MAL scrobbling
+    imdbId?: string,
+    season?: number,
+    episode?: number,
+    releaseDate?: string
 ) => {
     const [resumePosition, setResumePosition] = useState<number | null>(null);
     const [savedDuration, setSavedDuration] = useState<number | null>(null);
@@ -23,6 +29,7 @@ export const useWatchProgress = (
 
     const { settings: appSettings } = useSettings();
     const initialSeekTargetRef = useRef<number | null>(null);
+    const hasScrobbledRef = useRef(false);
 
     // Values refs for unmount cleanup
     const currentTimeRef = useRef(currentTime);
@@ -120,6 +127,26 @@ export const useWatchProgress = (
             try {
                 await storageService.setWatchProgress(id, type, progress, episodeId);
                 await traktAutosync.handleProgressUpdate(currentTimeRef.current, durationRef.current);
+
+                // Requirement 1: Auto Episode Tracking (>= 90% completion)
+                const progressPercent = (currentTimeRef.current / durationRef.current) * 100;
+                if (progressPercent >= 90 && !hasScrobbledRef.current) {
+                    hasScrobbledRef.current = true;
+                    logger.log(`[useWatchProgress] 90% threshold reached, scrobbling to MAL...`);
+                    
+                    if (type === 'series' && imdbId && season !== undefined && episode !== undefined) {
+                        watchedService.markEpisodeAsWatched(
+                            imdbId, 
+                            id, 
+                            season, 
+                            episode, 
+                            new Date(), 
+                            releaseDate
+                        );
+                    } else if (type === 'movie' && imdbId) {
+                        watchedService.markMovieAsWatched(imdbId);
+                    }
+                }
             } catch (error) {
                 logger.error('[useWatchProgress] Error saving watch progress:', error);
             }

@@ -75,7 +75,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const {
     uri, title = 'Episode Name', season, episode, episodeTitle, quality, year,
     streamProvider, streamName, headers, id, type, episodeId, imdbId,
-    availableStreams: passedAvailableStreams, backdrop, groupedEpisodes
+    availableStreams: passedAvailableStreams, backdrop, groupedEpisodes, releaseDate
   } = route.params;
 
   // --- State & Custom Hooks ---
@@ -261,7 +261,11 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.paused,
     traktAutosync,
     controlsHook.seekToTime,
-    currentStreamProvider
+    currentStreamProvider,
+    imdbId,
+    season,
+    episode,
+    releaseDate
   );
 
   const gestureControls = usePlayerGestureControls({

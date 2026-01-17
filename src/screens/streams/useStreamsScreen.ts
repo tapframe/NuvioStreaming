@@ -367,6 +367,7 @@ export const useStreamsScreen = () => {
         const season = (type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined;
         const episode = (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined;
         const episodeTitle = (type === 'series' || type === 'other') ? currentEpisode?.name : undefined;
+        const releaseDate = type === 'movie' ? metadata?.released : currentEpisode?.air_date;
 
         await streamCacheService.saveStreamToCache(
           id,
@@ -412,6 +413,7 @@ export const useStreamsScreen = () => {
         availableStreams: streamsToPass,
         backdrop: metadata?.banner || bannerImage,
         videoType,
+        releaseDate,
       } as any);
     },
     [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams, bannerImage, settings.streamCacheTTL]

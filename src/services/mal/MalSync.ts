@@ -200,6 +200,47 @@ export const MalSync = {
   },
 
   /**
+   * Direct scrobble with known MAL ID and Episode
+   * Used when ArmSync has already resolved the exact details.
+   */
+  scrobbleDirect: async (malId: number, episodeNumber: number) => {
+      try {
+          // Respect user settings
+          const isEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
+          const isAutoUpdate = mmkvStorage.getBoolean('mal_auto_update') ?? true;
+          if (!isEnabled || !isAutoUpdate) return;
+
+          // Check current status
+          const currentInfo = await MalApiService.getMyListStatus(malId);
+          const currentStatus = currentInfo.my_list_status?.status;
+          
+          // Auto-Add check
+          if (!currentStatus) {
+              const autoAdd = mmkvStorage.getBoolean('mal_auto_add') ?? true;
+              if (!autoAdd) {
+                  console.log(`[MalSync] Skipping direct scrobble: Not in list and auto-add disabled`);
+                  return;
+              }
+          }
+
+          // Safety checks (Completed/Dropped/Regression)
+          if (currentStatus === 'completed' || currentStatus === 'dropped') return;
+          if (currentInfo.my_list_status?.num_episodes_watched && episodeNumber <= currentInfo.my_list_status.num_episodes_watched) return;
+
+          // Determine Status
+          let status: MalListStatus = 'watching';
+          if (currentInfo.num_episodes > 0 && episodeNumber >= currentInfo.num_episodes) {
+              status = 'completed';
+          }
+
+          await MalApiService.updateStatus(malId, status, episodeNumber);
+          console.log(`[MalSync] Direct synced MAL ID ${malId} Ep ${episodeNumber} (${status})`);
+      } catch (e) {
+          console.error('[MalSync] Direct scrobble failed:', e);
+      }
+  },
+
+  /**
    * Import MAL list items into local library
    */
   syncMalToLibrary: async () => {

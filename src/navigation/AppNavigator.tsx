@@ -149,6 +149,7 @@ export type RootStackParamList = {
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
     backdrop?: string;
     videoType?: string;
+    releaseDate?: string;
     groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
   PlayerAndroid: {
@@ -169,6 +170,7 @@ export type RootStackParamList = {
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
     backdrop?: string;
     videoType?: string;
+    releaseDate?: string;
     groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };

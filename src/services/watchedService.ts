@@ -4,6 +4,7 @@ import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 import { MalSync } from './mal/MalSync';
 import { MalAuth } from './mal/MalAuth';
+import { ArmSyncService } from './mal/ArmSyncService';
 import { mappingService } from './MappingService';
 
 /**
@@ -84,7 +85,8 @@ class WatchedService {
         showId: string,
         season: number,
         episode: number,
-        watchedAt: Date = new Date()
+        watchedAt: Date = new Date(),
+        releaseDate?: string // Optional release date for precise matching
     ): Promise<{ success: boolean; syncedToTrakt: boolean }> {
         try {
             logger.log(`[WatchedService] Marking episode as watched: ${showImdbId} S${season}E${episode}`);
@@ -106,14 +108,31 @@ class WatchedService {
             // Sync to MAL
             const malToken = MalAuth.getToken();
             if (malToken && showImdbId) {
-                MalSync.scrobbleEpisode(
-                    'Anime', // Title fallback
-                    episode,
-                    0, // Total episodes (MalSync will fetch)
-                    'series',
-                    season,
-                    showImdbId
-                ).catch(err => logger.error('[WatchedService] MAL sync failed:', err));
+                // Strategy 1: "Perfect Match" using ARM + Release Date
+                let synced = false;
+                if (releaseDate) {
+                    try {
+                        const armResult = await ArmSyncService.resolveByDate(showImdbId, releaseDate);
+                        if (armResult) {
+                            await MalSync.scrobbleDirect(armResult.malId, armResult.episode);
+                            synced = true;
+                        }
+                    } catch (e) {
+                        logger.warn('[WatchedService] ARM Sync failed, falling back to offline map:', e);
+                    }
+                }
+
+                // Strategy 2: Offline Mapping Fallback
+                if (!synced) {
+                    MalSync.scrobbleEpisode(
+                        'Anime', // Title fallback
+                        episode,
+                        0,
+                        'series',
+                        season,
+                        showImdbId
+                    ).catch(err => logger.error('[WatchedService] MAL sync failed:', err));
+                }
             }
 
             // Store locally as "completed"

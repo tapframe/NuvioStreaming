@@ -189,7 +189,12 @@ const KSPlayerCore: React.FC = () => {
     duration,
     paused,
     traktAutosync,
-    controls.seekToTime
+    controls.seekToTime,
+    undefined,
+    imdbId,
+    season,
+    episode,
+    undefined // releaseDate not yet implemented for iOS
   );
 
   // Gestures
