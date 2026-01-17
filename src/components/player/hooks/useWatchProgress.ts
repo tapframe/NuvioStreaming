@@ -35,6 +35,11 @@ export const useWatchProgress = (
     const currentTimeRef = useRef(currentTime);
     const durationRef = useRef(duration);
 
+    // Reset scrobble flag when content changes
+    useEffect(() => {
+        hasScrobbledRef.current = false;
+    }, [id, episodeId]);
+
     useEffect(() => {
         currentTimeRef.current = currentTime;
     }, [currentTime]);

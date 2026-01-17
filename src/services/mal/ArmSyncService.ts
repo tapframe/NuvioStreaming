@@ -35,9 +35,9 @@ export const ArmSyncService = {
    */
   resolveByDate: async (imdbId: string, releaseDateStr: string): Promise<DateSyncResult | null> => {
     try {
-      const targetDate = new Date(releaseDateStr);
-      if (isNaN(targetDate.getTime())) {
-        logger.warn(`[ArmSync] Invalid date provided: ${releaseDateStr}`);
+      // Basic validation: ensure date is in YYYY-MM-DD format
+      if (!/^\d{4}-\d{2}-\d{2}/.test(releaseDateStr)) {
+        logger.warn(`[ArmSync] Invalid date format provided: ${releaseDateStr}`);
         return null;
       }
 
@@ -69,20 +69,16 @@ export const ArmSyncService = {
           const detailsRes = await axios.get(`${JIKAN_BASE}/anime/${malId}`);
           const anime = detailsRes.data.data;
           
-          const startDate = anime.aired?.from ? new Date(anime.aired.from) : null;
-          const endDate = anime.aired?.to ? new Date(anime.aired.to) : null;
+          const startDateStr = anime.aired?.from ? new Date(anime.aired.from).toISOString().split('T')[0] : null;
+          const endDateStr = anime.aired?.to ? new Date(anime.aired.to).toISOString().split('T')[0] : null;
 
-          // Date Matching Logic
+          // Date Matching Logic (Lexicographical string comparison is safe for YYYY-MM-DD)
           let isMatch = false;
-          if (startDate) {
-            // Buffer: Allow +/- 24h for timezone differences
-            const buffer = 24 * 60 * 60 * 1000;
-            const targetTime = targetDate.getTime();
-            const startTime = startDate.getTime() - buffer;
-            const endTime = endDate ? endDate.getTime() + buffer : null;
-
-            if (targetTime >= startTime) {
-              if (!endTime || targetTime <= endTime) {
+          if (startDateStr) {
+            // Check if our episode date is >= Season Start Date
+            if (releaseDateStr >= startDateStr) {
+              // If season has ended, our episode must be <= Season End Date
+              if (!endDateStr || releaseDateStr <= endDateStr) {
                 isMatch = true;
               }
             }
@@ -93,15 +89,13 @@ export const ArmSyncService = {
             
             // 3. Find Exact Episode
             await delay(500);
-            // Fetch first page of episodes (usually enough for seasonal anime)
-            // Ideally we'd paginate, but for now page 1 covers 95% of cases.
             const epsRes = await axios.get(`${JIKAN_BASE}/anime/${malId}/episodes`);
             const episodes = epsRes.data.data;
             
             const matchEp = episodes.find((ep: any) => {
               if (!ep.aired) return false;
-              const epDate = new Date(ep.aired);
-              return epDate.toISOString().split('T')[0] === releaseDateStr;
+              const epDateStr = new Date(ep.aired).toISOString().split('T')[0];
+              return epDateStr === releaseDateStr;
             });
 
             if (matchEp) {
