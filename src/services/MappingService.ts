@@ -25,6 +25,7 @@ interface Mappings {
 class MappingService {
   private mappings: Mappings = {};
   private imdbIndex: { [imdbId: string]: string[] } = {}; // Maps IMDb ID to array of AniList IDs
+  private malIndex: { [malId: number]: string } = {}; // Maps MAL ID to AniList ID
   private isInitialized = false;
 
   /**
@@ -63,7 +64,9 @@ class MappingService {
    */
   private buildIndex() {
     this.imdbIndex = {};
+    this.malIndex = {};
     for (const [anilistId, entry] of Object.entries(this.mappings)) {
+      // IMDb Index
       if (entry.imdb_id) {
         const imdbIds = Array.isArray(entry.imdb_id) ? entry.imdb_id : [entry.imdb_id];
         for (const id of imdbIds) {
@@ -71,6 +74,14 @@ class MappingService {
             this.imdbIndex[id] = [];
           }
           this.imdbIndex[id].push(anilistId);
+        }
+      }
+      
+      // MAL Index
+      if (entry.mal_id) {
+        const malIds = Array.isArray(entry.mal_id) ? entry.mal_id : [entry.mal_id];
+        for (const id of malIds) {
+          this.malIndex[id] = anilistId;
         }
       }
     }
@@ -85,16 +96,11 @@ class MappingService {
         console.warn('MappingService not initialized. Call init() first.');
     }
 
-    // Since we don't have a direct index for MAL IDs yet, we iterate (inefficient but works for now)
-    // Optimization: In a real app, we should build a malIndex similar to imdbIndex during init()
-    for (const entry of Object.values(this.mappings)) {
-        if (entry.mal_id) {
-            const malIds = Array.isArray(entry.mal_id) ? entry.mal_id : [entry.mal_id];
-            if (malIds.includes(malId)) {
-                if (entry.imdb_id) {
-                    return Array.isArray(entry.imdb_id) ? entry.imdb_id[0] : entry.imdb_id;
-                }
-            }
+    const anilistId = this.malIndex[malId];
+    if (anilistId) {
+        const entry = this.mappings[anilistId];
+        if (entry && entry.imdb_id) {
+            return Array.isArray(entry.imdb_id) ? entry.imdb_id[0] : entry.imdb_id;
         }
     }
     return null;

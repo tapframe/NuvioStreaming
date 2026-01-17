@@ -56,6 +56,7 @@ import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import MalSettingsScreen from '../screens/MalSettingsScreen';
+import MalLibraryScreen from '../screens/MalLibraryScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import ThemeScreen from '../screens/ThemeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -187,6 +188,7 @@ export type RootStackParamList = {
   HeroCatalogs: undefined;
   TraktSettings: undefined;
   MalSettings: undefined;
+  MalLibrary: undefined;
   PlayerSettings: undefined;
   ThemeSettings: undefined;
   ScraperSettings: undefined;
@@ -1570,6 +1572,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen
               name="MalSettings"
               component={MalSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="MalLibrary"
+              component={MalLibraryScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

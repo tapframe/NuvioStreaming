@@ -3,7 +3,7 @@ import { storageService } from './storageService';
 import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
 import { MalSync } from './mal/MalSync';
-import { MalAuthService } from './mal/MalAuth';
+import { MalAuth } from './mal/MalAuth';
 import { mappingService } from './MappingService';
 
 /**
@@ -39,6 +39,9 @@ class WatchedService {
         try {
             logger.log(`[WatchedService] Marking movie as watched: ${imdbId}`);
 
+            const isTraktAuth = await this.traktService.isAuthenticated();
+            let syncedToTrakt = false;
+
             // Sync to Trakt
             if (isTraktAuth) {
                 syncedToTrakt = await this.traktService.addToWatchedMovies(imdbId, watchedAt);
@@ -46,8 +49,8 @@ class WatchedService {
             }
 
             // Sync to MAL
-            const isMalAuth = await MalAuthService.isAuthenticated();
-            if (isMalAuth) {
+            const malToken = MalAuth.getToken();
+            if (malToken) {
                 MalSync.scrobbleEpisode(
                     'Movie', 
                     1, 
@@ -86,6 +89,9 @@ class WatchedService {
         try {
             logger.log(`[WatchedService] Marking episode as watched: ${showImdbId} S${season}E${episode}`);
 
+            const isTraktAuth = await this.traktService.isAuthenticated();
+            let syncedToTrakt = false;
+
             // Sync to Trakt
             if (isTraktAuth) {
                 syncedToTrakt = await this.traktService.addToWatchedEpisodes(
@@ -98,11 +104,8 @@ class WatchedService {
             }
 
             // Sync to MAL
-            const isMalAuth = await MalAuthService.isAuthenticated();
-            if (isMalAuth && showImdbId) {
-                // We need the title for scrobbleEpisode (as fallback), 
-                // but getMalId will now prioritize the IMDb mapping.
-                // We'll use a placeholder title or try to find it if possible.
+            const malToken = MalAuth.getToken();
+            if (malToken && showImdbId) {
                 MalSync.scrobbleEpisode(
                     'Anime', // Title fallback
                     episode,

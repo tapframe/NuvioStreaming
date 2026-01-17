@@ -10,7 +10,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -63,6 +63,7 @@ const SearchScreen = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const route = useRoute<any>();
   const { addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, isInWatchlist, isInCollection } = useTraktContext();
   const { showSuccess, showInfo } = useToast();
   const [query, setQuery] = useState('');
@@ -469,6 +470,13 @@ const SearchScreen = () => {
   useFocusEffect(
     useCallback(() => {
       isMounted.current = true;
+      
+      // Check for route query param
+      if (route.params?.query && route.params.query !== query) {
+          setQuery(route.params.query);
+          // The query effect will trigger debouncedSearch automatically
+      }
+
       return () => {
         isMounted.current = false;
         if (liveSearchHandle.current) {
@@ -477,7 +485,7 @@ const SearchScreen = () => {
         }
         debouncedSearch.cancel();
       };
-    }, [debouncedSearch])
+    }, [debouncedSearch, route.params?.query])
   );
 
   const performLiveSearch = async (searchQuery: string) => {

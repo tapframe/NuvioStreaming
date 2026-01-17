@@ -17,6 +17,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FastImage from '@d11/react-native-fast-image';
 import { MalAuth } from '../services/mal/MalAuth';
 import { MalApiService } from '../services/mal/MalApi';
+import { MalSync } from '../services/mal/MalSync';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { MalUser } from '../types/mal';
 import { useTheme } from '../contexts/ThemeContext';
@@ -37,6 +38,7 @@ const MalSettingsScreen: React.FC = () => {
   
   const [syncEnabled, setSyncEnabled] = useState(mmkvStorage.getBoolean('mal_enabled') ?? true);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(mmkvStorage.getBoolean('mal_auto_update') ?? true);
+  const [autoAddEnabled, setAutoAddEnabled] = useState(mmkvStorage.getBoolean('mal_auto_add') ?? true);
 
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -132,6 +134,11 @@ const MalSettingsScreen: React.FC = () => {
       mmkvStorage.setBoolean('mal_auto_update', val);
   };
 
+  const toggleAutoAdd = (val: boolean) => {
+      setAutoAddEnabled(val);
+      mmkvStorage.setBoolean('mal_auto_add', val);
+  };
+
   return (
     <SafeAreaView style={[
       styles.container,
@@ -193,6 +200,22 @@ const MalSettingsScreen: React.FC = () => {
                     >
                         <Text style={styles.buttonText}>Sign Out</Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.button, { backgroundColor: currentTheme.colors.primary, marginTop: 12 }]}
+                        onPress={() => {
+                            setIsLoading(true);
+                            MalSync.syncMalToLibrary().then(() => {
+                                setIsLoading(false);
+                                openAlert('Sync Complete', 'MAL data has been refreshed.');
+                            });
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <MaterialIcons name="sync" size={20} color="white" style={{ marginRight: 8 }} />
+                            <Text style={styles.buttonText}>Sync Now</Text>
+                        </View>
+                    </TouchableOpacity>
                 </View>
             ) : (
                 <View style={styles.signInContainer}>
@@ -207,12 +230,6 @@ const MalSettingsScreen: React.FC = () => {
                     <Text style={[styles.signInDescription, { color: currentTheme.colors.mediumEmphasis }]}>
                         Sync your watch history and manage your anime list.
                     </Text>
-                    <View style={[styles.noteContainer, { backgroundColor: currentTheme.colors.primary + '15', borderColor: currentTheme.colors.primary + '30' }]}>
-                        <MaterialIcons name="info-outline" size={18} color={currentTheme.colors.primary} />
-                        <Text style={[styles.noteText, { color: currentTheme.colors.highEmphasis }]}>
-                            MAL sync only works with the <Text style={{ fontWeight: 'bold' }}>AnimeKitsu</Text> catalog items.
-                        </Text>
-                    </View>
                     <TouchableOpacity
                         style={[styles.button, { backgroundColor: currentTheme.colors.primary }]}
                         onPress={handleSignIn}
@@ -234,10 +251,10 @@ const MalSettingsScreen: React.FC = () => {
                         <View style={styles.settingContent}>
                             <View style={styles.settingTextContainer}>
                                 <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
-                                    Enable Sync
+                                    Enable MAL Sync
                                 </Text>
                                 <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                                    Sync watch status to MyAnimeList
+                                    Global switch to enable or disable all MyAnimeList features.
                                 </Text>
                             </View>
                             <Switch
@@ -256,7 +273,7 @@ const MalSettingsScreen: React.FC = () => {
                                     Auto Episode Update
                                 </Text>
                                 <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                                    Automatically update episode progress when watching
+                                    Automatically update your progress on MAL when you finish watching an episode (>=90% completion).
                                 </Text>
                             </View>
                             <Switch
@@ -264,6 +281,25 @@ const MalSettingsScreen: React.FC = () => {
                                 onValueChange={toggleAutoUpdate}
                                 trackColor={{ false: currentTheme.colors.border, true: currentTheme.colors.primary + '80' }}
                                 thumbColor={autoUpdateEnabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={styles.settingItem}>
+                        <View style={styles.settingContent}>
+                            <View style={styles.settingTextContainer}>
+                                <Text style={[styles.settingLabel, { color: currentTheme.colors.highEmphasis }]}>
+                                    Auto Add Anime
+                                </Text>
+                                <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
+                                    If an anime is not in your MAL list, it will be added automatically when you start watching.
+                                </Text>
+                            </View>
+                            <Switch
+                                value={autoAddEnabled}
+                                onValueChange={toggleAutoAdd}
+                                trackColor={{ false: currentTheme.colors.border, true: currentTheme.colors.primary + '80' }}
+                                thumbColor={autoAddEnabled ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis}
                             />
                         </View>
                     </View>

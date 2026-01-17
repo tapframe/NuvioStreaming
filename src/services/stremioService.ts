@@ -1186,64 +1186,9 @@ class StremioService {
   async getStreams(type: string, id: string, callback?: StreamCallback): Promise<void> {
     await this.ensureInitialized();
 
-    // Resolve MAL/Kitsu IDs to IMDb/TMDB for better stream compatibility
     let activeId = id;
     let resolvedTmdbId: string | null = null;
     
-    if (id.startsWith('mal:') || id.includes(':mal:')) {
-      try {
-        // Parse MAL ID and potential season/episode
-        let malId: number | null = null;
-        let s: number | undefined;
-        let e: number | undefined;
-        
-        const parts = id.split(':');
-        // Handle mal:123
-        if (id.startsWith('mal:')) {
-           malId = parseInt(parts[1], 10);
-           // simple mal:id usually implies movie or main series entry, assume s1e1 if not present?
-           // MetadataScreen typically passes raw id for movies, or constructs episode string for series
-        } 
-        // Handle series:mal:123:1:1
-        else if (id.includes(':mal:')) {
-           // series:mal:123:1:1
-           if (parts[1] === 'mal') malId = parseInt(parts[2], 10);
-           if (parts.length >= 5) {
-             s = parseInt(parts[3], 10);
-             e = parseInt(parts[4], 10);
-           }
-        }
-
-        if (malId) {
-           logger.log(`[getStreams] Resolving MAL ID ${malId} to IMDb/TMDB...`);
-           const { imdbId, season: malSeason } = await MalSync.getIdsFromMalId(malId);
-           
-           if (imdbId) {
-             const finalSeason = s || malSeason || 1;
-             const finalEpisode = e || 1;
-             
-             // 1. Set ID for Stremio Addons (Torrentio/Debrid searchers prefer IMDb)
-             if (type === 'series') {
-                // Ensure proper IMDb format: tt12345:1:1
-                activeId = `${imdbId}:${finalSeason}:${finalEpisode}`;
-             } else {
-                activeId = imdbId;
-             }
-             logger.log(`[getStreams] Resolved -> Stremio ID: ${activeId}`);
-
-             // 2. Set ID for Local Scrapers (They prefer TMDB)
-             const tmdbIdNum = await TMDBService.getInstance().findTMDBIdByIMDB(imdbId);
-             if (tmdbIdNum) {
-                resolvedTmdbId = tmdbIdNum.toString();
-                logger.log(`[getStreams] Resolved -> TMDB ID: ${resolvedTmdbId}`);
-             }
-           }
-        }
-      } catch (err) {
-        logger.error('[getStreams] Failed to resolve MAL ID:', err);
-      }
-    }
-
     const addons = this.getInstalledAddons();
 
     // Check if local scrapers are enabled and execute them first

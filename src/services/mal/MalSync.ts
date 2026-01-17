@@ -42,6 +42,17 @@ export const MalSync = {
    * Caches the result to avoid repeated API calls.
    */
   getMalId: async (title: string, type: 'movie' | 'series' = 'series', year?: number, season?: number, imdbId?: string, episode: number = 1): Promise<number | null> => {
+    // Safety check: Never perform a MAL search for generic placeholders or empty strings.
+    // This prevents "cache poisoning" where a generic term matches a random anime.
+    const normalizedTitle = title.trim().toLowerCase();
+    const isGenericTitle = !normalizedTitle || normalizedTitle === 'anime' || normalizedTitle === 'movie';
+    
+    if (isGenericTitle) {
+        // If we have an offline mapping, we can still try it below, 
+        // but we MUST skip the fuzzy search logic at the end.
+        if (!imdbId) return null;
+    }
+
     // 1. Try Offline Mapping Service (Most accurate for perfect season/episode matching)
     if (imdbId && type === 'series' && season !== undefined) {
         const offlineMalId = mappingService.getMalId(imdbId, season, episode);
@@ -59,7 +70,9 @@ export const MalSync = {
     const cachedId = mmkvStorage.getNumber(cacheKey);
     if (cachedId) return cachedId;
 
-    // 3. Search MAL
+    // 3. Search MAL (Skip if generic title)
+    if (isGenericTitle) return null;
+
     try {
       let searchQuery = cleanTitle;
       // For Season 2+, explicitly search for that season
@@ -117,8 +130,47 @@ export const MalSync = {
     imdbId?: string
   ) => {
     try {
+      // Requirement 9 & 10: Respect user settings and safety
+      const isEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
+      const isAutoUpdate = mmkvStorage.getBoolean('mal_auto_update') ?? true;
+      
+      if (!isEnabled || !isAutoUpdate) {
+          return;
+      }
+
       const malId = await MalSync.getMalId(animeTitle, type, undefined, season, imdbId, episodeNumber);
       if (!malId) return;
+
+      // Check current status on MAL to avoid overwriting completed/dropped shows
+      try {
+        const currentInfo = await MalApiService.getMyListStatus(malId);
+        const currentStatus = currentInfo.my_list_status?.status;
+        const currentEpisodesWatched = currentInfo.my_list_status?.num_episodes_watched || 0;
+
+        // Requirement 4: Auto-Add Anime to MAL (Configurable)
+        if (!currentStatus) {
+            const autoAdd = mmkvStorage.getBoolean('mal_auto_add') ?? true;
+            if (!autoAdd) {
+                console.log(`[MalSync] Skipping scrobble for ${animeTitle}: Not in list and auto-add disabled`);
+                return;
+            }
+        }
+
+        // If already completed or dropped, don't auto-update via scrobble
+        if (currentStatus === 'completed' || currentStatus === 'dropped') {
+            console.log(`[MalSync] Skipping update for ${animeTitle}: Status is ${currentStatus}`);
+            return;
+        }
+
+        // If we are just starting (ep 1) or resuming (plan_to_watch/on_hold/null), set to watching
+        // Also ensure we don't downgrade episode count (though unlikely with scrobbling forward)
+        if (episodeNumber <= currentEpisodesWatched) {
+             console.log(`[MalSync] Skipping update for ${animeTitle}: Episode ${episodeNumber} <= Current ${currentEpisodesWatched}`);
+             return;
+        }
+      } catch (e) {
+        // If error (e.g. not found), proceed to add it
+      }
 
       let finalTotalEpisodes = totalEpisodes;
 
@@ -152,17 +204,27 @@ export const MalSync = {
    */
   syncMalToLibrary: async () => {
       try {
-          const list = await MalApiService.getUserList();
-          const watching = list.data.filter(item => item.list_status.status === 'watching' || item.list_status.status === 'plan_to_watch');
+          let allItems: MalAnimeNode[] = [];
+          let offset = 0;
+          let hasMore = true;
+
+          while (hasMore && offset < 1000) { // Limit to 1000 items for safety
+              const response = await MalApiService.getUserList(undefined, offset, 100);
+              if (response.data && response.data.length > 0) {
+                  allItems = [...allItems, ...response.data];
+                  offset += response.data.length;
+                  hasMore = !!response.paging.next;
+              } else {
+                  hasMore = false;
+              }
+          }
           
-          for (const item of watching) {
-              // Try to find in local catalogs to get a proper StreamingContent object
-              // This is complex because we need to map MAL -> Stremio/TMDB.
-              // For now, we'll just cache the mapping for future use.
+          for (const item of allItems) {
               const type = item.node.media_type === 'movie' ? 'movie' : 'series';
               const cacheKey = `${MAPPING_PREFIX}${item.node.title.trim()}_${type}`;
               mmkvStorage.setNumber(cacheKey, item.node.id);
           }
+          console.log(`[MalSync] Synced ${allItems.length} items to mapping cache.`);
           return true;
       } catch (e) {
           console.error('syncMalToLibrary failed', e);

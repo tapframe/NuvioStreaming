@@ -965,9 +965,7 @@ const LibraryScreen = () => {
             return;
           }
           if (filterType === 'mal') {
-              setShowTraktContent(false);
-              setFilter('mal');
-              loadMalList();
+              navigation.navigate('MalLibrary');
               return;
           }
           setShowTraktContent(false);

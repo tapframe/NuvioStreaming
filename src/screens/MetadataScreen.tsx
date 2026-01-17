@@ -85,10 +85,6 @@ const MemoizedRatingsSection = memo(RatingsSection);
 const MemoizedCommentsSection = memo(CommentsSection);
 const MemoizedCastDetailsModal = memo(CastDetailsModal);
 
-import { MalAuth } from '../services/mal/MalAuth';
-import { MalSync } from '../services/mal/MalSync';
-import { MalScoreModal } from '../components/metadata/MalScoreModal';
-
 // ... other imports
 
 const MetadataScreen: React.FC = () => {
@@ -129,73 +125,6 @@ const MetadataScreen: React.FC = () => {
     loadingCollection,
   } = useMetadata({ id, type, addonId });
 
-  const [malModalVisible, setMalModalVisible] = useState(false);
-  const [malId, setMalId] = useState<number | null>(null);
-  const isMalAuthenticated = !!MalAuth.getToken();
-
-  useEffect(() => {
-      // STRICT MODE: Only enable MAL features if the content source is explicitly Anime (MAL/Kitsu)
-      // This prevents "fuzzy match" errors where Cinemeta shows get mapped to random anime or wrong seasons.
-      const isAnimeSource = id && (id.startsWith('mal:') || id.startsWith('kitsu:') || id.includes(':mal:') || id.includes(':kitsu:'));
-
-      if (isMalAuthenticated && metadata?.name && isAnimeSource) {
-          // If it's a MAL source, extract ID directly
-          if (id.startsWith('mal:')) {
-             const directId = parseInt(id.split(':')[1], 10);
-             if (!isNaN(directId)) {
-                 setMalId(directId);
-                 return;
-             }
-          }
-          
-          // Otherwise resolve (e.g. Kitsu -> MAL)
-          MalSync.getMalId(metadata.name, Object.keys(groupedEpisodes).length > 0 ? 'series' : 'movie')
-            .then(id => setMalId(id));
-      } else {
-          setMalId(null);
-      }
-  }, [isMalAuthenticated, metadata, groupedEpisodes, id]);
-
-  // Log route parameters for debugging
-  React.useEffect(() => {
-    console.log('🔍 [MetadataScreen] Route params:', { id, type, episodeId, addonId });
-  }, [id, type, episodeId, addonId]);
-
-  // Enhanced responsive sizing for tablets and TV screens
-  const deviceWidth = Dimensions.get('window').width;
-  const deviceHeight = Dimensions.get('window').height;
-
-  // Determine device type based on width
-  const getDeviceType = useCallback(() => {
-    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
-    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
-    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
-    return 'phone';
-  }, [deviceWidth]);
-
-  const deviceType = getDeviceType();
-  const isTablet = deviceType === 'tablet';
-  const isLargeTablet = deviceType === 'largeTablet';
-  const isTV = deviceType === 'tv';
-  const isLargeScreen = isTablet || isLargeTablet || isTV;
-
-  // Enhanced spacing and padding for production sections
-  const horizontalPadding = useMemo(() => {
-    switch (deviceType) {
-      case 'tv':
-        return 32;
-      case 'largeTablet':
-        return 28;
-      case 'tablet':
-        return 24;
-      default:
-        return 16; // phone
-    }
-  }, [deviceType]);
-
-  // Optimized state management - reduced state variables
-  const [isContentReady, setIsContentReady] = useState(false);
-  const [showCastModal, setShowCastModal] = useState(false);
   const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
   const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
   const [isScreenFocused, setIsScreenFocused] = useState(true);
@@ -1029,8 +958,6 @@ const MetadataScreen: React.FC = () => {
                 dynamicBackgroundColor={dynamicBackgroundColor}
                 handleBack={handleBack}
                 tmdbId={tmdbId}
-                malId={malId}
-                onMalPress={() => setMalModalVisible(true)}
               />
 
               {/* Main Content - Optimized */}
@@ -1458,19 +1385,6 @@ const MetadataScreen: React.FC = () => {
           isSpoilerRevealed={selectedComment ? revealedSpoilers.has(selectedComment.id.toString()) : false}
           onSpoilerPress={() => selectedComment && handleSpoilerPress(selectedComment)}
         />
-
-        {malId && (
-            <MalScoreModal
-                visible={malModalVisible}
-                onClose={() => setMalModalVisible(false)}
-                malId={malId}
-                animeTitle={metadata?.name || ''}
-                seasons={Object.keys(groupedEpisodes).map(Number)}
-                currentSeason={selectedSeason}
-                imdbId={imdbId || undefined}
-                type={Object.keys(groupedEpisodes).length > 0 ? 'series' : type as 'movie' | 'series'}
-            />
-        )}
       </AnimatedSafeAreaView>
     </Animated.View>
   );
