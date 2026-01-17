@@ -72,11 +72,15 @@ export const ArmSyncService = {
           const startDateStr = anime.aired?.from ? new Date(anime.aired.from).toISOString().split('T')[0] : null;
           const endDateStr = anime.aired?.to ? new Date(anime.aired.to).toISOString().split('T')[0] : null;
 
-          // Date Matching Logic (Lexicographical string comparison is safe for YYYY-MM-DD)
+          // Date Matching Logic with Timezone Tolerance (2 days)
           let isMatch = false;
           if (startDateStr) {
-            // Check if our episode date is >= Season Start Date
-            if (releaseDateStr >= startDateStr) {
+            const startLimit = new Date(startDateStr);
+            startLimit.setDate(startLimit.getDate() - 2); // Allow release date to be up to 2 days before official start
+            const startLimitStr = startLimit.toISOString().split('T')[0];
+
+            // Check if our episode date is >= Season Start Date (with tolerance)
+            if (releaseDateStr >= startLimitStr) {
               // If season has ended, our episode must be <= Season End Date
               if (!endDateStr || releaseDateStr <= endDateStr) {
                 isMatch = true;
@@ -87,7 +91,7 @@ export const ArmSyncService = {
           if (isMatch) {
             logger.log(`[ArmSync] Match found! ID ${malId} covers ${releaseDateStr}`);
             
-            // 3. Find Exact Episode
+            // 3. Find Exact Episode (with tolerance)
             await delay(500);
             const epsRes = await axios.get(`${JIKAN_BASE}/anime/${malId}/episodes`);
             const episodes = epsRes.data.data;
@@ -95,8 +99,15 @@ export const ArmSyncService = {
             const matchEp = episodes.find((ep: any) => {
               if (!ep.aired) return false;
               try {
-                const epDateStr = new Date(ep.aired).toISOString().split('T')[0];
-                return epDateStr === releaseDateStr;
+                const epDate = new Date(ep.aired);
+                const targetDate = new Date(releaseDateStr);
+                
+                // Calculate difference in days
+                const diffTime = Math.abs(targetDate.getTime() - epDate.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                
+                // Match if within 2 days (48 hours)
+                return diffDays <= 2;
               } catch (e) {
                 return false;
               }
