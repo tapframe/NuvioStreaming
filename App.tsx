@@ -44,7 +44,6 @@ import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { mmkvStorage } from './src/services/mmkvStorage';
 import { CampaignManager } from './src/components/promotions/CampaignManager';
-import { WebViewExtractor } from './src/components/WebViewExtractor';
 
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
@@ -203,7 +202,6 @@ const ThemedApp = () => {
                 onDismiss={githubUpdate.onDismiss}
                 onLater={githubUpdate.onLater}
               />
-              <WebViewExtractor />
               <CampaignManager />
             </View>
           </DownloadsProvider>

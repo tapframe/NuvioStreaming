@@ -62,7 +62,6 @@ import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
 import { findBestSubtitleTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import { useTheme } from '../../contexts/ThemeContext';
 import axios from 'axios';
-import { streamExtractorService } from '../../services/StreamExtractorService';
 
 const DEBUG_MODE = false;
 
@@ -93,56 +92,6 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>((route.params as any).videoType);
-  
-  // Stream Resolution State
-  const [isResolving, setIsResolving] = useState(false);
-  const [resolutionError, setResolutionError] = useState<string | null>(null);
-
-  // Auto-resolve stream URL if it's an embed
-  useEffect(() => {
-    const resolveStream = async () => {
-      // Simple heuristic: If it doesn't look like a direct video file, try to resolve it
-      // Valid video extensions: .mp4, .mkv, .avi, .m3u8, .mpd, .mov, .flv, .webm
-      // Also check for magnet links (which don't need resolution)
-      const lowerUrl = uri.toLowerCase();
-      const isDirectFile = /\.(mp4|mkv|avi|m3u8|mpd|mov|flv|webm)(\?|$)/.test(lowerUrl);
-      const isMagnet = lowerUrl.startsWith('magnet:');
-      
-      // If it looks like a direct link or magnet, skip resolution
-      if (isDirectFile || isMagnet) {
-        setCurrentStreamUrl(uri);
-        return;
-      }
-
-      logger.log(`[AndroidVideoPlayer] URL ${uri} does not look like a direct file. Attempting resolution...`);
-      setIsResolving(true);
-      setResolutionError(null);
-
-      try {
-        const result = await streamExtractorService.extractStream(uri);
-        
-        if (result && result.streamUrl) {
-          logger.log(`[AndroidVideoPlayer] Resolved stream: ${result.streamUrl}`);
-          setCurrentStreamUrl(result.streamUrl);
-          
-          // If headers were returned, we might want to use them (though current player prop structure is simple)
-          // For now we just use the URL
-        } else {
-          logger.warn(`[AndroidVideoPlayer] Resolution returned no URL, using original.`);
-          setCurrentStreamUrl(uri); // Fallback to original
-        }
-      } catch (error) {
-        logger.error(`[AndroidVideoPlayer] Stream resolution failed:`, error);
-        // Fallback to original URL on error, maybe it works anyway?
-        setCurrentStreamUrl(uri);
-        // Optional: setResolutionError(error.message); 
-      } finally {
-        setIsResolving(false);
-      }
-    };
-
-    resolveStream();
-  }, [uri]);
 
   const [availableStreams, setAvailableStreams] = useState<any>(passedAvailableStreams || {});
   const [currentQuality, setCurrentQuality] = useState(quality);
@@ -833,38 +782,6 @@ const AndroidVideoPlayer: React.FC = () => {
         width={playerState.screenDimensions.width}
         height={playerState.screenDimensions.height}
       />
-
-      {/* Stream Resolution Overlay */}
-      {isResolving && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'black',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999
-        }}>
-          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-          <Text style={{ 
-            color: 'white', 
-            marginTop: 20, 
-            fontSize: 16, 
-            fontWeight: '600' 
-          }}>
-            Resolving Stream Source...
-          </Text>
-          <Text style={{ 
-            color: 'rgba(255,255,255,0.7)', 
-            marginTop: 8, 
-            fontSize: 14 
-          }}>
-            Extracting video from embed link
-          </Text>
-        </View>
-      )}
 
       <View style={{ flex: 1, backgroundColor: 'black' }}>
         {!isTransitioningStream && (
