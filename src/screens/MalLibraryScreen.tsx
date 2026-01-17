@@ -20,9 +20,9 @@ import { MalApiService } from '../services/mal/MalApi';
 import { MalAnimeNode, MalListStatus } from '../types/mal';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
-import { mappingService } from '../services/MappingService';
 import { logger } from '../utils/logger';
 import { MalEditModal } from '../components/mal/MalEditModal';
+import { MalSync } from '../services/mal/MalSync';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.35;
@@ -102,9 +102,8 @@ const MalLibraryScreen: React.FC = () => {
     // Requirement 8: Resolve correct Cinemata / TMDB / IMDb ID
     const malId = item.node.id;
     
-    // Check offline mapping first (reverse lookup)
-    await mappingService.init();
-    const imdbId = mappingService.getImdbIdFromMalId(malId);
+    // Use MalSync API to get external IDs
+    const { imdbId } = await MalSync.getIdsFromMalId(malId);
     
     if (imdbId) {
         navigation.navigate('Metadata', {

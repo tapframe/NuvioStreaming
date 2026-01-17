@@ -2,7 +2,7 @@ import { mmkvStorage } from '../mmkvStorage';
 import { MalApiService } from './MalApi';
 import { MalListStatus } from '../../types/mal';
 import { catalogService } from '../catalogService';
-import { mappingService } from '../MappingService';
+import { ArmSyncService } from './ArmSyncService';
 import axios from 'axios';
 
 const MAPPING_PREFIX = 'mal_map_';
@@ -41,7 +41,7 @@ export const MalSync = {
    * Tries to find a MAL ID for a given anime title or IMDb ID.
    * Caches the result to avoid repeated API calls.
    */
-  getMalId: async (title: string, type: 'movie' | 'series' = 'series', year?: number, season?: number, imdbId?: string, episode: number = 1): Promise<number | null> => {
+  getMalId: async (title: string, type: 'movie' | 'series' = 'series', year?: number, season?: number, imdbId?: string, episode: number = 1, releaseDate?: string): Promise<number | null> => {
     // Safety check: Never perform a MAL search for generic placeholders or empty strings.
     // This prevents "cache poisoning" where a generic term matches a random anime.
     const normalizedTitle = title.trim().toLowerCase();
@@ -53,12 +53,22 @@ export const MalSync = {
         if (!imdbId) return null;
     }
 
-    // 1. Try Offline Mapping Service (Most accurate for perfect season/episode matching)
-    if (imdbId && type === 'series' && season !== undefined) {
-        const offlineMalId = mappingService.getMalId(imdbId, season, episode);
-        if (offlineMalId) {
-            console.log(`[MalSync] Found offline mapping: ${imdbId} S${season}E${episode} -> MAL ${offlineMalId}`);
-            return offlineMalId;
+    // 1. Try ARM + Jikan Sync (Most accurate for perfect season/episode matching)
+    if (imdbId && type === 'series' && releaseDate) {
+        try {
+            const armResult = await ArmSyncService.resolveByDate(imdbId, releaseDate);
+            if (armResult && armResult.malId) {
+                console.log(`[MalSync] Found ARM match: ${imdbId} (${releaseDate}) -> MAL ${armResult.malId} Ep ${armResult.episode}`);
+                // Note: ArmSyncService returns the *absolute* episode number for MAL (e.g. 76)
+                // but our 'episode' arg is usually relative (e.g. 1). 
+                // scrobbleEpisode uses the malId returned here, and potentially the episode number from ArmSync
+                // But getMalId just returns the ID. 
+                // Ideally, scrobbleEpisode should call ArmSyncService directly to get both ID and correct Episode number.
+                // For now, we return the ID.
+                return armResult.malId;
+            }
+        } catch (e) {
+            console.warn('[MalSync] ARM Sync failed:', e);
         }
     }
 
@@ -127,7 +137,8 @@ export const MalSync = {
     totalEpisodes: number = 0,
     type: 'movie' | 'series' = 'series',
     season?: number,
-    imdbId?: string
+    imdbId?: string,
+    releaseDate?: string
   ) => {
     try {
       // Requirement 9 & 10: Respect user settings and safety
@@ -138,7 +149,24 @@ export const MalSync = {
           return;
       }
 
-      const malId = await MalSync.getMalId(animeTitle, type, undefined, season, imdbId, episodeNumber);
+      let malId: number | null = null;
+      let finalEpisodeNumber = episodeNumber;
+
+      // Try ARM Sync first to get exact MAL ID and absolute episode number
+      if (imdbId && type === 'series' && releaseDate) {
+          const armResult = await ArmSyncService.resolveByDate(imdbId, releaseDate);
+          if (armResult) {
+              malId = armResult.malId;
+              finalEpisodeNumber = armResult.episode;
+              console.log(`[MalSync] ARM Resolved: ${animeTitle} -> MAL ${malId} Ep ${finalEpisodeNumber}`);
+          }
+      }
+
+      // Fallback to standard lookup if ARM failed or not applicable
+      if (!malId) {
+          malId = await MalSync.getMalId(animeTitle, type, undefined, season, imdbId, episodeNumber, releaseDate);
+      }
+      
       if (!malId) return;
 
       // Check current status on MAL to avoid overwriting completed/dropped shows
@@ -164,8 +192,8 @@ export const MalSync = {
 
         // If we are just starting (ep 1) or resuming (plan_to_watch/on_hold/null), set to watching
         // Also ensure we don't downgrade episode count (though unlikely with scrobbling forward)
-        if (episodeNumber <= currentEpisodesWatched) {
-             console.log(`[MalSync] Skipping update for ${animeTitle}: Episode ${episodeNumber} <= Current ${currentEpisodesWatched}`);
+        if (finalEpisodeNumber <= currentEpisodesWatched) {
+             console.log(`[MalSync] Skipping update for ${animeTitle}: Episode ${finalEpisodeNumber} <= Current ${currentEpisodesWatched}`);
              return;
         }
       } catch (e) {
@@ -188,12 +216,12 @@ export const MalSync = {
 
       // Determine Status
       let status: MalListStatus = 'watching';
-      if (finalTotalEpisodes > 0 && episodeNumber >= finalTotalEpisodes) {
+      if (finalTotalEpisodes > 0 && finalEpisodeNumber >= finalTotalEpisodes) {
         status = 'completed';
       }
 
-      await MalApiService.updateStatus(malId, status, episodeNumber);
-      console.log(`[MalSync] Synced ${animeTitle} Ep ${episodeNumber}/${finalTotalEpisodes || '?'} -> MAL ID ${malId} (${status})`);
+      await MalApiService.updateStatus(malId, status, finalEpisodeNumber);
+      console.log(`[MalSync] Synced ${animeTitle} Ep ${finalEpisodeNumber}/${finalTotalEpisodes || '?'} -> MAL ID ${malId} (${status})`);
     } catch (e) {
       console.error('[MalSync] Scrobble failed:', e);
     }

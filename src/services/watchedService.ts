@@ -5,7 +5,6 @@ import { logger } from '../utils/logger';
 import { MalSync } from './mal/MalSync';
 import { MalAuth } from './mal/MalAuth';
 import { ArmSyncService } from './mal/ArmSyncService';
-import { mappingService } from './MappingService';
 
 /**
  * WatchedService - Manages "watched" status for movies, episodes, and seasons.
@@ -17,8 +16,6 @@ class WatchedService {
 
     private constructor() {
         this.traktService = TraktService.getInstance();
-        // Initialize mapping service
-        mappingService.init().catch(err => logger.error('[WatchedService] MappingService init failed:', err));
     }
 
     public static getInstance(): WatchedService {
@@ -130,7 +127,8 @@ class WatchedService {
                         0,
                         'series',
                         season,
-                        showImdbId
+                        showImdbId,
+                        releaseDate // Pass releaseDate for better matching
                     ).catch(err => logger.error('[WatchedService] MAL sync failed:', err));
                 }
             }
