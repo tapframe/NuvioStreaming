@@ -1,37 +1,60 @@
-name: Release Build
+name: Build Android Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  release:
+  build:
+    name: Build Android Release (arm64-v8a)
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v3
-      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
-          
+
       - name: Install dependencies
-        run: npm ci
-        
-      - name: Build app
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Release APK
+        working-directory: android
+        env:
+          EXPO_PUBLIC_INTRODB_API_URL: "https://api.introdb.app"
+          EXPO_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: "dummy-key"
+          EXPO_PUBLIC_USE_REMOTE_CACHE: "false"
+          EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY: "dummy"
+          EXPO_PUBLIC_MOVIEBOX_TMDB_API_KEY: "dummy"
+          EXPO_PUBLIC_TRAKT_CLIENT_ID: "dummy"
+          EXPO_PUBLIC_TRAKT_CLIENT_SECRET: "dummy"
+          EXPO_PUBLIC_TRAKT_REDIRECT_URI: "stremioexpo://auth/trakt"
+          EXPO_PUBLIC_DISCORD_USER_API: "https://discord.com/api"
         run: |
-          npm run build
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease -Pinclude=arm64-v8a
           
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: List Output Files
+        run: ls -R android/app/build/outputs/apk/
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            android/app/build/outputs/apk/release/*.apk
-          body_path: ALPHA_BUILD_2_ANNOUNCEMENT.md
-          draft: true
-          prerelease: true
-          generate_release_notes: true 
+          name: app-release-arm64-v8a
+          path: android/app/build/outputs/apk/release/*.apk

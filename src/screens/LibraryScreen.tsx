@@ -211,6 +211,10 @@ const SkeletonLoader = () => {
   );
 };
 
+import { MalApiService, MalSync, MalAnimeNode } from '../services/mal';
+
+// ... other imports
+
 const LibraryScreen = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -219,8 +223,12 @@ const LibraryScreen = () => {
   const { numColumns, itemWidth } = useMemo(() => getGridLayout(width), [width]);
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
-  const [filter, setFilter] = useState<'trakt' | 'movies' | 'series'>('movies');
+  const [filter, setFilter] = useState<'trakt' | 'movies' | 'series' | 'mal'>('movies');
   const [showTraktContent, setShowTraktContent] = useState(false);
+  const [malList, setMalMalList] = useState<MalAnimeNode[]>([]);
+  const [malLoading, setMalLoading] = useState(false);
+  const [malOffset, setMalOffset] = useState(0);
+  const [hasMoreMal, setHasMoreMal] = useState(true);
   const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
   const { showInfo, showError } = useToast();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -800,7 +808,142 @@ const LibraryScreen = () => {
     );
   };
 
-  const renderFilter = (filterType: 'trakt' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
+  const loadMalList = useCallback(async (isLoadMore = false) => {
+    if (malLoading || (isLoadMore && !hasMoreMal)) return;
+    
+    const currentOffset = isLoadMore ? malOffset : 0;
+    setMalLoading(true);
+    try {
+      const response = await MalApiService.getUserList(undefined, currentOffset);
+      if (isLoadMore) {
+          setMalMalList(prev => [...prev, ...response.data]);
+      } else {
+          setMalMalList(response.data);
+      }
+      setMalOffset(currentOffset + response.data.length);
+      setHasMoreMal(!!response.paging.next);
+    } catch (error) {
+      logger.error('Failed to load MAL list:', error);
+    } finally {
+      setMalLoading(false);
+    }
+  }, [malLoading, malOffset, hasMoreMal]);
+
+  const renderMalItem = ({ item }: { item: MalAnimeNode }) => (
+    <TouchableOpacity
+      style={[styles.itemContainer, { width: itemWidth }]}
+      onPress={() => navigation.navigate('Metadata', { 
+          id: `mal:${item.node.id}`, 
+          type: item.node.media_type === 'movie' ? 'movie' : 'series' 
+      })}
+      activeOpacity={0.7}
+    >
+      <View>
+        <View style={[styles.posterContainer, { shadowColor: currentTheme.colors.black, borderRadius: settings.posterBorderRadius ?? 12 }]}>
+          <FastImage
+            source={{ uri: item.node.main_picture?.large || item.node.main_picture?.medium || 'https://via.placeholder.com/300x450' }}
+            style={[styles.poster, { borderRadius: settings.posterBorderRadius ?? 12 }]}
+            resizeMode={FastImage.resizeMode.cover}
+          />
+          <View style={styles.malBadge}>
+             <Text style={styles.malBadgeText}>{item.list_status.status.replace('_', ' ')}</Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBar,
+                  { 
+                      width: `${(item.list_status.num_episodes_watched / (item.node.num_episodes || 1)) * 100}%`, 
+                      backgroundColor: '#2E51A2' 
+                  }
+                ]}
+              />
+          </View>
+        </View>
+        <Text style={[styles.cardTitle, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2}>
+          {item.node.title}
+        </Text>
+        <Text style={[styles.malScore, { color: '#F5C518' }]}>
+           ★ {item.list_status.score > 0 ? item.list_status.score : '-'}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderMalContent = () => {
+    if (malLoading && malList.length === 0) return <SkeletonLoader />;
+    
+    if (malList.length === 0) {
+        return (
+            <View style={styles.emptyContainer}>
+                <MaterialIcons name="library-books" size={64} color={currentTheme.colors.lightGray} />
+                <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>Your MAL list is empty</Text>
+                <TouchableOpacity
+                    style={[styles.exploreButton, { backgroundColor: currentTheme.colors.primary }]}
+                    onPress={() => loadMalList()}
+                >
+                    <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Refresh</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    const grouped = {
+      watching: malList.filter(i => i.list_status.status === 'watching'),
+      plan_to_watch: malList.filter(i => i.list_status.status === 'plan_to_watch'),
+      completed: malList.filter(i => i.list_status.status === 'completed'),
+      dropped: malList.filter(i => i.list_status.status === 'dropped'),
+      on_hold: malList.filter(i => i.list_status.status === 'on_hold'),
+    };
+
+    const sections = [
+      { key: 'watching', title: 'Watching', data: grouped.watching },
+      { key: 'plan_to_watch', title: 'Plan to Watch', data: grouped.plan_to_watch },
+      { key: 'completed', title: 'Completed', data: grouped.completed },
+      { key: 'dropped', title: 'Dropped', data: grouped.dropped },
+      { key: 'on_hold', title: 'On Hold', data: grouped.on_hold },
+    ];
+
+    return (
+      <ScrollView 
+        contentContainerStyle={[styles.listContainer, { paddingBottom: insets.bottom + 80 }]}
+        showsVerticalScrollIndicator={false}
+        onScroll={({ nativeEvent }) => {
+            if (isCloseToBottom(nativeEvent) && hasMoreMal) {
+                loadMalList(true);
+            }
+        }}
+        scrollEventThrottle={400}
+      >
+        {sections.map(section => (
+          section.data.length > 0 && (
+            <View key={section.key} style={styles.malSectionContainer}>
+              <Text style={[styles.malSectionHeader, { color: currentTheme.colors.highEmphasis }]}>
+                {section.title} <Text style={{ color: currentTheme.colors.mediumEmphasis, fontSize: 14 }}>({section.data.length})</Text>
+              </Text>
+              <View style={styles.malSectionGrid}>
+                {section.data.map(item => (
+                  <View key={item.node.id} style={{ marginBottom: 16 }}>
+                    {renderMalItem({ item })}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )
+        ))}
+        {malLoading && (
+           <ActivityIndicator color={currentTheme.colors.primary} style={{ marginTop: 20 }} />
+        )}
+      </ScrollView>
+    );
+  };
+
+  const isCloseToBottom = ({ layoutMeasurement, contentOffset, contentSize }: any) => {
+    const paddingToBottom = 20;
+    return layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+  };
+
+  const renderFilter = (filterType: 'trakt' | 'movies' | 'series' | 'mal', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
     const isActive = filter === filterType;
 
     return (
@@ -821,6 +964,13 @@ const LibraryScreen = () => {
             }
             return;
           }
+          if (filterType === 'mal') {
+              setShowTraktContent(false);
+              setFilter('mal');
+              loadMalList();
+              return;
+          }
+          setShowTraktContent(false);
           setFilter(filterType);
         }}
         activeOpacity={0.7}
@@ -930,14 +1080,20 @@ const LibraryScreen = () => {
 
       <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
         {!showTraktContent && (
-          <View style={styles.filtersContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            style={styles.filtersContainer}
+            contentContainerStyle={styles.filtersContent}
+          >
             {renderFilter('trakt', 'Trakt', 'pan-tool')}
+            {renderFilter('mal', 'MAL', 'book')}
             {renderFilter('movies', t('search.movies'), 'movie')}
             {renderFilter('series', t('search.tv_shows'), 'live-tv')}
-          </View>
+          </ScrollView>
         )}
 
-        {showTraktContent ? renderTraktContent() : renderContent()}
+        {showTraktContent ? renderTraktContent() : (filter === 'mal' ? renderMalContent() : renderContent())}
       </View>
 
       {selectedItem && (
@@ -1012,14 +1168,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filtersContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 8,
+    flexGrow: 0,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
     zIndex: 10,
+  },
+  filtersContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 8,
   },
   filterButton: {
     flexDirection: 'row',
@@ -1286,6 +1445,41 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  malBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  malBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  malScore: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  malSectionContainer: {
+    marginBottom: 24,
+  },
+  malSectionHeader: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  malSectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
 });
 

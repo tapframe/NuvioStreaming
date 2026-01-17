@@ -173,6 +173,9 @@ export const parseSRT = (srtContent: string): SubtitleCue[] => {
   return parseSRTEnhanced(srtContent);
 };
 
+// Export universal subtitle parser
+export { parseSubtitle };
+
 /**
  * Detect if text contains primarily RTL (right-to-left) characters
  * Checks for Arabic, Hebrew, Persian, Urdu, and other RTL scripts

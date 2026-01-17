@@ -105,6 +105,8 @@ interface HeroSectionProps {
   dynamicBackgroundColor?: string;
   handleBack: () => void;
   tmdbId?: number | null;
+  malId?: number | null;
+  onMalPress?: () => void;
 }
 
 // Ultra-optimized ActionButtons Component - minimal re-renders
@@ -127,7 +129,9 @@ const ActionButtons = memo(({
   isInWatchlist,
   isInCollection,
   onToggleWatchlist,
-  onToggleCollection
+  onToggleCollection,
+  malId,
+  onMalPress
 }: {
   handleShowStreams: () => void;
   toggleLibrary: () => void;
@@ -148,6 +152,8 @@ const ActionButtons = memo(({
   isInCollection?: boolean;
   onToggleWatchlist?: () => void;
   onToggleCollection?: () => void;
+  malId?: number | null;
+  onMalPress?: () => void;
 }) => {
   const { currentTheme } = useTheme();
   const { t } = useTranslation();
@@ -335,12 +341,13 @@ const ActionButtons = memo(({
     return isWatched ? t('metadata.play') : playButtonText;
   }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
-  // Count additional buttons (excluding Play and Save) - AI Chat no longer counted
+  // Count additional buttons (AI Chat removed - now in top right corner)
   const hasTraktCollection = isAuthenticated;
   const hasRatings = type === 'series';
+  const hasMal = !!malId;
 
   // Count additional buttons (AI Chat removed - now in top right corner)
-  const additionalButtonCount = (hasTraktCollection ? 1 : 0) + (hasRatings ? 1 : 0);
+  const additionalButtonCount = (hasTraktCollection ? 1 : 0) + (hasRatings ? 1 : 0) + (hasMal ? 1 : 0);
 
   return (
     <Animated.View style={[isTablet ? styles.tabletActionButtons : styles.actionButtons, animatedStyle]}>
@@ -450,6 +457,33 @@ const ActionButtons = memo(({
               name="assessment"
               size={isTablet ? 28 : 24}
               color={currentTheme.colors.white}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* MAL Button */}
+        {hasMal && (
+          <TouchableOpacity
+            style={[styles.iconButton, isTablet && styles.tabletIconButton, styles.singleRowIconButton]}
+            onPress={onMalPress}
+            activeOpacity={0.85}
+          >
+            {Platform.OS === 'ios' ? (
+              GlassViewComp && liquidGlassAvailable ? (
+                <GlassViewComp
+                  style={styles.blurBackgroundRound}
+                  glassEffectStyle="regular"
+                />
+              ) : (
+                <ExpoBlurView intensity={80} style={styles.blurBackgroundRound} tint="dark" />
+              )
+            ) : (
+              <View style={styles.androidFallbackBlurRound} />
+            )}
+            <Image
+              source={require('../../../assets/rating-icons/mal-icon.png')}
+              style={{ width: isTablet ? 28 : 24, height: isTablet ? 28 : 24, borderRadius: isTablet ? 14 : 12 }}
+              resizeMode="contain"
             />
           </TouchableOpacity>
         )}
@@ -857,6 +891,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   dynamicBackgroundColor,
   handleBack,
   tmdbId,
+  malId,
+  onMalPress,
   // Trakt integration props
   isAuthenticated,
   isInWatchlist,
@@ -1898,6 +1934,8 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
               isInCollection={isInCollection}
               onToggleWatchlist={onToggleWatchlist}
               onToggleCollection={onToggleCollection}
+              malId={malId}
+              onMalPress={onMalPress}
             />
           </View>
         </LinearGradient>

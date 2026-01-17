@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { View, StyleSheet, Platform, Animated, ToastAndroid } from 'react-native';
+import { View, StyleSheet, Platform, Animated, ToastAndroid, ActivityIndicator, Text } from 'react-native';
 import { toast } from '@backpackapp-io/react-native-toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -53,13 +53,18 @@ import { MpvPlayerRef } from './android/MpvPlayer';
 // Utils
 import { logger } from '../../utils/logger';
 import { styles } from './utils/playerStyles';
-import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSRT } from './utils/playerUtils';
+import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSubtitle } from './utils/playerUtils';
 import { storageService } from '../../services/storageService';
 import stremioService from '../../services/stremioService';
+import { localScraperService } from '../../services/pluginService';
+import { TMDBService } from '../../services/tmdbService';
 import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
 import { findBestSubtitleTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import { useTheme } from '../../contexts/ThemeContext';
 import axios from 'axios';
+import { streamExtractorService } from '../../services/StreamExtractorService';
+import { MalSync } from '../../services/mal/MalSync';
+import { mmkvStorage } from '../../services/mmkvStorage';
 
 const DEBUG_MODE = false;
 
@@ -90,6 +95,56 @@ const AndroidVideoPlayer: React.FC = () => {
 
   const [currentStreamUrl, setCurrentStreamUrl] = useState<string>(uri);
   const [currentVideoType, setCurrentVideoType] = useState<string | undefined>((route.params as any).videoType);
+  
+  // Stream Resolution State
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
+
+  // Auto-resolve stream URL if it's an embed
+  useEffect(() => {
+    const resolveStream = async () => {
+      // Simple heuristic: If it doesn't look like a direct video file, try to resolve it
+      // Valid video extensions: .mp4, .mkv, .avi, .m3u8, .mpd, .mov, .flv, .webm
+      // Also check for magnet links (which don't need resolution)
+      const lowerUrl = uri.toLowerCase();
+      const isDirectFile = /\.(mp4|mkv|avi|m3u8|mpd|mov|flv|webm)(\?|$)/.test(lowerUrl);
+      const isMagnet = lowerUrl.startsWith('magnet:');
+      
+      // If it looks like a direct link or magnet, skip resolution
+      if (isDirectFile || isMagnet) {
+        setCurrentStreamUrl(uri);
+        return;
+      }
+
+      logger.log(`[AndroidVideoPlayer] URL ${uri} does not look like a direct file. Attempting resolution...`);
+      setIsResolving(true);
+      setResolutionError(null);
+
+      try {
+        const result = await streamExtractorService.extractStream(uri);
+        
+        if (result && result.streamUrl) {
+          logger.log(`[AndroidVideoPlayer] Resolved stream: ${result.streamUrl}`);
+          setCurrentStreamUrl(result.streamUrl);
+          
+          // If headers were returned, we might want to use them (though current player prop structure is simple)
+          // For now we just use the URL
+        } else {
+          logger.warn(`[AndroidVideoPlayer] Resolution returned no URL, using original.`);
+          setCurrentStreamUrl(uri); // Fallback to original
+        }
+      } catch (error) {
+        logger.error(`[AndroidVideoPlayer] Stream resolution failed:`, error);
+        // Fallback to original URL on error, maybe it works anyway?
+        setCurrentStreamUrl(uri);
+        // Optional: setResolutionError(error.message); 
+      } finally {
+        setIsResolving(false);
+      }
+    };
+
+    resolveStream();
+  }, [uri]);
 
   const [availableStreams, setAvailableStreams] = useState<any>(passedAvailableStreams || {});
   const [currentQuality, setCurrentQuality] = useState(quality);
@@ -200,6 +255,42 @@ const AndroidVideoPlayer: React.FC = () => {
     showImdbId: imdbId,
     episodeId: episodeId
   });
+
+  // MAL Auto Tracking
+  const malTrackingRef = useRef(false);
+
+  useEffect(() => {
+     malTrackingRef.current = false;
+  }, [id, season, episode]);
+
+  useEffect(() => {
+      if (playerState.duration > 0 && playerState.currentTime > 0) {
+          const progress = playerState.currentTime / playerState.duration;
+          if (progress > 0.85 && !malTrackingRef.current) {
+               const autoUpdate = mmkvStorage.getBoolean('mal_auto_update') ?? true;
+               const malEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
+               
+               // Strict Mode: Only sync if source is explicitly MAL/Kitsu (Prevents Cinemeta mismatched syncing)
+               const isAnimeSource = id && (id.startsWith('mal:') || id.startsWith('kitsu:') || id.includes(':mal:') || id.includes(':kitsu:'));
+
+               if (malEnabled && autoUpdate && title && isAnimeSource) {
+                   malTrackingRef.current = true;
+                   
+                   // Calculate total episodes for completion status
+                   let totalEpisodes = 0;
+                   if (type === 'series' && groupedEpisodes) {
+                       totalEpisodes = Object.values(groupedEpisodes).reduce((acc, curr) => acc + (Array.isArray(curr) ? curr.length : 0), 0);
+                   }
+
+                   // If series, use episode number. If movie, use 1.
+                   const epNum = type === 'series' ? episode : 1;
+                   if (epNum) {
+                       MalSync.scrobbleEpisode(title, epNum, totalEpisodes, type as any, season, imdbId || undefined);
+                   }
+               }
+          }
+      }
+  }, [playerState.currentTime, playerState.duration, title, episode]);
 
   const watchProgress = useWatchProgress(
     id, type, episodeId,
@@ -617,41 +708,85 @@ const AndroidVideoPlayer: React.FC = () => {
   // Subtitle addon fetching
   const fetchAvailableSubtitles = useCallback(async () => {
     const targetImdbId = imdbId;
-    if (!targetImdbId) {
-      logger.warn('[AndroidVideoPlayer] No IMDB ID for subtitle fetch');
-      return;
-    }
-
+    
     setIsLoadingSubtitleList(true);
     try {
       const stremioType = type === 'series' ? 'series' : 'movie';
       const stremioVideoId = stremioType === 'series' && season && episode
         ? `series:${targetImdbId}:${season}:${episode}`
         : undefined;
-      const results = await stremioService.getSubtitles(stremioType, targetImdbId, stremioVideoId);
 
-      const subs: WyzieSubtitle[] = (results || []).map((sub: any) => ({
-        id: sub.id || `${sub.lang}-${sub.url}`,
-        url: sub.url,
-        flagUrl: '',
-        format: 'srt',
-        encoding: 'utf-8',
-        media: sub.addonName || sub.addon || '',
-        display: sub.lang || 'Unknown',
-        language: (sub.lang || '').toLowerCase(),
-        isHearingImpaired: false,
-        source: sub.addonName || sub.addon || 'Addon',
-      }));
+      // 1. Fetch from Stremio addons
+      const stremioPromise = stremioService.getSubtitles(stremioType, targetImdbId || '', stremioVideoId)
+        .then(results => (results || []).map((sub: any) => ({
+          id: sub.id || `${sub.lang}-${sub.url}`,
+          url: sub.url,
+          flagUrl: '',
+          format: 'srt',
+          encoding: 'utf-8',
+          media: sub.addonName || sub.addon || '',
+          display: sub.lang || 'Unknown',
+          language: (sub.lang || '').toLowerCase(),
+          isHearingImpaired: false,
+          source: sub.addonName || sub.addon || 'Addon',
+        })))
+        .catch(e => {
+          logger.error('[AndroidVideoPlayer] Error fetching Stremio subtitles', e);
+          return [];
+        });
 
-      setAvailableSubtitles(subs);
-      logger.info(`[AndroidVideoPlayer] Fetched ${subs.length} addon subtitles`);
-      // Auto-selection is now handled by useEffect that waits for internal tracks
+      // 2. Fetch from Local Plugins
+      const pluginPromise = (async () => {
+        try {
+          let tmdbIdStr: string | null = null;
+          
+          // Try to resolve TMDB ID
+          if (id && id.startsWith('tmdb:')) {
+            tmdbIdStr = id.split(':')[1];
+          } else if (targetImdbId) {
+            const resolvedId = await TMDBService.getInstance().findTMDBIdByIMDB(targetImdbId);
+            if (resolvedId) tmdbIdStr = resolvedId.toString();
+          }
+
+          if (tmdbIdStr) {
+            const results = await localScraperService.getSubtitles(
+              stremioType === 'series' ? 'tv' : 'movie',
+              tmdbIdStr,
+              season,
+              episode
+            );
+            
+            return results.map((sub: any) => ({
+              id: sub.url, // Use URL as ID for simple deduplication
+              url: sub.url,
+              flagUrl: '',
+              format: sub.format || 'srt',
+              encoding: 'utf-8',
+              media: sub.label || sub.addonName || 'Plugin',
+              display: sub.label || sub.lang || 'Plugin',
+              language: (sub.lang || 'en').toLowerCase(),
+              isHearingImpaired: false,
+              source: sub.addonName || 'Plugin'
+            }));
+          }
+        } catch (e) {
+          logger.warn('[AndroidVideoPlayer] Error fetching plugin subtitles', e);
+        }
+        return [];
+      })();
+
+      const [stremioSubs, pluginSubs] = await Promise.all([stremioPromise, pluginPromise]);
+      const allSubs = [...pluginSubs, ...stremioSubs];
+
+      setAvailableSubtitles(allSubs);
+      logger.info(`[AndroidVideoPlayer] Fetched ${allSubs.length} subtitles (${stremioSubs.length} Stremio, ${pluginSubs.length} Plugins)`);
+      
     } catch (e) {
-      logger.error('[AndroidVideoPlayer] Error fetching addon subtitles', e);
+      logger.error('[AndroidVideoPlayer] Error in fetchAvailableSubtitles', e);
     } finally {
       setIsLoadingSubtitleList(false);
     }
-  }, [imdbId, type, season, episode]);
+  }, [imdbId, type, season, episode, id]);
 
   const loadWyzieSubtitle = useCallback(async (subtitle: WyzieSubtitle) => {
     if (!subtitle.url) return;
@@ -670,7 +805,7 @@ const AndroidVideoPlayer: React.FC = () => {
       }
 
       // Parse subtitle file
-      const parsedCues = parseSRT(srtContent);
+      const parsedCues = parseSubtitle(srtContent, subtitle.url);
       setCustomSubtitles(parsedCues);
       setUseCustomSubtitles(true);
       setSelectedExternalSubtitleId(subtitle.id); // Track the selected external subtitle
@@ -733,8 +868,40 @@ const AndroidVideoPlayer: React.FC = () => {
         height={playerState.screenDimensions.height}
       />
 
+      {/* Stream Resolution Overlay */}
+      {isResolving && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'black',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999
+        }}>
+          <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+          <Text style={{ 
+            color: 'white', 
+            marginTop: 20, 
+            fontSize: 16, 
+            fontWeight: '600' 
+          }}>
+            Resolving Stream Source...
+          </Text>
+          <Text style={{ 
+            color: 'rgba(255,255,255,0.7)', 
+            marginTop: 8, 
+            fontSize: 14 
+          }}>
+            Extracting video from embed link
+          </Text>
+        </View>
+      )}
+
       <View style={{ flex: 1, backgroundColor: 'black' }}>
-        {!isTransitioningStream && (
+        {!isTransitioningStream && !isResolving && (
           <VideoSurface
             processedStreamUrl={currentStreamUrl}
             headers={headers}

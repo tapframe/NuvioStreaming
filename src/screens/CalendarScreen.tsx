@@ -31,6 +31,8 @@ import { tmdbService } from '../services/tmdbService';
 import { logger } from '../utils/logger';
 import { memoryManager } from '../utils/memoryManager';
 import { useCalendarData } from '../hooks/useCalendarData';
+import { AniListService } from '../services/anilist/AniListService';
+import { AniListAiringSchedule } from '../services/anilist/types';
 
 const { width } = Dimensions.get('window');
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
@@ -41,13 +43,17 @@ interface CalendarEpisode {
   title: string;
   seriesName: string;
   poster: string;
-  releaseDate: string;
+  releaseDate: string | null;
   season: number;
   episode: number;
   overview: string;
   vote_average: number;
   still_path: string | null;
   season_poster_path: string | null;
+  // MAL specific
+  day?: string;
+  time?: string;
+  genres?: string[];
 }
 
 interface CalendarSection {
@@ -75,14 +81,90 @@ const CalendarScreen = () => {
   const [uiReady, setUiReady] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [filteredEpisodes, setFilteredEpisodes] = useState<CalendarEpisode[]>([]);
+  
+  // AniList Integration
+  const [calendarSource, setCalendarSource] = useState<'nuvio' | 'anilist'>('nuvio');
+  const [aniListSchedule, setAniListSchedule] = useState<CalendarSection[]>([]);
+  const [aniListLoading, setAniListLoading] = useState(false);
+
+  const fetchAniListSchedule = useCallback(async () => {
+      setAniListLoading(true);
+      try {
+          const schedule = await AniListService.getWeeklySchedule();
+          
+          // Group by Day
+          const grouped: Record<string, CalendarEpisode[]> = {};
+          const daysOrder = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          
+          schedule.forEach((item) => {
+              const date = new Date(item.airingAt * 1000);
+              const dayName = format(date, 'EEEE'); // Monday, Tuesday...
+              
+              if (!grouped[dayName]) {
+                  grouped[dayName] = [];
+              }
+              
+              const episode: CalendarEpisode = {
+                  id: `kitsu:${item.media.idMal}`, // Fallback ID for now, ideally convert to IMDb/TMDB if possible
+                  seriesId: `mal:${item.media.idMal}`, // Use MAL ID for series navigation
+                  title: item.media.title.english || item.media.title.romaji, // Episode title not available, use series title
+                  seriesName: item.media.title.english || item.media.title.romaji,
+                  poster: item.media.coverImage.large || item.media.coverImage.medium,
+                  releaseDate: new Date(item.airingAt * 1000).toISOString(),
+                  season: 1, // AniList doesn't always provide season number easily
+                  episode: item.episode,
+                  overview: `Airing at ${format(date, 'HH:mm')}`,
+                  vote_average: 0,
+                  still_path: null,
+                  season_poster_path: null,
+                  day: dayName,
+                  time: format(date, 'HH:mm'),
+                  genres: [item.media.format] // Use format as genre for now
+              };
+              
+              grouped[dayName].push(episode);
+          });
+          
+          // Sort sections starting from today
+          const todayIndex = new Date().getDay(); // 0 = Sunday
+          const sortedSections: CalendarSection[] = [];
+          
+          for (let i = 0; i < 7; i++) {
+              const dayIndex = (todayIndex + i) % 7;
+              const dayName = daysOrder[dayIndex];
+              if (grouped[dayName] && grouped[dayName].length > 0) {
+                  sortedSections.push({
+                      title: i === 0 ? 'Today' : (i === 1 ? 'Tomorrow' : dayName),
+                      data: grouped[dayName].sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+                  });
+              }
+          }
+          
+          setAniListSchedule(sortedSections);
+      } catch (e) {
+          logger.error('Failed to load AniList schedule', e);
+      } finally {
+          setAniListLoading(false);
+      }
+  }, []);
+
+  useEffect(() => {
+      if (calendarSource === 'anilist' && aniListSchedule.length === 0) {
+          fetchAniListSchedule();
+      }
+  }, [calendarSource]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     // Check memory pressure before refresh
     memoryManager.checkMemoryPressure();
-    refresh(true);
+    if (calendarSource === 'nuvio') {
+        refresh(true);
+    } else {
+        fetchAniListSchedule();
+    }
     setRefreshing(false);
-  }, [refresh]);
+  }, [refresh, calendarSource, fetchAniListSchedule]);
 
   // Defer heavy UI work until after interactions to reduce jank/crashes
   useEffect(() => {
@@ -115,20 +197,22 @@ const CalendarScreen = () => {
       episodeId
     });
   }, [navigation, handleSeriesPress]);
-  
+
   const renderEpisodeItem = ({ item }: { item: CalendarEpisode }) => {
     const hasReleaseDate = !!item.releaseDate;
-    const releaseDate = hasReleaseDate ? parseISO(item.releaseDate) : null;
+    const releaseDate = hasReleaseDate && item.releaseDate ? parseISO(item.releaseDate) : null;
     const formattedDate = releaseDate ? format(releaseDate, 'MMM d, yyyy') : '';
     const isFuture = releaseDate ? isAfter(releaseDate, new Date()) : false;
+    const isAnimeItem = item.id.startsWith('mal:') || item.id.startsWith('kitsu:');
     
     // Use episode still image if available, fallback to series poster
+    // For AniList items, item.poster is already a full URL
     const imageUrl = item.still_path ? 
       tmdbService.getImageUrl(item.still_path) : 
       (item.season_poster_path ? 
         tmdbService.getImageUrl(item.season_poster_path) : 
         item.poster);
-    
+  
     return (
       <Animated.View entering={FadeIn.duration(300).delay(100)}>
         <TouchableOpacity 
@@ -142,36 +226,53 @@ const CalendarScreen = () => {
           >
             <FastImage
               source={{ uri: imageUrl || '' }}
-              style={styles.poster}
+              style={[
+                  styles.poster, 
+                  isAnimeItem && { aspectRatio: 2/3, width: 80, height: 120 }
+              ]}
               resizeMode={FastImage.resizeMode.cover}
             />
           </TouchableOpacity>
           
           <View style={styles.episodeDetails}>
-            <Text style={[styles.seriesName, { color: currentTheme.colors.text }]} numberOfLines={1}>
+            <Text style={[styles.seriesName, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>
               {item.seriesName}
             </Text>
             
-            {hasReleaseDate ? (
+            {(hasReleaseDate || isAnimeItem) ? (
               <>
-                <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
-                  S{item.season}:E{item.episode} - {item.title}
-                </Text>
+                {!isAnimeItem && (
+                    <Text style={[styles.episodeTitle, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
+                    S{item.season}:E{item.episode} - {item.title}
+                    </Text>
+                )}
                 
                 {item.overview ? (
-                  <Text style={[styles.overview, { color: currentTheme.colors.lightGray }]} numberOfLines={2}>
+                  <Text style={[styles.overview, { color: currentTheme.colors.mediumEmphasis }]} numberOfLines={2}>
                     {item.overview}
                   </Text>
                 ) : null}
+
+                {isAnimeItem && item.genres && item.genres.length > 0 && (
+                    <View style={styles.genreContainer}>
+                        {item.genres.slice(0, 3).map((g, i) => (
+                            <View key={i} style={[styles.genreChip, { backgroundColor: currentTheme.colors.primary + '20' }]}>
+                                <Text style={[styles.genreText, { color: currentTheme.colors.primary }]}>{g}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
                 
                 <View style={styles.metadataContainer}>
                   <View style={styles.dateContainer}>
                     <MaterialIcons 
-                      name={isFuture ? "event" : "event-available"} 
+                      name={isFuture || isAnimeItem ? "event" : "event-available"} 
                       size={16} 
-                      color={currentTheme.colors.lightGray} 
+                      color={currentTheme.colors.primary} 
                     />
-                    <Text style={[styles.date, { color: currentTheme.colors.lightGray }]}>{formattedDate}</Text>
+                    <Text style={[styles.date, { color: currentTheme.colors.primary, fontWeight: '600' }]}>
+                        {isAnimeItem ? `${item.day} ${item.time || ''}` : formattedDate}
+                    </Text>
                   </View>
                   
                   {item.vote_average > 0 && (
@@ -179,9 +280,9 @@ const CalendarScreen = () => {
                       <MaterialIcons 
                         name="star" 
                         size={16} 
-                        color={currentTheme.colors.primary} 
+                        color="#F5C518" 
                       />
-                      <Text style={[styles.rating, { color: currentTheme.colors.primary }]}>
+                      <Text style={[styles.rating, { color: '#F5C518' }]}>
                         {item.vote_average.toFixed(1)}
                       </Text>
                     </View>
@@ -231,18 +332,38 @@ const CalendarScreen = () => {
       </View>
     );
   };
+
+  const renderSourceSwitcher = () => (
+      <View style={styles.tabContainer}>
+          <TouchableOpacity 
+              style={[styles.tabButton, calendarSource === 'nuvio' && { backgroundColor: currentTheme.colors.primary }]}
+              onPress={() => setCalendarSource('nuvio')}
+          >
+              <Text style={[styles.tabText, calendarSource === 'nuvio' && { color: '#fff', fontWeight: 'bold' }]}>Nuvio</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+              style={[styles.tabButton, calendarSource === 'anilist' && { backgroundColor: currentTheme.colors.primary }]}
+              onPress={() => setCalendarSource('anilist')}
+          >
+              <Text style={[styles.tabText, calendarSource === 'anilist' && { color: '#fff', fontWeight: 'bold' }]}>AniList</Text>
+          </TouchableOpacity>
+      </View>
+  );
   
   // Process all episodes once data is loaded - using memory-efficient approach
   const allEpisodes = React.useMemo(() => {
     if (!uiReady) return [] as CalendarEpisode[];
-    const episodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => {
+    // Use AniList schedule if selected
+    const sourceData = calendarSource === 'anilist' ? aniListSchedule : calendarData;
+    
+    const episodes = sourceData.reduce((acc: CalendarEpisode[], section: CalendarSection) => {
       // Pre-trim section arrays defensively
       const trimmed = memoryManager.limitArraySize(section.data, 500);
       return acc.length > 1500 ? acc : [...acc, ...trimmed];
     }, [] as CalendarEpisode[]);
     // Global cap to keep memory bounded
     return memoryManager.limitArraySize(episodes, 1500);
-  }, [calendarData, uiReady]);
+  }, [calendarData, aniListSchedule, uiReady, calendarSource]);
   
   // Log when rendering with relevant state info
   logger.log(`[Calendar] Rendering: loading=${loading}, calendarData sections=${calendarData.length}, allEpisodes=${allEpisodes.length}`);
@@ -284,7 +405,7 @@ const CalendarScreen = () => {
     setFilteredEpisodes([]);
   }, []);
   
-  if ((loading || !uiReady) && !refreshing) {
+  if (((loading || aniListLoading) || !uiReady) && !refreshing) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
         <StatusBar barStyle="light-content" />
@@ -310,7 +431,11 @@ const CalendarScreen = () => {
         <Text style={[styles.headerTitle, { color: currentTheme.colors.text }]}>{t('calendar.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
+
+      {renderSourceSwitcher()}
       
+      {calendarSource === 'nuvio' && (
+      <>
       {selectedDate && filteredEpisodes.length > 0 && (
         <View style={[styles.filterInfoContainer, { borderBottomColor: currentTheme.colors.border }]}>
           <Text style={[styles.filterInfoText, { color: currentTheme.colors.text }]}>
@@ -326,6 +451,8 @@ const CalendarScreen = () => {
         episodes={allEpisodes}
         onSelectDate={handleDateSelect}
       />
+      </>
+      )}
       
       {selectedDate && filteredEpisodes.length > 0 ? (
         <FlatList
@@ -362,9 +489,9 @@ const CalendarScreen = () => {
             </Text>
           </TouchableOpacity>
         </View>
-      ) : calendarData.length > 0 ? (
+      ) : (calendarSource === 'anilist' ? aniListSchedule : calendarData).length > 0 ? (
         <SectionList
-          sections={calendarData}
+          sections={calendarSource === 'anilist' ? aniListSchedule : calendarData}
           keyExtractor={(item) => item.id}
           renderItem={renderEpisodeItem}
           renderSectionHeader={renderSectionHeader}
@@ -559,6 +686,41 @@ const styles = StyleSheet.create({
   noEpisodesText: {
     fontSize: 14,
     marginBottom: 4,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  genreContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  genreChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  genreText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
 });
 

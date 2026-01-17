@@ -13,6 +13,7 @@ import {
   Dimensions,
   Linking,
   FlatList,
+  Image,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useTranslation } from 'react-i18next';
@@ -378,10 +379,18 @@ const SettingsScreen: React.FC = () => {
                 customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
-                isLast={true}
                 isTablet={isTablet}
               />
             )}
+            <SettingItem
+                title="MyAnimeList"
+                description="Sync with MyAnimeList"
+                customIcon={<Image source={require('../../assets/rating-icons/mal-icon.png')} style={{ width: isTablet ? 24 : 20, height: isTablet ? 24 : 20, borderRadius: 4 }} resizeMode="contain" />}
+                renderControl={() => <ChevronRight />}
+                onPress={() => navigation.navigate('MalSettings')}
+                isLast={true}
+                isTablet={isTablet}
+            />
           </SettingsCard>
         );
 
@@ -672,9 +681,16 @@ const SettingsScreen: React.FC = () => {
                     customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
-                    isLast
                   />
                 )}
+                <SettingItem
+                    title="MyAnimeList"
+                    description="Sync with MyAnimeList"
+                    customIcon={<Image source={require('../../assets/rating-icons/mal-icon.png')} style={{ width: 20, height: 20, borderRadius: 4 }} resizeMode="contain" />}
+                    renderControl={() => <ChevronRight />}
+                    onPress={() => navigation.navigate('MalSettings')}
+                    isLast
+                />
               </SettingsCard>
             )}
 

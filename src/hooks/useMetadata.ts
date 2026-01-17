@@ -13,6 +13,7 @@ import { mmkvStorage } from '../services/mmkvStorage';
 import { Stream } from '../types/metadata';
 import { storageService } from '../services/storageService';
 import { useSettings } from './useSettings';
+import { MalSync } from '../services/mal/MalSync';
 
 // Constants for timeouts and retries
 const API_TIMEOUT = 10000; // 10 seconds
@@ -534,6 +535,18 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       // Handle TMDB-specific IDs
       let actualId = id;
+
+      // Handle MAL IDs
+      if (id.startsWith('mal:')) {
+          // STRICT MODE: Do NOT convert to IMDb/Cinemeta. 
+          // We want to force the app to use AnimeKitsu (or other MAL-compatible addons) for metadata.
+          // This ensures we get correct Season/Episode mapping (Separate entries) instead of Cinemeta's "S1E26" mess.
+          console.log('🔍 [useMetadata] Keeping MAL ID for metadata fetch:', id);
+          
+          // Note: Stream fetching (stremioService) WILL still convert this to IMDb secretly 
+          // to ensure Torrentio works, but the Metadata UI will stay purely MAL-based.
+      }
+
       if (id.startsWith('tmdb:')) {
         // Always try the original TMDB ID first - let addons decide if they support it
         console.log('🔍 [useMetadata] TMDB ID detected, trying original ID first:', { originalId: id });
@@ -823,9 +836,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
         // Store addon logo before TMDB enrichment overwrites it
         const addonLogo = (finalMetadata as any).logo;
-        const addonName = finalMetadata.name;
-        const addonDescription = finalMetadata.description;
-        const addonBanner = finalMetadata.banner;
 
 
         try {
@@ -860,8 +870,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: (addonName && addonName.trim()) ? addonName : (localized.title || finalMetadata.name),
-                    description: (addonDescription && addonDescription.trim()) ? addonDescription : (localized.overview || finalMetadata.description),
+                    name: localized.title || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     movieDetails: movieDetailsObj,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -897,8 +907,8 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
                   finalMetadata = {
                     ...finalMetadata,
-                    name: (addonName && addonName.trim()) ? addonName : (localized.name || finalMetadata.name),
-                    description: (addonDescription && addonDescription.trim()) ? addonDescription : (localized.overview || finalMetadata.description),
+                    name: localized.name || finalMetadata.name,
+                    description: localized.overview || finalMetadata.description,
                     tvDetails,
                     ...(productionInfo.length > 0 && { networks: productionInfo }),
                   };
@@ -930,7 +940,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             if (tmdbIdForLogo) {
               const logoUrl = await tmdbService.getContentLogo(contentType, tmdbIdForLogo, preferredLanguage);
               // Use TMDB logo if found, otherwise fall back to addon logo
-              finalMetadata.logo = addonLogo || logoUrl || undefined;
+              finalMetadata.logo = logoUrl || addonLogo || undefined;
               if (__DEV__) {
                 console.log('[useMetadata] Logo fetch result:', {
                   contentType,
@@ -970,15 +980,12 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         }
 
         // Clear banner field if TMDB banner enrichment is enabled to prevent flash
-        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichBanners) {
-          if (!addonBanner && !finalMetadata.banner) {
-            finalMetadata = {
-              ...finalMetadata,
-              banner: undefined,
-        // Let useMetadataAssets handle banner via TMDB
+        if (settings.enrichMetadataWithTMDB && settings.tmdbEnrichBanners && !finalMetadata.banner) {
+          finalMetadata = {
+            ...finalMetadata,
+            banner: undefined, // Let useMetadataAssets handle banner via TMDB
           };
         }
-      }
 
         // Preserve existing collection if it was set by fetchProductionInfo
         setMetadata((prev) => {
@@ -1543,9 +1550,6 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const allStremioAddons = await stremioService.getInstalledAddons();
         const localScrapers = await localScraperService.getInstalledScrapers();
 
-        // Map app-level "tv" type to Stremio "series" for addon capability checks
-        const stremioType = type === 'tv' ? 'series' : type;
-
         // Filter Stremio addons to only include those that provide streams for this content type
         const streamAddons = allStremioAddons.filter(addon => {
           if (!addon.resources || !Array.isArray(addon.resources)) {
@@ -1561,7 +1565,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               const typedResource = resource as any;
               if (typedResource.name === 'stream' &&
                 Array.isArray(typedResource.types) &&
-                typedResource.types.includes(stremioType)) {
+                typedResource.types.includes(type)) {
                 hasStreamResource = true;
 
                 // Check if this addon supports the ID prefix generically: any prefix must match start of id
@@ -1576,7 +1580,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
             }
             // Check if the element is the simple string "stream" AND the addon has a top-level types array
             else if (typeof resource === 'string' && resource === 'stream' && addon.types) {
-              if (Array.isArray(addon.types) && addon.types.includes(stremioType)) {
+              if (Array.isArray(addon.types) && addon.types.includes(type)) {
                 hasStreamResource = true;
                 // For simple string resources, check addon-level idPrefixes generically
                 if (addon.idPrefixes && Array.isArray(addon.idPrefixes) && addon.idPrefixes.length > 0) {
@@ -1644,9 +1648,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       // Start Stremio request using the converted ID format
       if (__DEV__) console.log('🎬 [loadStreams] Using ID for Stremio addons:', stremioId);
-      // Map app-level "tv" type to Stremio "series" when requesting streams
-      const stremioContentType = type === 'tv' ? 'series' : type;
-      processStremioSource(stremioContentType, stremioId, false);
+      processStremioSource(type, stremioId, false);
 
       // Also extract any embedded streams from metadata (PPV-style addons)
       extractEmbeddedStreams();
@@ -1924,8 +1926,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
       // For collections, treat episodes as individual movies, not series
       // For other types (e.g. StreamsPPV), preserve the original type unless it's explicitly 'series' logic we want
-      // Map app-level "tv" type to Stremio "series" for addon stream endpoint
-      const contentType = isCollection ? 'movie' : (type === 'tv' ? 'series' : type);
+      const contentType = isCollection ? 'movie' : type;
       if (__DEV__) console.log(`🎬 [loadEpisodeStreams] Using content type: ${contentType} for ${isCollection ? 'collection' : type}`);
 
       processStremioSource(contentType, stremioEpisodeId, true);

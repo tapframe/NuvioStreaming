@@ -5,6 +5,7 @@ import EventEmitter from 'eventemitter3';
 import { localScraperService } from './pluginService';
 import { DEFAULT_SETTINGS, AppSettings } from '../hooks/useSettings';
 import { TMDBService } from './tmdbService';
+import { MalSync } from './mal/MalSync';
 
 // Create an event emitter for addon changes
 export const addonEmitter = new EventEmitter();
@@ -1185,6 +1186,64 @@ class StremioService {
   async getStreams(type: string, id: string, callback?: StreamCallback): Promise<void> {
     await this.ensureInitialized();
 
+    // Resolve MAL/Kitsu IDs to IMDb/TMDB for better stream compatibility
+    let activeId = id;
+    let resolvedTmdbId: string | null = null;
+    
+    if (id.startsWith('mal:') || id.includes(':mal:')) {
+      try {
+        // Parse MAL ID and potential season/episode
+        let malId: number | null = null;
+        let s: number | undefined;
+        let e: number | undefined;
+        
+        const parts = id.split(':');
+        // Handle mal:123
+        if (id.startsWith('mal:')) {
+           malId = parseInt(parts[1], 10);
+           // simple mal:id usually implies movie or main series entry, assume s1e1 if not present?
+           // MetadataScreen typically passes raw id for movies, or constructs episode string for series
+        } 
+        // Handle series:mal:123:1:1
+        else if (id.includes(':mal:')) {
+           // series:mal:123:1:1
+           if (parts[1] === 'mal') malId = parseInt(parts[2], 10);
+           if (parts.length >= 5) {
+             s = parseInt(parts[3], 10);
+             e = parseInt(parts[4], 10);
+           }
+        }
+
+        if (malId) {
+           logger.log(`[getStreams] Resolving MAL ID ${malId} to IMDb/TMDB...`);
+           const { imdbId, season: malSeason } = await MalSync.getIdsFromMalId(malId);
+           
+           if (imdbId) {
+             const finalSeason = s || malSeason || 1;
+             const finalEpisode = e || 1;
+             
+             // 1. Set ID for Stremio Addons (Torrentio/Debrid searchers prefer IMDb)
+             if (type === 'series') {
+                // Ensure proper IMDb format: tt12345:1:1
+                activeId = `${imdbId}:${finalSeason}:${finalEpisode}`;
+             } else {
+                activeId = imdbId;
+             }
+             logger.log(`[getStreams] Resolved -> Stremio ID: ${activeId}`);
+
+             // 2. Set ID for Local Scrapers (They prefer TMDB)
+             const tmdbIdNum = await TMDBService.getInstance().findTMDBIdByIMDB(imdbId);
+             if (tmdbIdNum) {
+                resolvedTmdbId = tmdbIdNum.toString();
+                logger.log(`[getStreams] Resolved -> TMDB ID: ${resolvedTmdbId}`);
+             }
+           }
+        }
+      } catch (err) {
+        logger.error('[getStreams] Failed to resolve MAL ID:', err);
+      }
+    }
+
     const addons = this.getInstalledAddons();
 
     // Check if local scrapers are enabled and execute them first
@@ -1205,7 +1264,7 @@ class StremioService {
           const scraperType = type === 'series' ? 'tv' : type;
 
           // Parse the Stremio ID to extract ID and season/episode info
-          let tmdbId: string | null = null;
+          let tmdbId: string | null = resolvedTmdbId;
           let season: number | undefined = undefined;
           let episode: number | undefined = undefined;
           let idType: 'imdb' | 'kitsu' | 'tmdb' = 'imdb';
@@ -1406,7 +1465,7 @@ class StremioService {
           }
 
           const { baseUrl, queryParams } = this.getAddonBaseURL(addon.url);
-          const encodedId = encodeURIComponent(id);
+          const encodedId = encodeURIComponent(activeId);
           const url = queryParams ? `${baseUrl}/stream/${type}/${encodedId}.json?${queryParams}` : `${baseUrl}/stream/${type}/${encodedId}.json`;
 
           logger.log(`🔗 [getStreams] Requesting streams from ${addon.name} (${addon.id}): ${url}`);
@@ -1836,8 +1895,6 @@ class StremioService {
   // Check if any installed addons can provide streams (including embedded streams in metadata)
   async hasStreamProviders(type?: string): Promise<boolean> {
     await this.ensureInitialized();
-    // App-level content type "tv" maps to Stremio "series"
-    const normalizedType = type === 'tv' ? 'series' : type;
     const addons = Array.from(this.installedAddons.values());
 
     for (const addon of addons) {
@@ -1851,12 +1908,12 @@ class StremioService {
 
         if (hasStreamResource) {
           // If type specified, also check if addon supports this type
-          if (normalizedType) {
-            const supportsType = addon.types?.includes(normalizedType) ||
+          if (type) {
+            const supportsType = addon.types?.includes(type) ||
               addon.resources.some(resource =>
                 typeof resource === 'object' &&
                 (resource as any).name === 'stream' &&
-                (resource as any).types?.includes(normalizedType)
+                (resource as any).types?.includes(type)
               );
             if (supportsType) return true;
           } else {
@@ -1866,14 +1923,14 @@ class StremioService {
 
         // Also check for addons with meta resource that support the type
         // These addons might provide embedded streams within metadata
-        if (normalizedType) {
+        if (type) {
           const hasMetaResource = addon.resources.some(resource =>
             typeof resource === 'string'
               ? resource === 'meta'
               : (resource as any).name === 'meta'
           );
 
-          if (hasMetaResource && addon.types?.includes(normalizedType)) {
+          if (hasMetaResource && addon.types?.includes(type)) {
             // This addon provides meta for the type - might have embedded streams
             return true;
           }

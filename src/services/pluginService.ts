@@ -1162,32 +1162,74 @@ class LocalScraperService {
   }
 
 
-  private async executePlugin(code: string, params: any, consoleOverride?: any): Promise<LocalScraperResult[]> {
+  // Execute scraper code with full access to app environment (non-sandboxed)
+  public async testPlugin(code: string, params: any, options?: { onLog?: (line: string) => void }): Promise<{ streams: Stream[] }> {
     try {
+      // Create a specialized logger for testing that also calls the onLog callback
+      const testLogger = {
+        ...logger,
+        log: (...args: any[]) => {
+          logger.log('[PluginTest]', ...args);
+          options?.onLog?.(`[LOG] ${args.join(' ')}`);
+        },
+        info: (...args: any[]) => {
+          logger.info('[PluginTest]', ...args);
+          options?.onLog?.(`[INFO] ${args.join(' ')}`);
+        },
+        warn: (...args: any[]) => {
+          logger.warn('[PluginTest]', ...args);
+          options?.onLog?.(`[WARN] ${args.join(' ')}`);
+        },
+        error: (...args: any[]) => {
+          logger.error('[PluginTest]', ...args);
+          options?.onLog?.(`[ERROR] ${args.join(' ')}`);
+        },
+        debug: (...args: any[]) => {
+          logger.debug('[PluginTest]', ...args);
+          options?.onLog?.(`[DEBUG] ${args.join(' ')}`);
+        }
+      };
+
+      const result = await this.executePluginInternal(code, params, testLogger);
+      
+      // Use a dummy scraper info for the conversion
+      const dummyScraper: ScraperInfo = {
+        id: 'test-plugin',
+        name: 'Test Plugin',
+        description: 'Testing environment',
+        version: '1.0.0',
+        filename: 'test.js',
+        supportedTypes: ['movie', 'tv'],
+        enabled: true
+      };
+
+      const streams = this.convertToStreams(result, dummyScraper);
+      return { streams };
+    } catch (error: any) {
+      logger.error('[LocalScraperService] testPlugin failed:', error);
+      options?.onLog?.(`[FATAL] ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Execute scraper code with full access to app environment (non-sandboxed)
+  private async executePlugin(code: string, params: any): Promise<any> {
+    return this.executePluginInternal(code, params, logger);
+  }
+
+  private async executePluginInternal(code: string, params: any, customLogger: any): Promise<any> {
+    try {
+      // Get URL validation setting from storage
       const settingsData = await mmkvStorage.getItem('app_settings');
       const settings = settingsData ? JSON.parse(settingsData) : {};
       const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
 
+      // Load per-scraper settings for this run
       const allScraperSettingsRaw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
       const allScraperSettings = allScraperSettingsRaw ? JSON.parse(allScraperSettingsRaw) : {};
-      let perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId])
+      const perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId])
         ? allScraperSettings[params.scraperId]
         : (params?.settings || {});
-
-      if (params?.scraperId?.toLowerCase().includes('showbox')) {
-        const token = perScraperSettings.uiToken || perScraperSettings.cookie || perScraperSettings.token;
-        if (token) {
-          perScraperSettings = {
-            ...perScraperSettings,
-            uiToken: token,
-            cookie: token,
-            token: token
-          };
-          if (params) {
-            params.settings = perScraperSettings;
-          }
-        }
-      }
 
       // Module exports for CommonJS compatibility
       const moduleExports: any = {};
@@ -1226,63 +1268,11 @@ class LocalScraperService {
         }
       };
 
-      // Polyfilled fetch that properly handles redirect: 'manual'
-      // React Native's native fetch may or may not support redirect: 'manual' properly
-      const polyfilledFetch = async (url: string, options: any = {}): Promise<Response> => {
-        // If not using redirect: manual, use native fetch directly
-        if (options.redirect !== 'manual') {
-          return fetch(url, options);
-        }
-
-        // Try native fetch with redirect: 'manual' first
-        try {
-          logger.log('[PolyfilledFetch] Attempting native fetch with redirect: manual for:', url.substring(0, 50));
-          const nativeResponse = await fetch(url, options);
-
-          // Log what native fetch returns
-          const locationHeader = nativeResponse.headers.get('location');
-          logger.log('[PolyfilledFetch] Native fetch result - Status:', nativeResponse.status, 'URL:', nativeResponse.url?.substring(0, 60), 'Location:', locationHeader || 'none');
-
-          // Check if redirect happened - compare URLs
-          if (nativeResponse.url && nativeResponse.url !== url) {
-            // Fetch followed the redirect! Let's try to get the redirect location
-            // by making a HEAD request or checking if there's any pattern
-            logger.log('[PolyfilledFetch] REDIRECT DETECTED - Original:', url.substring(0, 50), 'Final:', nativeResponse.url.substring(0, 50));
-
-            // Create a mock 302 response with the final URL as location
-            const mockHeaders = new Headers(nativeResponse.headers);
-            mockHeaders.set('location', nativeResponse.url);
-
-            return {
-              ok: false,
-              status: 302,  // Mock as 302
-              statusText: 'Found',
-              headers: mockHeaders,
-              url: url,
-              text: nativeResponse.text.bind(nativeResponse),
-              json: nativeResponse.json.bind(nativeResponse),
-              blob: nativeResponse.blob.bind(nativeResponse),
-              arrayBuffer: nativeResponse.arrayBuffer.bind(nativeResponse),
-              clone: nativeResponse.clone.bind(nativeResponse),
-              body: nativeResponse.body,
-              bodyUsed: nativeResponse.bodyUsed,
-              redirected: true,
-              type: nativeResponse.type,
-              formData: nativeResponse.formData.bind(nativeResponse),
-            } as Response;
-          }
-
-          return nativeResponse;
-        } catch (error: any) {
-          logger.error('[PolyfilledFetch] Native fetch error:', error.message);
-          throw error;
-        }
-      };
-
       // Execution timeout (1 minute)
       const PLUGIN_TIMEOUT_MS = 60000;
+      const functionName = params.functionName || 'getStreams';
 
-      const executionPromise = new Promise<LocalScraperResult[]>((resolve, reject) => {
+      const executionPromise = new Promise<any>((resolve, reject) => {
         try {
           // Create function with full global access
           // We pass specific utilities but the plugin has access to everything
@@ -1295,7 +1285,6 @@ class LocalScraperService {
             'CryptoJS',
             'cheerio',
             'logger',
-            'console',
             'params',
             'PRIMARY_KEY',
             'TMDB_API_KEY',
@@ -1304,30 +1293,27 @@ class LocalScraperService {
             'SCRAPER_ID',
             `
             // Make env vars available globally for backward compatibility
-            const globalScope = typeof global !== 'undefined' ? global : (typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : this));
-            
-            if (globalScope) {
-              globalScope.PRIMARY_KEY = PRIMARY_KEY;
-              globalScope.TMDB_API_KEY = TMDB_API_KEY;
-              globalScope.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
-              globalScope.SCRAPER_ID = SCRAPER_ID;
-              globalScope.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
-            } else {
-               logger.error('[Plugin Sandbox] Could not find global scope to inject settings');
+            if (typeof global !== 'undefined') {
+              global.PRIMARY_KEY = PRIMARY_KEY;
+              global.TMDB_API_KEY = TMDB_API_KEY;
+              global.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
+              global.SCRAPER_ID = SCRAPER_ID;
+              global.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
             }
 
             // Plugin code
             ${code}
 
-            // Find and call getStreams function
-            if (typeof getStreams === 'function') {
-              return getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
-            } else if (module.exports && typeof module.exports.getStreams === 'function') {
-              return module.exports.getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
-            } else if (typeof global !== 'undefined' && typeof global.getStreams === 'function') {
-              return global.getStreams(params.tmdbId, params.mediaType, params.season, params.episode);
+            // Find and call target function (${functionName})
+            if (typeof ${functionName} === 'function') {
+              return ${functionName}(params.tmdbId, params.mediaType, params.season, params.episode);
+            } else if (module.exports && typeof module.exports.${functionName} === 'function') {
+              return module.exports.${functionName}(params.tmdbId, params.mediaType, params.season, params.episode);
+            } else if (typeof global !== 'undefined' && typeof global.${functionName} === 'function') {
+              return global.${functionName}(params.tmdbId, params.mediaType, params.season, params.episode);
             } else {
-              throw new Error('No getStreams function found in plugin');
+              // Return null if function not found (allow optional implementation)
+              return null;
             }
             `
           );
@@ -1338,11 +1324,10 @@ class LocalScraperService {
             moduleExports,
             pluginRequire,
             axios,
-            polyfilledFetch,  // Use polyfilled fetch for redirect: manual support
+            fetch,
             CryptoJS,
             cheerio,
-            logger,
-            consoleOverride || console,  // Expose console (or override) to plugins for debugging
+            customLogger,
             params,
             MOVIEBOX_PRIMARY_KEY,
             MOVIEBOX_TMDB_API_KEY,
@@ -1355,7 +1340,7 @@ class LocalScraperService {
           if (result && typeof result.then === 'function') {
             result.then(resolve).catch(reject);
           } else {
-            resolve(result || []);
+            resolve(result);
           }
         } catch (error) {
           reject(error);
@@ -1371,9 +1356,78 @@ class LocalScraperService {
       ]);
 
     } catch (error) {
-      logger.error('[LocalScraperService] Plugin execution failed:', error);
+      customLogger.error('[LocalScraperService] Plugin execution failed:', error);
       throw error;
     }
+  }
+
+  // Get subtitles from plugins
+  async getSubtitles(type: string, tmdbId: string, season?: number, episode?: number): Promise<any[]> {
+    await this.ensureInitialized();
+
+    // Check if local scrapers are enabled
+    const userSettings = await this.getUserScraperSettings();
+    if (!userSettings.enableLocalScrapers) {
+      return [];
+    }
+
+    // Get available scrapers from manifest (respects manifestEnabled)
+    const availableScrapers = await this.getAvailableScrapers();
+    const enabledScrapers = availableScrapers
+      .filter(scraper =>
+        scraper.enabled &&
+        scraper.manifestEnabled !== false
+      );
+
+    if (enabledScrapers.length === 0) {
+      return [];
+    }
+
+    logger.log(`[LocalScraperService] Fetching subtitles from ${enabledScrapers.length} plugins for ${type}:${tmdbId}`);
+
+    const results = await Promise.allSettled(
+      enabledScrapers.map(async (scraper) => {
+        try {
+          const code = this.scraperCode.get(scraper.id);
+          if (!code) return [];
+
+          // Load per-scraper settings
+          const scraperSettings = await this.getScraperSettings(scraper.id);
+
+          const subtitleResults = await this.executePlugin(code, {
+            tmdbId,
+            mediaType: type === 'series' ? 'tv' : 'movie',
+            season,
+            episode,
+            scraperId: scraper.id,
+            settings: scraperSettings,
+            functionName: 'getSubtitles'
+          });
+
+          if (Array.isArray(subtitleResults)) {
+             return subtitleResults.map(sub => ({
+               ...sub,
+               addon: scraper.id,
+               addonName: scraper.name,
+               source: scraper.name
+             }));
+          }
+          return [];
+        } catch (e) {
+          // Ignore errors for individual plugins
+          return [];
+        }
+      })
+    );
+
+    const allSubtitles: any[] = [];
+    results.forEach(result => {
+      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+        allSubtitles.push(...result.value);
+      }
+    });
+
+    return allSubtitles;
   }
 
   // Convert scraper results to Nuvio Stream format
@@ -1555,73 +1609,6 @@ class LocalScraperService {
     } catch (error) {
       logger.error('[LocalScraperService] Error getting user scraper settings:', error);
       return { enableLocalScrapers: false };
-    }
-  }
-
-  // Test a plugin independently with log capturing.
-  // If onLog is provided, each formatted log line is emitted as it happens.
-  async testPlugin(
-    code: string,
-    params: { tmdbId: string; mediaType: string; season?: number; episode?: number },
-    options?: { onLog?: (line: string) => void }
-  ): Promise<{ streams: Stream[]; logs: string[] }> {
-    const logs: string[] = [];
-    const emit = (line: string) => {
-      logs.push(line);
-      options?.onLog?.(line);
-    };
-
-    // Create a console proxy to capture logs
-    const consoleProxy = {
-      log: (...args: any[]) => {
-        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-        emit(`[LOG] ${msg}`);
-        console.log('[PluginTest]', msg);
-      },
-      error: (...args: any[]) => {
-        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-        emit(`[ERROR] ${msg}`);
-        console.error('[PluginTest]', msg);
-      },
-      warn: (...args: any[]) => {
-        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-        emit(`[WARN] ${msg}`);
-        console.warn('[PluginTest]', msg);
-      },
-      info: (...args: any[]) => {
-        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-        emit(`[INFO] ${msg}`);
-        console.info('[PluginTest]', msg);
-      },
-      debug: (...args: any[]) => {
-        const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-        emit(`[DEBUG] ${msg}`);
-        console.debug('[PluginTest]', msg);
-      }
-    };
-
-    try {
-      const results = await this.executePlugin(code, params, consoleProxy);
-
-      // Convert results using a dummy scraper info since we don't have one for ad-hoc tests
-      const dummyScraperInfo: ScraperInfo = {
-        id: 'test-plugin',
-        name: 'Test Plugin',
-        version: '1.0.0',
-        description: 'Test',
-        filename: 'test.js',
-        supportedTypes: ['movie', 'tv'],
-        enabled: true
-      };
-
-      const streams = this.convertToStreams(results, dummyScraperInfo);
-      return { streams, logs };
-    } catch (error: any) {
-      emit(`[FATAL ERROR] ${error.message || String(error)}`);
-      if (error.stack) {
-        emit(`[STACK] ${error.stack}`);
-      }
-      return { streams: [], logs };
     }
   }
 
