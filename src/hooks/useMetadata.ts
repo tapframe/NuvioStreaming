@@ -482,6 +482,7 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
   const loadMetadata = async () => {
     try {
+      console.log('🚀 [useMetadata] loadMetadata CALLED for:', { id, type });
       console.log('🔍 [useMetadata] loadMetadata started:', {
         id,
         type,
@@ -746,11 +747,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
         const [content, castData] = await Promise.allSettled([
           // Load content with timeout and retry
           withRetry(async () => {
+            console.log('⚡ [useMetadata] Calling catalogService.getEnhancedContentDetails...');
             console.log('🔍 [useMetadata] Calling catalogService.getEnhancedContentDetails:', { type, actualId, addonId });
             const result = await withTimeout(
               catalogService.getEnhancedContentDetails(type, actualId, addonId),
               API_TIMEOUT
             );
+            console.log('✅ [useMetadata] catalogService returned:', result ? 'DATA' : 'NULL');
             // Store the actual ID used (could be IMDB)
             if (actualId.startsWith('tt')) {
               setImdbId(actualId);
