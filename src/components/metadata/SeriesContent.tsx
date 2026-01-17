@@ -585,7 +585,15 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       const malEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
       if (malEnabled && metadata?.name) {
           const totalEpisodes = Object.values(groupedEpisodes).reduce((acc, curr) => acc + (curr?.length || 0), 0);
-          MalSync.scrobbleEpisode(metadata.name, episode.episode_number, totalEpisodes, 'series', episode.season_number, imdbId);
+          MalSync.scrobbleEpisode(
+              metadata.name, 
+              episode.episode_number, 
+              totalEpisodes, 
+              'series', 
+              episode.season_number, 
+              imdbId,
+              episode.air_date // Pass release date for ARM Sync converter
+          );
       }
 
       // Reload to ensure consistency (e.g. if optimistic update was slightly off or for other effects)
@@ -675,8 +683,18 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
       const malEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
       if (malEnabled && metadata?.name && episodeNumbers.length > 0) {
           const lastEp = Math.max(...episodeNumbers);
+          const lastEpisodeData = seasonEpisodes.find(e => e.episode_number === lastEp);
           const totalEpisodes = Object.values(groupedEpisodes).reduce((acc, curr) => acc + (curr?.length || 0), 0);
-          MalSync.scrobbleEpisode(metadata.name, lastEp, totalEpisodes, 'series', currentSeason, imdbId);
+          
+          MalSync.scrobbleEpisode(
+              metadata.name, 
+              lastEp, 
+              totalEpisodes, 
+              'series', 
+              currentSeason, 
+              imdbId,
+              lastEpisodeData?.air_date // Pass release date for accuracy
+          );
       }
 
       // Re-sync with source of truth
