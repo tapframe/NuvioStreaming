@@ -23,7 +23,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: false # Allow writing to cache for this branch
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
