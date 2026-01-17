@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { logger } from '../utils/logger';
+import { logger } from '../../utils/logger';
 
 interface ArmEntry {
   anidb?: number;
@@ -94,8 +94,12 @@ export const ArmSyncService = {
             
             const matchEp = episodes.find((ep: any) => {
               if (!ep.aired) return false;
-              const epDateStr = new Date(ep.aired).toISOString().split('T')[0];
-              return epDateStr === releaseDateStr;
+              try {
+                const epDateStr = new Date(ep.aired).toISOString().split('T')[0];
+                return epDateStr === releaseDateStr;
+              } catch (e) {
+                return false;
+              }
             });
 
             if (matchEp) {

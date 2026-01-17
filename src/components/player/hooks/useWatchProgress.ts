@@ -31,9 +31,13 @@ export const useWatchProgress = (
     const initialSeekTargetRef = useRef<number | null>(null);
     const hasScrobbledRef = useRef(false);
 
-    // Values refs for unmount cleanup
+    // Values refs for unmount cleanup and stale closure prevention
     const currentTimeRef = useRef(currentTime);
     const durationRef = useRef(duration);
+    const imdbIdRef = useRef(imdbId);
+    const seasonRef = useRef(season);
+    const episodeRef = useRef(episode);
+    const releaseDateRef = useRef(releaseDate);
 
     // Reset scrobble flag when content changes
     useEffect(() => {
@@ -47,6 +51,13 @@ export const useWatchProgress = (
     useEffect(() => {
         durationRef.current = duration;
     }, [duration]);
+
+    useEffect(() => {
+        imdbIdRef.current = imdbId;
+        seasonRef.current = season;
+        episodeRef.current = episode;
+        releaseDateRef.current = releaseDate;
+    }, [imdbId, season, episode, releaseDate]);
 
     // Keep latest traktAutosync ref to avoid dependency cycles in listeners
     const traktAutosyncRef = useRef(traktAutosync);
@@ -139,17 +150,22 @@ export const useWatchProgress = (
                     hasScrobbledRef.current = true;
                     logger.log(`[useWatchProgress] 90% threshold reached, scrobbling to MAL...`);
                     
-                    if (type === 'series' && imdbId && season !== undefined && episode !== undefined) {
+                    const currentImdbId = imdbIdRef.current;
+                    const currentSeason = seasonRef.current;
+                    const currentEpisode = episodeRef.current;
+                    const currentReleaseDate = releaseDateRef.current;
+
+                    if (type === 'series' && currentImdbId && currentSeason !== undefined && currentEpisode !== undefined) {
                         watchedService.markEpisodeAsWatched(
-                            imdbId, 
+                            currentImdbId, 
                             id, 
-                            season, 
-                            episode, 
+                            currentSeason, 
+                            currentEpisode, 
                             new Date(), 
-                            releaseDate
+                            currentReleaseDate
                         );
-                    } else if (type === 'movie' && imdbId) {
-                        watchedService.markMovieAsWatched(imdbId);
+                    } else if (type === 'movie' && currentImdbId) {
+                        watchedService.markMovieAsWatched(currentImdbId);
                     }
                 }
             } catch (error) {
@@ -160,9 +176,10 @@ export const useWatchProgress = (
 
     // Save Interval
     useEffect(() => {
-        if (id && type && !paused && duration > 0) {
+        if (id && type && !paused) {
             if (progressSaveInterval) clearInterval(progressSaveInterval);
 
+            // Use refs inside the interval so we don't need to restart it on every second
             const interval = setInterval(() => {
                 saveWatchProgress();
             }, 10000);
@@ -173,7 +190,7 @@ export const useWatchProgress = (
                 setProgressSaveInterval(null);
             };
         }
-    }, [id, type, paused, currentTime, duration]);
+    }, [id, type, paused]);
 
     // Unmount Save - deferred to allow navigation to complete first
     useEffect(() => {
