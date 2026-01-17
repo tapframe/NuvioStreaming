@@ -1,12 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { StatusBar, Platform, Dimensions, AppState } from 'react-native';
-import RNImmersiveMode from 'react-native-immersive-mode';
 import * as NavigationBar from 'expo-navigation-bar';
 import * as Brightness from 'expo-brightness';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { logger } from '../../../../utils/logger';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+
+// Optional Android immersive mode module
+let RNImmersiveMode: any = null;
+if (Platform.OS === 'android') {
+    try {
+        RNImmersiveMode = require('react-native-immersive-mode').default;
+    } catch {
+        RNImmersiveMode = null;
+    }
+}
 
 const DEBUG_MODE = false;
 
@@ -36,8 +45,14 @@ export const usePlayerSetup = (
     const enableImmersiveMode = async () => {
         if (Platform.OS === 'android') {
             // Standard immersive mode
-            RNImmersiveMode.setBarTranslucent(true);
-            RNImmersiveMode.fullLayout(true);
+            if (RNImmersiveMode) {
+                try {
+                    RNImmersiveMode.setBarTranslucent(true);
+                    RNImmersiveMode.fullLayout(true);
+                } catch (e) {
+                    console.warn('[usePlayerSetup] RNImmersiveMode failed:', e);
+                }
+            }
             StatusBar.setHidden(true, 'none');
 
             // Explicitly hide bottom navigation bar using Expo
@@ -52,8 +67,12 @@ export const usePlayerSetup = (
 
     const disableImmersiveMode = async () => {
         if (Platform.OS === 'android') {
-            RNImmersiveMode.setBarTranslucent(false);
-            RNImmersiveMode.fullLayout(false);
+            if (RNImmersiveMode) {
+                try {
+                    RNImmersiveMode.setBarTranslucent(false);
+                    RNImmersiveMode.fullLayout(false);
+                } catch (e) { }
+            }
             StatusBar.setHidden(false, 'fade');
 
             try {
