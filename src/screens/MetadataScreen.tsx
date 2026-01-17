@@ -88,6 +88,7 @@ const MemoizedCastDetailsModal = memo(CastDetailsModal);
 // ... other imports
 
 const MetadataScreen: React.FC = () => {
+  useEffect(() => { console.log('✅ MetadataScreen MOUNTED'); }, []);
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'Metadata'>>();
   const { id, type, episodeId, addonId } = route.params;
@@ -128,6 +129,41 @@ const MetadataScreen: React.FC = () => {
   const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
   const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
   const [isScreenFocused, setIsScreenFocused] = useState(true);
+  const [isContentReady, setIsContentReady] = useState(false);
+  const [showCastModal, setShowCastModal] = useState(false);
+
+  // Enhanced responsive sizing for tablets and TV screens
+  const deviceWidth = Dimensions.get('window').width;
+  const deviceHeight = Dimensions.get('window').height;
+
+  // Determine device type based on width
+  const getDeviceType = useCallback(() => {
+    if (deviceWidth >= BREAKPOINTS.tv) return 'tv';
+    if (deviceWidth >= BREAKPOINTS.largeTablet) return 'largeTablet';
+    if (deviceWidth >= BREAKPOINTS.tablet) return 'tablet';
+    return 'phone';
+  }, [deviceWidth]);
+
+  const deviceType = getDeviceType();
+  const isTablet = deviceType === 'tablet';
+  const isLargeTablet = deviceType === 'largeTablet';
+  const isTV = deviceType === 'tv';
+  const isLargeScreen = isTablet || isLargeTablet || isTV;
+
+  // Enhanced spacing and padding for production sections
+  const horizontalPadding = useMemo(() => {
+    switch (deviceType) {
+      case 'tv':
+        return 32;
+      case 'largeTablet':
+        return 28;
+      case 'tablet':
+        return 24;
+      default:
+        return 16; // phone
+    }
+  }, [deviceType]);
+
   // Source switching removed
   const transitionOpacity = useSharedValue(1);
   const interactionComplete = useRef(false);
@@ -848,25 +884,13 @@ const MetadataScreen: React.FC = () => {
 
   // Show error if exists
   if (metadataError || (!loading && !metadata)) {
-    console.log('🔍 [MetadataScreen] Showing error component:', {
-      hasError: !!metadataError,
-      errorMessage: metadataError,
-      isLoading: loading,
-      hasMetadata: !!metadata,
-      loadingState: loading
-    });
+    console.log('❌ MetadataScreen ERROR state:', { metadataError, loading, hasMetadata: !!metadata });
     return ErrorComponent;
   }
 
   // Show loading screen if metadata is not yet available or exit animation hasn't completed
   if (loading || !isContentReady || !loadingScreenExited) {
-    console.log('🔍 [MetadataScreen] Showing loading screen:', {
-      isLoading: loading,
-      isContentReady,
-      loadingScreenExited,
-      hasMetadata: !!metadata,
-      errorMessage: metadataError
-    });
+    console.log('⏳ MetadataScreen LOADING state:', { loading, isContentReady, loadingScreenExited, hasMetadata: !!metadata });
     return (
       <MetadataLoadingScreen
         ref={loadingScreenRef}
