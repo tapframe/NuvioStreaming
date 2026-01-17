@@ -867,7 +867,7 @@ const AndroidVideoPlayer: React.FC = () => {
       )}
 
       <View style={{ flex: 1, backgroundColor: 'black' }}>
-        {!isTransitioningStream && !isResolving && (
+        {!isTransitioningStream && (
           <VideoSurface
             processedStreamUrl={currentStreamUrl}
             headers={headers}
