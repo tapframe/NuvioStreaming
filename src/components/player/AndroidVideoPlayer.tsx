@@ -63,8 +63,6 @@ import { findBestSubtitleTrack, findBestAudioTrack } from './utils/trackSelectio
 import { useTheme } from '../../contexts/ThemeContext';
 import axios from 'axios';
 import { streamExtractorService } from '../../services/StreamExtractorService';
-import { MalSync } from '../../services/mal/MalSync';
-import { mmkvStorage } from '../../services/mmkvStorage';
 
 const DEBUG_MODE = false;
 
@@ -255,42 +253,6 @@ const AndroidVideoPlayer: React.FC = () => {
     showImdbId: imdbId,
     episodeId: episodeId
   });
-
-  // MAL Auto Tracking
-  const malTrackingRef = useRef(false);
-
-  useEffect(() => {
-     malTrackingRef.current = false;
-  }, [id, season, episode]);
-
-  useEffect(() => {
-      if (playerState.duration > 0 && playerState.currentTime > 0) {
-          const progress = playerState.currentTime / playerState.duration;
-          if (progress > 0.85 && !malTrackingRef.current) {
-               const autoUpdate = mmkvStorage.getBoolean('mal_auto_update') ?? true;
-               const malEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
-               
-               // Strict Mode: Only sync if source is explicitly MAL/Kitsu (Prevents Cinemeta mismatched syncing)
-               const isAnimeSource = id && (id.startsWith('mal:') || id.startsWith('kitsu:') || id.includes(':mal:') || id.includes(':kitsu:'));
-
-               if (malEnabled && autoUpdate && title && isAnimeSource) {
-                   malTrackingRef.current = true;
-                   
-                   // Calculate total episodes for completion status
-                   let totalEpisodes = 0;
-                   if (type === 'series' && groupedEpisodes) {
-                       totalEpisodes = Object.values(groupedEpisodes).reduce((acc, curr) => acc + (Array.isArray(curr) ? curr.length : 0), 0);
-                   }
-
-                   // If series, use episode number. If movie, use 1.
-                   const epNum = type === 'series' ? episode : 1;
-                   if (epNum) {
-                       MalSync.scrobbleEpisode(title, epNum, totalEpisodes, type as any, season, imdbId || undefined);
-                   }
-               }
-          }
-      }
-  }, [playerState.currentTime, playerState.duration, title, episode]);
 
   const watchProgress = useWatchProgress(
     id, type, episodeId,

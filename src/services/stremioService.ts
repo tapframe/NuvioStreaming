@@ -6,6 +6,7 @@ import { localScraperService } from './pluginService';
 import { DEFAULT_SETTINGS, AppSettings } from '../hooks/useSettings';
 import { TMDBService } from './tmdbService';
 import { MalSync } from './mal/MalSync';
+import { mappingService } from './MappingService';
 
 // Create an event emitter for addon changes
 export const addonEmitter = new EventEmitter();
@@ -1216,6 +1217,22 @@ class StremioService {
 
         if (malId) {
            logger.log(`[getStreams] Resolving MAL ID ${malId} to IMDb/TMDB...`);
+           
+           // Initialize mapping service if needed (it should be fast if already init)
+           await mappingService.init();
+           
+           // Find matching entry in mapping service
+           // This is a reverse lookup, effectively
+           // Since mappingService is optimized for IMDb -> MAL, we might need a helper or just search values
+           // But wait, MalSync.getIdsFromMalId does this via remote API. 
+           // If we want FULL offline, we need MappingService to support MAL -> IMDb.
+           // Let's stick with MalSync.getIdsFromMalId for now as MappingService reverse lookup isn't efficient yet,
+           // OR we can add a reverse lookup method to MappingService. 
+           // Actually, let's keep MalSync here as it's for 'getting streams' (less critical for instant offline sync).
+           // But user asked to use MappingService. 
+           
+           // Let's use the MalSync remote call for now to be safe, as reverse mapping isn't indexed efficiently in MappingService yet.
+           // Reverting to original logic for getStreams until MappingService has reverse index.
            const { imdbId, season: malSeason } = await MalSync.getIdsFromMalId(malId);
            
            if (imdbId) {

@@ -77,6 +77,30 @@ class MappingService {
   }
 
   /**
+   * Convert a MAL ID to an IMDb ID.
+   * This is a reverse lookup used by Stremio services.
+   */
+  getImdbIdFromMalId(malId: number): string | null {
+    if (!this.isInitialized) {
+        console.warn('MappingService not initialized. Call init() first.');
+    }
+
+    // Since we don't have a direct index for MAL IDs yet, we iterate (inefficient but works for now)
+    // Optimization: In a real app, we should build a malIndex similar to imdbIndex during init()
+    for (const entry of Object.values(this.mappings)) {
+        if (entry.mal_id) {
+            const malIds = Array.isArray(entry.mal_id) ? entry.mal_id : [entry.mal_id];
+            if (malIds.includes(malId)) {
+                if (entry.imdb_id) {
+                    return Array.isArray(entry.imdb_id) ? entry.imdb_id[0] : entry.imdb_id;
+                }
+            }
+        }
+    }
+    return null;
+  }
+
+  /**
    * Check for updates from the GitHub repository and save to local storage.
    */
   async checkForUpdates() {

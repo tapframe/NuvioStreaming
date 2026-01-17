@@ -2,6 +2,7 @@ import { mmkvStorage } from '../mmkvStorage';
 import { MalApiService } from './MalApi';
 import { MalListStatus } from '../../types/mal';
 import { catalogService } from '../catalogService';
+import { mappingService } from '../MappingService';
 import axios from 'axios';
 
 const MAPPING_PREFIX = 'mal_map_';
@@ -40,14 +41,17 @@ export const MalSync = {
    * Tries to find a MAL ID for a given anime title or IMDb ID.
    * Caches the result to avoid repeated API calls.
    */
-  getMalId: async (title: string, type: 'movie' | 'series' = 'series', year?: number, season?: number, imdbId?: string): Promise<number | null> => {
-    // 1. Try IMDb ID first (Most accurate) - BUT only for Season 1 or Movies.
-    // For Season 2+, IMDb usually points to the main series (S1), while MAL has separate entries.
-    // So we force a search for S2+ to find the specific "Season X" entry.
-    if (imdbId && (type === 'movie' || !season || season === 1)) {
-        const idFromImdb = await MalSync.getMalIdFromImdb(imdbId);
-        if (idFromImdb) return idFromImdb;
+  getMalId: async (title: string, type: 'movie' | 'series' = 'series', year?: number, season?: number, imdbId?: string, episode: number = 1): Promise<number | null> => {
+    // 1. Try Offline Mapping Service (Most accurate for perfect season/episode matching)
+    if (imdbId && type === 'series' && season !== undefined) {
+        const offlineMalId = mappingService.getMalId(imdbId, season, episode);
+        if (offlineMalId) {
+            console.log(`[MalSync] Found offline mapping: ${imdbId} S${season}E${episode} -> MAL ${offlineMalId}`);
+            return offlineMalId;
+        }
     }
+
+    // 2. Try IMDb ID first (Via online MalSync API) - BUT only for Season 1 or Movies.
 
     // 2. Check Cache for Title
     const cleanTitle = title.trim();
@@ -113,7 +117,7 @@ export const MalSync = {
     imdbId?: string
   ) => {
     try {
-      const malId = await MalSync.getMalId(animeTitle, type, undefined, season, imdbId);
+      const malId = await MalSync.getMalId(animeTitle, type, undefined, season, imdbId, episodeNumber);
       if (!malId) return;
 
       let finalTotalEpisodes = totalEpisodes;

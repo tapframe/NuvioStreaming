@@ -2,13 +2,13 @@ import { TraktService } from './traktService';
 import { storageService } from './storageService';
 import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
+import { MalSync } from './mal/MalSync';
+import { MalAuthService } from './mal/MalAuth';
+import { mappingService } from './MappingService';
 
 /**
  * WatchedService - Manages "watched" status for movies, episodes, and seasons.
- * Handles both local storage and Trakt sync transparently.
- * 
- * When Trakt is authenticated, it syncs to Trakt.
- * When not authenticated, it stores locally.
+ * Handles both local storage and Trakt/MAL sync transparently.
  */
 class WatchedService {
     private static instance: WatchedService;
@@ -16,6 +16,8 @@ class WatchedService {
 
     private constructor() {
         this.traktService = TraktService.getInstance();
+        // Initialize mapping service
+        mappingService.init().catch(err => logger.error('[WatchedService] MappingService init failed:', err));
     }
 
     public static getInstance(): WatchedService {
@@ -37,14 +39,23 @@ class WatchedService {
         try {
             logger.log(`[WatchedService] Marking movie as watched: ${imdbId}`);
 
-            // Check if Trakt is authenticated
-            const isTraktAuth = await this.traktService.isAuthenticated();
-            let syncedToTrakt = false;
-
+            // Sync to Trakt
             if (isTraktAuth) {
-                // Sync to Trakt
                 syncedToTrakt = await this.traktService.addToWatchedMovies(imdbId, watchedAt);
                 logger.log(`[WatchedService] Trakt sync result for movie: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            const isMalAuth = await MalAuthService.isAuthenticated();
+            if (isMalAuth) {
+                MalSync.scrobbleEpisode(
+                    'Movie', 
+                    1, 
+                    1, 
+                    'movie', 
+                    undefined, 
+                    imdbId
+                ).catch(err => logger.error('[WatchedService] MAL movie sync failed:', err));
             }
 
             // Also store locally as "completed" (100% progress)
@@ -75,12 +86,8 @@ class WatchedService {
         try {
             logger.log(`[WatchedService] Marking episode as watched: ${showImdbId} S${season}E${episode}`);
 
-            // Check if Trakt is authenticated
-            const isTraktAuth = await this.traktService.isAuthenticated();
-            let syncedToTrakt = false;
-
+            // Sync to Trakt
             if (isTraktAuth) {
-                // Sync to Trakt
                 syncedToTrakt = await this.traktService.addToWatchedEpisodes(
                     showImdbId,
                     season,
@@ -88,6 +95,22 @@ class WatchedService {
                     watchedAt
                 );
                 logger.log(`[WatchedService] Trakt sync result for episode: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            const isMalAuth = await MalAuthService.isAuthenticated();
+            if (isMalAuth && showImdbId) {
+                // We need the title for scrobbleEpisode (as fallback), 
+                // but getMalId will now prioritize the IMDb mapping.
+                // We'll use a placeholder title or try to find it if possible.
+                MalSync.scrobbleEpisode(
+                    'Anime', // Title fallback
+                    episode,
+                    0, // Total episodes (MalSync will fetch)
+                    'series',
+                    season,
+                    showImdbId
+                ).catch(err => logger.error('[WatchedService] MAL sync failed:', err));
             }
 
             // Store locally as "completed"
