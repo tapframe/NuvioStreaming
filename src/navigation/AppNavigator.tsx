@@ -55,6 +55,7 @@ import TMDBSettingsScreen from '../screens/TMDBSettingsScreen';
 import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
+import SimklSettingsScreen from '../screens/SimklSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import ThemeScreen from '../screens/ThemeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -185,6 +186,7 @@ export type RootStackParamList = {
   HomeScreenSettings: undefined;
   HeroCatalogs: undefined;
   TraktSettings: undefined;
+  SimklSettings: undefined;
   PlayerSettings: undefined;
   ThemeSettings: undefined;
   ScraperSettings: undefined;
@@ -1553,6 +1555,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen
               name="TraktSettings"
               component={TraktSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="SimklSettings"
+              component={SimklSettingsScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,

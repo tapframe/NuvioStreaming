@@ -27,6 +27,22 @@ export interface TraktUser {
   avatar?: string;
 }
 
+export interface TraktUserStats {
+  movies?: {
+    watched?: number;
+    minutes?: number;
+  };
+  shows?: {
+    watched?: number;
+    minutes?: number;
+  };
+  episodes?: {
+    watched?: number;
+    minutes?: number;
+  };
+  minutes?: number; // total minutes watched
+}
+
 export interface TraktWatchedItem {
   movie?: {
     title: string;
@@ -1115,6 +1131,13 @@ export class TraktService {
    */
   public async getUserProfile(): Promise<TraktUser> {
     return this.apiRequest<TraktUser>('/users/me?extended=full');
+  }
+
+  /**
+   * Get the user's watch stats
+   */
+  public async getUserStats(): Promise<TraktUserStats> {
+    return this.apiRequest<TraktUserStats>('/users/me/stats');
   }
 
   /**
