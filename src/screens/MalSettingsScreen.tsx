@@ -273,7 +273,7 @@ const MalSettingsScreen: React.FC = () => {
                                     Auto Episode Update
                                 </Text>
                                 <Text style={[styles.settingDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                                    Automatically update your progress on MAL when you finish watching an episode (>=90% completion).
+                                    Automatically update your progress on MAL when you finish watching an episode (&gt;=90% completion).
                                 </Text>
                             </View>
                             <Switch

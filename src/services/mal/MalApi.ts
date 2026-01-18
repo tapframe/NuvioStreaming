@@ -99,7 +99,7 @@ export const MalApiService = {
       }
   },
 
-  getMyListStatus: async (malId: number): Promise<{ list_status?: any; num_episodes: number }> => {
+  getMyListStatus: async (malId: number): Promise<{ my_list_status?: any; num_episodes: number }> => {
       try {
           const response = await api.get(`/anime/${malId}`, {
               params: { fields: 'my_list_status,num_episodes' }

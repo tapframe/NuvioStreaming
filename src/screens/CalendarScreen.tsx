@@ -33,33 +33,10 @@ import { memoryManager } from '../utils/memoryManager';
 import { useCalendarData } from '../hooks/useCalendarData';
 import { AniListService } from '../services/anilist/AniListService';
 import { AniListAiringSchedule } from '../services/anilist/types';
+import { CalendarEpisode, CalendarSection } from '../types/calendar';
 
 const { width } = Dimensions.get('window');
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
-
-interface CalendarEpisode {
-  id: string;
-  seriesId: string;
-  title: string;
-  seriesName: string;
-  poster: string;
-  releaseDate: string | null;
-  season: number;
-  episode: number;
-  overview: string;
-  vote_average: number;
-  still_path: string | null;
-  season_poster_path: string | null;
-  // MAL specific
-  day?: string;
-  time?: string;
-  genres?: string[];
-}
-
-interface CalendarSection {
-  title: string;
-  data: CalendarEpisode[];
-}
 
 const CalendarScreen = () => {
   const { t } = useTranslation();

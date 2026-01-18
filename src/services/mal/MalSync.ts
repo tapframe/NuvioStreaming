@@ -1,6 +1,6 @@
 import { mmkvStorage } from '../mmkvStorage';
 import { MalApiService } from './MalApi';
-import { MalListStatus } from '../../types/mal';
+import { MalListStatus, MalAnimeNode } from '../../types/mal';
 import { catalogService } from '../catalogService';
 import { ArmSyncService } from './ArmSyncService';
 import axios from 'axios';
