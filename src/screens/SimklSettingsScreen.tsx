@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     disclaimer: {
         fontSize: 12,
         textAlign: 'center',
-        marginTop: 20,
+        marginTop: 8,
         marginBottom: 8,
     },
     logoSection: {
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 20,
         marginTop: 16,
-        marginBottom: 8,
+        marginBottom: 0,
     },
     logo: {
         width: 150,
