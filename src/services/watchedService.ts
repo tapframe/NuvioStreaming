@@ -1,4 +1,5 @@
 import { TraktService } from './traktService';
+import { SimklService } from './simklService';
 import { storageService } from './storageService';
 import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
@@ -13,9 +14,11 @@ import { logger } from '../utils/logger';
 class WatchedService {
     private static instance: WatchedService;
     private traktService: TraktService;
+    private simklService: SimklService;
 
     private constructor() {
         this.traktService = TraktService.getInstance();
+        this.simklService = SimklService.getInstance();
     }
 
     public static getInstance(): WatchedService {
@@ -45,6 +48,13 @@ class WatchedService {
                 // Sync to Trakt
                 syncedToTrakt = await this.traktService.addToWatchedMovies(imdbId, watchedAt);
                 logger.log(`[WatchedService] Trakt sync result for movie: ${syncedToTrakt}`);
+            }
+
+            // Sync to Simkl
+            const isSimklAuth = await this.simklService.isAuthenticated();
+            if (isSimklAuth) {
+                await this.simklService.addToHistory({ movies: [{ ids: { imdb: imdbId }, watched_at: watchedAt.toISOString() }] });
+                logger.log(`[WatchedService] Simkl sync request sent for movie`);
             }
 
             // Also store locally as "completed" (100% progress)
@@ -88,6 +98,22 @@ class WatchedService {
                     watchedAt
                 );
                 logger.log(`[WatchedService] Trakt sync result for episode: ${syncedToTrakt}`);
+            }
+
+            // Sync to Simkl
+            const isSimklAuth = await this.simklService.isAuthenticated();
+            if (isSimklAuth) {
+                // Simkl structure: shows -> seasons -> episodes
+                await this.simklService.addToHistory({
+                    shows: [{
+                        ids: { imdb: showImdbId },
+                        seasons: [{
+                            number: season,
+                            episodes: [{ number: episode, watched_at: watchedAt.toISOString() }]
+                        }]
+                    }]
+                });
+                logger.log(`[WatchedService] Simkl sync request sent for episode`);
             }
 
             // Store locally as "completed"
@@ -135,6 +161,27 @@ class WatchedService {
                 logger.log(`[WatchedService] Trakt batch sync result: ${syncedToTrakt}`);
             }
 
+            // Sync to Simkl
+            const isSimklAuth = await this.simklService.isAuthenticated();
+            if (isSimklAuth) {
+                // Group by season for Simkl payload efficiency
+                const seasonMap = new Map<number, any[]>();
+                episodes.forEach(ep => {
+                    if (!seasonMap.has(ep.season)) seasonMap.set(ep.season, []);
+                    seasonMap.get(ep.season)?.push({ number: ep.episode, watched_at: watchedAt.toISOString() });
+                });
+
+                const seasons = Array.from(seasonMap.entries()).map(([num, eps]) => ({ number: num, episodes: eps }));
+
+                await this.simklService.addToHistory({
+                    shows: [{
+                        ids: { imdb: showImdbId },
+                        seasons: seasons
+                    }]
+                });
+                logger.log(`[WatchedService] Simkl batch sync request sent`);
+            }
+
             // Store locally as "completed" for each episode
             for (const ep of episodes) {
                 const episodeId = `${showId}:${ep.season}:${ep.episode}`;
@@ -180,6 +227,24 @@ class WatchedService {
                 logger.log(`[WatchedService] Trakt season sync result: ${syncedToTrakt}`);
             }
 
+            // Sync to Simkl
+            const isSimklAuth = await this.simklService.isAuthenticated();
+            if (isSimklAuth) {
+                // Simkl doesn't have a direct "mark season" generic endpoint in the same way, but we can construct it
+                // We know the episodeNumbers from the arguments!
+                const episodes = episodeNumbers.map(num => ({ number: num, watched_at: watchedAt.toISOString() }));
+                await this.simklService.addToHistory({
+                    shows: [{
+                        ids: { imdb: showImdbId },
+                        seasons: [{
+                            number: season,
+                            episodes: episodes
+                        }]
+                    }]
+                });
+                logger.log(`[WatchedService] Simkl season sync request sent`);
+            }
+
             // Store locally as "completed" for each episode in the season
             for (const epNum of episodeNumbers) {
                 const episodeId = `${showId}:${season}:${epNum}`;
@@ -208,6 +273,13 @@ class WatchedService {
             if (isTraktAuth) {
                 syncedToTrakt = await this.traktService.removeMovieFromHistory(imdbId);
                 logger.log(`[WatchedService] Trakt remove result for movie: ${syncedToTrakt}`);
+            }
+
+            // Simkl Unmark
+            const isSimklAuth = await this.simklService.isAuthenticated();
+            if (isSimklAuth) {
+                await this.simklService.removeFromHistory({ movies: [{ ids: { imdb: imdbId } }] });
+                logger.log(`[WatchedService] Simkl remove request sent for movie`);
             }
 
             // Remove local progress
@@ -243,6 +315,21 @@ class WatchedService {
                     episode
                 );
                 logger.log(`[WatchedService] Trakt remove result for episode: ${syncedToTrakt}`);
+            }
+
+            // Simkl Unmark
+            const isSimklAuth = await this.simklService.isAuthenticated();
+            if (isSimklAuth) {
+                await this.simklService.removeFromHistory({
+                    shows: [{
+                        ids: { imdb: showImdbId },
+                        seasons: [{
+                            number: season,
+                            episodes: [{ number: episode }]
+                        }]
+                    }]
+                });
+                logger.log(`[WatchedService] Simkl remove request sent for episode`);
             }
 
             // Remove local progress
@@ -281,7 +368,27 @@ class WatchedService {
                     showImdbId,
                     season
                 );
+                syncedToTrakt = await this.traktService.removeSeasonFromHistory(
+                    showImdbId,
+                    season
+                );
                 logger.log(`[WatchedService] Trakt season removal result: ${syncedToTrakt}`);
+            }
+
+            // Sync to Simkl
+            const isSimklAuth = await this.simklService.isAuthenticated();
+            if (isSimklAuth) {
+                const episodes = episodeNumbers.map(num => ({ number: num }));
+                await this.simklService.removeFromHistory({
+                    shows: [{
+                        ids: { imdb: showImdbId },
+                        seasons: [{
+                            number: season,
+                            episodes: episodes
+                        }]
+                    }]
+                });
+                logger.log(`[WatchedService] Simkl season removal request sent`);
             }
 
             // Remove local progress for each episode in the season
@@ -301,60 +408,60 @@ class WatchedService {
      * Check if a movie is marked as watched (locally)
      */
     public async isMovieWatched(imdbId: string): Promise<boolean> {
-      try {
-        const isAuthed = await this.traktService.isAuthenticated();
+        try {
+            const isAuthed = await this.traktService.isAuthenticated();
 
-        if (isAuthed) {
-          const traktWatched =
-            await this.traktService.isMovieWatchedAccurate(imdbId);
-          if (traktWatched) return true;
+            if (isAuthed) {
+                const traktWatched =
+                    await this.traktService.isMovieWatchedAccurate(imdbId);
+                if (traktWatched) return true;
+            }
+
+            const local = await mmkvStorage.getItem(`watched:movie:${imdbId}`);
+            return local === 'true';
+        } catch {
+            return false;
         }
-
-        const local = await mmkvStorage.getItem(`watched:movie:${imdbId}`);
-        return local === 'true';
-      } catch {
-        return false;
-      }
     }
-    
+
 
     /**
      * Check if an episode is marked as watched (locally)
      */
     public async isEpisodeWatched(
-      showId: string,
-      season: number,
-      episode: number
+        showId: string,
+        season: number,
+        episode: number
     ): Promise<boolean> {
-      try {
-        const isAuthed = await this.traktService.isAuthenticated();
+        try {
+            const isAuthed = await this.traktService.isAuthenticated();
 
-        if (isAuthed) {
-          const traktWatched =
-            await this.traktService.isEpisodeWatchedAccurate(
-              showId,
-              season,
-              episode
+            if (isAuthed) {
+                const traktWatched =
+                    await this.traktService.isEpisodeWatchedAccurate(
+                        showId,
+                        season,
+                        episode
+                    );
+                if (traktWatched) return true;
+            }
+
+            const episodeId = `${showId}:${season}:${episode}`;
+            const progress = await storageService.getWatchProgress(
+                showId,
+                'series',
+                episodeId
             );
-          if (traktWatched) return true;
+
+            if (!progress) return false;
+
+            const pct = (progress.currentTime / progress.duration) * 100;
+            return pct >= 99;
+        } catch {
+            return false;
         }
-
-        const episodeId = `${showId}:${season}:${episode}`;
-        const progress = await storageService.getWatchProgress(
-          showId,
-          'series',
-          episodeId
-        );
-
-        if (!progress) return false;
-
-        const pct = (progress.currentTime / progress.duration) * 100;
-        return pct >= 99;
-      } catch {
-        return false;
-      }
     }
-    
+
     /**
      * Set local watched status by creating a "completed" progress entry
      */

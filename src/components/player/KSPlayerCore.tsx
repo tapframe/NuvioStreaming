@@ -67,6 +67,7 @@ interface PlayerRouteParams {
   year?: number;
   streamProvider?: string;
   streamName?: string;
+  videoType?: string;
   id: string;
   type: string;
   episodeId?: string;
@@ -91,6 +92,42 @@ const KSPlayerCore: React.FC = () => {
     headers, streamProvider, streamName,
     initialPosition: routeInitialPosition
   } = params;
+
+  const videoType = (params as any)?.videoType as string | undefined;
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    const headerKeys = Object.keys(headers || {});
+    logger.log('[KSPlayerCore] route params', {
+      uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+      id,
+      type,
+      episodeId,
+      imdbId,
+      title,
+      episodeTitle,
+      season,
+      episode,
+      quality,
+      year,
+      streamProvider,
+      streamName,
+      videoType,
+      headersKeys: headerKeys,
+      headersCount: headerKeys.length,
+    });
+  }, [uri, episodeId]);
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    const headerKeys = Object.keys(headers || {});
+    logger.log('[KSPlayerCore] source update', {
+      uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+      videoType,
+      headersCount: headerKeys.length,
+      headersKeys: headerKeys,
+    });
+  }, [uri, headers, videoType]);
 
   // --- Hooks ---
   const playerState = usePlayerState();
@@ -399,6 +436,17 @@ const KSPlayerCore: React.FC = () => {
 
   // Handlers
   const onLoad = (data: any) => {
+    if (__DEV__) {
+      logger.log('[KSPlayerCore] onLoad', {
+        uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+        duration: data?.duration,
+        audioTracksCount: Array.isArray(data?.audioTracks) ? data.audioTracks.length : 0,
+        textTracksCount: Array.isArray(data?.textTracks) ? data.textTracks.length : 0,
+        videoType,
+        headersKeys: Object.keys(headers || {}),
+      });
+    }
+
     setDuration(data.duration);
     if (data.audioTracks) tracks.setKsAudioTracks(data.audioTracks);
     if (data.textTracks) tracks.setKsTextTracks(data.textTracks);
@@ -482,6 +530,18 @@ const KSPlayerCore: React.FC = () => {
     } catch (e) {
       msg = 'Error parsing error details';
     }
+
+    if (__DEV__) {
+      logger.error('[KSPlayerCore] onError', {
+        msg,
+        uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+        videoType,
+        streamProvider,
+        streamName,
+        headersKeys: Object.keys(headers || {}),
+        rawError: error,
+      });
+    }
     modals.setErrorDetails(msg);
     modals.setShowErrorModal(true);
   };
@@ -525,6 +585,17 @@ const KSPlayerCore: React.FC = () => {
       modals.setShowSourcesModal(false);
       return;
     }
+
+    if (__DEV__) {
+      logger.log('[KSPlayerCore] switching stream', {
+        fromUri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+        toUri: typeof newStream?.url === 'string' ? newStream.url.slice(0, 240) : newStream?.url,
+        newStreamHeadersKeys: Object.keys(newStream?.headers || {}),
+        newProvider: newStream?.addonName || newStream?.name || newStream?.addon || 'Unknown',
+        newName: newStream?.name || newStream?.title || 'Unknown',
+      });
+    }
+
     modals.setShowSourcesModal(false);
     setPaused(true);
 
@@ -558,6 +629,19 @@ const KSPlayerCore: React.FC = () => {
     modals.setShowEpisodeStreamsModal(false);
     setPaused(true);
     const ep = modals.selectedEpisodeForStreams;
+
+    if (__DEV__) {
+      logger.log('[KSPlayerCore] switching episode stream', {
+        toUri: typeof stream?.url === 'string' ? stream.url.slice(0, 240) : stream?.url,
+        streamHeadersKeys: Object.keys(stream?.headers || {}),
+        ep: {
+          season: ep?.season_number,
+          episode: ep?.episode_number,
+          name: ep?.name,
+          stremioId: ep?.stremioId,
+        },
+      });
+    }
 
     const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
     const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';

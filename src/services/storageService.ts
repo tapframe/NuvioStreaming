@@ -9,6 +9,9 @@ interface WatchProgress {
   traktSynced?: boolean;
   traktLastSynced?: number;
   traktProgress?: number;
+  simklSynced?: boolean;
+  simklLastSynced?: number;
+  simklProgress?: number;
 }
 
 class StorageService {
@@ -464,6 +467,46 @@ class StorageService {
   }
 
   /**
+   * Update Simkl sync status for a watch progress entry
+   */
+  public async updateSimklSyncStatus(
+    id: string,
+    type: string,
+    simklSynced: boolean,
+    simklProgress?: number,
+    episodeId?: string,
+    exactTime?: number
+  ): Promise<void> {
+    try {
+      const existingProgress = await this.getWatchProgress(id, type, episodeId);
+      if (existingProgress) {
+        // Preserve the highest Simkl progress and currentTime values
+        const highestSimklProgress = (() => {
+          if (simklProgress === undefined) return existingProgress.simklProgress;
+          if (existingProgress.simklProgress === undefined) return simklProgress;
+          return Math.max(simklProgress, existingProgress.simklProgress);
+        })();
+
+        const highestCurrentTime = (() => {
+          if (!exactTime || exactTime <= 0) return existingProgress.currentTime;
+          return Math.max(exactTime, existingProgress.currentTime);
+        })();
+
+        const updatedProgress: WatchProgress = {
+          ...existingProgress,
+          simklSynced,
+          simklLastSynced: simklSynced ? Date.now() : existingProgress.simklLastSynced,
+          simklProgress: highestSimklProgress,
+          currentTime: highestCurrentTime,
+        };
+        await this.setWatchProgress(id, type, updatedProgress, episodeId);
+      }
+    } catch (error) {
+      logger.error('Error updating Simkl sync status:', error);
+    }
+  }
+
+  /**
    * Get all watch progress entries that need Trakt sync
    */
   public async getUnsyncedProgress(): Promise<Array<{
@@ -495,8 +538,8 @@ class StorageService {
           continue;
         }
         // Check if needs sync (either never synced or local progress is newer)
-        const needsSync = !progress.traktSynced ||
-          (progress.traktLastSynced && progress.lastUpdated > progress.traktLastSynced);
+        const needsSync = (!progress.traktSynced || (progress.traktLastSynced && progress.lastUpdated > progress.traktLastSynced)) ||
+          (!progress.simklSynced || (progress.simklLastSynced && progress.lastUpdated > progress.simklLastSynced));
 
         if (needsSync) {
           const parts = key.split(':');
@@ -611,6 +654,7 @@ class StorageService {
           duration,
           lastUpdated: traktTimestamp,
           traktSynced: true,
+          simklSynced: false,
           traktLastSynced: Date.now(),
           traktProgress
         };
@@ -684,6 +728,105 @@ class StorageService {
       }
     } catch (error) {
       logger.error('Error merging with Trakt progress:', error);
+    }
+  }
+
+  /**
+   * Merge Simkl progress with local progress using exact time when available
+   */
+  public async mergeWithSimklProgress(
+    id: string,
+    type: string,
+    simklProgress: number,
+    simklPausedAt: string,
+    episodeId?: string,
+    exactTime?: number
+  ): Promise<void> {
+    try {
+      const localProgress = await this.getWatchProgress(id, type, episodeId);
+      const simklTimestamp = new Date(simklPausedAt).getTime();
+
+      if (!localProgress) {
+        let duration = await this.getContentDuration(id, type, episodeId);
+        let currentTime: number;
+
+        if (exactTime && exactTime > 0) {
+          currentTime = exactTime;
+          if (!duration) {
+            duration = (exactTime / simklProgress) * 100;
+          }
+        } else {
+          if (!duration) {
+            if (type === 'movie') {
+              duration = 6600;
+            } else if (episodeId) {
+              duration = 2700;
+            } else {
+              duration = 3600;
+            }
+          }
+          currentTime = (simklProgress / 100) * duration;
+        }
+
+        const newProgress: WatchProgress = {
+          currentTime,
+          duration,
+          lastUpdated: simklTimestamp,
+          simklSynced: true,
+          simklLastSynced: Date.now(),
+          simklProgress
+        };
+        await this.setWatchProgress(id, type, newProgress, episodeId);
+      } else {
+        const localProgressPercent = (localProgress.currentTime / localProgress.duration) * 100;
+        const progressDiff = Math.abs(simklProgress - localProgressPercent);
+
+        if (progressDiff < 5 && simklProgress < 100 && localProgressPercent < 100) {
+          return;
+        }
+
+        let currentTime: number;
+        let duration = localProgress.duration;
+
+        if (exactTime && exactTime > 0 && localProgress.duration > 0) {
+          currentTime = exactTime;
+          const calculatedDuration = (exactTime / simklProgress) * 100;
+          if (Math.abs(calculatedDuration - localProgress.duration) > 300) {
+            duration = calculatedDuration;
+          }
+        } else if (localProgress.duration > 0) {
+          currentTime = (simklProgress / 100) * localProgress.duration;
+        } else {
+          const storedDuration = await this.getContentDuration(id, type, episodeId);
+          duration = storedDuration || 0;
+          if (!duration || duration <= 0) {
+            if (exactTime && exactTime > 0) {
+              duration = (exactTime / simklProgress) * 100;
+              currentTime = exactTime;
+            } else {
+              if (type === 'movie') duration = 6600;
+              else if (episodeId) duration = 2700;
+              else duration = 3600;
+              currentTime = (simklProgress / 100) * duration;
+            }
+          } else {
+            currentTime = exactTime && exactTime > 0 ? exactTime : (simklProgress / 100) * duration;
+          }
+        }
+
+        const updatedProgress: WatchProgress = {
+          ...localProgress,
+          currentTime,
+          duration,
+          lastUpdated: simklTimestamp,
+          simklSynced: true,
+          simklLastSynced: Date.now(),
+          simklProgress
+        };
+        await this.setWatchProgress(id, type, updatedProgress, episodeId);
+      }
+    } catch (error) {
+      logger.error('Error merging with Simkl progress:', error);
     }
   }
 
