@@ -234,25 +234,26 @@ export const useStreamsScreen = () => {
         return 0;
       };
 
-      const allStreams: Array<{ stream: Stream; quality: number; providerPriority: number }> = [];
+      const allStreams: Array<{ stream: Stream; quality: number; providerPriority: number; originalIndex: number }> = [];
 
       Object.entries(streamsData).forEach(([addonId, { streams }]) => {
         const qualityFiltered = filterByQuality(streams);
         const filteredStreams = filterByLanguage(qualityFiltered);
 
-        filteredStreams.forEach(stream => {
+        filteredStreams.forEach((stream, index) => {
           const quality = getQualityNumeric(stream.name || stream.title);
           const providerPriority = getProviderPriority(addonId);
-          allStreams.push({ stream, quality, providerPriority });
+          allStreams.push({ stream, quality, providerPriority, originalIndex: index });
         });
       });
 
       if (allStreams.length === 0) return null;
 
+      // Sort primarily by provider priority, then respect the addon's internal order (originalIndex)
+      // This ensures if an addon lists 1080p before 4K, we pick 1080p
       allStreams.sort((a, b) => {
-        if (a.quality !== b.quality) return b.quality - a.quality;
         if (a.providerPriority !== b.providerPriority) return b.providerPriority - a.providerPriority;
-        return 0;
+        return a.originalIndex - b.originalIndex;
       });
 
       logger.log(
