@@ -23,6 +23,7 @@ import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTraktIntegration } from '../hooks/useTraktIntegration';
 import { useTraktAutosyncSettings } from '../hooks/useTraktAutosyncSettings';
+import { useSimklIntegration } from '../hooks/useSimklIntegration';
 import { colors } from '../styles';
 import CustomAlert from '../components/CustomAlert';
 import { useTranslation } from 'react-i18next';
@@ -67,6 +68,7 @@ const TraktSettingsScreen: React.FC = () => {
     isLoading: traktLoading,
     refreshAuthStatus
   } = useTraktIntegration();
+  const { isAuthenticated: isSimklAuthenticated } = useSimklIntegration();
 
   const [showSyncFrequencyModal, setShowSyncFrequencyModal] = useState(false);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
@@ -184,6 +186,10 @@ const TraktSettingsScreen: React.FC = () => {
   }, [response, checkAuthStatus, request?.codeVerifier, navigation]);
 
   const handleSignIn = () => {
+    if (isSimklAuthenticated) {
+      openAlert('Conflict', 'You cannot connect to Trakt while Simkl is connected. Please disconnect Simkl first.');
+      return;
+    }
     promptAsync(); // Trigger the authentication flow
   };
 

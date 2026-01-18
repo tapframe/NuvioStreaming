@@ -1,7 +1,9 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { useTraktIntegration } from './useTraktIntegration';
+import { useSimklIntegration } from './useSimklIntegration';
 import { useTraktAutosyncSettings } from './useTraktAutosyncSettings';
 import { TraktContentData } from '../services/traktService';
+import { SimklContentData } from '../services/simklService';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 
@@ -29,6 +31,13 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     stopWatching,
     stopWatchingImmediate
   } = useTraktIntegration();
+
+  const {
+    isAuthenticated: isSimklAuthenticated,
+    startWatching: startSimkl,
+    updateProgress: updateSimkl,
+    stopWatching: stopSimkl
+  } = useSimklIntegration();
 
   const { settings: autosyncSettings } = useTraktAutosyncSettings();
 
@@ -145,14 +154,29 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
     }
   }, [options]);
 
+  const buildSimklContentData = useCallback((): SimklContentData => {
+    return {
+      type: options.type === 'series' ? 'episode' : 'movie',
+      title: options.title,
+      ids: {
+        imdb: options.imdbId
+      },
+      season: options.season,
+      episode: options.episode
+    };
+  }, [options]);
+
   // Start watching (scrobble start)
   const handlePlaybackStart = useCallback(async (currentTime: number, duration: number) => {
     if (isUnmounted.current) return; // Prevent execution after component unmount
 
     logger.log(`[TraktAutosync] handlePlaybackStart called: time=${currentTime}, duration=${duration}, authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}, alreadyStarted=${hasStartedWatching.current}, alreadyStopped=${hasStopped.current}, sessionComplete=${isSessionComplete.current}, session=${sessionKey.current}`);
 
-    if (!isAuthenticated || !autosyncSettings.enabled) {
-      logger.log(`[TraktAutosync] Skipping handlePlaybackStart: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
+    const shouldSyncTrakt = isAuthenticated && autosyncSettings.enabled;
+    const shouldSyncSimkl = isSimklAuthenticated;
+
+    if (!shouldSyncTrakt && !shouldSyncSimkl) {
+      logger.log(`[TraktAutosync] Skipping handlePlaybackStart: Trakt (auth=${isAuthenticated}, enabled=${autosyncSettings.enabled}), Simkl (auth=${isSimklAuthenticated})`);
       return;
     }
 
@@ -190,16 +214,28 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         return;
       }
 
-      const success = await startWatching(contentData, progressPercent);
-      if (success) {
+      if (shouldSyncTrakt) {
+        const success = await startWatching(contentData, progressPercent);
+        if (success) {
+          hasStartedWatching.current = true;
+          hasStopped.current = false; // Reset stop flag when starting
+          logger.log(`[TraktAutosync] Started watching: ${contentData.title} (session: ${sessionKey.current})`);
+        }
+      } else {
+        // If Trakt is disabled but Simkl is enabled, we still mark stated/stopped flags for local logic
         hasStartedWatching.current = true;
-        hasStopped.current = false; // Reset stop flag when starting
-        logger.log(`[TraktAutosync] Started watching: ${contentData.title} (session: ${sessionKey.current})`);
+        hasStopped.current = false;
+      }
+
+      // Simkl Start
+      if (shouldSyncSimkl) {
+        const simklData = buildSimklContentData();
+        await startSimkl(simklData, progressPercent);
       }
     } catch (error) {
       logger.error('[TraktAutosync] Error starting watch:', error);
     }
-  }, [isAuthenticated, autosyncSettings.enabled, startWatching, buildContentData]);
+  }, [isAuthenticated, isSimklAuthenticated, autosyncSettings.enabled, startWatching, startSimkl, buildContentData, buildSimklContentData]);
 
   // Sync progress during playback
   const handleProgressUpdate = useCallback(async (
@@ -209,7 +245,10 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
   ) => {
     if (isUnmounted.current) return; // Prevent execution after component unmount
 
-    if (!isAuthenticated || !autosyncSettings.enabled || duration <= 0) {
+    const shouldSyncTrakt = isAuthenticated && autosyncSettings.enabled;
+    const shouldSyncSimkl = isSimklAuthenticated;
+
+    if ((!shouldSyncTrakt && !shouldSyncSimkl) || duration <= 0) {
       return;
     }
 
@@ -225,70 +264,95 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
       // IMMEDIATE SYNC: Use immediate method for user-triggered actions (force=true)
       // Use regular queued method for background periodic syncs
-      let success: boolean;
+      let traktSuccess: boolean = false;
 
-      if (force) {
-        // IMMEDIATE: User action (pause/unpause) - bypass queue
-        const contentData = buildContentData();
-        if (!contentData) {
-          logger.warn('[TraktAutosync] Skipping progress update: invalid content data');
-          return;
-        }
-        success = await updateProgressImmediate(contentData, progressPercent);
+      if (shouldSyncTrakt) {
+        if (force) {
+          // IMMEDIATE: User action (pause/unpause) - bypass queue
+          const contentData = buildContentData();
+          if (!contentData) {
+            logger.warn('[TraktAutosync] Skipping Trakt progress update: invalid content data');
+            return;
+          }
+          traktSuccess = await updateProgressImmediate(contentData, progressPercent);
 
-        if (success) {
-          lastSyncTime.current = now;
-          lastSyncProgress.current = progressPercent;
+          if (traktSuccess) {
+            lastSyncTime.current = now;
+            lastSyncProgress.current = progressPercent;
 
-          // Update local storage sync status
-          await storageService.updateTraktSyncStatus(
-            options.id,
-            options.type,
-            true,
-            progressPercent,
-            options.episodeId,
-            currentTime
-          );
+            // Update local storage sync status
+            await storageService.updateTraktSyncStatus(
+              options.id,
+              options.type,
+              true,
+              progressPercent,
+              options.episodeId,
+              currentTime
+            );
 
-          logger.log(`[TraktAutosync] IMMEDIATE: Progress updated to ${progressPercent.toFixed(1)}%`);
-        }
-      } else {
-        // BACKGROUND: Periodic sync - use queued method
-        const progressDiff = Math.abs(progressPercent - lastSyncProgress.current);
+            logger.log(`[TraktAutosync] Trakt IMMEDIATE: Progress updated to ${progressPercent.toFixed(1)}%`);
+          }
+        } else {
+          // BACKGROUND: Periodic sync - use queued method
+          const progressDiff = Math.abs(progressPercent - lastSyncProgress.current);
 
-        // Only skip if not forced and progress difference is minimal (< 0.5%)
-        if (progressDiff < 0.5) {
-          return;
-        }
+          // Only skip if not forced and progress difference is minimal (< 0.5%)
+          if (progressDiff < 0.5) {
+            logger.log(`[TraktAutosync] Trakt: Skipping periodic progress update, progress diff too small (${progressDiff.toFixed(2)}%)`);
+            // If only Trakt is active and we skip, we should return here.
+            // If Simkl is also active, we continue to let Simkl update.
+            if (!shouldSyncSimkl) return;
+          }
 
-        const contentData = buildContentData();
-        if (!contentData) {
-          logger.warn('[TraktAutosync] Skipping progress update: invalid content data');
-          return;
-        }
-        success = await updateProgress(contentData, progressPercent, force);
+          const contentData = buildContentData();
+          if (!contentData) {
+            logger.warn('[TraktAutosync] Skipping Trakt progress update: invalid content data');
+            return;
+          }
+          traktSuccess = await updateProgress(contentData, progressPercent, force);
 
-        if (success) {
-          lastSyncTime.current = now;
-          lastSyncProgress.current = progressPercent;
+          if (traktSuccess) {
+            lastSyncTime.current = now;
+            lastSyncProgress.current = progressPercent;
 
-          // Update local storage sync status
-          await storageService.updateTraktSyncStatus(
-            options.id,
-            options.type,
-            true,
-            progressPercent,
-            options.episodeId,
-            currentTime
-          );
+            // Update local storage sync status
+            await storageService.updateTraktSyncStatus(
+              options.id,
+              options.type,
+              true,
+              progressPercent,
+              options.episodeId,
+              currentTime
+            );
 
-          // Progress sync logging removed
+            // Progress sync logging removed
+            logger.log(`[TraktAutosync] Trakt: Progress updated to ${progressPercent.toFixed(1)}%`);
+          }
         }
       }
+
+      // Simkl Update (No immediate/queued differentiation for now in Simkl hook, just call update)
+      if (shouldSyncSimkl) {
+        // Debounce simkl updates slightly if needed, but hook handles calls.
+        // We do basic difference check here
+        const simklData = buildSimklContentData();
+        await updateSimkl(simklData, progressPercent);
+
+        // Update local storage for Simkl
+        await storageService.updateSimklSyncStatus(
+          options.id,
+          options.type,
+          true,
+          progressPercent,
+          options.episodeId
+        );
+        logger.log(`[TraktAutosync] Simkl: Progress updated to ${progressPercent.toFixed(1)}%`);
+      }
+
     } catch (error) {
       logger.error('[TraktAutosync] Error syncing progress:', error);
     }
-  }, [isAuthenticated, autosyncSettings.enabled, updateProgress, updateProgressImmediate, buildContentData, options]);
+  }, [isAuthenticated, isSimklAuthenticated, autosyncSettings.enabled, updateProgress, updateSimkl, updateProgressImmediate, buildContentData, buildSimklContentData, options]);
 
   // Handle playback end/pause
   const handlePlaybackEnd = useCallback(async (currentTime: number, duration: number, reason: 'ended' | 'unmount' | 'user_close' = 'ended') => {
@@ -298,8 +362,11 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
 
     // Removed excessive logging for handlePlaybackEnd calls
 
-    if (!isAuthenticated || !autosyncSettings.enabled) {
-      // logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: authenticated=${isAuthenticated}, enabled=${autosyncSettings.enabled}`);
+    const shouldSyncTrakt = isAuthenticated && autosyncSettings.enabled;
+    const shouldSyncSimkl = isSimklAuthenticated;
+
+    if (!shouldSyncTrakt && !shouldSyncSimkl) {
+      logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: Neither Trakt nor Simkl are active.`);
       return;
     }
 
@@ -323,6 +390,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         isSignificantUpdate = true;
       } else {
         // Already stopped this session, skipping duplicate call
+        logger.log(`[TraktAutosync] Skipping handlePlaybackEnd: session already stopped and no significant progress improvement.`);
         return;
       }
     }
@@ -390,8 +458,20 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       if (!hasStartedWatching.current && progressPercent > 1) {
         const contentData = buildContentData();
         if (contentData) {
-          const success = await startWatching(contentData, progressPercent);
-          if (success) {
+          let started = false;
+          // Try starting Trakt if enabled
+          if (shouldSyncTrakt) {
+            const s = await startWatching(contentData, progressPercent);
+            if (s) started = true;
+          }
+          // Try starting Simkl if enabled (always 'true' effectively if authenticated)
+          if (shouldSyncSimkl) {
+            const simklData = buildSimklContentData();
+            await startSimkl(simklData, progressPercent);
+            started = true;
+          }
+
+          if (started) {
             hasStartedWatching.current = true;
           }
         }
@@ -401,6 +481,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       // Lower threshold for unmount calls to catch more edge cases
       if (reason === 'unmount' && progressPercent < 0.5) {
         // Early unmount stop logging removed
+        logger.log(`[TraktAutosync] Skipping unmount stop call due to minimal progress (${progressPercent.toFixed(1)}%)`);
         return;
       }
 
@@ -419,13 +500,24 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
         return;
       }
 
-      // IMMEDIATE: Use immediate method for user-initiated closes, regular method for natural ends
-      const success = useImmediate
-        ? await stopWatchingImmediate(contentData, progressPercent)
-        : await stopWatching(contentData, progressPercent);
+      let overallSuccess = false;
 
-      if (success) {
-        // Update local storage sync status
+      // IMMEDIATE: Use immediate method for user-initiated closes, regular method for natural ends
+      let traktStopSuccess = false;
+      if (shouldSyncTrakt) {
+        traktStopSuccess = useImmediate
+          ? await stopWatchingImmediate(contentData, progressPercent)
+          : await stopWatching(contentData, progressPercent);
+        if (traktStopSuccess) {
+          logger.log(`[TraktAutosync] Trakt: ${useImmediate ? 'IMMEDIATE: ' : ''}Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
+          overallSuccess = true;
+        } else {
+          logger.warn(`[TraktAutosync] Trakt: Failed to stop watching.`);
+        }
+      }
+
+      if (traktStopSuccess) {
+        // Update local storage sync status for Trakt
         await storageService.updateTraktSyncStatus(
           options.id,
           options.type,
@@ -434,7 +526,30 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           options.episodeId,
           currentTime
         );
+      } else if (shouldSyncTrakt) {
+        // If Trakt stop failed, reset the stop flag so we can try again later
+        hasStopped.current = false;
+        logger.warn(`[TraktAutosync] Trakt: Failed to stop watching, reset stop flag for retry`);
+      }
 
+      // Simkl Stop
+      if (shouldSyncSimkl) {
+        const simklData = buildSimklContentData();
+        await stopSimkl(simklData, progressPercent);
+
+        // Update local storage sync status for Simkl
+        await storageService.updateSimklSyncStatus(
+          options.id,
+          options.type,
+          true,
+          progressPercent,
+          options.episodeId
+        );
+        logger.log(`[TraktAutosync] Simkl: Successfully stopped watching: ${simklData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
+        overallSuccess = true; // Mark overall success if at least one worked (Simkl doesn't have immediate/queued logic yet)
+      }
+
+      if (overallSuccess) {
         // Mark session as complete if >= user completion threshold
         if (progressPercent >= autosyncSettings.completionThreshold) {
           isSessionComplete.current = true;
@@ -450,8 +565,10 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
                   currentTime: duration,
                   duration,
                   lastUpdated: Date.now(),
-                  traktSynced: true,
-                  traktProgress: Math.max(progressPercent, 100),
+                  traktSynced: shouldSyncTrakt ? true : undefined,
+                  traktProgress: shouldSyncTrakt ? Math.max(progressPercent, 100) : undefined,
+                  simklSynced: shouldSyncSimkl ? true : undefined,
+                  simklProgress: shouldSyncSimkl ? Math.max(progressPercent, 100) : undefined,
                 } as any,
                 options.episodeId,
                 { forceNotify: true }
@@ -460,11 +577,14 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
           } catch { }
         }
 
-        logger.log(`[TraktAutosync] ${useImmediate ? 'IMMEDIATE: ' : ''}Successfully stopped watching: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
+        // General success log if at least one service succeeded
+        if (!shouldSyncTrakt || traktStopSuccess) { // Only log this if Trakt succeeded or wasn't active
+          logger.log(`[TraktAutosync] Overall: Successfully processed stop for: ${contentData.title} (${progressPercent.toFixed(1)}% - ${reason})`);
+        }
       } else {
-        // If stop failed, reset the stop flag so we can try again later
+        // If neither service succeeded, reset the stop flag
         hasStopped.current = false;
-        logger.warn(`[TraktAutosync] Failed to stop watching, reset stop flag for retry`);
+        logger.warn(`[TraktAutosync] Overall: Failed to stop watching, reset stop flag for retry`);
       }
 
       // Reset state only for natural end or very high progress unmounts
@@ -480,7 +600,7 @@ export function useTraktAutosync(options: TraktAutosyncOptions) {
       // Reset stop flag on error so we can try again
       hasStopped.current = false;
     }
-  }, [isAuthenticated, autosyncSettings.enabled, stopWatching, stopWatchingImmediate, startWatching, buildContentData, options]);
+  }, [isAuthenticated, isSimklAuthenticated, autosyncSettings.enabled, stopWatching, stopSimkl, stopWatchingImmediate, startWatching, buildContentData, buildSimklContentData, options]);
 
   // Reset state (useful when switching content)
   const resetState = useCallback(() => {
