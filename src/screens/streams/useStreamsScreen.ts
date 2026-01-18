@@ -25,7 +25,6 @@ import {
   getQualityNumeric,
   detectMkvViaHead,
   inferVideoTypeFromUrl,
-  filterHeadersForVidrock,
   sortStreamsByQuality,
 } from './utils';
 import {
@@ -356,11 +355,17 @@ export const useStreamsScreen = () => {
   // Navigate to player
   const navigateToPlayer = useCallback(
     async (stream: Stream, options?: { headers?: Record<string, string> }) => {
-      const finalHeaders = filterHeadersForVidrock(options?.headers || (stream.headers as any));
+      const optionHeaders = options?.headers;
+      const streamHeaders = (stream.headers as any) as Record<string, string> | undefined;
+      const proxyHeaders = ((stream as any)?.behaviorHints?.proxyHeaders?.request || undefined) as
+        | Record<string, string>
+        | undefined;
+      const streamProvider = stream.addonId || (stream as any).addonName || stream.name;
+      const finalHeaders = optionHeaders || streamHeaders || proxyHeaders;
 
       const streamsToPass = selectedEpisode ? episodeStreams : groupedStreams;
       const streamName = stream.name || stream.title || 'Unnamed Stream';
-      const streamProvider = stream.addonId || stream.addonName || stream.name;
+      const resolvedStreamProvider = streamProvider;
 
       // Save stream to cache
       try {
@@ -393,6 +398,22 @@ export const useStreamsScreen = () => {
         }
       } catch { }
 
+      if (__DEV__) {
+        const finalHeaderKeys = Object.keys(finalHeaders || {});
+
+        logger.log('[StreamsScreen][navigateToPlayer] stream selection', {
+          url: typeof stream.url === 'string' ? stream.url.slice(0, 240) : stream.url,
+          addonId: stream.addonId,
+          addonName: (stream as any).addonName,
+          name: stream.name,
+          title: stream.title,
+          inferredVideoType: videoType,
+          optionHeadersKeys: Object.keys(optionHeaders || {}),
+          streamHeadersKeys: Object.keys(streamHeaders || {}),
+          finalHeadersKeys: finalHeaderKeys,
+        });
+      }
+
       const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
 
       navigation.navigate(playerRoute as any, {
@@ -403,7 +424,7 @@ export const useStreamsScreen = () => {
         episode: (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined,
         quality: (stream.title?.match(/(\d+)p/) || [])[1] || undefined,
         year: metadata?.year,
-        streamProvider,
+        streamProvider: resolvedStreamProvider,
         streamName,
         headers: finalHeaders,
         id,
@@ -423,6 +444,24 @@ export const useStreamsScreen = () => {
     async (stream: Stream) => {
       try {
         if (!stream.url) return;
+
+        if (__DEV__) {
+          const streamHeaders = (stream.headers as any) as Record<string, string> | undefined;
+          const proxyHeaders = ((stream as any)?.behaviorHints?.proxyHeaders?.request || undefined) as
+            | Record<string, string>
+            | undefined;
+
+          logger.log('[StreamsScreen][handleStreamPress] pressed stream', {
+            url: typeof stream.url === 'string' ? stream.url.slice(0, 240) : stream.url,
+            addonId: stream.addonId,
+            addonName: (stream as any).addonName,
+            name: stream.name,
+            title: stream.title,
+            streamHeadersKeys: Object.keys(streamHeaders || {}),
+            proxyHeadersKeys: Object.keys(proxyHeaders || {}),
+            inferredVideoType: inferVideoTypeFromUrl(stream.url),
+          });
+        }
 
         // Block magnet links
         if (typeof stream.url === 'string' && stream.url.startsWith('magnet:')) {
