@@ -9,6 +9,7 @@ import {
     ScrollView,
     StatusBar,
     Platform,
+    Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { makeRedirectUri, useAuthRequest, ResponseType, CodeChallengeMethod } from 'expo-auth-session';
@@ -54,7 +55,9 @@ const SimklSettingsScreen: React.FC = () => {
         isAuthenticated,
         isLoading,
         checkAuthStatus,
-        refreshAuthStatus
+        refreshAuthStatus,
+        userSettings,
+        userStats
     } = useSimklIntegration();
     const { isAuthenticated: isTraktAuthenticated } = useTraktIntegration();
 
@@ -167,12 +170,71 @@ const SimklSettingsScreen: React.FC = () => {
                         </View>
                     ) : isAuthenticated ? (
                         <View style={styles.profileContainer}>
-                            <Text style={[styles.statusTitle, { color: currentTheme.colors.highEmphasis }]}>
-                                Connected
-                            </Text>
+                            <View style={styles.profileHeader}>
+                                {userSettings?.user?.avatar ? (
+                                    <Image
+                                        source={{ uri: userSettings.user.avatar }}
+                                        style={styles.avatar}
+                                    />
+                                ) : (
+                                    <View style={[styles.avatarPlaceholder, { backgroundColor: currentTheme.colors.elevation3 }]}> 
+                                        <MaterialIcons name="person" size={20} color={currentTheme.colors.mediumEmphasis} />
+                                    </View>
+                                )}
+                                <View style={styles.profileText}>
+                                    {userSettings?.user && (
+                                        <Text style={[styles.statusTitle, { color: currentTheme.colors.highEmphasis }]}>
+                                            {userSettings.user.name}
+                                        </Text>
+                                    )}
+                                    {userSettings?.account?.type && (
+                                        <Text style={[styles.accountType, { color: currentTheme.colors.mediumEmphasis, textTransform: 'capitalize' }]}>
+                                            {userSettings.account.type} Account
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
                             <Text style={[styles.statusDesc, { color: currentTheme.colors.mediumEmphasis }]}>
                                 Your watched items are syncing with Simkl.
                             </Text>
+
+                            {userStats && (
+                                <View style={[styles.statsGrid, { borderTopColor: currentTheme.colors.border, borderBottomColor: currentTheme.colors.border }]}> 
+                                    <View style={styles.statItem}>
+                                        <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}>
+                                            {userStats.movies?.completed?.count || 0}
+                                        </Text>
+                                        <Text style={[styles.statLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                                            Movies
+                                        </Text>
+                                    </View>
+                                    <View style={styles.statItem}>
+                                        <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}>
+                                            {(userStats.tv?.watching?.count || 0) + (userStats.tv?.completed?.count || 0)}
+                                        </Text>
+                                        <Text style={[styles.statLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                                            TV Shows
+                                        </Text>
+                                    </View>
+                                    <View style={styles.statItem}>
+                                        <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}>
+                                            {userStats.anime?.completed?.count || 0}
+                                        </Text>
+                                        <Text style={[styles.statLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                                            Anime
+                                        </Text>
+                                    </View>
+                                    <View style={styles.statItem}>
+                                        <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}>
+                                            {Math.round(((userStats.total_mins || 0) + (userStats.movies?.total_mins || 0) + (userStats.tv?.total_mins || 0) + (userStats.anime?.total_mins || 0)) / 60)}h
+                                        </Text>
+                                        <Text style={[styles.statLabel, { color: currentTheme.colors.mediumEmphasis }]}>
+                                            Watched
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+
                             <TouchableOpacity
                                 style={[styles.button, { backgroundColor: currentTheme.colors.error, marginTop: 20 }]}
                                 onPress={handleSignOut}
@@ -204,6 +266,14 @@ const SimklSettingsScreen: React.FC = () => {
                             </TouchableOpacity>
                         </View>
                     )}
+                </View>
+
+                <View style={styles.logoSection}>
+                    <Image
+                        source={require('../../assets/simkl-logo.png')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                    />
                 </View>
 
                 <Text style={[styles.disclaimer, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}>
@@ -284,17 +354,65 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
     profileContainer: {
+        alignItems: 'stretch',
+        paddingVertical: 8,
+    },
+    profileHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 20,
+        marginBottom: 12,
+    },
+    avatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        marginRight: 12,
+        backgroundColor: '#00000010',
+    },
+    avatarPlaceholder: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    profileText: {
+        flex: 1,
     },
     statusTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    accountType: {
+        fontSize: 13,
+        fontWeight: '500',
         marginBottom: 8,
     },
     statusDesc: {
-        fontSize: 15,
-        marginBottom: 10,
+        fontSize: 14,
+        marginBottom: 8,
+    },
+    statsGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 16,
+        marginVertical: 12,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+    },
+    statItem: {
+        alignItems: 'center',
+    },
+    statValue: {
+        fontSize: 17,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    statLabel: {
+        fontSize: 12,
+        fontWeight: '500',
     },
     button: {
         width: '100%',
@@ -312,6 +430,30 @@ const styles = StyleSheet.create({
         fontSize: 12,
         textAlign: 'center',
         marginTop: 20,
+        marginBottom: 8,
+    },
+    logoSection: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 20,
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    logo: {
+        width: 150,
+        height: 30,
+    },
+    logoContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 28,
+        marginBottom: 24,
+        borderRadius: 12,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        shadowOffset: { width: 0, height: 2 },
     },
 });
 

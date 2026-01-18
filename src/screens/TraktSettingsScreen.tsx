@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { makeRedirectUri, useAuthRequest, ResponseType, Prompt, CodeChallengeMethod } from 'expo-auth-session';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FastImage from '@d11/react-native-fast-image';
-import { traktService, TraktUser } from '../services/traktService';
+import { traktService, TraktUser, TraktUserStats } from '../services/traktService';
 import { useSettings } from '../hooks/useSettings';
 import { logger } from '../utils/logger';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
@@ -55,6 +55,7 @@ const TraktSettingsScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userProfile, setUserProfile] = useState<TraktUser | null>(null);
+  const [userStats, setUserStats] = useState<TraktUserStats | null>(null);
   const { currentTheme } = useTheme();
 
   const {
@@ -109,8 +110,16 @@ const TraktSettingsScreen: React.FC = () => {
       if (authenticated) {
         const profile = await traktService.getUserProfile();
         setUserProfile(profile);
+        try {
+          const stats = await traktService.getUserStats();
+          setUserStats(stats);
+        } catch (statsError) {
+          logger.warn('[TraktSettingsScreen] Failed to load stats:', statsError);
+          setUserStats(null);
+        }
       } else {
         setUserProfile(null);
+        setUserStats(null);
       }
     } catch (error) {
       logger.error('[TraktSettingsScreen] Error checking auth status:', error);
@@ -353,6 +362,42 @@ const TraktSettingsScreen: React.FC = () => {
                 ]}>
                   {t('trakt.joined', { date: new Date(userProfile.joined_at).toLocaleDateString() })}
                 </Text>
+                {userStats && (
+                  <View style={[styles.statsGrid, { borderTopColor: currentTheme.colors.border, borderBottomColor: currentTheme.colors.border }]}> 
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}> 
+                        {userStats.movies?.watched ?? 0}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}>
+                        Movies
+                      </Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}> 
+                        {userStats.shows?.watched ?? 0}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}> 
+                        Shows
+                      </Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}> 
+                        {userStats.episodes?.watched ?? 0}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}> 
+                        Episodes
+                      </Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: currentTheme.colors.primary }]}> 
+                        {Math.round(((userStats.minutes ?? 0) + (userStats.movies?.minutes ?? 0) + (userStats.shows?.minutes ?? 0) + (userStats.episodes?.minutes ?? 0)) / 60)}h
+                      </Text>
+                      <Text style={[styles.statLabel, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}> 
+                        Watched
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity
@@ -708,13 +753,34 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   statsContainer: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 0.5,
     borderTopColor: 'rgba(150,150,150,0.2)',
   },
   joinedDate: {
     fontSize: 14,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '500',
   },
   settingsSection: {
     padding: 20,

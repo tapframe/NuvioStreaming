@@ -3,7 +3,9 @@ import { AppState, AppStateStatus } from 'react-native';
 import {
     SimklService,
     SimklContentData,
-    SimklPlaybackData
+    SimklPlaybackData,
+    SimklUserSettings,
+    SimklStats
 } from '../services/simklService';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
@@ -16,6 +18,8 @@ export function useSimklIntegration() {
 
     // Basic lists
     const [continueWatching, setContinueWatching] = useState<SimklPlaybackData[]>([]);
+    const [userSettings, setUserSettings] = useState<SimklUserSettings | null>(null);
+    const [userStats, setUserStats] = useState<SimklStats | null>(null);
 
     // Check authentication status
     const checkAuthStatus = useCallback(async () => {
@@ -43,6 +47,20 @@ export function useSimklIntegration() {
             setContinueWatching(playback);
         } catch (error) {
             logger.error('[useSimklIntegration] Error loading playback status:', error);
+        }
+    }, [isAuthenticated]);
+
+    // Load user settings and stats
+    const loadUserProfile = useCallback(async () => {
+        if (!isAuthenticated) return;
+        try {
+            const settings = await simklService.getUserSettings();
+            setUserSettings(settings);
+
+            const stats = await simklService.getUserStats();
+            setUserStats(stats);
+        } catch (error) {
+            logger.error('[useSimklIntegration] Error loading user profile:', error);
         }
     }, [isAuthenticated]);
 
@@ -153,6 +171,7 @@ export function useSimklIntegration() {
 
         try {
             const playback = await simklService.getPlaybackStatus();
+            logger.log(`[useSimklIntegration] fetched Simkl playback: ${playback.length}`);
 
             for (const item of playback) {
                 let id: string | undefined;
@@ -165,7 +184,8 @@ export function useSimklIntegration() {
                 } else if (item.show && item.episode) {
                     id = item.show.ids.imdb;
                     type = 'series';
-                    episodeId = `${id}:${item.episode.season}:${item.episode.episode}`;
+                    const epNum = (item.episode as any).episode ?? (item.episode as any).number;
+                    episodeId = epNum !== undefined ? `${id}:${item.episode.season}:${epNum}` : undefined;
                 }
 
                 if (id) {
@@ -197,8 +217,9 @@ export function useSimklIntegration() {
         if (isAuthenticated) {
             loadPlaybackStatus();
             fetchAndMergeSimklProgress();
+            loadUserProfile();
         }
-    }, [isAuthenticated, loadPlaybackStatus, fetchAndMergeSimklProgress]);
+    }, [isAuthenticated, loadPlaybackStatus, fetchAndMergeSimklProgress, loadUserProfile]);
 
     // App state listener for sync
     useEffect(() => {
@@ -222,6 +243,8 @@ export function useSimklIntegration() {
         stopWatching,
         syncAllProgress,
         fetchAndMergeSimklProgress,
-        continueWatching
+        continueWatching,
+        userSettings,
+        userStats,
     };
 }

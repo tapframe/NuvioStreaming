@@ -74,10 +74,48 @@ export interface SimklPlaybackData {
     };
     episode?: {
         season: number;
-        episode: number;
+        // Simkl docs show `episode` in playback responses, but some APIs return `number`
+        episode?: number;
+        number?: number;
         title: string;
         tvdb_season?: number;
         tvdb_number?: number;
+    };
+}
+
+export interface SimklUserSettings {
+    user: {
+        name: string;
+        joined_at: string;
+        gender?: string;
+        avatar: string;
+        bio?: string;
+        loc?: string;
+        age?: string;
+    };
+    account: {
+        id: number;
+        timezone?: string;
+        type?: string;
+    };
+    connections?: Record<string, boolean>;
+}
+
+export interface SimklStats {
+    total_mins: number;
+    movies?: {
+        total_mins: number;
+        completed?: { count: number };
+    };
+    tv?: {
+        total_mins: number;
+        watching?: { count: number };
+        completed?: { count: number };
+    };
+    anime?: {
+        total_mins: number;
+        watching?: { count: number };
+        completed?: { count: number };
     };
 }
 
@@ -480,18 +518,41 @@ export class SimklService {
     }
 
     public async getPlaybackStatus(): Promise<SimklPlaybackData[]> {
-        // Get both movies and episodes
-        // Simkl endpoint: /sync/playback (returns all if no type specified, or we specify type)
-        // Docs say /sync/playback/{type}
-        // Let's trying getting all if possible, or fetch both. Docs say type is optional param? 
-        // Docs: /sync/playback/{type} -> actually path param seems required or at least standard.
-        // But query params: type (optional). 
-        // Let's try fetching without path param or empty? 
-        // Docs: "Retrieves all paused... optionally filter by type by appending /movie"
-        // Let's assume /sync/playback works for all.
+        // Docs: GET /sync/playback/{type} with {type} values `movies` or `episodes`.
+        // Some docs also mention appending /movie or /episode; we try both variants for safety.
+        const tryEndpoints = async (endpoints: string[]): Promise<SimklPlaybackData[]> => {
+            for (const endpoint of endpoints) {
+                try {
+                    const res = await this.apiRequest<SimklPlaybackData[]>(endpoint);
+                    if (Array.isArray(res)) {
+                        logger.log(`[SimklService] getPlaybackStatus: ${endpoint} -> ${res.length} items`);
+                        return res;
+                    }
+                } catch (e) {
+                    logger.warn(`[SimklService] getPlaybackStatus: ${endpoint} failed`, e);
+                }
+            }
+            return [];
+        };
 
-        const response = await this.apiRequest<SimklPlaybackData[]>('/sync/playback');
-        return response || [];
+        const movies = await tryEndpoints([
+            '/sync/playback/movies',
+            '/sync/playback/movie',
+            '/sync/playback?type=movies'
+        ]);
+
+        const episodes = await tryEndpoints([
+            '/sync/playback/episodes',
+            '/sync/playback/episode',
+            '/sync/playback?type=episodes'
+        ]);
+
+        const combined = [...episodes, ...movies]
+            .filter(Boolean)
+            .sort((a, b) => new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime());
+
+        logger.log(`[SimklService] getPlaybackStatus: combined ${combined.length} items (episodes=${episodes.length}, movies=${movies.length})`);
+        return combined;
     }
 
     /**
@@ -506,4 +567,42 @@ export class SimklService {
         }
         return await this.apiRequest(url);
     }
-}
+
+    /**
+     * Get user settings/profile
+     */
+    public async getUserSettings(): Promise<SimklUserSettings | null> {
+        try {
+            const response = await this.apiRequest<SimklUserSettings>('/users/settings', 'POST');
+            logger.log('[SimklService] getUserSettings:', JSON.stringify(response));
+            return response;
+        } catch (error) {
+            logger.error('[SimklService] Failed to get user settings:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Get user stats
+     */
+    public async getUserStats(): Promise<SimklStats | null> {
+        try {
+            if (!await this.isAuthenticated()) {
+                return null;
+            }
+
+            // Need account ID from settings first
+            const settings = await this.getUserSettings();
+            if (!settings?.account?.id) {
+                logger.warn('[SimklService] Cannot get user stats: no account ID');
+                return null;
+            }
+
+            const response = await this.apiRequest<SimklStats>(`/users/${settings.account.id}/stats`, 'POST');
+            logger.log('[SimklService] getUserStats:', JSON.stringify(response));
+            return response;
+        } catch (error) {
+            logger.error('[SimklService] Failed to get user stats:', error);
+            return null;
+        }
+    }}
