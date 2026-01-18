@@ -1,6 +1,7 @@
 import { mmkvStorage } from './mmkvStorage';
 import { AppState, AppStateStatus } from 'react-native';
 import { logger } from '../utils/logger';
+import Constants from 'expo-constants';
 
 // Storage keys
 export const SIMKL_ACCESS_TOKEN_KEY = 'simkl_access_token';
@@ -117,6 +118,19 @@ export interface SimklStats {
         watching?: { count: number };
         completed?: { count: number };
     };
+}
+
+export interface SimklActivities {
+    all?: string;
+    playback?: {
+        all?: string;
+        movies?: string;
+        episodes?: string;
+        tv?: string;
+        anime?: string;
+        [key: string]: string | undefined;
+    };
+    [key: string]: any;
 }
 
 export class SimklService {
@@ -272,10 +286,12 @@ export class SimklService {
             return null;
         }
 
+        const appVersion = Constants.expoConfig?.version || (Constants as any).manifest?.version || 'unknown';
         const headers: HeadersInit = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.accessToken}`,
-            'simkl-api-key': SIMKL_CLIENT_ID
+            'simkl-api-key': SIMKL_CLIENT_ID,
+            'User-Agent': `Nuvio/${appVersion}`
         };
 
         const options: RequestInit = {
@@ -518,41 +534,27 @@ export class SimklService {
     }
 
     public async getPlaybackStatus(): Promise<SimklPlaybackData[]> {
-        // Docs: GET /sync/playback/{type} with {type} values `movies` or `episodes`.
-        // Some docs also mention appending /movie or /episode; we try both variants for safety.
-        const tryEndpoints = async (endpoints: string[]): Promise<SimklPlaybackData[]> => {
-            for (const endpoint of endpoints) {
-                try {
-                    const res = await this.apiRequest<SimklPlaybackData[]>(endpoint);
-                    if (Array.isArray(res)) {
-                        logger.log(`[SimklService] getPlaybackStatus: ${endpoint} -> ${res.length} items`);
-                        return res;
-                    }
-                } catch (e) {
-                    logger.warn(`[SimklService] getPlaybackStatus: ${endpoint} failed`, e);
-                }
-            }
-            return [];
-        };
-
-        const movies = await tryEndpoints([
-            '/sync/playback/movies',
-            '/sync/playback/movie',
-            '/sync/playback?type=movies'
-        ]);
-
-        const episodes = await tryEndpoints([
-            '/sync/playback/episodes',
-            '/sync/playback/episode',
-            '/sync/playback?type=episodes'
-        ]);
-
-        const combined = [...episodes, ...movies]
+        const playback = await this.apiRequest<SimklPlaybackData[]>('/sync/playback');
+        const items = Array.isArray(playback) ? playback : [];
+        const sorted = items
             .filter(Boolean)
             .sort((a, b) => new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime());
 
-        logger.log(`[SimklService] getPlaybackStatus: combined ${combined.length} items (episodes=${episodes.length}, movies=${movies.length})`);
-        return combined;
+        logger.log(`[SimklService] getPlaybackStatus: ${sorted.length} items`);
+        return sorted;
+    }
+
+    /**
+     * SYNC: Get account activity timestamps
+     */
+    public async getActivities(): Promise<SimklActivities | null> {
+        try {
+            const response = await this.apiRequest<SimklActivities>('/sync/activities');
+            return response || null;
+        } catch (error) {
+            logger.error('[SimklService] Failed to get activities:', error);
+            return null;
+        }
     }
 
     /**
@@ -585,20 +587,19 @@ export class SimklService {
     /**
      * Get user stats
      */
-    public async getUserStats(): Promise<SimklStats | null> {
+    public async getUserStats(accountId?: number): Promise<SimklStats | null> {
         try {
             if (!await this.isAuthenticated()) {
                 return null;
             }
 
-            // Need account ID from settings first
-            const settings = await this.getUserSettings();
-            if (!settings?.account?.id) {
+            const resolvedAccountId = accountId ?? (await this.getUserSettings())?.account?.id;
+            if (!resolvedAccountId) {
                 logger.warn('[SimklService] Cannot get user stats: no account ID');
                 return null;
             }
 
-            const response = await this.apiRequest<SimklStats>(`/users/${settings.account.id}/stats`, 'POST');
+            const response = await this.apiRequest<SimklStats>(`/users/${resolvedAccountId}/stats`, 'POST');
             logger.log('[SimklService] getUserStats:', JSON.stringify(response));
             return response;
         } catch (error) {

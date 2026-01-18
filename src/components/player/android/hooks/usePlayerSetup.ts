@@ -16,6 +16,7 @@ export const usePlayerSetup = (
     setBrightness: (bri: number) => void,
     paused: boolean
 ) => {
+    const originalAppBrightnessRef = useRef<number | null>(null);
     const originalSystemBrightnessRef = useRef<number | null>(null);
     const originalSystemBrightnessModeRef = useRef<number | null>(null);
     const isAppBackgrounded = useRef(false);
@@ -100,6 +101,7 @@ export const usePlayerSetup = (
                     }
                 }
                 const currentBrightness = await Brightness.getBrightnessAsync();
+                originalAppBrightnessRef.current = currentBrightness;
                 setBrightness(currentBrightness);
             } catch (error) {
                 logger.warn('[usePlayerSetup] Error setting brightness', error);
@@ -111,12 +113,26 @@ export const usePlayerSetup = (
         return () => {
             subscription?.remove();
             disableImmersiveMode();
-            async function restoreBrightness() {
-                await Brightness.setBrightnessAsync(originalSystemBrightnessRef.current!);
-                setBrightness(originalSystemBrightnessRef.current!);
-            }
-            if (Platform.OS === 'android' && originalSystemBrightnessRef.current !== null)
-                restoreBrightness();
+            const restoreBrightness = async () => {
+                try {
+                    if (Platform.OS === 'android') {
+                        if (originalSystemBrightnessModeRef.current !== null) {
+                            await (Brightness as any).setSystemBrightnessModeAsync?.(originalSystemBrightnessModeRef.current);
+                        }
+                        if (originalSystemBrightnessRef.current !== null) {
+                            await (Brightness as any).setSystemBrightnessAsync?.(originalSystemBrightnessRef.current);
+                        }
+                    }
+                    if (originalAppBrightnessRef.current !== null) {
+                        await Brightness.setBrightnessAsync(originalAppBrightnessRef.current);
+                        setBrightness(originalAppBrightnessRef.current);
+                    }
+                } catch (e) {
+                    logger.warn('[usePlayerSetup] Error restoring brightness', e);
+                }
+            };
+
+            restoreBrightness();
         };
     }, []);
 

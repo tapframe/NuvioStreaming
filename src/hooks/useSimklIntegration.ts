@@ -1,16 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import {
     SimklService,
     SimklContentData,
     SimklPlaybackData,
     SimklUserSettings,
-    SimklStats
+    SimklStats,
+    SimklActivities
 } from '../services/simklService';
 import { storageService } from '../services/storageService';
 import { logger } from '../utils/logger';
 
 const simklService = SimklService.getInstance();
+
+let hasLoadedProfileOnce = false;
+let cachedUserSettings: SimklUserSettings | null = null;
+let cachedUserStats: SimklStats | null = null;
 
 export function useSimklIntegration() {
     const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -18,8 +23,37 @@ export function useSimklIntegration() {
 
     // Basic lists
     const [continueWatching, setContinueWatching] = useState<SimklPlaybackData[]>([]);
-    const [userSettings, setUserSettings] = useState<SimklUserSettings | null>(null);
-    const [userStats, setUserStats] = useState<SimklStats | null>(null);
+    const [userSettings, setUserSettings] = useState<SimklUserSettings | null>(() => cachedUserSettings);
+    const [userStats, setUserStats] = useState<SimklStats | null>(() => cachedUserStats);
+
+    const lastPlaybackFetchAt = useRef(0);
+    const lastActivitiesCheckAt = useRef(0);
+    const lastPlaybackActivityAt = useRef<number | null>(null);
+
+    const parseActivityDate = (value?: string): number | null => {
+        if (!value) return null;
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? null : parsed;
+    };
+
+    const getLatestPlaybackActivity = (activities: SimklActivities | null): number | null => {
+        if (!activities) return null;
+
+        const candidates: Array<number | null> = [
+            parseActivityDate(activities.playback?.all),
+            parseActivityDate(activities.playback?.movies),
+            parseActivityDate(activities.playback?.episodes),
+            parseActivityDate(activities.playback?.tv),
+            parseActivityDate(activities.playback?.anime),
+            parseActivityDate(activities.all),
+            parseActivityDate((activities as any).last_update),
+            parseActivityDate((activities as any).updated_at)
+        ];
+
+        const timestamps = candidates.filter((value): value is number => typeof value === 'number');
+        if (timestamps.length === 0) return null;
+        return Math.max(...timestamps);
+    };
 
     // Check authentication status
     const checkAuthStatus = useCallback(async () => {
@@ -56,9 +90,17 @@ export function useSimklIntegration() {
         try {
             const settings = await simklService.getUserSettings();
             setUserSettings(settings);
+            cachedUserSettings = settings;
 
-            const stats = await simklService.getUserStats();
-            setUserStats(stats);
+            const accountId = settings?.account?.id;
+            if (accountId) {
+                const stats = await simklService.getUserStats(accountId);
+                setUserStats(stats);
+                cachedUserStats = stats;
+            } else {
+                setUserStats(null);
+                cachedUserStats = null;
+            }
         } catch (error) {
             logger.error('[useSimklIntegration] Error loading user profile:', error);
         }
@@ -170,8 +212,32 @@ export function useSimklIntegration() {
         if (!isAuthenticated) return false;
 
         try {
+            const now = Date.now();
+            if (now - lastActivitiesCheckAt.current < 30000) {
+                return true;
+            }
+            lastActivitiesCheckAt.current = now;
+
+            const activities = await simklService.getActivities();
+            const latestPlaybackActivity = getLatestPlaybackActivity(activities);
+
+            if (latestPlaybackActivity && lastPlaybackActivityAt.current === latestPlaybackActivity) {
+                return true;
+            }
+
+            if (latestPlaybackActivity) {
+                lastPlaybackActivityAt.current = latestPlaybackActivity;
+            }
+
+            if (now - lastPlaybackFetchAt.current < 60000) {
+                return true;
+            }
+            lastPlaybackFetchAt.current = now;
+
             const playback = await simklService.getPlaybackStatus();
             logger.log(`[useSimklIntegration] fetched Simkl playback: ${playback.length}`);
+
+            setContinueWatching(playback);
 
             for (const item of playback) {
                 let id: string | undefined;
@@ -215,9 +281,11 @@ export function useSimklIntegration() {
 
     useEffect(() => {
         if (isAuthenticated) {
-            loadPlaybackStatus();
             fetchAndMergeSimklProgress();
-            loadUserProfile();
+            if (!hasLoadedProfileOnce) {
+                hasLoadedProfileOnce = true;
+                loadUserProfile();
+            }
         }
     }, [isAuthenticated, loadPlaybackStatus, fetchAndMergeSimklProgress, loadUserProfile]);
 
