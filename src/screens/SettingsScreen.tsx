@@ -375,10 +375,10 @@ const SettingsScreen: React.FC = () => {
         return (
           <SettingsCard title={t('settings.sections.account')} isTablet={isTablet}>
             {isItemVisible('trakt') && (
-              <SettingItem
-                title={t('trakt.title')}
-                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
-                customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+                    <SettingItem
+                      title={t('trakt.title')}
+                      description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
+                      customIcon={<TraktIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
                 isLast={!isItemVisible('simkl')}
@@ -386,10 +386,10 @@ const SettingsScreen: React.FC = () => {
               />
             )}
             {isItemVisible('simkl') && (
-              <SettingItem
-                title={'Simkl'}
-                description={isSimklAuthenticated ? 'Connected' : 'Track what you watch'}
-                customIcon={<SimklIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+                    <SettingItem
+                      title={'Simkl'}
+                      description={isSimklAuthenticated ? 'Connected' : 'Track what you watch'}
+                      customIcon={<SimklIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('SimklSettings')}
                 isLast={true}
@@ -683,7 +683,7 @@ const SettingsScreen: React.FC = () => {
                   <SettingItem
                     title={t('trakt.title')}
                     description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
-                    customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
+                    customIcon={<TraktIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
                     isLast={!isItemVisible('simkl')}
@@ -693,7 +693,7 @@ const SettingsScreen: React.FC = () => {
                   <SettingItem
                     title={'Simkl'}
                     description={isSimklAuthenticated ? 'Connected' : 'Track what you watch'}
-                    customIcon={<SimklIcon size={20} color={currentTheme.colors.primary} />}
+                    customIcon={<SimklIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('SimklSettings')}
                     isLast={true}
