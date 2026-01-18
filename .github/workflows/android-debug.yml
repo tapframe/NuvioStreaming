@@ -2,7 +2,7 @@ name: Build Android Debug
 
 on:
   push:
-    branches: [ "main", "Build" ]
+    branches: [ "main", "Build", "Mal" ]
   workflow_dispatch:
 
 jobs:

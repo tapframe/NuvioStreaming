@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - Build
+      - Mal
   workflow_dispatch:
 
 jobs:
