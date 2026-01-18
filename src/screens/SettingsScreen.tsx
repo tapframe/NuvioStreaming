@@ -387,8 +387,8 @@ const SettingsScreen: React.FC = () => {
             )}
             {isItemVisible('simkl') && (
                     <SettingItem
-                      title={'Simkl'}
-                      description={isSimklAuthenticated ? 'Connected' : 'Track what you watch'}
+                      title={t('settings.items.simkl')}
+                      description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
                       customIcon={<SimklIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('SimklSettings')}
@@ -691,8 +691,8 @@ const SettingsScreen: React.FC = () => {
                 )}
                 {isItemVisible('simkl') && (
                   <SettingItem
-                    title={'Simkl'}
-                    description={isSimklAuthenticated ? 'Connected' : 'Track what you watch'}
+                    title={t('settings.items.simkl')}
+                    description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
                     customIcon={<SimklIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('SimklSettings')}

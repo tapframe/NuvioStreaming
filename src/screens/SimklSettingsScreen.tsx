@@ -21,6 +21,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSimklIntegration } from '../hooks/useSimklIntegration';
 import { useTraktIntegration } from '../hooks/useTraktIntegration';
 import CustomAlert from '../components/CustomAlert';
+import { useTranslation } from 'react-i18next';
 
 const ANDROID_STATUSBAR_HEIGHT = StatusBar.currentHeight || 0;
 
@@ -50,6 +51,7 @@ const SimklSettingsScreen: React.FC = () => {
     const [alertMessage, setAlertMessage] = useState('');
 
     const { currentTheme } = useTheme();
+    const { t } = useTranslation();
 
     const {
         isAuthenticated,
@@ -97,30 +99,30 @@ const SimklSettingsScreen: React.FC = () => {
                     .then(success => {
                         if (success) {
                             refreshAuthStatus();
-                            openAlert('Success', 'Connected to Simkl successfully!');
+                            openAlert(t('common.success'), t('simkl.auth_success_msg'));
                         } else {
-                            openAlert('Error', 'Failed to connect to Simkl.');
+                            openAlert(t('common.error'), t('simkl.auth_error_msg'));
                         }
                     })
                     .catch(err => {
                         logger.error('[SimklSettingsScreen] Token exchange error:', err);
-                        openAlert('Error', 'An error occurred during connection.');
+                        openAlert(t('common.error'), t('simkl.auth_error_generic'));
                     })
                     .finally(() => setIsExchangingCode(false));
             } else if (response.type === 'error') {
-                openAlert('Error', 'Authentication error: ' + (response.error?.message || 'Unknown'));
+                openAlert(t('simkl.auth_error_title'), t('simkl.auth_error_generic') + ' ' + (response.error?.message || t('common.unknown')));
             }
         }
     }, [response, refreshAuthStatus]);
 
     const handleSignIn = () => {
         if (!SIMKL_CLIENT_ID) {
-            openAlert('Configuration Error', 'Simkl Client ID is missing in environment variables.');
+            openAlert(t('simkl.config_error_title'), t('simkl.config_error_msg'));
             return;
         }
 
         if (isTraktAuthenticated) {
-            openAlert('Conflict', 'You cannot connect to Simkl while Trakt is connected. Please disconnect Trakt first.');
+            openAlert(t('simkl.conflict_title'), t('simkl.conflict_msg'));
             return;
         }
 
@@ -130,7 +132,7 @@ const SimklSettingsScreen: React.FC = () => {
     const handleSignOut = async () => {
         await simklService.logout();
         refreshAuthStatus();
-        openAlert('Signed Out', 'You have disconnected from Simkl.');
+        openAlert(t('common.success'), t('simkl.sign_out_confirm'));
     };
 
     return (
@@ -156,7 +158,7 @@ const SimklSettingsScreen: React.FC = () => {
             </View>
 
             <Text style={[styles.headerTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
-                Simkl Integration
+                {t('simkl.settings_title')}
             </Text>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -195,7 +197,7 @@ const SimklSettingsScreen: React.FC = () => {
                                 </View>
                             </View>
                             <Text style={[styles.statusDesc, { color: currentTheme.colors.mediumEmphasis }]}>
-                                Your watched items are syncing with Simkl.
+                                {t('simkl.syncing_desc')}
                             </Text>
 
                             {userStats && (
@@ -239,16 +241,16 @@ const SimklSettingsScreen: React.FC = () => {
                                 style={[styles.button, { backgroundColor: currentTheme.colors.error, marginTop: 20 }]}
                                 onPress={handleSignOut}
                             >
-                                <Text style={styles.buttonText}>Disconnect</Text>
+                                <Text style={styles.buttonText}>{t('simkl.sign_out')}</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
                         <View style={styles.signInContainer}>
                             <Text style={[styles.signInTitle, { color: currentTheme.colors.highEmphasis }]}>
-                                Connect Simkl
+                                {t('simkl.connect_title')}
                             </Text>
                             <Text style={[styles.signInDescription, { color: currentTheme.colors.mediumEmphasis }]}>
-                                Sync your watch history and track what you're watching.
+                                {t('simkl.connect_desc')}
                             </Text>
                             <TouchableOpacity
                                 style={[
@@ -261,7 +263,7 @@ const SimklSettingsScreen: React.FC = () => {
                                 {isExchangingCode ? (
                                     <ActivityIndicator color="white" />
                                 ) : (
-                                    <Text style={styles.buttonText}>Sign In with Simkl</Text>
+                                    <Text style={styles.buttonText}>{t('simkl.sign_in')}</Text>
                                 )}
                             </TouchableOpacity>
                         </View>
@@ -277,7 +279,7 @@ const SimklSettingsScreen: React.FC = () => {
                 </View>
 
                 <Text style={[styles.disclaimer, { color: isDarkMode ? currentTheme.colors.mediumEmphasis : currentTheme.colors.textMutedDark }]}>
-                    Nuvio is not affiliated with Simkl.
+                    {t('simkl.disclaimer')}
                 </Text>
             </ScrollView>
 
