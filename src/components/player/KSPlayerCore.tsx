@@ -598,6 +598,20 @@ const KSPlayerCore: React.FC = () => {
     controls.seekToTime(value);
   };
 
+  const handleProgress = useCallback((d: any) => {
+    if (!isSliderDragging) {
+      setCurrentTime(d.currentTime);
+    }
+    // Only update buffered if it changed by more than 0.5s to reduce re-renders
+    const newBuffered = d.buffered || 0;
+    setBuffered(prevBuffered => {
+      if (Math.abs(newBuffered - prevBuffered) > 0.5) {
+        return newBuffered;
+      }
+      return prevBuffered;
+    });
+  }, [isSliderDragging, setCurrentTime, setBuffered]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
       <StatusBar hidden={true} />
@@ -637,16 +651,7 @@ const KSPlayerCore: React.FC = () => {
         onAudioTracks={(d) => tracks.setKsAudioTracks(d.audioTracks || [])}
         onTextTracks={(d) => tracks.setKsTextTracks(d.textTracks || [])}
         onLoad={onLoad}
-        onProgress={(d) => {
-          if (!isSliderDragging) {
-            setCurrentTime(d.currentTime);
-          }
-          // Only update buffered if it changed by more than 0.5s to reduce re-renders
-          const newBuffered = d.buffered || 0;
-          if (Math.abs(newBuffered - buffered) > 0.5) {
-            setBuffered(newBuffered);
-          }
-        }}
+        onProgress={handleProgress}
         onEnd={async () => {
           setCurrentTime(duration);
           await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');

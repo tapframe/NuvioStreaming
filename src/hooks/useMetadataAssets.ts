@@ -177,15 +177,15 @@ export const useMetadataAssets = (
                 // Only update if request wasn't aborted and component is still mounted
                 if (!isMountedRef.current) return;
 
-                if (metadata?.banner) {
-                  finalBanner = metadata.banner;
-                  bannerSourceType = 'default';
-                } else if (details?.backdrop_path) {
+                if (details?.backdrop_path) {
                   finalBanner = tmdbService.getImageUrl(details.backdrop_path);
                   bannerSourceType = 'tmdb';
                   if (finalBanner) {
                     FastImage.preload([{ uri: finalBanner }]);
                   }
+                } else if (metadata?.banner) {
+                  finalBanner = metadata.banner;
+                  bannerSourceType = 'default';
                 } else {
                   finalBanner = bannerImage || null;
                   bannerSourceType = 'default';

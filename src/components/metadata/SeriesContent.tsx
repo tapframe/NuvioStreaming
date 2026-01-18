@@ -41,6 +41,7 @@ interface SeriesContentProps {
 const DEFAULT_PLACEHOLDER = 'https://via.placeholder.com/300x450/1a1a1a/666666?text=No+Image';
 const EPISODE_PLACEHOLDER = 'https://via.placeholder.com/500x280/1a1a1a/666666?text=No+Preview';
 const TMDB_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Tmdb.new.logo.svg/512px-Tmdb.new.logo.svg.png?20200406190906';
+const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
 
 const SeriesContentComponent: React.FC<SeriesContentProps> = ({
   episodes,
@@ -1166,7 +1167,18 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                 <View style={styles.ratingContainer}>
                   {isImdbRating ? (
                     <>
-
+                      <FastImage
+                        source={{ uri: IMDb_LOGO }}
+                        style={[
+                          styles.tmdbLogo, // Reuse same style for dimensions
+                          {
+                            width: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24,
+                            height: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                            marginRight: 4
+                          }
+                        ]}
+                        resizeMode={FastImage.resizeMode.contain}
+                      />
                       <Text style={[
                         styles.ratingText,
                         {
@@ -1422,7 +1434,18 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
                 <View style={styles.ratingContainerHorizontal}>
                   {isImdbRating ? (
                     <>
-
+                      <FastImage
+                        source={{ uri: IMDb_LOGO }}
+                        style={[
+                          styles.tmdbLogo, // Reuse same style
+                          {
+                            width: isTV ? 28 : isLargeTablet ? 26 : isTablet ? 24 : 24,
+                            height: isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14,
+                            marginRight: 4
+                          }
+                        ]}
+                        resizeMode={FastImage.resizeMode.contain}
+                      />
                       <Text style={[
                         styles.ratingTextHorizontal,
                         {
