@@ -158,7 +158,7 @@ const SimklSettingsScreen: React.FC = () => {
             </View>
 
             <Text style={[styles.headerTitle, { color: isDarkMode ? currentTheme.colors.highEmphasis : currentTheme.colors.textDark }]}>
-                {t('simkl.settings_title')}
+                {t('simkl.settings_title')} (Alpha)
             </Text>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
