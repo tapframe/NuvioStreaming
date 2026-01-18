@@ -98,3 +98,8 @@ trakt-docss
 libmpv-android/
 mpv-android/
 mpvKt/
+
+# Torrent libraries
+LibTorrent/
+iTorrent/
+simkl-docss
