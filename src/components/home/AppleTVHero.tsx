@@ -446,7 +446,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         if (url) {
           const bestUrl = TrailerService.getBestFormatUrl(url);
           setTrailerUrl(bestUrl);
-          logger.info('[AppleTVHero] Trailer URL loaded:', bestUrl);
+          // logger.info('[AppleTVHero] Trailer URL loaded:', bestUrl);
         } else {
           logger.info('[AppleTVHero] No trailer found for:', currentItem.name);
           setTrailerUrl(null);
@@ -997,7 +997,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         {/* Background Images with Crossfade */}
         <View style={styles.backgroundContainer}>
           {/* Current Image - Always visible as base */}
-          <Animated.View style={[styles.imageWrapper, backgroundParallaxStyle]}>
+          <Animated.View style={[styles.imageWrapper, backgroundParallaxStyle, { opacity: thumbnailOpacity }]}>
             <FastImage
               source={{
                 uri: bannerUrl,
@@ -1441,7 +1441,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 40,
+    height: 400, // Increased to cover action buttons with dark background
     pointerEvents: 'none',
   },
   // Loading & Empty States

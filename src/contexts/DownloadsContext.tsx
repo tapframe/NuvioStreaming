@@ -75,7 +75,7 @@ async function getExtensionFromHeaders(url: string, headers?: Record<string, str
   try {
     const response = await fetch(url, { method: 'HEAD', headers });
     const contentType = response.headers.get('content-type');
-    
+
     if (contentType) {
       // Map common content types to extensions
       if (contentType.includes('video/mp4')) return 'mp4';
@@ -90,15 +90,15 @@ async function getExtensionFromHeaders(url: string, headers?: Record<string, str
   } catch (error) {
     console.warn('[DownloadsContext] Could not get content-type from HEAD request', error);
   }
-  
+
   return null;
 }
 
 function isDownloadableUrl(url: string): boolean {
   if (!url) return false;
-  
+
   const lower = url.toLowerCase();
-  
+
   // Check for streaming formats that should NOT be downloadable (only m3u8 and DASH)
   const streamingFormats = [
     '.m3u8',           // HLS streaming
@@ -106,15 +106,15 @@ function isDownloadableUrl(url: string): boolean {
     'm3u8',            // HLS without extension
     'mpd',             // DASH without extension
   ];
-  
+
   // Check if URL contains streaming format indicators
-  const isStreamingFormat = streamingFormats.some(format => 
-    lower.includes(format) || 
+  const isStreamingFormat = streamingFormats.some(format =>
+    lower.includes(format) ||
     lower.includes(`ext=${format}`) ||
     lower.includes(`format=${format}`) ||
     lower.includes(`container=${format}`)
   );
-  
+
   // Return true if it's NOT a streaming format (m3u8 or DASH)
   return !isStreamingFormat;
 }
@@ -183,7 +183,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           });
           setDownloads(restored);
         }
-      } catch {}
+      } catch { }
     })();
   }, []);
 
@@ -209,18 +209,18 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (d.progress <= prev || d.progress - prev < 2) return; // notify every 2%
       lastNotifyRef.current.set(d.id, d.progress);
       await notificationService.notifyDownloadProgress(d.title, d.progress, d.downloadedBytes, d.totalBytes);
-    } catch {}
+    } catch { }
   }, []);
 
   const notifyCompleted = useCallback(async (d: DownloadItem) => {
     try {
       if (appStateRef.current === 'active') return;
       await notificationService.notifyDownloadComplete(d.title);
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
-    mmkvStorage.setItem(STORAGE_KEY, JSON.stringify(downloads)).catch(() => {});
+    mmkvStorage.setItem(STORAGE_KEY, JSON.stringify(downloads)).catch(() => { });
   }, [downloads]);
 
   const updateDownload = useCallback((id: string, updater: (d: DownloadItem) => DownloadItem) => {
@@ -247,7 +247,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // No need to recreate it
     } else {
       console.log(`[DownloadsContext] Creating new resumable for download: ${id}`);
-      
+
       // Use the exact same file URI that was used initially
       const fileUri = item.fileUri;
       if (!fileUri) {
@@ -322,13 +322,13 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (fileInfo.size === 0) {
           throw new Error('Downloaded file is empty (0 bytes)');
         }
-        
+
         // CRITICAL FIX: Check if file size matches expected size (if known)
         const currentItem = downloadsRef.current.find(d => d.id === id);
         if (currentItem && currentItem.totalBytes > 0) {
           const sizeDifference = Math.abs(fileInfo.size - currentItem.totalBytes);
           const percentDifference = (sizeDifference / currentItem.totalBytes) * 100;
-          
+
           // Allow up to 1% difference to account for potential header/metadata variations
           if (percentDifference > 1) {
             throw new Error(
@@ -336,7 +336,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         }
-        
+
         console.log(`[DownloadsContext] File validation passed: ${result.uri} (${fileInfo.size} bytes)`);
       } catch (validationError) {
         console.error(`[DownloadsContext] File validation failed: ${validationError}`);
@@ -373,15 +373,15 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       // Only mark as error and clean up if it's a real error (not pause-related)
       console.log(`[DownloadsContext] Marking download as error: ${id}`);
-      
+
       // For validation errors, clear resumeData and allow fresh restart
       if (e.message && e.message.includes('validation failed')) {
         console.log(`[DownloadsContext] Validation error - clearing resume data for fresh start: ${id}`);
-        updateDownload(id, (d) => ({ 
-          ...d, 
-          status: 'error', 
+        updateDownload(id, (d) => ({
+          ...d,
+          status: 'error',
           resumeData: undefined, // Clear corrupted resume data
-          updatedAt: Date.now() 
+          updatedAt: Date.now()
         }));
         // Clean up resumable to force fresh download on retry
         resumablesRef.current.delete(id);
@@ -389,13 +389,13 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } else if (e.message && (e.message.includes('size mismatch') || e.message.includes('empty'))) {
         // File corruption detected - clear everything for fresh start
         console.log(`[DownloadsContext] File corruption detected - clearing for fresh start: ${id}`);
-        updateDownload(id, (d) => ({ 
-          ...d, 
+        updateDownload(id, (d) => ({
+          ...d,
           status: 'error',
           downloadedBytes: 0,
           progress: 0,
           resumeData: undefined, // Clear corrupted resume data
-          updatedAt: Date.now() 
+          updatedAt: Date.now()
         }));
         resumablesRef.current.delete(id);
         lastBytesRef.current.delete(id);
@@ -443,7 +443,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const fileUri = extension ? `${baseDir}downloads/${uniqueId}.${extension}` : `${baseDir}downloads/${uniqueId}`;
 
     // Ensure directory exists
-    await FileSystem.makeDirectoryAsync(`${baseDir}downloads`, { intermediates: true }).catch(() => {});
+    await FileSystem.makeDirectoryAsync(`${baseDir}downloads`, { intermediates: true }).catch(() => { });
 
     const createdAt = Date.now();
     const newItem: DownloadItem = {
@@ -515,9 +515,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     resumablesRef.current.set(compoundId, resumable);
     lastBytesRef.current.set(compoundId, { bytes: 0, time: Date.now() });
 
-    try {
-      const result = await resumable.downloadAsync();
-      
+    // Start download in background (non-blocking) to allow UI success alert
+    resumable.downloadAsync().then(async (result) => {
+
       // Check if download was paused during download
       const currentItem = downloadsRef.current.find(d => d.id === compoundId);
       if (currentItem && currentItem.status === 'paused') {
@@ -536,7 +536,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         // Don't delete resumable - keep it for resume
         return;
       }
-      
+
       if (!result) throw new Error('Download failed');
 
       // Validate the downloaded file
@@ -548,13 +548,13 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (fileInfo.size === 0) {
           throw new Error('Downloaded file is empty (0 bytes)');
         }
-        
+
         // CRITICAL FIX: Check if file size matches expected size (if known)
         const currentItem = downloadsRef.current.find(d => d.id === compoundId);
         if (currentItem && currentItem.totalBytes > 0) {
           const sizeDifference = Math.abs(fileInfo.size - currentItem.totalBytes);
           const percentDifference = (sizeDifference / currentItem.totalBytes) * 100;
-          
+
           // Allow up to 1% difference to account for potential header/metadata variations
           if (percentDifference > 1) {
             throw new Error(
@@ -562,7 +562,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             );
           }
         }
-        
+
         console.log(`[DownloadsContext] File validation passed: ${result.uri} (${fileInfo.size} bytes)`);
       } catch (validationError) {
         console.error(`[DownloadsContext] File validation failed: ${validationError}`);
@@ -581,7 +581,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (done) notifyCompleted({ ...done, status: 'completed', progress: 100, fileUri: result.uri } as DownloadItem);
       resumablesRef.current.delete(compoundId);
       lastBytesRef.current.delete(compoundId);
-    } catch (e: any) {
+    }).catch(async (e: any) => {
       // If user paused, keep paused state, else error
       const current = downloadsRef.current.find(d => d.id === compoundId);
       if (current && current.status === 'paused') {
@@ -602,15 +602,15 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       console.log(`[DownloadsContext] Marking initial download as error: ${compoundId}`);
-      
+
       // For validation errors, clear resumeData and allow fresh restart
       if (e.message && e.message.includes('validation failed')) {
         console.log(`[DownloadsContext] Validation error - clearing resume data for fresh start: ${compoundId}`);
-        updateDownload(compoundId, (d) => ({ 
-          ...d, 
-          status: 'error', 
+        updateDownload(compoundId, (d) => ({
+          ...d,
+          status: 'error',
           resumeData: undefined, // Clear corrupted resume data
-          updatedAt: Date.now() 
+          updatedAt: Date.now()
         }));
         // Clean up resumable to force fresh download on retry
         resumablesRef.current.delete(compoundId);
@@ -618,13 +618,13 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } else if (e.message && (e.message.includes('size mismatch') || e.message.includes('empty'))) {
         // File corruption detected - clear everything for fresh start
         console.log(`[DownloadsContext] File corruption detected - clearing for fresh start: ${compoundId}`);
-        updateDownload(compoundId, (d) => ({ 
-          ...d, 
+        updateDownload(compoundId, (d) => ({
+          ...d,
           status: 'error',
           downloadedBytes: 0,
           progress: 0,
           resumeData: undefined, // Clear corrupted resume data
-          updatedAt: Date.now() 
+          updatedAt: Date.now()
         }));
         resumablesRef.current.delete(compoundId);
         lastBytesRef.current.delete(compoundId);
@@ -634,27 +634,27 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         updateDownload(compoundId, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
         // Keep resumable for potential retry
       }
-    }
+    });
   }, [updateDownload, resumeDownload]);
 
   const pauseDownload = useCallback(async (id: string) => {
     console.log(`[DownloadsContext] Pausing download: ${id}`);
-    
+
     // First, update the status to 'paused' immediately
     // This will cause any ongoing download/resume operations to check status and exit gracefully
     updateDownload(id, (d) => ({ ...d, status: 'paused', updatedAt: Date.now() }));
-    
+
     const resumable = resumablesRef.current.get(id);
     if (resumable) {
       try {
         // CRITICAL FIX: Get the pause state which contains resumeData
         const pauseResult = await resumable.pauseAsync();
         console.log(`[DownloadsContext] Successfully paused download: ${id}`);
-        
+
         // CRITICAL FIX: Save the resumeData from pauseAsync result or savable()
         // The pauseAsync returns a DownloadPauseState object with resumeData
         const savableState = resumable.savable();
-        
+
         // Update the download item with the critical resumeData for future resume
         updateDownload(id, (d) => ({
           ...d,
@@ -662,9 +662,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           resumeData: savableState.resumeData || pauseResult.resumeData, // Store resume data
           updatedAt: Date.now(),
         }));
-        
+
         console.log(`[DownloadsContext] Saved resume data for download: ${id}`);
-        
+
         // Keep the resumable in memory for resume - DO NOT DELETE
       } catch (error) {
         console.log(`[DownloadsContext] Pause async failed (this is normal if already paused): ${id}`, error);
@@ -691,7 +691,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const resumable = resumablesRef.current.get(id);
     try {
       if (resumable) {
-        try { await resumable.pauseAsync(); } catch {}
+        try { await resumable.pauseAsync(); } catch { }
       }
     } finally {
       resumablesRef.current.delete(id);
@@ -700,7 +700,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const item = downloadsRef.current.find(d => d.id === id);
     if (item?.fileUri) {
-      await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => {});
+      await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => { });
     }
     setDownloads(prev => prev.filter(d => d.id !== id));
   }, []);
@@ -708,7 +708,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const removeDownload = useCallback(async (id: string) => {
     const item = downloadsRef.current.find(d => d.id === id);
     if (item?.fileUri && item.status === 'completed') {
-      await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => {});
+      await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => { });
     }
     setDownloads(prev => prev.filter(d => d.id !== id));
   }, []);

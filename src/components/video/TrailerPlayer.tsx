@@ -64,7 +64,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   const { currentTheme } = useTheme();
   const { isTrailerPlaying: globalTrailerPlaying } = useTrailer();
   const videoRef = useRef<VideoRef>(null);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [isMuted, setIsMuted] = useState(muted);
@@ -90,16 +90,16 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       if (videoRef.current) {
         // Pause the video
         setIsPlaying(false);
-        
+
         // Seek to beginning to stop any background processing
         videoRef.current.seek(0);
-        
+
         // Clear any pending timeouts
         if (hideControlsTimeout.current) {
           clearTimeout(hideControlsTimeout.current);
           hideControlsTimeout.current = null;
         }
-        
+
         logger.info('TrailerPlayer', 'Video cleanup completed');
       }
     } catch (error) {
@@ -138,7 +138,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   // Component mount/unmount tracking
   useEffect(() => {
     setIsComponentMounted(true);
-    
+
     return () => {
       setIsComponentMounted(false);
       cleanupVideo();
@@ -185,15 +185,15 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
 
   const showControlsWithTimeout = useCallback(() => {
     if (!isComponentMounted) return;
-    
+
     setShowControls(true);
     controlsOpacity.value = withTiming(1, { duration: 200 });
-    
+
     // Clear existing timeout
     if (hideControlsTimeout.current) {
       clearTimeout(hideControlsTimeout.current);
     }
-    
+
     // Set new timeout to hide controls
     hideControlsTimeout.current = setTimeout(() => {
       if (isComponentMounted) {
@@ -205,7 +205,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
 
   const handleVideoPress = useCallback(() => {
     if (!isComponentMounted) return;
-    
+
     if (showControls) {
       // If controls are visible, toggle play/pause
       handlePlayPause();
@@ -218,7 +218,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   const handlePlayPause = useCallback(async () => {
     try {
       if (!videoRef.current || !isComponentMounted) return;
-      
+
       playButtonScale.value = withTiming(0.8, { duration: 100 }, () => {
         if (isComponentMounted) {
           playButtonScale.value = withTiming(1, { duration: 100 });
@@ -226,7 +226,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       });
 
       setIsPlaying(!isPlaying);
-      
+
       showControlsWithTimeout();
     } catch (error) {
       logger.error('TrailerPlayer', 'Error toggling playback:', error);
@@ -236,7 +236,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
   const handleMuteToggle = useCallback(async () => {
     try {
       if (!videoRef.current || !isComponentMounted) return;
-      
+
       setIsMuted(!isMuted);
       showControlsWithTimeout();
     } catch (error) {
@@ -246,28 +246,28 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
 
   const handleLoadStart = useCallback(() => {
     if (!isComponentMounted) return;
-    
+
     setIsLoading(true);
     setHasError(false);
     // Only show loading spinner if not hidden
     loadingOpacity.value = hideLoadingSpinner ? 0 : 1;
     onLoadStart?.();
-    logger.info('TrailerPlayer', 'Video load started');
+    // logger.info('TrailerPlayer', 'Video load started');
   }, [loadingOpacity, onLoadStart, hideLoadingSpinner, isComponentMounted]);
 
   const handleLoad = useCallback((data: OnLoadData) => {
     if (!isComponentMounted) return;
-    
+
     setIsLoading(false);
     loadingOpacity.value = withTiming(0, { duration: 300 });
     setDuration(data.duration * 1000); // Convert to milliseconds
     onLoad?.();
-    logger.info('TrailerPlayer', 'Video loaded successfully');
+    // logger.info('TrailerPlayer', 'Video loaded successfully');
   }, [loadingOpacity, onLoad, isComponentMounted]);
 
   const handleError = useCallback((error: any) => {
     if (!isComponentMounted) return;
-    
+
     setIsLoading(false);
     setHasError(true);
     loadingOpacity.value = withTiming(0, { duration: 300 });
@@ -278,10 +278,10 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
 
   const handleProgress = useCallback((data: OnProgressData) => {
     if (!isComponentMounted) return;
-    
+
     setPosition(data.currentTime * 1000); // Convert to milliseconds
     onProgress?.(data);
-    
+
     if (onPlaybackStatusUpdate) {
       onPlaybackStatusUpdate({
         isLoaded: data.currentTime > 0,
@@ -304,7 +304,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         clearTimeout(hideControlsTimeout.current);
         hideControlsTimeout.current = null;
       }
-      
+
       // Reset all animated values to prevent memory leaks
       try {
         controlsOpacity.value = 0;
@@ -313,7 +313,7 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
       } catch (error) {
         logger.error('TrailerPlayer', 'Error cleaning up animation values:', error);
       }
-      
+
       // Ensure video is stopped
       cleanupVideo();
     };
@@ -420,9 +420,9 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
         </Animated.View>
       )}
 
-            {/* Video controls overlay */}
+      {/* Video controls overlay */}
       {!hideControls && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.videoOverlay}
           onPress={handleVideoPress}
           activeOpacity={1}
@@ -439,10 +439,10 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
             <View style={styles.centerControls}>
               <Animated.View style={playButtonAnimatedStyle}>
                 <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
-                  <MaterialIcons 
-                    name={isPlaying ? 'pause' : 'play-arrow'} 
-                    size={isTablet ? 64 : 48} 
-                    color="white" 
+                  <MaterialIcons
+                    name={isPlaying ? 'pause' : 'play-arrow'}
+                    size={isTablet ? 64 : 48}
+                    color="white"
                   />
                 </TouchableOpacity>
               </Animated.View>
@@ -457,8 +457,8 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
                 {/* Progress bar */}
                 <View style={styles.progressContainer}>
                   <View style={styles.progressBar}>
-                    <View 
-                      style={[styles.progressFill, { width: `${progressPercentage}%` }]} 
+                    <View
+                      style={[styles.progressFill, { width: `${progressPercentage}%` }]}
                     />
                   </View>
                 </View>
@@ -466,27 +466,27 @@ const TrailerPlayer = React.forwardRef<any, TrailerPlayerProps>(({
                 {/* Control buttons */}
                 <View style={styles.controlButtons}>
                   <TouchableOpacity style={styles.controlButton} onPress={handlePlayPause}>
-                    <MaterialIcons 
-                      name={isPlaying ? 'pause' : 'play-arrow'} 
-                      size={isTablet ? 32 : 24} 
-                      color="white" 
+                    <MaterialIcons
+                      name={isPlaying ? 'pause' : 'play-arrow'}
+                      size={isTablet ? 32 : 24}
+                      color="white"
                     />
                   </TouchableOpacity>
-                  
+
                   <TouchableOpacity style={styles.controlButton} onPress={handleMuteToggle}>
-                    <MaterialIcons 
-                      name={isMuted ? 'volume-off' : 'volume-up'} 
-                      size={isTablet ? 32 : 24} 
-                      color="white" 
+                    <MaterialIcons
+                      name={isMuted ? 'volume-off' : 'volume-up'}
+                      size={isTablet ? 32 : 24}
+                      color="white"
                     />
                   </TouchableOpacity>
-                  
+
                   {onFullscreenToggle && (
                     <TouchableOpacity style={styles.controlButton} onPress={onFullscreenToggle}>
-                      <MaterialIcons 
-                        name="fullscreen" 
-                        size={isTablet ? 32 : 24} 
-                        color="white" 
+                      <MaterialIcons
+                        name="fullscreen"
+                        size={isTablet ? 32 : 24}
+                        color="white"
                       />
                     </TouchableOpacity>
                   )}

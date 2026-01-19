@@ -925,7 +925,7 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
   // Handle trailer preload completion
   const handleTrailerPreloaded = useCallback(() => {
     setTrailerPreloaded(true);
-    logger.info('HeroSection', 'Trailer preloaded successfully');
+    // logger.info('HeroSection', 'Trailer preloaded successfully');
   }, []);
 
   // Handle smooth transition when trailer is ready to play

@@ -60,7 +60,7 @@ export const useTraktComments = ({
       const traktService = TraktService.getInstance();
       let fetchedComments: TraktContentComment[] = [];
 
-      console.log(`[useTraktComments] Loading comments for ${type} - IMDb: ${imdbId}, TMDB: ${tmdbId}, page: ${pageNum}`);
+
 
       switch (type) {
         case 'movie':
@@ -87,10 +87,10 @@ export const useTraktComments = ({
       setComments(prevComments => {
         if (append) {
           const newComments = [...prevComments, ...fetchedComments];
-          console.log(`[useTraktComments] Appended ${fetchedComments.length} comments, total: ${newComments.length}`);
+
           return newComments;
         } else {
-          console.log(`[useTraktComments] Loaded ${fetchedComments.length} comments`);
+
           return fetchedComments;
         }
       });

@@ -351,7 +351,6 @@ const CompactCommentCard: React.FC<{
         onPressIn={() => setIsPressed(true)}
         onPressOut={() => setIsPressed(false)}
         onPress={() => {
-          console.log('CompactCommentCard: TouchableOpacity pressed for comment:', comment.id);
           onPress();
         }}
         activeOpacity={1}
@@ -789,26 +788,21 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
   }, [loading]);
 
   // Debug logging
-  console.log('CommentsSection: Comments data:', comments);
-  console.log('CommentsSection: Comments length:', comments?.length);
-  console.log('CommentsSection: Loading:', loading);
-  console.log('CommentsSection: Error:', error);
+  // Debug logging removed per user request
 
   const renderComment = useCallback(({ item }: { item: TraktContentComment }) => {
     // Safety check for null/undefined items
     if (!item || !item.id) {
-      console.log('CommentsSection: Invalid comment item:', item);
       return null;
     }
 
-    console.log('CommentsSection: Rendering comment:', item.id);
+
 
     return (
       <CompactCommentCard
         comment={item}
         theme={currentTheme}
         onPress={() => {
-          console.log('CommentsSection: Comment pressed:', item.id);
           onCommentPress?.(item);
         }}
         isSpoilerRevealed={true}
