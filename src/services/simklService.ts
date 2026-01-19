@@ -151,6 +151,16 @@ export class SimklService {
     // Default completion threshold (can't be configured on Simkl side essentially, but we use it for logic)
     private readonly COMPLETION_THRESHOLD = 80;
 
+    // Caching & Deduplication
+    private playbackStatusPromise: Promise<SimklPlaybackData[]> | null = null;
+    private cachedPlaybackStatus: SimklPlaybackData[] = [];
+    private lastPlaybackStatusTime: number = 0;
+    private readonly PLAYBACK_CACHE_TTL = 10000; // 10 seconds
+
+    private cachedUserSettings: SimklUserSettings | null = null;
+    private lastUserSettingsTime: number = 0;
+    private readonly USER_SETTINGS_CACHE_TTL = 300000; // 5 minutes (5 * 60 * 1000)
+
     private constructor() {
         // Determine cleanup logic if needed
         AppState.addEventListener('change', this.handleAppStateChange);
@@ -254,6 +264,16 @@ export class SimklService {
         await this.ensureInitialized();
         this.accessToken = null;
         await mmkvStorage.removeItem(SIMKL_ACCESS_TOKEN_KEY);
+
+        // Clear caches
+        this.cachedPlaybackStatus = [];
+        this.lastPlaybackStatusTime = 0;
+        this.playbackStatusPromise = null;
+        this.lastSyncTimes.clear();
+
+        this.cachedUserSettings = null;
+        this.lastUserSettingsTime = 0;
+
         logger.log('[SimklService] Logged out');
     }
 
@@ -533,15 +553,40 @@ export class SimklService {
         return await this.apiRequest('/sync/history/remove', 'POST', items);
     }
 
-    public async getPlaybackStatus(): Promise<SimklPlaybackData[]> {
-        const playback = await this.apiRequest<SimklPlaybackData[]>('/sync/playback');
-        const items = Array.isArray(playback) ? playback : [];
-        const sorted = items
-            .filter(Boolean)
-            .sort((a, b) => new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime());
+    public async getPlaybackStatus(forceRefresh: boolean = false): Promise<SimklPlaybackData[]> {
+        await this.ensureInitialized();
 
-        logger.log(`[SimklService] getPlaybackStatus: ${sorted.length} items`);
-        return sorted;
+        const now = Date.now();
+
+        // 1. Check cache (unless forced)
+        if (!forceRefresh && this.cachedPlaybackStatus.length > 0 && (now - this.lastPlaybackStatusTime < this.PLAYBACK_CACHE_TTL)) {
+            logger.log('[SimklService] getPlaybackStatus: Returning cached data');
+            return this.cachedPlaybackStatus;
+        }
+
+        // 2. Check in-flight request deduplication
+        if (this.playbackStatusPromise) {
+            logger.log('[SimklService] getPlaybackStatus: Returning in-flight promise');
+            return this.playbackStatusPromise;
+        }
+
+        // 3. Make new request
+        this.playbackStatusPromise = (async () => {
+            try {
+                const response = await this.apiRequest<SimklPlaybackData[]>('/sync/playback');
+                const data = response || [];
+
+                // Update cache
+                this.cachedPlaybackStatus = data;
+                this.lastPlaybackStatusTime = Date.now();
+
+                return data;
+            } finally {
+                this.playbackStatusPromise = null;
+            }
+        })();
+
+        return this.playbackStatusPromise;
     }
 
     /**
@@ -573,10 +618,22 @@ export class SimklService {
     /**
      * Get user settings/profile
      */
-    public async getUserSettings(): Promise<SimklUserSettings | null> {
+    public async getUserSettings(forceRefresh: boolean = false): Promise<SimklUserSettings | null> {
+        const now = Date.now();
+        if (!forceRefresh && this.cachedUserSettings && (now - this.lastUserSettingsTime < this.USER_SETTINGS_CACHE_TTL)) {
+            logger.log('[SimklService] getUserSettings: Returning cached data');
+            return this.cachedUserSettings;
+        }
+
         try {
             const response = await this.apiRequest<SimklUserSettings>('/users/settings', 'POST');
             logger.log('[SimklService] getUserSettings:', JSON.stringify(response));
+
+            if (response) {
+                this.cachedUserSettings = response;
+                this.lastUserSettingsTime = Date.now();
+            }
+
             return response;
         } catch (error) {
             logger.error('[SimklService] Failed to get user settings:', error);
@@ -606,4 +663,5 @@ export class SimklService {
             logger.error('[SimklService] Failed to get user stats:', error);
             return null;
         }
-    }}
+    }
+}
