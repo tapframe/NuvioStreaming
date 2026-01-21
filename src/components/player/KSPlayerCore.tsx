@@ -802,6 +802,7 @@ const KSPlayerCore: React.FC = () => {
         volume={volume}
         brightness={brightness}
         controlsTimeout={controlsTimeout}
+        resizeMode={resizeMode}
       />
 
       {/* UI Controls */}
@@ -829,7 +830,21 @@ const KSPlayerCore: React.FC = () => {
             togglePlayback={controls.togglePlayback}
             skip={controls.skip}
             handleClose={handleClose}
-            cycleAspectRatio={() => setResizeMode(prev => prev === 'cover' ? 'contain' : 'cover')}
+            cycleAspectRatio={() => {
+              gestureControls.showResizeModeOverlayFn(() => {
+                setResizeMode(prev => {
+                  switch (prev) {
+                    case 'contain':
+                      return 'cover';
+                    case 'cover':
+                      return 'stretch';
+                    case 'stretch':
+                    default:
+                      return 'contain';
+                  }
+                });
+              });
+            }}
             cyclePlaybackSpeed={() => speedControl.setPlaybackSpeed(speedControl.playbackSpeed >= 2 ? 1 : speedControl.playbackSpeed + 0.25)}
             currentPlaybackSpeed={speedControl.playbackSpeed}
             setShowAudioModal={modals.setShowAudioModal}

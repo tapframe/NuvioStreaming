@@ -183,6 +183,12 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
         console.log('[VideoSurface] Headers:', exoRequestHeaders);
     }, [streamUrl, useExoPlayer, exoRequestHeaders]);
 
+    useEffect(() => {
+        if (mpvPlayerRef?.current && !useExoPlayer) {
+            mpvPlayerRef.current.setResizeMode(getMpvResizeMode());
+        }
+    }, [resizeMode, useExoPlayer, mpvPlayerRef]);
+
     const handleMpvLoad = (data: { duration: number; width: number; height: number }) => {
         console.log('[VideoSurface] MPV onLoad received:', data);
         onLoad({
@@ -297,6 +303,18 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
             case 'contain':
             default:
                 return ResizeMode.CONTAIN;
+        }
+    };
+
+    const getMpvResizeMode = (): 'contain' | 'cover' | 'stretch' => {
+        switch (resizeMode) {
+            case 'cover':
+                return 'cover';
+            case 'stretch':
+                return 'stretch';
+            case 'contain':
+            default:
+                return 'contain';
         }
     };
 
