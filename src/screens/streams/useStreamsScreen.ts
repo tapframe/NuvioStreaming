@@ -23,7 +23,6 @@ import {
   filterStreamsByQuality,
   filterStreamsByLanguage,
   getQualityNumeric,
-  detectMkvViaHead,
   inferVideoTypeFromUrl,
   sortStreamsByQuality,
 } from './utils';
@@ -37,7 +36,6 @@ import {
   TMDBEpisodeOverride,
   AlertAction,
 } from './types';
-import { MKV_HEAD_TIMEOUT_MS } from './constants';
 
 // Cache for scraper logos
 const scraperLogoCache = new Map<string, string>();
@@ -467,36 +465,6 @@ export const useStreamsScreen = () => {
         if (typeof stream.url === 'string' && stream.url.startsWith('magnet:')) {
           openAlert('Not supported', 'Torrent streaming is not supported yet.');
           return;
-        }
-
-        // iOS MKV detection
-        if (Platform.OS === 'ios' && settings.preferredPlayer === 'internal') {
-          const lowerUrl = (stream.url || '').toLowerCase();
-          const isMkvByPath =
-            lowerUrl.includes('.mkv') ||
-            /[?&]ext=mkv\b/i.test(lowerUrl) ||
-            /format=mkv\b/i.test(lowerUrl) ||
-            /container=mkv\b/i.test(lowerUrl);
-          const isHttp = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
-
-          if (!isMkvByPath && isHttp) {
-            try {
-              const mkvDetected = await Promise.race<boolean>([
-                detectMkvViaHead(stream.url, (stream.headers as any) || undefined),
-                new Promise<boolean>(res => setTimeout(() => res(false), MKV_HEAD_TIMEOUT_MS)),
-              ]);
-              if (mkvDetected) {
-                const mergedHeaders = {
-                  ...(stream.headers || {}),
-                  'Content-Type': 'video/x-matroska',
-                } as Record<string, string>;
-                navigateToPlayer(stream, { headers: mergedHeaders });
-                return;
-              }
-            } catch (e) {
-              logger.warn('[StreamsScreen] MKV detection failed:', e);
-            }
-          }
         }
 
         // iOS external player

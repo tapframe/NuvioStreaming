@@ -49,7 +49,6 @@ export interface AppSettings {
   scraperRepositoryUrl: string; // URL to the scraper repository
   enableLocalScrapers: boolean; // Enable/disable local scraper functionality
   scraperTimeout: number; // Timeout for scraper execution in seconds
-  enableScraperUrlValidation: boolean; // Enable/disable URL validation for scrapers
   streamDisplayMode: 'separate' | 'grouped'; // How to display streaming links - separately by provider or grouped under one name
   streamSortMode: 'scraper-then-quality' | 'quality-then-scraper'; // How to sort streams - by scraper first or quality first
   showScraperLogos: boolean; // Show scraper logos next to streaming links
@@ -138,7 +137,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   scraperRepositoryUrl: '',
   enableLocalScrapers: true,
   scraperTimeout: 60, // 60 seconds timeout
-  enableScraperUrlValidation: true, // Enable URL validation by default
   streamDisplayMode: 'separate', // Default to separate display by provider
   streamSortMode: 'scraper-then-quality', // Default to current behavior (scraper first, then quality)
   showScraperLogos: true, // Show scraper logos by default

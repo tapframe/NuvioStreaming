@@ -4,7 +4,6 @@
  */
 
 import { Platform } from 'react-native';
-import { isMkvStream } from './mkvDetection';
 
 export interface PlayerSelectionOptions {
   uri: string;

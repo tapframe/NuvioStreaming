@@ -1164,10 +1164,6 @@ class LocalScraperService {
 
   private async executePlugin(code: string, params: any, consoleOverride?: any): Promise<LocalScraperResult[]> {
     try {
-      const settingsData = await mmkvStorage.getItem('app_settings');
-      const settings = settingsData ? JSON.parse(settingsData) : {};
-      const urlValidationEnabled = settings.enableScraperUrlValidation ?? true;
-
       const allScraperSettingsRaw = await mmkvStorage.getItem(this.SCRAPER_SETTINGS_KEY);
       const allScraperSettings = allScraperSettingsRaw ? JSON.parse(allScraperSettingsRaw) : {};
       let perScraperSettings = (params && params.scraperId && allScraperSettings[params.scraperId])
@@ -1299,7 +1295,6 @@ class LocalScraperService {
             'params',
             'PRIMARY_KEY',
             'TMDB_API_KEY',
-            'URL_VALIDATION_ENABLED',
             'SCRAPER_SETTINGS',
             'SCRAPER_ID',
             `
@@ -1311,7 +1306,6 @@ class LocalScraperService {
               globalScope.TMDB_API_KEY = TMDB_API_KEY;
               globalScope.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
               globalScope.SCRAPER_ID = SCRAPER_ID;
-              globalScope.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
             } else {
                logger.error('[Plugin Sandbox] Could not find global scope to inject settings');
             }
@@ -1346,7 +1340,6 @@ class LocalScraperService {
             params,
             MOVIEBOX_PRIMARY_KEY,
             MOVIEBOX_TMDB_API_KEY,
-            urlValidationEnabled,
             perScraperSettings,
             params?.scraperId
           );

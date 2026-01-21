@@ -116,12 +116,7 @@ export const usePlayerSetup = (
             const restoreBrightness = async () => {
                 try {
                     if (Platform.OS === 'android') {
-                        if (originalSystemBrightnessModeRef.current !== null) {
-                            await (Brightness as any).setSystemBrightnessModeAsync?.(originalSystemBrightnessModeRef.current);
-                        }
-                        if (originalSystemBrightnessRef.current !== null) {
-                            await (Brightness as any).setSystemBrightnessAsync?.(originalSystemBrightnessRef.current);
-                        }
+
                     }
                     if (originalAppBrightnessRef.current !== null) {
                         await Brightness.setBrightnessAsync(originalAppBrightnessRef.current);

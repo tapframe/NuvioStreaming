@@ -3,48 +3,6 @@ import { logger } from '../utils/logger';
 import { TMDBService } from '../services/tmdbService';
 import { isTmdbUrl } from '../utils/logoUtils';
 import FastImage from '@d11/react-native-fast-image';
-import { mmkvStorage } from '../services/mmkvStorage';
-
-// Cache for image availability checks
-const imageAvailabilityCache: Record<string, boolean> = {};
-
-// Helper function to check image availability with caching
-const checkImageAvailability = async (url: string): Promise<boolean> => {
-  // Check memory cache first
-  if (imageAvailabilityCache[url] !== undefined) {
-    return imageAvailabilityCache[url];
-  }
-
-  // Check AsyncStorage cache
-  try {
-    const cachedResult = await mmkvStorage.getItem(`image_available:${url}`);
-    if (cachedResult !== null) {
-      const isAvailable = cachedResult === 'true';
-      imageAvailabilityCache[url] = isAvailable;
-      return isAvailable;
-    }
-  } catch (error) {
-    // Ignore AsyncStorage errors
-  }
-
-  // Perform actual check
-  try {
-    const response = await fetch(url, { method: 'HEAD' });
-    const isAvailable = response.ok;
-
-    // Update caches
-    imageAvailabilityCache[url] = isAvailable;
-    try {
-      await mmkvStorage.setItem(`image_available:${url}`, isAvailable ? 'true' : 'false');
-    } catch (error) {
-      // Ignore AsyncStorage errors
-    }
-
-    return isAvailable;
-  } catch (error) {
-    return false;
-  }
-};
 
 export const useMetadataAssets = (
   metadata: any,

@@ -1,5 +1,4 @@
 import { Stream } from '../../types/metadata';
-import { MKV_HEAD_TIMEOUT_MS } from './constants';
 
 /**
  * Language variations for filtering
@@ -148,30 +147,6 @@ export const sortStreamsByQuality = (streams: Stream[]): Stream[] => {
     const nameB = (b.name || b.title || '').toLowerCase();
     return nameA.localeCompare(nameB);
   });
-};
-
-/**
- * Detect MKV format via HEAD request
- */
-export const detectMkvViaHead = async (
-  url: string,
-  headers?: Record<string, string>
-): Promise<boolean> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), MKV_HEAD_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      method: 'HEAD',
-      headers,
-      signal: controller.signal as any,
-    } as any);
-    const contentType = res.headers.get('content-type') || '';
-    return /matroska|x-matroska/i.test(contentType);
-  } catch (_e) {
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
 };
 
 /**
