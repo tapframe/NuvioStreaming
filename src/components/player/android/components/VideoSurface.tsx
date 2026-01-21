@@ -33,6 +33,7 @@ const CODEC_ERROR_PATTERNS = [
 
 interface VideoSurfaceProps {
     processedStreamUrl: string;
+    videoType?: string;
     headers?: { [key: string]: string };
     volume: number;
     playbackSpeed: number;
@@ -93,6 +94,7 @@ const isCodecError = (errorString: string): boolean => {
 
 export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     processedStreamUrl,
+    videoType,
     headers,
     volume,
     playbackSpeed,
@@ -135,6 +137,32 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
 }) => {
     // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
+
+    const normalizeRnVideoType = (t?: string): 'm3u8' | 'mpd' | undefined => {
+        if (!t) return undefined;
+        const lower = String(t).toLowerCase();
+        if (lower === 'm3u8' || lower === 'hls') return 'm3u8';
+        if (lower === 'mpd' || lower === 'dash') return 'mpd';
+        return undefined;
+    };
+
+    const inferRnVideoTypeFromUrl = (url?: string): 'm3u8' | 'mpd' | undefined => {
+        if (!url) return undefined;
+        const lower = url.toLowerCase();
+        // Strong signals
+        if (/\.m3u8(\b|$)/i.test(lower) || /(^|[?&])type=(m3u8|hls)(\b|$)/i.test(lower)) return 'm3u8';
+        if (/\.mpd(\b|$)/i.test(lower) || /(^|[?&])type=(mpd|dash)(\b|$)/i.test(lower)) return 'mpd';
+
+        // Heuristics for providers that serve HLS behind extensionless endpoints.
+        if (/\b(hls|m3u8|m3u)\b/i.test(lower)) return 'm3u8';
+        if (/\/playlist\//i.test(lower) && (/(^|[?&])token=/.test(lower) || /(^|[?&])expires=/.test(lower))) return 'm3u8';
+
+        // Common fallback keywords
+        if (/\bdash\b/i.test(lower) || /manifest/.test(lower)) return 'mpd';
+        return undefined;
+    };
+
+    const resolvedRnVideoType = normalizeRnVideoType(videoType) ?? inferRnVideoTypeFromUrl(streamUrl);
 
     // ========== MPV Handlers ==========
     const handleMpvLoad = (data: { duration: number; width: number; height: number }) => {
@@ -304,6 +332,7 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     source={{
                         uri: streamUrl,
                         headers: headers,
+                        ...(resolvedRnVideoType ? { type: resolvedRnVideoType } : null),
                     }}
                     paused={paused}
                     volume={volume}

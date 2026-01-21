@@ -155,9 +155,19 @@ export const sortStreamsByQuality = (streams: Stream[]): Stream[] => {
 export const inferVideoTypeFromUrl = (url?: string): string | undefined => {
   if (!url) return undefined;
   const lower = url.toLowerCase();
-  if (/(\.|ext=)(m3u8)(\b|$)/i.test(lower)) return 'm3u8';
-  if (/(\.|ext=)(mpd)(\b|$)/i.test(lower)) return 'mpd';
-  if (/(\.|ext=)(mp4)(\b|$)/i.test(lower)) return 'mp4';
+  // HLS
+  if (/(\.|ext=)(m3u8)(\b|$)/i.test(lower) || /\.m3u8(\b|$)/i.test(lower)) return 'm3u8';
+  if (/(^|[?&])type=(m3u8|hls)(\b|$)/i.test(lower)) return 'm3u8';
+  if (/\b(m3u8|m3u)\b/i.test(lower) || /\bhls\b/i.test(lower)) return 'm3u8';
+  // Some providers serve HLS playlists behind extensionless endpoints.
+  // Example: https://<host>/playlist/<id>?token=...&expires=...
+  if (/\/playlist\//i.test(lower) && (/(^|[?&])token=/.test(lower) || /(^|[?&])expires=/.test(lower))) return 'm3u8';
+
+  // DASH
+  if (/(\.|ext=)(mpd)(\b|$)/i.test(lower) || /\.mpd(\b|$)/i.test(lower)) return 'mpd';
+
+  // Progressive
+  if (/(\.|ext=)(mp4)(\b|$)/i.test(lower) || /\.mp4(\b|$)/i.test(lower)) return 'mp4';
   return undefined;
 };
 

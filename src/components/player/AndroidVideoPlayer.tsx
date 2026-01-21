@@ -737,6 +737,7 @@ const AndroidVideoPlayer: React.FC = () => {
         {!isTransitioningStream && (
           <VideoSurface
             processedStreamUrl={currentStreamUrl}
+            videoType={currentVideoType}
             headers={headers}
             volume={volume}
             playbackSpeed={speedControl.playbackSpeed}
