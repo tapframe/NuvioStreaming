@@ -19,18 +19,21 @@ export const usePlayerGestureControls = (config: GestureControlConfig) => {
   // State for overlays
   const [showVolumeOverlay, setShowVolumeOverlay] = useState(false);
   const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
+  const [showResizeModeOverlay, setShowResizeModeOverlay] = useState(false);
   
   // Animated values
   const volumeGestureTranslateY = useRef(new Animated.Value(0)).current;
   const brightnessGestureTranslateY = useRef(new Animated.Value(0)).current;
   const volumeOverlayOpacity = useRef(new Animated.Value(0)).current;
   const brightnessOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const resizeModeOverlayOpacity = useRef(new Animated.Value(0)).current;
   
   // Tracking refs
   const lastVolumeGestureY = useRef(0);
   const lastBrightnessGestureY = useRef(0);
   const volumeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
   const brightnessOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
+  const resizeModeOverlayTimeout = useRef<NodeJS.Timeout | null>(null);
   
   // Extract config with defaults and platform adjustments
   const volumeRange = config.volumeRange || { min: 0, max: 1 };
@@ -152,6 +155,30 @@ export const usePlayerGestureControls = (config: GestureControlConfig) => {
     if (brightnessOverlayTimeout.current) {
       clearTimeout(brightnessOverlayTimeout.current);
     }
+    if (resizeModeOverlayTimeout.current) {
+      clearTimeout(resizeModeOverlayTimeout.current);
+    }
+  };
+
+  const showResizeModeOverlayFn = (callback?: () => void) => {
+    if (resizeModeOverlayTimeout.current) {
+      clearTimeout(resizeModeOverlayTimeout.current);
+    }
+    setShowResizeModeOverlay(true);
+    Animated.timing(resizeModeOverlayOpacity, {
+      toValue: 1,
+      duration: 100,
+      useNativeDriver: true,
+    }).start(() => {
+      if (callback) callback();
+      resizeModeOverlayTimeout.current = setTimeout(() => {
+        Animated.timing(resizeModeOverlayOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => setShowResizeModeOverlay(false));
+      }, overlayTimeout);
+    });
   };
   
   return {
@@ -162,8 +189,13 @@ export const usePlayerGestureControls = (config: GestureControlConfig) => {
     // Overlay state
     showVolumeOverlay,
     showBrightnessOverlay,
+    showResizeModeOverlay,
     volumeOverlayOpacity,
     brightnessOverlayOpacity,
+    resizeModeOverlayOpacity,
+    
+    // Overlay functions
+    showResizeModeOverlayFn,
     
     // Cleanup
     cleanup,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import {
     TapGestureHandler,
     PanGestureHandler,
@@ -21,6 +21,7 @@ interface GestureControlsProps {
     volume: number;
     brightness: number;
     controlsTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
+    resizeMode?: string;
 }
 
 export const GestureControls: React.FC<GestureControlsProps> = ({
@@ -34,7 +35,8 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
     hideControls,
     volume,
     brightness,
-    controlsTimeout
+    controlsTimeout,
+    resizeMode = 'contain'
 }) => {
 
     const getVolumeIcon = (value: number) => {
@@ -151,42 +153,77 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
             {/* Volume/Brightness Pill Overlay */}
             {(gestureControls.showVolumeOverlay || gestureControls.showBrightnessOverlay) && (
                 <View style={localStyles.gestureIndicatorContainer}>
-                    <View
-                        style={[
-                            localStyles.iconWrapper,
-                            {
-                                backgroundColor: gestureControls.showVolumeOverlay && volume === 0
-                                    ? 'rgba(242, 184, 181)'
-                                    : 'rgba(59, 59, 59)'
-                            }
-                        ]}
-                    >
-                        <MaterialIcons
-                            name={
-                                gestureControls.showVolumeOverlay
-                                    ? getVolumeIcon(volume)
-                                    : getBrightnessIcon(brightness)
-                            }
-                            size={24}
-                            color={
-                                gestureControls.showVolumeOverlay && volume === 0
-                                    ? 'rgba(96, 20, 16)'
-                                    : 'rgba(255, 255, 255)'
-                            }
-                        />
-                    </View>
+                    <View style={localStyles.gestureIndicatorPill}>
+                        <View
+                            style={[
+                                localStyles.iconWrapper,
+                                {
+                                    backgroundColor: gestureControls.showVolumeOverlay && volume === 0
+                                        ? 'rgba(242, 184, 181)'
+                                        : 'rgba(59, 59, 59)'
+                                }
+                            ]}
+                        >
+                            <MaterialIcons
+                                name={
+                                    gestureControls.showVolumeOverlay
+                                        ? getVolumeIcon(volume)
+                                        : getBrightnessIcon(brightness)
+                                }
+                                size={24}
+                                color={
+                                    gestureControls.showVolumeOverlay && volume === 0
+                                        ? 'rgba(96, 20, 16)'
+                                        : 'rgba(255, 255, 255)'
+                                }
+                            />
+                        </View>
 
-                    <Text
+                        <Text
+                            style={[
+                                localStyles.gestureText,
+                                gestureControls.showVolumeOverlay && volume === 0 && { color: 'rgba(242, 184, 181)' }
+                            ]}
+                        >
+                            {gestureControls.showVolumeOverlay && volume === 0
+                                ? "Muted"
+                                : `${Math.round((gestureControls.showVolumeOverlay ? volume : brightness) * 100)}%`
+                            }
+                        </Text>
+                    </View>
+                </View>
+            )}
+
+            {/* Aspect Ratio Overlay */}
+            {gestureControls.showResizeModeOverlay && (
+                <View style={localStyles.gestureIndicatorContainer}>
+                    <Animated.View
                         style={[
-                            localStyles.gestureText,
-                            gestureControls.showVolumeOverlay && volume === 0 && { color: 'rgba(242, 184, 181)' }
+                            localStyles.gestureIndicatorPill,
+                            { opacity: gestureControls.resizeModeOverlayOpacity }
                         ]}
                     >
-                        {gestureControls.showVolumeOverlay && volume === 0
-                            ? "Muted"
-                            : `${Math.round((gestureControls.showVolumeOverlay ? volume : brightness) * 100)}%`
-                        }
-                    </Text>
+                        <View
+                            style={[
+                                localStyles.iconWrapper,
+                                {
+                                    backgroundColor: 'rgba(59, 59, 59)'
+                                }
+                            ]}
+                        >
+                            <MaterialIcons
+                                name="aspect-ratio"
+                                size={24}
+                                color="rgba(255, 255, 255)"
+                            />
+                        </View>
+
+                        <Text
+                            style={localStyles.gestureText}
+                        >
+                            {resizeMode.charAt(0).toUpperCase() + resizeMode.slice(1)}
+                        </Text>
+                    </Animated.View>
                 </View>
             )}
         </>

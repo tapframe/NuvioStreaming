@@ -704,9 +704,21 @@ const AndroidVideoPlayer: React.FC = () => {
   }, []);
 
   const cycleResizeMode = useCallback(() => {
-    if (playerState.resizeMode === 'contain') playerState.setResizeMode('cover');
-    else playerState.setResizeMode('contain');
-  }, [playerState.resizeMode]);
+    gestureControls.showResizeModeOverlayFn(() => {
+      switch (playerState.resizeMode) {
+        case 'contain':
+          playerState.setResizeMode('cover');
+          break;
+        case 'cover':
+          playerState.setResizeMode('stretch');
+          break;
+        case 'stretch':
+        default:
+          playerState.setResizeMode('contain');
+          break;
+      }
+    });
+  }, [playerState.resizeMode, gestureControls.showResizeModeOverlayFn]);
 
   // Memoize selectedTextTrack to prevent unnecessary re-renders
   const memoizedSelectedTextTrack = useMemo(() => {
@@ -861,6 +873,8 @@ const AndroidVideoPlayer: React.FC = () => {
           volume={volume}
           brightness={brightness}
           controlsTimeout={controlsTimeout}
+          resizeMode={playerState.resizeMode}
+          resizeMode={playerState.resizeMode}
         />
 
         <PlayerControls

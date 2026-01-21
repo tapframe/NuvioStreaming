@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import {
     TapGestureHandler,
     PanGestureHandler,
@@ -21,6 +21,7 @@ interface GestureControlsProps {
     volume: number;
     brightness: number;
     controlsTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
+    resizeMode?: string;
 }
 
 export const GestureControls: React.FC<GestureControlsProps> = ({
@@ -34,7 +35,8 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
     hideControls,
     volume,
     brightness,
-    controlsTimeout
+    controlsTimeout,
+    resizeMode = 'contain'
 }) => {
 
     const getVolumeIcon = (value: number) => {
@@ -192,6 +194,29 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
                             }
                         </Text>
                     </View>
+                </View>
+            )}
+
+            {gestureControls.showResizeModeOverlay && (
+                <View style={localStyles.gestureIndicatorContainer}>
+                    <Animated.View
+                        style={[
+                            localStyles.gestureIndicatorPill,
+                            { opacity: gestureControls.resizeModeOverlayOpacity }
+                        ]}
+                    >
+                        <View style={localStyles.iconWrapper}>
+                            <MaterialIcons
+                                name="aspect-ratio"
+                                size={18}
+                                color={'rgba(255, 255, 255, 0.9)'}
+                            />
+                        </View>
+
+                        <Text style={localStyles.gestureText}>
+                            {resizeMode.charAt(0).toUpperCase() + resizeMode.slice(1)}
+                        </Text>
+                    </Animated.View>
                 </View>
             )}
         </>
