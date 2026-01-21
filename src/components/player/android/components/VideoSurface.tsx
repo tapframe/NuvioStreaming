@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { PinchGestureHandler } from 'react-native-gesture-handler';
 import Video, { VideoRef, SelectedTrack, SelectedVideoTrack, ResizeMode } from 'react-native-video';
@@ -7,28 +7,14 @@ import { styles } from '../../utils/playerStyles';
 import { ResizeModeType } from '../../utils/playerTypes';
 import { logger } from '../../../../utils/logger';
 
-// Codec error patterns that indicate we should fallback to MPV
+
 const CODEC_ERROR_PATTERNS = [
-    'exceeds_capabilities',
-    'no_exceeds_capabilities',
-    'decoder_exception',
-    'decoder.*error',
-    'codec.*error',
-    'unsupported.*codec',
-    'mediacodec.*exception',
-    'omx.*error',
-    'dolby.*vision',
-    'hevc.*error',
-    'no suitable decoder',
-    'decoder initialization failed',
-    'format.no_decoder',
-    'no_decoder',
-    'decoding_failed',
-    'error_code_decoding',
-    'exoplaybackexception',
-    'mediacodecvideodecoder',
-    'mediacodecvideodecoderexception',
-    'decoder failed',
+    'exceeds_capabilities', 'no_exceeds_capabilities', 'decoder_exception',
+    'decoder.*error', 'codec.*error', 'unsupported.*codec',
+    'mediacodec.*exception', 'omx.*error', 'dolby.*vision', 'hevc.*error',
+    'no suitable decoder', 'decoder initialization failed',
+    'format.no_decoder', 'no_decoder', 'decoding_failed', 'error_code_decoding',
+    'mediacodecvideodecoder', 'mediacodecvideodecoderexception', 'decoder failed',
 ];
 
 interface VideoSurfaceProps {
@@ -135,7 +121,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     subtitleDelay,
     subtitleAlignment,
 }) => {
-    // Use the actual stream URL
     const streamUrl = currentStreamUrl || processedStreamUrl;
 
     const normalizeRnVideoType = (t?: string): 'm3u8' | 'mpd' | undefined => {
@@ -149,22 +134,55 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     const inferRnVideoTypeFromUrl = (url?: string): 'm3u8' | 'mpd' | undefined => {
         if (!url) return undefined;
         const lower = url.toLowerCase();
-        // Strong signals
         if (/\.m3u8(\b|$)/i.test(lower) || /(^|[?&])type=(m3u8|hls)(\b|$)/i.test(lower)) return 'm3u8';
         if (/\.mpd(\b|$)/i.test(lower) || /(^|[?&])type=(mpd|dash)(\b|$)/i.test(lower)) return 'mpd';
 
-        // Heuristics for providers that serve HLS behind extensionless endpoints.
         if (/\b(hls|m3u8|m3u)\b/i.test(lower)) return 'm3u8';
         if (/\/playlist\//i.test(lower) && (/(^|[?&])token=/.test(lower) || /(^|[?&])expires=/.test(lower))) return 'm3u8';
 
-        // Common fallback keywords
         if (/\bdash\b/i.test(lower) || /manifest/.test(lower)) return 'mpd';
         return undefined;
     };
 
     const resolvedRnVideoType = normalizeRnVideoType(videoType) ?? inferRnVideoTypeFromUrl(streamUrl);
 
-    // ========== MPV Handlers ==========
+    const probeHlsResponse = useCallback(async (url: string) => {
+        try {
+            const res = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-2047' } });
+            const text = await res.text();
+            const prefix = text.slice(0, 200).replace(/\s+/g, ' ').trim();
+            console.log('[VideoSurface] Manifest probe:', {
+                status: res.status,
+                contentType: res.headers.get('content-type'),
+                contentEncoding: res.headers.get('content-encoding'),
+                prefix,
+            });
+        } catch (e: any) {
+            console.log('[VideoSurface] Manifest probe failed:', e?.message);
+        }
+    }, []);
+
+    const exoRequestHeaders = (() => {
+        const merged = { ...(headers ?? {}) } as Record<string, string>;
+        const hasUA = Object.keys(merged).some(k => k.toLowerCase() === 'user-agent');
+        if (!hasUA && resolvedRnVideoType === 'm3u8') {
+            merged['User-Agent'] = 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
+            merged['Accept'] = '*/*';
+        }
+        return merged;
+    })();
+
+    const exoRequestHeadersArray = Object.entries(exoRequestHeaders).map(([key, value]) => ({ key, value }));
+
+    const lastLoggedExoRequestKeyRef = useRef<string>('');
+    useEffect(() => {
+        if (!__DEV__ || !useExoPlayer) return;
+        const key = `${streamUrl}::${JSON.stringify(exoRequestHeaders)}`;
+        if (lastLoggedExoRequestKeyRef.current === key) return;
+        lastLoggedExoRequestKeyRef.current = key;
+        console.log('[VideoSurface] Headers:', exoRequestHeaders);
+    }, [streamUrl, useExoPlayer, exoRequestHeaders]);
+
     const handleMpvLoad = (data: { duration: number; width: number; height: number }) => {
         console.log('[VideoSurface] MPV onLoad received:', data);
         onLoad({
@@ -197,31 +215,18 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
         onEnd();
     };
 
-    // ========== ExoPlayer Handlers ==========
     const handleExoLoad = (data: any) => {
-        console.log('[VideoSurface] ExoPlayer onLoad received:', data);
-        console.log('[VideoSurface] ExoPlayer textTracks raw:', JSON.stringify(data.textTracks, null, 2));
-
-        // Extract track information
-        // IMPORTANT:
-        // react-native-video expects selected*Track with { type: 'index', value: <0-based array index> }.
-        // Some RNVideo/Exo track objects expose `index`, but it is not guaranteed to be unique or
-        // aligned with the list index. Using it can cause only the first item to render/select.
         const audioTracks = data.audioTracks?.map((t: any, i: number) => ({
             id: i,
             name: t.title || t.language || `Track ${i + 1}`,
             language: t.language,
         })) ?? [];
 
-        const subtitleTracks = data.textTracks?.map((t: any, i: number) => {
-            const track = {
-                id: i,
-                name: t.title || t.language || `Track ${i + 1}`,
-                language: t.language,
-            };
-            console.log('[VideoSurface] Mapped subtitle track:', track, 'original:', t);
-            return track;
-        }) ?? [];
+        const subtitleTracks = data.textTracks?.map((t: any, i: number) => ({
+            id: i,
+            name: t.title || t.language || `Track ${i + 1}`,
+            language: t.language,
+        })) ?? [];
 
         if (onTracksChanged && (audioTracks.length > 0 || subtitleTracks.length > 0)) {
             onTracksChanged({ audioTracks, subtitleTracks });
@@ -243,45 +248,26 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     };
 
     const handleExoError = (error: any) => {
-        console.log('[VideoSurface] ExoPlayer onError received:', JSON.stringify(error, null, 2));
-
-        // Extract error string - try multiple paths
-        let errorString = 'Unknown error';
+        // Extract error message from multiple possible paths
         const errorParts: string[] = [];
+        if (typeof error?.error === 'string') errorParts.push(error.error);
+        if (error?.error?.errorString) errorParts.push(error.error.errorString);
+        if (error?.error?.errorCode) errorParts.push(String(error.error.errorCode));
+        if (typeof error === 'string') errorParts.push(error);
+        if (error?.nativeStackAndroid) errorParts.push(error.nativeStackAndroid.join(' '));
+        if (error?.message) errorParts.push(error.message);
+        const errorString = errorParts.length > 0 ? errorParts.join(' ') : JSON.stringify(error);
 
-        if (typeof error?.error === 'string') {
-            errorParts.push(error.error);
-        }
-        if (error?.error?.errorString) {
-            errorParts.push(error.error.errorString);
-        }
-        if (error?.error?.errorCode) {
-            errorParts.push(String(error.error.errorCode));
-        }
-        if (typeof error === 'string') {
-            errorParts.push(error);
-        }
-        if (error?.nativeStackAndroid) {
-            errorParts.push(error.nativeStackAndroid.join(' '));
-        }
-        if (error?.message) {
-            errorParts.push(error.message);
-        }
-
-        // Combine all error parts for comprehensive checking
-        errorString = errorParts.length > 0 ? errorParts.join(' ') : JSON.stringify(error);
-
-        console.log('[VideoSurface] Extracted error string:', errorString);
-        console.log('[VideoSurface] isCodecError result:', isCodecError(errorString));
-
-        // Check if this is a codec error that should trigger fallback
         if (isCodecError(errorString)) {
-            logger.warn('[VideoSurface] ExoPlayer codec error detected, triggering MPV fallback:', errorString);
+            logger.warn('[VideoSurface] Codec error → MPV fallback:', errorString);
             onCodecError?.();
-            return; // Don't propagate codec errors - we're falling back silently
+            return;
         }
 
-        // Non-codec errors should be propagated
+        if (__DEV__ && (errorString.includes('ERROR_CODE_PARSING_MANIFEST_MALFORMED') || errorString.includes('23002'))) {
+            probeHlsResponse(streamUrl);
+        }
+
         onError({
             error: {
                 errorString: errorString,
@@ -302,7 +288,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
         onSeek({ currentTime: data.currentTime });
     };
 
-    // Map ResizeModeType to react-native-video ResizeMode
     const getExoResizeMode = (): ResizeMode => {
         switch (resizeMode) {
             case 'cover':
@@ -331,9 +316,10 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     ref={exoPlayerRef}
                     source={{
                         uri: streamUrl,
-                        headers: headers,
+                        headers: exoRequestHeaders,
+                        requestHeaders: exoRequestHeadersArray,
                         ...(resolvedRnVideoType ? { type: resolvedRnVideoType } : null),
-                    }}
+                    } as any}
                     paused={paused}
                     volume={volume}
                     rate={playbackSpeed}
@@ -353,39 +339,18 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     ignoreSilentSwitch="ignore"
                     automaticallyWaitsToMinimizeStalling={true}
                     useTextureView={true}
-                    // Subtitle Styling for ExoPlayer
-                    // ExoPlayer (via our patched react-native-video) supports:
-                    // - fontSize, paddingTop/Bottom/Left/Right, opacity, subtitlesFollowVideo
-                    // - PLUS: textColor, backgroundColor, edgeType, edgeColor (outline/shadow)
                     subtitleStyle={{
-                        // Convert MPV-scaled size back to UI size (AndroidVideoPlayer passes MPV-scaled values here)
                         fontSize: subtitleSize ? Math.round(subtitleSize / 1.5) : 28,
                         paddingTop: 0,
-                        // IMPORTANT:
-                        // Use the same unit as external subtitles (RN CustomSubtitles uses dp bottomOffset directly).
-                        // Using MPV's subtitlePosition mapping makes internal/external offsets feel inconsistent.
                         paddingBottom: Math.max(0, Math.round(subtitleBottomOffset ?? 0)),
                         paddingLeft: 16,
                         paddingRight: 16,
-                        // Opacity controls entire subtitle view visibility
-                        // Always keep text visible (opacity 1), background control is limited in ExoPlayer
                         opacity: 1,
                         subtitlesFollowVideo: false,
-                        // Extended styling (requires our patched RNVideo on Android)
                         textColor: subtitleColor || '#FFFFFFFF',
-                        // Android Color.parseColor doesn't accept rgba(...). Use #AARRGGBB.
-                        backgroundColor:
-                            subtitleBackgroundOpacity && subtitleBackgroundOpacity > 0
-                                ? `#${alphaHex(subtitleBackgroundOpacity)}000000`
-                                : '#00000000',
-                        edgeType:
-                            subtitleBorderSize && subtitleBorderSize > 0
-                                ? 'outline'
-                                : (subtitleShadowEnabled ? 'shadow' : 'none'),
-                        edgeColor:
-                            (subtitleBorderSize && subtitleBorderSize > 0 && subtitleBorderColor)
-                                ? subtitleBorderColor
-                                : (subtitleShadowEnabled ? '#FF000000' : 'transparent'),
+                        backgroundColor: subtitleBackgroundOpacity && subtitleBackgroundOpacity > 0 ? `#${alphaHex(subtitleBackgroundOpacity)}000000` : '#00000000',
+                        edgeType: subtitleBorderSize && subtitleBorderSize > 0 ? 'outline' : (subtitleShadowEnabled ? 'shadow' : 'none'),
+                        edgeColor: (subtitleBorderSize && subtitleBorderSize > 0 && subtitleBorderColor) ? subtitleBorderColor : (subtitleShadowEnabled ? '#FF000000' : 'transparent'),
                     } as any}
                 />
             ) : (
@@ -406,7 +371,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     onTracksChanged={onTracksChanged}
                     decoderMode={decoderMode}
                     gpuMode={gpuMode}
-                    // Subtitle Styling
                     subtitleSize={subtitleSize}
                     subtitleColor={subtitleColor}
                     subtitleBackgroundOpacity={subtitleBackgroundOpacity}
@@ -419,7 +383,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                 />
             )}
 
-            {/* Gesture overlay - transparent, on top of the player */}
             <PinchGestureHandler
                 ref={pinchRef}
                 onGestureEvent={onPinchGestureEvent}
