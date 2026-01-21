@@ -6,6 +6,12 @@ import { Stream } from '../types/streams';
 import { cacheService } from './cacheService';
 import CryptoJS from 'crypto-js';
 
+const MAX_CONCURRENT_SCRAPERS = 5;
+const MAX_INFLIGHT_KEYS = 30;
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
+const MAX_RESULT_ITEMS = 150;
+const SCRAPER_BATCH_DELAY_MS = 25;
+
 // Types for local scrapers
 export interface ScraperManifest {
   name: string;
@@ -1086,17 +1092,24 @@ class LocalScraperService {
       return;
     }
 
-    logger.log(`[LocalScraperService] Executing ${enabledScrapers.length} scrapers for ${media}:${tmdbId}`, {
-      scrapers: enabledScrapers.map(s => s.name)
-    });
+    logger.log(`[LocalScraperService] Executing ${enabledScrapers.length} scrapers for ${media}:${tmdbId}`);
 
     // Generate a lightweight request id for tracing
     const requestId = `rs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 
-    // Execute all enabled scrapers
-    for (const scraper of enabledScrapers) {
-      this.executeScraper(scraper, media, tmdbId, season, episode, callback, requestId);
-    }
+    const executeBatch = async (scrapers: ScraperInfo[], batchSize: number) => {
+      for (let i = 0; i < scrapers.length; i += batchSize) {
+        const batch = scrapers.slice(i, i + batchSize);
+        batch.forEach(scraper => {
+          this.executeScraper(scraper, media, tmdbId, season, episode, callback, requestId);
+        });
+        if (i + batchSize < scrapers.length) {
+          await new Promise(r => setTimeout(r, SCRAPER_BATCH_DELAY_MS));
+        }
+      }
+    };
+
+    executeBatch(enabledScrapers, MAX_CONCURRENT_SCRAPERS);
   }
 
   // Execute individual scraper
@@ -1121,6 +1134,11 @@ class LocalScraperService {
       // Build single-flight key
       const flightKey = `${scraper.id}|${type}|${tmdbId}|${season ?? ''}|${episode ?? ''}`;
 
+      if (this.inFlightByKey.size >= MAX_INFLIGHT_KEYS) {
+        const firstKey = this.inFlightByKey.keys().next().value;
+        if (firstKey) this.inFlightByKey.delete(firstKey);
+      }
+
       // Create a sandboxed execution environment with single-flight coalescing
       let promise: Promise<LocalScraperResult[]>;
       if (this.inFlightByKey.has(flightKey)) {
@@ -1143,7 +1161,11 @@ class LocalScraperService {
         }).catch(() => { });
       }
 
-      const results = await promise;
+      let results = await promise;
+
+      if (Array.isArray(results) && results.length > MAX_RESULT_ITEMS) {
+        results = results.slice(0, MAX_RESULT_ITEMS);
+      }
 
       // Convert results to Nuvio Stream format
       const streams = this.convertToStreams(results, scraper);
@@ -1205,6 +1227,54 @@ class LocalScraperService {
       const MOVIEBOX_PRIMARY_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY;
       const MOVIEBOX_TMDB_API_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_TMDB_API_KEY || '439c478a771f35c05022f9feabcca01c';
 
+      const sandboxedAxios = {
+        get: async (url: string, config?: any) => {
+          return axios.get(url, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        post: async (url: string, data?: any, config?: any) => {
+          return axios.post(url, data, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        put: async (url: string, data?: any, config?: any) => {
+          return axios.put(url, data, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        delete: async (url: string, config?: any) => {
+          return axios.delete(url, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        request: async (config: any) => {
+          return axios.request({
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        create: (config?: any) => axios.create({
+          ...config,
+          maxContentLength: MAX_RESPONSE_SIZE,
+          maxBodyLength: MAX_RESPONSE_SIZE,
+        }),
+      };
+
       // Custom require function for backward compatibility with existing plugins
       const pluginRequire = (moduleName: string): any => {
         switch (moduleName) {
@@ -1216,7 +1286,7 @@ class LocalScraperService {
           case 'crypto-js':
             return CryptoJS;
           case 'axios':
-            return axios;
+            return sandboxedAxios;
           default:
             throw new Error(`Module '${moduleName}' is not available in plugins`);
         }
@@ -1331,7 +1401,7 @@ class LocalScraperService {
             moduleObj,
             moduleExports,
             pluginRequire,
-            axios,
+            sandboxedAxios,
             polyfilledFetch,  // Use polyfilled fetch for redirect: manual support
             CryptoJS,
             cheerio,
