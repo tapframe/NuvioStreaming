@@ -236,8 +236,8 @@ const CalendarScreen = () => {
   const allEpisodes = React.useMemo(() => {
     if (!uiReady) return [] as CalendarEpisode[];
     const episodes = calendarData.reduce((acc: CalendarEpisode[], section: CalendarSection) => {
-      // Pre-trim section arrays defensively
-      const trimmed = memoryManager.limitArraySize(section.data, 500);
+      
+      const trimmed = memoryManager.limitArraySize(section.data.filter(ep => ep.season !== 0), 500);
       return acc.length > 1500 ? acc : [...acc, ...trimmed];
     }, [] as CalendarEpisode[]);
     // Global cap to keep memory bounded

@@ -142,7 +142,8 @@ export const ThisWeekSection = React.memo(() => {
     if (!thisWeekSection) return [];
 
     // Get raw episodes (limit to 60 to be safe for performance but allow grouping)
-    const rawEpisodes = memoryManager.limitArraySize(thisWeekSection.data, 60);
+    
+    const rawEpisodes = memoryManager.limitArraySize(thisWeekSection.data.filter(ep => ep.season !== 0), 60);
 
     // Group by series and date
     const groups: Record<string, typeof rawEpisodes> = {};
