@@ -2165,7 +2165,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(400)}
       style={styles.container}
     >
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
@@ -2304,7 +2305,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           )}
         </BottomSheetView>
       </BottomSheetModal>
-    </View>
+    </Animated.View>
   );
 });
 

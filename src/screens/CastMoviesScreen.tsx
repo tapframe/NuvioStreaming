@@ -40,7 +40,8 @@ import CustomAlert from '../components/CustomAlert';
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
 const numColumns = isTablet ? 4 : 3;
-const posterWidth = (width - 60 - (numColumns - 1) * 12) / numColumns;
+const HORIZONTAL_PADDING = 20;
+const posterWidth = (width - (HORIZONTAL_PADDING * 2) - (numColumns - 1) * 12) / numColumns;
 const posterHeight = posterWidth * 1.5;
 
 interface CastMovie {

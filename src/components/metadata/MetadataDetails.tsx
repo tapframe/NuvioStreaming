@@ -110,26 +110,32 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
     checkMDBListEnabled();
   }, []);
 
-  const handleTextLayout = (event: any) => {
-    const { lines } = event.nativeEvent;
-    // If we have 3 or more lines, it means the text was truncated
-    setIsTextTruncated(lines.length >= 3);
-  };
+
 
   const handleCollapsedTextLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
-    setMeasuredHeights(prev => ({ ...prev, collapsed: height }));
-    // Only set initial measurement flag once we have a valid height
+    setMeasuredHeights(prev => {
+      const newHeights = { ...prev, collapsed: height };
+      if (newHeights.expanded > 0 && height > 0) {
+        setIsTextTruncated(newHeights.expanded > height);
+      }
+      return newHeights;
+    });
     if (height > 0 && !hasInitialMeasurement) {
       setHasInitialMeasurement(true);
-      // Update animated height immediately without animation for first measurement
       animatedHeight.value = height;
     }
   };
 
   const handleExpandedTextLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
-    setMeasuredHeights(prev => ({ ...prev, expanded: height }));
+    setMeasuredHeights(prev => {
+      const newHeights = { ...prev, expanded: height };
+      if (newHeights.collapsed > 0 && height > 0) {
+        setIsTextTruncated(height > newHeights.collapsed);
+      }
+      return newHeights;
+    });
   };
 
   // Animate height changes
@@ -382,7 +388,6 @@ const MetadataDetails: React.FC<MetadataDetailsProps> = ({
                   }
                 ]}
                 numberOfLines={isFullDescriptionOpen ? undefined : 3}
-                onTextLayout={handleTextLayout}
               >
                 {metadata.description}
               </Text>

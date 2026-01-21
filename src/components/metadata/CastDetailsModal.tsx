@@ -33,7 +33,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-  withSpring,
   runOnJS,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -83,7 +82,7 @@ export const CastDetailsModal: React.FC<CastDetailsModalProps> = ({
   useEffect(() => {
     if (visible && castMember) {
       modalOpacity.value = withTiming(1, { duration: 250 });
-      modalScale.value = withSpring(1, { damping: 20, stiffness: 200 });
+      modalScale.value = withTiming(1, { duration: 250 });
 
       if (!hasFetched || personDetails?.id !== castMember.id) {
         fetchPersonDetails();
