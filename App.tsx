@@ -18,6 +18,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens, enableFreeze } from 'react-native-screens';
 import AppNavigator, {
   CustomNavigationDarkTheme,
@@ -213,23 +214,25 @@ const ThemedApp = () => {
 
 function App(): React.JSX.Element {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <GenreProvider>
-          <CatalogProvider>
-            <TraktProvider>
-              <ThemeProvider>
-                <TrailerProvider>
-                  <ToastProvider>
-                    <ThemedApp />
-                  </ToastProvider>
-                </TrailerProvider>
-              </ThemeProvider>
-            </TraktProvider>
-          </CatalogProvider>
-        </GenreProvider>
-      </BottomSheetModalProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <BottomSheetModalProvider>
+          <GenreProvider>
+            <CatalogProvider>
+              <TraktProvider>
+                <ThemeProvider>
+                  <TrailerProvider>
+                    <ToastProvider>
+                      <ThemedApp />
+                    </ToastProvider>
+                  </TrailerProvider>
+                </ThemeProvider>
+              </TraktProvider>
+            </CatalogProvider>
+          </GenreProvider>
+        </BottomSheetModalProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 

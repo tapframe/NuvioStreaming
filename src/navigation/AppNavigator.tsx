@@ -761,7 +761,7 @@ const MainTabs = () => {
         bottom: 0,
         left: 0,
         right: 0,
-        height: Platform.OS === 'android' ? 70 + insets.bottom : 85 + insets.bottom,
+        height: Platform.OS === 'android' ? 70 : 85 + insets.bottom,
         backgroundColor: 'transparent',
         overflow: 'hidden',
       }}>
@@ -811,7 +811,7 @@ const MainTabs = () => {
         <View
           style={{
             height: '100%',
-            paddingBottom: Platform.OS === 'android' ? 15 + insets.bottom : 20 + insets.bottom,
+            paddingBottom: Platform.OS === 'android' ? 15 : 20 + insets.bottom,
             paddingTop: Platform.OS === 'android' ? 8 : 12,
             backgroundColor: 'transparent',
           }}
@@ -1232,7 +1232,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
   }, []);
 
   return (
-    <SafeAreaProvider>
+    <>
       <StatusBar
         translucent
         backgroundColor="transparent"
@@ -1242,6 +1242,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
         <View style={{
           flex: 1,
           backgroundColor: currentTheme.colors.darkBackground,
+          paddingBottom: insets.bottom, // Respect safe area bottom for Android nav bar and iOS home indicator
           ...(Platform.OS === 'android' && {
             // Prevent white flashes on Android
             opacity: 1,
@@ -1852,7 +1853,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
           </Stack.Navigator>
         </View>
       </PaperProvider>
-    </SafeAreaProvider>
+    </>
   );
 };
 
