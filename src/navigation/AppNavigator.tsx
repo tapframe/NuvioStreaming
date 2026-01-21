@@ -1242,8 +1242,8 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
         <View style={{
           flex: 1,
           backgroundColor: currentTheme.colors.darkBackground,
-          paddingBottom: insets.bottom, // Respect safe area bottom for Android nav bar and iOS home indicator
           ...(Platform.OS === 'android' && {
+            paddingBottom: insets.bottom, // Respect safe area bottom for Android nav bar
             // Prevent white flashes on Android
             opacity: 1,
           })

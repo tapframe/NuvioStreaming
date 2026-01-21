@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nuvio",
     "slug": "nuvio",
-    "version": "1.3.5",
+    "version": "1.3.6",
     "orientation": "default",
     "backgroundColor": "#020404",
     "icon": "./assets/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
@@ -97,6 +97,6 @@
       "fallbackToCacheTimeout": 30000,
       "url": "https://ota.nuvioapp.space/api/manifest"
     },
-    "runtimeVersion": "1.3.5"
+    "runtimeVersion": "1.3.6"
   }
 }
