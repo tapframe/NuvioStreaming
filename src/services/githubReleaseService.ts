@@ -6,6 +6,13 @@ export interface GithubReleaseInfo {
   body?: string;
   html_url?: string;
   published_at?: string;
+  assets?: Array<{
+    name: string;
+    browser_download_url: string;
+    content_type: string;
+    size: number;
+    download_count: number;
+  }>;
 }
 
 const GITHUB_LATEST_RELEASE_URL = 'https://api.github.com/repos/tapframe/NuvioStreaming/releases/latest';
@@ -27,6 +34,7 @@ export async function fetchLatestGithubRelease(): Promise<GithubReleaseInfo | nu
       body: json.body,
       html_url: json.html_url,
       published_at: json.published_at,
+      assets: json.assets,
     };
   } catch {
     return null;
@@ -69,7 +77,7 @@ export async function fetchTotalDownloads(): Promise<number | null> {
     });
     if (!res.ok) return null;
     const releases = await res.json();
-    
+
     let total = 0;
     releases.forEach((release: any) => {
       if (release.assets && Array.isArray(release.assets)) {
@@ -78,7 +86,7 @@ export async function fetchTotalDownloads(): Promise<number | null> {
         });
       }
     });
-    
+
     return total;
   } catch {
     return null;
@@ -102,12 +110,12 @@ export async function fetchContributors(): Promise<GitHubContributor[] | null> {
         'User-Agent': `Nuvio/${Platform.OS}`,
       },
     });
-    
+
     if (!res.ok) {
       if (__DEV__) console.error('GitHub API error:', res.status, res.statusText);
       return null;
     }
-    
+
     const contributors = await res.json();
     return contributors;
   } catch (error) {

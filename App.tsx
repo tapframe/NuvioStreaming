@@ -11,7 +11,8 @@ import {
   StyleSheet,
   I18nManager,
   Platform,
-  LogBox
+  LogBox,
+  Linking
 } from 'react-native';
 import './src/i18n'; // Initialize i18n
 import { NavigationContainer } from '@react-navigation/native';
@@ -104,6 +105,45 @@ const ThemedApp = () => {
 
   // GitHub major/minor release overlay
   const githubUpdate = useGithubMajorUpdate();
+  const [isDownloadingGitHub, setIsDownloadingGitHub] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  const handleGithubUpdateAction = async () => {
+    console.log('handleGithubUpdateAction triggered. Release data exists:', !!githubUpdate.releaseData);
+    if (Platform.OS === 'android') {
+      setIsDownloadingGitHub(true);
+      setDownloadProgress(0);
+      try {
+        const { default: AndroidUpdateService } = await import('./src/services/androidUpdateService');
+        if (githubUpdate.releaseData) {
+          console.log('Calling AndroidUpdateService with:', githubUpdate.releaseData.tag_name);
+          const success = await AndroidUpdateService.downloadAndInstallUpdate(
+            githubUpdate.releaseData,
+            (progress) => {
+              setDownloadProgress(progress);
+            }
+          );
+          console.log('AndroidUpdateService result:', success);
+          if (!success) {
+            console.log('Update failed, falling back to browser');
+            // If download fails or no APK found, fallback to browser
+            if (githubUpdate.releaseUrl) Linking.openURL(githubUpdate.releaseUrl);
+          }
+        } else if (githubUpdate.releaseUrl) {
+          console.log('No release data, falling back to browser');
+          Linking.openURL(githubUpdate.releaseUrl);
+        }
+      } catch (error) {
+        console.error('Failed to update via Android service', error);
+        if (githubUpdate.releaseUrl) Linking.openURL(githubUpdate.releaseUrl);
+      } finally {
+        setIsDownloadingGitHub(false);
+        setDownloadProgress(0);
+      }
+    } else {
+      if (githubUpdate.releaseUrl) Linking.openURL(githubUpdate.releaseUrl);
+    }
+  };
 
   // Check onboarding status and initialize services
   useEffect(() => {
@@ -202,6 +242,9 @@ const ThemedApp = () => {
                 releaseUrl={githubUpdate.releaseUrl}
                 onDismiss={githubUpdate.onDismiss}
                 onLater={githubUpdate.onLater}
+                onUpdateAction={handleGithubUpdateAction}
+                isDownloading={isDownloadingGitHub}
+                downloadProgress={downloadProgress}
               />
               <CampaignManager />
             </View>

@@ -230,13 +230,48 @@ const UpdateScreen: React.FC = () => {
     }
   }, []);
 
-  const installUpdate = async () => {
+  const installUpdate = async (options?: { forceGithub?: boolean }) => {
     try {
       setIsInstalling(true);
       setUpdateStatus('downloading');
       setUpdateProgress(0);
       setLastOperation(t('updates.status_downloading'));
 
+      const forceGithub = options?.forceGithub === true;
+
+      // If it's a GitHub release update
+      if ((updateInfo?.source === 'github' || forceGithub) && Platform.OS === 'android') {
+        const { default: AndroidUpdateService } = await import('../services/androidUpdateService');
+
+        // We need the full release info with assets
+        const fullRelease = await import('../services/githubReleaseService').then(m => m.fetchLatestGithubRelease());
+
+        if (!fullRelease || !fullRelease.assets) {
+          throw new Error('Could not fetch release assets');
+        }
+
+        setLastOperation('Downloading APK...');
+        // Note: Progress is not currently supported by FileSystem.downloadAsync in the simple way
+        // We'll simulate it for now or implement a more complex downloader later if needed
+        const success = await AndroidUpdateService.downloadAndInstallUpdate(
+          fullRelease,
+          (progress) => {
+            setUpdateProgress(progress * 100);
+          }
+        );
+
+        if (success) {
+          setUpdateProgress(100);
+          setUpdateStatus('success');
+          setLastOperation(t('updates.status_success'));
+          // No alert needed, system installer takes over
+        } else {
+          throw new Error('Download or installation failed');
+        }
+        return;
+      }
+
+      // Fallback for OTA / Expo Updates
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setUpdateProgress(prev => {
@@ -509,7 +544,7 @@ const UpdateScreen: React.FC = () => {
                       { backgroundColor: currentTheme.colors.success || '#34C759' },
                       (isInstalling) && styles.disabledAction
                     ]}
-                    onPress={installUpdate}
+                    onPress={() => installUpdate()}
                     disabled={isInstalling}
                     activeOpacity={0.8}
                   >
@@ -634,6 +669,23 @@ const UpdateScreen: React.FC = () => {
 
                 <View style={[styles.actionSection, { marginTop: 8 }]}>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
+                    {Platform.OS === 'android' && (
+                      <TouchableOpacity
+                        style={[styles.modernButton, { backgroundColor: currentTheme.colors.success || '#34C759', flex: 1 }]}
+                        onPress={() => installUpdate({ forceGithub: true })}
+                        disabled={isInstalling}
+                        activeOpacity={0.8}
+                      >
+                        {isInstalling ? (
+                          <MaterialIcons name="downloading" size={18} color="white" />
+                        ) : (
+                          <MaterialIcons name="system-update" size={18} color="white" />
+                        )}
+                        <Text style={styles.modernButtonText}>
+                          {isInstalling ? `${t('updates.status_downloading')}...` : t('updates.action_install')}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity
                       style={[styles.modernButton, { backgroundColor: currentTheme.colors.primary, flex: 1 }]}
                       onPress={() => github.releaseUrl ? Linking.openURL(github.releaseUrl as string) : null}

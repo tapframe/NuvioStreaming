@@ -7,11 +7,14 @@ import { fetchLatestGithubRelease, isAnyUpgrade } from '../services/githubReleas
 
 const DISMISSED_KEY = '@github_major_update_dismissed_version';
 
+import { GithubReleaseInfo } from '../services/githubReleaseService';
+
 export interface MajorUpdateData {
   visible: boolean;
   latestTag?: string;
   releaseNotes?: string;
   releaseUrl?: string;
+  releaseData?: GithubReleaseInfo;
   onDismiss: () => void;
   onLater: () => void;
   refresh: () => void;
@@ -22,6 +25,7 @@ export function useGithubMajorUpdate(): MajorUpdateData {
   const [latestTag, setLatestTag] = useState<string | undefined>();
   const [releaseNotes, setReleaseNotes] = useState<string | undefined>();
   const [releaseUrl, setReleaseUrl] = useState<string | undefined>();
+  const [releaseData, setReleaseData] = useState<GithubReleaseInfo | undefined>();
 
   const check = useCallback(async () => {
     if (Platform.OS === 'ios') return;
@@ -47,6 +51,7 @@ export function useGithubMajorUpdate(): MajorUpdateData {
         setLatestTag(info.tag_name);
         setReleaseNotes(info.body);
         setReleaseUrl(info.html_url);
+        setReleaseData(info);
         setVisible(true);
       }
     } catch {
@@ -67,7 +72,7 @@ export function useGithubMajorUpdate(): MajorUpdateData {
     setVisible(false);
   }, []);
 
-  return { visible, latestTag, releaseNotes, releaseUrl, onDismiss, onLater, refresh: check };
+  return { visible, latestTag, releaseNotes, releaseUrl, releaseData, onDismiss, onLater, refresh: check };
 }
 
 
