@@ -7,7 +7,7 @@ import { Dimensions, Platform } from 'react-native';
 
 // Use only resize modes supported by all player backends
 // (not all players support 'stretch' or 'none')
-export type PlayerResizeMode = 'contain' | 'cover';
+export type PlayerResizeMode = 'contain' | 'cover' | 'stretch';
 
 export const usePlayerState = () => {
     // Playback State
