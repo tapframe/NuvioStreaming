@@ -13,6 +13,17 @@ const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
 const MAX_RESULT_ITEMS = 150;
 const SCRAPER_BATCH_DELAY_MS = 25;
 
+const VIDEO_CONTENT_TYPES = [
+  'video/',
+  'application/octet-stream',
+  'application/x-mpegurl',
+  'application/vnd.apple.mpegurl',
+  'application/dash+xml',
+  'binary/octet-stream',
+];
+
+const MAX_PREFLIGHT_SIZE = 50 * 1024 * 1024;
+
 // Types for local scrapers
 export interface ScraperManifest {
   name: string;
@@ -72,6 +83,62 @@ export interface LocalScraperResult {
 
 // Callback type for scraper results
 type ScraperCallback = (streams: Stream[] | null, scraperId: string | null, scraperName: string | null, error: Error | null) => void;
+
+async function preflightSizeCheck(url: string, timeout: number = 15000): Promise<void> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type')?.toLowerCase() || '';
+    const isVideoContent = VIDEO_CONTENT_TYPES.some(type => contentType.includes(type));
+    
+    if (isVideoContent) {
+      logger.warn('[PreflightCheck] Rejected video content type:', contentType, 'for URL:', url.substring(0, 80));
+      throw new Error(`Response is video content (${contentType}), not fetching to prevent OOM`);
+    }
+
+    const contentLengthHeader = response.headers.get('content-length');
+    if (contentLengthHeader) {
+      const contentLength = parseInt(contentLengthHeader, 10);
+      if (!isNaN(contentLength) && contentLength > MAX_PREFLIGHT_SIZE) {
+        logger.warn('[PreflightCheck] Rejected large response:', contentLength, 'bytes for URL:', url.substring(0, 80));
+        throw new Error(`Response too large (${contentLength} bytes), max allowed is ${MAX_PREFLIGHT_SIZE}`);
+      }
+    }
+
+    const finalUrl = response.url || url;
+    const videoExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts', '.m3u8'];
+    const hasVideoExtension = videoExtensions.some(ext => finalUrl.toLowerCase().includes(ext));
+    
+    if (hasVideoExtension && contentType && !contentType.includes('text') && !contentType.includes('json') && !contentType.includes('html')) {
+      logger.warn('[PreflightCheck] URL appears to be a video file:', finalUrl.substring(0, 80));
+      throw new Error(`URL appears to be a video file, not fetching to prevent OOM`);
+    }
+
+    logger.log('[PreflightCheck] Passed for URL:', url.substring(0, 60), 'Content-Length:', contentLengthHeader || 'unknown');
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      logger.warn('[PreflightCheck] HEAD request timed out for:', url.substring(0, 60));
+      return;
+    }
+    
+    if (error.message?.includes('video content') || error.message?.includes('too large') || error.message?.includes('video file')) {
+      throw error;
+    }
+    
+    logger.warn('[PreflightCheck] HEAD request failed (allowing GET):', error.message?.substring(0, 100));
+  }
+}
 
 class LocalScraperService {
   private static instance: LocalScraperService;
@@ -1226,6 +1293,9 @@ class LocalScraperService {
 
       const sandboxedAxios = {
         get: async (url: string, config?: any) => {
+          if (!config?.skipSizeCheck) {
+            await preflightSizeCheck(url, config?.timeout || 30000);
+          }
           return axios.get(url, {
             ...config,
             maxContentLength: MAX_RESPONSE_SIZE,
@@ -1258,6 +1328,10 @@ class LocalScraperService {
           });
         },
         request: async (config: any) => {
+          const method = (config?.method || 'GET').toString().toUpperCase();
+          if (method === 'GET' && config?.url && !config?.skipSizeCheck) {
+            await preflightSizeCheck(config.url, config?.timeout || 30000);
+          }
           return axios.request({
             ...config,
             maxContentLength: MAX_RESPONSE_SIZE,
@@ -1289,10 +1363,18 @@ class LocalScraperService {
         }
       };
 
-      // Polyfilled fetch that properly handles redirect: 'manual'
-      // React Native's native fetch may or may not support redirect: 'manual' properly
       const polyfilledFetch = async (url: string, options: any = {}): Promise<Response> => {
-        // If not using redirect: manual, use native fetch directly
+        const method = (options?.method || 'GET').toString().toUpperCase();
+        
+        if (method === 'GET' && !options?.skipSizeCheck) {
+          try {
+            await preflightSizeCheck(url, options?.timeout || 15000);
+          } catch (preflightError: any) {
+            logger.error('[PolyfilledFetch] Preflight check failed:', preflightError.message);
+            throw preflightError;
+          }
+        }
+
         if (options.redirect !== 'manual') {
           return fetch(url, options);
         }
