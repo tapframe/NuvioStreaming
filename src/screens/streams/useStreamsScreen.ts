@@ -646,7 +646,8 @@ export const useStreamsScreen = () => {
       hasDoneInitialLoadRef.current = true;
 
       try {
-        const hasStremioProviders = await stremioService.hasStreamProviders(type);
+        const stremioType = type === 'tv' ? 'series' : type;
+        const hasStremioProviders = await stremioService.hasStreamProviders(stremioType);
         const hasLocalScrapers = settings.enableLocalScrapers && (await localScraperService.hasScrapers());
         const hasProviders = hasStremioProviders || hasLocalScrapers;
 
