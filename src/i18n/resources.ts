@@ -7,6 +7,8 @@ import fr from './locales/fr.json';
 import it from './locales/it.json';
 import de from './locales/de.json';
 
+import hr from './locales/hr.json';
+
 export const resources = {
     en: { translation: en },
     'pt-BR': { translation: ptBR },
@@ -16,4 +18,5 @@ export const resources = {
     fr: { translation: fr },
     it: { translation: it },
     de: { translation: de },
+    hr: { translation: hr },
 };
