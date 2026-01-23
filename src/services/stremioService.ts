@@ -5,6 +5,7 @@ import EventEmitter from 'eventemitter3';
 import { localScraperService } from './pluginService';
 import { DEFAULT_SETTINGS, AppSettings } from '../hooks/useSettings';
 import { TMDBService } from './tmdbService';
+import { safeAxiosConfig, createSafeAxiosConfig } from '../utils/axiosConfig';
 
 // Create an event emitter for addon changes
 export const addonEmitter = new EventEmitter();
@@ -626,7 +627,7 @@ class StremioService {
         : `${url.replace(/\/$/, '')}/manifest.json`;
 
       const response = await this.retryRequest(async () => {
-        return await axios.get(manifestUrl);
+        return await axios.get(manifestUrl, safeAxiosConfig);
       });
 
       const manifest = response.data;
@@ -878,7 +879,7 @@ class StremioService {
         // For page 1 without filters, try simple URL first (best compatibility)
         if (pageSkip === 0 && extraParts.length === 0) {
           if (__DEV__) console.log(`🔍 [getCatalog] Trying simple URL for ${manifest.name}: ${urlSimple}`);
-          response = await this.retryRequest(async () => axios.get(urlSimple));
+          response = await this.retryRequest(async () => axios.get(urlSimple, safeAxiosConfig));
           // Check if we got valid metas - if empty, try other styles
           if (!response?.data?.metas || response.data.metas.length === 0) {
             throw new Error('Empty response from simple URL');
@@ -890,7 +891,7 @@ class StremioService {
         try {
           // Try path-style URL (correct per protocol)
           if (__DEV__) console.log(`🔍 [getCatalog] Trying path-style URL for ${manifest.name}: ${urlPathStyle}`);
-          response = await this.retryRequest(async () => axios.get(urlPathStyle));
+          response = await this.retryRequest(async () => axios.get(urlPathStyle, safeAxiosConfig));
           // Check if we got valid metas - if empty, try query-style
           if (!response?.data?.metas || response.data.metas.length === 0) {
             throw new Error('Empty response from path-style URL');
@@ -899,7 +900,7 @@ class StremioService {
           try {
             // Try legacy query-style URL as last resort
             if (__DEV__) console.log(`🔍 [getCatalog] Trying query-style URL for ${manifest.name}: ${urlQueryStyle}`);
-            response = await this.retryRequest(async () => axios.get(urlQueryStyle));
+            response = await this.retryRequest(async () => axios.get(urlQueryStyle, safeAxiosConfig));
           } catch (e3) {
             if (__DEV__) console.log(`❌ [getCatalog] All URL styles failed for ${manifest.name}`);
             throw e3;
@@ -994,7 +995,7 @@ class StremioService {
           if (isSupported) {
             try {
               const response = await this.retryRequest(async () => {
-                return await axios.get(url, { timeout: 10000 });
+                return await axios.get(url, createSafeAxiosConfig(10000));
               });
 
 
@@ -1025,7 +1026,7 @@ class StremioService {
 
 
           const response = await this.retryRequest(async () => {
-            return await axios.get(url, { timeout: 10000 });
+            return await axios.get(url, createSafeAxiosConfig(10000));
           });
 
 
@@ -1096,7 +1097,7 @@ class StremioService {
 
 
           const response = await this.retryRequest(async () => {
-            return await axios.get(url, { timeout: 10000 });
+            return await axios.get(url, createSafeAxiosConfig(10000));
           });
 
 
@@ -1412,7 +1413,7 @@ class StremioService {
           logger.log(`🔗 [getStreams] Requesting streams from ${addon.name} (${addon.id}): ${url}`);
 
           const response = await this.retryRequest(async () => {
-            return await axios.get(url);
+            return await axios.get(url, safeAxiosConfig);
           });
 
           let processedStreams: Stream[] = [];
@@ -1462,13 +1463,12 @@ class StremioService {
 
       const response = await this.retryRequest(async () => {
         logger.log(`Making request to ${url} with timeout ${timeout}ms`);
-        return await axios.get(url, {
-          timeout,
+        return await axios.get(url, createSafeAxiosConfig(timeout, {
           headers: {
             'Accept': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36'
           }
-        });
+        }));
       }, 5); // Increase retries for stream fetching
 
       if (response.data && response.data.streams && Array.isArray(response.data.streams)) {
@@ -1770,7 +1770,7 @@ class StremioService {
             : `${baseUrl}/subtitles/${type}/${encodedId}.json`;
         }
         logger.log(`[getSubtitles] Fetching subtitles from ${addon.name}: ${url}`);
-        const response = await this.retryRequest(async () => axios.get(url, { timeout: 10000 }));
+        const response = await this.retryRequest(async () => axios.get(url, createSafeAxiosConfig(10000)));
         if (response.data && Array.isArray(response.data.subtitles)) {
           logger.log(`[getSubtitles] Got ${response.data.subtitles.length} subtitles from ${addon.name}`);
           return response.data.subtitles.map((sub: any, index: number) => ({
@@ -1910,7 +1910,7 @@ class StremioService {
         const url = `${baseUrl}/addon_catalog/${type}/${encodeURIComponent(id)}.json${queryParams ? `?${queryParams}` : ''}`;
 
         logger.log(`[getAddonCatalogs] Fetching from ${addon.name}: ${url}`);
-        const response = await this.retryRequest(() => axios.get(url, { timeout: 10000 }));
+        const response = await this.retryRequest(() => axios.get(url, createSafeAxiosConfig(10000)));
 
         if (response.data?.addons && Array.isArray(response.data.addons)) {
           results.push(...response.data.addons);

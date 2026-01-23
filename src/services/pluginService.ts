@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { Stream } from '../types/streams';
 import { cacheService } from './cacheService';
 import CryptoJS from 'crypto-js';
+import { safeAxiosConfig, createSafeAxiosConfig } from '../utils/axiosConfig';
 
 const MAX_CONCURRENT_SCRAPERS = 5;
 const MAX_INFLIGHT_KEYS = 30;
@@ -407,13 +408,12 @@ class LocalScraperService {
         : `${repositoryUrl}/manifest.json`;
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
 
-      const response = await axios.get(manifestUrl, {
-        timeout: 10000,
+      const response = await axios.get(manifestUrl, createSafeAxiosConfig(10000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
-      });
+      }));
 
       if (response.data && response.data.name) {
         logger.log('[LocalScraperService] Found repository name in manifest:', response.data.name);
@@ -645,14 +645,13 @@ class LocalScraperService {
         : `${this.repositoryUrl}/manifest.json`;
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
 
-      const response = await axios.get(manifestUrl, {
-        timeout: 10000,
+      const response = await axios.get(manifestUrl, createSafeAxiosConfig(10000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
           'Expires': '0'
         }
-      });
+      }));
       const manifest: ScraperManifest = response.data;
 
       // Store repository name from manifest
@@ -740,14 +739,13 @@ class LocalScraperService {
         : `${repo.url}/manifest.json`;
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
 
-      const response = await axios.get(manifestUrl, {
-        timeout: 10000,
+      const response = await axios.get(manifestUrl, createSafeAxiosConfig(10000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
           'Expires': '0'
         }
-      });
+      }));
       const manifest: ScraperManifest = response.data;
 
       // Update repository name from manifest
@@ -823,14 +821,13 @@ class LocalScraperService {
       // Add cache-busting parameters to force fresh download
       const scraperUrlWithCacheBust = `${scraperUrl}?t=${Date.now()}&v=${Math.random()}`;
 
-      const response = await axios.get(scraperUrlWithCacheBust, {
-        timeout: 15000,
+      const response = await axios.get(scraperUrlWithCacheBust, createSafeAxiosConfig(15000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
           'Expires': '0'
         }
-      });
+      }));
       const scraperCode = response.data;
 
       // Store scraper info and code
