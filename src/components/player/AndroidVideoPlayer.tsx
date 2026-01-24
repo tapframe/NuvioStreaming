@@ -729,8 +729,6 @@ const AndroidVideoPlayer: React.FC = () => {
 
   return (
     <View style={[styles.container, {
-      width: playerState.screenDimensions.width,
-      height: playerState.screenDimensions.height,
       position: 'absolute', top: 0, left: 0
     }]}>
       <LoadingOverlay

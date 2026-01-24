@@ -669,14 +669,14 @@ const AddonsScreen = () => {
   };
 
   const moveAddonUp = (addon: ExtendedManifest) => {
-    if (stremioService.moveAddonUp(addon.id)) {
+    if (stremioService.moveAddonUp(addon.installationId || addon.id)) {
       // Refresh the list to reflect the new order
       loadAddons();
     }
   };
 
   const moveAddonDown = (addon: ExtendedManifest) => {
-    if (stremioService.moveAddonDown(addon.id)) {
+    if (stremioService.moveAddonDown(addon.installationId || addon.id)) {
       // Refresh the list to reflect the new order
       loadAddons();
     }
@@ -690,8 +690,8 @@ const AddonsScreen = () => {
       {
         label: t('addons.uninstall_button'),
         onPress: async () => {
-          await stremioService.removeAddon(addon.id);
-          setAddons(prev => prev.filter(a => a.id !== addon.id));
+          await stremioService.removeAddon(addon.installationId || addon.id);
+          setAddons(prev => prev.filter(a => (a.installationId || a.id) !== (addon.installationId || addon.id)));
           // Ensure we re-read from storage/order to avoid reappearing on next load
           await loadAddons();
         },
@@ -1066,7 +1066,7 @@ const AddonsScreen = () => {
               ) : (
                 addons.map((addon, index) => (
                   <View
-                    key={addon.id}
+                    key={addon.installationId || addon.id}
                     style={{ marginBottom: index === addons.length - 1 ? 32 : 0 }}
                   >
                     {renderAddonItem({ item: addon, index })}

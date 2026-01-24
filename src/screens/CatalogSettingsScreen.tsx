@@ -308,9 +308,12 @@ const CatalogSettingsScreen = () => {
       addons.forEach(addon => {
         if (addon.catalogs && addon.catalogs.length > 0) {
           const uniqueCatalogs = new Map<string, CatalogSetting>();
+          // Use installationId if available, otherwise fallback to id
+          const uniqueAddonId = addon.installationId || addon.id;
 
           addon.catalogs.forEach(catalog => {
-            const settingKey = `${addon.id}:${catalog.type}:${catalog.id}`;
+            // Generate a truly unique key using installationId
+            const settingKey = `${uniqueAddonId}:${catalog.type}:${catalog.id}`;
             let displayName = catalog.name || catalog.id;
             const catalogType = catalog.type === 'movie' ? 'Movies' : catalog.type === 'series' ? 'TV Shows' : catalog.type.charAt(0).toUpperCase() + catalog.type.slice(1);
 
@@ -335,7 +338,7 @@ const CatalogSettingsScreen = () => {
             }
 
             uniqueCatalogs.set(settingKey, {
-              addonId: addon.id,
+              addonId: uniqueAddonId, // Store unique ID here
               catalogId: catalog.id,
               type: catalog.type,
               name: displayName,
@@ -351,11 +354,15 @@ const CatalogSettingsScreen = () => {
       // Group settings by addon name
       const grouped: GroupedCatalogs = {};
       availableCatalogs.forEach(setting => {
-        const addon = addons.find(a => a.id === setting.addonId);
+        // Find addon by matching either installationId or id
+        const addon = addons.find(a => (a.installationId || a.id) === setting.addonId);
         if (!addon) return;
 
-        if (!grouped[setting.addonId]) {
-          grouped[setting.addonId] = {
+        // Use the unique addon ID (installationId) as the group key
+        const groupKey = setting.addonId;
+
+        if (!grouped[groupKey]) {
+          grouped[groupKey] = {
             name: addon.name,
             catalogs: [],
             expanded: true,
@@ -363,9 +370,9 @@ const CatalogSettingsScreen = () => {
           };
         }
 
-        grouped[setting.addonId].catalogs.push(setting);
+        grouped[groupKey].catalogs.push(setting);
         if (setting.enabled) {
-          grouped[setting.addonId].enabledCount++;
+          grouped[groupKey].enabledCount++;
         }
       });
 
