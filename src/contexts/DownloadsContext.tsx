@@ -9,6 +9,7 @@ import {
 } from '@kesha-antonov/react-native-background-downloader';
 import { mmkvStorage } from '../services/mmkvStorage';
 import { notificationService } from '../services/notificationService';
+import { startOrUpdateDownloadLiveActivity, stopDownloadLiveActivity } from '../services/liveActivityService';
 
 export type DownloadStatus = 'downloading' | 'completed' | 'paused' | 'error' | 'queued';
 
@@ -17,6 +18,7 @@ export interface DownloadItem {
   contentId: string; // base id (e.g., tt0903747 for series, tt0499549 for movies)
   type: 'movie' | 'series';
   title: string; // movie title or show name
+  year?: number;
   providerName?: string;
   season?: number;
   episode?: number;
@@ -46,6 +48,7 @@ type StartDownloadInput = {
   id: string; // Base content ID (e.g., tt0903747)
   type: 'movie' | 'series';
   title: string;
+  year?: number;
   providerName?: string;
   season?: number;
   episode?: number;
@@ -117,6 +120,31 @@ function isHttpUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function formatSeasonEpisode(season?: number, episode?: number): string | null {
+  if (typeof season !== 'number' || typeof episode !== 'number') return null;
+  return `S${season}E${episode}`;
+}
+
+function formatMovieTitleWithYear(title: string, year?: number): string {
+  if (!year || !Number.isFinite(year)) return title;
+  if (/\(\d{4}\)\s*$/.test(title)) return title;
+  return `${title} (${year})`;
+}
+
+function getLiveActivityText(d: DownloadItem): { title: string; subtitle: string } {
+  const title = d.type === 'movie' ? formatMovieTitleWithYear(d.title, d.year) : d.title;
+  const parts: string[] = [];
+
+  if (d.type === 'series') {
+    const se = formatSeasonEpisode(d.season, d.episode);
+    if (se) parts.push(se);
+    if (d.episodeTitle) parts.push(String(d.episodeTitle));
+  }
+
+  parts.push(`${d.progress}%`);
+  return { title, subtitle: parts.join(' • ') };
 }
 
 async function getContentLength(url: string, headers?: Record<string, string>): Promise<number | null> {
@@ -269,6 +297,10 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Cache last notified progress to reduce spam
   const lastNotifyRef = useRef<Map<string, number>>(new Map());
 
+  // iOS-only Live Activities for background download progress
+  const liveActivityIdsRef = useRef<Map<string, string>>(new Map());
+  const lastLiveProgressRef = useRef<Map<string, number>>(new Map());
+
   const maybeNotifyProgress = useCallback(async (d: DownloadItem) => {
     try {
       if (appStateRef.current === 'active') return;
@@ -286,6 +318,86 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await notificationService.notifyDownloadComplete(d.title);
     } catch { }
   }, []);
+
+  const stopLiveActivityForDownload = useCallback(async (downloadId: string, opts?: { title?: string; subtitle?: string; progressPercent?: number }) => {
+    const activityId = liveActivityIdsRef.current.get(downloadId);
+    if (!activityId) return;
+
+    liveActivityIdsRef.current.delete(downloadId);
+    lastLiveProgressRef.current.delete(downloadId);
+
+    const title = opts?.title || downloadsRef.current.find(d => d.id === downloadId)?.title || 'Download';
+    await stopDownloadLiveActivity({
+      activityId,
+      title,
+      subtitle: opts?.subtitle,
+      progressPercent: opts?.progressPercent,
+    });
+  }, []);
+
+  const stopAllLiveActivities = useCallback(async () => {
+    const entries = Array.from(liveActivityIdsRef.current.entries());
+    liveActivityIdsRef.current.clear();
+    lastLiveProgressRef.current.clear();
+
+    await Promise.all(
+      entries.map(async ([downloadId, activityId]) => {
+        const title = downloadsRef.current.find(d => d.id === downloadId)?.title || 'Download';
+        await stopDownloadLiveActivity({ activityId, title });
+      })
+    );
+  }, []);
+
+  const maybeUpdateLiveActivity = useCallback(async (d: DownloadItem) => {
+    try {
+      if (d.status !== 'downloading') return;
+
+      // Create the Live Activity as soon as possible (even in foreground) so it exists
+      // when the user backgrounds / swipes away. Only keep updating progress while backgrounded.
+      const existingActivityId = liveActivityIdsRef.current.get(d.id);
+      const isBackground = appStateRef.current !== 'active';
+      if (!isBackground && existingActivityId) return;
+
+      const prev = lastLiveProgressRef.current.get(d.id) ?? -1;
+      if (isBackground && (d.progress <= prev || d.progress - prev < 2)) return; // update every 2%
+      lastLiveProgressRef.current.set(d.id, d.progress);
+
+      const { title, subtitle } = getLiveActivityText(d);
+
+      const activityId = await startOrUpdateDownloadLiveActivity({
+        activityId: existingActivityId,
+        title,
+        subtitle,
+        progressPercent: d.progress,
+        deepLinkUrl: '/downloads',
+      });
+
+      if (activityId && activityId !== existingActivityId) {
+        liveActivityIdsRef.current.set(d.id, activityId);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const syncLiveActivitiesForBackground = useCallback(async () => {
+    if (appStateRef.current === 'active') return;
+
+    const activeIds = new Set(downloadsRef.current.filter(d => d.status === 'downloading').map(d => d.id));
+    await Promise.all(
+      downloadsRef.current
+        .filter(d => d.status === 'downloading')
+        .map(d => maybeUpdateLiveActivity(d))
+    );
+
+    // Stop activities for downloads that are no longer downloading.
+    const existing = Array.from(liveActivityIdsRef.current.keys());
+    await Promise.all(
+      existing
+        .filter(id => !activeIds.has(id))
+        .map(id => stopLiveActivityForDownload(id))
+    );
+  }, [maybeUpdateLiveActivity, stopLiveActivityForDownload]);
 
   useEffect(() => {
     mmkvStorage.setItem(STORAGE_KEY, JSON.stringify(downloads)).catch(() => { });
@@ -307,6 +419,11 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           status: 'downloading',
           updatedAt: Date.now(),
         }));
+
+        const current = downloadsRef.current.find(x => x.id === taskId);
+        if (current) {
+          maybeUpdateLiveActivity({ ...current, status: 'downloading' });
+        }
       })
       .progress(({ bytesDownloaded, bytesTotal }: any) => {
         const now = Date.now();
@@ -338,7 +455,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (current && typeof bytesDownloaded === 'number') {
           const totalBytes = typeof bytesTotal === 'number' && bytesTotal > 0 ? bytesTotal : current.totalBytes;
           const progress = totalBytes > 0 ? Math.floor((bytesDownloaded / totalBytes) * 100) : current.progress;
-          maybeNotifyProgress({ ...current, downloadedBytes: bytesDownloaded, totalBytes, progress });
+          const next = { ...current, downloadedBytes: bytesDownloaded, totalBytes, progress };
+          maybeNotifyProgress(next);
+          maybeUpdateLiveActivity({ ...next, status: 'downloading' });
         }
       })
       .done(({ location, bytesDownloaded, bytesTotal }: any) => {
@@ -357,7 +476,12 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }));
 
         const doneItem = downloadsRef.current.find(x => x.id === taskId);
-        if (doneItem) notifyCompleted({ ...doneItem, status: 'completed', progress: 100, fileUri: finalUri || doneItem.fileUri } as DownloadItem);
+        if (doneItem) {
+          notifyCompleted({ ...doneItem, status: 'completed', progress: 100, fileUri: finalUri || doneItem.fileUri } as DownloadItem);
+          stopLiveActivityForDownload(taskId, { title: doneItem.title, subtitle: 'Completed', progressPercent: 100 });
+        } else {
+          stopLiveActivityForDownload(taskId, { subtitle: 'Completed', progressPercent: 100 });
+        }
 
         try {
           completeHandler(taskId);
@@ -373,9 +497,12 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           updatedAt: Date.now(),
         }));
 
+        const current = downloadsRef.current.find(x => x.id === taskId);
+        stopLiveActivityForDownload(taskId, { title: current?.title, subtitle: 'Error', progressPercent: current?.progress });
+
         console.log(`[DownloadsContext] Background download error: ${taskId}`, error);
       });
-  }, [maybeNotifyProgress, notifyCompleted, updateDownload]);
+  }, [maybeNotifyProgress, maybeUpdateLiveActivity, notifyCompleted, stopLiveActivityForDownload, updateDownload]);
 
   useEffect(() => {
     (async () => {
@@ -396,6 +523,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               contentId: String(meta.contentId ?? taskId),
               type: (meta.type as 'movie' | 'series') ?? 'movie',
               title: String(meta.title ?? 'Content'),
+              year: typeof meta.year === 'number' ? meta.year : undefined,
               providerName: meta.providerName,
               season: typeof meta.season === 'number' ? meta.season : undefined,
               episode: typeof meta.episode === 'number' ? meta.episode : undefined,
@@ -466,7 +594,12 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             if (looksComplete) {
               const done = downloadsRef.current.find(x => x.id === d.id);
-              if (done) notifyCompleted({ ...done, status: 'completed', progress: 100, fileUri: d.fileUri } as DownloadItem);
+              if (done) {
+                notifyCompleted({ ...done, status: 'completed', progress: 100, fileUri: d.fileUri } as DownloadItem);
+                stopLiveActivityForDownload(d.id, { title: done.title, subtitle: 'Completed', progressPercent: 100 });
+              } else {
+                stopLiveActivityForDownload(d.id, { subtitle: 'Completed', progressPercent: 100 });
+              }
               tasksRef.current.delete(d.id);
               lastBytesRef.current.delete(d.id);
             }
@@ -478,17 +611,20 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
       refreshInProgressRef.current = false;
     }
-  }, [updateDownload, notifyCompleted]);
+  }, [updateDownload, notifyCompleted, stopLiveActivityForDownload]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
       appStateRef.current = s;
       if (s === 'active') {
+        stopAllLiveActivities();
         refreshAllDownloadsFromDisk();
+      } else {
+        syncLiveActivitiesForBackground();
       }
     });
     return () => sub.remove();
-  }, [refreshAllDownloadsFromDisk]);
+  }, [refreshAllDownloadsFromDisk, stopAllLiveActivities, syncLiveActivitiesForBackground]);
 
   const resumeDownload = useCallback(async (id: string) => {
     const item = downloadsRef.current.find(d => d.id === id);
@@ -516,11 +652,14 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     try {
       await task.resume();
+
+      // If app is backgrounded, kick Live Activity updates.
+      maybeUpdateLiveActivity({ ...item, status: 'downloading' });
     } catch (e) {
       console.log(`[DownloadsContext] Resume failed: ${id}`, e);
       updateDownload(id, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
     }
-  }, [attachDownloadTask, updateDownload]);
+  }, [attachDownloadTask, maybeUpdateLiveActivity, updateDownload]);
 
   const startDownload = useCallback(async (input: StartDownloadInput) => {
     if (!isHttpUrl(input.url)) {
@@ -581,6 +720,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       contentId,
       type: input.type,
       title: input.title,
+      year: typeof input.year === 'number' ? input.year : undefined,
       providerName: input.providerName,
       season: input.season,
       episode: input.episode,
@@ -608,6 +748,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     setDownloads(prev => [newItem, ...prev]);
 
+    // If somehow started while app is backgrounded, show Live Activity.
+    maybeUpdateLiveActivity(newItem);
+
     const task = createDownloadTask({
       id: compoundId,
       url: input.url,
@@ -617,6 +760,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         contentId,
         type: input.type,
         title: input.title,
+        year: typeof input.year === 'number' ? input.year : undefined,
         providerName: input.providerName,
         season: input.season,
         episode: input.episode,
@@ -643,7 +787,7 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       updateDownload(compoundId, (d) => ({ ...d, status: 'error', updatedAt: Date.now() }));
       throw e;
     }
-  }, [attachDownloadTask, resumeDownload, updateDownload]);
+  }, [attachDownloadTask, maybeUpdateLiveActivity, resumeDownload, updateDownload]);
 
   const pauseDownload = useCallback(async (id: string) => {
     console.log(`[DownloadsContext] Pausing download: ${id}`);
@@ -651,6 +795,9 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // First, update the status to 'paused' immediately
     // This will cause any ongoing download/resume operations to check status and exit gracefully
     updateDownload(id, (d) => ({ ...d, status: 'paused', updatedAt: Date.now() }));
+
+    const current = downloadsRef.current.find(d => d.id === id);
+    stopLiveActivityForDownload(id, { title: current?.title, subtitle: 'Paused', progressPercent: current?.progress });
 
     const task = tasksRef.current.get(id);
     if (!task) return;
@@ -660,9 +807,11 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (e) {
       console.log(`[DownloadsContext] Pause failed: ${id}`, e);
     }
-  }, [updateDownload]);
+  }, [stopLiveActivityForDownload, updateDownload]);
 
   const cancelDownload = useCallback(async (id: string) => {
+    const current = downloadsRef.current.find(d => d.id === id);
+    await stopLiveActivityForDownload(id, { title: current?.title, subtitle: 'Canceled', progressPercent: current?.progress });
     try {
       const task = tasksRef.current.get(id);
       if (task) {
@@ -678,15 +827,16 @@ export const DownloadsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => { });
     }
     setDownloads(prev => prev.filter(d => d.id !== id));
-  }, []);
+  }, [stopLiveActivityForDownload]);
 
   const removeDownload = useCallback(async (id: string) => {
     const item = downloadsRef.current.find(d => d.id === id);
+    await stopLiveActivityForDownload(id, { title: item?.title, subtitle: 'Removed', progressPercent: item?.progress });
     if (item?.fileUri && item.status === 'completed') {
       await FileSystem.deleteAsync(item.fileUri, { idempotent: true }).catch(() => { });
     }
     setDownloads(prev => prev.filter(d => d.id !== id));
-  }, []);
+  }, [stopLiveActivityForDownload]);
 
   const value = useMemo<DownloadsContextValue>(() => ({
     downloads,

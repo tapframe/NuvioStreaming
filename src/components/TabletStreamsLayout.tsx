@@ -371,6 +371,7 @@ const TabletStreamsLayout: React.FC<TabletStreamsLayoutProps> = ({
           showAlert={(t: string, m: string) => openAlert(t, m)}
           parentTitle={metadata?.name}
           parentType={type as 'movie' | 'series'}
+          parentYear={metadata?.year}
           parentSeason={(type === 'series' || type === 'other') ? currentEpisode?.season_number : undefined}
           parentEpisode={(type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined}
           parentEpisodeTitle={(type === 'series' || type === 'other') ? currentEpisode?.name : undefined}

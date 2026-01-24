@@ -84,4 +84,13 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
+
+  func application(
+    _ application: UIApplication,
+    handleEventsForBackgroundURLSession identifier: String,
+    completionHandler: @escaping () -> Void
+  ) {
+    RNBackgroundDownloader.setCompletionHandlerWithIdentifier(identifier, completionHandler: completionHandler)
+  }
+
 }

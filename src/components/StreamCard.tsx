@@ -29,6 +29,7 @@ interface StreamCardProps {
   showAlert: (title: string, message: string) => void;
   parentTitle?: string;
   parentType?: 'movie' | 'series';
+  parentYear?: number;
   parentSeason?: number;
   parentEpisode?: number;
   parentEpisodeTitle?: string;
@@ -50,6 +51,7 @@ const StreamCard = memo(({
   showAlert,
   parentTitle,
   parentType,
+  parentYear,
   parentSeason,
   parentEpisode,
   parentEpisodeTitle,
@@ -139,6 +141,9 @@ const StreamCard = memo(({
       const parent: any = stream as any;
       const inferredTitle = parentTitle || stream.name || stream.title || parent.metaName || 'Content';
       const inferredType: 'movie' | 'series' = parentType || (parent.kind === 'series' || parent.type === 'series' ? 'series' : 'movie');
+      const year = typeof parentYear === 'number'
+        ? parentYear
+        : (typeof parent.year === 'number' ? parent.year : undefined);
       const season = typeof parentSeason === 'number' ? parentSeason : (parent.season || parent.season_number);
       const episode = typeof parentEpisode === 'number' ? parentEpisode : (parent.episode || parent.episode_number);
       const episodeTitle = parentEpisodeTitle || parent.episodeTitle || parent.episode_name;
@@ -160,6 +165,7 @@ const StreamCard = memo(({
         id: String(idForContent),
         type: inferredType,
         title: String(inferredTitle),
+        year: inferredType === 'movie' ? year : undefined,
         providerName: String(provider),
         season: inferredType === 'series' ? (season ? Number(season) : undefined) : undefined,
         episode: inferredType === 'series' ? (episode ? Number(episode) : undefined) : undefined,

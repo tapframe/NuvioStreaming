@@ -55,6 +55,7 @@
     "expo-intent-launcher": "~13.0.7",
     "expo-keep-awake": "~15.0.8",
     "expo-linear-gradient": "~15.0.7",
+    "expo-live-activity": "^0.4.2",
     "expo-localization": "~17.0.7",
     "expo-navigation-bar": "~5.0.10",
     "expo-notifications": "~0.32.12",

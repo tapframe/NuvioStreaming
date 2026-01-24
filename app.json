@@ -67,6 +67,7 @@
     },
     "owner": "nayifleo",
     "plugins": [
+      "expo-live-activity",
       [
         "@sentry/react-native/expo",
         {
