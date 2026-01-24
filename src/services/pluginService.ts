@@ -86,6 +86,12 @@ type ScraperCallback = (streams: Stream[] | null, scraperId: string | null, scra
 
 async function preflightSizeCheck(url: string, timeout: number = 15000): Promise<void> {
   try {
+    // Skip preflight check for non-HTTP(S) URLs (tokens, IDs, etc.)
+    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+      logger.log('[PreflightCheck] Skipping non-HTTP URL:', url.substring(0, 60));
+      return;
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
@@ -128,7 +134,7 @@ async function preflightSizeCheck(url: string, timeout: number = 15000): Promise
     logger.log('[PreflightCheck] Passed for URL:', url.substring(0, 60), 'Content-Length:', contentLengthHeader || 'unknown');
   } catch (error: any) {
     if (error.name === 'AbortError') {
-      logger.warn('[PreflightCheck] HEAD request timed out for:', url.substring(0, 60));
+      logger.warn('[PreflightCheck] HEAD request timed out for:', url.substring(0, 40));
       return;
     }
     

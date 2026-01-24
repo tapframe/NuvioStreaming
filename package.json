@@ -17,6 +17,7 @@
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
     "@gorhom/bottom-sheet": "^5.2.6",
+    "@kesha-antonov/react-native-background-downloader": "^4.4.5",
     "@legendapp/list": "^2.0.13",
     "@lottiefiles/dotlottie-react": "^0.17.7",
     "@react-native-community/blur": "^4.4.1",

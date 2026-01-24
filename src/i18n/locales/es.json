@@ -715,7 +715,7 @@
             "auto_select_subs_desc": "Selecciona automáticamente los subtítulos que coincidan con tus preferencias",
             "show_trailers": "Mostrar tráileres",
             "show_trailers_desc": "Mostrar tráileres en la sección destacada",
-            "enable_downloads": "Activar descargas (Beta)",
+            "enable_downloads": "Activar descargas",
             "enable_downloads_desc": "Mostrar pestaña de descargas y permitir guardar fuentes",
             "notifications": "Notificaciones",
             "notifications_desc": "Recordatorios de episodios",

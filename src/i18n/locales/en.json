@@ -715,7 +715,7 @@
             "auto_select_subs_desc": "Automatically select subtitles matching your preferences",
             "show_trailers": "Show Trailers",
             "show_trailers_desc": "Display trailers in hero section",
-            "enable_downloads": "Enable Downloads (Beta)",
+            "enable_downloads": "Enable Downloads",
             "enable_downloads_desc": "Show Downloads tab and enable saving streams",
             "notifications": "Notifications",
             "notifications_desc": "Episode reminders",

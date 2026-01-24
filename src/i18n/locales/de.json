@@ -715,7 +715,7 @@
             "auto_select_subs_desc": "Wählt automatisch Untertitel nach Ihren Präferenzen",
             "show_trailers": "Trailer anzeigen",
             "show_trailers_desc": "Trailer im Hero-Bereich anzeigen",
-            "enable_downloads": "Downloads aktivieren (Beta)",
+            "enable_downloads": "Downloads aktivieren",
             "enable_downloads_desc": "Downloads-Tab anzeigen und Speichern von Streams aktivieren",
             "notifications": "Benachrichtigungen",
             "notifications_desc": "Episodenerinnerungen",
