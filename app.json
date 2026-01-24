@@ -37,7 +37,8 @@
       },
       "bundleIdentifier": "com.nuvio.app",
       "associatedDomains": [],
-      "jsEngine": "hermes"
+      "jsEngine": "hermes",
+      "appleTeamId": "8QBDZ766S3"
     },
     "android": {
       "adaptiveIcon": {
