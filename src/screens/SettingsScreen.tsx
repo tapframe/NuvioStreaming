@@ -808,6 +808,13 @@ const SettingsScreen: React.FC = () => {
             {/* About */}
             <SettingsCard title={t('settings.about').toUpperCase()}>
               <SettingItem
+                title={t('settings.items.contributors')}
+                description={t('settings.items.view_contributors')}
+                icon="users"
+                renderControl={() => <ChevronRight />}
+                onPress={() => navigation.navigate('Contributors')}
+              />
+              <SettingItem
                 title={t('settings.about_nuvio')}
                 description={getDisplayedAppVersion()}
                 icon="info"

@@ -211,15 +211,7 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
                     onPress={handleVersionTap}
                     isTablet={isTablet}
                 />
-                <SettingItem
-                    title={t('settings.items.contributors')}
-                    description={t('settings.items.view_contributors')}
-                    icon="users"
-                    renderControl={() => <ChevronRight />}
-                    onPress={() => navigation.navigate('Contributors')}
-                    isLast={!developerModeEnabled}
-                    isTablet={isTablet}
-                />
+
                 {developerModeEnabled && (
                     <SettingItem
                         title={t('settings.developer_mode.title', 'Developer Mode')}
