@@ -351,6 +351,8 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     paused={paused}
                     volume={volume}
                     rate={playbackSpeed}
+                    // @ts-ignore - Prop supported by react-native-video 6.0+
+                    bufferingStrategy="DependingOnMemory"
                     resizeMode={getExoResizeMode()}
                     selectedAudioTrack={selectedAudioTrack}
                     selectedTextTrack={selectedTextTrack}
