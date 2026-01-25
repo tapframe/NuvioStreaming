@@ -254,7 +254,7 @@ const DonorCard: React.FC<DonorCardProps> = ({ donor, currentTheme, isTablet }) 
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
-      
+
       return date.toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',
@@ -333,7 +333,7 @@ const ContributorsScreen: React.FC = () => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
-      
+
       // Use locale-aware formatting
       return date.toLocaleDateString(undefined, {
         year: 'numeric',
@@ -382,15 +382,17 @@ const ContributorsScreen: React.FC = () => {
     const sorted = Array.from(map.values()).sort((a, b) => b.total - a.total);
 
     let lastTotal: number | null = null;
-    let lastRank = 0;
+    let currentRank = 0;
 
-    return sorted.map((entry, index) => {
-      const rank = lastTotal !== null && entry.total === lastTotal ? lastRank : index + 1;
+    return sorted.map((entry) => {
+      if (lastTotal === null || entry.total !== lastTotal) {
+        currentRank += 1;
+      }
       lastTotal = entry.total;
-      lastRank = rank;
+
       return {
         ...entry,
-        rank,
+        rank: currentRank,
       };
     });
   }, [donations, getDonationTs]);
@@ -803,87 +805,87 @@ const ContributorsScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-                {donationsLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={currentTheme.colors.primary} />
-                    <Text style={[styles.loadingText, { color: currentTheme.colors.mediumEmphasis }]}>{t('contributors.loading_donors')}</Text>
-                  </View>
-                ) : donationsError ? (
-                  <View style={styles.errorContainer}>
-                    <Feather name="alert-circle" size={48} color={currentTheme.colors.mediumEmphasis} />
-                    <Text style={[styles.errorText, { color: currentTheme.colors.mediumEmphasis }]}>
-                      {donationsError}
-                    </Text>
-                    <TouchableOpacity
-                      style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
-                      onPress={() => loadDonations(true)}
-                    >
-                      <Text style={[styles.retryText, { color: currentTheme.colors.white }]}>{t('common.retry')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : donations.length === 0 ? (
-                  <View style={styles.emptyContainer}>
-                    <Feather name="gift" size={48} color={currentTheme.colors.mediumEmphasis} />
-                    <Text style={[styles.emptyText, { color: currentTheme.colors.mediumEmphasis }]}>{t('contributors.no_donors')}</Text>
-                  </View>
+              {donationsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: currentTheme.colors.mediumEmphasis }]}>{t('contributors.loading_donors')}</Text>
+                </View>
+              ) : donationsError ? (
+                <View style={styles.errorContainer}>
+                  <Feather name="alert-circle" size={48} color={currentTheme.colors.mediumEmphasis} />
+                  <Text style={[styles.errorText, { color: currentTheme.colors.mediumEmphasis }]}>
+                    {donationsError}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
+                    onPress={() => loadDonations(true)}
+                  >
+                    <Text style={[styles.retryText, { color: currentTheme.colors.white }]}>{t('common.retry')}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : donations.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Feather name="gift" size={48} color={currentTheme.colors.mediumEmphasis} />
+                  <Text style={[styles.emptyText, { color: currentTheme.colors.mediumEmphasis }]}>{t('contributors.no_donors')}</Text>
+                </View>
+              ) : (
+                donorsTab === 'latest' ? (
+                  latestDonations.map((donor, index) => (
+                    <DonorCard
+                      key={`${donor.name}-${donor.date}-${index}`}
+                      donor={donor}
+                      currentTheme={currentTheme}
+                      isTablet={isTablet}
+                    />
+                  ))
                 ) : (
-                  donorsTab === 'latest' ? (
-                    latestDonations.map((donor, index) => (
-                      <DonorCard
-                        key={`${donor.name}-${donor.date}-${index}`}
-                        donor={donor}
-                        currentTheme={currentTheme}
-                        isTablet={isTablet}
-                      />
-                    ))
-                  ) : (
-                    leaderboardDonations.map((entry, index) => (
-                      <View
-                        key={`${entry.name}-${entry.currency}-${index}`}
-                        style={[
-                          styles.leaderboardCard,
-                          { backgroundColor: currentTheme.colors.elevation1 },
-                          isTablet && styles.tabletContributorCard
-                        ]}
-                      >
-                        <View style={styles.leaderboardAvatar}>
-                          {getRankAnimation(entry.rank) ? (
-                            <View style={styles.leaderboardBadge}>
-                              <Text style={[styles.leaderboardRankText, { color: currentTheme.colors.white }]}>{entry.rank}</Text>
-                              <LottieView
-                                source={getRankAnimation(entry.rank)}
-                                autoPlay
-                                loop={false}
-                                style={styles.leaderboardLottie}
-                              />
-                            </View>
-                          ) : (
+                  leaderboardDonations.map((entry, index) => (
+                    <View
+                      key={`${entry.name}-${entry.currency}-${index}`}
+                      style={[
+                        styles.leaderboardCard,
+                        { backgroundColor: currentTheme.colors.elevation1 },
+                        isTablet && styles.tabletContributorCard
+                      ]}
+                    >
+                      <View style={styles.leaderboardAvatar}>
+                        {getRankAnimation(entry.rank) ? (
+                          <View style={styles.leaderboardBadge}>
                             <Text style={[styles.leaderboardRankText, { color: currentTheme.colors.white }]}>{entry.rank}</Text>
-                          )}
-                        </View>
-                        <View style={styles.contributorInfo}>
-                          <Text style={[
-                            styles.username,
-                            { color: currentTheme.colors.highEmphasis },
-                            isTablet && styles.tabletUsername
-                          ]}>
-                            {entry.name}
-                          </Text>
-                          <Text style={[
-                            styles.donorAmount,
-                            { color: currentTheme.colors.mediumEmphasis },
-                            isTablet && styles.tabletContributions
-                          ]}>
-                            {entry.total.toFixed(2)} {entry.currency} · {entry.count} {entry.count === 1 ? 'donation' : 'donations'}
-                          </Text>
-                          <Text style={[styles.donorMessage, { color: currentTheme.colors.mediumEmphasis }]}>
-                            Rank #{entry.rank} · Last: {formatDonationDate(entry.lastDate)}
-                          </Text>
-                        </View>
+                            <LottieView
+                              source={getRankAnimation(entry.rank)}
+                              autoPlay
+                              loop={false}
+                              style={styles.leaderboardLottie}
+                            />
+                          </View>
+                        ) : (
+                          <Text style={[styles.leaderboardRankText, { color: currentTheme.colors.white }]}>{entry.rank}</Text>
+                        )}
                       </View>
-                    ))
-                  )
-                )}
+                      <View style={styles.contributorInfo}>
+                        <Text style={[
+                          styles.username,
+                          { color: currentTheme.colors.highEmphasis },
+                          isTablet && styles.tabletUsername
+                        ]}>
+                          {entry.name}
+                        </Text>
+                        <Text style={[
+                          styles.donorAmount,
+                          { color: currentTheme.colors.mediumEmphasis },
+                          isTablet && styles.tabletContributions
+                        ]}>
+                          {entry.total.toFixed(2)} {entry.currency} · {entry.count} {entry.count === 1 ? 'donation' : 'donations'}
+                        </Text>
+                        <Text style={[styles.donorMessage, { color: currentTheme.colors.mediumEmphasis }]}>
+                          Rank #{entry.rank} · Last: {formatDonationDate(entry.lastDate)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )
+              )}
             </ScrollView>
           ) : activeTab === 'contributors' ? (
             // Contributors Tab

@@ -183,6 +183,15 @@ export const AboutSettingsContent: React.FC<AboutSettingsContentProps> = ({
     return (
         <>
             <SettingsCard title={t('settings.sections.information')} isTablet={isTablet}>
+                {isTablet && (
+                    <SettingItem
+                        title={t('contributors.title', 'Contributors')}
+                        icon="users"
+                        onPress={() => navigation.navigate('Contributors')}
+                        renderControl={() => <ChevronRight />}
+                        isTablet={isTablet}
+                    />
+                )}
                 <SettingItem
                     title={t('settings.items.legal')}
                     icon="file-text"

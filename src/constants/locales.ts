@@ -8,5 +8,6 @@ export const LOCALES = [
     { code: 'it', key: 'italian' },
     { code: 'es', key: 'spanish' },
     { code: 'hr', key: 'croatian' },
-    { code: 'zh-CN', key: 'chinese' }
+    { code: 'zh-CN', key: 'chinese' },
+    { code: 'hi', key: 'hindi' }
 ];

@@ -8,6 +8,7 @@ import it from './locales/it.json';
 import de from './locales/de.json';
 
 import hr from './locales/hr.json';
+import hi from './locales/hi.json';
 import zhCN from './locales/zh-CN.json';
 
 export const resources = {
@@ -21,4 +22,5 @@ export const resources = {
     de: { translation: de },
     hr: { translation: hr },
     'zh-CN': { translation: zhCN },
+    hi: { translation: hi },
 };
