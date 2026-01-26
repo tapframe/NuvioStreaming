@@ -176,8 +176,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const openingAnimation = useOpeningAnimation(backdrop, metadata);
 
   const [volume, setVolume] = useState(1.0);
-  const [brightness, setBrightness] = useState(1.0);
-  const setupHook = usePlayerSetup(playerState.setScreenDimensions, setVolume, setBrightness, playerState.paused);
+  const setupHook = usePlayerSetup(playerState.setScreenDimensions, setVolume, playerState.paused);
 
   const controlsHook = usePlayerControls(
     mpvPlayerRef,
@@ -218,8 +217,6 @@ const AndroidVideoPlayer: React.FC = () => {
   const gestureControls = usePlayerGestureControls({
     volume,
     setVolume,
-    brightness,
-    setBrightness,
     volumeRange: { min: 0, max: 1 },
     volumeSensitivity: 0.006,
     brightnessSensitivity: 0.004,
@@ -873,7 +870,6 @@ const AndroidVideoPlayer: React.FC = () => {
           showControls={playerState.showControls}
           hideControls={hideControls}
           volume={volume}
-          brightness={brightness}
           controlsTimeout={controlsTimeout}
           resizeMode={playerState.resizeMode}
         />

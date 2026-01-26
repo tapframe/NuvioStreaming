@@ -19,7 +19,7 @@ interface GestureControlsProps {
     showControls: boolean;
     hideControls: () => void;
     volume: number;
-    brightness: number;
+    brightness?: number;
     controlsTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
     resizeMode?: string;
 }
@@ -34,7 +34,7 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
     showControls,
     hideControls,
     volume,
-    brightness,
+    brightness = 0.5,
     controlsTimeout,
     resizeMode = 'contain'
 }) => {
