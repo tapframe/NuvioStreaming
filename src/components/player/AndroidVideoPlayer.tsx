@@ -44,6 +44,7 @@ import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import SkipIntroButton from './overlays/SkipIntroButton';
 import UpNextButton from './common/UpNextButton';
 import { CustomAlert } from '../CustomAlert';
+import { CreditsInfo } from '../../services/introService';
 
 
 // Android-specific components
@@ -144,6 +145,9 @@ const AndroidVideoPlayer: React.FC = () => {
   // Subtitle sync modal state
   const [showSyncModal, setShowSyncModal] = useState(false);
 
+  // Credits timing state from API
+  const [creditsInfo, setCreditsInfo] = useState<CreditsInfo | null>(null);
+
   // Track auto-selection ref to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
 
@@ -167,7 +171,7 @@ const AndroidVideoPlayer: React.FC = () => {
   }, [uri, episodeId]);
 
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
-  const { metadata, cast } = Boolean(id && type) ? (metadataResult as any) : { metadata: null, cast: [] };
+  const { metadata, cast, tmdbId } = Boolean(id && type) ? (metadataResult as any) : { metadata: null, cast: [], tmdbId: null };
   const hasLogo = metadata && metadata.logo;
   const openingAnimation = useOpeningAnimation(backdrop, metadata);
 
@@ -961,8 +965,10 @@ const AndroidVideoPlayer: React.FC = () => {
           episode={episode}
           malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
           kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+          tmdbId={tmdbId || undefined}
           currentTime={playerState.currentTime}
           onSkip={(endTime) => controlsHook.seekToTime(endTime)}
+          onCreditsInfo={setCreditsInfo}
           controlsVisible={playerState.showControls}
           controlsFixedOffset={100}
         />
@@ -988,6 +994,7 @@ const AndroidVideoPlayer: React.FC = () => {
           metadata={metadataResult?.metadata ? { poster: metadataResult.metadata.poster, id: metadataResult.metadata.id } : undefined}
           controlsVisible={playerState.showControls}
           controlsFixedOffset={100}
+          creditsInfo={creditsInfo}
         />
       </View>
 

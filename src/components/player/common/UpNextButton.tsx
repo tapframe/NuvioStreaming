@@ -4,6 +4,7 @@ import { Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { logger } from '../../../utils/logger';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CreditsInfo } from '../../../services/introService';
 
 export interface Insets {
   top: number;
@@ -33,6 +34,7 @@ interface UpNextButtonProps {
   metadata?: { poster?: string; id?: string }; // Added metadata prop
   controlsVisible?: boolean;
   controlsFixedOffset?: number;
+  creditsInfo?: CreditsInfo | null; // Add credits info from API
 }
 
 const UpNextButton: React.FC<UpNextButtonProps> = ({
@@ -49,6 +51,7 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
   metadata,
   controlsVisible = false,
   controlsFixedOffset = 100,
+  creditsInfo,
 }) => {
   const [visible, setVisible] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
@@ -76,10 +79,19 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
 
   const shouldShow = useMemo(() => {
     if (!nextEpisode || duration <= 0) return false;
+
+    // If we have credits timing from API, use that as primary source
+    if (creditsInfo?.startTime !== null && creditsInfo?.startTime !== undefined) {
+      // Show button when we reach credits start time and stay visible until 10s before end
+      const timeRemaining = duration - currentTime;
+      const isInCredits = currentTime >= creditsInfo.startTime;
+      return isInCredits && timeRemaining > 10;
+    }
+
+    // Fallback: Use fixed timing (show when under ~1 minute and above 10s)
     const timeRemaining = duration - currentTime;
-    // Be tolerant to timer jitter: show when under ~1 minute and above 10s
     return timeRemaining < 61 && timeRemaining > 10;
-  }, [nextEpisode, duration, currentTime]);
+  }, [nextEpisode, duration, currentTime, creditsInfo]);
 
   // Debug logging removed to reduce console noise
   // The state is computed in shouldShow useMemo above
