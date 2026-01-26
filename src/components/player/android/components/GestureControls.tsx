@@ -52,78 +52,104 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
         return 'brightness-high';
     };
 
+    // Create refs for all gesture handlers to enable cross-referencing
+    const leftPanRef = React.useRef(null);
+    const rightPanRef = React.useRef(null);
+    const leftTapRef = React.useRef(null);
+    const rightTapRef = React.useRef(null);
+    const centerTapRef = React.useRef(null);
+    const leftLongPressRef = React.useRef(null);
+    const rightLongPressRef = React.useRef(null);
+
+    // Shared style for left side gesture area
+    const leftSideStyle = {
+        position: 'absolute' as const,
+        top: screenDimensions.height * 0.15,
+        left: 0,
+        width: screenDimensions.width * 0.4,
+        height: screenDimensions.height * 0.7,
+        zIndex: 10,
+    };
+
+    // Shared style for right side gesture area
+    const rightSideStyle = {
+        position: 'absolute' as const,
+        top: screenDimensions.height * 0.15,
+        right: 0,
+        width: screenDimensions.width * 0.4,
+        height: screenDimensions.height * 0.7,
+        zIndex: 10,
+    };
+
     return (
         <>
-            {/* Left side gesture handler - brightness + tap + long press */}
+            {/* Left side gestures - brightness + tap + long press (flat structure) */}
             <LongPressGestureHandler
+                ref={leftLongPressRef}
                 onActivated={onLongPressActivated}
                 onEnded={onLongPressEnd}
                 onHandlerStateChange={onLongPressStateChange}
                 minDurationMs={500}
                 shouldCancelWhenOutside={false}
-                simultaneousHandlers={[]}
             >
-                <PanGestureHandler
-                    onGestureEvent={gestureControls.onBrightnessGestureEvent}
-                    activeOffsetY={[-10, 10]}
-                    failOffsetX={[-30, 30]}
-                    shouldCancelWhenOutside={false}
-                    simultaneousHandlers={[]}
-                    maxPointers={1}
-                >
-                    <TapGestureHandler
-                        onActivated={toggleControls}
-                        shouldCancelWhenOutside={false}
-                        simultaneousHandlers={[]}
-                    >
-                        <View style={{
-                            position: 'absolute',
-                            top: screenDimensions.height * 0.15,
-                            left: 0,
-                            width: screenDimensions.width * 0.4,
-                            height: screenDimensions.height * 0.7,
-                            zIndex: 10,
-                        }} />
-                    </TapGestureHandler>
-                </PanGestureHandler>
+                <View style={leftSideStyle} />
             </LongPressGestureHandler>
 
-            {/* Right side gesture handler - volume + tap + long press */}
+            <PanGestureHandler
+                ref={leftPanRef}
+                onGestureEvent={gestureControls.onBrightnessGestureEvent}
+                activeOffsetY={[-15, 15]}
+                failOffsetX={[-60, 60]}
+                shouldCancelWhenOutside={false}
+                maxPointers={1}
+            >
+                <View style={leftSideStyle} />
+            </PanGestureHandler>
+
+            <TapGestureHandler
+                ref={leftTapRef}
+                onActivated={toggleControls}
+                shouldCancelWhenOutside={false}
+                waitFor={[leftPanRef, leftLongPressRef]}
+            >
+                <View style={leftSideStyle} />
+            </TapGestureHandler>
+
+            {/* Right side gestures - volume + tap + long press (flat structure) */}
             <LongPressGestureHandler
+                ref={rightLongPressRef}
                 onActivated={onLongPressActivated}
                 onEnded={onLongPressEnd}
                 onHandlerStateChange={onLongPressStateChange}
                 minDurationMs={500}
                 shouldCancelWhenOutside={false}
-                simultaneousHandlers={[]}
             >
-                <PanGestureHandler
-                    onGestureEvent={gestureControls.onVolumeGestureEvent}
-                    activeOffsetY={[-10, 10]}
-                    failOffsetX={[-30, 30]}
-                    shouldCancelWhenOutside={false}
-                    simultaneousHandlers={[]}
-                    maxPointers={1}
-                >
-                    <TapGestureHandler
-                        onActivated={toggleControls}
-                        shouldCancelWhenOutside={false}
-                        simultaneousHandlers={[]}
-                    >
-                        <View style={{
-                            position: 'absolute',
-                            top: screenDimensions.height * 0.15,
-                            right: 0,
-                            width: screenDimensions.width * 0.4,
-                            height: screenDimensions.height * 0.7,
-                            zIndex: 10,
-                        }} />
-                    </TapGestureHandler>
-                </PanGestureHandler>
+                <View style={rightSideStyle} />
             </LongPressGestureHandler>
+
+            <PanGestureHandler
+                ref={rightPanRef}
+                onGestureEvent={gestureControls.onVolumeGestureEvent}
+                activeOffsetY={[-15, 15]}
+                failOffsetX={[-60, 60]}
+                shouldCancelWhenOutside={false}
+                maxPointers={1}
+            >
+                <View style={rightSideStyle} />
+            </PanGestureHandler>
+
+            <TapGestureHandler
+                ref={rightTapRef}
+                onActivated={toggleControls}
+                shouldCancelWhenOutside={false}
+                waitFor={[rightPanRef, rightLongPressRef]}
+            >
+                <View style={rightSideStyle} />
+            </TapGestureHandler>
 
             {/* Center area tap handler */}
             <TapGestureHandler
+                ref={centerTapRef}
                 onActivated={() => {
                     if (showControls) {
                         const timeoutId = setTimeout(() => {
@@ -138,7 +164,6 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
                     }
                 }}
                 shouldCancelWhenOutside={false}
-                simultaneousHandlers={[]}
             >
                 <View style={{
                     position: 'absolute',
@@ -146,7 +171,7 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
                     left: screenDimensions.width * 0.4,
                     width: screenDimensions.width * 0.2,
                     height: screenDimensions.height * 0.7,
-                    zIndex: 5,
+                    zIndex: 10,
                 }} />
             </TapGestureHandler>
 

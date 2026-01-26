@@ -386,7 +386,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         {/* Center Controls - CloudStream Style */}
         <View style={[styles.controls, {
           transform: [{ translateY: -(playButtonSize / 2) }]
-        }]}>
+        }]} pointerEvents="box-none">
 
           {/* Backward Seek Button (-10s) */}
           <TouchableOpacity
