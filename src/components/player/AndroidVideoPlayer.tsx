@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { View, StyleSheet, Platform, Animated, ToastAndroid } from 'react-native';
+import { View, StyleSheet, Platform, Animated, ToastAndroid, ActivityIndicator } from 'react-native';
 import { toast } from '@backpackapp-io/react-native-toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -787,7 +787,9 @@ const AndroidVideoPlayer: React.FC = () => {
               modals.setErrorDetails(displayError);
               modals.setShowErrorModal(true);
             }}
-            onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
+            onBuffer={(buf) => {
+              playerState.setIsBuffering(buf.isBuffering);
+            }}
             onTracksChanged={(data) => {
               console.log('[AndroidVideoPlayer] onTracksChanged:', data);
               if (data?.audioTracks) {
@@ -879,6 +881,13 @@ const AndroidVideoPlayer: React.FC = () => {
           formatTime={formatTime}
         />
 
+        {/* Buffering Indicator (Visible when controls are hidden) */}
+        {playerState.isBuffering && !playerState.showControls && (
+          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        )}
+
         <PlayerControls
           showControls={playerState.showControls}
           fadeAnim={fadeAnim}
@@ -926,6 +935,7 @@ const AndroidVideoPlayer: React.FC = () => {
           playerBackend={useExoPlayer ? 'ExoPlayer' : 'MPV'}
           onSwitchToMPV={handleManualSwitchToMPV}
           useExoPlayer={useExoPlayer}
+          isBuffering={playerState.isBuffering}
         />
 
         <SpeedActivatedOverlay

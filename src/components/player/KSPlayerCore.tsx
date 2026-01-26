@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StatusBar, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, StatusBar, StyleSheet, Animated, Dimensions, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -745,10 +745,16 @@ const KSPlayerCore: React.FC = () => {
           await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');
         }}
         onError={handleError}
-        onBuffer={setIsBuffering}
+        onBuffer={(b) => {
+          setIsBuffering(b);
+        }}
         onReadyForDisplay={() => setIsPlayerReady(true)}
-        onPlaybackStalled={() => setIsBuffering(true)}
-        onPlaybackResume={() => setIsBuffering(false)}
+        onPlaybackStalled={() => {
+          setIsBuffering(true);
+        }}
+        onPlaybackResume={() => {
+          setIsBuffering(false);
+        }}
         screenWidth={screenDimensions.width}
         screenHeight={screenDimensions.height}
         customVideoStyles={{ width: '100%', height: '100%' }}
@@ -817,6 +823,13 @@ const KSPlayerCore: React.FC = () => {
       {/* UI Controls */}
       {isVideoLoaded && (
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          {/* Buffering Indicator (Visible when controls are hidden) */}
+          {isBuffering && !showControls && (
+            <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+            </View>
+          )}
+
           <PlayerControls
             showControls={showControls}
             fadeAnim={fadeAnim}
@@ -871,6 +884,7 @@ const KSPlayerCore: React.FC = () => {
             isAirPlayActive={isAirPlayActive}
             allowsAirPlay={allowsAirPlay}
             onAirPlayPress={() => ksPlayerRef.current?.showAirPlayPicker()}
+            isBuffering={isBuffering}
           />
         </View>
       )}
