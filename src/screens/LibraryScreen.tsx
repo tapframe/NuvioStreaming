@@ -19,6 +19,7 @@ import {
   Platform,
   ScrollView,
   BackHandler,
+  Image,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
@@ -34,6 +35,7 @@ import { logger } from '../utils/logger';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTraktContext } from '../contexts/TraktContext';
+import { useSimklContext } from '../contexts/SimklContext';
 import TraktIcon from '../../assets/rating-icons/trakt.svg';
 import { traktService, TraktService, TraktImages } from '../services/traktService';
 import { TraktLoadingSpinner } from '../components/common/TraktLoadingSpinner';
@@ -87,6 +89,8 @@ function getGridLayout(screenWidth: number): { numColumns: number; itemWidth: nu
   return { numColumns, itemWidth };
 }
 
+import { TMDBService } from '../services/tmdbService';
+
 const TraktItem = React.memo(({
   item,
   width,
@@ -109,12 +113,47 @@ const TraktItem = React.memo(({
         const url = TraktService.getTraktPosterUrl(item.images);
         if (isMounted && url) {
           setPosterUrl(url);
+          return;
+        }
+      }
+
+      if (item.imdbId || item.traktId) {
+        try {
+          const tmdbService = TMDBService.getInstance();
+          let tmdbId: number | null = null;
+
+          if (item.imdbId) {
+            tmdbId = await tmdbService.findTMDBIdByIMDB(item.imdbId);
+          }
+
+          if (!tmdbId && item.traktId) {
+
+          }
+
+          if (tmdbId) {
+            let posterPath: string | null = null;
+
+            if (item.type === 'movie') {
+              const details = await tmdbService.getMovieDetails(String(tmdbId));
+              posterPath = details?.poster_path ?? null;
+            } else {
+              const details = await tmdbService.getTVShowDetails(tmdbId);
+              posterPath = details?.poster_path ?? null;
+            }
+
+            if (isMounted && posterPath) {
+              const url = tmdbService.getImageUrl(posterPath, 'w500');
+              setPosterUrl(url);
+            }
+          }
+        } catch (error) {
+          logger.debug('Failed to fetch poster from TMDB', error);
         }
       }
     };
     fetchPoster();
     return () => { isMounted = false; };
-  }, [item.images]);
+  }, [item.images, item.imdbId, item.traktId, item.type]);
 
   const handlePress = useCallback(() => {
     if (item.imdbId) {
@@ -219,9 +258,11 @@ const LibraryScreen = () => {
   const { numColumns, itemWidth } = useMemo(() => getGridLayout(width), [width]);
   const [loading, setLoading] = useState(true);
   const [libraryItems, setLibraryItems] = useState<LibraryItem[]>([]);
-  const [filter, setFilter] = useState<'trakt' | 'movies' | 'series'>('movies');
+  const [filter, setFilter] = useState<'trakt' | 'simkl' | 'movies' | 'series'>('movies');
   const [showTraktContent, setShowTraktContent] = useState(false);
   const [selectedTraktFolder, setSelectedTraktFolder] = useState<string | null>(null);
+  const [showSimklContent, setShowSimklContent] = useState(false);
+  const [selectedSimklFolder, setSelectedSimklFolder] = useState<string | null>(null);
   const { showInfo, showError } = useToast();
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
@@ -230,7 +271,6 @@ const LibraryScreen = () => {
   const { settings } = useSettings();
   const flashListRef = useRef<any>(null);
 
-  // Scroll to top handler
   const scrollToTop = useCallback(() => {
     flashListRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
@@ -251,6 +291,29 @@ const LibraryScreen = () => {
     loadWatchedItems,
     loadAllCollections
   } = useTraktContext();
+
+  const {
+    isAuthenticated: simklAuthenticated,
+    isLoading: simklLoading,
+    watchingShows,
+    watchingMovies,
+    watchingAnime,
+    planToWatchShows,
+    planToWatchMovies,
+    planToWatchAnime,
+    completedShows,
+    completedMovies,
+    completedAnime,
+    onHoldShows,
+    onHoldMovies,
+    onHoldAnime,
+    droppedShows,
+    droppedMovies,
+    droppedAnime,
+    continueWatching: simklContinueWatching,
+    ratedContent: simklRatedContent,
+    loadAllCollections: loadSimklCollections
+  } = useSimklContext();
 
   useEffect(() => {
     const applyStatusBarConfig = () => {
@@ -276,12 +339,20 @@ const LibraryScreen = () => {
         }
         return true;
       }
+      if (showSimklContent) {
+        if (selectedSimklFolder) {
+          setSelectedSimklFolder(null);
+        } else {
+          setShowSimklContent(false);
+        }
+        return true;
+      }
       return false;
     };
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
-  }, [showTraktContent, selectedTraktFolder]);
+  }, [showTraktContent, showSimklContent, selectedTraktFolder, selectedSimklFolder]);
 
   useEffect(() => {
     const loadLibrary = async () => {
@@ -395,6 +466,117 @@ const LibraryScreen = () => {
 
     return folders.filter(folder => folder.itemCount > 0);
   }, [traktAuthenticated, watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
+
+  const simklFolders = useMemo((): TraktFolder[] => {
+    if (!simklAuthenticated) return [];
+
+    const folders: TraktFolder[] = [
+      {
+        id: 'continue-watching',
+        name: t('library.continue'),
+        icon: 'play-circle-outline',
+        itemCount: simklContinueWatching?.length || 0,
+      },
+      {
+        id: 'watching-shows',
+        name: 'Watching Shows',
+        icon: 'visibility',
+        itemCount: watchingShows?.length || 0,
+      },
+      {
+        id: 'watching-movies',
+        name: 'Watching Movies',
+        icon: 'visibility',
+        itemCount: watchingMovies?.length || 0,
+      },
+      {
+        id: 'watching-anime',
+        name: 'Watching Anime',
+        icon: 'visibility',
+        itemCount: watchingAnime?.length || 0,
+      },
+      {
+        id: 'plantowatch-shows',
+        name: 'Plan to Watch Shows',
+        icon: 'bookmark-border',
+        itemCount: planToWatchShows?.length || 0,
+      },
+      {
+        id: 'plantowatch-movies',
+        name: 'Plan to Watch Movies',
+        icon: 'bookmark-border',
+        itemCount: planToWatchMovies?.length || 0,
+      },
+      {
+        id: 'plantowatch-anime',
+        name: 'Plan to Watch Anime',
+        icon: 'bookmark-border',
+        itemCount: planToWatchAnime?.length || 0,
+      },
+      {
+        id: 'completed-shows',
+        name: 'Completed Shows',
+        icon: 'check-circle',
+        itemCount: completedShows?.length || 0,
+      },
+      {
+        id: 'completed-movies',
+        name: 'Completed Movies',
+        icon: 'check-circle',
+        itemCount: completedMovies?.length || 0,
+      },
+      {
+        id: 'completed-anime',
+        name: 'Completed Anime',
+        icon: 'check-circle',
+        itemCount: completedAnime?.length || 0,
+      },
+      {
+        id: 'onhold-shows',
+        name: 'On Hold Shows',
+        icon: 'pause-circle-outline',
+        itemCount: onHoldShows?.length || 0,
+      },
+      {
+        id: 'onhold-movies',
+        name: 'On Hold Movies',
+        icon: 'pause-circle-outline',
+        itemCount: onHoldMovies?.length || 0,
+      },
+      {
+        id: 'onhold-anime',
+        name: 'On Hold Anime',
+        icon: 'pause-circle-outline',
+        itemCount: onHoldAnime?.length || 0,
+      },
+      {
+        id: 'dropped-shows',
+        name: 'Dropped Shows',
+        icon: 'cancel',
+        itemCount: droppedShows?.length || 0,
+      },
+      {
+        id: 'dropped-movies',
+        name: 'Dropped Movies',
+        icon: 'cancel',
+        itemCount: droppedMovies?.length || 0,
+      },
+      {
+        id: 'dropped-anime',
+        name: 'Dropped Anime',
+        icon: 'cancel',
+        itemCount: droppedAnime?.length || 0,
+      },
+      {
+        id: 'ratings',
+        name: t('library.rated'),
+        icon: 'star',
+        itemCount: simklRatedContent?.length || 0,
+      }
+    ];
+
+    return folders.filter(folder => folder.itemCount > 0);
+  }, [simklAuthenticated, watchingShows, watchingMovies, watchingAnime, planToWatchShows, planToWatchMovies, planToWatchAnime, completedShows, completedMovies, completedAnime, onHoldShows, onHoldMovies, onHoldAnime, droppedShows, droppedMovies, droppedAnime, simklContinueWatching, simklRatedContent, t]);
 
   const renderItem = ({ item }: { item: LibraryItem }) => (
     <TouchableOpacity
@@ -712,6 +894,233 @@ const LibraryScreen = () => {
     });
   }, [watchedMovies, watchedShows, watchlistMovies, watchlistShows, collectionMovies, collectionShows, continueWatching, ratedContent]);
 
+  const getSimklFolderItems = useCallback((folderId: string): TraktDisplayItem[] => {
+    const items: TraktDisplayItem[] = [];
+
+    switch (folderId) {
+      case 'continue-watching':
+        return (simklContinueWatching || []).map(item => {
+          const content = item.show || item.movie;
+          return {
+            id: String(content?.ids?.simkl || Math.random()),
+            name: content?.title || 'Unknown',
+            type: item.show ? 'series' : 'movie',
+            poster: '',
+            year: content?.year,
+            lastWatched: item.paused_at,
+            imdbId: content?.ids?.imdb,
+            traktId: content?.ids?.simkl || 0,
+          };
+        });
+
+      case 'watching-shows':
+        return (watchingShows || []).map(item => ({
+          id: String(item.show?.ids?.simkl || Math.random()),
+          name: item.show?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.show?.year,
+          lastWatched: item.last_watched_at,
+          rating: item.user_rating,
+          imdbId: item.show?.ids?.imdb,
+          traktId: item.show?.ids?.simkl || 0,
+        }));
+
+      case 'watching-movies':
+        return (watchingMovies || []).map(item => ({
+          id: String(item.movie?.ids?.simkl || Math.random()),
+          name: item.movie?.title || 'Unknown',
+          type: 'movie' as const,
+          poster: '',
+          year: item.movie?.year,
+          lastWatched: item.last_watched_at,
+          rating: item.user_rating,
+          imdbId: item.movie?.ids?.imdb,
+          traktId: item.movie?.ids?.simkl || 0,
+        }));
+
+      case 'watching-anime':
+        return (watchingAnime || []).map(item => ({
+          id: String(item.anime?.ids?.simkl || Math.random()),
+          name: item.anime?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.anime?.year,
+          lastWatched: item.last_watched_at,
+          rating: item.user_rating,
+          imdbId: item.anime?.ids?.imdb,
+          traktId: item.anime?.ids?.simkl || 0,
+        }));
+
+      case 'plantowatch-shows':
+        return (planToWatchShows || []).map(item => ({
+          id: String(item.show?.ids?.simkl || Math.random()),
+          name: item.show?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.show?.year,
+          lastWatched: item.added_to_watchlist_at,
+          imdbId: item.show?.ids?.imdb,
+          traktId: item.show?.ids?.simkl || 0,
+        }));
+
+      case 'plantowatch-movies':
+        return (planToWatchMovies || []).map(item => ({
+          id: String(item.movie?.ids?.simkl || Math.random()),
+          name: item.movie?.title || 'Unknown',
+          type: 'movie' as const,
+          poster: '',
+          year: item.movie?.year,
+          lastWatched: item.added_to_watchlist_at,
+          imdbId: item.movie?.ids?.imdb,
+          traktId: item.movie?.ids?.simkl || 0,
+        }));
+
+      case 'plantowatch-anime':
+        return (planToWatchAnime || []).map(item => ({
+          id: String(item.anime?.ids?.simkl || Math.random()),
+          name: item.anime?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.anime?.year,
+          lastWatched: item.added_to_watchlist_at,
+          imdbId: item.anime?.ids?.imdb,
+          traktId: item.anime?.ids?.simkl || 0,
+        }));
+
+      case 'completed-shows':
+        return (completedShows || []).map(item => ({
+          id: String(item.show?.ids?.simkl || Math.random()),
+          name: item.show?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.show?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.show?.ids?.imdb,
+          traktId: item.show?.ids?.simkl || 0,
+        }));
+
+      case 'completed-movies':
+        return (completedMovies || []).map(item => ({
+          id: String(item.movie?.ids?.simkl || Math.random()),
+          name: item.movie?.title || 'Unknown',
+          type: 'movie' as const,
+          poster: '',
+          year: item.movie?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.movie?.ids?.imdb,
+          traktId: item.movie?.ids?.simkl || 0,
+        }));
+
+      case 'completed-anime':
+        return (completedAnime || []).map(item => ({
+          id: String(item.anime?.ids?.simkl || Math.random()),
+          name: item.anime?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.anime?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.anime?.ids?.imdb,
+          traktId: item.anime?.ids?.simkl || 0,
+        }));
+
+      case 'onhold-shows':
+        return (onHoldShows || []).map(item => ({
+          id: String(item.show?.ids?.simkl || Math.random()),
+          name: item.show?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.show?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.show?.ids?.imdb,
+          traktId: item.show?.ids?.simkl || 0,
+        }));
+
+      case 'onhold-movies':
+        return (onHoldMovies || []).map(item => ({
+          id: String(item.movie?.ids?.simkl || Math.random()),
+          name: item.movie?.title || 'Unknown',
+          type: 'movie' as const,
+          poster: '',
+          year: item.movie?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.movie?.ids?.imdb,
+          traktId: item.movie?.ids?.simkl || 0,
+        }));
+
+      case 'onhold-anime':
+        return (onHoldAnime || []).map(item => ({
+          id: String(item.anime?.ids?.simkl || Math.random()),
+          name: item.anime?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.anime?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.anime?.ids?.imdb,
+          traktId: item.anime?.ids?.simkl || 0,
+        }));
+
+      case 'dropped-shows':
+        return (droppedShows || []).map(item => ({
+          id: String(item.show?.ids?.simkl || Math.random()),
+          name: item.show?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.show?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.show?.ids?.imdb,
+          traktId: item.show?.ids?.simkl || 0,
+        }));
+
+      case 'dropped-movies':
+        return (droppedMovies || []).map(item => ({
+          id: String(item.movie?.ids?.simkl || Math.random()),
+          name: item.movie?.title || 'Unknown',
+          type: 'movie' as const,
+          poster: '',
+          year: item.movie?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.movie?.ids?.imdb,
+          traktId: item.movie?.ids?.simkl || 0,
+        }));
+
+      case 'dropped-anime':
+        return (droppedAnime || []).map(item => ({
+          id: String(item.anime?.ids?.simkl || Math.random()),
+          name: item.anime?.title || 'Unknown',
+          type: 'series' as const,
+          poster: '',
+          year: item.anime?.year,
+          lastWatched: item.last_watched_at,
+          imdbId: item.anime?.ids?.imdb,
+          traktId: item.anime?.ids?.simkl || 0,
+        }));
+
+      case 'ratings':
+        return (simklRatedContent || []).map(item => {
+          const content = item.show || item.movie || item.anime;
+          const type = item.show ? 'series' : item.movie ? 'movie' : 'series';
+          return {
+            id: String(content?.ids?.simkl || Math.random()),
+            name: content?.title || 'Unknown',
+            type,
+            poster: '',
+            year: content?.year,
+            lastWatched: item.rated_at,
+            rating: item.rating,
+            imdbId: content?.ids?.imdb,
+            traktId: content?.ids?.simkl || 0,
+          };
+        });
+    }
+
+    return items.sort((a, b) => {
+      const dateA = a.lastWatched ? new Date(a.lastWatched).getTime() : 0;
+      const dateB = b.lastWatched ? new Date(b.lastWatched).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [simklContinueWatching, watchingShows, watchingMovies, watchingAnime, planToWatchShows, planToWatchMovies, planToWatchAnime, completedShows, completedMovies, completedAnime, onHoldShows, onHoldMovies, onHoldAnime, droppedShows, droppedMovies, droppedAnime, simklRatedContent]);
+
   const renderTraktContent = () => {
     if (traktLoading) {
       return <TraktLoadingSpinner />;
@@ -800,7 +1209,133 @@ const LibraryScreen = () => {
     );
   };
 
-  const renderFilter = (filterType: 'trakt' | 'movies' | 'series', label: string, iconName: keyof typeof MaterialIcons.glyphMap) => {
+  const renderSimklCollectionFolder = ({ folder }: { folder: TraktFolder }) => (
+    <TouchableOpacity
+      style={[styles.itemContainer, { width: itemWidth }]}
+      onPress={() => {
+        setSelectedSimklFolder(folder.id);
+        loadSimklCollections();
+      }}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.posterContainer, styles.folderContainer, { shadowColor: currentTheme.colors.black, backgroundColor: currentTheme.colors.elevation1 }]}>
+        <View style={styles.folderGradient}>
+          <MaterialIcons
+            name={folder.icon}
+            size={48}
+            color={currentTheme.colors.white}
+            style={{ marginBottom: 8 }}
+          />
+          <Text style={[styles.folderTitle, { color: currentTheme.colors.white }]}>
+            {folder.name}
+          </Text>
+          <Text style={styles.folderCount}>
+            {folder.itemCount} {t('library.items')}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderSimklContent = () => {
+    if (simklLoading) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 80 }}>
+          <Image
+            source={require('../../assets/simkl-logo.png')}
+            style={{ width: 120, height: 40, tintColor: currentTheme.colors.text }}
+            resizeMode="contain"
+          />
+        </View>
+      );
+    }
+
+    if (!selectedSimklFolder) {
+      if (simklFolders.length === 0) {
+        return (
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="video-library" size={80} color={currentTheme.colors.lightGray} />
+            <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>
+              {t('library.no_trakt')}
+            </Text>
+            <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
+              {t('library.no_trakt_desc')}
+            </Text>
+            <TouchableOpacity
+              style={[styles.exploreButton, {
+                backgroundColor: currentTheme.colors.primary,
+                shadowColor: currentTheme.colors.black
+              }]}
+              onPress={() => {
+                loadSimklCollections();
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>{t('library.load_collections')}</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      return (
+        <FlashList
+          ref={flashListRef}
+          data={simklFolders}
+          renderItem={({ item }) => renderSimklCollectionFolder({ folder: item })}
+          keyExtractor={item => item.id}
+          numColumns={numColumns}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          onEndReachedThreshold={0.7}
+          onEndReached={() => { }}
+        />
+      );
+    }
+
+    const folderItems = getSimklFolderItems(selectedSimklFolder);
+
+    if (folderItems.length === 0) {
+      const folderName = simklFolders.find(f => f.id === selectedSimklFolder)?.name || t('library.collection');
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="video-library" size={80} color={currentTheme.colors.lightGray} />
+          <Text style={[styles.emptyText, { color: currentTheme.colors.white }]}>{t('library.empty_folder', { folder: folderName })}</Text>
+          <Text style={[styles.emptySubtext, { color: currentTheme.colors.mediumGray }]}>
+            {t('library.empty_folder_desc')}
+          </Text>
+          <TouchableOpacity
+            style={[styles.exploreButton, {
+              backgroundColor: currentTheme.colors.primary,
+              shadowColor: currentTheme.colors.black
+            }]}
+            onPress={() => {
+              loadSimklCollections();
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.exploreButtonText, { color: currentTheme.colors.white }]}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <FlashList
+        ref={flashListRef}
+        data={folderItems}
+        renderItem={({ item }) => renderTraktItem({ item })}
+        keyExtractor={(item) => `${item.type}-${item.id}`}
+        numColumns={numColumns}
+        style={styles.traktContainer}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        showsVerticalScrollIndicator={false}
+        onEndReachedThreshold={0.7}
+        onEndReached={() => { }}
+      />
+    );
+  };
+
+  const renderFilter = (filterType: 'trakt' | 'simkl' | 'movies' | 'series', label: string) => {
     const isActive = filter === filterType;
 
     return (
@@ -821,22 +1356,20 @@ const LibraryScreen = () => {
             }
             return;
           }
+          if (filterType === 'simkl') {
+            if (!simklAuthenticated) {
+              navigation.navigate('Settings');
+            } else {
+              setShowSimklContent(true);
+              setSelectedSimklFolder(null);
+              loadSimklCollections();
+            }
+            return;
+          }
           setFilter(filterType);
         }}
         activeOpacity={0.7}
       >
-        {filterType === 'trakt' ? (
-          <View style={[styles.filterIcon, { justifyContent: 'center', alignItems: 'center' }]}>
-            <TraktIcon width={18} height={18} style={{ opacity: isActive ? 1 : 0.6 }} />
-          </View>
-        ) : (
-          <MaterialIcons
-            name={iconName}
-            size={22}
-            color={isActive ? currentTheme.colors.white : currentTheme.colors.mediumGray}
-            style={styles.filterIcon}
-          />
-        )}
         <Text
           style={[
             styles.filterText,
@@ -912,14 +1445,26 @@ const LibraryScreen = () => {
           ? (selectedTraktFolder
             ? traktFolders.find(f => f.id === selectedTraktFolder)?.name || t('library.collection')
             : t('library.trakt_collection'))
-          : t('library.title')
+          : showSimklContent
+            ? (selectedSimklFolder
+              ? simklFolders.find(f => f.id === selectedSimklFolder)?.name || t('library.collection')
+              : 'SIMKL Collections')
+            : t('library.title')
         }
-        showBackButton={showTraktContent}
-        onBackPress={showTraktContent ? () => {
-          if (selectedTraktFolder) {
-            setSelectedTraktFolder(null);
-          } else {
-            setShowTraktContent(false);
+        showBackButton={showTraktContent || showSimklContent}
+        onBackPress={(showTraktContent || showSimklContent) ? () => {
+          if (showTraktContent) {
+            if (selectedTraktFolder) {
+              setSelectedTraktFolder(null);
+            } else {
+              setShowTraktContent(false);
+            }
+          } else if (showSimklContent) {
+            if (selectedSimklFolder) {
+              setSelectedSimklFolder(null);
+            } else {
+              setShowSimklContent(false);
+            }
           }
         } : undefined}
         useMaterialIcons={showTraktContent}
@@ -929,15 +1474,16 @@ const LibraryScreen = () => {
       />
 
       <View style={[styles.contentContainer, { backgroundColor: currentTheme.colors.darkBackground }]}>
-        {!showTraktContent && (
+        {!showTraktContent && !showSimklContent && (
           <View style={styles.filtersContainer}>
-            {renderFilter('trakt', 'Trakt', 'pan-tool')}
-            {renderFilter('movies', t('search.movies'), 'movie')}
-            {renderFilter('series', t('search.tv_shows'), 'live-tv')}
+            {renderFilter('trakt', 'Trakt')}
+            {renderFilter('simkl', 'SIMKL')}
+            {renderFilter('movies', t('search.movies'))}
+            {renderFilter('series', t('search.tv_shows'))}
           </View>
         )}
 
-        {showTraktContent ? renderTraktContent() : renderContent()}
+        {showTraktContent ? renderTraktContent() : showSimklContent ? renderSimklContent() : renderContent()}
       </View>
 
       {selectedItem && (
@@ -1065,13 +1611,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.03)',
     aspectRatio: 2 / 3,
-    // Consistent shadow/elevation matching ContentItem
     elevation: Platform.OS === 'android' ? 1 : 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 1,
-    // Consistent border styling
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.15)',
   },

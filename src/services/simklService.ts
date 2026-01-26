@@ -66,11 +66,13 @@ export interface SimklPlaybackData {
     movie?: {
         title: string;
         year: number;
+        poster?: string;
         ids: SimklIds;
     };
     show?: {
         title: string;
         year: number;
+        poster?: string;
         ids: SimklIds;
     };
     episode?: {
@@ -130,8 +132,94 @@ export interface SimklActivities {
         anime?: string;
         [key: string]: string | undefined;
     };
+    movies?: {
+        all?: string;
+        rated_at?: string;
+        plantowatch?: string;
+        completed?: string;
+        dropped?: string;
+        [key: string]: string | undefined;
+    };
+    shows?: {
+        all?: string;
+        rated_at?: string;
+        playback?: string;
+        plantowatch?: string;
+        watching?: string;
+        completed?: string;
+        hold?: string;
+        dropped?: string;
+        [key: string]: string | undefined;
+    };
+    anime?: {
+        all?: string;
+        rated_at?: string;
+        playback?: string;
+        plantowatch?: string;
+        watching?: string;
+        completed?: string;
+        hold?: string;
+        dropped?: string;
+        [key: string]: string | undefined;
+    };
     [key: string]: any;
 }
+
+export interface SimklWatchlistItem {
+    movie?: {
+        title: string;
+        year: number;
+        poster?: string;
+        ids: SimklIds;
+    };
+    show?: {
+        title: string;
+        year: number;
+        poster?: string;
+        ids: SimklIds;
+    };
+    anime?: {
+        title: string;
+        year: number;
+        poster?: string;
+        ids: SimklIds;
+    };
+    status?: 'watching' | 'plantowatch' | 'completed' | 'hold' | 'dropped';
+    last_watched_at?: string;
+    user_rating?: number;
+    watched_episodes_count?: number;
+    total_episodes_count?: number;
+    last_watched?: string;
+    next_to_watch?: string;
+    added_to_watchlist_at?: string;
+}
+
+export interface SimklRatingItem {
+    movie?: {
+        title: string;
+        year: number;
+        poster?: string;
+        ids: SimklIds;
+    };
+    show?: {
+        title: string;
+        year: number;
+        poster?: string;
+        ids: SimklIds;
+    };
+    anime?: {
+        title: string;
+        year: number;
+        poster?: string;
+        ids: SimklIds;
+    };
+    rating: number;
+    rated_at: string;
+    last_watched_at?: string;
+    user_rated_at?: string;
+}
+
+export type SimklStatus = 'watching' | 'plantowatch' | 'completed' | 'hold' | 'dropped';
 
 export class SimklService {
     private static instance: SimklService;
@@ -603,16 +691,201 @@ export class SimklService {
     }
 
     /**
-     * SYNC: Get Full Watch History (summary)
-     * Optimization: Check /sync/activities first in real usage.
-     * For now, we implement simple fetch.
+     * SYNC: Get all items from user's lists
+     * Enhanced version with type and status filtering
      */
-    public async getAllItems(dateFrom?: string): Promise<any> {
+    public async getAllItems(
+        type?: 'movies' | 'shows' | 'anime',
+        status?: SimklStatus,
+        dateFrom?: string
+    ): Promise<SimklWatchlistItem[]> {
         let url = '/sync/all-items/';
-        if (dateFrom) {
-            url += `?date_from=${dateFrom}`;
+
+        if (type) {
+            url += `${type}/`;
         }
-        return await this.apiRequest(url);
+
+        if (status) {
+            url += status;
+        }
+
+        const params: string[] = [];
+        if (dateFrom) {
+            params.push(`date_from=${dateFrom}`);
+        }
+
+        if (params.length > 0) {
+            url += `?${params.join('&')}`;
+        }
+
+        try {
+            logger.log(`[SimklService] getAllItems: Fetching ${url}`);
+            const response = await this.apiRequest<any>(url);
+            if (!response) {
+                logger.log('[SimklService] getAllItems: No response from API');
+                return [];
+            }
+
+            logger.log('[SimklService] getAllItems: Response keys:', Object.keys(response));
+
+            // Parse response based on type
+            const items: SimklWatchlistItem[] = [];
+
+            if (response.movies && type === 'movies') {
+                logger.log(`[SimklService] getAllItems: Returning ${response.movies.length} movies`);
+                if (response.movies.length > 0) {
+                    logger.log('[SimklService] getAllItems: First movie sample:', JSON.stringify(response.movies[0], null, 2));
+                }
+                return response.movies || [];
+            }
+            if (response.shows && type === 'shows') {
+                logger.log(`[SimklService] getAllItems: Returning ${response.shows.length} shows`);
+                if (response.shows.length > 0) {
+                    logger.log('[SimklService] getAllItems: First show sample:', JSON.stringify(response.shows[0], null, 2));
+                }
+                return response.shows || [];
+            }
+            if (response.anime && type === 'anime') {
+                logger.log(`[SimklService] getAllItems: Returning ${response.anime.length} anime`);
+                if (response.anime.length > 0) {
+                    logger.log('[SimklService] getAllItems: First anime sample:', JSON.stringify(response.anime[0], null, 2));
+                }
+                return response.anime || [];
+            }
+
+            // If no type specified, return all
+            if (!type) {
+                if (response.movies) items.push(...response.movies);
+                if (response.shows) items.push(...response.shows);
+                if (response.anime) items.push(...response.anime);
+                logger.log(`[SimklService] getAllItems: Returning ${items.length} total items`);
+                return items;
+            }
+
+            logger.log('[SimklService] getAllItems: No matching type found, returning empty array');
+            return [];
+        } catch (error) {
+            logger.error('[SimklService] Failed to get all items:', error);
+            return [];
+        }
+    }
+
+    /**
+     * SYNC: Get user ratings
+     */
+    public async getRatings(
+        type?: 'movies' | 'shows' | 'anime',
+        ratingFilter?: string
+    ): Promise<SimklRatingItem[]> {
+        let url = '/sync/ratings/';
+
+        if (type) {
+            url += type;
+            if (ratingFilter) {
+                url += `/${ratingFilter}`;
+            }
+        }
+
+        try {
+            const response = await this.apiRequest<any>(url);
+            if (!response) return [];
+
+            const items: SimklRatingItem[] = [];
+
+            // Aggregate ratings from all types
+            if (response.movies) items.push(...response.movies);
+            if (response.shows) items.push(...response.shows);
+            if (response.anime) items.push(...response.anime);
+
+            return items;
+        } catch (error) {
+            logger.error('[SimklService] Failed to get ratings:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Add item to a specific status list
+     */
+    public async addToList(
+        imdbId: string,
+        type: 'movie' | 'show' | 'anime',
+        status: SimklStatus
+    ): Promise<boolean> {
+        const contentType = type === 'movie' ? 'movies' : type === 'show' ? 'shows' : 'anime';
+
+        const payload = {
+            [contentType]: [{
+                to: status,
+                ids: { imdb: imdbId }
+            }]
+        };
+
+        try {
+            const response = await this.apiRequest('/sync/add-to-list', 'POST', payload);
+            return !!response;
+        } catch (error) {
+            logger.error('[SimklService] Failed to add to list:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Remove item from list (marks as not interested)
+     */
+    public async removeFromList(
+        imdbId: string,
+        type: 'movie' | 'show' | 'anime'
+    ): Promise<boolean> {
+        const contentType = type === 'movie' ? 'movies' : type === 'show' ? 'shows' : 'anime';
+
+        const payload = {
+            [contentType]: [{
+                ids: { imdb: imdbId }
+            }]
+        };
+
+        try {
+            const response = await this.apiRequest('/sync/remove-from-list', 'POST', payload);
+            return !!response;
+        } catch (error) {
+            logger.error('[SimklService] Failed to remove from list:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Add rating for item
+     */
+    public async addRating(
+        imdbId: string,
+        type: 'movie' | 'show' | 'anime',
+        rating: number
+    ): Promise<boolean> {
+        const contentType = type === 'movie' ? 'movies' : type === 'show' ? 'shows' : 'anime';
+
+        const payload = {
+            [contentType]: [{
+                ids: { imdb: imdbId },
+                rating: Math.max(1, Math.min(10, rating))
+            }]
+        };
+
+        try {
+            const response = await this.apiRequest('/sync/ratings', 'POST', payload);
+            return !!response;
+        } catch (error) {
+            logger.error('[SimklService] Failed to add rating:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Get poster URL - returns empty string to let app's existing poster infrastructure handle it
+     * The app will use IMDB ID or TMDB ID to fetch posters through existing metadata services
+     */
+    public static getPosterUrl(): string {
+        return '';
     }
 
     /**
