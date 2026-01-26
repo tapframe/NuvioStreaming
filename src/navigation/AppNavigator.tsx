@@ -73,7 +73,7 @@ import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
 import BackupScreen from '../screens/BackupScreen';
 import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
 import ContributorsScreen from '../screens/ContributorsScreen';
-import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
+
 import {
   ContentDiscoverySettingsScreen,
   AppearanceSettingsScreen,
@@ -214,7 +214,7 @@ export type RootStackParamList = {
   };
   ContinueWatchingSettings: undefined;
   Contributors: undefined;
-  DebridIntegration: undefined;
+
   // New organized settings screens
   ContentDiscoverySettings: undefined;
   AppearanceSettings: undefined;
@@ -1730,21 +1730,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen
-              name="DebridIntegration"
-              component={DebridIntegrationScreen}
-              options={{
-                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
-                animationDuration: Platform.OS === 'android' ? 250 : 300,
-                presentation: 'card',
-                gestureEnabled: true,
-                gestureDirection: 'horizontal',
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: currentTheme.colors.darkBackground,
-                },
-              }}
-            />
+
             <Stack.Screen
               name="ContentDiscoverySettings"
               component={ContentDiscoverySettingsScreen}
