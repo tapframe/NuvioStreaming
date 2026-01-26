@@ -807,6 +807,11 @@ const KSPlayerCore: React.FC = () => {
         brightness={brightness}
         controlsTimeout={controlsTimeout}
         resizeMode={resizeMode}
+        skip={controls.skip}
+        currentTime={currentTime}
+        duration={duration}
+        seekToTime={controls.seekToTime}
+        formatTime={formatTime}
       />
 
       {/* UI Controls */}

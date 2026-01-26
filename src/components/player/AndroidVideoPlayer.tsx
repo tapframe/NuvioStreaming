@@ -872,6 +872,11 @@ const AndroidVideoPlayer: React.FC = () => {
           volume={volume}
           controlsTimeout={controlsTimeout}
           resizeMode={playerState.resizeMode}
+          skip={controlsHook.skip}
+          currentTime={playerState.currentTime}
+          duration={playerState.duration}
+          seekToTime={controlsHook.seekToTime}
+          formatTime={formatTime}
         />
 
         <PlayerControls

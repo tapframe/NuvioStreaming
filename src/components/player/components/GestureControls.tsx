@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import {
     TapGestureHandler,
@@ -22,6 +22,12 @@ interface GestureControlsProps {
     brightness?: number;
     controlsTimeout: React.MutableRefObject<NodeJS.Timeout | null>;
     resizeMode?: string;
+    // New props for double-tap skip and horizontal seek
+    skip?: (seconds: number) => void;
+    currentTime?: number;
+    duration?: number;
+    seekToTime?: (seconds: number) => void;
+    formatTime?: (seconds: number) => string;
 }
 
 export const GestureControls: React.FC<GestureControlsProps> = ({
@@ -36,7 +42,12 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
     volume,
     brightness = 0.5,
     controlsTimeout,
-    resizeMode = 'contain'
+    resizeMode = 'contain',
+    skip,
+    currentTime,
+    duration,
+    seekToTime,
+    formatTime,
 }) => {
 
     const getVolumeIcon = (value: number) => {
@@ -52,105 +63,234 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
         return 'brightness-high';
     };
 
+    // Refs for gesture handlers
+    const leftDoubleTapRef = React.useRef(null);
+    const rightDoubleTapRef = React.useRef(null);
+    const horizontalSeekPanRef = React.useRef(null);
+    const leftVerticalPanRef = React.useRef(null);
+    const rightVerticalPanRef = React.useRef(null);
+
+    // State for double-tap skip overlays
+    const [showSkipForwardOverlay, setShowSkipForwardOverlay] = useState(false);
+    const [showSkipBackwardOverlay, setShowSkipBackwardOverlay] = useState(false);
+    const [skipAmount, setSkipAmount] = useState(10);
+
+    // State for horizontal seek
+    const [isHorizontalSeeking, setIsHorizontalSeeking] = useState(false);
+    const [seekPreviewTime, setSeekPreviewTime] = useState(0);
+    const [seekStartTime, setSeekStartTime] = useState(0);
+
+    // Refs for overlay timeouts
+    const skipForwardTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+    const skipBackwardTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // Cleanup timeouts on unmount
+    React.useEffect(() => {
+        return () => {
+            if (skipForwardTimeoutRef.current) clearTimeout(skipForwardTimeoutRef.current);
+            if (skipBackwardTimeoutRef.current) clearTimeout(skipBackwardTimeoutRef.current);
+        };
+    }, []);
+
+    // Double-tap handlers
+    const handleLeftDoubleTap = () => {
+        if (skip) {
+            skip(-10);
+            setSkipAmount(prev => {
+                const newAmount = showSkipBackwardOverlay ? prev + 10 : 10;
+                return newAmount;
+            });
+            setShowSkipBackwardOverlay(true);
+            if (skipBackwardTimeoutRef.current) {
+                clearTimeout(skipBackwardTimeoutRef.current);
+            }
+            skipBackwardTimeoutRef.current = setTimeout(() => {
+                setShowSkipBackwardOverlay(false);
+                setSkipAmount(10);
+            }, 800);
+        }
+    };
+
+    const handleRightDoubleTap = () => {
+        if (skip) {
+            skip(10);
+            setSkipAmount(prev => {
+                const newAmount = showSkipForwardOverlay ? prev + 10 : 10;
+                return newAmount;
+            });
+            setShowSkipForwardOverlay(true);
+            if (skipForwardTimeoutRef.current) {
+                clearTimeout(skipForwardTimeoutRef.current);
+            }
+            skipForwardTimeoutRef.current = setTimeout(() => {
+                setShowSkipForwardOverlay(false);
+                setSkipAmount(10);
+            }, 800);
+        }
+    };
+
+    // Shared styles for gesture areas (relative to parent container)
+    const leftSideStyle = {
+        position: 'absolute' as const,
+        top: 0,
+        left: 0,
+        width: screenDimensions.width * 0.4,
+        height: '100%' as const,
+    };
+
+    const rightSideStyle = {
+        position: 'absolute' as const,
+        top: 0,
+        right: 0,
+        width: screenDimensions.width * 0.4,
+        height: '100%' as const,
+    };
+
+    // Full gesture area style
+    const gestureAreaStyle = {
+        position: 'absolute' as const,
+        top: screenDimensions.height * 0.15,
+        left: 0,
+        width: screenDimensions.width,
+        height: screenDimensions.height * 0.7,
+        zIndex: 10,
+    };
+
     return (
         <>
-            {/* Left side gesture handler - brightness + tap + long press */}
-            <LongPressGestureHandler
-                onActivated={onLongPressActivated}
-                onEnded={onLongPressEnd}
-                onHandlerStateChange={onLongPressStateChange}
-                minDurationMs={500}
-                shouldCancelWhenOutside={false}
-                simultaneousHandlers={[]}
-            >
-                <PanGestureHandler
-                    onGestureEvent={gestureControls.onBrightnessGestureEvent}
-                    activeOffsetY={[-10, 10]}
-                    failOffsetX={[-30, 30]}
-                    shouldCancelWhenOutside={false}
-                    simultaneousHandlers={[]}
-                    maxPointers={1}
-                >
-                    <TapGestureHandler
-                        onActivated={toggleControls}
-                        shouldCancelWhenOutside={false}
-                        simultaneousHandlers={[]}
-                    >
-                        <View style={{
-                            position: 'absolute',
-                            top: screenDimensions.height * 0.15,
-                            left: 0,
-                            width: screenDimensions.width * 0.4,
-                            height: screenDimensions.height * 0.7,
-                            zIndex: 10,
-                        }} />
-                    </TapGestureHandler>
-                </PanGestureHandler>
-            </LongPressGestureHandler>
+            {/* Horizontal seek gesture - OUTERMOST wrapper, fails on vertical movement */}
+            <PanGestureHandler
+                ref={horizontalSeekPanRef}
+                onGestureEvent={(event: any) => {
+                    const { translationX, state } = event.nativeEvent;
 
-            {/* Right side gesture handler - volume + tap + long press */}
-            <LongPressGestureHandler
-                onActivated={onLongPressActivated}
-                onEnded={onLongPressEnd}
-                onHandlerStateChange={onLongPressStateChange}
-                minDurationMs={500}
-                shouldCancelWhenOutside={false}
-                simultaneousHandlers={[]}
-            >
-                <PanGestureHandler
-                    onGestureEvent={gestureControls.onVolumeGestureEvent}
-                    activeOffsetY={[-10, 10]}
-                    failOffsetX={[-30, 30]}
-                    shouldCancelWhenOutside={false}
-                    simultaneousHandlers={[]}
-                    maxPointers={1}
-                >
-                    <TapGestureHandler
-                        onActivated={toggleControls}
-                        shouldCancelWhenOutside={false}
-                        simultaneousHandlers={[]}
-                    >
-                        <View style={{
-                            position: 'absolute',
-                            top: screenDimensions.height * 0.15,
-                            right: 0,
-                            width: screenDimensions.width * 0.4,
-                            height: screenDimensions.height * 0.7,
-                            zIndex: 10,
-                        }} />
-                    </TapGestureHandler>
-                </PanGestureHandler>
-            </LongPressGestureHandler>
-
-            {/* Center area tap handler */}
-            <TapGestureHandler
-                onActivated={() => {
-                    if (showControls) {
-                        const timeoutId = setTimeout(() => {
-                            hideControls();
-                        }, 0);
-                        if (controlsTimeout.current) {
-                            clearTimeout(controlsTimeout.current);
+                    if (state === State.ACTIVE) {
+                        if (!isHorizontalSeeking && currentTime !== undefined) {
+                            setIsHorizontalSeeking(true);
+                            setSeekStartTime(currentTime);
                         }
-                        controlsTimeout.current = timeoutId;
-                    } else {
-                        toggleControls();
+
+                        if (duration && duration > 0) {
+                            const sensitivityFactor = duration > 3600 ? 120 : duration > 1800 ? 90 : 60;
+                            const seekDelta = (translationX / screenDimensions.width) * sensitivityFactor;
+                            const newTime = Math.max(0, Math.min(duration, seekStartTime + seekDelta));
+                            setSeekPreviewTime(newTime);
+                        }
                     }
                 }}
-                shouldCancelWhenOutside={false}
-                simultaneousHandlers={[]}
-            >
-                <View style={{
-                    position: 'absolute',
-                    top: screenDimensions.height * 0.15,
-                    left: screenDimensions.width * 0.4,
-                    width: screenDimensions.width * 0.2,
-                    height: screenDimensions.height * 0.7,
-                    zIndex: 5,
-                }} />
-            </TapGestureHandler>
+                onHandlerStateChange={(event: any) => {
+                    const { state } = event.nativeEvent;
 
-            {/* Volume/Brightness Pill Overlay - Compact top design */}
+                    if (state === State.END || state === State.CANCELLED) {
+                        if (isHorizontalSeeking && seekToTime) {
+                            seekToTime(seekPreviewTime);
+                        }
+                        setIsHorizontalSeeking(false);
+                    }
+                }}
+                activeOffsetX={[-30, 30]}
+                failOffsetY={[-20, 20]}
+                maxPointers={1}
+            >
+                <View style={gestureAreaStyle}>
+                    {/* Left side gestures */}
+                    <TapGestureHandler
+                        ref={leftDoubleTapRef}
+                        numberOfTaps={2}
+                        onActivated={handleLeftDoubleTap}
+                    >
+                        <View style={leftSideStyle}>
+                            <LongPressGestureHandler
+                                onActivated={onLongPressActivated}
+                                onEnded={onLongPressEnd}
+                                onHandlerStateChange={onLongPressStateChange}
+                                minDurationMs={500}
+                            >
+                                <View style={StyleSheet.absoluteFill}>
+                                    <PanGestureHandler
+                                        ref={leftVerticalPanRef}
+                                        onGestureEvent={gestureControls.onBrightnessGestureEvent}
+                                        activeOffsetY={[-10, 10]}
+                                        failOffsetX={[-20, 20]}
+                                        maxPointers={1}
+                                    >
+                                        <View style={StyleSheet.absoluteFill}>
+                                            <TapGestureHandler
+                                                waitFor={leftDoubleTapRef}
+                                                onActivated={toggleControls}
+                                            >
+                                                <View style={StyleSheet.absoluteFill} />
+                                            </TapGestureHandler>
+                                        </View>
+                                    </PanGestureHandler>
+                                </View>
+                            </LongPressGestureHandler>
+                        </View>
+                    </TapGestureHandler>
+
+                    {/* Center area tap handler */}
+                    <TapGestureHandler
+                        onActivated={() => {
+                            if (showControls) {
+                                const timeoutId = setTimeout(() => {
+                                    hideControls();
+                                }, 0);
+                                if (controlsTimeout.current) {
+                                    clearTimeout(controlsTimeout.current);
+                                }
+                                controlsTimeout.current = timeoutId;
+                            } else {
+                                toggleControls();
+                            }
+                        }}
+                    >
+                        <View style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: screenDimensions.width * 0.4,
+                            width: screenDimensions.width * 0.2,
+                            height: '100%',
+                        }} />
+                    </TapGestureHandler>
+
+                    {/* Right side gestures */}
+                    <TapGestureHandler
+                        ref={rightDoubleTapRef}
+                        numberOfTaps={2}
+                        onActivated={handleRightDoubleTap}
+                    >
+                        <View style={rightSideStyle}>
+                            <LongPressGestureHandler
+                                onActivated={onLongPressActivated}
+                                onEnded={onLongPressEnd}
+                                onHandlerStateChange={onLongPressStateChange}
+                                minDurationMs={500}
+                            >
+                                <View style={StyleSheet.absoluteFill}>
+                                    <PanGestureHandler
+                                        ref={rightVerticalPanRef}
+                                        onGestureEvent={gestureControls.onVolumeGestureEvent}
+                                        activeOffsetY={[-10, 10]}
+                                        failOffsetX={[-20, 20]}
+                                        maxPointers={1}
+                                    >
+                                        <View style={StyleSheet.absoluteFill}>
+                                            <TapGestureHandler
+                                                waitFor={rightDoubleTapRef}
+                                                onActivated={toggleControls}
+                                            >
+                                                <View style={StyleSheet.absoluteFill} />
+                                            </TapGestureHandler>
+                                        </View>
+                                    </PanGestureHandler>
+                                </View>
+                            </LongPressGestureHandler>
+                        </View>
+                    </TapGestureHandler>
+                </View>
+            </PanGestureHandler>
+
+            {/* Volume/Brightness Pill Overlay */}
             {(gestureControls.showVolumeOverlay || gestureControls.showBrightnessOverlay) && (
                 <View style={localStyles.gestureIndicatorContainer}>
                     <View style={[
@@ -217,6 +357,99 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
                             {resizeMode.charAt(0).toUpperCase() + resizeMode.slice(1)}
                         </Text>
                     </Animated.View>
+                </View>
+            )}
+
+            {/* Skip Forward Overlay - Right side */}
+            {showSkipForwardOverlay && (
+                <View style={{
+                    position: 'absolute',
+                    right: screenDimensions.width * 0.1,
+                    top: screenDimensions.height * 0.35,
+                    height: screenDimensions.height * 0.3,
+                    width: screenDimensions.width * 0.25,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 2000,
+                }}>
+                    <View style={{
+                        position: 'absolute',
+                        width: 100,
+                        height: 100,
+                        borderRadius: 50,
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    }} />
+                    <View style={{ alignItems: 'center' }}>
+                        <MaterialIcons name="fast-forward" size={32} color="#FFFFFF" />
+                        <Text style={{
+                            color: '#FFFFFF',
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                            marginTop: 4,
+                        }}>
+                            +{skipAmount}s
+                        </Text>
+                    </View>
+                </View>
+            )}
+
+            {/* Skip Backward Overlay - Left side */}
+            {showSkipBackwardOverlay && (
+                <View style={{
+                    position: 'absolute',
+                    left: screenDimensions.width * 0.1,
+                    top: screenDimensions.height * 0.35,
+                    height: screenDimensions.height * 0.3,
+                    width: screenDimensions.width * 0.25,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 2000,
+                }}>
+                    <View style={{
+                        position: 'absolute',
+                        width: 100,
+                        height: 100,
+                        borderRadius: 50,
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    }} />
+                    <View style={{ alignItems: 'center' }}>
+                        <MaterialIcons name="fast-rewind" size={32} color="#FFFFFF" />
+                        <Text style={{
+                            color: '#FFFFFF',
+                            fontSize: 16,
+                            fontWeight: 'bold',
+                            marginTop: 4,
+                        }}>
+                            -{skipAmount}s
+                        </Text>
+                    </View>
+                </View>
+            )}
+
+            {/* Horizontal Seek Preview Overlay */}
+            {isHorizontalSeeking && formatTime && (
+                <View style={localStyles.gestureIndicatorContainer}>
+                    <View style={localStyles.gestureIndicatorPill}>
+                        <View style={[localStyles.iconWrapper, { backgroundColor: 'rgba(59, 59, 59)' }]}>
+                            <MaterialIcons
+                                name={seekPreviewTime > (currentTime || 0) ? "fast-forward" : "fast-rewind"}
+                                size={18}
+                                color="rgba(255, 255, 255, 0.9)"
+                            />
+                        </View>
+                        <Text style={localStyles.gestureText}>
+                            {formatTime(seekPreviewTime)}
+                        </Text>
+                        <Text style={{
+                            color: seekPreviewTime > (currentTime || 0) ? '#4CAF50' : '#FF5722',
+                            fontSize: 12,
+                            fontWeight: '600',
+                            marginLeft: 4,
+                        }}>
+                            {seekPreviewTime > (currentTime || 0) ? '+' : ''}
+                            {Math.round(seekPreviewTime - (currentTime || 0))}s
+                        </Text>
+                    </View>
                 </View>
             )}
         </>
