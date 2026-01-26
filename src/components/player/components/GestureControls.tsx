@@ -92,40 +92,85 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
         };
     }, []);
 
+    // Refs for tracking rapid seek state
+    const seekBaselineTime = React.useRef<number | null>(null);
+    const gestureSkipAmount = React.useRef(0);
+
     // Double-tap handlers
     const handleLeftDoubleTap = () => {
-        if (skip) {
-            skip(-10);
-            setSkipAmount(prev => {
-                const newAmount = showSkipBackwardOverlay ? prev + 10 : 10;
-                return newAmount;
-            });
+        if (seekToTime && currentTime !== undefined) {
+            // If overlay is not visible, this is a new seek sequence
+            if (!showSkipBackwardOverlay) {
+                seekBaselineTime.current = currentTime;
+                gestureSkipAmount.current = 0;
+            }
+
+            // Increment skip amount
+            gestureSkipAmount.current += 10;
+            const currentSkip = gestureSkipAmount.current;
+
+            // Calculate target time based on locked baseline
+            const baseTime = seekBaselineTime.current !== null ? seekBaselineTime.current : currentTime;
+            const targetTime = Math.max(0, baseTime - currentSkip);
+
+            // Execute seek
+            seekToTime(targetTime);
+
+            // Update UI state
+            setSkipAmount(currentSkip);
             setShowSkipBackwardOverlay(true);
+
             if (skipBackwardTimeoutRef.current) {
                 clearTimeout(skipBackwardTimeoutRef.current);
             }
             skipBackwardTimeoutRef.current = setTimeout(() => {
                 setShowSkipBackwardOverlay(false);
                 setSkipAmount(10);
+                gestureSkipAmount.current = 0;
+                seekBaselineTime.current = null;
             }, 800);
+        } else if (skip) {
+            // Fallback if seekToTime not available
+            skip(-10);
         }
     };
 
     const handleRightDoubleTap = () => {
-        if (skip) {
-            skip(10);
-            setSkipAmount(prev => {
-                const newAmount = showSkipForwardOverlay ? prev + 10 : 10;
-                return newAmount;
-            });
+        if (seekToTime && currentTime !== undefined) {
+            // If overlay is not visible, this is a new seek sequence
+            if (!showSkipForwardOverlay) {
+                seekBaselineTime.current = currentTime;
+                gestureSkipAmount.current = 0;
+            }
+
+            // Increment skip amount
+            gestureSkipAmount.current += 10;
+            const currentSkip = gestureSkipAmount.current;
+
+            // Calculate target time based on locked baseline
+            const baseTime = seekBaselineTime.current !== null ? seekBaselineTime.current : currentTime;
+            const targetTime = baseTime + currentSkip;
+            // Note: duration check happens in seekToTime
+
+            // Execute seek
+            seekToTime(targetTime);
+
+            // Update UI state
+            setSkipAmount(currentSkip);
             setShowSkipForwardOverlay(true);
+
             if (skipForwardTimeoutRef.current) {
                 clearTimeout(skipForwardTimeoutRef.current);
             }
             skipForwardTimeoutRef.current = setTimeout(() => {
                 setShowSkipForwardOverlay(false);
                 setSkipAmount(10);
+                gestureSkipAmount.current = 0;
+                seekBaselineTime.current = null;
             }, 800);
+        } else if (skip) {
+            // Fallback
+            skip(10);
         }
     };
 
@@ -362,31 +407,12 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
 
             {/* Skip Forward Overlay - Right side */}
             {showSkipForwardOverlay && (
-                <View style={{
-                    position: 'absolute',
-                    right: screenDimensions.width * 0.1,
-                    top: screenDimensions.height * 0.35,
-                    height: screenDimensions.height * 0.3,
-                    width: screenDimensions.width * 0.25,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 2000,
-                }}>
-                    <View style={{
-                        position: 'absolute',
-                        width: 100,
-                        height: 100,
-                        borderRadius: 50,
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    }} />
-                    <View style={{ alignItems: 'center' }}>
-                        <MaterialIcons name="fast-forward" size={32} color="#FFFFFF" />
-                        <Text style={{
-                            color: '#FFFFFF',
-                            fontSize: 16,
-                            fontWeight: 'bold',
-                            marginTop: 4,
-                        }}>
+                <View style={localStyles.gestureIndicatorContainer}>
+                    <View style={localStyles.gestureIndicatorPill}>
+                        <View style={localStyles.iconWrapper}>
+                            <MaterialIcons name="fast-forward" size={18} color="rgba(255, 255, 255, 0.9)" />
+                        </View>
+                        <Text style={localStyles.gestureText}>
                             +{skipAmount}s
                         </Text>
                     </View>
@@ -395,31 +421,12 @@ export const GestureControls: React.FC<GestureControlsProps> = ({
 
             {/* Skip Backward Overlay - Left side */}
             {showSkipBackwardOverlay && (
-                <View style={{
-                    position: 'absolute',
-                    left: screenDimensions.width * 0.1,
-                    top: screenDimensions.height * 0.35,
-                    height: screenDimensions.height * 0.3,
-                    width: screenDimensions.width * 0.25,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 2000,
-                }}>
-                    <View style={{
-                        position: 'absolute',
-                        width: 100,
-                        height: 100,
-                        borderRadius: 50,
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    }} />
-                    <View style={{ alignItems: 'center' }}>
-                        <MaterialIcons name="fast-rewind" size={32} color="#FFFFFF" />
-                        <Text style={{
-                            color: '#FFFFFF',
-                            fontSize: 16,
-                            fontWeight: 'bold',
-                            marginTop: 4,
-                        }}>
+                <View style={localStyles.gestureIndicatorContainer}>
+                    <View style={localStyles.gestureIndicatorPill}>
+                        <View style={localStyles.iconWrapper}>
+                            <MaterialIcons name="fast-rewind" size={18} color="rgba(255, 255, 255, 0.9)" />
+                        </View>
+                        <Text style={localStyles.gestureText}>
                             -{skipAmount}s
                         </Text>
                     </View>
