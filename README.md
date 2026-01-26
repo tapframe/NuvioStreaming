@@ -1,19 +1,22 @@
-# Nuvio Media Hub
-
 <div align="center">
-  <img src="assets/titlelogo.png" alt="Nuvio Logo" width="120" />
-  <p align="center">
+
+  <img src="assets/nuviotext.png" alt="Nuvio" width="300" />
+  <br />
+  <br />
+
+  [![Contributors][contributors-shield]][contributors-url]
+  [![Forks][forks-shield]][forks-url]
+  [![Stargazers][stars-shield]][stars-url]
+  [![Issues][issues-shield]][issues-url]
+  [![License][license-shield]][license-url]
+
+  <p>
     A modern media hub built with React Native and Expo.
     <br />
     Stremio Addon ecosystem • Cross-platform • Offline metadata & sync
   </p>
-</div>
 
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
-[![License][license-shield]][license-url]
+</div>
 
 ## About
 
