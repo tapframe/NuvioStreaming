@@ -825,7 +825,7 @@ const KSPlayerCore: React.FC = () => {
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
           {/* Buffering Indicator (Visible when controls are hidden) */}
           {isBuffering && !showControls && (
-            <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
               <ActivityIndicator size="large" color="#FFFFFF" />
             </View>
           )}

@@ -883,7 +883,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
         {/* Buffering Indicator (Visible when controls are hidden) */}
         {playerState.isBuffering && !playerState.showControls && (
-          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
             <ActivityIndicator size="large" color="#FFFFFF" />
           </View>
         )}
