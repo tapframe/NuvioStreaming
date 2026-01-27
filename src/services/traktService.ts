@@ -27,6 +27,22 @@ export interface TraktUser {
   avatar?: string;
 }
 
+export interface TraktUserStats {
+  movies?: {
+    watched?: number;
+    minutes?: number;
+  };
+  shows?: {
+    watched?: number;
+    minutes?: number;
+  };
+  episodes?: {
+    watched?: number;
+    minutes?: number;
+  };
+  minutes?: number; // total minutes watched
+}
+
 export interface TraktWatchedItem {
   movie?: {
     title: string;
@@ -1118,6 +1134,13 @@ export class TraktService {
   }
 
   /**
+   * Get the user's watch stats
+   */
+  public async getUserStats(): Promise<TraktUserStats> {
+    return this.apiRequest<TraktUserStats>('/users/me/stats');
+  }
+
+  /**
    * Get the user's watched movies
    */
   public async getWatchedMovies(): Promise<TraktWatchedItem[]> {
@@ -1440,7 +1463,7 @@ export class TraktService {
           if (matchingResult) {
             const traktId = matchingResult[type]?.ids?.trakt;
             if (traktId) {
-              logger.log(`[TraktService] Found Trakt ID: ${traktId} for IMDb ID: ${fullImdbId}`);
+              // logger.log(`[TraktService] Found Trakt ID: ${traktId} for IMDb ID: ${fullImdbId}`);
               return traktId;
             }
           }
@@ -1448,7 +1471,7 @@ export class TraktService {
           // Fallback: try the first result if type filtering didn't work
           const traktId = data[0][type]?.ids?.trakt;
           if (traktId) {
-            logger.log(`[TraktService] Found Trakt ID (fallback): ${traktId} for IMDb ID: ${fullImdbId}`);
+            // logger.log(`[TraktService] Found Trakt ID (fallback): ${traktId} for IMDb ID: ${fullImdbId}`);
             return traktId;
           }
         }
@@ -2837,7 +2860,7 @@ export class TraktService {
       if (data && data.length > 0) {
         const traktId = data[0][type === 'show' ? 'show' : type]?.ids?.trakt;
         if (traktId) {
-          logger.log(`[TraktService] Found Trakt ID via TMDB: ${traktId} for TMDB ID: ${tmdbId}`);
+          // logger.log(`[TraktService] Found Trakt ID via TMDB: ${traktId} for TMDB ID: ${tmdbId}`);
           return traktId;
         }
       }
@@ -2870,7 +2893,7 @@ export class TraktService {
 
       const endpoint = `/movies/${traktId}/comments?page=${page}&limit=${limit}`;
       const result = await this.apiRequest<TraktContentComment[]>(endpoint, 'GET');
-      console.log(`[TraktService] Movie comments response:`, result);
+      // console.log(`[TraktService] Movie comments response:`, result);
       return result;
     } catch (error) {
       logger.error('[TraktService] Failed to get movie comments:', error);

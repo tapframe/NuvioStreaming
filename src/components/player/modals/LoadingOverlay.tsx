@@ -44,7 +44,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
       // Reset
       logoOpacity.value = 0;
       logoScale.value = 1;
-      
+
       // Start animations after 1 second delay
       logoOpacity.value = withDelay(
         1000,
@@ -53,7 +53,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           easing: Easing.out(Easing.cubic),
         })
       );
-      
+
       logoScale.value = withDelay(
         1000,
         withRepeat(
@@ -82,24 +82,23 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   if (!visible) return null;
 
   return (
-    <Animated.View 
+    <Animated.View
       style={[
         styles.openingOverlay,
         {
           opacity: backgroundFadeAnim,
           zIndex: 3000,
         },
-        // Cast to any to support both number and string dimensions
-        { width, height } as any,
+        { width: '100%', height: '100%' },
       ]}
     >
       {backdrop && (
         <Animated.View style={[
-            StyleSheet.absoluteFill,
-            {
-              opacity: backdropImageOpacityAnim
-            }
-          ]}>
+          StyleSheet.absoluteFill,
+          {
+            opacity: backdropImageOpacityAnim
+          }
+        ]}>
           <Image
             source={{ uri: backdrop }}
             style={StyleSheet.absoluteFillObject}
@@ -117,15 +116,15 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
         locations={[0, 0.3, 0.7, 1]}
         style={StyleSheet.absoluteFill}
       />
-      
-      <TouchableOpacity 
+
+      <TouchableOpacity
         style={styles.loadingCloseButton}
         onPress={onClose}
         activeOpacity={0.7}
       >
         <MaterialIcons name="close" size={24} color="#ffffff" />
       </TouchableOpacity>
-      
+
       <View style={styles.openingContent}>
         {hasLogo && logo ? (
           <Reanimated.View style={[

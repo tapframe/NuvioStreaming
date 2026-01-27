@@ -1443,10 +1443,6 @@ const PluginsScreen: React.FC = () => {
     }
   };
 
-  const handleToggleUrlValidation = async (enabled: boolean) => {
-    await updateSetting('enableScraperUrlValidation', enabled);
-  };
-
   const handleToggleQualityExclusion = async (quality: string) => {
     const currentExcluded = settings.excludedQualities || [];
     const isExcluded = currentExcluded.includes(quality);
@@ -1971,22 +1967,6 @@ const PluginsScreen: React.FC = () => {
           colors={colors}
           styles={styles}
         >
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>{t('plugins.enable_url_validation')}</Text>
-              <Text style={styles.settingDescription}>
-                {t('plugins.url_validation_desc')}
-              </Text>
-            </View>
-            <Switch
-              value={settings.enableScraperUrlValidation && settings.enableLocalScrapers}
-              onValueChange={handleToggleUrlValidation}
-              trackColor={{ false: colors.elevation3, true: colors.primary }}
-              thumbColor={settings.enableScraperUrlValidation && settings.enableLocalScrapers ? colors.white : '#f4f3f4'}
-              disabled={!settings.enableLocalScrapers}
-            />
-          </View>
-
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingTitle}>{t('plugins.group_streams')}</Text>

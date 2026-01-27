@@ -5,6 +5,7 @@ import axios from 'axios';
 import { TMDBService } from './tmdbService';
 import { logger } from '../utils/logger';
 import { getCatalogDisplayName } from '../utils/catalogNameUtils';
+import { createSafeAxiosConfig } from '../utils/axiosConfig';
 
 // Add a constant for storing the data source preference
 const DATA_SOURCE_KEY = 'discover_data_source';
@@ -1476,7 +1477,7 @@ class CatalogService {
                 logger.warn(`Search failed for catalog in ${addon.name}:`, s.reason);
               }
             }
-            
+
             if (addonResults.length === 0) {
               logger.log(`No results from ${addon.name}`);
               return;
@@ -1542,7 +1543,7 @@ class CatalogService {
           logger.warn(`Addon ${manifest.name} (${manifest.id}) has no URL, skipping search`);
           return [];
         }
-        
+
         // Extract base URL and preserve query params (same logic as stremioService.getAddonBaseURL)
         const [baseUrlPart, queryParams] = chosenUrl.split('?');
         let cleanBaseUrl = baseUrlPart.replace(/manifest\.json$/, '').replace(/\/$/, '');
@@ -1554,7 +1555,7 @@ class CatalogService {
 
         const encodedCatalogId = encodeURIComponent(catalogId);
         const encodedQuery = encodeURIComponent(query);
-        
+
         // Try path-style URL first (per Stremio protocol)
         url = `${cleanBaseUrl}/catalog/${type}/${encodedCatalogId}/search=${encodedQuery}.json`;
 
@@ -1566,9 +1567,7 @@ class CatalogService {
 
       logger.log(`Searching ${manifest.name} (${type}/${catalogId}):`, url);
 
-      const response = await axios.get<{ metas: any[] }>(url, {
-        timeout: 10000, // 10 second timeout per addon
-      });
+      const response = await axios.get<{ metas: any[] }>(url, createSafeAxiosConfig(10000));
 
       const metas = response.data?.metas || [];
 

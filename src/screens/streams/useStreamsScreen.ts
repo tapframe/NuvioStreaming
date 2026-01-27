@@ -23,9 +23,7 @@ import {
   filterStreamsByQuality,
   filterStreamsByLanguage,
   getQualityNumeric,
-  detectMkvViaHead,
   inferVideoTypeFromUrl,
-  filterHeadersForVidrock,
   sortStreamsByQuality,
 } from './utils';
 import {
@@ -38,7 +36,6 @@ import {
   TMDBEpisodeOverride,
   AlertAction,
 } from './types';
-import { MKV_HEAD_TIMEOUT_MS } from './constants';
 
 // Cache for scraper logos
 const scraperLogoCache = new Map<string, string>();
@@ -227,32 +224,36 @@ export const useStreamsScreen = () => {
 
       const getProviderPriority = (addonId: string): number => {
         const installedAddons = stremioService.getInstalledAddons();
-        const addonIndex = installedAddons.findIndex(addon => addon.id === addonId);
+        // Check installationId first, then id for backward compatibility
+        const addonIndex = installedAddons.findIndex(addon =>
+          (addon.installationId && addon.installationId === addonId) || addon.id === addonId
+        );
         if (addonIndex !== -1) {
           return 50 - addonIndex;
         }
         return 0;
       };
 
-      const allStreams: Array<{ stream: Stream; quality: number; providerPriority: number }> = [];
+      const allStreams: Array<{ stream: Stream; quality: number; providerPriority: number; originalIndex: number }> = [];
 
       Object.entries(streamsData).forEach(([addonId, { streams }]) => {
         const qualityFiltered = filterByQuality(streams);
         const filteredStreams = filterByLanguage(qualityFiltered);
 
-        filteredStreams.forEach(stream => {
+        filteredStreams.forEach((stream, index) => {
           const quality = getQualityNumeric(stream.name || stream.title);
           const providerPriority = getProviderPriority(addonId);
-          allStreams.push({ stream, quality, providerPriority });
+          allStreams.push({ stream, quality, providerPriority, originalIndex: index });
         });
       });
 
       if (allStreams.length === 0) return null;
 
+      // Sort primarily by provider priority, then respect the addon's internal order (originalIndex)
+      // This ensures if an addon lists 1080p before 4K, we pick 1080p
       allStreams.sort((a, b) => {
-        if (a.quality !== b.quality) return b.quality - a.quality;
         if (a.providerPriority !== b.providerPriority) return b.providerPriority - a.providerPriority;
-        return 0;
+        return a.originalIndex - b.originalIndex;
       });
 
       logger.log(
@@ -355,11 +356,17 @@ export const useStreamsScreen = () => {
   // Navigate to player
   const navigateToPlayer = useCallback(
     async (stream: Stream, options?: { headers?: Record<string, string> }) => {
-      const finalHeaders = filterHeadersForVidrock(options?.headers || (stream.headers as any));
+      const optionHeaders = options?.headers;
+      const streamHeaders = (stream.headers as any) as Record<string, string> | undefined;
+      const proxyHeaders = ((stream as any)?.behaviorHints?.proxyHeaders?.request || undefined) as
+        | Record<string, string>
+        | undefined;
+      const streamProvider = stream.addonId || (stream as any).addonName || stream.name;
+      const finalHeaders = optionHeaders || streamHeaders || proxyHeaders;
 
       const streamsToPass = selectedEpisode ? episodeStreams : groupedStreams;
       const streamName = stream.name || stream.title || 'Unnamed Stream';
-      const streamProvider = stream.addonId || stream.addonName || stream.name;
+      const resolvedStreamProvider = streamProvider;
       const releaseDate = type === 'movie' ? metadata?.released : currentEpisode?.air_date;
 
       // Save stream to cache
@@ -393,6 +400,22 @@ export const useStreamsScreen = () => {
         }
       } catch { }
 
+      if (__DEV__) {
+        const finalHeaderKeys = Object.keys(finalHeaders || {});
+
+        logger.log('[StreamsScreen][navigateToPlayer] stream selection', {
+          url: typeof stream.url === 'string' ? stream.url.slice(0, 240) : stream.url,
+          addonId: stream.addonId,
+          addonName: (stream as any).addonName,
+          name: stream.name,
+          title: stream.title,
+          inferredVideoType: videoType,
+          optionHeadersKeys: Object.keys(optionHeaders || {}),
+          streamHeadersKeys: Object.keys(streamHeaders || {}),
+          finalHeadersKeys: finalHeaderKeys,
+        });
+      }
+
       const playerRoute = Platform.OS === 'ios' ? 'PlayerIOS' : 'PlayerAndroid';
 
       navigation.navigate(playerRoute as any, {
@@ -403,7 +426,7 @@ export const useStreamsScreen = () => {
         episode: (type === 'series' || type === 'other') ? currentEpisode?.episode_number : undefined,
         quality: (stream.title?.match(/(\d+)p/) || [])[1] || undefined,
         year: metadata?.year,
-        streamProvider,
+        streamProvider: resolvedStreamProvider,
         streamName,
         headers: finalHeaders,
         id,
@@ -425,40 +448,28 @@ export const useStreamsScreen = () => {
       try {
         if (!stream.url) return;
 
+        if (__DEV__) {
+          const streamHeaders = (stream.headers as any) as Record<string, string> | undefined;
+          const proxyHeaders = ((stream as any)?.behaviorHints?.proxyHeaders?.request || undefined) as
+            | Record<string, string>
+            | undefined;
+
+          logger.log('[StreamsScreen][handleStreamPress] pressed stream', {
+            url: typeof stream.url === 'string' ? stream.url.slice(0, 240) : stream.url,
+            addonId: stream.addonId,
+            addonName: (stream as any).addonName,
+            name: stream.name,
+            title: stream.title,
+            streamHeadersKeys: Object.keys(streamHeaders || {}),
+            proxyHeadersKeys: Object.keys(proxyHeaders || {}),
+            inferredVideoType: inferVideoTypeFromUrl(stream.url),
+          });
+        }
+
         // Block magnet links
         if (typeof stream.url === 'string' && stream.url.startsWith('magnet:')) {
           openAlert('Not supported', 'Torrent streaming is not supported yet.');
           return;
-        }
-
-        // iOS MKV detection
-        if (Platform.OS === 'ios' && settings.preferredPlayer === 'internal') {
-          const lowerUrl = (stream.url || '').toLowerCase();
-          const isMkvByPath =
-            lowerUrl.includes('.mkv') ||
-            /[?&]ext=mkv\b/i.test(lowerUrl) ||
-            /format=mkv\b/i.test(lowerUrl) ||
-            /container=mkv\b/i.test(lowerUrl);
-          const isHttp = lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://');
-
-          if (!isMkvByPath && isHttp) {
-            try {
-              const mkvDetected = await Promise.race<boolean>([
-                detectMkvViaHead(stream.url, (stream.headers as any) || undefined),
-                new Promise<boolean>(res => setTimeout(() => res(false), MKV_HEAD_TIMEOUT_MS)),
-              ]);
-              if (mkvDetected) {
-                const mergedHeaders = {
-                  ...(stream.headers || {}),
-                  'Content-Type': 'video/x-matroska',
-                } as Record<string, string>;
-                navigateToPlayer(stream, { headers: mergedHeaders });
-                return;
-              }
-            } catch (e) {
-              logger.warn('[StreamsScreen] MKV detection failed:', e);
-            }
-          }
         }
 
         // iOS external player
@@ -752,7 +763,9 @@ export const useStreamsScreen = () => {
       const pluginProviders: string[] = [];
 
       Array.from(allProviders).forEach(provider => {
-        const isInstalledAddon = installedAddons.some(addon => addon.id === provider);
+        const isInstalledAddon = installedAddons.some(addon =>
+          (addon.installationId && addon.installationId === provider) || addon.id === provider
+        );
         if (isInstalledAddon) {
           addonProviders.push(provider);
         } else {
@@ -764,12 +777,18 @@ export const useStreamsScreen = () => {
 
       addonProviders
         .sort((a, b) => {
-          const indexA = installedAddons.findIndex(addon => addon.id === a);
-          const indexB = installedAddons.findIndex(addon => addon.id === b);
+          const indexA = installedAddons.findIndex(addon =>
+            (addon.installationId && addon.installationId === a) || addon.id === a
+          );
+          const indexB = installedAddons.findIndex(addon =>
+            (addon.installationId && addon.installationId === b) || addon.id === b
+          );
           return indexA - indexB;
         })
         .forEach(provider => {
-          const installedAddon = installedAddons.find(addon => addon.id === provider);
+          const installedAddon = installedAddons.find(addon =>
+            (addon.installationId && addon.installationId === provider) || addon.id === provider
+          );
           filterChips.push({ id: provider, name: installedAddon?.name || provider });
         });
 
@@ -799,8 +818,12 @@ export const useStreamsScreen = () => {
       { id: 'all', name: 'All Providers' },
       ...Array.from(allProviders)
         .sort((a, b) => {
-          const indexA = installedAddons.findIndex(addon => addon.id === a);
-          const indexB = installedAddons.findIndex(addon => addon.id === b);
+          const indexA = installedAddons.findIndex(addon =>
+            (addon.installationId && addon.installationId === a) || addon.id === a
+          );
+          const indexB = installedAddons.findIndex(addon =>
+            (addon.installationId && addon.installationId === b) || addon.id === b
+          );
           if (indexA !== -1 && indexB !== -1) return indexA - indexB;
           if (indexA !== -1) return -1;
           if (indexB !== -1) return 1;
@@ -808,7 +831,9 @@ export const useStreamsScreen = () => {
         })
         .map(provider => {
           const addonInfo = streams[provider];
-          const installedAddon = installedAddons.find(addon => addon.id === provider);
+          const installedAddon = installedAddons.find(addon =>
+            (addon.installationId && addon.installationId === provider) || addon.id === provider
+          );
           let displayName = provider;
           if (installedAddon) displayName = installedAddon.name;
           else if (addonInfo?.addonName) displayName = addonInfo.addonName;
@@ -840,7 +865,9 @@ export const useStreamsScreen = () => {
 
       // Legacy: handle old grouped-plugins filter (fallback)
       if (settings.streamDisplayMode === 'grouped' && selectedProvider === 'grouped-plugins') {
-        const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+        const isInstalledAddon = installedAddons.some(addon =>
+          (addon.installationId && addon.installationId === addonId) || addon.id === addonId
+        );
         return !isInstalledAddon;
       }
 
@@ -849,8 +876,12 @@ export const useStreamsScreen = () => {
 
     // Sort entries: installed addons first (in their installation order), then plugins
     const sortedEntries = filteredEntries.sort(([addonIdA], [addonIdB]) => {
-      const isAddonA = installedAddons.some(addon => addon.id === addonIdA);
-      const isAddonB = installedAddons.some(addon => addon.id === addonIdB);
+      const isAddonA = installedAddons.some(addon =>
+        (addon.installationId && addon.installationId === addonIdA) || addon.id === addonIdA
+      );
+      const isAddonB = installedAddons.some(addon =>
+        (addon.installationId && addon.installationId === addonIdB) || addon.id === addonIdB
+      );
 
       // Addons always come before plugins
       if (isAddonA && !isAddonB) return -1;
@@ -858,8 +889,12 @@ export const useStreamsScreen = () => {
 
       // Both are addons - sort by installation order
       if (isAddonA && isAddonB) {
-        const indexA = installedAddons.findIndex(addon => addon.id === addonIdA);
-        const indexB = installedAddons.findIndex(addon => addon.id === addonIdB);
+        const indexA = installedAddons.findIndex(addon =>
+          (addon.installationId && addon.installationId === addonIdA) || addon.id === addonIdA
+        );
+        const indexB = installedAddons.findIndex(addon =>
+          (addon.installationId && addon.installationId === addonIdB) || addon.id === addonIdB
+        );
         return indexA - indexB;
       }
 
@@ -877,7 +912,9 @@ export const useStreamsScreen = () => {
       const pluginStreams: Stream[] = [];
 
       sortedEntries.forEach(([addonId, { streams: providerStreams }]) => {
-        const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+        const isInstalledAddon = installedAddons.some(addon =>
+          (addon.installationId && addon.installationId === addonId) || addon.id === addonId
+        );
 
         if (isInstalledAddon) {
           addonStreams.push(...providerStreams);
@@ -924,7 +961,9 @@ export const useStreamsScreen = () => {
 
     return sortedEntries
       .map(([addonId, { addonName, streams: providerStreams }]) => {
-        const isInstalledAddon = installedAddons.some(addon => addon.id === addonId);
+        const isInstalledAddon = installedAddons.some(addon =>
+          (addon.installationId && addon.installationId === addonId) || addon.id === addonId
+        );
         let filteredStreams = providerStreams;
 
         if (!isInstalledAddon) {

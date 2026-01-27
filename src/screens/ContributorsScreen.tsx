@@ -20,11 +20,13 @@ import { useNavigation } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import FastImage from '@d11/react-native-fast-image';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
+import LottieView from 'lottie-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchContributors, GitHubContributor } from '../services/githubReleaseService';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { Donation, getDonationsWithCache } from '../services/donationsService';
 
 const { width, height } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -77,7 +79,10 @@ const getSpecialMentionsConfig = (t: any) => [
   },
 ];
 
-type TabType = 'contributors' | 'special';
+type TabType = 'contributors' | 'special' | 'donors';
+
+type DonorsTabType = 'latest' | 'leaderboard';
+
 
 interface ContributorCardProps {
   contributor: GitHubContributor;
@@ -237,6 +242,65 @@ const SpecialMentionCard: React.FC<SpecialMentionCardProps> = ({ mention, curren
   );
 };
 
+interface DonorCardProps {
+  donor: Donation;
+  currentTheme: any;
+  isTablet: boolean;
+}
+
+const DonorCard: React.FC<DonorCardProps> = ({ donor, currentTheme, isTablet }) => {
+  const formatDonationDate = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  return (
+    <View
+      style={[
+        styles.contributorCard,
+        { backgroundColor: currentTheme.colors.elevation1 },
+        isTablet && styles.tabletContributorCard
+      ]}
+    >
+      <View style={styles.donorAvatar}>
+        <Text style={[styles.donorAvatarText, { color: currentTheme.colors.white }]}>$</Text>
+      </View>
+      <View style={styles.contributorInfo}>
+        <Text style={[
+          styles.username,
+          { color: currentTheme.colors.highEmphasis },
+          isTablet && styles.tabletUsername
+        ]}>
+          {donor.name}
+        </Text>
+        <Text style={[
+          styles.donorAmount,
+          { color: currentTheme.colors.mediumEmphasis },
+          isTablet && styles.tabletContributions
+        ]}>
+          {donor.amount.toFixed(2)} {donor.currency} · {formatDonationDate(donor.date)}
+        </Text>
+        {donor.message ? (
+          <Text style={[styles.donorMessage, { color: currentTheme.colors.mediumEmphasis }]}>
+            {donor.message}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
 const ContributorsScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -245,13 +309,107 @@ const ContributorsScreen: React.FC = () => {
 
   const SPECIAL_MENTIONS_CONFIG = getSpecialMentionsConfig(t);
 
-  const [activeTab, setActiveTab] = useState<TabType>('contributors');
+  const [activeTab, setActiveTab] = useState<TabType>('donors');
   const [contributors, setContributors] = useState<GitHubContributor[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [specialMentions, setSpecialMentions] = useState<SpecialMention[]>([]);
   const [specialMentionsLoading, setSpecialMentionsLoading] = useState(true);
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [donationsLoading, setDonationsLoading] = useState(false);
+  const [donationsRefreshing, setDonationsRefreshing] = useState(false);
+  const [donationsError, setDonationsError] = useState<string | null>(null);
+  const [donorsTab, setDonorsTab] = useState<DonorsTabType>('leaderboard');
+
+  const getDonationTs = useCallback((dateValue?: string) => {
+    if (!dateValue) return 0;
+    const ts = Date.parse(dateValue);
+    return Number.isFinite(ts) ? ts : 0;
+  }, []);
+
+  const formatDonationDate = useCallback((dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+
+      // Use locale-aware formatting
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  }, []);
+
+  const latestDonations = React.useMemo(() => {
+    return donations
+      .slice()
+      .sort((a, b) => getDonationTs(b.date) - getDonationTs(a.date));
+  }, [donations, getDonationTs]);
+
+  const leaderboardDonations = React.useMemo(() => {
+    const map = new Map<string, { name: string; currency: string; total: number; count: number; lastDate: string }>();
+    for (const d of donations) {
+      const name = (d.name || 'Supporter').trim() || 'Supporter';
+      const currency = d.currency || 'USD';
+      const key = `${name}__${currency}`;
+      const existing = map.get(key);
+      const amount = Number.isFinite(d.amount) ? d.amount : 0;
+      const ts = getDonationTs(d.date);
+      if (!existing) {
+        map.set(key, {
+          name,
+          currency,
+          total: amount,
+          count: 1,
+          lastDate: d.date,
+        });
+      } else {
+        const existingTs = getDonationTs(existing.lastDate);
+        map.set(key, {
+          ...existing,
+          total: existing.total + amount,
+          count: existing.count + 1,
+          lastDate: ts > existingTs ? d.date : existing.lastDate,
+        });
+      }
+    }
+
+    const sorted = Array.from(map.values()).sort((a, b) => b.total - a.total);
+
+    let lastTotal: number | null = null;
+    let currentRank = 0;
+
+    return sorted.map((entry) => {
+      if (lastTotal === null || entry.total !== lastTotal) {
+        currentRank += 1;
+      }
+      lastTotal = entry.total;
+
+      return {
+        ...entry,
+        rank: currentRank,
+      };
+    });
+  }, [donations, getDonationTs]);
+
+  const getInitials = useCallback((name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'U';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }, []);
+
+  const getRankAnimation = useCallback((rank: number) => {
+    if (rank === 1) return require('../../assets/lottie/ranking/gold.json');
+    if (rank === 2) return require('../../assets/lottie/ranking/silver.json');
+    if (rank === 3) return require('../../assets/lottie/ranking/bronze.json');
+    return null;
+  }, []);
 
   // Fetch Discord user data for special mentions
   const loadSpecialMentions = useCallback(async () => {
@@ -308,6 +466,33 @@ const ContributorsScreen: React.FC = () => {
       loadSpecialMentions();
     }
   }, [activeTab, specialMentions.length, loadSpecialMentions]);
+
+  const loadDonations = useCallback(async (isRefresh = false) => {
+    try {
+      setDonationsError(null);
+      if (isRefresh) {
+        setDonationsRefreshing(true);
+      } else {
+        setDonationsLoading(true);
+      }
+      const data = await getDonationsWithCache(isRefresh);
+      setDonations(Array.isArray(data) ? data : []);
+    } catch (e) {
+      if (__DEV__) console.error('Error loading donations:', e);
+      setDonationsError('Failed to load donors.');
+      setDonations([]);
+    } finally {
+      setDonationsLoading(false);
+      setDonationsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'donors') {
+      // Force refresh on tab open so new donations appear quickly
+      loadDonations(true);
+    }
+  }, [activeTab, loadDonations]);
 
   const loadContributors = useCallback(async (isRefresh = false) => {
     try {
@@ -489,6 +674,23 @@ const ContributorsScreen: React.FC = () => {
         <TouchableOpacity
           style={[
             styles.tab,
+            activeTab === 'donors' && { backgroundColor: currentTheme.colors.primary },
+            isTablet && styles.tabletTab
+          ]}
+          onPress={() => setActiveTab('donors')}
+          activeOpacity={0.7}
+        >
+          <Text style={[
+            styles.tabText,
+            { color: activeTab === 'donors' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis },
+            isTablet && styles.tabletTabText
+          ]}>
+            {t('contributors.tab_donors')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tab,
             activeTab === 'contributors' && { backgroundColor: currentTheme.colors.primary },
             isTablet && styles.tabletTab
           ]}
@@ -524,7 +726,168 @@ const ContributorsScreen: React.FC = () => {
 
       <View style={styles.content}>
         <View style={[styles.contentContainer, isTablet && styles.tabletContentContainer]}>
-          {activeTab === 'contributors' ? (
+          {activeTab === 'donors' ? (
+            // Donors Tab
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={[
+                styles.listContent,
+                isTablet && styles.tabletListContent
+              ]}
+              refreshControl={
+                <RefreshControl
+                  refreshing={donationsRefreshing}
+                  onRefresh={() => loadDonations(true)}
+                  tintColor={currentTheme.colors.primary}
+                  colors={[currentTheme.colors.primary]}
+                />
+              }
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={[
+                styles.gratitudeCard,
+                { backgroundColor: currentTheme.colors.elevation1 },
+                isTablet && styles.tabletGratitudeCard
+              ]}>
+                <View style={styles.gratitudeContent}>
+                  <Feather name="gift" size={isTablet ? 32 : 24} color={currentTheme.colors.primary} />
+                  <Text style={[
+                    styles.gratitudeText,
+                    { color: currentTheme.colors.highEmphasis },
+                    isTablet && styles.tabletGratitudeText
+                  ]}>
+                    {t('contributors.tab_donors')}
+                  </Text>
+                  <Text style={[
+                    styles.gratitudeSubtext,
+                    { color: currentTheme.colors.mediumEmphasis },
+                    isTablet && styles.tabletGratitudeSubtext
+                  ]}>
+                    {t('contributors.donors_desc')}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Donors sub-tabs */}
+              <View style={[
+                styles.subTabSwitcher,
+                { backgroundColor: currentTheme.colors.elevation1 }
+              ]}>
+                <TouchableOpacity
+                  style={[
+                    styles.subTab,
+                    donorsTab === 'leaderboard' && { backgroundColor: currentTheme.colors.primary }
+                  ]}
+                  onPress={() => setDonorsTab('leaderboard')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.subTabText,
+                    { color: donorsTab === 'leaderboard' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis }
+                  ]}>
+                    {t('contributors.leaderboard')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.subTab,
+                    donorsTab === 'latest' && { backgroundColor: currentTheme.colors.primary }
+                  ]}
+                  onPress={() => setDonorsTab('latest')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.subTabText,
+                    { color: donorsTab === 'latest' ? currentTheme.colors.white : currentTheme.colors.mediumEmphasis }
+                  ]}>
+                    {t('contributors.latest_donations')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {donationsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+                  <Text style={[styles.loadingText, { color: currentTheme.colors.mediumEmphasis }]}>{t('contributors.loading_donors')}</Text>
+                </View>
+              ) : donationsError ? (
+                <View style={styles.errorContainer}>
+                  <Feather name="alert-circle" size={48} color={currentTheme.colors.mediumEmphasis} />
+                  <Text style={[styles.errorText, { color: currentTheme.colors.mediumEmphasis }]}>
+                    {donationsError}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.retryButton, { backgroundColor: currentTheme.colors.primary }]}
+                    onPress={() => loadDonations(true)}
+                  >
+                    <Text style={[styles.retryText, { color: currentTheme.colors.white }]}>{t('common.retry')}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : donations.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Feather name="gift" size={48} color={currentTheme.colors.mediumEmphasis} />
+                  <Text style={[styles.emptyText, { color: currentTheme.colors.mediumEmphasis }]}>{t('contributors.no_donors')}</Text>
+                </View>
+              ) : (
+                donorsTab === 'latest' ? (
+                  latestDonations.map((donor, index) => (
+                    <DonorCard
+                      key={`${donor.name}-${donor.date}-${index}`}
+                      donor={donor}
+                      currentTheme={currentTheme}
+                      isTablet={isTablet}
+                    />
+                  ))
+                ) : (
+                  leaderboardDonations.map((entry, index) => (
+                    <View
+                      key={`${entry.name}-${entry.currency}-${index}`}
+                      style={[
+                        styles.leaderboardCard,
+                        { backgroundColor: currentTheme.colors.elevation1 },
+                        isTablet && styles.tabletContributorCard
+                      ]}
+                    >
+                      <View style={styles.leaderboardAvatar}>
+                        {getRankAnimation(entry.rank) ? (
+                          <View style={styles.leaderboardBadge}>
+                            <Text style={[styles.leaderboardRankText, { color: currentTheme.colors.white }]}>{entry.rank}</Text>
+                            <LottieView
+                              source={getRankAnimation(entry.rank)}
+                              autoPlay
+                              loop={false}
+                              style={styles.leaderboardLottie}
+                            />
+                          </View>
+                        ) : (
+                          <Text style={[styles.leaderboardRankText, { color: currentTheme.colors.white }]}>{entry.rank}</Text>
+                        )}
+                      </View>
+                      <View style={styles.contributorInfo}>
+                        <Text style={[
+                          styles.username,
+                          { color: currentTheme.colors.highEmphasis },
+                          isTablet && styles.tabletUsername
+                        ]}>
+                          {entry.name}
+                        </Text>
+                        <Text style={[
+                          styles.donorAmount,
+                          { color: currentTheme.colors.mediumEmphasis },
+                          isTablet && styles.tabletContributions
+                        ]}>
+                          {entry.total.toFixed(2)} {entry.currency} · {entry.count} {entry.count === 1 ? 'donation' : 'donations'}
+                        </Text>
+                        <Text style={[styles.donorMessage, { color: currentTheme.colors.mediumEmphasis }]}>
+                          Rank #{entry.rank} · Last: {formatDonationDate(entry.lastDate)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))
+                )
+              )}
+            </ScrollView>
+          ) : activeTab === 'contributors' ? (
             // Contributors Tab
             <>
               {error ? (
@@ -606,7 +969,7 @@ const ContributorsScreen: React.FC = () => {
                 </ScrollView>
               )}
             </>
-          ) : (
+          ) : activeTab === 'special' ? (
             // Special Mentions Tab
             <ScrollView
               style={styles.scrollView}
@@ -650,7 +1013,7 @@ const ContributorsScreen: React.FC = () => {
                 />
               ))}
             </ScrollView>
-          )}
+          ) : null}
         </View>
       </View>
     </View>
@@ -930,6 +1293,81 @@ const styles = StyleSheet.create({
   },
   tabletTabText: {
     fontSize: 16,
+  },
+  subTabSwitcher: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    padding: 4,
+    borderRadius: 12,
+  },
+  subTab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  leaderboardCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  leaderboardAvatar: {
+    width: 100,
+    height: 100,
+    marginRight: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaderboardBadge: {
+    width: 100,
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaderboardLottie: {
+    width: 100,
+    height: 100,
+  },
+  leaderboardRankText: {
+    position: 'absolute',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  donorAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
+    backgroundColor: DISCORD_BRAND_COLOR,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donorAvatarText: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  donorAmount: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  donorMessage: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
 

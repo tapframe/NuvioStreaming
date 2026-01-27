@@ -57,6 +57,7 @@ import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
 import MalSettingsScreen from '../screens/MalSettingsScreen';
 import MalLibraryScreen from '../screens/MalLibraryScreen';
+import SimklSettingsScreen from '../screens/SimklSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import ThemeScreen from '../screens/ThemeScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -74,7 +75,7 @@ import BackdropGalleryScreen from '../screens/BackdropGalleryScreen';
 import BackupScreen from '../screens/BackupScreen';
 import ContinueWatchingSettingsScreen from '../screens/ContinueWatchingSettingsScreen';
 import ContributorsScreen from '../screens/ContributorsScreen';
-import DebridIntegrationScreen from '../screens/DebridIntegrationScreen';
+
 import {
   ContentDiscoverySettingsScreen,
   AppearanceSettingsScreen,
@@ -191,6 +192,7 @@ export type RootStackParamList = {
   TraktSettings: undefined;
   MalSettings: undefined;
   MalLibrary: undefined;
+  SimklSettings: undefined;
   PlayerSettings: undefined;
   ThemeSettings: undefined;
   ScraperSettings: undefined;
@@ -218,7 +220,7 @@ export type RootStackParamList = {
   };
   ContinueWatchingSettings: undefined;
   Contributors: undefined;
-  DebridIntegration: undefined;
+
   // New organized settings screens
   ContentDiscoverySettings: undefined;
   AppearanceSettings: undefined;
@@ -765,7 +767,7 @@ const MainTabs = () => {
         bottom: 0,
         left: 0,
         right: 0,
-        height: Platform.OS === 'android' ? 70 + insets.bottom : 85 + insets.bottom,
+        height: Platform.OS === 'android' ? 70 : 85 + insets.bottom,
         backgroundColor: 'transparent',
         overflow: 'hidden',
       }}>
@@ -815,7 +817,7 @@ const MainTabs = () => {
         <View
           style={{
             height: '100%',
-            paddingBottom: Platform.OS === 'android' ? 15 + insets.bottom : 20 + insets.bottom,
+            paddingBottom: Platform.OS === 'android' ? 15 : 20 + insets.bottom,
             paddingTop: Platform.OS === 'android' ? 8 : 12,
             backgroundColor: 'transparent',
           }}
@@ -1236,7 +1238,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
   }, []);
 
   return (
-    <SafeAreaProvider>
+    <>
       <StatusBar
         translucent
         backgroundColor="transparent"
@@ -1247,6 +1249,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
           flex: 1,
           backgroundColor: currentTheme.colors.darkBackground,
           ...(Platform.OS === 'android' && {
+            paddingBottom: insets.bottom, // Respect safe area bottom for Android nav bar
             // Prevent white flashes on Android
             opacity: 1,
           })
@@ -1602,6 +1605,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
               }}
             />
             <Stack.Screen
+              name="SimklSettings"
+              component={SimklSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
               name="PlayerSettings"
               component={PlayerSettingsScreen}
               options={{
@@ -1748,21 +1766,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
-            <Stack.Screen
-              name="DebridIntegration"
-              component={DebridIntegrationScreen}
-              options={{
-                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
-                animationDuration: Platform.OS === 'android' ? 250 : 300,
-                presentation: 'card',
-                gestureEnabled: true,
-                gestureDirection: 'horizontal',
-                headerShown: false,
-                contentStyle: {
-                  backgroundColor: currentTheme.colors.darkBackground,
-                },
-              }}
-            />
+
             <Stack.Screen
               name="ContentDiscoverySettings"
               component={ContentDiscoverySettingsScreen}
@@ -1871,7 +1875,7 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
           </Stack.Navigator>
         </View>
       </PaperProvider>
-    </SafeAreaProvider>
+    </>
   );
 };
 

@@ -207,7 +207,7 @@ const CatalogSection = ({ catalog }: CatalogSectionProps) => {
         horizontal
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
-        decelerationRate="fast"
+        decelerationRate="normal"
         scrollEnabled={true}
         nestedScrollEnabled={true}
         contentContainerStyle={StyleSheet.flatten([

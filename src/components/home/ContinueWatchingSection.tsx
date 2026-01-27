@@ -28,6 +28,7 @@ import { storageService } from '../../services/storageService';
 import { logger } from '../../utils/logger';
 import * as Haptics from 'expo-haptics';
 import { TraktService } from '../../services/traktService';
+import { SimklService } from '../../services/simklService';
 import { stremioService } from '../../services/stremioService';
 import { streamCacheService } from '../../services/streamCacheService';
 import { useSettings } from '../../hooks/useSettings';
@@ -220,6 +221,10 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   // Track last Trakt sync to prevent excessive API calls
   const lastTraktSyncRef = useRef<number>(0);
   const TRAKT_SYNC_COOLDOWN = 0; // disabled (always fetch Trakt playback)
+
+  // Track last Simkl sync to prevent excessive API calls
+  const lastSimklSyncRef = useRef<number>(0);
+  const SIMKL_SYNC_COOLDOWN = 0; // disabled (always fetch Simkl playback)
 
   // Track last Trakt reconcile per item (local -> Trakt catch-up)
   const lastTraktReconcileRef = useRef<Map<string, number>>(new Map());
@@ -471,13 +476,19 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
       const traktService = TraktService.getInstance();
       const isTraktAuthed = await traktService.isAuthenticated();
 
+      const simklService = SimklService.getInstance();
+      // Prefer Trakt if both are authenticated
+      const isSimklAuthed = !isTraktAuthed ? await simklService.isAuthenticated() : false;
+
+      logger.log(`[CW] Providers authed: trakt=${isTraktAuthed} simkl=${isSimklAuthed}`);
+
       // Declare groupPromises outside the if block
       let groupPromises: Promise<void>[] = [];
 
       // In Trakt mode, CW is sourced from Trakt only, but we still want to overlay local progress
       // when local is ahead (scrobble lag/offline playback).
       let localProgressIndex: Map<string, LocalProgressEntry[]> | null = null;
-      if (isTraktAuthed) {
+      if (isTraktAuthed || isSimklAuthed) {
         try {
           const allProgress = await storageService.getAllWatchProgress();
           const index = new Map<string, LocalProgressEntry[]>();
@@ -519,8 +530,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }
       }
 
-      // Non-Trakt: use local storage
-      if (!isTraktAuthed) {
+      // Local-only mode (no Trakt, no Simkl): use local storage
+      if (!isTraktAuthed && !isSimklAuthed) {
         const allProgress = await storageService.getAllWatchProgress();
         if (Object.keys(allProgress).length === 0) {
           setContinueWatchingItems([]);
@@ -1300,8 +1311,219 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
         }
       })();
 
-      // Wait for all groups and trakt merge to settle, then finalize loading state
-      await Promise.allSettled([...groupPromises, traktMergePromise]);
+      // SIMKL: fetch playback progress (in-progress, paused) and merge similarly to Trakt
+      const simklMergePromise = (async () => {
+        try {
+          if (!isSimklAuthed || isTraktAuthed) return;
+
+          const now = Date.now();
+          if (SIMKL_SYNC_COOLDOWN > 0 && (now - lastSimklSyncRef.current) < SIMKL_SYNC_COOLDOWN) {
+            return;
+          }
+          lastSimklSyncRef.current = now;
+
+          const playbackItems = await simklService.getPlaybackStatus();
+          logger.log(`[CW][Simkl] playback items: ${playbackItems.length}`);
+
+          const simklBatch: ContinueWatchingItem[] = [];
+          const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+          const sortedPlaybackItems = [...playbackItems]
+            .sort((a, b) => new Date(b.paused_at).getTime() - new Date(a.paused_at).getTime())
+            .slice(0, 30);
+
+          for (const item of sortedPlaybackItems) {
+            try {
+              // Skip accidental clicks
+              if ((item.progress ?? 0) < 2) continue;
+
+              const pausedAt = new Date(item.paused_at).getTime();
+              if (pausedAt < thirtyDaysAgo) continue;
+
+              if (item.type === 'movie' && item.movie?.ids?.imdb) {
+                // Skip completed movies
+                if (item.progress >= 85) continue;
+
+                const imdbId = item.movie.ids.imdb.startsWith('tt')
+                  ? item.movie.ids.imdb
+                  : `tt${item.movie.ids.imdb}`;
+
+                const movieKey = `movie:${imdbId}`;
+                if (recentlyRemovedRef.current.has(movieKey)) continue;
+
+                const cachedData = await getCachedMetadata('movie', imdbId);
+                if (!cachedData?.basicContent) continue;
+
+                simklBatch.push({
+                  ...cachedData.basicContent,
+                  id: imdbId,
+                  type: 'movie',
+                  progress: item.progress,
+                  lastUpdated: pausedAt,
+                  addonId: undefined,
+                } as ContinueWatchingItem);
+              } else if (item.type === 'episode' && item.show?.ids?.imdb && item.episode) {
+                const showImdb = item.show.ids.imdb.startsWith('tt')
+                  ? item.show.ids.imdb
+                  : `tt${item.show.ids.imdb}`;
+
+                const episodeNum = (item.episode as any).episode ?? (item.episode as any).number;
+                if (episodeNum === undefined || episodeNum === null) {
+                  logger.warn('[CW][Simkl] Missing episode number in playback item, skipping', item);
+                  continue;
+                }
+
+                const showKey = `series:${showImdb}`;
+                if (recentlyRemovedRef.current.has(showKey)) continue;
+
+                const cachedData = await getCachedMetadata('series', showImdb);
+                if (!cachedData?.basicContent) continue;
+
+                // If episode is completed (>= 85%), find next episode
+                if (item.progress >= 85) {
+                  const metadata = cachedData.metadata;
+                  if (metadata?.videos) {
+                    const nextEpisode = findNextEpisode(
+                      item.episode.season,
+                      episodeNum,
+                      metadata.videos,
+                      undefined,
+                      showImdb
+                    );
+
+                    if (nextEpisode) {
+                      simklBatch.push({
+                        ...cachedData.basicContent,
+                        id: showImdb,
+                        type: 'series',
+                        progress: 0,
+                        lastUpdated: pausedAt,
+                        season: nextEpisode.season,
+                        episode: nextEpisode.episode,
+                        episodeTitle: nextEpisode.title || `Episode ${nextEpisode.episode}`,
+                        addonId: undefined,
+                      } as ContinueWatchingItem);
+                    }
+                  }
+                  continue;
+                }
+
+                simklBatch.push({
+                  ...cachedData.basicContent,
+                  id: showImdb,
+                  type: 'series',
+                  progress: item.progress,
+                  lastUpdated: pausedAt,
+                  season: item.episode.season,
+                  episode: episodeNum,
+                  episodeTitle: item.episode.title || `Episode ${episodeNum}`,
+                  addonId: undefined,
+                } as ContinueWatchingItem);
+              }
+            } catch {
+              // Continue with other items
+            }
+          }
+
+          if (simklBatch.length === 0) {
+            setContinueWatchingItems([]);
+            return;
+          }
+
+          // Dedupe (keep most recent per show/movie)
+          const deduped = new Map<string, ContinueWatchingItem>();
+          for (const item of simklBatch) {
+            const key = `${item.type}:${item.id}`;
+            const existing = deduped.get(key);
+            if (!existing || (item.lastUpdated ?? 0) > (existing.lastUpdated ?? 0)) {
+              deduped.set(key, item);
+            }
+          }
+
+          // Filter removed items
+          const filteredItems: ContinueWatchingItem[] = [];
+          for (const item of deduped.values()) {
+            const key = item.type === 'series' && item.season && item.episode
+              ? `${item.type}:${item.id}:${item.season}:${item.episode}`
+              : `${item.type}:${item.id}`;
+            if (recentlyRemovedRef.current.has(key)) continue;
+
+            const removeId = item.type === 'series' && item.season && item.episode
+              ? `${item.id}:${item.season}:${item.episode}`
+              : item.id;
+            const isRemoved = await storageService.isContinueWatchingRemoved(removeId, item.type);
+            if (!isRemoved) filteredItems.push(item);
+          }
+
+          // Overlay local progress when local is ahead or newer
+          const adjustedItems = filteredItems.map((it) => {
+            if (!localProgressIndex) return it;
+
+            const matches: LocalProgressEntry[] = [];
+            for (const idVariant of getIdVariants(it.id)) {
+              const list = localProgressIndex.get(`${it.type}:${idVariant}`);
+              if (!list) continue;
+              for (const entry of list) {
+                if (it.type === 'series' && it.season !== undefined && it.episode !== undefined) {
+                  if (entry.season === it.season && entry.episode === it.episode) {
+                    matches.push(entry);
+                  }
+                } else {
+                  matches.push(entry);
+                }
+              }
+            }
+
+            if (matches.length === 0) return it;
+
+            const mostRecentLocal = matches.reduce<LocalProgressEntry | null>((acc, cur) => {
+              if (!acc) return cur;
+              return (cur.lastUpdated ?? 0) > (acc.lastUpdated ?? 0) ? cur : acc;
+            }, null);
+
+            const highestLocal = matches.reduce<LocalProgressEntry | null>((acc, cur) => {
+              if (!acc) return cur;
+              return (cur.progressPercent ?? 0) > (acc.progressPercent ?? 0) ? cur : acc;
+            }, null);
+
+            if (!mostRecentLocal || !highestLocal) return it;
+
+            const localProgress = mostRecentLocal.progressPercent;
+            const simklProgress = it.progress ?? 0;
+            const localTs = mostRecentLocal.lastUpdated ?? 0;
+            const simklTs = it.lastUpdated ?? 0;
+
+            const isAhead = isFinite(localProgress) && localProgress > simklProgress + 0.5;
+            const isLocalNewer = localTs > simklTs + 5000;
+
+            if (isAhead || isLocalNewer) {
+              return {
+                ...it,
+                progress: localProgress,
+                lastUpdated: localTs > 0 ? localTs : it.lastUpdated,
+              } as ContinueWatchingItem;
+            }
+
+            // Otherwise keep Simkl, but if local has a newer timestamp, use it for ordering
+            if (localTs > 0 && localTs > simklTs) {
+              return {
+                ...it,
+                lastUpdated: localTs,
+              } as ContinueWatchingItem;
+            }
+
+            return it;
+          });
+
+          adjustedItems.sort((a, b) => (b.lastUpdated ?? 0) - (a.lastUpdated ?? 0));
+          setContinueWatchingItems(adjustedItems);
+        } catch (err) {
+          logger.error('[SimklSync] Error in Simkl merge:', err);
+        }
+      })();
+
+      // Wait for all groups and provider merges to settle, then finalize loading state
+      await Promise.allSettled([...groupPromises, traktMergePromise, simklMergePromise]);
     } catch (error) {
       // Continue even if loading fails
     } finally {
@@ -1943,7 +2165,8 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
   }
 
   return (
-    <View
+    <Animated.View
+      entering={FadeIn.duration(400)}
       style={styles.container}
     >
       <View style={[styles.header, { paddingHorizontal: horizontalPadding }]}>
@@ -2082,7 +2305,7 @@ const ContinueWatchingSection = React.forwardRef<ContinueWatchingRef>((props, re
           )}
         </BottomSheetView>
       </BottomSheetModal>
-    </View>
+    </Animated.View>
   );
 });
 

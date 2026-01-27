@@ -224,7 +224,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   const thumbnailOpacity = useSharedValue(1);
   const trailerOpacity = useSharedValue(0);
   const trailerMuted = settings?.trailerMuted ?? true;
-  const heroOpacity = useSharedValue(0); // Start hidden for smooth fade-in
+  // Initialize to 0 for smooth fade-in
+  const heroOpacity = useSharedValue(0);
 
   // Handler for trailer end
   const handleTrailerEnd = useCallback(() => {
@@ -270,15 +271,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     'worklet';
     const scrollYValue = scrollY.value;
 
-    // Disable parallax during drag to avoid transform conflicts
-    if (isDragging.value > 0) {
-      return {
-        transform: [
-          { scale: 1.0 },
-          { translateY: 0 }
-        ],
-      };
-    }
+    // Keep parallax active during drag to prevent jumps
+    // if (isDragging.value > 0) { ... }
 
     // Pre-calculated constants - start at 1.0 for normal size
     const DEFAULT_ZOOM = 1.0;
@@ -308,15 +302,8 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     'worklet';
     const scrollYValue = scrollY.value;
 
-    // Disable parallax during drag to avoid transform conflicts
-    if (isDragging.value > 0) {
-      return {
-        transform: [
-          { scale: 1.0 },
-          { translateY: 0 }
-        ],
-      };
-    }
+    // Keep parallax active during drag to prevent jumps
+    // if (isDragging.value > 0) { ... }
 
     // Pre-calculated constants - start at 1.0 for normal size
     const DEFAULT_ZOOM = 1.0;
@@ -360,13 +347,10 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   // Smooth fade-in when content loads
   useEffect(() => {
     if (currentItem && !loading) {
-      heroOpacity.value = withDelay(
-        100,
-        withTiming(1, {
-          duration: 500,
-          easing: Easing.out(Easing.cubic),
-        })
-      );
+      heroOpacity.value = withTiming(1, {
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+      });
     }
   }, [currentItem, loading, heroOpacity]);
 
@@ -462,7 +446,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
         if (url) {
           const bestUrl = TrailerService.getBestFormatUrl(url);
           setTrailerUrl(bestUrl);
-          logger.info('[AppleTVHero] Trailer URL loaded:', bestUrl);
+          // logger.info('[AppleTVHero] Trailer URL loaded:', bestUrl);
         } else {
           logger.info('[AppleTVHero] No trailer found for:', currentItem.name);
           setTrailerUrl(null);
@@ -970,7 +954,7 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
     setCurrentIndex(index);
   }, []);
 
-  if (loading) {
+  if (loading && !currentItem) {
     return (
       <View style={[styles.container, { height: HERO_HEIGHT, marginTop: -insets.top }]}>
         <View style={styles.skeletonContainer}>
@@ -1008,13 +992,12 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View
-        entering={initialLoadComplete ? undefined : FadeIn.duration(600).delay(150)}
-        style={[styles.container, heroContainerStyle, { height: HERO_HEIGHT, marginTop: -insets.top }]}
+        style={[styles.container, heroContainerStyle, { height: HERO_HEIGHT, marginTop: -insets.top, backgroundColor: currentTheme.colors.darkBackground }]}
       >
         {/* Background Images with Crossfade */}
         <View style={styles.backgroundContainer}>
           {/* Current Image - Always visible as base */}
-          <Animated.View style={[styles.imageWrapper, backgroundParallaxStyle]}>
+          <Animated.View style={[styles.imageWrapper, backgroundParallaxStyle, { opacity: thumbnailOpacity }]}>
             <FastImage
               source={{
                 uri: bannerUrl,
@@ -1029,17 +1012,19 @@ const AppleTVHero: React.FC<AppleTVHeroProps> = ({
 
           {/* Next/Preview Image - Animated overlay during drag */}
           {nextIndex !== currentIndex && (
-            <Animated.View style={[styles.imageWrapperAbsolute, nextImageStyle, backgroundParallaxStyle]}>
-              <FastImage
-                source={{
-                  uri: nextBannerUrl,
-                  priority: FastImage.priority.high,
-                  cache: FastImage.cacheControl.immutable,
-                }}
-                style={styles.backgroundImage}
-                resizeMode={FastImage.resizeMode.cover}
-                onLoad={() => setBannerLoaded((prev) => ({ ...prev, [nextIndex]: true }))}
-              />
+            <Animated.View style={[styles.imageWrapperAbsolute, backgroundParallaxStyle]}>
+              <Animated.View style={[StyleSheet.absoluteFill, nextImageStyle]}>
+                <FastImage
+                  source={{
+                    uri: nextBannerUrl,
+                    priority: FastImage.priority.high,
+                    cache: FastImage.cacheControl.immutable,
+                  }}
+                  style={styles.backgroundImage}
+                  resizeMode={FastImage.resizeMode.cover}
+                  onLoad={() => setBannerLoaded((prev) => ({ ...prev, [nextIndex]: true }))}
+                />
+              </Animated.View>
             </Animated.View>
           )}
 
@@ -1456,7 +1441,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 40,
+    height: 400, // Increased to cover action buttons with dark background
     pointerEvents: 'none',
   },
   // Loading & Empty States

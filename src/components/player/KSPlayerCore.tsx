@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, StatusBar, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, StatusBar, StyleSheet, Animated, Dimensions, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
@@ -21,6 +21,7 @@ import ResumeOverlay from './modals/ResumeOverlay';
 import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import SkipIntroButton from './overlays/SkipIntroButton';
 import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './components';
+import { CreditsInfo } from '../../services/introService';
 
 // Platform-specific components
 import { KSPlayerSurface } from './ios/components/KSPlayerSurface';
@@ -69,6 +70,7 @@ interface PlayerRouteParams {
   year?: number;
   streamProvider?: string;
   streamName?: string;
+  videoType?: string;
   id: string;
   type: string;
   episodeId?: string;
@@ -93,6 +95,42 @@ const KSPlayerCore: React.FC = () => {
     headers, streamProvider, streamName,
     initialPosition: routeInitialPosition
   } = params;
+
+  const videoType = (params as any)?.videoType as string | undefined;
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    const headerKeys = Object.keys(headers || {});
+    logger.log('[KSPlayerCore] route params', {
+      uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+      id,
+      type,
+      episodeId,
+      imdbId,
+      title,
+      episodeTitle,
+      season,
+      episode,
+      quality,
+      year,
+      streamProvider,
+      streamName,
+      videoType,
+      headersKeys: headerKeys,
+      headersCount: headerKeys.length,
+    });
+  }, [uri, episodeId]);
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    const headerKeys = Object.keys(headers || {});
+    logger.log('[KSPlayerCore] source update', {
+      uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+      videoType,
+      headersCount: headerKeys.length,
+      headersKeys: headerKeys,
+    });
+  }, [uri, headers, videoType]);
 
   // --- Hooks ---
   const playerState = usePlayerState();
@@ -119,7 +157,7 @@ const KSPlayerCore: React.FC = () => {
   const speedControl = useSpeedControl(1.0);
 
   // Metadata Hook
-  const { metadata, groupedEpisodes, cast } = useMetadata({ id, type: type as 'movie' | 'series' });
+  const { metadata, groupedEpisodes, cast, tmdbId } = useMetadata({ id, type: type as 'movie' | 'series' });
 
   // Trakt Autosync
   const traktAutosync = useTraktAutosync({
@@ -141,6 +179,9 @@ const KSPlayerCore: React.FC = () => {
 
   // Subtitle sync modal state
   const [showSyncModal, setShowSyncModal] = useState(false);
+
+  // Credits timing state from API
+  const [creditsInfo, setCreditsInfo] = useState<CreditsInfo | null>(null);
 
   // Track auto-selection refs to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
@@ -455,6 +496,17 @@ const KSPlayerCore: React.FC = () => {
 
   // Handlers
   const onLoad = (data: any) => {
+    if (__DEV__) {
+      logger.log('[KSPlayerCore] onLoad', {
+        uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+        duration: data?.duration,
+        audioTracksCount: Array.isArray(data?.audioTracks) ? data.audioTracks.length : 0,
+        textTracksCount: Array.isArray(data?.textTracks) ? data.textTracks.length : 0,
+        videoType,
+        headersKeys: Object.keys(headers || {}),
+      });
+    }
+
     setDuration(data.duration);
     if (data.audioTracks) tracks.setKsAudioTracks(data.audioTracks);
     if (data.textTracks) tracks.setKsTextTracks(data.textTracks);
@@ -538,6 +590,18 @@ const KSPlayerCore: React.FC = () => {
     } catch (e) {
       msg = 'Error parsing error details';
     }
+
+    if (__DEV__) {
+      logger.error('[KSPlayerCore] onError', {
+        msg,
+        uri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+        videoType,
+        streamProvider,
+        streamName,
+        headersKeys: Object.keys(headers || {}),
+        rawError: error,
+      });
+    }
     modals.setErrorDetails(msg);
     modals.setShowErrorModal(true);
   };
@@ -581,6 +645,17 @@ const KSPlayerCore: React.FC = () => {
       modals.setShowSourcesModal(false);
       return;
     }
+
+    if (__DEV__) {
+      logger.log('[KSPlayerCore] switching stream', {
+        fromUri: typeof uri === 'string' ? uri.slice(0, 240) : uri,
+        toUri: typeof newStream?.url === 'string' ? newStream.url.slice(0, 240) : newStream?.url,
+        newStreamHeadersKeys: Object.keys(newStream?.headers || {}),
+        newProvider: newStream?.addonName || newStream?.name || newStream?.addon || 'Unknown',
+        newName: newStream?.name || newStream?.title || 'Unknown',
+      });
+    }
+
     modals.setShowSourcesModal(false);
     setPaused(true);
 
@@ -614,6 +689,19 @@ const KSPlayerCore: React.FC = () => {
     modals.setShowEpisodeStreamsModal(false);
     setPaused(true);
     const ep = modals.selectedEpisodeForStreams;
+
+    if (__DEV__) {
+      logger.log('[KSPlayerCore] switching episode stream', {
+        toUri: typeof stream?.url === 'string' ? stream.url.slice(0, 240) : stream?.url,
+        streamHeadersKeys: Object.keys(stream?.headers || {}),
+        ep: {
+          season: ep?.season_number,
+          episode: ep?.episode_number,
+          name: ep?.name,
+          stremioId: ep?.stremioId,
+        },
+      });
+    }
 
     const newQuality = stream.quality || (stream.title?.match(/(\d+)p/)?.[0]);
     const newProvider = stream.addonName || stream.name || stream.addon || 'Unknown';
@@ -654,6 +742,20 @@ const KSPlayerCore: React.FC = () => {
     controls.seekToTime(value);
   };
 
+  const handleProgress = useCallback((d: any) => {
+    if (!isSliderDragging) {
+      setCurrentTime(d.currentTime);
+    }
+    // Only update buffered if it changed by more than 0.5s to reduce re-renders
+    const newBuffered = d.buffered || 0;
+    setBuffered(prevBuffered => {
+      if (Math.abs(newBuffered - prevBuffered) > 0.5) {
+        return newBuffered;
+      }
+      return prevBuffered;
+    });
+  }, [isSliderDragging, setCurrentTime, setBuffered]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000000' }}>
       <StatusBar hidden={true} />
@@ -693,25 +795,22 @@ const KSPlayerCore: React.FC = () => {
         onAudioTracks={(d) => tracks.setKsAudioTracks(d.audioTracks || [])}
         onTextTracks={(d) => tracks.setKsTextTracks(d.textTracks || [])}
         onLoad={onLoad}
-        onProgress={(d) => {
-          if (!isSliderDragging) {
-            setCurrentTime(d.currentTime);
-          }
-          // Only update buffered if it changed by more than 0.5s to reduce re-renders
-          const newBuffered = d.buffered || 0;
-          if (Math.abs(newBuffered - buffered) > 0.5) {
-            setBuffered(newBuffered);
-          }
-        }}
+        onProgress={handleProgress}
         onEnd={async () => {
           setCurrentTime(duration);
           await traktAutosync.handlePlaybackEnd(duration, duration, 'ended');
         }}
         onError={handleError}
-        onBuffer={setIsBuffering}
+        onBuffer={(b) => {
+          setIsBuffering(b);
+        }}
         onReadyForDisplay={() => setIsPlayerReady(true)}
-        onPlaybackStalled={() => setIsBuffering(true)}
-        onPlaybackResume={() => setIsBuffering(false)}
+        onPlaybackStalled={() => {
+          setIsBuffering(true);
+        }}
+        onPlaybackResume={() => {
+          setIsBuffering(false);
+        }}
         screenWidth={screenDimensions.width}
         screenHeight={screenDimensions.height}
         customVideoStyles={{ width: '100%', height: '100%' }}
@@ -769,11 +868,24 @@ const KSPlayerCore: React.FC = () => {
         volume={volume}
         brightness={brightness}
         controlsTimeout={controlsTimeout}
+        resizeMode={resizeMode}
+        skip={controls.skip}
+        currentTime={currentTime}
+        duration={duration}
+        seekToTime={controls.seekToTime}
+        formatTime={formatTime}
       />
 
       {/* UI Controls */}
       {isVideoLoaded && (
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          {/* Buffering Indicator (Visible when controls are hidden) */}
+          {isBuffering && !showControls && (
+            <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+            </View>
+          )}
+
           <PlayerControls
             showControls={showControls}
             fadeAnim={fadeAnim}
@@ -796,7 +908,21 @@ const KSPlayerCore: React.FC = () => {
             togglePlayback={controls.togglePlayback}
             skip={controls.skip}
             handleClose={handleClose}
-            cycleAspectRatio={() => setResizeMode(prev => prev === 'cover' ? 'contain' : 'cover')}
+            cycleAspectRatio={() => {
+              gestureControls.showResizeModeOverlayFn(() => {
+                setResizeMode(prev => {
+                  switch (prev) {
+                    case 'contain':
+                      return 'cover';
+                    case 'cover':
+                      return 'stretch';
+                    case 'stretch':
+                    default:
+                      return 'contain';
+                  }
+                });
+              });
+            }}
             cyclePlaybackSpeed={() => speedControl.setPlaybackSpeed(speedControl.playbackSpeed >= 2 ? 1 : speedControl.playbackSpeed + 0.25)}
             currentPlaybackSpeed={speedControl.playbackSpeed}
             setShowAudioModal={modals.setShowAudioModal}
@@ -814,6 +940,7 @@ const KSPlayerCore: React.FC = () => {
             isAirPlayActive={isAirPlayActive}
             allowsAirPlay={allowsAirPlay}
             onAirPlayPress={() => ksPlayerRef.current?.showAirPlayPicker()}
+            isBuffering={isBuffering}
           />
         </View>
       )}
@@ -875,8 +1002,10 @@ const KSPlayerCore: React.FC = () => {
         episode={episode}
         malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
         kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+        tmdbId={tmdbId || undefined}
         currentTime={currentTime}
         onSkip={(endTime) => controls.seekToTime(endTime)}
+        onCreditsInfo={setCreditsInfo}
         controlsVisible={showControls}
         controlsFixedOffset={126}
       />
@@ -902,6 +1031,7 @@ const KSPlayerCore: React.FC = () => {
         metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
         controlsVisible={showControls}
         controlsFixedOffset={126}
+        creditsInfo={creditsInfo}
       />
 
       {/* Modals */}

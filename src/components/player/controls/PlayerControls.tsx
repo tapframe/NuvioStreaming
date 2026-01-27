@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, StyleSheet, Platform, Dimensions, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Feather from 'react-native-vector-icons/Feather';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -54,6 +54,7 @@ interface PlayerControlsProps {
   // MPV Switch (Android only)
   onSwitchToMPV?: () => void;
   useExoPlayer?: boolean;
+  isBuffering?: boolean;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -98,6 +99,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onAirPlayPress,
   onSwitchToMPV,
   useExoPlayer,
+  isBuffering = false,
 }) => {
   const { currentTheme } = useTheme();
   const { t } = useTranslation();
@@ -386,7 +388,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
         {/* Center Controls - CloudStream Style */}
         <View style={[styles.controls, {
           transform: [{ translateY: -(playButtonSize / 2) }]
-        }]}>
+        }]} pointerEvents="box-none">
 
           {/* Backward Seek Button (-10s) */}
           <TouchableOpacity
@@ -463,7 +465,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           <TouchableOpacity
             onPress={handlePlayPauseWithAnimation}
             activeOpacity={0.7}
-            style={{ marginHorizontal: buttonSpacing }}
+            disabled={isBuffering}
           >
             <View style={[styles.playButtonCircle, { width: playButtonSize, height: playButtonSize }]}>
               <Animated.View style={[
@@ -479,11 +481,15 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 transform: [{ scale: playIconScale }],
                 opacity: playIconOpacity
               }}>
-                <Ionicons
-                  name={paused ? "play" : "pause"}
-                  size={playIconSizeCalculated}
-                  color="#FFFFFF"
-                />
+                {isBuffering ? (
+                  <ActivityIndicator size="large" color="#FFFFFF" />
+                ) : (
+                  <Ionicons
+                    name={paused ? "play" : "pause"}
+                    size={playIconSizeCalculated}
+                    color="#FFFFFF"
+                  />
+                )}
               </Animated.View>
             </View>
           </TouchableOpacity>

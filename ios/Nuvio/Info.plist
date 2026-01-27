@@ -39,7 +39,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>29</string>
+	<string>35</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>12.0</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -58,9 +58,13 @@
 		<string>_CC1AD845._googlecast._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your local network</string>
+	<string>Nuvio uses the local network to discover Cast-enabled devices on your WiFi network and to connect to local media servers.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app does not require microphone access.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<false/>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>RCTRootViewBackgroundColor</key>
@@ -73,13 +77,6 @@
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
-	<key>UILaunchScreen</key>
-	<dict>
-		<key>UIColorName</key>
-		<string>SplashScreenBackground</string>
-		<key>UIImageName</key>
-		<string>SplashScreenLegacy</string>
-	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>

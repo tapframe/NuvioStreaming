@@ -11,13 +11,15 @@ import {
   StyleSheet,
   I18nManager,
   Platform,
-  LogBox
+  LogBox,
+  Linking
 } from 'react-native';
 import './src/i18n'; // Initialize i18n
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens, enableFreeze } from 'react-native-screens';
 import AppNavigator, {
   CustomNavigationDarkTheme,
@@ -28,6 +30,7 @@ import 'react-native-reanimated';
 import { CatalogProvider } from './src/contexts/CatalogContext';
 import { GenreProvider } from './src/contexts/GenreContext';
 import { TraktProvider } from './src/contexts/TraktContext';
+import { SimklProvider } from './src/contexts/SimklContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { TrailerProvider } from './src/contexts/TrailerContext';
 import { DownloadsProvider } from './src/contexts/DownloadsContext';
@@ -103,6 +106,45 @@ const ThemedApp = () => {
 
   // GitHub major/minor release overlay
   const githubUpdate = useGithubMajorUpdate();
+  const [isDownloadingGitHub, setIsDownloadingGitHub] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  const handleGithubUpdateAction = async () => {
+    console.log('handleGithubUpdateAction triggered. Release data exists:', !!githubUpdate.releaseData);
+    if (Platform.OS === 'android') {
+      setIsDownloadingGitHub(true);
+      setDownloadProgress(0);
+      try {
+        const { default: AndroidUpdateService } = await import('./src/services/androidUpdateService');
+        if (githubUpdate.releaseData) {
+          console.log('Calling AndroidUpdateService with:', githubUpdate.releaseData.tag_name);
+          const success = await AndroidUpdateService.downloadAndInstallUpdate(
+            githubUpdate.releaseData,
+            (progress) => {
+              setDownloadProgress(progress);
+            }
+          );
+          console.log('AndroidUpdateService result:', success);
+          if (!success) {
+            console.log('Update failed, falling back to browser');
+            // If download fails or no APK found, fallback to browser
+            if (githubUpdate.releaseUrl) Linking.openURL(githubUpdate.releaseUrl);
+          }
+        } else if (githubUpdate.releaseUrl) {
+          console.log('No release data, falling back to browser');
+          Linking.openURL(githubUpdate.releaseUrl);
+        }
+      } catch (error) {
+        console.error('Failed to update via Android service', error);
+        if (githubUpdate.releaseUrl) Linking.openURL(githubUpdate.releaseUrl);
+      } finally {
+        setIsDownloadingGitHub(false);
+        setDownloadProgress(0);
+      }
+    } else {
+      if (githubUpdate.releaseUrl) Linking.openURL(githubUpdate.releaseUrl);
+    }
+  };
 
   // Check onboarding status and initialize services
   useEffect(() => {
@@ -201,6 +243,9 @@ const ThemedApp = () => {
                 releaseUrl={githubUpdate.releaseUrl}
                 onDismiss={githubUpdate.onDismiss}
                 onLater={githubUpdate.onLater}
+                onUpdateAction={handleGithubUpdateAction}
+                isDownloading={isDownloadingGitHub}
+                downloadProgress={downloadProgress}
               />
               <CampaignManager />
             </View>
@@ -213,23 +258,27 @@ const ThemedApp = () => {
 
 function App(): React.JSX.Element {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <GenreProvider>
-          <CatalogProvider>
-            <TraktProvider>
-              <ThemeProvider>
-                <TrailerProvider>
-                  <ToastProvider>
-                    <ThemedApp />
-                  </ToastProvider>
-                </TrailerProvider>
-              </ThemeProvider>
-            </TraktProvider>
-          </CatalogProvider>
-        </GenreProvider>
-      </BottomSheetModalProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <BottomSheetModalProvider>
+          <GenreProvider>
+            <CatalogProvider>
+              <TraktProvider>
+                <SimklProvider>
+                  <ThemeProvider>
+                    <TrailerProvider>
+                      <ToastProvider>
+                        <ThemedApp />
+                      </ToastProvider>
+                    </TrailerProvider>
+                  </ThemeProvider>
+                </SimklProvider>
+              </TraktProvider>
+            </CatalogProvider>
+          </GenreProvider>
+        </BottomSheetModalProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 

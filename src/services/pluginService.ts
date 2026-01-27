@@ -5,6 +5,24 @@ import { logger } from '../utils/logger';
 import { Stream } from '../types/streams';
 import { cacheService } from './cacheService';
 import CryptoJS from 'crypto-js';
+import { safeAxiosConfig, createSafeAxiosConfig } from '../utils/axiosConfig';
+
+const MAX_CONCURRENT_SCRAPERS = 5;
+const MAX_INFLIGHT_KEYS = 30;
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024;
+const MAX_RESULT_ITEMS = 150;
+const SCRAPER_BATCH_DELAY_MS = 25;
+
+const VIDEO_CONTENT_TYPES = [
+  'video/',
+  'application/octet-stream',
+  'application/x-mpegurl',
+  'application/vnd.apple.mpegurl',
+  'application/dash+xml',
+  'binary/octet-stream',
+];
+
+const MAX_PREFLIGHT_SIZE = 50 * 1024 * 1024;
 
 // Types for local scrapers
 export interface ScraperManifest {
@@ -65,6 +83,68 @@ export interface LocalScraperResult {
 
 // Callback type for scraper results
 type ScraperCallback = (streams: Stream[] | null, scraperId: string | null, scraperName: string | null, error: Error | null) => void;
+
+async function preflightSizeCheck(url: string, timeout: number = 15000): Promise<void> {
+  try {
+    // Skip preflight check for non-HTTP(S) URLs (tokens, IDs, etc.)
+    if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+      logger.log('[PreflightCheck] Skipping non-HTTP URL:', url.substring(0, 60));
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    const contentType = response.headers.get('content-type')?.toLowerCase() || '';
+    const isVideoContent = VIDEO_CONTENT_TYPES.some(type => contentType.includes(type));
+    
+    if (isVideoContent) {
+      logger.warn('[PreflightCheck] Rejected video content type:', contentType, 'for URL:', url.substring(0, 80));
+      throw new Error(`Response is video content (${contentType}), not fetching to prevent OOM`);
+    }
+
+    const contentLengthHeader = response.headers.get('content-length');
+    if (contentLengthHeader) {
+      const contentLength = parseInt(contentLengthHeader, 10);
+      if (!isNaN(contentLength) && contentLength > MAX_PREFLIGHT_SIZE) {
+        logger.warn('[PreflightCheck] Rejected large response:', contentLength, 'bytes for URL:', url.substring(0, 80));
+        throw new Error(`Response too large (${contentLength} bytes), max allowed is ${MAX_PREFLIGHT_SIZE}`);
+      }
+    }
+
+    const finalUrl = response.url || url;
+    const videoExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts', '.m3u8'];
+    const hasVideoExtension = videoExtensions.some(ext => finalUrl.toLowerCase().includes(ext));
+    
+    if (hasVideoExtension && contentType && !contentType.includes('text') && !contentType.includes('json') && !contentType.includes('html')) {
+      logger.warn('[PreflightCheck] URL appears to be a video file:', finalUrl.substring(0, 80));
+      throw new Error(`URL appears to be a video file, not fetching to prevent OOM`);
+    }
+
+    logger.log('[PreflightCheck] Passed for URL:', url.substring(0, 60), 'Content-Length:', contentLengthHeader || 'unknown');
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      logger.warn('[PreflightCheck] HEAD request timed out for:', url.substring(0, 40));
+      return;
+    }
+    
+    if (error.message?.includes('video content') || error.message?.includes('too large') || error.message?.includes('video file')) {
+      throw error;
+    }
+    
+    logger.warn('[PreflightCheck] HEAD request failed (allowing GET):', error.message?.substring(0, 100));
+  }
+}
 
 class LocalScraperService {
   private static instance: LocalScraperService;
@@ -401,13 +481,12 @@ class LocalScraperService {
         : `${repositoryUrl}/manifest.json`;
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}`;
 
-      const response = await axios.get(manifestUrl, {
-        timeout: 10000,
+      const response = await axios.get(manifestUrl, createSafeAxiosConfig(10000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
-      });
+      }));
 
       if (response.data && response.data.name) {
         logger.log('[LocalScraperService] Found repository name in manifest:', response.data.name);
@@ -639,14 +718,13 @@ class LocalScraperService {
         : `${this.repositoryUrl}/manifest.json`;
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
 
-      const response = await axios.get(manifestUrl, {
-        timeout: 10000,
+      const response = await axios.get(manifestUrl, createSafeAxiosConfig(10000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
           'Expires': '0'
         }
-      });
+      }));
       const manifest: ScraperManifest = response.data;
 
       // Store repository name from manifest
@@ -734,14 +812,13 @@ class LocalScraperService {
         : `${repo.url}/manifest.json`;
       const manifestUrl = `${baseManifestUrl}?t=${Date.now()}&v=${Math.random()}`;
 
-      const response = await axios.get(manifestUrl, {
-        timeout: 10000,
+      const response = await axios.get(manifestUrl, createSafeAxiosConfig(10000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
           'Expires': '0'
         }
-      });
+      }));
       const manifest: ScraperManifest = response.data;
 
       // Update repository name from manifest
@@ -817,14 +894,13 @@ class LocalScraperService {
       // Add cache-busting parameters to force fresh download
       const scraperUrlWithCacheBust = `${scraperUrl}?t=${Date.now()}&v=${Math.random()}`;
 
-      const response = await axios.get(scraperUrlWithCacheBust, {
-        timeout: 15000,
+      const response = await axios.get(scraperUrlWithCacheBust, createSafeAxiosConfig(15000, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
           'Expires': '0'
         }
-      });
+      }));
       const scraperCode = response.data;
 
       // Store scraper info and code
@@ -1086,17 +1162,24 @@ class LocalScraperService {
       return;
     }
 
-    logger.log(`[LocalScraperService] Executing ${enabledScrapers.length} scrapers for ${media}:${tmdbId}`, {
-      scrapers: enabledScrapers.map(s => s.name)
-    });
+    logger.log(`[LocalScraperService] Executing ${enabledScrapers.length} scrapers for ${media}:${tmdbId}`);
 
     // Generate a lightweight request id for tracing
     const requestId = `rs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 
-    // Execute all enabled scrapers
-    for (const scraper of enabledScrapers) {
-      this.executeScraper(scraper, media, tmdbId, season, episode, callback, requestId);
-    }
+    const executeBatch = async (scrapers: ScraperInfo[], batchSize: number) => {
+      for (let i = 0; i < scrapers.length; i += batchSize) {
+        const batch = scrapers.slice(i, i + batchSize);
+        batch.forEach(scraper => {
+          this.executeScraper(scraper, media, tmdbId, season, episode, callback, requestId);
+        });
+        if (i + batchSize < scrapers.length) {
+          await new Promise(r => setTimeout(r, SCRAPER_BATCH_DELAY_MS));
+        }
+      }
+    };
+
+    executeBatch(enabledScrapers, MAX_CONCURRENT_SCRAPERS);
   }
 
   // Execute individual scraper
@@ -1121,6 +1204,11 @@ class LocalScraperService {
       // Build single-flight key
       const flightKey = `${scraper.id}|${type}|${tmdbId}|${season ?? ''}|${episode ?? ''}`;
 
+      if (this.inFlightByKey.size >= MAX_INFLIGHT_KEYS) {
+        const firstKey = this.inFlightByKey.keys().next().value;
+        if (firstKey) this.inFlightByKey.delete(firstKey);
+      }
+
       // Create a sandboxed execution environment with single-flight coalescing
       let promise: Promise<LocalScraperResult[]>;
       if (this.inFlightByKey.has(flightKey)) {
@@ -1143,7 +1231,11 @@ class LocalScraperService {
         }).catch(() => { });
       }
 
-      const results = await promise;
+      let results = await promise;
+
+      if (Array.isArray(results) && results.length > MAX_RESULT_ITEMS) {
+        results = results.slice(0, MAX_RESULT_ITEMS);
+      }
 
       // Convert results to Nuvio Stream format
       const streams = this.convertToStreams(results, scraper);
@@ -1251,6 +1343,61 @@ class LocalScraperService {
       const MOVIEBOX_PRIMARY_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_PRIMARY_KEY;
       const MOVIEBOX_TMDB_API_KEY = process.env.EXPO_PUBLIC_MOVIEBOX_TMDB_API_KEY || '439c478a771f35c05022f9feabcca01c';
 
+      const sandboxedAxios = {
+        get: async (url: string, config?: any) => {
+          if (!config?.skipSizeCheck) {
+            await preflightSizeCheck(url, config?.timeout || 30000);
+          }
+          return axios.get(url, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        post: async (url: string, data?: any, config?: any) => {
+          return axios.post(url, data, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        put: async (url: string, data?: any, config?: any) => {
+          return axios.put(url, data, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        delete: async (url: string, config?: any) => {
+          return axios.delete(url, {
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        request: async (config: any) => {
+          const method = (config?.method || 'GET').toString().toUpperCase();
+          if (method === 'GET' && config?.url && !config?.skipSizeCheck) {
+            await preflightSizeCheck(config.url, config?.timeout || 30000);
+          }
+          return axios.request({
+            ...config,
+            maxContentLength: MAX_RESPONSE_SIZE,
+            maxBodyLength: MAX_RESPONSE_SIZE,
+            timeout: config?.timeout || 30000,
+          });
+        },
+        create: (config?: any) => axios.create({
+          ...config,
+          maxContentLength: MAX_RESPONSE_SIZE,
+          maxBodyLength: MAX_RESPONSE_SIZE,
+        }),
+      };
+
       // Custom require function for backward compatibility with existing plugins
       const pluginRequire = (moduleName: string): any => {
         switch (moduleName) {
@@ -1262,12 +1409,74 @@ class LocalScraperService {
           case 'crypto-js':
             return CryptoJS;
           case 'axios':
-            return axios;
+            return sandboxedAxios;
           default:
             throw new Error(`Module '${moduleName}' is not available in plugins`);
         }
       };
 
+      const polyfilledFetch = async (url: string, options: any = {}): Promise<Response> => {
+        const method = (options?.method || 'GET').toString().toUpperCase();
+        
+        if (method === 'GET' && !options?.skipSizeCheck) {
+          try {
+            await preflightSizeCheck(url, options?.timeout || 15000);
+          } catch (preflightError: any) {
+            logger.error('[PolyfilledFetch] Preflight check failed:', preflightError.message);
+            throw preflightError;
+          }
+        }
+
+        if (options.redirect !== 'manual') {
+          return fetch(url, options);
+        }
+
+        // Try native fetch with redirect: 'manual' first
+        try {
+          logger.log('[PolyfilledFetch] Attempting native fetch with redirect: manual for:', url.substring(0, 50));
+          const nativeResponse = await fetch(url, options);
+
+          // Log what native fetch returns
+          const locationHeader = nativeResponse.headers.get('location');
+          logger.log('[PolyfilledFetch] Native fetch result - Status:', nativeResponse.status, 'URL:', nativeResponse.url?.substring(0, 60), 'Location:', locationHeader || 'none');
+
+          // Check if redirect happened - compare URLs
+          if (nativeResponse.url && nativeResponse.url !== url) {
+            // Fetch followed the redirect! Let's try to get the redirect location
+            // by making a HEAD request or checking if there's any pattern
+            logger.log('[PolyfilledFetch] REDIRECT DETECTED - Original:', url.substring(0, 50), 'Final:', nativeResponse.url.substring(0, 50));
+
+            // Create a mock 302 response with the final URL as location
+            const mockHeaders = new Headers(nativeResponse.headers);
+            mockHeaders.set('location', nativeResponse.url);
+
+            return {
+              ok: false,
+              status: 302,  // Mock as 302
+              statusText: 'Found',
+              headers: mockHeaders,
+              url: url,
+              text: nativeResponse.text.bind(nativeResponse),
+              json: nativeResponse.json.bind(nativeResponse),
+              blob: nativeResponse.blob.bind(nativeResponse),
+              arrayBuffer: nativeResponse.arrayBuffer.bind(nativeResponse),
+              clone: nativeResponse.clone.bind(nativeResponse),
+              body: nativeResponse.body,
+              bodyUsed: nativeResponse.bodyUsed,
+              redirected: true,
+              type: nativeResponse.type,
+              formData: nativeResponse.formData.bind(nativeResponse),
+            } as Response;
+          }
+
+          return nativeResponse;
+        } catch (error: any) {
+          logger.error('[PolyfilledFetch] Native fetch error:', error.message);
+          throw error;
+        }
+      };
+
+>>>>>>> upstream/main
       // Execution timeout (1 minute)
       const PLUGIN_TIMEOUT_MS = 60000;
       const functionName = params.functionName || 'getStreams';
@@ -1288,17 +1497,22 @@ class LocalScraperService {
             'params',
             'PRIMARY_KEY',
             'TMDB_API_KEY',
-            'URL_VALIDATION_ENABLED',
             'SCRAPER_SETTINGS',
             'SCRAPER_ID',
             `
             // Make env vars available globally for backward compatibility
-            if (typeof global !== 'undefined') {
-              global.PRIMARY_KEY = PRIMARY_KEY;
-              global.TMDB_API_KEY = TMDB_API_KEY;
-              global.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
-              global.SCRAPER_ID = SCRAPER_ID;
-              global.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
+            const globalScope = typeof global !== 'undefined' ? global : (typeof window !== 'undefined' ? window : (typeof self !== 'undefined' ? self : this));
+            
+            if (globalScope) {
+              globalScope.PRIMARY_KEY = PRIMARY_KEY;
+              globalScope.TMDB_API_KEY = TMDB_API_KEY;
+              globalScope.SCRAPER_SETTINGS = SCRAPER_SETTINGS;
+              globalScope.SCRAPER_ID = SCRAPER_ID;
+              if (typeof URL_VALIDATION_ENABLED !== 'undefined') {
+                globalScope.URL_VALIDATION_ENABLED = URL_VALIDATION_ENABLED;
+              }
+            } else {
+               logger.error('[Plugin Sandbox] Could not find global scope to inject settings');
             }
 
             // Plugin code
@@ -1323,15 +1537,14 @@ class LocalScraperService {
             moduleObj,
             moduleExports,
             pluginRequire,
-            axios,
-            fetch,
+            sandboxedAxios,
+            polyfilledFetch,  // Use polyfilled fetch for redirect: manual support
             CryptoJS,
             cheerio,
             customLogger,
             params,
             MOVIEBOX_PRIMARY_KEY,
             MOVIEBOX_TMDB_API_KEY,
-            urlValidationEnabled,
             perScraperSettings,
             params?.scraperId
           );

@@ -48,6 +48,8 @@ import { AboutSettingsContent, AboutFooter } from './settings/AboutSettingsScree
 import { SettingsCard, SettingItem, ChevronRight, CustomSwitch } from './settings/SettingsComponents';
 import { useBottomSheetBackHandler } from '../hooks/useBottomSheetBackHandler';
 import { LOCALES } from '../constants/locales';
+import { useSimklIntegration } from '../hooks/useSimklIntegration';
+import SimklIcon from '../components/icons/SimklIcon';
 
 const { width } = Dimensions.get('window');
 const isTablet = width >= 768;
@@ -202,6 +204,7 @@ const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { lastUpdate } = useCatalogContext();
   const { isAuthenticated, userProfile, refreshAuthStatus } = useTraktContext();
+  const { isAuthenticated: isSimklAuthenticated } = useSimklIntegration();
   const { currentTheme } = useTheme();
 
   // Tablet-specific state
@@ -373,12 +376,27 @@ const SettingsScreen: React.FC = () => {
         return (
           <SettingsCard title={t('settings.sections.account')} isTablet={isTablet}>
             {isItemVisible('trakt') && (
-              <SettingItem
-                title={t('trakt.title')}
-                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
-                customIcon={<TraktIcon size={isTablet ? 24 : 20} color={currentTheme.colors.primary} />}
+                    <SettingItem
+                      title={t('trakt.title')}
+                      description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
+                      customIcon={<TraktIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
+                isLast={!isItemVisible('simkl')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('simkl') && (
+                    <SettingItem
+                      title={t('settings.items.simkl')}
+                      description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
+                      customIcon={<SimklIcon size={isTablet ? 24 : 20} />}
+                renderControl={() => <ChevronRight />}
+                onPress={() => navigation.navigate('SimklSettings')}
+                isLast={false}
+                isTablet={isTablet}
+              />
+            )}
                 isTablet={isTablet}
               />
             )}
@@ -627,7 +645,7 @@ const SettingsScreen: React.FC = () => {
             contentContainerStyle={[styles.bottomSheetContent, { paddingBottom: insets.bottom + 16 }]}
           >
             {
-              LOCALES.sort((a,b) => a.key.localeCompare(b.key)).map(l =>
+              LOCALES.sort((a, b) => a.key.localeCompare(b.key)).map(l =>
                 <TouchableOpacity
                   key={l.key}
                   style={[
@@ -672,15 +690,28 @@ const SettingsScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Account */}
-            {(settingsConfig?.categories?.['account']?.visible !== false) && isItemVisible('trakt') && (
+            {(settingsConfig?.categories?.['account']?.visible !== false) && (isItemVisible('trakt') || isItemVisible('simkl')) && (
               <SettingsCard title={t('settings.account').toUpperCase()}>
                 {isItemVisible('trakt') && (
                   <SettingItem
                     title={t('trakt.title')}
                     description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
-                    customIcon={<TraktIcon size={20} color={currentTheme.colors.primary} />}
+                    customIcon={<TraktIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
+                    isLast={!isItemVisible('simkl')}
+                  />
+                )}
+                {isItemVisible('simkl') && (
+                  <SettingItem
+                    title={t('settings.items.simkl')}
+                    description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
+                    customIcon={<SimklIcon size={20} />}
+                    renderControl={() => <ChevronRight />}
+                    onPress={() => navigation.navigate('SimklSettings')}
+                    isLast={false}
+                  />
+                )}
                   />
                 )}
                 <SettingItem
@@ -799,6 +830,13 @@ const SettingsScreen: React.FC = () => {
 
             {/* About */}
             <SettingsCard title={t('settings.about').toUpperCase()}>
+              <SettingItem
+                title={t('settings.items.contributors')}
+                description={t('settings.items.view_contributors')}
+                icon="users"
+                renderControl={() => <ChevronRight />}
+                onPress={() => navigation.navigate('Contributors')}
+              />
               <SettingItem
                 title={t('settings.about_nuvio')}
                 description={getDisplayedAppVersion()}
@@ -956,7 +994,7 @@ const SettingsScreen: React.FC = () => {
           contentContainerStyle={[styles.bottomSheetContent, { paddingBottom: insets.bottom + 16 }]}
         >
           {
-            LOCALES.sort((a,b) => a.key.localeCompare(b.key)).map(l =>
+            LOCALES.sort((a, b) => a.key.localeCompare(b.key)).map(l =>
               <TouchableOpacity
                 key={l.key}
                 style={[

@@ -9,7 +9,7 @@
     <key>EXUpdatesLaunchWaitMs</key>
     <integer>30000</integer>
     <key>EXUpdatesRuntimeVersion</key>
-    <string>1.2.11</string>
+    <string>1.3.6</string>
     <key>EXUpdatesURL</key>
     <string>https://ota.nuvioapp.space/api/manifest</string>
   </dict>

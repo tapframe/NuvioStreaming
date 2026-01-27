@@ -37,30 +37,32 @@ export const usePlayerControls = (config: PlayerControlsConfig) => {
         setPaused(!paused);
     }, [paused, setPaused]);
 
+    const seekTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
     const seekToTime = useCallback((rawSeconds: number) => {
         const timeInSeconds = Math.max(0, Math.min(rawSeconds, duration > 0 ? duration - END_EPSILON : rawSeconds));
 
-        if (playerRef.current && duration > 0 && !isSeeking.current) {
+        if (playerRef.current && duration > 0) {
             if (DEBUG_MODE) logger.log(`[usePlayerControls] Seeking to ${timeInSeconds}`);
 
             isSeeking.current = true;
 
-            // iOS optimization: pause while seeking for smoother experience
-
+            // Clear existing timeout to keep isSeeking true during rapid seeks
+            if (seekTimeoutRef.current) {
+                clearTimeout(seekTimeoutRef.current);
+            }
 
             // Actually perform the seek
             playerRef.current.seek(timeInSeconds);
 
             // Debounce the seeking state reset
-            setTimeout(() => {
+            seekTimeoutRef.current = setTimeout(() => {
                 if (isMounted.current && isSeeking.current) {
                     isSeeking.current = false;
-                    // Resume if it was playing (iOS specific)
-
                 }
             }, 500);
         }
-    }, [duration, paused, setPaused, playerRef, isSeeking, isMounted]);
+    }, [duration, paused, playerRef, isSeeking, isMounted]);
 
     const skip = useCallback((seconds: number) => {
         seekToTime(currentTime + seconds);

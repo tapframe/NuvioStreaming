@@ -10,6 +10,7 @@ export interface MpvPlayerRef {
     seek: (positionSeconds: number) => void;
     setAudioTrack: (trackId: number) => void;
     setSubtitleTrack: (trackId: number) => void;
+    setResizeMode: (mode: 'contain' | 'cover' | 'stretch') => void;
 }
 
 export interface MpvPlayerProps {
@@ -64,6 +65,9 @@ const MpvPlayer = forwardRef<MpvPlayerRef, MpvPlayerProps>((props, ref) => {
         },
         setSubtitleTrack: (trackId: number) => {
             dispatchCommand('setSubtitleTrack', [trackId]);
+        },
+        setResizeMode: (mode: 'contain' | 'cover' | 'stretch') => {
+            dispatchCommand('setResizeMode', [mode]);
         },
     }), [dispatchCommand]);
 

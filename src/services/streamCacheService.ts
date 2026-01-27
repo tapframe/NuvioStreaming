@@ -150,26 +150,6 @@ class StreamCacheService {
   }
 
   /**
-   * Validate if a stream URL is still accessible
-   */
-  private async validateStreamUrl(url: string): Promise<boolean> {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-      
-      const response = await fetch(url, {
-        method: 'HEAD',
-        signal: controller.signal as any,
-      } as any);
-      
-      clearTimeout(timeout);
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
    * Get cache info for debugging
    */
   async getCacheInfo(): Promise<{ totalCached: number; expiredCount: number; validCount: number }> {

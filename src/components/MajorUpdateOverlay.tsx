@@ -10,12 +10,17 @@ interface Props {
   releaseUrl?: string;
   onDismiss: () => void;
   onLater: () => void;
+  onUpdateAction?: () => void;
+  isDownloading?: boolean;
+  downloadProgress?: number;
 }
 
-const MajorUpdateOverlay: React.FC<Props> = ({ visible, latestTag, releaseNotes, releaseUrl, onDismiss, onLater }) => {
+const MajorUpdateOverlay: React.FC<Props> = ({ visible, latestTag, releaseNotes, releaseUrl, onDismiss, onLater, onUpdateAction, isDownloading, downloadProgress }) => {
   const { currentTheme } = useTheme();
 
   if (!visible) return null;
+
+  const progressPercent = downloadProgress ? Math.round(downloadProgress * 100) : 0;
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent presentationStyle="overFullScreen" supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}>
@@ -40,10 +45,16 @@ const MajorUpdateOverlay: React.FC<Props> = ({ visible, latestTag, releaseNotes,
           )}
 
           <View style={styles.actions}>
-            {releaseUrl ? (
-              <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: currentTheme.colors.primary }]} onPress={() => Linking.openURL(releaseUrl)}>
-                <MaterialIcons name="open-in-new" size={18} color="#fff" />
-                <Text style={styles.primaryText}>View release</Text>
+            {releaseUrl || onUpdateAction ? (
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: currentTheme.colors.primary, opacity: isDownloading ? 0.7 : 1 }]}
+                onPress={onUpdateAction || (() => releaseUrl && Linking.openURL(releaseUrl))}
+                disabled={isDownloading}
+              >
+                <MaterialIcons name={isDownloading ? "downloading" : "system-update"} size={18} color="#fff" />
+                <Text style={styles.primaryText}>
+                  {isDownloading ? `Downloading... ${progressPercent}%` : (onUpdateAction ? 'Update Now' : 'View release')}
+                </Text>
               </TouchableOpacity>
             ) : null}
 

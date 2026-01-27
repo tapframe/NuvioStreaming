@@ -85,6 +85,7 @@ mmkv.md
 fix-android-scroll-lag-summary.md
 server/cache-server
 server/campaign-manager
+server/sync-service
 carousal.md
 node_modules
 expofs.md
@@ -98,3 +99,10 @@ trakt-docss
 libmpv-android/
 mpv-android/
 mpvKt/
+
+# Torrent libraries
+LibTorrent/
+iTorrent/
+simkl-docss
+downloader.md
+server

@@ -5,14 +5,15 @@ import Svg, { Path } from 'react-native-svg';
 interface TraktIconProps {
   size?: number;
   color?: string;
+  style?: any;
 }
 
-const TraktIcon: React.FC<TraktIconProps> = ({ size = 24, color = '#ed2224' }) => {
+const TraktIcon: React.FC<TraktIconProps> = ({ size = 24, color = '#ed2224', style }) => {
   return (
-    <View style={{ width: size, height: size }}>
+    <View style={[{ width: size, height: size, flex: 1 }, style]}>
       <Svg
-        width={size}
-        height={size}
+        width="100%"
+        height="100%"
         viewBox="0 0 144.8 144.8"
       >
         <Path

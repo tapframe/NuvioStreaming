@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { StatusBar, Platform, Dimensions, AppState } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
-import * as Brightness from 'expo-brightness';
+
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { logger } from '../../../../utils/logger';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,11 +22,10 @@ const DEBUG_MODE = false;
 export const usePlayerSetup = (
     setScreenDimensions: (dim: any) => void,
     setVolume: (vol: number) => void,
-    setBrightness: (bri: number) => void,
+
     paused: boolean
 ) => {
-    const originalSystemBrightnessRef = useRef<number | null>(null);
-    const originalSystemBrightnessModeRef = useRef<number | null>(null);
+
     const isAppBackgrounded = useRef(false);
 
     // Prevent screen sleep while playing
@@ -103,38 +102,9 @@ export const usePlayerSetup = (
         // Initialize volume (default to 1.0)
         setVolume(1.0);
 
-        // Initialize Brightness
-        const initBrightness = async () => {
-            try {
-                if (Platform.OS === 'android') {
-                    try {
-                        const [sysBright, sysMode] = await Promise.all([
-                            (Brightness as any).getSystemBrightnessAsync?.(),
-                            (Brightness as any).getSystemBrightnessModeAsync?.()
-                        ]);
-                        originalSystemBrightnessRef.current = typeof sysBright === 'number' ? sysBright : null;
-                        originalSystemBrightnessModeRef.current = typeof sysMode === 'number' ? sysMode : null;
-                    } catch (e) {
-                        // ignore
-                    }
-                }
-                const currentBrightness = await Brightness.getBrightnessAsync();
-                setBrightness(currentBrightness);
-            } catch (error) {
-                logger.warn('[usePlayerSetup] Error setting brightness', error);
-                setBrightness(1.0);
-            }
-        };
-        initBrightness();
-
         return () => {
             subscription?.remove();
             disableImmersiveMode();
-
-            // Restore brightness on unmount
-            if (Platform.OS === 'android' && originalSystemBrightnessRef.current !== null) {
-                // restoration logic normally happens here or in a separate effect
-            }
         };
     }, []);
 

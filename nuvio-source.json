@@ -31,11 +31,19 @@
       ],
       "versions": [
         {
+          "version": "1.3.6",
+          "buildVersion": "34",
+          "date": "2026-01-21",
+          "localizedDescription": "# Nuvio Media Hub – v1.3.6  \n\n## Update Notes\n\n### Player & Playback\n- Updated **React Native Video** to the latest version  \n- Fixed some **TXT-based streams** failing to play in ExoPlayer  \n- Fixed **M3U8 streams without file extension** failing to play in ExoPlayer  \n- Added more **aspect ratio options** to ExoPlayer for better viewing control  \n\n### Improvements & Fixes\n- Updated several **dependencies**  \n- Added an **in-built major app update downloader** (Android)  \n- Various **internal fixes and stability improvements**  \n\nThis update focuses on improving playback compatibility, update handling, and overall stability.",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/v1.3.6/Stable_1-3-6.ipa",
+          "size": 25700000
+        },
+        {
           "version": "1.3.5",
           "buildVersion": "33",
           "date": "2026-01-09",
           "localizedDescription": "## Update Notes\n\n### ExoPlayer Subtitle Fixes\nThis update mainly focuses on fixing multiple subtitle-related issues in ExoPlayer:\n- Fixed issue where **only the first subtitle index** was being rendered  \n- Fixed subtitles **always showing background** due to Android native caption settings  \n- Fixed subtitles being **rendered inside the player view**  \n- Fixed **subtitle bottom offset** issues  \n- Merged PR **#391** by **@saifshaikh1805**  \n  - Fixes issue **#301**\n\n### KSPlayer Improvements\n- Improved **subtitle behavior** in KSPlayer  \n- Merged PR **#394** by **@AdityasahuX07**\n\n### Settings & Persistence\n- Implemented **save and load** functionality for **Discover settings**\n\nThis release improves subtitle rendering accuracy across players and adds better persistence for user preferences.",
-          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/v1.3.5/app-release.apk",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/v1.3.5/Stable_1-3-5.ipa",
           "size": 25700000
         },
         {
@@ -43,7 +51,7 @@
           "buildVersion": "32",
           "date": "2026-01-06",
           "localizedDescription": "## Update Notes\n\n### Player & Playback\n- Fixed **Android player crashes with large files** when using ExoPlayer  \n  - Merged PR **#361** by **@chrisk325**\n\n### Trakt Improvements\n- Improved **Trakt Continue Watching** section for better accuracy and reliability\n\n### Internationalization\n- Added **multi-language support** across the app using **i18n**  \n  - More languages will be added through **community contributions**  \n  - ⚠️ **Arabic UI does not use RTL yet**. RTL support will be added in a future update\n\n### Stability & Fixes\n- Crash optimizations and internal stability improvements\n\nThis update focuses on improving playback stability, Trakt experience, and expanding language support.",
-          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/v1.3.4/app-release.apk",
+          "downloadURL": "https://github.com/tapframe/NuvioStreaming/releases/download/v1.3.4/Stable_1-3-4.ipa",
           "size": 25700000
         },
         {

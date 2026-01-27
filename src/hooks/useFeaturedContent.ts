@@ -77,7 +77,10 @@ export function useFeaturedContent() {
       }
     }
 
-    setLoading(true);
+    // Only show loading if we don't have any content
+    if (!featuredContent && !persistentStore.featuredContent) {
+      setLoading(true);
+    }
     cleanup();
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
@@ -116,8 +119,8 @@ export function useFeaturedContent() {
           try {
             if (base.logo && !isTmdbUrl(base.logo)) {
               return base;
-          }
-          
+            }
+
             if (!settings.enrichMetadataWithTMDB) {
               return { ...base, logo: base.logo || undefined };
             }

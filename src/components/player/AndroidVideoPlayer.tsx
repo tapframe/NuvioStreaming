@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { View, StyleSheet, Platform, Animated, ToastAndroid, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, Platform, Animated, ToastAndroid, ActivityIndicator } from 'react-native';
 import { toast } from '@backpackapp-io/react-native-toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -44,6 +44,7 @@ import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import SkipIntroButton from './overlays/SkipIntroButton';
 import UpNextButton from './common/UpNextButton';
 import { CustomAlert } from '../CustomAlert';
+import { CreditsInfo } from '../../services/introService';
 
 
 // Android-specific components
@@ -146,36 +147,38 @@ const AndroidVideoPlayer: React.FC = () => {
   // Subtitle sync modal state
   const [showSyncModal, setShowSyncModal] = useState(false);
 
+  // Credits timing state from API
+  const [creditsInfo, setCreditsInfo] = useState<CreditsInfo | null>(null);
+
   // Track auto-selection ref to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
 
   // Track previous video session to reset subtitle offset only when video actually changes
   const previousVideoRef = useRef<{ uri?: string; episodeId?: string }>({});
-  
+
   // Reset subtitle offset when starting a new video session
   useEffect(() => {
     const currentVideo = { uri, episodeId };
     const previousVideo = previousVideoRef.current;
-    
+
     // Only reset if this is actually a new video (uri or episodeId changed)
-    if (previousVideo.uri !== undefined && 
-        (previousVideo.uri !== currentVideo.uri || previousVideo.episodeId !== currentVideo.episodeId)) {
+    if (previousVideo.uri !== undefined &&
+      (previousVideo.uri !== currentVideo.uri || previousVideo.episodeId !== currentVideo.episodeId)) {
       setSubtitleOffsetSec(0);
     }
-    
+
     // Update the ref for next comparison
     previousVideoRef.current = currentVideo;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uri, episodeId]);
 
   const metadataResult = useMetadata({ id: id || 'placeholder', type: (type as any) });
-  const { metadata, cast } = Boolean(id && type) ? (metadataResult as any) : { metadata: null, cast: [] };
+  const { metadata, cast, tmdbId } = Boolean(id && type) ? (metadataResult as any) : { metadata: null, cast: [], tmdbId: null };
   const hasLogo = metadata && metadata.logo;
   const openingAnimation = useOpeningAnimation(backdrop, metadata);
 
   const [volume, setVolume] = useState(1.0);
-  const [brightness, setBrightness] = useState(1.0);
-  const setupHook = usePlayerSetup(playerState.setScreenDimensions, setVolume, setBrightness, playerState.paused);
+  const setupHook = usePlayerSetup(playerState.setScreenDimensions, setVolume, playerState.paused);
 
   const controlsHook = usePlayerControls(
     mpvPlayerRef,
@@ -220,8 +223,6 @@ const AndroidVideoPlayer: React.FC = () => {
   const gestureControls = usePlayerGestureControls({
     volume,
     setVolume,
-    brightness,
-    setBrightness,
     volumeRange: { min: 0, max: 1 },
     volumeSensitivity: 0.006,
     brightnessSensitivity: 0.004,
@@ -754,9 +755,21 @@ const AndroidVideoPlayer: React.FC = () => {
   }, []);
 
   const cycleResizeMode = useCallback(() => {
-    if (playerState.resizeMode === 'contain') playerState.setResizeMode('cover');
-    else playerState.setResizeMode('contain');
-  }, [playerState.resizeMode]);
+    gestureControls.showResizeModeOverlayFn(() => {
+      switch (playerState.resizeMode) {
+        case 'contain':
+          playerState.setResizeMode('cover');
+          break;
+        case 'cover':
+          playerState.setResizeMode('stretch');
+          break;
+        case 'stretch':
+        default:
+          playerState.setResizeMode('contain');
+          break;
+      }
+    });
+  }, [playerState.resizeMode, gestureControls.showResizeModeOverlayFn]);
 
   // Memoize selectedTextTrack to prevent unnecessary re-renders
   const memoizedSelectedTextTrack = useMemo(() => {
@@ -767,8 +780,6 @@ const AndroidVideoPlayer: React.FC = () => {
 
   return (
     <View style={[styles.container, {
-      width: playerState.screenDimensions.width,
-      height: playerState.screenDimensions.height,
       position: 'absolute', top: 0, left: 0
     }]}>
       <LoadingOverlay
@@ -787,6 +798,7 @@ const AndroidVideoPlayer: React.FC = () => {
         {!isTransitioningStream && (
           <VideoSurface
             processedStreamUrl={currentStreamUrl}
+            videoType={currentVideoType}
             headers={headers}
             volume={volume}
             playbackSpeed={speedControl.playbackSpeed}
@@ -825,7 +837,9 @@ const AndroidVideoPlayer: React.FC = () => {
               modals.setErrorDetails(displayError);
               modals.setShowErrorModal(true);
             }}
-            onBuffer={(buf) => playerState.setIsBuffering(buf.isBuffering)}
+            onBuffer={(buf) => {
+              playerState.setIsBuffering(buf.isBuffering);
+            }}
             onTracksChanged={(data) => {
               console.log('[AndroidVideoPlayer] onTracksChanged:', data);
               if (data?.audioTracks) {
@@ -908,9 +922,21 @@ const AndroidVideoPlayer: React.FC = () => {
           showControls={playerState.showControls}
           hideControls={hideControls}
           volume={volume}
-          brightness={brightness}
           controlsTimeout={controlsTimeout}
+          resizeMode={playerState.resizeMode}
+          skip={controlsHook.skip}
+          currentTime={playerState.currentTime}
+          duration={playerState.duration}
+          seekToTime={controlsHook.seekToTime}
+          formatTime={formatTime}
         />
+
+        {/* Buffering Indicator (Visible when controls are hidden) */}
+        {playerState.isBuffering && !playerState.showControls && (
+          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', zIndex: 15 }]}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        )}
 
         <PlayerControls
           showControls={playerState.showControls}
@@ -959,6 +985,7 @@ const AndroidVideoPlayer: React.FC = () => {
           playerBackend={useExoPlayer ? 'ExoPlayer' : 'MPV'}
           onSwitchToMPV={handleManualSwitchToMPV}
           useExoPlayer={useExoPlayer}
+          isBuffering={playerState.isBuffering}
         />
 
         <SpeedActivatedOverlay
@@ -999,8 +1026,10 @@ const AndroidVideoPlayer: React.FC = () => {
           episode={episode}
           malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
           kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+          tmdbId={tmdbId || undefined}
           currentTime={playerState.currentTime}
           onSkip={(endTime) => controlsHook.seekToTime(endTime)}
+          onCreditsInfo={setCreditsInfo}
           controlsVisible={playerState.showControls}
           controlsFixedOffset={100}
         />
@@ -1026,6 +1055,7 @@ const AndroidVideoPlayer: React.FC = () => {
           metadata={metadataResult?.metadata ? { poster: metadataResult.metadata.poster, id: metadataResult.metadata.id } : undefined}
           controlsVisible={playerState.showControls}
           controlsFixedOffset={100}
+          creditsInfo={creditsInfo}
         />
       </View>
 

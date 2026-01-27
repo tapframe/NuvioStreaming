@@ -1,5 +1,4 @@
 import { Stream } from '../../types/metadata';
-import { MKV_HEAD_TIMEOUT_MS } from './constants';
 
 /**
  * Language variations for filtering
@@ -151,38 +150,24 @@ export const sortStreamsByQuality = (streams: Stream[]): Stream[] => {
 };
 
 /**
- * Detect MKV format via HEAD request
- */
-export const detectMkvViaHead = async (
-  url: string,
-  headers?: Record<string, string>
-): Promise<boolean> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), MKV_HEAD_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      method: 'HEAD',
-      headers,
-      signal: controller.signal as any,
-    } as any);
-    const contentType = res.headers.get('content-type') || '';
-    return /matroska|x-matroska/i.test(contentType);
-  } catch (_e) {
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
-/**
  * Infer video type from URL
  */
 export const inferVideoTypeFromUrl = (url?: string): string | undefined => {
   if (!url) return undefined;
   const lower = url.toLowerCase();
-  if (/(\.|ext=)(m3u8)(\b|$)/i.test(lower)) return 'm3u8';
-  if (/(\.|ext=)(mpd)(\b|$)/i.test(lower)) return 'mpd';
-  if (/(\.|ext=)(mp4)(\b|$)/i.test(lower)) return 'mp4';
+  // HLS
+  if (/(\.|ext=)(m3u8)(\b|$)/i.test(lower) || /\.m3u8(\b|$)/i.test(lower)) return 'm3u8';
+  if (/(^|[?&])type=(m3u8|hls)(\b|$)/i.test(lower)) return 'm3u8';
+  if (/\b(m3u8|m3u)\b/i.test(lower) || /\bhls\b/i.test(lower)) return 'm3u8';
+  // Some providers serve HLS playlists behind extensionless endpoints.
+  // Example: https://<host>/playlist/<id>?token=...&expires=...
+  if (/\/playlist\//i.test(lower) && (/(^|[?&])token=/.test(lower) || /(^|[?&])expires=/.test(lower))) return 'm3u8';
+
+  // DASH
+  if (/(\.|ext=)(mpd)(\b|$)/i.test(lower) || /\.mpd(\b|$)/i.test(lower)) return 'mpd';
+
+  // Progressive
+  if (/(\.|ext=)(mp4)(\b|$)/i.test(lower) || /\.mp4(\b|$)/i.test(lower)) return 'mp4';
   return undefined;
 };
 
