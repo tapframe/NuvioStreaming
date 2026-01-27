@@ -624,13 +624,40 @@ const AddonsScreen = () => {
     try {
       setInstalling(true);
       const manifest = await stremioService.getManifest(urlToInstall);
+
+      // Check if this addon is already installed
+      const installedAddons = await stremioService.getInstalledAddonsAsync();
+      const existingInstallations = installedAddons.filter(a => a.id === manifest.id);
+      const isAlreadyInstalled = existingInstallations.length > 0;
+
+      // Check if addon provides streams
+      const providesStreams = manifest.resources?.some(resource => {
+        if (typeof resource === 'string') {
+          return resource === 'stream';
+        } else if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+          return (resource as any).name === 'stream';
+        }
+        return false;
+      }) || false;
+
+      
+      if (isAlreadyInstalled && !providesStreams) {
+        setAlertTitle(t('common.error'));
+        setAlertMessage('This addon is already installed. Multiple installations are only allowed for stream providers.');
+        setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
+        setAlertVisible(true);
+        return;
+      }
+
       setAddonDetails(manifest);
       setAddonUrl(urlToInstall);
       setShowConfirmModal(true);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to fetch addon details:', error);
       setAlertTitle(t('common.error'));
-      setAlertMessage(`${t('addons.fetch_error')} ${urlToInstall}`);
+     
+      const errorMessage = error?.message || `${t('addons.fetch_error')} ${urlToInstall}`;
+      setAlertMessage(errorMessage);
       setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     } finally {
@@ -652,10 +679,12 @@ const AddonsScreen = () => {
       setAlertMessage(t('addons.install_success'));
       setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to install addon:', error);
       setAlertTitle(t('common.error'));
-      setAlertMessage(t('addons.install_error'));
+      // Show specific error message if available, otherwise use generic message
+      const errorMessage = error?.message || t('addons.install_error');
+      setAlertMessage(errorMessage);
       setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
       setAlertVisible(true);
     } finally {
@@ -669,14 +698,14 @@ const AddonsScreen = () => {
   };
 
   const moveAddonUp = (addon: ExtendedManifest) => {
-    if (stremioService.moveAddonUp(addon.installationId || addon.id)) {
+    if (addon.installationId && stremioService.moveAddonUp(addon.installationId)) {
       // Refresh the list to reflect the new order
       loadAddons();
     }
   };
 
   const moveAddonDown = (addon: ExtendedManifest) => {
-    if (stremioService.moveAddonDown(addon.installationId || addon.id)) {
+    if (addon.installationId && stremioService.moveAddonDown(addon.installationId)) {
       // Refresh the list to reflect the new order
       loadAddons();
     }
@@ -690,10 +719,12 @@ const AddonsScreen = () => {
       {
         label: t('addons.uninstall_button'),
         onPress: async () => {
-          await stremioService.removeAddon(addon.installationId || addon.id);
-          setAddons(prev => prev.filter(a => (a.installationId || a.id) !== (addon.installationId || addon.id)));
-          // Ensure we re-read from storage/order to avoid reappearing on next load
-          await loadAddons();
+          if (addon.installationId) {
+            await stremioService.removeAddon(addon.installationId);
+            setAddons(prev => prev.filter(a => a.installationId !== addon.installationId));
+            // Ensure we re-read from storage/order to avoid reappearing on next load
+            await loadAddons();
+          }
         },
         style: { color: colors.error }
       },
@@ -840,6 +871,11 @@ const AddonsScreen = () => {
     // Check if addon is pre-installed
     const isPreInstalled = stremioService.isPreInstalledAddon(item.id);
 
+    // Check if there are multiple installations of this addon
+    const sameAddonInstallations = addons.filter(a => a.id === item.id);
+    const hasMultipleInstallations = sameAddonInstallations.length > 1;
+    const installationNumber = sameAddonInstallations.findIndex(a => a.installationId === item.installationId) + 1;
+
     // Format the types into a simple category text
     const categoryText = types.length > 0
       ? types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' • ')
@@ -890,11 +926,16 @@ const AddonsScreen = () => {
             </View>
           )}
           <View style={styles.addonTitleContainer}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2, flexWrap: 'wrap' }}>
               <Text style={styles.addonName}>{item.name}</Text>
               {isPreInstalled && (
                 <View style={[styles.priorityBadge, { marginLeft: 8, backgroundColor: colors.success }]}>
                   <Text style={[styles.priorityText, { fontSize: 10 }]}>{t('addons.pre_installed')}</Text>
+                </View>
+              )}
+              {hasMultipleInstallations && (
+                <View style={[styles.priorityBadge, { marginLeft: 8, backgroundColor: colors.primary }]}>
+                  <Text style={[styles.priorityText, { fontSize: 10 }]}>#{installationNumber}</Text>
                 </View>
               )}
             </View>
@@ -935,6 +976,11 @@ const AddonsScreen = () => {
         <Text style={styles.addonDescription}>
           {description.length > 100 ? description.substring(0, 100) + '...' : description}
         </Text>
+        {hasMultipleInstallations && item.originalUrl && (
+          <Text style={[styles.addonDescription, { fontSize: 11, marginTop: 4, color: colors.mediumGray }]}>
+            {item.originalUrl}
+          </Text>
+        )}
       </View>
     );
   };

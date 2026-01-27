@@ -716,10 +716,12 @@ const DebridIntegrationScreen = () => {
             setAlertMessage(t('debrid.connected_title'));
             setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
-        } catch (error) {
+        } catch (error: any) {
             logger.error('Failed to install Torbox addon:', error);
             setAlertTitle(t('common.error'));
-            setAlertMessage(t('addons.install_error'));
+       
+            const errorMessage = error?.message || t('addons.install_error');
+            setAlertMessage(errorMessage);
             setAlertActions([{ label: t('common.ok'), onPress: () => setAlertVisible(false) }]);
             setAlertVisible(true);
         } finally {
