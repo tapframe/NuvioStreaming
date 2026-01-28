@@ -250,6 +250,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
                   uri={config.icon as string}
                   width={source === 'imdb' ? iconSize * 2 : iconSize}
                   height={iconSize}
+                  style={{ marginRight: iconTextGap }}
                 />
               ) : config.isImage ? (
                 <Image
