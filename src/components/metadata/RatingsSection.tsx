@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { SvgUri } from 'react-native-svg';
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, Dimensions } from 'react-native';
 import { MaterialIcons as MaterialIconsWrapper } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -22,7 +23,7 @@ const BREAKPOINTS = {
   tv: 1440,
 };
 
-const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
+const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg';
 
 export const RATING_PROVIDERS = {
   imdb: {
@@ -162,8 +163,8 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   const ratingConfig = {
     imdb: {
       name: 'IMDb',
-      icon: { uri: IMDb_LOGO },
-      isImage: true,
+      icon: IMDb_LOGO,
+      isRemoteSvg: true,
       color: '#F5C518',
       transform: (value: number) => value.toFixed(1)
     },
@@ -244,10 +245,24 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
 
           return (
             <View key={source} style={[styles.compactRatingItem, { marginRight: itemSpacing }]}>
-              {config.isImage ? (
+              {config.isRemoteSvg ? (
+                <SvgUri
+                  uri={config.icon as string}
+                  width={source === 'imdb' ? iconSize * 2 : iconSize}
+                  height={iconSize}
+                  style={{ marginRight: iconTextGap }}
+                />
+              ) : config.isImage ? (
                 <Image
                   source={config.icon as any}
-                  style={[styles.compactRatingIcon, { width: source === 'imdb' ? iconSize * 2 : iconSize, height: iconSize, marginRight: iconTextGap }]}
+                  style={[
+                    styles.compactRatingIcon,
+                    {
+                      width: source === 'imdb' ? iconSize * 2 : iconSize,
+                      height: iconSize,
+                      marginRight: iconTextGap,
+                    },
+                  ]}
                   resizeMode="contain"
                 />
               ) : config.icon ? (
@@ -258,13 +273,14 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
                   })}
                 </View>
               ) : (
-                // Text fallback
-                <Text style={{
-                  color: config.color,
-                  fontSize: textSize,
-                  fontWeight: '900',
-                  marginRight: iconTextGap
-                }}>
+                <Text
+                  style={{
+                    color: config.color,
+                    fontSize: textSize,
+                    fontWeight: '900',
+                    marginRight: iconTextGap,
+                  }}
+                >
                   {config.name}
                 </Text>
               )}
