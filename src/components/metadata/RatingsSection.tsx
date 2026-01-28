@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { SvgUri } from 'react-native-svg';
 import { View, Text, StyleSheet, ActivityIndicator, Image, Animated, Dimensions } from 'react-native';
 import { MaterialIcons as MaterialIconsWrapper } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -163,8 +162,8 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   const ratingConfig = {
     imdb: {
       name: 'IMDb',
-      icon: IMDb_LOGO,
-      isRemoteSvg: true,
+      icon: { uri: IMDb_LOGO },
+      isImage: false,
       color: '#F5C518',
       transform: (value: number) => value.toFixed(1)
     },
@@ -245,24 +244,10 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
 
           return (
             <View key={source} style={[styles.compactRatingItem, { marginRight: itemSpacing }]}>
-              {config.isRemoteSvg ? (
-                <SvgUri
-                  uri={config.icon as string}
-                  width={source === 'imdb' ? iconSize * 2 : iconSize}
-                  height={iconSize}
-                  style={{ marginRight: iconTextGap }}
-                />
-              ) : config.isImage ? (
+              {config.isImage ? (
                 <Image
                   source={config.icon as any}
-                  style={[
-                    styles.compactRatingIcon,
-                    {
-                      width: source === 'imdb' ? iconSize * 2 : iconSize,
-                      height: iconSize,
-                      marginRight: iconTextGap,
-                    },
-                  ]}
+                  style={[styles.compactRatingIcon, { width: source === 'imdb' ? iconSize * 2 : iconSize, height: iconSize, marginRight: iconTextGap }]}
                   resizeMode="contain"
                 />
               ) : config.icon ? (
@@ -273,14 +258,13 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
                   })}
                 </View>
               ) : (
-                <Text
-                  style={{
-                    color: config.color,
-                    fontSize: textSize,
-                    fontWeight: '900',
-                    marginRight: iconTextGap,
-                  }}
-                >
+                // Text fallback
+                <Text style={{
+                  color: config.color,
+                  fontSize: textSize,
+                  fontWeight: '900',
+                  marginRight: iconTextGap
+                }}>
                   {config.name}
                 </Text>
               )}
