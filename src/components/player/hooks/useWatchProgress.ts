@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import { storageService } from '../../../services/storageService';
 import { logger } from '../../../utils/logger';
 import { useSettings } from '../../../hooks/useSettings';
+import { watchedService } from '../../../services/watchedService';
 
 export const useWatchProgress = (
     id: string | undefined,
@@ -13,7 +14,12 @@ export const useWatchProgress = (
     paused: boolean,
     traktAutosync: any,
     seekToTime: (time: number) => void,
-    addonId?: string
+    addonId?: string,
+    // New parameters for MAL scrobbling
+    imdbId?: string,
+    season?: number,
+    episode?: number,
+    releaseDate?: string
 ) => {
     const [resumePosition, setResumePosition] = useState<number | null>(null);
     const [savedDuration, setSavedDuration] = useState<number | null>(null);
@@ -23,10 +29,20 @@ export const useWatchProgress = (
 
     const { settings: appSettings } = useSettings();
     const initialSeekTargetRef = useRef<number | null>(null);
+    const hasScrobbledRef = useRef(false);
 
-    // Values refs for unmount cleanup
+    // Values refs for unmount cleanup and stale closure prevention
     const currentTimeRef = useRef(currentTime);
     const durationRef = useRef(duration);
+    const imdbIdRef = useRef(imdbId);
+    const seasonRef = useRef(season);
+    const episodeRef = useRef(episode);
+    const releaseDateRef = useRef(releaseDate);
+
+    // Reset scrobble flag when content changes
+    useEffect(() => {
+        hasScrobbledRef.current = false;
+    }, [id, episodeId]);
 
     useEffect(() => {
         currentTimeRef.current = currentTime;
@@ -35,6 +51,13 @@ export const useWatchProgress = (
     useEffect(() => {
         durationRef.current = duration;
     }, [duration]);
+
+    useEffect(() => {
+        imdbIdRef.current = imdbId;
+        seasonRef.current = season;
+        episodeRef.current = episode;
+        releaseDateRef.current = releaseDate;
+    }, [imdbId, season, episode, releaseDate]);
 
     // Keep latest traktAutosync ref to avoid dependency cycles in listeners
     const traktAutosyncRef = useRef(traktAutosync);
@@ -120,6 +143,31 @@ export const useWatchProgress = (
             try {
                 await storageService.setWatchProgress(id, type, progress, episodeId);
                 await traktAutosync.handleProgressUpdate(currentTimeRef.current, durationRef.current);
+
+                // Requirement 1: Auto Episode Tracking (>= 90% completion)
+                const progressPercent = (currentTimeRef.current / durationRef.current) * 100;
+                if (progressPercent >= 90 && !hasScrobbledRef.current) {
+                    hasScrobbledRef.current = true;
+                    logger.log(`[useWatchProgress] 90% threshold reached, scrobbling to MAL...`);
+                    
+                    const currentImdbId = imdbIdRef.current;
+                    const currentSeason = seasonRef.current;
+                    const currentEpisode = episodeRef.current;
+                    const currentReleaseDate = releaseDateRef.current;
+
+                    if (type === 'series' && currentImdbId && currentSeason !== undefined && currentEpisode !== undefined) {
+                        watchedService.markEpisodeAsWatched(
+                            currentImdbId, 
+                            id, 
+                            currentSeason, 
+                            currentEpisode, 
+                            new Date(), 
+                            currentReleaseDate
+                        );
+                    } else if (type === 'movie' && currentImdbId) {
+                        watchedService.markMovieAsWatched(currentImdbId);
+                    }
+                }
             } catch (error) {
                 logger.error('[useWatchProgress] Error saving watch progress:', error);
             }
@@ -128,9 +176,10 @@ export const useWatchProgress = (
 
     // Save Interval
     useEffect(() => {
-        if (id && type && !paused && duration > 0) {
+        if (id && type && !paused) {
             if (progressSaveInterval) clearInterval(progressSaveInterval);
 
+            // Use refs inside the interval so we don't need to restart it on every second
             const interval = setInterval(() => {
                 saveWatchProgress();
             }, 10000);
@@ -141,7 +190,7 @@ export const useWatchProgress = (
                 setProgressSaveInterval(null);
             };
         }
-    }, [id, type, paused, currentTime, duration]);
+    }, [id, type, paused]);
 
     // Unmount Save - deferred to allow navigation to complete first
     useEffect(() => {

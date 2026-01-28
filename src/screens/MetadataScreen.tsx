@@ -85,16 +85,14 @@ const MemoizedRatingsSection = memo(RatingsSection);
 const MemoizedCommentsSection = memo(CommentsSection);
 const MemoizedCastDetailsModal = memo(CastDetailsModal);
 
+// ... other imports
+
 const MetadataScreen: React.FC = () => {
-  const route = useRoute<RouteProp<Record<string, RouteParams & { episodeId?: string; addonId?: string }>, string>>();
+  useEffect(() => { console.log('✅ MetadataScreen MOUNTED'); }, []);
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'Metadata'>>();
   const { id, type, episodeId, addonId } = route.params;
   const { t } = useTranslation();
-
-  // Log route parameters for debugging
-  React.useEffect(() => {
-    console.log('🔍 [MetadataScreen] Route params:', { id, type, episodeId, addonId });
-  }, [id, type, episodeId, addonId]);
 
   // Consolidated hooks for better performance
   const { settings } = useSettings();
@@ -104,6 +102,35 @@ const MetadataScreen: React.FC = () => {
 
   // Trakt integration
   const { isAuthenticated, isInWatchlist, isInCollection, addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection } = useTraktContext();
+
+  const {
+    metadata,
+    loading,
+    error: metadataError,
+    cast,
+    loadingCast,
+    episodes,
+    selectedSeason,
+    loadingSeasons,
+    loadMetadata,
+    handleSeasonChange,
+    toggleLibrary,
+    inLibrary,
+    groupedEpisodes,
+    recommendations,
+    loadingRecommendations,
+    setMetadata,
+    imdbId,
+    tmdbId,
+    collectionMovies,
+    loadingCollection,
+  } = useMetadata({ id, type, addonId });
+
+  const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
+  const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
+  const [isScreenFocused, setIsScreenFocused] = useState(true);
+  const [isContentReady, setIsContentReady] = useState(false);
+  const [showCastModal, setShowCastModal] = useState(false);
 
   // Enhanced responsive sizing for tablets and TV screens
   const deviceWidth = Dimensions.get('window').width;
@@ -137,12 +164,6 @@ const MetadataScreen: React.FC = () => {
     }
   }, [deviceType]);
 
-  // Optimized state management - reduced state variables
-  const [isContentReady, setIsContentReady] = useState(false);
-  const [showCastModal, setShowCastModal] = useState(false);
-  const [selectedCastMember, setSelectedCastMember] = useState<any>(null);
-  const [shouldLoadSecondaryData, setShouldLoadSecondaryData] = useState(false);
-  const [isScreenFocused, setIsScreenFocused] = useState(true);
   // Source switching removed
   const transitionOpacity = useSharedValue(1);
   const interactionComplete = useRef(false);
@@ -169,30 +190,6 @@ const MetadataScreen: React.FC = () => {
   React.useEffect(() => {
     console.log('MetadataScreen: selectedComment changed to:', selectedComment?.id);
   }, [selectedComment]);
-
-  const {
-    metadata,
-    loading,
-    error: metadataError,
-    cast,
-    loadingCast,
-    episodes,
-    selectedSeason,
-    loadingSeasons,
-    loadMetadata,
-    handleSeasonChange,
-    toggleLibrary,
-    inLibrary,
-    groupedEpisodes,
-    recommendations,
-    loadingRecommendations,
-    setMetadata,
-    imdbId,
-    tmdbId,
-    collectionMovies,
-    loadingCollection,
-  } = useMetadata({ id, type, addonId });
-
 
   // Log useMetadata hook state changes for debugging
   React.useEffect(() => {
@@ -887,25 +884,13 @@ const MetadataScreen: React.FC = () => {
 
   // Show error if exists
   if (metadataError || (!loading && !metadata)) {
-    console.log('🔍 [MetadataScreen] Showing error component:', {
-      hasError: !!metadataError,
-      errorMessage: metadataError,
-      isLoading: loading,
-      hasMetadata: !!metadata,
-      loadingState: loading
-    });
+    console.log('❌ MetadataScreen ERROR state:', { metadataError, loading, hasMetadata: !!metadata });
     return ErrorComponent;
   }
 
   // Show loading screen if metadata is not yet available or exit animation hasn't completed
   if (loading || !isContentReady || !loadingScreenExited) {
-    console.log('🔍 [MetadataScreen] Showing loading screen:', {
-      isLoading: loading,
-      isContentReady,
-      loadingScreenExited,
-      hasMetadata: !!metadata,
-      errorMessage: metadataError
-    });
+    console.log('⏳ MetadataScreen LOADING state:', { loading, isContentReady, loadingScreenExited, hasMetadata: !!metadata });
     return (
       <MetadataLoadingScreen
         ref={loadingScreenRef}

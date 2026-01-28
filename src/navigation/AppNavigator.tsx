@@ -55,6 +55,8 @@ import TMDBSettingsScreen from '../screens/TMDBSettingsScreen';
 import HomeScreenSettings from '../screens/HomeScreenSettings';
 import HeroCatalogsScreen from '../screens/HeroCatalogsScreen';
 import TraktSettingsScreen from '../screens/TraktSettingsScreen';
+import MalSettingsScreen from '../screens/MalSettingsScreen';
+import MalLibraryScreen from '../screens/MalLibraryScreen';
 import SimklSettingsScreen from '../screens/SimklSettingsScreen';
 import PlayerSettingsScreen from '../screens/PlayerSettingsScreen';
 import ThemeScreen from '../screens/ThemeScreen';
@@ -148,6 +150,7 @@ export type RootStackParamList = {
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
     backdrop?: string;
     videoType?: string;
+    releaseDate?: string;
     groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
   PlayerAndroid: {
@@ -168,6 +171,7 @@ export type RootStackParamList = {
     availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
     backdrop?: string;
     videoType?: string;
+    releaseDate?: string;
     groupedEpisodes?: { [seasonNumber: number]: any[] };
   };
   Catalog: { id: string; type: string; addonId?: string; name?: string; genreFilter?: string };
@@ -186,6 +190,8 @@ export type RootStackParamList = {
   HomeScreenSettings: undefined;
   HeroCatalogs: undefined;
   TraktSettings: undefined;
+  MalSettings: undefined;
+  MalLibrary: undefined;
   SimklSettings: undefined;
   PlayerSettings: undefined;
   ThemeSettings: undefined;
@@ -1556,6 +1562,36 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
             <Stack.Screen
               name="TraktSettings"
               component={TraktSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="MalSettings"
+              component={MalSettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'default' : 'fade',
+                animationDuration: Platform.OS === 'android' ? 250 : 200,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
+            <Stack.Screen
+              name="MalLibrary"
+              component={MalLibraryScreen}
               options={{
                 animation: Platform.OS === 'android' ? 'default' : 'fade',
                 animationDuration: Platform.OS === 'android' ? 250 : 200,
