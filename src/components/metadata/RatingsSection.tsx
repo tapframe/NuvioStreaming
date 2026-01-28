@@ -22,7 +22,7 @@ const BREAKPOINTS = {
   tv: 1440,
 };
 
-const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
+const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg';
 
 export const RATING_PROVIDERS = {
   imdb: {
@@ -163,7 +163,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
     imdb: {
       name: 'IMDb',
       icon: { uri: IMDb_LOGO },
-      isImage: true,
+      isImage: false,
       color: '#F5C518',
       transform: (value: number) => value.toFixed(1)
     },
