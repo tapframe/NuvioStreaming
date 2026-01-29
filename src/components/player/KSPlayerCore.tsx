@@ -21,7 +21,6 @@ import ResumeOverlay from './modals/ResumeOverlay';
 import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import SkipIntroButton from './overlays/SkipIntroButton';
 import { SpeedActivatedOverlay, PauseOverlay, GestureControls } from './components';
-import { CreditsInfo } from '../../services/introService';
 
 // Platform-specific components
 import { KSPlayerSurface } from './ios/components/KSPlayerSurface';
@@ -155,7 +154,7 @@ const KSPlayerCore: React.FC = () => {
   const speedControl = useSpeedControl(1.0);
 
   // Metadata Hook
-  const { metadata, groupedEpisodes, cast, tmdbId } = useMetadata({ id, type: type as 'movie' | 'series' });
+  const { metadata, groupedEpisodes, cast } = useMetadata({ id, type: type as 'movie' | 'series' });
 
   // Trakt Autosync
   const traktAutosync = useTraktAutosync({
@@ -177,9 +176,6 @@ const KSPlayerCore: React.FC = () => {
 
   // Subtitle sync modal state
   const [showSyncModal, setShowSyncModal] = useState(false);
-
-  // Credits timing state from API
-  const [creditsInfo, setCreditsInfo] = useState<CreditsInfo | null>(null);
 
   // Track auto-selection refs to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
@@ -946,10 +942,8 @@ const KSPlayerCore: React.FC = () => {
         episode={episode}
         malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
         kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
-        tmdbId={tmdbId || undefined}
         currentTime={currentTime}
         onSkip={(endTime) => controls.seekToTime(endTime)}
-        onCreditsInfo={setCreditsInfo}
         controlsVisible={showControls}
         controlsFixedOffset={126}
       />
@@ -975,7 +969,6 @@ const KSPlayerCore: React.FC = () => {
         metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
         controlsVisible={showControls}
         controlsFixedOffset={126}
-        creditsInfo={creditsInfo}
       />
 
       {/* Modals */}

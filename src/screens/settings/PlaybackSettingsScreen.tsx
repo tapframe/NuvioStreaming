@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,6 @@ import { SvgXml } from 'react-native-svg';
 const { width } = Dimensions.get('window');
 
 const INTRODB_LOGO_URI = 'https://introdb.app/images/logo-vector.svg';
-const THEINTRODB_FAVICON_URI = 'https://theintrodb.org/favicon.ico';
 
 // Available languages for audio/subtitle selection
 const AVAILABLE_LANGUAGES = [
@@ -78,7 +77,6 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
     const config = useRealtimeConfig();
 
     const [introDbLogoXml, setIntroDbLogoXml] = useState<string | null>(null);
-    const [theIntroDbLoaded, setTheIntroDbLoaded] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -105,57 +103,20 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
         };
     }, []);
 
-    // Preload TheIntroDB favicon
-    useEffect(() => {
-        let cancelled = false;
-        const load = async () => {
-            try {
-                await fetch(THEINTRODB_FAVICON_URI);
-                if (!cancelled) setTheIntroDbLoaded(true);
-            } catch {
-                if (!cancelled) setTheIntroDbLoaded(false);
-            }
-        };
-        load();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    const introDbLogoIcon = useMemo(() => {
-        const selectedSource = settings?.introDbSource || 'theintrodb';
-
-        if (selectedSource === 'theintrodb') {
-            // Show TheIntroDB favicon
-            return theIntroDbLoaded ? (
-                <Image
-                    source={{ uri: THEINTRODB_FAVICON_URI }}
-                    style={{ width: 20, height: 20 }}
-                    resizeMode="contain"
-                />
-            ) : (
-                <MaterialIcons name="skip-next" size={18} color={currentTheme.colors.primary} />
-            );
-        } else {
-            // Show IntroDB logo (legacy)
-            return introDbLogoXml ? (
-                <SvgXml xml={introDbLogoXml} width={28} height={18} />
-            ) : (
-                <MaterialIcons name="skip-next" size={18} color={currentTheme.colors.primary} />
-            );
-        }
-    }, [settings?.introDbSource, introDbLogoXml, theIntroDbLoaded, currentTheme.colors.primary]);
+    const introDbLogoIcon = introDbLogoXml ? (
+        <SvgXml xml={introDbLogoXml} width={28} height={18} />
+    ) : (
+        <MaterialIcons name="skip-next" size={18} color={currentTheme.colors.primary} />
+    );
 
     // Bottom sheet refs
     const audioLanguageSheetRef = useRef<BottomSheetModal>(null);
     const subtitleLanguageSheetRef = useRef<BottomSheetModal>(null);
     const subtitleSourceSheetRef = useRef<BottomSheetModal>(null);
-    const introSourceSheetRef = useRef<BottomSheetModal>(null);
 
     // Snap points
     const languageSnapPoints = useMemo(() => ['70%'], []);
     const sourceSnapPoints = useMemo(() => ['45%'], []);
-    const introSourceSnapPoints = useMemo(() => ['35%'], []);
 
     // Handlers to present sheets - ensure only one is open at a time
     const openAudioLanguageSheet = useCallback(() => {
@@ -174,13 +135,6 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
         audioLanguageSheetRef.current?.dismiss();
         subtitleLanguageSheetRef.current?.dismiss();
         setTimeout(() => subtitleSourceSheetRef.current?.present(), 100);
-    }, []);
-
-    const openIntroSourceSheet = useCallback(() => {
-        audioLanguageSheetRef.current?.dismiss();
-        subtitleLanguageSheetRef.current?.dismiss();
-        subtitleSourceSheetRef.current?.dismiss();
-        setTimeout(() => introSourceSheetRef.current?.present(), 100);
     }, []);
 
     const isItemVisible = (itemId: string) => {
@@ -234,17 +188,6 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
         subtitleSourceSheetRef.current?.dismiss();
     };
 
-    const handleSelectIntroSource = (value: 'theintrodb' | 'introdb') => {
-        updateSetting('introDbSource', value);
-        introSourceSheetRef.current?.dismiss();
-    };
-
-    const getIntroSourceLabel = (value: string) => {
-        if (value === 'theintrodb') return 'TheIntroDB';
-        if (value === 'introdb') return 'IntroDB';
-        return 'TheIntroDB';
-    };
-
     return (
         <>
             {hasVisibleItems(['video_player']) && (
@@ -269,7 +212,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
             <SettingsCard title={t('player.section_playback', { defaultValue: 'Playback' })} isTablet={isTablet}>
                 <SettingItem
                     title={t('player.skip_intro_settings_title', { defaultValue: 'Skip Intro' })}
-                    description={getIntroSourceLabel(settings?.introDbSource || 'theintrodb')}
+                    description={t('player.powered_by_introdb', { defaultValue: 'Powered by IntroDB' })}
                     customIcon={introDbLogoIcon}
                     renderControl={() => (
                         <CustomSwitch
@@ -277,19 +220,9 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                             onValueChange={(value) => updateSetting('skipIntroEnabled', value)}
                         />
                     )}
+                    isLast
                     isTablet={isTablet}
                 />
-                {settings?.skipIntroEnabled && (
-                    <SettingItem
-                        title="Intro Source"
-                        description={`Using ${getIntroSourceLabel(settings?.introDbSource || 'theintrodb')}`}
-                        icon="database"
-                        renderControl={() => <ChevronRight />}
-                        onPress={openIntroSourceSheet}
-                        isLast
-                        isTablet={isTablet}
-                    />
-                )}
             </SettingsCard>
 
             {/* Audio & Subtitle Preferences */}
@@ -499,67 +432,6 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                                         {option.value === 'internal' && t('settings.options.internal_first_desc')}
                                         {option.value === 'external' && t('settings.options.external_first_desc')}
                                         {option.value === 'any' && t('settings.options.any_available_desc')}
-                                    </Text>
-                                </View>
-                                {isSelected && (
-                                    <MaterialIcons name="check" size={20} color={currentTheme.colors.primary} />
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </BottomSheetScrollView>
-            </BottomSheetModal>
-
-            {/* Intro Source Bottom Sheet */}
-            <BottomSheetModal
-                ref={introSourceSheetRef}
-                index={0}
-                snapPoints={introSourceSnapPoints}
-                enableDynamicSizing={false}
-                enablePanDownToClose={true}
-                backdropComponent={renderBackdrop}
-                backgroundStyle={{ backgroundColor: '#1a1a1a' }}
-                handleIndicatorStyle={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-            >
-                <View style={styles.sheetHeader}>
-                    <Text style={styles.sheetTitle}>Skip Intro Source</Text>
-                </View>
-                <BottomSheetScrollView contentContainerStyle={styles.sheetContent}>
-                    {[
-                        { value: 'theintrodb', label: 'TheIntroDB', description: 'theintrodb.org - Supports skip recap and end credits if available', logo: THEINTRODB_FAVICON_URI },
-                        { value: 'introdb', label: 'IntroDB', description: 'Skip Intro database by introdb.app', logo: INTRODB_LOGO_URI }
-                    ].map((option) => {
-                        const isSelected = option.value === (settings?.introDbSource || 'theintrodb');
-                        return (
-                            <TouchableOpacity
-                                key={option.value}
-                                style={[
-                                    styles.sourceItem,
-                                    isSelected && { backgroundColor: currentTheme.colors.primary + '20', borderColor: currentTheme.colors.primary }
-                                ]}
-                                onPress={() => handleSelectIntroSource(option.value as 'theintrodb' | 'introdb')}
-                            >
-                                <View style={styles.sourceItemContent}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        {option.value === 'theintrodb' ? (
-                                            <Image
-                                                source={{ uri: option.logo }}
-                                                style={{ width: 20, height: 20 }}
-                                                resizeMode="contain"
-                                            />
-                                        ) : (
-                                            introDbLogoXml ? (
-                                                <SvgXml xml={introDbLogoXml} width={28} height={18} />
-                                            ) : (
-                                                <MaterialIcons name="skip-next" size={18} color={currentTheme.colors.primary} />
-                                            )
-                                        )}
-                                        <Text style={[styles.sourceLabel, { color: isSelected ? currentTheme.colors.primary : '#fff' }]}>
-                                            {option.label}
-                                        </Text>
-                                    </View>
-                                    <Text style={styles.sourceDescription}>
-                                        {option.description}
                                     </Text>
                                 </View>
                                 {isSelected && (
