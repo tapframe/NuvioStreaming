@@ -633,6 +633,7 @@
         "croatian": "Hrvatski",
         "chinese": "Kineski (pojednostavljeni)",
         "hindi": "Hindski",
+        "serbian": "Srpski"
         "account": "Račun",
         "content_discovery": "Sadržaj i otkrivanje",
         "appearance": "Izgled",
@@ -1363,4 +1364,5 @@
             "no_logs_captured": "Nema zapisa."
         }
     }
+
 }
