@@ -24,5 +24,5 @@ export const resources = {
     hr: { translation: hr },
     'zh-CN': { translation: zhCN },
     hi: { translation: hi },
-    sr: { translation: hr },
+    sr: { translation: sr },
 };
