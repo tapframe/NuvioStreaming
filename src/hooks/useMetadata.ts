@@ -212,12 +212,13 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
     try {
       await stremioService.getStreams(type, id,
-        (streams, addonId, addonName, error) => {
+        (streams, addonId, addonName, error, installationId) => {
           const processTime = Date.now() - sourceStartTime;
 
           console.log('🔍 [processStremioSource] Callback received:', {
             addonId,
             addonName,
+            installationId,
             streamCount: streams?.length || 0,
             error: error?.message || null,
             processTime
@@ -276,20 +277,23 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
               // Use debounced update to prevent rapid state changes
               debouncedStreamUpdate(() => {
                 const updateState = (prevState: GroupedStreams): GroupedStreams => {
-                  if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId})`);
+                  // Use installationId as key to keep multiple installations separate
+                  const key = installationId || addonId || 'unknown';
+                  if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Updating state for addon ${addonName} (${addonId}) [${installationId}]`);
                   return {
                     ...prevState,
-                    [addonId]: {
+                    [key]: {
                       addonName: addonName,
                       streams: optimizedStreams // Use optimized streams
                     }
                   };
                 };
 
-                // Track response order for addons
+                // Track response order for addons (use installationId to track each installation separately)
                 setAddonResponseOrder(prevOrder => {
-                  if (!prevOrder.includes(addonId)) {
-                    return [...prevOrder, addonId];
+                  const key = installationId || addonId || 'unknown';
+                  if (!prevOrder.includes(key)) {
+                    return [...prevOrder, key];
                   }
                   return prevOrder;
                 });
@@ -309,20 +313,23 @@ export const useMetadata = ({ id, type, addonId }: UseMetadataProps): UseMetadat
 
               debouncedStreamUpdate(() => {
                 const updateState = (prevState: GroupedStreams): GroupedStreams => {
-                  if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Adding empty provider ${addonName} (${addonId}) to state`);
+                  // Use installationId as key to keep multiple installations separate
+                  const key = installationId || addonId || 'unknown';
+                  if (__DEV__) logger.log(`🔄 [${logPrefix}:${sourceName}] Adding empty provider ${addonName} (${addonId}) [${installationId}] to state`);
                   return {
                     ...prevState,
-                    [addonId]: {
+                    [key]: {
                       addonName: addonName,
                       streams: [] // Empty array for providers with no streams
                     }
                   };
                 };
 
-                // Track response order for addons
+                // Track response order for addons (use installationId to track each installation separately)
                 setAddonResponseOrder(prevOrder => {
-                  if (!prevOrder.includes(addonId)) {
-                    return [...prevOrder, addonId];
+                  const key = installationId || addonId || 'unknown';
+                  if (!prevOrder.includes(key)) {
+                    return [...prevOrder, key];
                   }
                   return prevOrder;
                 });

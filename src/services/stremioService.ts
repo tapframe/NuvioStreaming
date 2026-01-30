@@ -149,9 +149,9 @@ export interface SubtitleResponse {
   addonName: string;
 }
 
-// Modify the callback signature to include addon ID
+// Modify the callback signature to include addon ID and installation ID
 interface StreamCallback {
-  (streams: Stream[] | null, addonId: string | null, addonName: string | null, error: Error | null): void;
+  (streams: Stream[] | null, addonId: string | null, addonName: string | null, error: Error | null, installationId?: string | null): void;
 }
 
 interface CatalogFilter {
@@ -187,6 +187,7 @@ interface ResourceObject {
 
 export interface Manifest {
   id: string;
+  installationId?: string;             // Unique ID for this installation (allows multiple installs of same addon)
   name: string;
   version: string;
   description: string;
@@ -209,7 +210,6 @@ export interface Manifest {
   background?: string;                 // Background image URL
   logo?: string;                       // Logo URL
   contactEmail?: string;               // Contact email
-  installationId?: string;             // Unique ID for this specific installation
 }
 
 // Config object for addon configuration per protocol
@@ -264,8 +264,8 @@ export interface AddonCapabilities {
 
 class StremioService {
   private static instance: StremioService;
-  private installedAddons: Map<string, Manifest> = new Map();
-  private addonOrder: string[] = [];
+  private installedAddons: Map<string, Manifest> = new Map(); // Key is installationId
+  private addonOrder: string[] = []; // Array of installationIds
   private readonly STORAGE_KEY = 'stremio-addons';
   private readonly ADDON_ORDER_KEY = 'stremio-addon-order';
   private readonly MAX_CONCURRENT_REQUESTS = 3;
@@ -277,6 +277,29 @@ class StremioService {
   private constructor() {
     // Start initialization but don't wait for it
     this.initializationPromise = this.initialize();
+  }
+
+  // Generate a unique installation ID for an addon
+  private generateInstallationId(addonId: string): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 9);
+    return `${addonId}-${timestamp}-${random}`;
+  }
+
+
+  private addonProvidesStreams(manifest: Manifest): boolean {
+    if (!manifest.resources || !Array.isArray(manifest.resources)) {
+      return false;
+    }
+
+    return manifest.resources.some(resource => {
+      if (typeof resource === 'string') {
+        return resource === 'stream';
+      } else if (typeof resource === 'object' && resource !== null && 'name' in resource) {
+        return (resource as ResourceObject).name === 'stream';
+      }
+      return false;
+    });
   }
 
   // Dynamic validator for content IDs based on installed addon capabilities
@@ -420,13 +443,13 @@ class StremioService {
       if (storedAddons) {
         const parsed = JSON.parse(storedAddons);
 
-        // Convert to Map
+        // Convert to Map using installationId as key
         this.installedAddons = new Map();
         for (const addon of parsed) {
           if (addon && addon.id) {
-            // Migration: Ensure installationId exists
+            // Generate installationId for existing addons that don't have one (migration)
             if (!addon.installationId) {
-              addon.installationId = addon.id;
+              addon.installationId = this.generateInstallationId(addon.id);
             }
             this.installedAddons.set(addon.installationId, addon);
           }
@@ -437,21 +460,19 @@ class StremioService {
       const cinemetaId = 'com.linvo.cinemeta';
       const hasUserRemovedCinemeta = await this.hasUserRemovedAddon(cinemetaId);
 
-      // Check if any installed addon has this ID (using valid values iteration)
-      const isCinemetaInstalled = Array.from(this.installedAddons.values()).some(a => a.id === cinemetaId);
+      // Check if Cinemeta is already installed (by checking addon.id, not installationId)
+      const hasCinemeta = Array.from(this.installedAddons.values()).some(addon => addon.id === cinemetaId);
 
-      if (!isCinemetaInstalled && !hasUserRemovedCinemeta) {
+      if (!hasCinemeta && !hasUserRemovedCinemeta) {
         try {
           const cinemetaManifest = await this.getManifest('https://v3-cinemeta.strem.io/manifest.json');
-          // For default addons, we can use the ID as installationId to keep it clean (or generate one)
-          // Using ID ensures only one instance of default addon is auto-installed
-          cinemetaManifest.installationId = cinemetaId;
-          this.installedAddons.set(cinemetaId, cinemetaManifest);
+          cinemetaManifest.installationId = this.generateInstallationId(cinemetaId);
+          this.installedAddons.set(cinemetaManifest.installationId, cinemetaManifest);
         } catch (error) {
           // Fallback to minimal manifest if fetch fails
           const fallbackManifest: Manifest = {
             id: cinemetaId,
-            installationId: cinemetaId,
+            installationId: this.generateInstallationId(cinemetaId),
             name: 'Cinemeta',
             version: '3.0.13',
             description: 'Provides metadata for movies and series from TheTVDB, TheMovieDB, etc.',
@@ -488,7 +509,7 @@ class StremioService {
               configurable: false
             }
           };
-          this.installedAddons.set(cinemetaId, fallbackManifest);
+          this.installedAddons.set(fallbackManifest.installationId!, fallbackManifest);
         }
       }
 
@@ -496,17 +517,18 @@ class StremioService {
       const opensubsId = 'org.stremio.opensubtitlesv3';
       const hasUserRemovedOpenSubtitles = await this.hasUserRemovedAddon(opensubsId);
 
-      const isOpenSubsInstalled = Array.from(this.installedAddons.values()).some(a => a.id === opensubsId);
+      // Check if OpenSubtitles is already installed (by checking addon.id, not installationId)
+      const hasOpenSubs = Array.from(this.installedAddons.values()).some(addon => addon.id === opensubsId);
 
-      if (!isOpenSubsInstalled && !hasUserRemovedOpenSubtitles) {
+      if (!hasOpenSubs && !hasUserRemovedOpenSubtitles) {
         try {
           const opensubsManifest = await this.getManifest('https://opensubtitles-v3.strem.io/manifest.json');
-          opensubsManifest.installationId = opensubsId;
-          this.installedAddons.set(opensubsId, opensubsManifest);
+          opensubsManifest.installationId = this.generateInstallationId(opensubsId);
+          this.installedAddons.set(opensubsManifest.installationId, opensubsManifest);
         } catch (error) {
           const fallbackManifest: Manifest = {
             id: opensubsId,
-            installationId: opensubsId,
+            installationId: this.generateInstallationId(opensubsId),
             name: 'OpenSubtitles v3',
             version: '1.0.0',
             description: 'OpenSubtitles v3 Addon for Stremio',
@@ -525,7 +547,7 @@ class StremioService {
               configurable: false
             }
           };
-          this.installedAddons.set(opensubsId, fallbackManifest);
+          this.installedAddons.set(fallbackManifest.installationId!, fallbackManifest);
         }
       }
 
@@ -535,27 +557,30 @@ class StremioService {
       if (!storedOrder) storedOrder = await mmkvStorage.getItem(`@user:local:${this.ADDON_ORDER_KEY}`);
       if (storedOrder) {
         this.addonOrder = JSON.parse(storedOrder);
-        // Filter out any ids that aren't in installedAddons
-        this.addonOrder = this.addonOrder.filter(id => this.installedAddons.has(id));
+        // Filter out any installationIds that aren't in installedAddons
+        this.addonOrder = this.addonOrder.filter(installationId => this.installedAddons.has(installationId));
       }
 
-      // Add Cinemeta to order only if user hasn't removed it and it's installed
+      // Add Cinemeta to order only if user hasn't removed it
       const hasUserRemovedCinemetaOrder = await this.hasUserRemovedAddon(cinemetaId);
-      // We check if the installationId (which is cinemetaId for default) is in the map
-      if (!this.addonOrder.includes(cinemetaId) && this.installedAddons.has(cinemetaId) && !hasUserRemovedCinemetaOrder) {
-        this.addonOrder.push(cinemetaId);
+      const cinemetaInstallation = Array.from(this.installedAddons.values()).find(addon => addon.id === cinemetaId);
+      if (cinemetaInstallation && cinemetaInstallation.installationId &&
+          !this.addonOrder.includes(cinemetaInstallation.installationId) && !hasUserRemovedCinemetaOrder) {
+        this.addonOrder.push(cinemetaInstallation.installationId);
       }
 
       // Only add OpenSubtitles to order if user hasn't removed it
       const hasUserRemovedOpenSubtitlesOrder = await this.hasUserRemovedAddon(opensubsId);
-      if (!this.addonOrder.includes(opensubsId) && this.installedAddons.has(opensubsId) && !hasUserRemovedOpenSubtitlesOrder) {
-        this.addonOrder.push(opensubsId);
+      const opensubsInstallation = Array.from(this.installedAddons.values()).find(addon => addon.id === opensubsId);
+      if (opensubsInstallation && opensubsInstallation.installationId &&
+          !this.addonOrder.includes(opensubsInstallation.installationId) && !hasUserRemovedOpenSubtitlesOrder) {
+        this.addonOrder.push(opensubsInstallation.installationId);
       }
 
-      // Add any missing addons to the order
-      const installedIds = Array.from(this.installedAddons.keys());
-      const missingIds = installedIds.filter(id => !this.addonOrder.includes(id));
-      this.addonOrder = [...this.addonOrder, ...missingIds];
+      // Add any missing addons to the order (use installationIds)
+      const installedInstallationIds = Array.from(this.installedAddons.keys());
+      const missingInstallationIds = installedInstallationIds.filter(installationId => !this.addonOrder.includes(installationId));
+      this.addonOrder = [...this.addonOrder, ...missingInstallationIds];
 
       // Ensure order and addons are saved
       await this.saveAddonOrder();
@@ -669,48 +694,57 @@ class StremioService {
   async installAddon(url: string): Promise<void> {
     const manifest = await this.getManifest(url);
     if (manifest && manifest.id) {
-      // Generate a unique installation ID
-      const installationId = `${manifest.id}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-      manifest.installationId = installationId;
+      // Check if this addon is already installed
+      const existingInstallations = Array.from(this.installedAddons.values()).filter(a => a.id === manifest.id);
+      const isAlreadyInstalled = existingInstallations.length > 0;
 
-      this.installedAddons.set(installationId, manifest);
+      // Only allow multiple installations for stream-providing addons
+      if (isAlreadyInstalled && !this.addonProvidesStreams(manifest)) {
+        throw new Error('This addon is already installed. Multiple installations are only allowed for stream providers.');
+      }
+
+      // Generate a unique installation ID for this installation
+      manifest.installationId = this.generateInstallationId(manifest.id);
+
+      // Store using installationId as key (allows multiple installations of same addon)
+      this.installedAddons.set(manifest.installationId, manifest);
 
       // If addon was previously removed by user, unmark it on reinstall and clean up
       await this.unmarkAddonAsRemovedByUser(manifest.id);
+      await this.cleanupRemovedAddonFromStorage(manifest.id);
 
-      // Note: cleanupRemovedAddonFromStorage takes an installationId (from addonOrder context), 
-      // but here we are dealing with a new installationId, strictly speaking. 
-      // However, we might want to cleanup any stray legacy entries for this addon ID if we wanted strict uniqueness,
-      // but we clearly support duplicates now, so we don't need to clean up other instances.
-      // We ONLY keep the unmarkAddonAsRemovedByUser to allow re-auto-install of defaults if user manually installs them.
-
-      // Add to order (new addons go to the end)
-      this.addonOrder.push(installationId);
+      // Add installationId to order (new addons go to the end)
+      if (!this.addonOrder.includes(manifest.installationId)) {
+        this.addonOrder.push(manifest.installationId);
+      }
 
       await this.saveInstalledAddons();
       await this.saveAddonOrder();
-      // Emit an event that an addon was added
-      addonEmitter.emit(ADDON_EVENTS.ADDON_ADDED, installationId);
+      // Emit an event that an addon was added (include both ids for compatibility)
+      addonEmitter.emit(ADDON_EVENTS.ADDON_ADDED, { installationId: manifest.installationId, addonId: manifest.id });
     } else {
       throw new Error('Invalid addon manifest');
     }
   }
 
   async removeAddon(installationId: string): Promise<void> {
-    // Allow removal of any addon
+    // Allow removal of any addon installation, including pre-installed ones like Cinemeta
     if (this.installedAddons.has(installationId)) {
       const addon = this.installedAddons.get(installationId);
       this.installedAddons.delete(installationId);
-      // Remove from order
+      // Remove from order using installationId
       this.addonOrder = this.addonOrder.filter(id => id !== installationId);
 
-      // Track user explicit removal for the addon ID (tombstone to prevent auto-reinstall of defaults)
-      if (addon && addon.id) {
-        await this.markAddonAsRemovedByUser(addon.id);
+      // Track user explicit removal only if this is the last installation of this addon
+      if (addon) {
+        const remainingInstallations = Array.from(this.installedAddons.values()).filter(a => a.id === addon.id);
+        if (remainingInstallations.length === 0) {
+          // This was the last installation, mark addon as removed by user
+          await this.markAddonAsRemovedByUser(addon.id);
+          // Proactively clean up any persisted orders/legacy keys for this addon
+          await this.cleanupRemovedAddonFromStorage(addon.id);
+        }
       }
-
-      // Clean up this specific installation from storage keys
-      await this.cleanupRemovedAddonFromStorage(installationId);
 
       // Persist removals before app possibly exits
       await this.saveInstalledAddons();
@@ -721,10 +755,10 @@ class StremioService {
   }
 
   getInstalledAddons(): Manifest[] {
-    // Return addons in the specified order
+    // Return addons in the specified order (using installationIds)
     const result = this.addonOrder
-      .filter(id => this.installedAddons.has(id))
-      .map(id => this.installedAddons.get(id)!);
+      .filter(installationId => this.installedAddons.has(installationId))
+      .map(installationId => this.installedAddons.get(installationId)!);
     return result;
   }
 
@@ -1434,7 +1468,7 @@ class StremioService {
         try {
           if (!addon.url) {
             logger.warn(`⚠️ [getStreams] Addon ${addon.id} has no URL`);
-            if (callback) callback(null, addon.installationId || addon.id, addon.name, new Error('Addon has no URL'));
+            if (callback) callback(null, addon.id, addon.name, new Error('Addon has no URL'), addon.installationId);
             return;
           }
 
@@ -1442,7 +1476,7 @@ class StremioService {
           const encodedId = encodeURIComponent(activeId);
           const url = queryParams ? `${baseUrl}/stream/${type}/${encodedId}.json?${queryParams}` : `${baseUrl}/stream/${type}/${encodedId}.json`;
 
-          logger.log(`🔗 [getStreams] Requesting streams from ${addon.name} (${addon.id}): ${url}`);
+          logger.log(`🔗 [getStreams] Requesting streams from ${addon.name} (${addon.id}) [${addon.installationId}]: ${url}`);
 
           const response = await this.retryRequest(async () => {
             return await axios.get(url, safeAxiosConfig);
@@ -1450,22 +1484,21 @@ class StremioService {
 
           let processedStreams: Stream[] = [];
           if (response.data && response.data.streams) {
-            logger.log(`✅ [getStreams] Got ${response.data.streams.length} streams from ${addon.name} (${addon.id})`);
+            logger.log(`✅ [getStreams] Got ${response.data.streams.length} streams from ${addon.name} (${addon.id}) [${addon.installationId}]`);
             processedStreams = this.processStreams(response.data.streams, addon);
-            logger.log(`✅ [getStreams] Processed ${processedStreams.length} valid streams from ${addon.name} (${addon.id})`);
+            logger.log(`✅ [getStreams] Processed ${processedStreams.length} valid streams from ${addon.name} (${addon.id}) [${addon.installationId}]`);
           } else {
-            logger.log(`⚠️ [getStreams] No streams found in response from ${addon.name} (${addon.id})`);
+            logger.log(`⚠️ [getStreams] No streams found in response from ${addon.name} (${addon.id}) [${addon.installationId}]`);
           }
 
           if (callback) {
-            // Call callback with processed streams (can be empty array)
-            // Use installationId if available to distinct between multiple installations of same addon
-            callback(processedStreams, addon.installationId || addon.id, addon.name, null);
+            // Call callback with processed streams (can be empty array), include installationId
+            callback(processedStreams, addon.id, addon.name, null, addon.installationId);
           }
         } catch (error) {
           if (callback) {
-            // Call callback with error
-            callback(null, addon.installationId || addon.id, addon.name, error as Error);
+            // Call callback with error, include installationId
+            callback(null, addon.id, addon.name, error as Error, addon.installationId);
           }
         }
       })(); // Immediately invoke the async function
@@ -1646,7 +1679,7 @@ class StremioService {
           name: name,
           title: displayTitle,
           addonName: addon.name,
-          addonId: addon.installationId || addon.id,
+          addonId: addon.id,
 
           // Include description as-is to preserve full details
           description: stream.description,
@@ -1837,9 +1870,9 @@ class StremioService {
     return deduped;
   }
 
-  // Add methods to move addons in the order
-  moveAddonUp(id: string): boolean {
-    const index = this.addonOrder.indexOf(id);
+  // Add methods to move addons in the order (using installationIds)
+  moveAddonUp(installationId: string): boolean {
+    const index = this.addonOrder.indexOf(installationId);
     if (index > 0) {
       // Swap with the previous item
       [this.addonOrder[index - 1], this.addonOrder[index]] =
@@ -1852,8 +1885,8 @@ class StremioService {
     return false;
   }
 
-  moveAddonDown(id: string): boolean {
-    const index = this.addonOrder.indexOf(id);
+  moveAddonDown(installationId: string): boolean {
+    const index = this.addonOrder.indexOf(installationId);
     if (index >= 0 && index < this.addonOrder.length - 1) {
       // Swap with the next item
       [this.addonOrder[index], this.addonOrder[index + 1]] =

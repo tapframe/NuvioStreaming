@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 import { tmdbService } from './tmdbService';
-import { mmkvStorage } from './mmkvStorage';
 
 /**
  * IntroDB API service for fetching TV show intro timestamps
@@ -9,7 +8,6 @@ import { mmkvStorage } from './mmkvStorage';
  */
 
 const INTRODB_API_URL = process.env.EXPO_PUBLIC_INTRODB_API_URL;
-const THEINTRODB_API_URL = 'https://api.theintrodb.org/v1';
 const ANISKIP_API_URL = 'https://api.aniskip.com/v2';
 const KITSU_API_URL = 'https://kitsu.io/api/edge';
 const ARM_IMDB_URL = 'https://arm.haglund.dev/api/v2/imdb';
@@ -20,29 +18,8 @@ export interface SkipInterval {
     startTime: number;
     endTime: number;
     type: SkipType;
-    provider: 'introdb' | 'aniskip' | 'theintrodb';
+    provider: 'introdb' | 'aniskip';
     skipId?: string;
-}
-
-export interface CreditsInfo {
-    startTime: number | null;
-    endTime: number | null;
-    confidence: number;
-}
-
-export interface TheIntroDBTimestamp {
-    start_ms: number | null;
-    end_ms: number | null;
-    confidence: number;
-    submission_count: number;
-}
-
-export interface TheIntroDBResponse {
-    tmdb_id: number;
-    type: 'movie' | 'tv';
-    intro?: TheIntroDBTimestamp;
-    recap?: TheIntroDBTimestamp;
-    credits?: TheIntroDBTimestamp;
 }
 
 export interface IntroTimestamps {
@@ -175,75 +152,6 @@ async function fetchFromAniSkip(malId: string, episode: number): Promise<SkipInt
     return [];
 }
 
-async function fetchFromTheIntroDb(
-    tmdbId: number,
-    type: 'movie' | 'tv',
-    season?: number,
-    episode?: number
-): Promise<{ intervals: SkipInterval[], credits: CreditsInfo | null }> {
-    try {
-        const params: any = { tmdb_id: tmdbId };
-        if (type === 'tv' && season !== undefined && episode !== undefined) {
-            params.season = season;
-            params.episode = episode;
-        }
-
-        const response = await axios.get<TheIntroDBResponse>(`${THEINTRODB_API_URL}/media`, {
-            params,
-            timeout: 5000,
-        });
-
-        const intervals: SkipInterval[] = [];
-        let credits: CreditsInfo | null = null;
-
-        // Add intro skip interval if available
-        if (response.data.intro && response.data.intro.end_ms !== null) {
-            intervals.push({
-                startTime: response.data.intro.start_ms !== null ? response.data.intro.start_ms / 1000 : 0,
-                endTime: response.data.intro.end_ms / 1000,
-                type: 'intro',
-                provider: 'theintrodb'
-            });
-        }
-
-        // Add recap skip interval if available
-        if (response.data.recap && response.data.recap.start_ms !== null && response.data.recap.end_ms !== null) {
-            intervals.push({
-                startTime: response.data.recap.start_ms / 1000,
-                endTime: response.data.recap.end_ms / 1000,
-                type: 'recap',
-                provider: 'theintrodb'
-            });
-        }
-
-        // Store credits info for next episode button timing
-        if (response.data.credits && response.data.credits.start_ms !== null) {
-            credits = {
-                startTime: response.data.credits.start_ms / 1000,
-                endTime: response.data.credits.end_ms !== null ? response.data.credits.end_ms / 1000 : null,
-                confidence: response.data.credits.confidence
-            };
-        }
-
-        if (intervals.length > 0 || credits) {
-            logger.log(`[IntroService] TheIntroDB found data for TMDB ${tmdbId}:`, {
-                intervals: intervals.length,
-                hasCredits: !!credits
-            });
-        }
-
-        return { intervals, credits };
-    } catch (error: any) {
-        if (axios.isAxiosError(error) && error.response?.status === 404) {
-            logger.log(`[IntroService] No TheIntroDB data for TMDB ${tmdbId}`);
-            return { intervals: [], credits: null };
-        }
-
-        logger.error('[IntroService] Error fetching from TheIntroDB:', error?.message || error);
-        return { intervals: [], credits: null };
-    }
-}
-
 async function fetchFromIntroDb(imdbId: string, season: number, episode: number): Promise<SkipInterval[]> {
     try {
         const response = await axios.get<IntroTimestamps>(`${INTRODB_API_URL}/intro`, {
@@ -287,52 +195,19 @@ export async function getSkipTimes(
     season: number,
     episode: number,
     malId?: string,
-    kitsuId?: string,
-    tmdbId?: number,
-    type?: 'movie' | 'tv'
-): Promise<{ intervals: SkipInterval[], credits: CreditsInfo | null }> {
-    // Get user preference for intro source
-    const introDbSource = mmkvStorage.getString('introDbSource') || 'theintrodb';
-
-    if (introDbSource === 'theintrodb') {
-        // User prefers TheIntroDB (new API)
-        // 1. Try TheIntroDB (Primary) - Supports both movies and TV shows
-        if (tmdbId && type) {
-            const theIntroDbResult = await fetchFromTheIntroDb(tmdbId, type, season, episode);
-            if (theIntroDbResult.intervals.length > 0 || theIntroDbResult.credits) {
-                return theIntroDbResult;
-            }
-        }
-
-        // 2. Try old IntroDB (Fallback for TV Shows)
-        if (imdbId) {
-            const introDbIntervals = await fetchFromIntroDb(imdbId, season, episode);
-            if (introDbIntervals.length > 0) {
-                return { intervals: introDbIntervals, credits: null };
-            }
-        }
-    } else {
-        // User prefers IntroDB (legacy)
-        // 1. Try old IntroDB first
-        if (imdbId) {
-            const introDbIntervals = await fetchFromIntroDb(imdbId, season, episode);
-            if (introDbIntervals.length > 0) {
-                return { intervals: introDbIntervals, credits: null };
-            }
-        }
-
-        // 2. Try TheIntroDB as fallback
-        if (tmdbId && type) {
-            const theIntroDbResult = await fetchFromTheIntroDb(tmdbId, type, season, episode);
-            if (theIntroDbResult.intervals.length > 0 || theIntroDbResult.credits) {
-                return theIntroDbResult;
-            }
+    kitsuId?: string
+): Promise<SkipInterval[]> {
+    // 1. Try IntroDB (TV Shows) first
+    if (imdbId) {
+        const introDbIntervals = await fetchFromIntroDb(imdbId, season, episode);
+        if (introDbIntervals.length > 0) {
+            return introDbIntervals;
         }
     }
 
-    // 3. Try AniSkip (Anime) if we have MAL ID or Kitsu ID
+    // 2. Try AniSkip (Anime) if we have MAL ID or Kitsu ID
     let finalMalId = malId;
-
+    
     // If we have Kitsu ID but no MAL ID, try to resolve it
     if (!finalMalId && kitsuId) {
         logger.log(`[IntroService] Resolving MAL ID from Kitsu ID: ${kitsuId}`);
@@ -357,11 +232,11 @@ export async function getSkipTimes(
         const aniSkipIntervals = await fetchFromAniSkip(finalMalId, episode);
         if (aniSkipIntervals.length > 0) {
             logger.log(`[IntroService] Found ${aniSkipIntervals.length} skip intervals from AniSkip`);
-            return { intervals: aniSkipIntervals, credits: null };
+            return aniSkipIntervals;
         }
     }
 
-    return { intervals: [], credits: null };
+    return [];
 }
 
 /**

@@ -10,7 +10,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { introService, SkipInterval, SkipType, CreditsInfo } from '../../../services/introService';
+import { introService, SkipInterval, SkipType } from '../../../services/introService';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { logger } from '../../../utils/logger';
 import { useSettings } from '../../../hooks/useSettings';
@@ -22,10 +22,8 @@ interface SkipIntroButtonProps {
     episode?: number;
     malId?: string;
     kitsuId?: string;
-    tmdbId?: number;
     currentTime: number;
     onSkip: (endTime: number) => void;
-    onCreditsInfo?: (credits: CreditsInfo | null) => void;
     controlsVisible?: boolean;
     controlsFixedOffset?: number;
 }
@@ -37,10 +35,8 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     episode,
     malId,
     kitsuId,
-    tmdbId,
     currentTime,
     onSkip,
-    onCreditsInfo,
     controlsVisible = false,
     controlsFixedOffset = 100,
 }) => {
@@ -69,22 +65,20 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
 
     // Fetch skip data when episode changes
     useEffect(() => {
-        const episodeKey = `${imdbId}-${season}-${episode}-${malId}-${kitsuId}-${tmdbId}`;
+        const episodeKey = `${imdbId}-${season}-${episode}-${malId}-${kitsuId}`;
 
         if (!skipIntroEnabled) {
             setSkipIntervals([]);
             setCurrentInterval(null);
             setIsVisible(false);
             fetchedRef.current = false;
-            if (onCreditsInfo) onCreditsInfo(null);
             return;
         }
 
         // Skip if not a series or missing required data (though MAL/Kitsu ID might be enough for some cases, usually need season/ep)
-        if (type !== 'series' || (!imdbId && !malId && !kitsuId && !tmdbId) || !season || !episode) {
+        if (type !== 'series' || (!imdbId && !malId && !kitsuId) || !season || !episode) {
             setSkipIntervals([]);
             fetchedRef.current = false;
-            if (onCreditsInfo) onCreditsInfo(null);
             return;
         }
 
@@ -100,35 +94,24 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         setSkipIntervals([]);
 
         const fetchSkipData = async () => {
-            logger.log(`[SkipIntroButton] Fetching skip data for S${season}E${episode} (TMDB: ${tmdbId}, IMDB: ${imdbId}, MAL: ${malId}, Kitsu: ${kitsuId})...`);
+            logger.log(`[SkipIntroButton] Fetching skip data for S${season}E${episode} (IMDB: ${imdbId}, MAL: ${malId}, Kitsu: ${kitsuId})...`);
             try {
-                const mediaType = type === 'series' ? 'tv' : type === 'movie' ? 'movie' : 'tv';
-                const result = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId, tmdbId, mediaType);
-                setSkipIntervals(result.intervals);
+                const intervals = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId);
+                setSkipIntervals(intervals);
 
-                // Pass credits info to parent via callback
-                if (onCreditsInfo) {
-                    onCreditsInfo(result.credits);
-                }
-
-                if (result.intervals.length > 0) {
-                    logger.log(`[SkipIntroButton] ✓ Found ${result.intervals.length} skip intervals:`, result.intervals);
+                if (intervals.length > 0) {
+                    logger.log(`[SkipIntroButton] ✓ Found ${intervals.length} skip intervals:`, intervals);
                 } else {
                     logger.log(`[SkipIntroButton] ✗ No skip data available for this episode`);
-                }
-
-                if (result.credits) {
-                    logger.log(`[SkipIntroButton] ✓ Found credits timing:`, result.credits);
                 }
             } catch (error) {
                 logger.error('[SkipIntroButton] Error fetching skip data:', error);
                 setSkipIntervals([]);
-                if (onCreditsInfo) onCreditsInfo(null);
             }
         };
 
         fetchSkipData();
-    }, [imdbId, type, season, episode, malId, kitsuId, tmdbId, skipIntroEnabled, onCreditsInfo]);
+    }, [imdbId, type, season, episode, malId, kitsuId, skipIntroEnabled]);
 
     // Determine active interval based on current playback position
     useEffect(() => {
