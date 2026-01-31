@@ -8,6 +8,10 @@ import { useTranslation } from 'react-i18next';
 import { styles } from '../utils/playerStyles'; // Updated styles
 import { getTrackDisplayName } from '../utils/playerUtils';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { useSettings } from '../../../hooks/useSettings';
+
+import { introService } from '../../../services/introService';
+import { toastService } from '../../../services/toastService';
 
 interface PlayerControlsProps {
   showControls: boolean;
@@ -37,6 +41,7 @@ interface PlayerControlsProps {
   setShowAudioModal: (show: boolean) => void;
   setShowSubtitleModal: (show: boolean) => void;
   setShowSpeedModal: (show: boolean) => void;
+  setShowSubmitIntroModal: (show: boolean) => void;
   isSubtitleModalOpen?: boolean;
   setShowSourcesModal?: (show: boolean) => void;
   setShowEpisodesModal?: (show: boolean) => void;
@@ -55,6 +60,7 @@ interface PlayerControlsProps {
   onSwitchToMPV?: () => void;
   useExoPlayer?: boolean;
   isBuffering?: boolean;
+  imdbId?: string;
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({
@@ -85,6 +91,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   setShowAudioModal,
   setShowSubtitleModal,
   setShowSpeedModal,
+  setShowSubmitIntroModal,
   isSubtitleModalOpen,
   setShowSourcesModal,
   setShowEpisodesModal,
@@ -100,9 +107,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   onSwitchToMPV,
   useExoPlayer,
   isBuffering = false,
+  imdbId,
 }) => {
   const { currentTheme } = useTheme();
+  const { settings } = useSettings();
   const { t } = useTranslation();
+
+  // --- Intro Submission Logic ---
+  const handleIntroPress = () => {
+    setShowSubmitIntroModal(true);
+  };
 
 
   /* Responsive Spacing */
@@ -618,6 +632,20 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                   color={ksAudioTracks.length <= 1 ? 'grey' : 'white'}
                 />
               </TouchableOpacity>
+
+              {/* Submit Intro Button */}
+              {season !== undefined && episode !== undefined && settings.introSubmitEnabled && settings.introDbApiKey && (
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={handleIntroPress}
+                >
+                  <Ionicons
+                    name="flag-outline"
+                    size={24}
+                    color="white"
+                  />
+                </TouchableOpacity>
+              )}
 
               {/* Right Side: Episodes Button */}
               {setShowEpisodesModal && (
