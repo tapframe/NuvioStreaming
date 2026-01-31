@@ -91,7 +91,7 @@ const KSPlayerCore: React.FC = () => {
   const {
     uri, title, episodeTitle, season, episode, id, type, quality, year,
     episodeId, imdbId, backdrop, availableStreams,
-    headers, streamProvider, streamName,
+    headers, streamProvider, streamName, releaseDate,
     initialPosition: routeInitialPosition
   } = params;
 
@@ -998,6 +998,7 @@ const KSPlayerCore: React.FC = () => {
         episode={episode}
         malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
         kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+        releaseDate={releaseDate}
         currentTime={currentTime}
         onSkip={(endTime) => controls.seekToTime(endTime)}
         controlsVisible={showControls}

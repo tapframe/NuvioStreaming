@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 import { tmdbService } from './tmdbService';
+import { ArmSyncService } from './mal/ArmSyncService';
 
 /**
  * IntroDB API service for fetching TV show intro timestamps
@@ -195,7 +196,8 @@ export async function getSkipTimes(
     season: number,
     episode: number,
     malId?: string,
-    kitsuId?: string
+    kitsuId?: string,
+    releaseDate?: string
 ): Promise<SkipInterval[]> {
     // 1. Try IntroDB (TV Shows) first
     if (imdbId) {
@@ -207,7 +209,22 @@ export async function getSkipTimes(
 
     // 2. Try AniSkip (Anime) if we have MAL ID or Kitsu ID
     let finalMalId = malId;
+    let finalEpisode = episode;
     
+    // If we have IMDb ID and Release Date, try ArmSyncService to resolve exact MAL ID and Episode
+    if (!finalMalId && imdbId && releaseDate) {
+         try {
+             const armResult = await ArmSyncService.resolveByDate(imdbId, releaseDate);
+             if (armResult) {
+                 finalMalId = armResult.malId.toString();
+                 finalEpisode = armResult.episode;
+                 logger.log(`[IntroService] ArmSync resolved: MAL ${finalMalId} Ep ${finalEpisode}`);
+             }
+         } catch (e) {
+             logger.warn('[IntroService] ArmSync failed', e);
+         }
+    }
+
     // If we have Kitsu ID but no MAL ID, try to resolve it
     if (!finalMalId && kitsuId) {
         logger.log(`[IntroService] Resolving MAL ID from Kitsu ID: ${kitsuId}`);
@@ -228,8 +245,8 @@ export async function getSkipTimes(
     }
 
     if (finalMalId) {
-        logger.log(`[IntroService] Fetching AniSkip for MAL ID: ${finalMalId} Ep: ${episode}`);
-        const aniSkipIntervals = await fetchFromAniSkip(finalMalId, episode);
+        logger.log(`[IntroService] Fetching AniSkip for MAL ID: ${finalMalId} Ep: ${finalEpisode}`);
+        const aniSkipIntervals = await fetchFromAniSkip(finalMalId, finalEpisode);
         if (aniSkipIntervals.length > 0) {
             logger.log(`[IntroService] Found ${aniSkipIntervals.length} skip intervals from AniSkip`);
             return aniSkipIntervals;

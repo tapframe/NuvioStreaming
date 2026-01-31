@@ -1022,6 +1022,7 @@ const AndroidVideoPlayer: React.FC = () => {
           episode={episode}
           malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
           kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+          releaseDate={releaseDate}
           currentTime={playerState.currentTime}
           onSkip={(endTime) => controlsHook.seekToTime(endTime)}
           controlsVisible={playerState.showControls}
