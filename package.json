@@ -1,11 +1,12 @@
 {
   "name": "nuvio",
-  "version": "0.6.0-beta.6",
+  "version": "0.6.0-beta.16",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
+    "build": "export NODE_ENV=production && cd android && ./gradlew assembleRelease",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -19,7 +20,7 @@
     "@gorhom/bottom-sheet": "^5.2.6",
     "@kesha-antonov/react-native-background-downloader": "^4.4.5",
     "@legendapp/list": "^2.0.13",
-    "@lottiefiles/dotlottie-react": "^0.17.7",
+    "@lottiefiles/dotlottie-react": "^0.13.5",
     "@react-native-community/blur": "^4.4.1",
     "@react-native-community/netinfo": "^11.4.1",
     "@react-native-community/slider": "^5.1.1",
@@ -109,6 +110,9 @@
     "react-native-svg-transformer": "^1.5.0",
     "typescript": "^5.9.3",
     "xcode": "^3.0.1"
+  },
+  "overrides": {
+    "@types/react": "~18.3.12"
   },
   "private": true
 }

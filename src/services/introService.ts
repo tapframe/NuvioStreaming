@@ -188,6 +188,44 @@ async function fetchFromIntroDb(imdbId: string, season: number, episode: number)
 }
 
 /**
+ * Submits an intro timestamp to IntroDB
+ */
+export async function submitIntro(
+    apiKey: string,
+    imdbId: string,
+    season: number,
+    episode: number,
+    startTime: number, // in seconds
+    endTime: number    // in seconds
+): Promise<boolean> {
+    try {
+        if (!apiKey) {
+            logger.warn('[IntroService] Missing API key for submission');
+            return false;
+        }
+
+        const response = await axios.post(`${INTRODB_API_URL}/submit`, {
+            imdb_id: imdbId,
+            season,
+            episode,
+            start_ms: Math.round(startTime * 1000),
+            end_ms: Math.round(endTime * 1000),
+        }, {
+            headers: { 
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000,
+        });
+
+        return response.status === 200 || response.status === 201;
+    } catch (error: any) {
+        logger.error('[IntroService] Error submitting intro:', error?.response?.data || error?.message || error);
+        return false;
+    }
+}
+
+/**
  * Fetches skip intervals (intro, outro, recap) from available providers
  */
 export async function getSkipTimes(
@@ -266,7 +304,8 @@ export async function getIntroTimestamps(
 
 export const introService = {
     getIntroTimestamps,
-    getSkipTimes
+    getSkipTimes,
+    submitIntro
 };
 
 export default introService;

@@ -10,6 +10,7 @@ import UpNextButton from './common/UpNextButton';
 import { PlayerControls } from './controls/PlayerControls';
 import AudioTrackModal from './modals/AudioTrackModal';
 import SpeedModal from './modals/SpeedModal';
+import { SubmitIntroModal } from './modals/SubmitIntroModal';
 import SubtitleModals from './modals/SubtitleModals';
 import { SubtitleSyncModal } from './modals/SubtitleSyncModal';
 import SourcesModal from './modals/SourcesModal';
@@ -868,6 +869,7 @@ const KSPlayerCore: React.FC = () => {
             setShowAudioModal={modals.setShowAudioModal}
             setShowSubtitleModal={modals.setShowSubtitleModal}
             setShowSpeedModal={modals.setShowSpeedModal}
+            setShowSubmitIntroModal={modals.setShowSubmitIntroModal}
             isSubtitleModalOpen={modals.showSubtitleModal}
             setShowSourcesModal={modals.setShowSourcesModal}
             setShowEpisodesModal={type === 'series' ? modals.setShowEpisodesModal : undefined}
@@ -881,6 +883,7 @@ const KSPlayerCore: React.FC = () => {
             allowsAirPlay={allowsAirPlay}
             onAirPlayPress={() => ksPlayerRef.current?.showAirPlayPicker()}
             isBuffering={isBuffering}
+            imdbId={imdbId}
           />
         </View>
       )}
@@ -996,6 +999,15 @@ const KSPlayerCore: React.FC = () => {
         setHoldToSpeedEnabled={speedControl.setHoldToSpeedEnabled}
         holdToSpeedValue={speedControl.holdToSpeedValue}
         setHoldToSpeedValue={speedControl.setHoldToSpeedValue}
+      />
+
+      <SubmitIntroModal
+        visible={modals.showSubmitIntroModal}
+        onClose={() => modals.setShowSubmitIntroModal(false)}
+        currentTime={currentTime}
+        imdbId={imdbId}
+        season={season}
+        episode={episode}
       />
 
       <SubtitleModals
