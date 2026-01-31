@@ -59,6 +59,8 @@ export interface AppSettings {
   // Playback behavior
   alwaysResume: boolean; // If true, resume automatically without prompt when progress < 85%
   skipIntroEnabled: boolean; // Enable/disable Skip Intro overlay (IntroDB)
+  introSubmitEnabled: boolean; // Enable/disable Intro Submission
+  introDbApiKey: string; // API Key for IntroDB submission
   // Downloads
   enableDownloads: boolean; // Show Downloads tab and enable saving streams
   // Theme settings
@@ -147,6 +149,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Playback behavior defaults
   alwaysResume: true,
   skipIntroEnabled: true,
+  introSubmitEnabled: false,
+  introDbApiKey: '',
   // Downloads
   enableDownloads: false,
   useExternalPlayerForDownloads: false,

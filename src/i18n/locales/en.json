@@ -417,7 +417,12 @@
         "timing_offset": "Timing Offset (s)",
         "visual_sync": "Visual Sync",
         "timing_hint": "Nudge subtitles earlier (-) or later (+) to sync if needed.",
-        "reset_defaults": "Reset to defaults"
+        "reset_defaults": "Reset to defaults",
+        "mark_intro_start": "Mark Intro Start",
+        "mark_intro_end": "Mark Intro End",
+        "intro_start_marked": "Intro start marked",
+        "intro_submitted": "Intro submitted successfully",
+        "intro_submit_failed": "Failed to submit intro"
     },
     "downloads": {
         "title": "Downloads",

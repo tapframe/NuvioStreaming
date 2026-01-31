@@ -15,6 +15,7 @@ export const usePlayerModals = () => {
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [showSubtitleLanguageModal, setShowSubtitleLanguageModal] = useState(false);
     const [showCastDetails, setShowCastDetails] = useState(false);
+    const [showSubmitIntroModal, setShowSubmitIntroModal] = useState(false);
 
     // Some modals have associated data
     const [selectedEpisodeForStreams, setSelectedEpisodeForStreams] = useState<Episode | null>(null);
@@ -31,6 +32,7 @@ export const usePlayerModals = () => {
         showErrorModal, setShowErrorModal,
         showSubtitleLanguageModal, setShowSubtitleLanguageModal,
         showCastDetails, setShowCastDetails,
+        showSubmitIntroModal, setShowSubmitIntroModal,
         selectedEpisodeForStreams, setSelectedEpisodeForStreams,
         errorDetails, setErrorDetails,
         selectedCastMember, setSelectedCastMember

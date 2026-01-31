@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions, TextInput } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { useTranslation } from 'react-i18next';
 import { SvgXml } from 'react-native-svg';
+import { toastService } from '../../services/toastService';
 
 const { width } = Dimensions.get('window');
 
@@ -77,6 +78,16 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
     const config = useRealtimeConfig();
 
     const [introDbLogoXml, setIntroDbLogoXml] = useState<string | null>(null);
+    const [apiKeyInput, setApiKeyInput] = useState(settings?.introDbApiKey || '');
+
+    useEffect(() => {
+        setApiKeyInput(settings?.introDbApiKey || '');
+    }, [settings?.introDbApiKey]);
+
+    const handleApiKeySubmit = () => {
+        updateSetting('introDbApiKey', apiKeyInput);
+        toastService.success(t('settings.items.api_key_saved', { defaultValue: 'API Key Saved' }));
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -223,6 +234,49 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                     isLast
                     isTablet={isTablet}
                 />
+            </SettingsCard>
+
+            {/* IntroDB Contribution Section */}
+            <SettingsCard title={t('settings.sections.introdb_contribution', { defaultValue: 'IntroDB Contribution' })} isTablet={isTablet}>
+                <SettingItem
+                    title={t('settings.items.enable_intro_submission', { defaultValue: 'Enable Intro Submission' })}
+                    description={t('settings.items.enable_intro_submission_desc', { defaultValue: 'Contribute timestamps to the community' })}
+                    icon="flag"
+                    renderControl={() => (
+                        <CustomSwitch
+                            value={settings?.introSubmitEnabled ?? false}
+                            onValueChange={(value) => updateSetting('introSubmitEnabled', value)}
+                        />
+                    )}
+                    isLast={!settings?.introSubmitEnabled}
+                    isTablet={isTablet}
+                />
+                
+                {settings?.introSubmitEnabled && (
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.inputLabel}>
+                            {t('settings.items.introdb_api_key', { defaultValue: 'INTRODB API KEY' })}
+                        </Text>
+                        <View style={styles.apiKeyRow}>
+                            <TextInput
+                                style={[styles.input, { flex: 1, marginRight: 10, color: currentTheme.colors.highEmphasis }]}
+                                value={apiKeyInput}
+                                onChangeText={setApiKeyInput}
+                                placeholder="Enter your API key"
+                                placeholderTextColor={currentTheme.colors.mediumEmphasis}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                secureTextEntry
+                            />
+                            <TouchableOpacity
+                                style={styles.confirmButton}
+                                onPress={handleApiKeySubmit}
+                            >
+                                <MaterialIcons name="check" size={24} color="black" />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </SettingsCard>
 
             {/* Audio & Subtitle Preferences */}
@@ -541,6 +595,39 @@ const styles = StyleSheet.create({
     sourceDescription: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.5)',
+    },
+    inputContainer: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
+        paddingTop: 8,
+    },
+    inputLabel: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.5)',
+        marginBottom: 8,
+        marginLeft: 4,
+    },
+    input: {
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        color: 'white',
+        fontSize: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+    },
+    apiKeyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    confirmButton: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        width: 48,
+        height: 48,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 
