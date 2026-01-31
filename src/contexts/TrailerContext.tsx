@@ -1,3 +1,5 @@
+import * as ScreenOrientation from 'expo-screen-orientation';
+
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 
 interface TrailerContextValue {
@@ -11,6 +13,17 @@ const TrailerContext = createContext<TrailerContextValue | undefined>(undefined)
 
 export const TrailerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isTrailerPlaying, setIsTrailerPlaying] = useState(true);
+
+  React.useEffect(() => {
+    async function handleRotation() {
+      if (isTrailerPlaying) {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      } else {
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      }
+    }
+    handleRotation();
+  }, [isTrailerPlaying]);
 
   const pauseTrailer = useCallback(() => {
     setIsTrailerPlaying(false);

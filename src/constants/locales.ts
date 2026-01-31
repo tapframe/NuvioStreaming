@@ -10,4 +10,5 @@ export const LOCALES = [
     { code: 'hr', key: 'croatian' },
     { code: 'zh-CN', key: 'chinese' },
     { code: 'hi', key: 'hindi' }
+    { code: 'sr', key: 'serbian' } 
 ];

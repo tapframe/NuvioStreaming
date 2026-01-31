@@ -1175,6 +1175,8 @@ const TMDBSettingsScreen = () => {
                           { code: 'uk', label: 'Українська', native: 'Ukrainian' },
                           { code: 'vi', label: 'Tiếng Việt', native: 'Vietnamese' },
                           { code: 'th', label: 'ไทย', native: 'Thai' },
+                          { code: 'hr', 
+label: 'Hrvatski', native: 'Croatian' },
                         ];
 
                         const filteredLanguages = languages.filter(({ label, code, native }) =>
