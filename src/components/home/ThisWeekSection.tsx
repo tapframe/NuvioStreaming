@@ -23,6 +23,7 @@ import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { useCalendarData } from '../../hooks/useCalendarData';
 import { memoryManager } from '../../utils/memoryManager';
 import { tmdbService } from '../../services/tmdbService';
+import { CalendarEpisode } from '../../types/calendar';
 
 // Compute base sizes; actual tablet sizes will be adjusted inside component for responsiveness
 const { width } = Dimensions.get('window');
@@ -43,7 +44,7 @@ interface ThisWeekEpisode {
   seriesName: string;
   title: string;
   poster: string;
-  releaseDate: string;
+  releaseDate: string | null;
   season: number;
   episode: number;
   isReleased: boolean;

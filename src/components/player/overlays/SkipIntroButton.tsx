@@ -22,6 +22,7 @@ interface SkipIntroButtonProps {
     episode?: number;
     malId?: string;
     kitsuId?: string;
+    releaseDate?: string;
     currentTime: number;
     onSkip: (endTime: number) => void;
     controlsVisible?: boolean;
@@ -35,6 +36,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     episode,
     malId,
     kitsuId,
+    releaseDate,
     currentTime,
     onSkip,
     controlsVisible = false,
@@ -96,7 +98,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         const fetchSkipData = async () => {
             logger.log(`[SkipIntroButton] Fetching skip data for S${season}E${episode} (IMDB: ${imdbId}, MAL: ${malId}, Kitsu: ${kitsuId})...`);
             try {
-                const intervals = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId);
+                const intervals = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId, releaseDate);
                 setSkipIntervals(intervals);
 
                 if (intervals.length > 0) {
@@ -111,7 +113,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
         };
 
         fetchSkipData();
-    }, [imdbId, type, season, episode, malId, kitsuId, skipIntroEnabled]);
+    }, [imdbId, type, season, episode, malId, kitsuId, releaseDate, skipIntroEnabled]);
 
     // Determine active interval based on current playback position
     useEffect(() => {

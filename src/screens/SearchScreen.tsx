@@ -10,7 +10,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -63,6 +63,7 @@ const SearchScreen = () => {
   const { t } = useTranslation();
   const { settings } = useSettings();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const route = useRoute<any>();
   const { addToWatchlist, removeFromWatchlist, addToCollection, removeFromCollection, isInWatchlist, isInCollection } = useTraktContext();
   const { showSuccess, showInfo } = useToast();
   const [query, setQuery] = useState('');
@@ -153,18 +154,13 @@ const SearchScreen = () => {
           type: catalog.type,
         };
         await mmkvStorage.setItem(DISCOVER_CATALOG_KEY, JSON.stringify(catalogData));
-      } else {
-        // Clear catalog if null
-        await mmkvStorage.removeItem(DISCOVER_CATALOG_KEY);
       }
 
-      // Save genre - use empty string to indicate "All genres"
-      // This way we distinguish between "not set" and "All genres"
+      // Save genre
       if (genre) {
         await mmkvStorage.setItem(DISCOVER_GENRE_KEY, genre);
       } else {
-        // Save empty string to indicate "All genres" is selected
-        await mmkvStorage.setItem(DISCOVER_GENRE_KEY, '');
+        await mmkvStorage.removeItem(DISCOVER_GENRE_KEY);
       }
     } catch (error) {
       logger.error('Failed to save discover settings:', error);
@@ -193,21 +189,11 @@ const SearchScreen = () => {
 
               // Load saved genre
               const savedGenre = await mmkvStorage.getItem(DISCOVER_GENRE_KEY);
-              if (savedGenre !== null) {
-                if (savedGenre === '') {
-                  // Empty string means "All genres" was selected
-                  setSelectedDiscoverGenre(null);
-                } else if (foundCatalog.genres.includes(savedGenre)) {
-                  setSelectedDiscoverGenre(savedGenre);
-                } else if (foundCatalog.genres.length > 0) {
-                  // Set first genre as default if saved genre not available
-                  setSelectedDiscoverGenre(foundCatalog.genres[0]);
-                }
-              } else {
-                // No saved genre, default to first genre
-                if (foundCatalog.genres.length > 0) {
-                  setSelectedDiscoverGenre(foundCatalog.genres[0]);
-                }
+              if (savedGenre && foundCatalog.genres.includes(savedGenre)) {
+                setSelectedDiscoverGenre(savedGenre);
+              } else if (foundCatalog.genres.length > 0) {
+                // Set first genre as default if saved genre not available
+                setSelectedDiscoverGenre(foundCatalog.genres[0]);
               }
               return;
             }
@@ -484,6 +470,13 @@ const SearchScreen = () => {
   useFocusEffect(
     useCallback(() => {
       isMounted.current = true;
+      
+      // Check for route query param
+      if (route.params?.query && route.params.query !== query) {
+          setQuery(route.params.query);
+          // The query effect will trigger debouncedSearch automatically
+      }
+
       return () => {
         isMounted.current = false;
         if (liveSearchHandle.current) {
@@ -492,7 +485,7 @@ const SearchScreen = () => {
         }
         debouncedSearch.cancel();
       };
-    }, [debouncedSearch])
+    }, [debouncedSearch, route.params?.query])
   );
 
   const performLiveSearch = async (searchQuery: string) => {
@@ -703,7 +696,7 @@ const SearchScreen = () => {
   const handleGenreSelect = (genre: string | null) => {
     setSelectedDiscoverGenre(genre);
 
-    // Save genre setting - this will save empty string for null (All genres)
+    // Save genre setting
     saveDiscoverSettings(selectedDiscoverType, selectedCatalog, genre);
 
     genreSheetRef.current?.dismiss();
