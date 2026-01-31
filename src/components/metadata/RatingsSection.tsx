@@ -163,7 +163,7 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
     imdb: {
       name: 'IMDb',
       icon: { uri: IMDb_LOGO },
-      isImage: false,
+      isImage: true,
       color: '#F5C518',
       transform: (value: number) => value.toFixed(1)
     },
