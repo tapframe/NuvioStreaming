@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +42,7 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 fun ContentCard(
     item: MetaPreview,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit = {}
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -62,6 +65,10 @@ fun ContentCard(
             onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
+                .then(
+                    if (focusRequester != null) Modifier.focusRequester(focusRequester)
+                    else Modifier
+                )
                 .onFocusChanged { isFocused = it.isFocused },
             shape = CardDefaults.shape(
                 shape = RoundedCornerShape(8.dp)

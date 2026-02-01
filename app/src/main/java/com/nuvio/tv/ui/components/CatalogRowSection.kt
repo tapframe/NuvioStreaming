@@ -16,8 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -33,7 +37,9 @@ fun CatalogRowSection(
     onItemClick: (String, String, String) -> Unit,
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
-    initialScrollIndex: Int = 0
+    initialScrollIndex: Int = 0,
+    focusedItemIndex: Int = -1,
+    onItemFocused: (itemIndex: Int) -> Unit = {}
 ) {
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = initialScrollIndex
@@ -43,6 +49,22 @@ fun CatalogRowSection(
     LaunchedEffect(initialScrollIndex) {
         if (initialScrollIndex > 0) {
             listState.scrollToItem(initialScrollIndex)
+        }
+    }
+
+    // Track which item has focus
+    var currentFocusedIndex by remember { mutableStateOf(-1) }
+    val itemFocusRequester = remember { FocusRequester() }
+
+    // Restore focus to specific item if requested
+    LaunchedEffect(focusedItemIndex) {
+        if (focusedItemIndex >= 0 && focusedItemIndex < catalogRow.items.size) {
+            kotlinx.coroutines.delay(100)  // Wait for composition
+            try {
+                itemFocusRequester.requestFocus()
+            } catch (e: IllegalStateException) {
+                // Item not yet composed, ignore
+            }
         }
     }
 
@@ -95,7 +117,13 @@ fun CatalogRowSection(
                 ContentCard(
                     item = item,
                     onClick = { onItemClick(item.id, item.type.toApiString(), catalogRow.addonBaseUrl) },
-                    modifier = Modifier
+                    modifier = Modifier.onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            currentFocusedIndex = index
+                            onItemFocused(index)
+                        }
+                    },
+                    focusRequester = if (index == focusedItemIndex) itemFocusRequester else null
                 )
             }
 
