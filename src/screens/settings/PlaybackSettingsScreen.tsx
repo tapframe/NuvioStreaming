@@ -82,6 +82,15 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
     const [apiKeyInput, setApiKeyInput] = useState(settings?.introDbApiKey || '');
     const [isVerifyingKey, setIsVerifyingKey] = useState(false);
 
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => {
+            isMounted.current = false;
+        };
+    }, []);
+
     useEffect(() => {
         setApiKeyInput(settings?.introDbApiKey || '');
     }, [settings?.introDbApiKey]);
@@ -95,6 +104,8 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
 
         setIsVerifyingKey(true);
         const isValid = await introService.verifyApiKey(apiKeyInput);
+        
+        if (!isMounted.current) return;
         setIsVerifyingKey(false);
 
         if (isValid) {

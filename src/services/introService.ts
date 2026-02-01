@@ -209,6 +209,11 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
         // 200/201 would also mean valid (though unexpected with empty body)
         if (response.status === 200 || response.status === 201) return true;
 
+        // Explicitly handle auth failures
+        if (response.status === 401 || response.status === 403) return false;
+
+        // Log warning for unexpected states (500, 429, etc.) but fail safe
+        logger.warn(`[IntroService] Verification received unexpected status: ${response.status}`);
         return false;
     } catch (error: any) {
         logger.log('[IntroService] API Key verification failed:', error.message);
