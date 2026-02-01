@@ -32,9 +32,19 @@ fun CatalogRowSection(
     catalogRow: CatalogRow,
     onItemClick: (String, String, String) -> Unit,
     onLoadMore: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialScrollIndex: Int = 0
 ) {
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialScrollIndex
+    )
+
+    // Restore scroll position if needed
+    LaunchedEffect(initialScrollIndex) {
+        if (initialScrollIndex > 0) {
+            listState.scrollToItem(initialScrollIndex)
+        }
+    }
 
     val shouldLoadMore by remember {
         derivedStateOf {

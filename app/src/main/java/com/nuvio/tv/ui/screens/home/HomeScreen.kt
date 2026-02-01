@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -29,8 +31,35 @@ fun HomeScreen(
     onNavigateToDetail: (String, String, String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val focusState by viewModel.focusState.collectAsState()
 
-    val columnListState = rememberLazyListState()
+    val columnListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = focusState.verticalScrollIndex,
+        initialFirstVisibleItemScrollOffset = focusState.verticalScrollOffset
+    )
+
+    // Restore scroll position when state is available
+    LaunchedEffect(focusState.verticalScrollIndex, focusState.verticalScrollOffset) {
+        if (focusState.verticalScrollIndex > 0 || focusState.verticalScrollOffset > 0) {
+            columnListState.scrollToItem(
+                focusState.verticalScrollIndex,
+                focusState.verticalScrollOffset
+            )
+        }
+    }
+
+    // Save scroll position when leaving screen
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.saveFocusState(
+                verticalScrollIndex = columnListState.firstVisibleItemIndex,
+                verticalScrollOffset = columnListState.firstVisibleItemScrollOffset,
+                focusedRowIndex = 0, // Basic implementation
+                focusedItemIndex = 0, // Basic implementation
+                catalogRowScrollStates = emptyMap() // Will be enhanced with horizontal scroll tracking
+            )
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -79,6 +108,7 @@ fun HomeScreen(
                         items = uiState.catalogRows,
                         key = { _, item -> "${item.addonId}_${item.type}_${item.catalogId}" }
                     ) { index, catalogRow ->
+                        val catalogKey = "${catalogRow.addonId}_${catalogRow.type.toApiString()}_${catalogRow.catalogId}"
                         CatalogRowSection(
                             catalogRow = catalogRow,
                             onItemClick = { id, type, addonBaseUrl ->
@@ -92,7 +122,8 @@ fun HomeScreen(
                                         type = catalogRow.type.toApiString()
                                     )
                                 )
-                            }
+                            },
+                            initialScrollIndex = focusState.catalogRowScrollStates[catalogKey] ?: 0
                         )
                     }
                 }

@@ -31,6 +31,9 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+    private val _focusState = MutableStateFlow(HomeScreenFocusState())
+    val focusState: StateFlow<HomeScreenFocusState> = _focusState.asStateFlow()
+
     private val catalogsMap = linkedMapOf<String, CatalogRow>()
     private val catalogOrder = mutableListOf<String>()
 
@@ -189,5 +192,31 @@ class HomeViewModel @Inject constructor(
 
     private fun CatalogDescriptor.isSearchOnlyCatalog(): Boolean {
         return extra.any { extra -> extra.name == "search" && extra.isRequired }
+    }
+
+    /**
+     * Saves the current focus and scroll state for restoration when returning to this screen.
+     */
+    fun saveFocusState(
+        verticalScrollIndex: Int,
+        verticalScrollOffset: Int,
+        focusedRowIndex: Int,
+        focusedItemIndex: Int,
+        catalogRowScrollStates: Map<String, Int>
+    ) {
+        _focusState.value = HomeScreenFocusState(
+            verticalScrollIndex = verticalScrollIndex,
+            verticalScrollOffset = verticalScrollOffset,
+            focusedRowIndex = focusedRowIndex,
+            focusedItemIndex = focusedItemIndex,
+            catalogRowScrollStates = catalogRowScrollStates
+        )
+    }
+
+    /**
+     * Clears the saved focus state.
+     */
+    fun clearFocusState() {
+        _focusState.value = HomeScreenFocusState()
     }
 }
