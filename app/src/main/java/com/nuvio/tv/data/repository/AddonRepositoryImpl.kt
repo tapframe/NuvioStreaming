@@ -7,8 +7,11 @@ import com.nuvio.tv.data.mapper.toDomain
 import com.nuvio.tv.data.remote.api.AddonApi
 import com.nuvio.tv.domain.model.Addon
 import com.nuvio.tv.domain.repository.AddonRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import javax.inject.Inject
 
 class AddonRepositoryImpl @Inject constructor(
@@ -17,17 +20,16 @@ class AddonRepositoryImpl @Inject constructor(
 ) : AddonRepository {
 
     override fun getInstalledAddons(): Flow<List<Addon>> =
-        preferences.installedAddonUrls.map { urls ->
-            val addons = mutableListOf<Addon>()
-
-            for (url in urls) {
-                when (val result = fetchAddon(url)) {
-                    is NetworkResult.Success -> addons.add(result.data)
-                    else -> { /* Skip failed addons */ }
+        preferences.installedAddonUrls.flatMapLatest { urls ->
+            flow {
+                val addons = urls.mapNotNull { url ->
+                    when (val result = fetchAddon(url)) {
+                        is NetworkResult.Success -> result.data
+                        else -> null // Skip failed addons
+                    }
                 }
-            }
-
-            addons
+                emit(addons)
+            }.flowOn(Dispatchers.IO)
         }
 
     override suspend fun fetchAddon(baseUrl: String): NetworkResult<Addon> {
