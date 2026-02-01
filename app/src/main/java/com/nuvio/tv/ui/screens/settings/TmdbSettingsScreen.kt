@@ -205,7 +205,8 @@ private fun ToggleCard(
                 enabled = enabled,
                 onCheckedChange = { onToggle(it) },
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = NuvioColors.Primary,
+                    checkedThumbColor = NuvioColors.Secondary,
+                    checkedTrackColor = NuvioColors.Secondary.copy(alpha = 0.3f),
                     uncheckedThumbColor = Color.Gray
                 )
             )

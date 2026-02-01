@@ -249,14 +249,14 @@ private fun PluginHeader(
                 Text(
                     text = if (pluginsEnabled) "Enabled" else "Disabled",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (pluginsEnabled) NuvioColors.Primary else NuvioColors.TextSecondary
+                    color = if (pluginsEnabled) NuvioColors.Secondary else NuvioColors.TextSecondary
                 )
                 Switch(
                     checked = pluginsEnabled,
                     onCheckedChange = onPluginsEnabledChange,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = NuvioColors.Primary,
-                        checkedTrackColor = NuvioColors.Primary.copy(alpha = 0.3f)
+                        checkedThumbColor = NuvioColors.Secondary,
+                        checkedTrackColor = NuvioColors.Secondary.copy(alpha = 0.3f)
                     )
                 )
             }
@@ -450,8 +450,8 @@ private fun ScraperCard(
                         checked = scraper.enabled,
                         onCheckedChange = onToggle,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = NuvioColors.Primary,
-                            checkedTrackColor = NuvioColors.Primary.copy(alpha = 0.3f)
+                            checkedThumbColor = NuvioColors.Secondary,
+                            checkedTrackColor = NuvioColors.Secondary.copy(alpha = 0.3f)
                         )
                     )
                 }
