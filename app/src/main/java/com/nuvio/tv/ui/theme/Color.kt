@@ -28,8 +28,8 @@ object NuvioColors {
     val TextDisabled = Color(0xFF4D4D4D)
 
     // Focus states - Critical for TV navigation
-    val FocusRing = Color(0xFFBDBDBD)
-    val FocusBackground = Color(0xFF2B2B2B)
+    val FocusRing = Color(0xFF00E5CC)        // Bright teal for high visibility
+    val FocusBackground = Color(0xFF1A3D38)  // Dark teal background
 
     // Status colors
     val Rating = Color(0xFFFFD700)
@@ -38,5 +38,5 @@ object NuvioColors {
 
     // Borders
     val Border = Color(0xFF333333)
-    val BorderFocused = Color(0xFFBDBDBD)
+    val BorderFocused = Color(0xFF00E5CC)    // Bright teal for high visibility
 }
