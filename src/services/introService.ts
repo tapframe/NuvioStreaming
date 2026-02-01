@@ -188,6 +188,35 @@ async function fetchFromIntroDb(imdbId: string, season: number, episode: number)
 }
 
 /**
+ * Verifies an IntroDB API key
+ */
+export async function verifyApiKey(apiKey: string): Promise<boolean> {
+    try {
+        if (!apiKey) return false;
+
+        const response = await axios.post(`${INTRODB_API_URL}/submit`, {}, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 5000,
+            validateStatus: (status) => true // Handle status codes manually
+        });
+
+        // 400 means Auth passed but payload was empty/invalid -> Key is Valid
+        if (response.status === 400) return true;
+        
+        // 200/201 would also mean valid (though unexpected with empty body)
+        if (response.status === 200 || response.status === 201) return true;
+
+        return false;
+    } catch (error: any) {
+        logger.log('[IntroService] API Key verification failed:', error.message);
+        return false;
+    }
+}
+
+/**
  * Submits an intro timestamp to IntroDB
  */
 export async function submitIntro(
@@ -305,7 +334,8 @@ export async function getIntroTimestamps(
 export const introService = {
     getIntroTimestamps,
     getSkipTimes,
-    submitIntro
+    submitIntro,
+    verifyApiKey
 };
 
 export default introService;

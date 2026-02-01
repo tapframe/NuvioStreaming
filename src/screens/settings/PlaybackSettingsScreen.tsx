@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions, TextInput } from 'react-native';
+import { View, StyleSheet, ScrollView, StatusBar, Platform, Text, TouchableOpacity, Dimensions, TextInput, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop } from '@g
 import { useTranslation } from 'react-i18next';
 import { SvgXml } from 'react-native-svg';
 import { toastService } from '../../services/toastService';
+import { introService } from '../../services/introService';
 
 const { width } = Dimensions.get('window');
 
@@ -79,14 +80,29 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
 
     const [introDbLogoXml, setIntroDbLogoXml] = useState<string | null>(null);
     const [apiKeyInput, setApiKeyInput] = useState(settings?.introDbApiKey || '');
+    const [isVerifyingKey, setIsVerifyingKey] = useState(false);
 
     useEffect(() => {
         setApiKeyInput(settings?.introDbApiKey || '');
     }, [settings?.introDbApiKey]);
 
-    const handleApiKeySubmit = () => {
-        updateSetting('introDbApiKey', apiKeyInput);
-        toastService.success(t('settings.items.api_key_saved', { defaultValue: 'API Key Saved' }));
+    const handleApiKeySubmit = async () => {
+        if (!apiKeyInput.trim()) {
+            updateSetting('introDbApiKey', '');
+            toastService.success(t('settings.items.api_key_cleared', { defaultValue: 'API Key Cleared' }));
+            return;
+        }
+
+        setIsVerifyingKey(true);
+        const isValid = await introService.verifyApiKey(apiKeyInput);
+        setIsVerifyingKey(false);
+
+        if (isValid) {
+            updateSetting('introDbApiKey', apiKeyInput);
+            toastService.success(t('settings.items.api_key_saved', { defaultValue: 'API Key Saved' }));
+        } else {
+            toastService.error(t('settings.items.api_key_invalid', { defaultValue: 'Invalid API Key' }));
+        }
     };
 
     useEffect(() => {
@@ -271,8 +287,13 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                             <TouchableOpacity
                                 style={styles.confirmButton}
                                 onPress={handleApiKeySubmit}
+                                disabled={isVerifyingKey}
                             >
-                                <MaterialIcons name="check" size={24} color="black" />
+                                {isVerifyingKey ? (
+                                    <ActivityIndicator size="small" color="black" />
+                                ) : (
+                                    <MaterialIcons name="check" size={24} color="black" />
+                                )}
                             </TouchableOpacity>
                         </View>
                     </View>

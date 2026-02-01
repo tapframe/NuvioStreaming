@@ -9,6 +9,6 @@ export const LOCALES = [
     { code: 'es', key: 'spanish' },
     { code: 'hr', key: 'croatian' },
     { code: 'zh-CN', key: 'chinese' },
-    { code: 'hi', key: 'hindi' }
+    { code: 'hi', key: 'hindi' },
     { code: 'sr', key: 'serbian' } 
 ];
