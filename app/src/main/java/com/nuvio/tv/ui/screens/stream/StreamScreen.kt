@@ -409,12 +409,12 @@ private fun AddonChip(
         },
         colors = FilterChipDefaults.colors(
             containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.Primary,
-            selectedContainerColor = NuvioColors.Primary.copy(alpha = 0.3f),
-            focusedSelectedContainerColor = NuvioColors.Primary,
+            focusedContainerColor = NuvioColors.Secondary,
+            selectedContainerColor = NuvioColors.Secondary.copy(alpha = 0.3f),
+            focusedSelectedContainerColor = NuvioColors.Secondary,
             contentColor = NuvioColors.TextSecondary,
             focusedContentColor = NuvioColors.OnPrimary,
-            selectedContentColor = NuvioColors.Primary,
+            selectedContentColor = NuvioColors.Secondary,
             focusedSelectedContentColor = NuvioColors.OnPrimary
         ),
         border = FilterChipDefaults.border(
