@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -25,20 +26,20 @@ class PluginViewModel @Inject constructor(
     
     private fun observePluginData() {
         viewModelScope.launch {
-            pluginManager.pluginsEnabled.collect { enabled ->
-                _uiState.update { it.copy(pluginsEnabled = enabled) }
-            }
-        }
-        
-        viewModelScope.launch {
-            pluginManager.repositories.collect { repos ->
-                _uiState.update { it.copy(repositories = repos) }
-            }
-        }
-        
-        viewModelScope.launch {
-            pluginManager.scrapers.collect { scraperList ->
-                _uiState.update { it.copy(scrapers = scraperList) }
+            combine(
+                pluginManager.pluginsEnabled,
+                pluginManager.repositories,
+                pluginManager.scrapers
+            ) { enabled, repos, scrapers ->
+                Triple(enabled, repos, scrapers)
+            }.collect { (enabled, repos, scrapers) ->
+                _uiState.update {
+                    it.copy(
+                        pluginsEnabled = enabled,
+                        repositories = repos,
+                        scrapers = scrapers
+                    )
+                }
             }
         }
     }
