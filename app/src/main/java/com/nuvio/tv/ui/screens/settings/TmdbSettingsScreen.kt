@@ -182,7 +182,8 @@ private fun ToggleCard(
                 shape = RoundedCornerShape(12.dp)
             )
         ),
-        shape = CardDefaults.shape(RoundedCornerShape(12.dp))
+        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
+        scale = CardDefaults.scale(focusedScale = 1.0f)
     ) {
         Row(
             modifier = Modifier

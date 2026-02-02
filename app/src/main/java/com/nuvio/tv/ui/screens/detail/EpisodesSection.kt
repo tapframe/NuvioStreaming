@@ -169,7 +169,7 @@ private fun EpisodeCard(
             )
         ),
         scale = CardDefaults.scale(
-            focusedScale = 1.05f
+            focusedScale = 1.02f
         )
     ) {
         Column {

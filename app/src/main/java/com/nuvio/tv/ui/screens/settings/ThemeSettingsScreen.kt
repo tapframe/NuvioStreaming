@@ -123,7 +123,7 @@ private fun ThemeCard(
             )
         ),
         shape = CardDefaults.shape(RoundedCornerShape(16.dp)),
-        scale = CardDefaults.scale(focusedScale = 1.05f)
+        scale = CardDefaults.scale(focusedScale = 1.02f)
     ) {
         Column(
             modifier = Modifier
