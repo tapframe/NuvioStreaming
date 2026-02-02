@@ -49,7 +49,9 @@ import com.nuvio.tv.data.local.ThemeDataStore
 import com.nuvio.tv.domain.model.AppTheme
 import com.nuvio.tv.ui.navigation.NuvioNavHost
 import com.nuvio.tv.ui.navigation.Screen
+import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.theme.NuvioTheme
+import androidx.tv.material3.NavigationDrawerItemDefaults
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -161,6 +163,14 @@ class MainActivity : ComponentActivity() {
                                                 }
                                                 drawerState.setValue(DrawerValue.Closed)
                                             },
+                                            colors = NavigationDrawerItemDefaults.colors(
+                                                selectedContainerColor = NuvioColors.FocusBackground,
+                                                focusedContainerColor = NuvioColors.FocusBackground,
+                                                pressedContainerColor = NuvioColors.FocusBackground,
+                                                selectedContentColor = NuvioColors.FocusRing,
+                                                focusedContentColor = NuvioColors.FocusRing,
+                                                pressedContentColor = NuvioColors.FocusRing
+                                            ),
                                             leadingContent = {
                                                 Icon(imageVector = icon, contentDescription = null)
                                             }
