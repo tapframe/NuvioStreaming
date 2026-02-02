@@ -150,7 +150,7 @@ private fun SettingsItem(
             )
         ),
         shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        scale = CardDefaults.scale(focusedScale = 1.0f)
+        scale = CardDefaults.scale(focusedScale = 1.02f)
     ) {
         Row(
             modifier = Modifier
