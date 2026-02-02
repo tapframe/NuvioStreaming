@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.items
+import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -265,8 +267,16 @@ private fun PluginHeader(
             Button(
                 onClick = onAddRepository,
                 colors = ButtonDefaults.colors(
-                    containerColor = NuvioColors.Primary,
-                    contentColor = Color.White
+                    containerColor = NuvioColors.Secondary,
+                    focusedContainerColor = NuvioColors.SecondaryVariant,
+                    contentColor = Color.White,
+                    focusedContentColor = Color.White
+                ),
+                border = ButtonDefaults.border(
+                    focusedBorder = Border(
+                        border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                        shape = RoundedCornerShape(50)
+                    )
                 )
             ) {
                 Icon(
@@ -296,8 +306,14 @@ private fun RepositoryCard(
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused },
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = if (isFocused) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
+            containerColor = NuvioColors.BackgroundCard,
             focusedContainerColor = NuvioColors.FocusBackground
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                shape = RoundedCornerShape(12.dp)
+            )
         ),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(12.dp))
     ) {

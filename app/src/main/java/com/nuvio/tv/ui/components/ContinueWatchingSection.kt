@@ -101,7 +101,7 @@ private fun ContinueWatchingCard(
         ),
         colors = CardDefaults.colors(
             containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.BackgroundCard
+            focusedContainerColor = NuvioColors.FocusBackground
         ),
         border = CardDefaults.border(
             focusedBorder = Border(

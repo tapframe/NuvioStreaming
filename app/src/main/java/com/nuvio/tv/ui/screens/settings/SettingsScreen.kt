@@ -2,6 +2,7 @@
 
 package com.nuvio.tv.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
@@ -32,6 +34,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.tv.foundation.lazy.list.TvLazyColumn
+import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -43,7 +46,8 @@ import com.nuvio.tv.ui.theme.NuvioColors
 @Composable
 fun SettingsScreen(
     onNavigateToPlugins: () -> Unit = {},
-    onNavigateToTmdb: () -> Unit = {}
+    onNavigateToTmdb: () -> Unit = {},
+    onNavigateToTheme: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -75,6 +79,15 @@ fun SettingsScreen(
         ) {
             item {
                 SettingsItem(
+                    icon = Icons.Default.Palette,
+                    title = "Appearance",
+                    subtitle = "Choose your color theme",
+                    onClick = onNavigateToTheme
+                )
+            }
+
+            item {
+                SettingsItem(
                     icon = Icons.Default.Build,
                     title = "Plugins",
                     subtitle = "Manage local scrapers and providers",
@@ -90,7 +103,7 @@ fun SettingsScreen(
                     onClick = onNavigateToTmdb
                 )
             }
-            
+
             item {
                 SettingsItem(
                     icon = Icons.Default.Settings,
@@ -127,7 +140,14 @@ private fun SettingsItem(
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused },
         colors = CardDefaults.colors(
-            containerColor = if (isFocused) NuvioColors.FocusBackground else NuvioColors.BackgroundCard
+            containerColor = NuvioColors.BackgroundCard,
+            focusedContainerColor = NuvioColors.FocusBackground
+        ),
+        border = CardDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                shape = RoundedCornerShape(12.dp)
+            )
         ),
         shape = CardDefaults.shape(RoundedCornerShape(12.dp))
     ) {

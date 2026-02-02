@@ -83,7 +83,7 @@ fun SeasonTabs(
                 ),
                 colors = CardDefaults.colors(
                     containerColor = if (isSelected) NuvioColors.SurfaceVariant else NuvioColors.BackgroundCard,
-                    focusedContainerColor = NuvioColors.Primary
+                    focusedContainerColor = NuvioColors.Secondary
                 ),
                 border = CardDefaults.border(
                     focusedBorder = Border(
@@ -160,7 +160,7 @@ private fun EpisodeCard(
         ),
         colors = CardDefaults.colors(
             containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.BackgroundCard
+            focusedContainerColor = NuvioColors.FocusBackground
         ),
         border = CardDefaults.border(
             focusedBorder = Border(
