@@ -9,7 +9,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ClosedCaption
@@ -36,7 +39,6 @@ import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -91,9 +93,13 @@ fun PlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val containerFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
+    val episodesFocusRequester = remember { FocusRequester() }
+    val streamsFocusRequester = remember { FocusRequester() }
 
     BackHandler {
-        if (uiState.showControls) {
+        if (uiState.showEpisodesPanel) {
+            viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel)
+        } else if (uiState.showControls) {
             // If controls are visible, hide them instead of going back
             viewModel.hideControls()
         } else {
@@ -123,7 +129,9 @@ fun PlayerScreen(
 
     // Request focus for key events when controls are hidden
     LaunchedEffect(uiState.showControls) {
-        if (uiState.showControls) {
+        if (uiState.showControls && !uiState.showEpisodesPanel &&
+            !uiState.showAudioDialog && !uiState.showSubtitleDialog && !uiState.showSpeedDialog
+        ) {
             // When controls are shown, focus the play/pause button
             try {
                 playPauseFocusRequester.requestFocus()
@@ -253,10 +261,35 @@ fun PlayerScreen(
                 onSeekForward = { viewModel.onEvent(PlayerEvent.OnSeekForward) },
                 onSeekBackward = { viewModel.onEvent(PlayerEvent.OnSeekBackward) },
                 onSeekTo = { viewModel.onEvent(PlayerEvent.OnSeekTo(it)) },
+                onShowEpisodesPanel = { viewModel.onEvent(PlayerEvent.OnShowEpisodesPanel) },
                 onShowAudioDialog = { viewModel.onEvent(PlayerEvent.OnShowAudioDialog) },
                 onShowSubtitleDialog = { viewModel.onEvent(PlayerEvent.OnShowSubtitleDialog) },
                 onShowSpeedDialog = { viewModel.onEvent(PlayerEvent.OnShowSpeedDialog) },
                 onBack = onBackPress
+            )
+        }
+
+        // Episodes/streams side panel (slides in from right)
+        AnimatedVisibility(
+            visible = uiState.showEpisodesPanel && uiState.error == null,
+            enter = fadeIn(animationSpec = tween(120)) + slideInHorizontally(
+                animationSpec = tween(220),
+                initialOffsetX = { it }
+            ),
+            exit = fadeOut(animationSpec = tween(120)) + slideOutHorizontally(
+                animationSpec = tween(220),
+                targetOffsetX = { it }
+            )
+        ) {
+            EpisodesSidePanel(
+                uiState = uiState,
+                episodesFocusRequester = episodesFocusRequester,
+                streamsFocusRequester = streamsFocusRequester,
+                onClose = { viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel) },
+                onBackToEpisodes = { viewModel.onEvent(PlayerEvent.OnBackFromEpisodeStreams) },
+                onAddonFilterSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeAddonFilterSelected(it)) },
+                onEpisodeSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeSelected(it)) },
+                onStreamSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeStreamSelected(it)) }
             )
         }
 
@@ -301,6 +334,7 @@ private fun PlayerControlsOverlay(
     onSeekForward: () -> Unit,
     onSeekBackward: () -> Unit,
     onSeekTo: (Long) -> Unit,
+    onShowEpisodesPanel: () -> Unit,
     onShowAudioDialog: () -> Unit,
     onShowSubtitleDialog: () -> Unit,
     onShowSpeedDialog: () -> Unit,
@@ -434,6 +468,15 @@ private fun PlayerControlsOverlay(
                         onClick = onShowSpeedDialog
                     )
 
+                    // Episodes (only show when playing a specific episode)
+                    if (uiState.currentSeason != null && uiState.currentEpisode != null) {
+                        ControlButton(
+                            icon = Icons.AutoMirrored.Filled.List,
+                            contentDescription = "Episodes",
+                            onClick = onShowEpisodesPanel
+                        )
+                    }
+
                     if (uiState.audioTracks.isNotEmpty()) {
                         ControlButton(
                             icon = Icons.AutoMirrored.Filled.VolumeUp,
@@ -454,6 +497,8 @@ private fun PlayerControlsOverlay(
         }
     }
 }
+
+
 
 @Composable
 private fun PlayPauseButton(
@@ -828,7 +873,7 @@ private fun SpeedItem(
 }
 
 @Composable
-private fun DialogButton(
+internal fun DialogButton(
     text: String,
     onClick: () -> Unit,
     isPrimary: Boolean

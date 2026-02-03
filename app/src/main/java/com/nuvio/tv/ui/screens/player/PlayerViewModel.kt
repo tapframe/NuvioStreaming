@@ -15,9 +15,15 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.common.MimeTypes
+import com.nuvio.tv.core.network.NetworkResult
+import com.nuvio.tv.domain.model.Stream
+import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
+import com.nuvio.tv.domain.repository.MetaRepository
+import com.nuvio.tv.domain.repository.StreamRepository
 import com.nuvio.tv.domain.repository.WatchProgressRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,6 +33,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -37,10 +44,12 @@ import javax.inject.Inject
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val watchProgressRepository: WatchProgressRepository,
+    private val metaRepository: MetaRepository,
+    private val streamRepository: StreamRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private val streamUrl: String = savedStateHandle.get<String>("streamUrl")?.let {
+    private val initialStreamUrl: String = savedStateHandle.get<String>("streamUrl")?.let {
         URLDecoder.decode(it, "UTF-8")
     } ?: ""
     private val title: String = savedStateHandle.get<String>("title")?.let {
@@ -72,13 +81,27 @@ class PlayerViewModel @Inject constructor(
     private val videoId: String? = savedStateHandle.get<String>("videoId")?.let {
         if (it.isNotEmpty()) URLDecoder.decode(it, "UTF-8") else null
     }
-    private val season: Int? = savedStateHandle.get<String>("season")?.toIntOrNull()
-    private val episode: Int? = savedStateHandle.get<String>("episode")?.toIntOrNull()
-    private val episodeTitle: String? = savedStateHandle.get<String>("episodeTitle")?.let {
+    private val initialSeason: Int? = savedStateHandle.get<String>("season")?.toIntOrNull()
+    private val initialEpisode: Int? = savedStateHandle.get<String>("episode")?.toIntOrNull()
+    private val initialEpisodeTitle: String? = savedStateHandle.get<String>("episodeTitle")?.let {
         if (it.isNotEmpty()) URLDecoder.decode(it, "UTF-8") else null
     }
 
-    private val _uiState = MutableStateFlow(PlayerUiState(title = title))
+    private var currentStreamUrl: String = initialStreamUrl
+    private var currentHeaders: Map<String, String> = parseHeaders(headersJson)
+    private var currentVideoId: String? = videoId
+    private var currentSeason: Int? = initialSeason
+    private var currentEpisode: Int? = initialEpisode
+    private var currentEpisodeTitle: String? = initialEpisodeTitle
+
+    private val _uiState = MutableStateFlow(
+        PlayerUiState(
+            title = title,
+            currentSeason = currentSeason,
+            currentEpisode = currentEpisode,
+            currentEpisodeTitle = currentEpisodeTitle
+        )
+    )
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
     private var _exoPlayer: ExoPlayer? = null
@@ -94,18 +117,18 @@ class PlayerViewModel @Inject constructor(
     private val saveThresholdMs = 5000L // Save every 5 seconds of playback change
 
     init {
-        initializePlayer()
-        loadSavedProgress()
+        initializePlayer(currentStreamUrl, currentHeaders)
+        loadSavedProgressFor(currentSeason, currentEpisode)
     }
 
-    private fun loadSavedProgress() {
+    private fun loadSavedProgressFor(season: Int?, episode: Int?) {
         if (contentId == null) return
         
         viewModelScope.launch {
             val progress = if (season != null && episode != null) {
-                watchProgressRepository.getEpisodeProgress(contentId, season, episode).first()
+                watchProgressRepository.getEpisodeProgress(contentId, season, episode).firstOrNull()
             } else {
-                watchProgressRepository.getProgress(contentId).first()
+                watchProgressRepository.getProgress(contentId).firstOrNull()
             }
             
             progress?.let { saved ->
@@ -125,8 +148,8 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun initializePlayer() {
-        if (streamUrl.isEmpty()) {
+    private fun initializePlayer(url: String, headers: Map<String, String>) {
+        if (url.isEmpty()) {
             _uiState.update { it.copy(error = "No stream URL provided") }
             return
         }
@@ -138,51 +161,7 @@ class PlayerViewModel @Inject constructor(
             _exoPlayer = ExoPlayer.Builder(context)
                 .setRenderersFactory(renderersFactory)
                 .build().apply {
-                // Create data source factory with optional headers
-                val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
-                    setDefaultRequestProperties(parseHeaders())
-                    setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                }
-
-                // Detect stream type from URL
-                val isHls = streamUrl.contains(".m3u8", ignoreCase = true) ||
-                        streamUrl.contains("/playlist", ignoreCase = true) ||
-                        streamUrl.contains("/hls", ignoreCase = true) ||
-                        streamUrl.contains("m3u8", ignoreCase = true)
-                
-                val isDash = streamUrl.contains(".mpd", ignoreCase = true) ||
-                        streamUrl.contains("/dash", ignoreCase = true)
-
-                // Create media item with MIME type hint for better detection
-                val mediaItemBuilder = MediaItem.Builder()
-                    .setUri(streamUrl)
-                
-                when {
-                    isHls -> mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
-                    isDash -> mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MPD)
-                }
-                
-                val mediaItem = mediaItemBuilder.build()
-
-                // Create media source based on detected type
-                val mediaSource = when {
-                    isHls -> {
-                        HlsMediaSource.Factory(dataSourceFactory)
-                            .setAllowChunklessPreparation(true)
-                            .createMediaSource(mediaItem)
-                    }
-                    isDash -> {
-                        DashMediaSource.Factory(dataSourceFactory)
-                            .createMediaSource(mediaItem)
-                    }
-                    else -> {
-                        // Use default factory which will try to auto-detect
-                        DefaultMediaSourceFactory(dataSourceFactory)
-                            .createMediaSource(mediaItem)
-                    }
-                }
-
-                setMediaSource(mediaSource)
+                setMediaSource(createMediaSource(url, headers))
 
                 playWhenReady = true
                 prepare()
@@ -241,12 +220,45 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun parseHeaders(): Map<String, String> {
-        if (headersJson.isNullOrEmpty()) return emptyMap()
+    private fun createMediaSource(url: String, headers: Map<String, String>): MediaSource {
+        val dataSourceFactory = DefaultHttpDataSource.Factory().apply {
+            setDefaultRequestProperties(headers)
+            setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        }
+
+        val isHls = url.contains(".m3u8", ignoreCase = true) ||
+            url.contains("/playlist", ignoreCase = true) ||
+            url.contains("/hls", ignoreCase = true) ||
+            url.contains("m3u8", ignoreCase = true)
+
+        val isDash = url.contains(".mpd", ignoreCase = true) ||
+            url.contains("/dash", ignoreCase = true)
+
+        val mediaItemBuilder = MediaItem.Builder().setUri(url)
+        when {
+            isHls -> mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
+            isDash -> mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_MPD)
+        }
+
+        val mediaItem = mediaItemBuilder.build()
+
+        return when {
+            isHls -> HlsMediaSource.Factory(dataSourceFactory)
+                .setAllowChunklessPreparation(true)
+                .createMediaSource(mediaItem)
+            isDash -> DashMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(mediaItem)
+            else -> DefaultMediaSourceFactory(dataSourceFactory)
+                .createMediaSource(mediaItem)
+        }
+    }
+
+    private fun parseHeaders(headers: String?): Map<String, String> {
+        if (headers.isNullOrEmpty()) return emptyMap()
         
         return try {
             // Simple parsing for key=value&key2=value2 format
-            headersJson.split("&").associate { pair ->
+            headers.split("&").associate { pair ->
                 val parts = pair.split("=", limit = 2)
                 if (parts.size == 2) {
                     URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
@@ -257,6 +269,203 @@ class PlayerViewModel @Inject constructor(
         } catch (e: Exception) {
             emptyMap()
         }
+    }
+
+    private fun showEpisodesPanel() {
+        _uiState.update {
+            it.copy(
+                showEpisodesPanel = true,
+                showControls = true,
+                showAudioDialog = false,
+                showSubtitleDialog = false,
+                showSpeedDialog = false
+            )
+        }
+        loadEpisodesIfNeeded()
+    }
+
+    private fun dismissEpisodesPanel() {
+        _uiState.update {
+            it.copy(
+                showEpisodesPanel = false,
+                showEpisodeStreams = false,
+                isLoadingEpisodeStreams = false,
+                episodeStreamsError = null,
+                episodeAllStreams = emptyList(),
+                episodeSelectedAddonFilter = null,
+                episodeFilteredStreams = emptyList(),
+                episodeAvailableAddons = emptyList(),
+                episodeStreamsForVideoId = null,
+                episodeStreamsSeason = null,
+                episodeStreamsEpisode = null,
+                episodeStreamsTitle = null
+            )
+        }
+        scheduleHideControls()
+    }
+
+    private fun loadEpisodesIfNeeded() {
+        val type = contentType
+        val id = contentId
+        if (type.isNullOrBlank() || id.isNullOrBlank()) return
+        if (type !in listOf("series", "tv")) return
+        if (_uiState.value.episodes.isNotEmpty() || _uiState.value.isLoadingEpisodes) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingEpisodes = true, episodesError = null) }
+
+            when (
+                val result = metaRepository.getMetaFromAllAddons(type = type, id = id)
+                    .first { it !is NetworkResult.Loading }
+            ) {
+                is NetworkResult.Success -> {
+                    val seasonNumber = currentSeason ?: initialSeason ?: 1
+                    val episodes = result.data.videos
+                        .filter { (it.season ?: -1) == seasonNumber }
+                        .sortedWith(compareBy<Video> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
+
+                    _uiState.update {
+                        it.copy(
+                            isLoadingEpisodes = false,
+                            episodes = episodes,
+                            episodesError = null
+                        )
+                    }
+                }
+
+                is NetworkResult.Error -> {
+                    _uiState.update { it.copy(isLoadingEpisodes = false, episodesError = result.message) }
+                }
+
+                NetworkResult.Loading -> {
+                    // filtered above
+                }
+            }
+        }
+    }
+
+    private fun loadStreamsForEpisode(video: Video) {
+        val type = contentType
+        if (type.isNullOrBlank()) {
+            _uiState.update { it.copy(episodeStreamsError = "Missing content type") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    showEpisodeStreams = true,
+                    isLoadingEpisodeStreams = true,
+                    episodeStreamsError = null,
+                    episodeAllStreams = emptyList(),
+                    episodeSelectedAddonFilter = null,
+                    episodeFilteredStreams = emptyList(),
+                    episodeAvailableAddons = emptyList(),
+                    episodeStreamsForVideoId = video.id,
+                    episodeStreamsSeason = video.season,
+                    episodeStreamsEpisode = video.episode,
+                    episodeStreamsTitle = video.title
+                )
+            }
+
+            streamRepository.getStreamsFromAllAddons(
+                type = type,
+                videoId = video.id,
+                season = video.season,
+                episode = video.episode
+            ).collect { result ->
+                when (result) {
+                    is NetworkResult.Success -> {
+                        val addonStreams = result.data
+                        val allStreams = addonStreams.flatMap { it.streams }
+                        val availableAddons = addonStreams.map { it.addonName }
+                        val filteredStreams = allStreams
+                        _uiState.update {
+                            it.copy(
+                                isLoadingEpisodeStreams = false,
+                                episodeAllStreams = allStreams,
+                                episodeSelectedAddonFilter = null,
+                                episodeFilteredStreams = filteredStreams,
+                                episodeAvailableAddons = availableAddons,
+                                episodeStreamsError = null
+                            )
+                        }
+                    }
+
+                    is NetworkResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoadingEpisodeStreams = false,
+                                episodeStreamsError = result.message
+                            )
+                        }
+                    }
+
+                    NetworkResult.Loading -> {
+                        _uiState.update { it.copy(isLoadingEpisodeStreams = true) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun switchToEpisodeStream(stream: Stream) {
+        val url = stream.getStreamUrl()
+        if (url.isNullOrBlank()) {
+            _uiState.update { it.copy(episodeStreamsError = "Invalid stream URL") }
+            return
+        }
+
+        saveWatchProgress()
+
+        val newHeaders = stream.behaviorHints?.proxyHeaders?.request ?: emptyMap()
+        val targetVideo = _uiState.value.episodes.firstOrNull { it.id == _uiState.value.episodeStreamsForVideoId }
+
+        currentStreamUrl = url
+        currentHeaders = newHeaders
+        currentVideoId = targetVideo?.id ?: _uiState.value.episodeStreamsForVideoId ?: currentVideoId
+        currentSeason = targetVideo?.season ?: _uiState.value.episodeStreamsSeason ?: currentSeason
+        currentEpisode = targetVideo?.episode ?: _uiState.value.episodeStreamsEpisode ?: currentEpisode
+        currentEpisodeTitle = targetVideo?.title ?: _uiState.value.episodeStreamsTitle ?: currentEpisodeTitle
+
+        lastSavedPosition = 0L
+
+        _uiState.update {
+            it.copy(
+                isBuffering = true,
+                error = null,
+                currentSeason = currentSeason,
+                currentEpisode = currentEpisode,
+                currentEpisodeTitle = currentEpisodeTitle,
+                showEpisodesPanel = false,
+                showEpisodeStreams = false,
+                isLoadingEpisodeStreams = false,
+                episodeStreamsError = null,
+                episodeAllStreams = emptyList(),
+                episodeSelectedAddonFilter = null,
+                episodeFilteredStreams = emptyList(),
+                episodeAvailableAddons = emptyList(),
+                episodeStreamsForVideoId = null,
+                episodeStreamsSeason = null,
+                episodeStreamsEpisode = null,
+                episodeStreamsTitle = null
+            )
+        }
+
+        _exoPlayer?.let { player ->
+            try {
+                player.setMediaSource(createMediaSource(url, newHeaders))
+                player.prepare()
+                player.playWhenReady = true
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message ?: "Failed to play selected stream") }
+                return
+            }
+        } ?: run {
+            initializePlayer(url, newHeaders)
+        }
+
+        loadSavedProgressFor(currentSeason, currentEpisode)
     }
 
     private fun updateAvailableTracks(tracks: Tracks) {
@@ -383,10 +592,10 @@ class PlayerViewModel @Inject constructor(
             poster = poster,
             backdrop = backdrop,
             logo = logo,
-            videoId = videoId ?: contentId,
-            season = season,
-            episode = episode,
-            episodeTitle = episodeTitle,
+            videoId = currentVideoId ?: contentId,
+            season = currentSeason,
+            episode = currentEpisode,
+            episodeTitle = currentEpisodeTitle,
             position = position,
             duration = duration,
             lastWatched = System.currentTimeMillis()
@@ -402,7 +611,8 @@ class PlayerViewModel @Inject constructor(
         hideControlsJob = viewModelScope.launch {
             delay(3000)
             if (_uiState.value.isPlaying && !_uiState.value.showAudioDialog && 
-                !_uiState.value.showSubtitleDialog && !_uiState.value.showSpeedDialog) {
+                !_uiState.value.showSubtitleDialog && !_uiState.value.showSpeedDialog &&
+                !_uiState.value.showEpisodesPanel) {
                 _uiState.update { it.copy(showControls = false) }
             }
         }
@@ -480,6 +690,38 @@ class PlayerViewModel @Inject constructor(
             PlayerEvent.OnShowSpeedDialog -> {
                 _uiState.update { it.copy(showSpeedDialog = true, showControls = true) }
             }
+            PlayerEvent.OnShowEpisodesPanel -> {
+                showEpisodesPanel()
+            }
+            PlayerEvent.OnDismissEpisodesPanel -> {
+                dismissEpisodesPanel()
+            }
+            PlayerEvent.OnBackFromEpisodeStreams -> {
+                _uiState.update {
+                    it.copy(
+                        showEpisodeStreams = false,
+                        isLoadingEpisodeStreams = false,
+                        episodeStreamsError = null,
+                        episodeAllStreams = emptyList(),
+                        episodeSelectedAddonFilter = null,
+                        episodeFilteredStreams = emptyList(),
+                        episodeAvailableAddons = emptyList(),
+                        episodeStreamsForVideoId = null,
+                        episodeStreamsSeason = null,
+                        episodeStreamsEpisode = null,
+                        episodeStreamsTitle = null
+                    )
+                }
+            }
+            is PlayerEvent.OnEpisodeSelected -> {
+                loadStreamsForEpisode(event.video)
+            }
+            is PlayerEvent.OnEpisodeAddonFilterSelected -> {
+                filterEpisodeStreamsByAddon(event.addonName)
+            }
+            is PlayerEvent.OnEpisodeStreamSelected -> {
+                switchToEpisodeStream(event.stream)
+            }
             PlayerEvent.OnDismissDialog -> {
                 _uiState.update { 
                     it.copy(
@@ -493,8 +735,24 @@ class PlayerViewModel @Inject constructor(
             PlayerEvent.OnRetry -> {
                 _uiState.update { it.copy(error = null) }
                 releasePlayer()
-                initializePlayer()
+                initializePlayer(currentStreamUrl, currentHeaders)
             }
+        }
+    }
+
+    private fun filterEpisodeStreamsByAddon(addonName: String?) {
+        val allStreams = _uiState.value.episodeAllStreams
+        val filteredStreams = if (addonName == null) {
+            allStreams
+        } else {
+            allStreams.filter { it.addonName == addonName }
+        }
+
+        _uiState.update {
+            it.copy(
+                episodeSelectedAddonFilter = addonName,
+                episodeFilteredStreams = filteredStreams
+            )
         }
     }
 
