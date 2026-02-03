@@ -409,12 +409,12 @@ private fun AddonChip(
         },
         colors = FilterChipDefaults.colors(
             containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.Primary,
-            selectedContainerColor = NuvioColors.Primary.copy(alpha = 0.3f),
-            focusedSelectedContainerColor = NuvioColors.Primary,
+            focusedContainerColor = NuvioColors.Secondary,
+            selectedContainerColor = NuvioColors.Secondary.copy(alpha = 0.3f),
+            focusedSelectedContainerColor = NuvioColors.Secondary,
             contentColor = NuvioColors.TextSecondary,
             focusedContentColor = NuvioColors.OnPrimary,
-            selectedContentColor = NuvioColors.Primary,
+            selectedContentColor = NuvioColors.Secondary,
             focusedSelectedContentColor = NuvioColors.OnPrimary
         ),
         border = FilterChipDefaults.border(
@@ -497,7 +497,13 @@ private fun ErrorState(
             modifier = Modifier.onFocusChanged { isFocused = it.isFocused },
             colors = CardDefaults.colors(
                 containerColor = NuvioColors.BackgroundCard,
-                focusedContainerColor = NuvioColors.Primary
+                focusedContainerColor = NuvioColors.Secondary
+            ),
+            border = CardDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                    shape = RoundedCornerShape(8.dp)
+                )
             ),
             shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp))
         ) {
@@ -583,7 +589,7 @@ private fun StreamCard(
             )
         ),
         shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        scale = CardDefaults.scale(focusedScale = 1.02f)
+        scale = CardDefaults.scale(focusedScale = 1.05f)
     ) {
         Row(
             modifier = Modifier

@@ -111,7 +111,7 @@ private fun SidebarNavItem(
         label = "navItemBackground"
     )
     val borderColor by animateColorAsState(
-        targetValue = if (isFocused) NuvioColors.BorderFocused else Color.Transparent,
+        targetValue = if (isFocused) NuvioColors.FocusRing else Color.Transparent,
         label = "navItemBorder"
     )
 
@@ -121,7 +121,7 @@ private fun SidebarNavItem(
             .height(56.dp)
             .clip(shape)
             .background(backgroundColor)
-            .border(width = 1.dp, color = borderColor, shape = shape)
+            .border(width = 2.dp, color = borderColor, shape = shape)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { state ->
                 isFocused = state.isFocused

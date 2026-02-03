@@ -83,6 +83,7 @@ sealed class Screen(val route: String) {
     data object Library : Screen("library")
     data object Settings : Screen("settings")
     data object TmdbSettings : Screen("tmdb_settings")
+    data object ThemeSettings : Screen("theme_settings")
     data object AddonManager : Screen("addon_manager")
     data object Plugins : Screen("plugins")
 }

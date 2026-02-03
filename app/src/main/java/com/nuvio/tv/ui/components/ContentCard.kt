@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,7 +28,6 @@ import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Glow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
@@ -40,6 +41,7 @@ import com.nuvio.tv.ui.theme.NuvioTheme
 fun ContentCard(
     item: MetaPreview,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit = {}
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -62,6 +64,10 @@ fun ContentCard(
             onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
+                .then(
+                    if (focusRequester != null) Modifier.focusRequester(focusRequester)
+                    else Modifier
+                )
                 .onFocusChanged { isFocused = it.isFocused },
             shape = CardDefaults.shape(
                 shape = RoundedCornerShape(8.dp)
@@ -72,18 +78,12 @@ fun ContentCard(
             ),
             border = CardDefaults.border(
                 focusedBorder = Border(
-                    border = BorderStroke(3.dp, NuvioColors.FocusRing),
+                    border = BorderStroke(2.dp, NuvioColors.FocusRing),
                     shape = RoundedCornerShape(8.dp)
                 )
             ),
             scale = CardDefaults.scale(
-                focusedScale = 1.08f
-            ),
-            glow = CardDefaults.glow(
-                focusedGlow = Glow(
-                    elevation = 8.dp,
-                    elevationColor = NuvioColors.FocusRing.copy(alpha = 0.3f)
-                )
+                focusedScale = 1.02f
             )
         ) {
             Box(

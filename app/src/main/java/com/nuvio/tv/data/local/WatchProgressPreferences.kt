@@ -179,6 +179,7 @@ class WatchProgressPreferences @Inject constructor(
             val type = object : TypeToken<Map<String, WatchProgress>>() {}.type
             gson.fromJson(json, type) ?: emptyMap()
         } catch (e: Exception) {
+            android.util.Log.e("WatchProgressPrefs", "Failed to parse progress data", e)
             emptyMap()
         }
     }

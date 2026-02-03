@@ -122,7 +122,7 @@ private fun LibraryTabs(
                 shape = CardDefaults.shape(shape = RoundedCornerShape(20.dp)),
                 colors = CardDefaults.colors(
                     containerColor = if (isSelected) NuvioColors.SurfaceVariant else NuvioColors.BackgroundCard,
-                    focusedContainerColor = NuvioColors.Primary
+                    focusedContainerColor = NuvioColors.Secondary
                 ),
                 border = CardDefaults.border(
                     focusedBorder = Border(

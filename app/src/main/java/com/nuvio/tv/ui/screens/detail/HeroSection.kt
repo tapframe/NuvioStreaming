@@ -1,5 +1,6 @@
 package com.nuvio.tv.ui.screens.detail
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,6 +24,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Border
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -164,12 +166,18 @@ private fun PlayButton(
             .onFocusChanged { isFocused = it.isFocused },
         colors = ButtonDefaults.colors(
             containerColor = androidx.compose.ui.graphics.Color.White,
-            focusedContainerColor = androidx.compose.ui.graphics.Color(0xFFD0D0D0),
+            focusedContainerColor = androidx.compose.ui.graphics.Color.White,
             contentColor = androidx.compose.ui.graphics.Color.Black,
             focusedContentColor = androidx.compose.ui.graphics.Color.Black
         ),
         shape = ButtonDefaults.shape(
             shape = RoundedCornerShape(32.dp)
+        ),
+        border = ButtonDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                shape = RoundedCornerShape(32.dp)
+            )
         ),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)
     ) {
@@ -206,9 +214,15 @@ private fun ActionIconButton(
             .onFocusChanged { isFocused = it.isFocused },
         colors = IconButtonDefaults.colors(
             containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.Primary,
+            focusedContainerColor = NuvioColors.Secondary,
             contentColor = NuvioColors.TextPrimary,
             focusedContentColor = NuvioColors.OnPrimary
+        ),
+        border = IconButtonDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                shape = CircleShape
+            )
         ),
         shape = IconButtonDefaults.shape(
             shape = CircleShape

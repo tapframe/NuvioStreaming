@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
@@ -44,18 +45,29 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import coil.compose.AsyncImage
+import com.nuvio.tv.data.local.ThemeDataStore
+import com.nuvio.tv.domain.model.AppTheme
 import com.nuvio.tv.ui.navigation.NuvioNavHost
 import com.nuvio.tv.ui.navigation.Screen
+import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.theme.NuvioTheme
+import androidx.tv.material3.NavigationDrawerItemDefaults
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var themeDataStore: ThemeDataStore
+
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            NuvioTheme {
+            val currentTheme by themeDataStore.selectedTheme.collectAsState(initial = AppTheme.CRIMSON)
+
+            NuvioTheme(appTheme = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     shape = RectangleShape
@@ -151,6 +163,14 @@ class MainActivity : ComponentActivity() {
                                                 }
                                                 drawerState.setValue(DrawerValue.Closed)
                                             },
+                                            colors = NavigationDrawerItemDefaults.colors(
+                                                selectedContainerColor = NuvioColors.FocusBackground,
+                                                focusedContainerColor = NuvioColors.FocusBackground,
+                                                pressedContainerColor = NuvioColors.FocusBackground,
+                                                selectedContentColor = NuvioColors.FocusRing,
+                                                focusedContentColor = NuvioColors.FocusRing,
+                                                pressedContentColor = NuvioColors.FocusRing
+                                            ),
                                             leadingContent = {
                                                 Icon(imageVector = icon, contentDescription = null)
                                             }
