@@ -187,31 +187,30 @@ private fun EpisodeCard(
                 )
 
                 // Show watched/in-progress indicator
-                val indicatorColor = when {
-                    watchProgress?.isCompleted() == true -> NuvioColors.Primary.copy(alpha = 0.8f)
-                    watchProgress?.isInProgress() == true -> NuvioColors.Primary
-                    else -> NuvioColors.Primary
-                }
-                
-                val indicatorText = when {
-                    watchProgress?.isCompleted() == true -> "✓"
-                    watchProgress?.isInProgress() == true -> "◉"
-                    else -> "◉"
-                }
+                val isCompleted = watchProgress?.isCompleted() == true
+                val isInProgress = watchProgress?.isInProgress() == true
+                if (isCompleted || isInProgress) {
+                    val indicatorColor = if (isCompleted) {
+                        NuvioColors.Primary.copy(alpha = 0.9f)
+                    } else {
+                        NuvioColors.Primary
+                    }
+                    val indicatorText = if (isCompleted) "Watched" else "In Progress"
 
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(NuvioColors.Background.copy(alpha = 0.8f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = indicatorText,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = indicatorColor
-                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(NuvioColors.Background.copy(alpha = 0.8f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = indicatorText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = indicatorColor
+                        )
+                    }
                 }
 
                 // Progress bar overlay at bottom of thumbnail
@@ -243,14 +242,23 @@ private fun EpisodeCard(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Text(
-                        text = "S${episode.season?.toString()?.padStart(2, '0')}E${episode.episode?.toString()?.padStart(2, '0')} - $formattedDate",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = NuvioTheme.extendedColors.textSecondary
-                    )
-                    
+                    Column {
+                        Text(
+                            text = "S${episode.season?.toString()?.padStart(2, '0')}E${episode.episode?.toString()?.padStart(2, '0')}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = NuvioTheme.extendedColors.textSecondary
+                        )
+                        if (formattedDate.isNotBlank()) {
+                            Text(
+                                text = formattedDate,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = NuvioTheme.extendedColors.textTertiary
+                            )
+                        }
+                    }
+
                     episode.runtime?.let { runtime ->
                         Text(
                             text = "${runtime}m",

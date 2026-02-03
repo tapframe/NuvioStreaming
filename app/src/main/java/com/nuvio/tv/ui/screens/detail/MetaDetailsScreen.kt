@@ -155,6 +155,18 @@ private fun MetaDetailsContent(
 ) {
     val isSeries = meta.type == ContentType.SERIES || meta.videos.isNotEmpty()
     val nextEpisode = episodesForSeason.firstOrNull()
+    val heroVideo = remember(meta.videos, nextToWatch, nextEpisode, isSeries) {
+        if (!isSeries) return@remember null
+        val byId = nextToWatch?.nextVideoId?.let { id ->
+            meta.videos.firstOrNull { it.id == id }
+        }
+        val bySeasonEpisode = if (byId == null && nextToWatch?.nextSeason != null && nextToWatch.nextEpisode != null) {
+            meta.videos.firstOrNull { it.season == nextToWatch.nextSeason && it.episode == nextToWatch.nextEpisode }
+        } else {
+            null
+        }
+        byId ?: bySeasonEpisode ?: nextEpisode
+    }
     val listState = rememberTvLazyListState()
     val selectedSeasonFocusRequester = remember { FocusRequester() }
 
@@ -236,13 +248,11 @@ private fun MetaDetailsContent(
                     nextEpisode = nextEpisode,
                     nextToWatch = nextToWatch,
                     onPlayClick = {
-                        // Use nextToWatch's video ID if available, otherwise fall back to logic
-                        val videoId = nextToWatch?.nextVideoId ?: if (isSeries && nextEpisode != null) {
-                            nextEpisode.id
+                        if (heroVideo != null) {
+                            onEpisodeClick(heroVideo)
                         } else {
-                            meta.id
+                            onPlayClick(meta.id)
                         }
-                        onPlayClick(videoId)
                     },
                     isInLibrary = isInLibrary,
                     onToggleLibrary = onToggleLibrary

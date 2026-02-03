@@ -302,12 +302,15 @@ class MetaDetailsViewModel @Inject constructor(
             return
         }
 
+        val nonSpecialEpisodes = allEpisodes.filter { (it.season ?: 0) > 0 }
+        val episodePool = if (nonSpecialEpisodes.isNotEmpty()) nonSpecialEpisodes else allEpisodes
+
         // Find the last watched episode that's in progress or find the next unwatched
         var resumeEpisode: Video? = null
         var resumeProgress: WatchProgress? = null
         var nextUnwatchedEpisode: Video? = null
 
-        for (episode in allEpisodes) {
+        for (episode in episodePool) {
             val season = episode.season ?: continue
             val ep = episode.episode ?: continue
             val progress = progressMap[season to ep]
@@ -361,7 +364,7 @@ class MetaDetailsViewModel @Inject constructor(
             }
             else -> {
                 // All episodes watched or start from beginning
-                val firstEpisode = allEpisodes.firstOrNull()
+                val firstEpisode = episodePool.firstOrNull()
                 NextToWatch(
                     watchProgress = null,
                     isResume = false,
