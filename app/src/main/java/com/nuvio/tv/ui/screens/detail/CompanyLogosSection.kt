@@ -25,6 +25,8 @@ import androidx.tv.foundation.lazy.list.items
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.nuvio.tv.domain.model.MetaCompany
 import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.theme.NuvioTheme
@@ -71,8 +73,12 @@ private fun CompanyLogoCard(company: MetaCompany) {
         contentAlignment = Alignment.Center
     ) {
         if (company.logo != null) {
+            val context = LocalContext.current
             AsyncImage(
-                model = company.logo,
+                model = ImageRequest.Builder(context)
+                    .data(company.logo)
+                    .crossfade(400)
+                    .build(),
                 contentDescription = company.name,
                 modifier = Modifier
                     .fillMaxWidth()

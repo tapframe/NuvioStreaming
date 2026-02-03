@@ -2,9 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/nuvio-providers" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/nuvio-providers/aesdecryptor" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/third_party/media" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/third_party/media/libraries/decoder_ffmpeg/src/main/jni/ffmpeg" vcs="Git" />
   </component>
 </project>

@@ -69,9 +69,13 @@ fun HeroContentSection(
                 .padding(start = 48.dp, end = 48.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.Bottom
         ) {
+            val context = LocalContext.current
             if (meta.logo != null) {
                 AsyncImage(
-                    model = meta.logo,
+                    model = ImageRequest.Builder(context)
+                        .data(meta.logo)
+                        .crossfade(500)
+                        .build(),
                     contentDescription = meta.name,
                     modifier = Modifier
                         .height(100.dp)
@@ -284,6 +288,7 @@ private fun MetaInfoRow(meta: Meta) {
                         model = ImageRequest.Builder(context)
                             .data(com.nuvio.tv.R.raw.imdb_logo_2016)
                             .decoderFactory(SvgDecoder.Factory())
+                            .crossfade(300)
                             .build(),
                         contentDescription = "Rating",
                         modifier = Modifier.size(30.dp),

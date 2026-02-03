@@ -28,6 +28,8 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import com.nuvio.tv.domain.model.MetaCastMember
 import com.nuvio.tv.ui.theme.NuvioColors
 
@@ -105,8 +107,12 @@ private fun CastMemberItem(
             ) {
                 val photo = member.photo
                 if (!photo.isNullOrBlank()) {
+                    val context = LocalContext.current
                     AsyncImage(
-                        model = photo,
+                        model = ImageRequest.Builder(context)
+                            .data(photo)
+                            .crossfade(400)
+                            .build(),
                         contentDescription = member.name,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
