@@ -26,9 +26,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.rememberTvLazyListState
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
 import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.MetaCastMember
@@ -36,6 +33,7 @@ import com.nuvio.tv.domain.model.NextToWatch
 import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.ui.components.ErrorState
+import com.nuvio.tv.ui.components.FadeInAsyncImage
 import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.theme.NuvioColors
 
@@ -171,15 +169,12 @@ private fun MetaDetailsContent(
     Box(modifier = Modifier.fillMaxSize()) {
         // Sticky background image - stays fixed in place while content scrolls
         Box(modifier = Modifier.fillMaxSize()) {
-            val context = LocalContext.current
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(meta.background ?: meta.poster)
-                    .crossfade(600)
-                    .build(),
+            FadeInAsyncImage(
+                model = meta.background ?: meta.poster,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                fadeDurationMs = 600
             )
 
             // Light global dim so text remains readable

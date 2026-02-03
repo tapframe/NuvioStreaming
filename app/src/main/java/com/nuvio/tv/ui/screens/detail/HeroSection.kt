@@ -36,6 +36,7 @@ import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.Video
+import com.nuvio.tv.ui.components.FadeInAsyncImage
 import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.theme.NuvioTheme
 import androidx.compose.material.icons.Icons
@@ -69,20 +70,17 @@ fun HeroContentSection(
                 .padding(start = 48.dp, end = 48.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.Bottom
         ) {
-            val context = LocalContext.current
             if (meta.logo != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(meta.logo)
-                        .crossfade(500)
-                        .build(),
+                FadeInAsyncImage(
+                    model = meta.logo,
                     contentDescription = meta.name,
                     modifier = Modifier
                         .height(100.dp)
                         .fillMaxWidth(0.4f)
                         .padding(bottom = 16.dp),
                     contentScale = ContentScale.Fit,
-                    alignment = Alignment.CenterStart
+                    alignment = Alignment.CenterStart,
+                    fadeDurationMs = 500
                 )
             } else {
                 Text(
@@ -288,7 +286,6 @@ private fun MetaInfoRow(meta: Meta) {
                         model = ImageRequest.Builder(context)
                             .data(com.nuvio.tv.R.raw.imdb_logo_2016)
                             .decoderFactory(SvgDecoder.Factory())
-                            .crossfade(300)
                             .build(),
                         contentDescription = "Rating",
                         modifier = Modifier.size(30.dp),

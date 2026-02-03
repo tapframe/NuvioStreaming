@@ -8,6 +8,7 @@ import com.nuvio.tv.domain.model.MetaCastMember
 import com.nuvio.tv.domain.model.MetaCompany
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,8 +19,15 @@ private const val TMDB_API_KEY = "439c478a771f35c05022f9feabcca01c"
 class TmdbMetadataService @Inject constructor(
     private val tmdbApi: TmdbApi
 ) {
+    // In-memory caches
+    private val enrichmentCache = ConcurrentHashMap<String, TmdbEnrichment>()
+    private val episodeCache = ConcurrentHashMap<String, Map<Pair<Int, Int>, TmdbEpisodeEnrichment>>()
+
     suspend fun fetchEnrichment(tmdbId: String, contentType: ContentType): TmdbEnrichment? =
         withContext(Dispatchers.IO) {
+            val cacheKey = "$tmdbId:${contentType.name}"
+            enrichmentCache[cacheKey]?.let { return@withContext it }
+
             val numericId = tmdbId.toIntOrNull() ?: return@withContext null
             val tmdbType = when (contentType) {
                 ContentType.SERIES, ContentType.TV -> "tv"
@@ -119,7 +127,7 @@ class TmdbMetadataService @Inject constructor(
                     return@withContext null
                 }
 
-                TmdbEnrichment(
+                val enrichment = TmdbEnrichment(
                     description = description,
                     genres = genres,
                     backdrop = backdrop,
@@ -136,6 +144,8 @@ class TmdbMetadataService @Inject constructor(
                     countries = countries,
                     language = language
                 )
+                enrichmentCache[cacheKey] = enrichment
+                enrichment
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch TMDB enrichment: ${e.message}", e)
                 null
@@ -146,6 +156,9 @@ class TmdbMetadataService @Inject constructor(
         tmdbId: String,
         seasonNumbers: List<Int>
     ): Map<Pair<Int, Int>, TmdbEpisodeEnrichment> = withContext(Dispatchers.IO) {
+        val cacheKey = "$tmdbId:${seasonNumbers.sorted().joinToString(",")}"
+        episodeCache[cacheKey]?.let { return@withContext it }
+
         val numericId = tmdbId.toIntOrNull() ?: return@withContext emptyMap()
         val result = mutableMapOf<Pair<Int, Int>, TmdbEpisodeEnrichment>()
 
@@ -162,6 +175,9 @@ class TmdbMetadataService @Inject constructor(
             }
         }
 
+        if (result.isNotEmpty()) {
+            episodeCache[cacheKey] = result
+        }
         result
     }
 

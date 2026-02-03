@@ -10,18 +10,30 @@ import com.nuvio.tv.domain.repository.MetaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class MetaRepositoryImpl @Inject constructor(
     private val api: AddonApi,
     private val addonRepository: AddonRepository
 ) : MetaRepository {
+
+    // In-memory cache: "type:id" -> Meta
+    private val metaCache = ConcurrentHashMap<String, Meta>()
 
     override fun getMeta(
         addonBaseUrl: String,
         type: String,
         id: String
     ): Flow<NetworkResult<Meta>> = flow {
+        val cacheKey = "$type:$id"
+        metaCache[cacheKey]?.let { cached ->
+            emit(NetworkResult.Success(cached))
+            return@flow
+        }
+
         emit(NetworkResult.Loading)
 
         val url = buildMetaUrl(addonBaseUrl, type, id)
@@ -30,7 +42,9 @@ class MetaRepositoryImpl @Inject constructor(
             is NetworkResult.Success -> {
                 val metaDto = result.data.meta
                 if (metaDto != null) {
-                    emit(NetworkResult.Success(metaDto.toDomain()))
+                    val meta = metaDto.toDomain()
+                    metaCache[cacheKey] = meta
+                    emit(NetworkResult.Success(meta))
                 } else {
                     emit(NetworkResult.Error("Meta not found"))
                 }
@@ -44,15 +58,21 @@ class MetaRepositoryImpl @Inject constructor(
         type: String,
         id: String
     ): Flow<NetworkResult<Meta>> = flow {
+        val cacheKey = "$type:$id"
+        metaCache[cacheKey]?.let { cached ->
+            emit(NetworkResult.Success(cached))
+            return@flow
+        }
+
         emit(NetworkResult.Loading)
 
         val addons = addonRepository.getInstalledAddons().first()
-        
+
         // Find addons that support meta resource for this type
         // Resources can be simple strings like "meta" or objects with name/types
         val metaAddons = addons.filter { addon ->
-            addon.resources.any { resource -> 
-                resource.name == "meta" && 
+            addon.resources.any { resource ->
+                resource.name == "meta" &&
                 (resource.types.isEmpty() || resource.types.contains(type))
             }
         }
@@ -62,21 +82,23 @@ class MetaRepositoryImpl @Inject constructor(
             val fallbackAddons = addons.filter { addon ->
                 addon.types.any { it.toApiString() == type }
             }
-            
+
             for (addon in fallbackAddons) {
                 val url = buildMetaUrl(addon.baseUrl, type, id)
                 when (val result = safeApiCall { api.getMeta(url) }) {
                     is NetworkResult.Success -> {
                         val metaDto = result.data.meta
                         if (metaDto != null) {
-                            emit(NetworkResult.Success(metaDto.toDomain()))
+                            val meta = metaDto.toDomain()
+                            metaCache[cacheKey] = meta
+                            emit(NetworkResult.Success(meta))
                             return@flow
                         }
                     }
                     else -> { /* Try next addon */ }
                 }
             }
-            
+
             emit(NetworkResult.Error("No addons support meta for type: $type"))
             return@flow
         }
@@ -88,7 +110,9 @@ class MetaRepositoryImpl @Inject constructor(
                 is NetworkResult.Success -> {
                     val metaDto = result.data.meta
                     if (metaDto != null) {
-                        emit(NetworkResult.Success(metaDto.toDomain()))
+                        val meta = metaDto.toDomain()
+                        metaCache[cacheKey] = meta
+                        emit(NetworkResult.Success(meta))
                         return@flow
                     }
                 }
