@@ -104,7 +104,7 @@ fun SkipIntroButton(
                 .onFocusChanged { isFocused = it.isFocused },
             colors = CardDefaults.colors(
                 containerColor = Color(0xFF1E1E1E).copy(alpha = 0.85f),
-                focusedContainerColor = NuvioColors.Primary
+                focusedContainerColor = NuvioColors.Secondary
             ),
             shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp))
         ) {
@@ -130,7 +130,7 @@ fun SkipIntroButton(
                 modifier = Modifier
                     .height(2.dp)
                     .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
-                    .background(if (isFocused) Color.White else NuvioColors.Primary)
+                    .background(if (isFocused) Color.White else NuvioColors.Secondary)
                     .align(Alignment.CenterHorizontally)
             )
         }

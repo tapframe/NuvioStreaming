@@ -546,7 +546,7 @@ private fun PlayerControlsOverlay(
                         Text(
                             text = "${uiState.playbackSpeed}x",
                             style = MaterialTheme.typography.labelMedium,
-                            color = NuvioColors.Primary,
+                            color = NuvioColors.Secondary,
                             modifier = Modifier.padding(end = 4.dp)
                         )
                     }
@@ -605,9 +605,9 @@ private fun PlayPauseButton(
             .onFocusChanged { isFocused = it.isFocused },
         colors = IconButtonDefaults.colors(
             containerColor = Color.White.copy(alpha = 0.2f),
-            focusedContainerColor = NuvioColors.Primary,
+            focusedContainerColor = NuvioColors.Secondary,
             contentColor = Color.White,
-            focusedContentColor = NuvioColors.OnPrimary
+            focusedContentColor = Color.White
         ),
         shape = IconButtonDefaults.shape(shape = CircleShape)
     ) {
@@ -634,7 +634,7 @@ private fun ControlButton(
             .onFocusChanged { isFocused = it.isFocused },
         colors = IconButtonDefaults.colors(
             containerColor = Color.Transparent,
-            focusedContainerColor = Color.White.copy(alpha = 0.2f),
+            focusedContainerColor = NuvioColors.FocusBackground,
             contentColor = Color.White,
             focusedContentColor = Color.White
         ),
@@ -676,7 +676,7 @@ private fun ProgressBar(
                 .fillMaxHeight()
                 .fillMaxWidth(animatedProgress)
                 .clip(RoundedCornerShape(3.dp))
-                .background(NuvioColors.Primary)
+                .background(NuvioColors.Secondary)
         )
     }
 }
@@ -878,8 +878,8 @@ private fun TrackItem(
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused },
         colors = CardDefaults.colors(
-            containerColor = if (isSelected) NuvioColors.Primary.copy(alpha = 0.2f) else NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.Primary.copy(alpha = 0.4f)
+            containerColor = if (isSelected) NuvioColors.Secondary.copy(alpha = 0.2f) else NuvioColors.BackgroundCard,
+            focusedContainerColor = NuvioColors.FocusBackground
         ),
         shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp))
     ) {
@@ -894,7 +894,7 @@ private fun TrackItem(
                 Text(
                     text = track.name,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary
+                    color = if (isSelected) NuvioColors.Secondary else NuvioColors.TextPrimary
                 )
                 if (track.language != null) {
                     Text(
@@ -909,7 +909,7 @@ private fun TrackItem(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Selected",
-                    tint = NuvioColors.Primary,
+                    tint = NuvioColors.Secondary,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -931,8 +931,8 @@ private fun SpeedItem(
             .fillMaxWidth()
             .onFocusChanged { isFocused = it.isFocused },
         colors = CardDefaults.colors(
-            containerColor = if (isSelected) NuvioColors.Primary.copy(alpha = 0.2f) else NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.Primary.copy(alpha = 0.4f)
+            containerColor = if (isSelected) NuvioColors.Secondary.copy(alpha = 0.2f) else NuvioColors.BackgroundCard,
+            focusedContainerColor = NuvioColors.FocusBackground
         ),
         shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp))
     ) {
@@ -953,7 +953,7 @@ private fun SpeedItem(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Selected",
-                    tint = NuvioColors.Primary,
+                    tint = NuvioColors.Secondary,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -973,8 +973,8 @@ internal fun DialogButton(
         onClick = onClick,
         modifier = Modifier.onFocusChanged { isFocused = it.isFocused },
         colors = CardDefaults.colors(
-            containerColor = if (isPrimary) NuvioColors.Primary else NuvioColors.BackgroundCard,
-            focusedContainerColor = if (isPrimary) NuvioColors.Primary else NuvioColors.FocusBackground
+            containerColor = if (isPrimary) NuvioColors.Secondary else NuvioColors.BackgroundCard,
+            focusedContainerColor = if (isPrimary) NuvioColors.Secondary else NuvioColors.FocusBackground
         ),
         shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp))
     ) {

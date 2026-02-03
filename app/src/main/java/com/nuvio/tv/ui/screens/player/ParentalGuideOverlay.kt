@@ -121,7 +121,7 @@ fun ParentalGuideOverlay(
                 .width(3.dp)
                 .height((totalLineHeight * lineHeightFraction.value).dp)
                 .clip(RoundedCornerShape(1.dp))
-                .background(NuvioColors.Primary)
+                .background(NuvioColors.Secondary)
         )
 
         // Warning items
