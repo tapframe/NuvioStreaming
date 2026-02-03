@@ -44,13 +44,15 @@ sealed class Screen(val route: String) {
             return "stream/$videoId/$contentType/$encodedTitle?poster=$encodedPoster&backdrop=$encodedBackdrop&logo=$encodedLogo&season=${season ?: ""}&episode=${episode ?: ""}&episodeName=$encodedEpisodeName&genres=$encodedGenres&year=$encodedYear&contentId=$encodedContentId&contentName=$encodedContentName"
         }
     }
-    data object Player : Screen("player/{streamUrl}/{title}?headers={headers}&contentId={contentId}&contentType={contentType}&contentName={contentName}&poster={poster}&backdrop={backdrop}&logo={logo}&videoId={videoId}&season={season}&episode={episode}&episodeTitle={episodeTitle}") {
+    data object Player : Screen("player/{streamUrl}/{title}?streamName={streamName}&year={year}&headers={headers}&contentId={contentId}&contentType={contentType}&contentName={contentName}&poster={poster}&backdrop={backdrop}&logo={logo}&videoId={videoId}&season={season}&episode={episode}&episodeTitle={episodeTitle}") {
         private fun encode(value: String): String = 
             URLEncoder.encode(value, "UTF-8").replace("+", "%20")
         
         fun createRoute(
             streamUrl: String,
             title: String,
+            streamName: String? = null,
+            year: String? = null,
             headers: Map<String, String>? = null,
             contentId: String? = null,
             contentType: String? = null,
@@ -65,6 +67,8 @@ sealed class Screen(val route: String) {
         ): String {
             val encodedUrl = encode(streamUrl)
             val encodedTitle = encode(title)
+            val encodedStreamName = streamName?.let { encode(it) } ?: ""
+            val encodedYear = year?.let { encode(it) } ?: ""
             val encodedHeaders = headers?.entries?.joinToString("&") { (k, v) ->
                 "${encode(k)}=${encode(v)}"
             }?.let { encode(it) } ?: ""
@@ -76,7 +80,7 @@ sealed class Screen(val route: String) {
             val encodedLogo = logo?.let { encode(it) } ?: ""
             val encodedVideoId = videoId?.let { encode(it) } ?: ""
             val encodedEpisodeTitle = episodeTitle?.let { encode(it) } ?: ""
-            return "player/$encodedUrl/$encodedTitle?headers=$encodedHeaders&contentId=$encodedContentId&contentType=$encodedContentType&contentName=$encodedContentName&poster=$encodedPoster&backdrop=$encodedBackdrop&logo=$encodedLogo&videoId=$encodedVideoId&season=${season ?: ""}&episode=${episode ?: ""}&episodeTitle=$encodedEpisodeTitle"
+            return "player/$encodedUrl/$encodedTitle?streamName=$encodedStreamName&year=$encodedYear&headers=$encodedHeaders&contentId=$encodedContentId&contentType=$encodedContentType&contentName=$encodedContentName&poster=$encodedPoster&backdrop=$encodedBackdrop&logo=$encodedLogo&videoId=$encodedVideoId&season=${season ?: ""}&episode=${episode ?: ""}&episodeTitle=$encodedEpisodeTitle"
         }
     }
     data object Search : Screen("search")

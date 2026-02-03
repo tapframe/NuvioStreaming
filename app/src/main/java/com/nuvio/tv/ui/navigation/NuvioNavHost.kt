@@ -137,6 +137,8 @@ fun NuvioNavHost(
                             Screen.Player.createRoute(
                                 streamUrl = url,
                                 title = playbackInfo.title,
+                                streamName = playbackInfo.streamName,
+                                year = playbackInfo.year,
                                 headers = playbackInfo.headers,
                                 contentId = playbackInfo.contentId,
                                 contentType = playbackInfo.contentType,
@@ -160,6 +162,16 @@ fun NuvioNavHost(
             arguments = listOf(
                 navArgument("streamUrl") { type = NavType.StringType },
                 navArgument("title") { type = NavType.StringType },
+                navArgument("streamName") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("year") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
                 navArgument("headers") {
                     type = NavType.StringType
                     nullable = true

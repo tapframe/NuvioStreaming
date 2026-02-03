@@ -55,6 +55,12 @@ class PlayerViewModel @Inject constructor(
     private val title: String = savedStateHandle.get<String>("title")?.let {
         URLDecoder.decode(it, "UTF-8")
     } ?: ""
+    private val streamName: String? = savedStateHandle.get<String>("streamName")?.let {
+        if (it.isNotEmpty()) URLDecoder.decode(it, "UTF-8") else null
+    }
+    private val year: String? = savedStateHandle.get<String>("year")?.let {
+        if (it.isNotEmpty()) URLDecoder.decode(it, "UTF-8") else null
+    }
     private val headersJson: String? = savedStateHandle.get<String>("headers")?.let {
         if (it.isNotEmpty()) URLDecoder.decode(it, "UTF-8") else null
     }
@@ -97,6 +103,9 @@ class PlayerViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         PlayerUiState(
             title = title,
+            contentName = contentName,
+            currentStreamName = streamName,
+            releaseYear = year,
             currentSeason = currentSeason,
             currentEpisode = currentEpisode,
             currentEpisodeTitle = currentEpisodeTitle
@@ -281,7 +290,14 @@ class PlayerViewModel @Inject constructor(
                 showSpeedDialog = false
             )
         }
-        loadEpisodesIfNeeded()
+
+        // If episodes are already cached, ensure the selected season matches current playback.
+        val desiredSeason = currentSeason ?: _uiState.value.episodesSelectedSeason
+        if (_uiState.value.episodesAll.isNotEmpty() && desiredSeason != null) {
+            selectEpisodesSeason(desiredSeason)
+        } else {
+            loadEpisodesIfNeeded()
+        }
     }
 
     private fun dismissEpisodesPanel() {
@@ -304,12 +320,31 @@ class PlayerViewModel @Inject constructor(
         scheduleHideControls()
     }
 
+    private fun selectEpisodesSeason(season: Int) {
+        val all = _uiState.value.episodesAll
+        if (all.isEmpty()) return
+
+        val seasons = _uiState.value.episodesAvailableSeasons
+        if (seasons.isNotEmpty() && season !in seasons) return
+
+        val episodesForSeason = all
+            .filter { (it.season ?: -1) == season }
+            .sortedWith(compareBy<Video> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
+
+        _uiState.update {
+            it.copy(
+                episodesSelectedSeason = season,
+                episodes = episodesForSeason
+            )
+        }
+    }
+
     private fun loadEpisodesIfNeeded() {
         val type = contentType
         val id = contentId
         if (type.isNullOrBlank() || id.isNullOrBlank()) return
         if (type !in listOf("series", "tv")) return
-        if (_uiState.value.episodes.isNotEmpty() || _uiState.value.isLoadingEpisodes) return
+        if (_uiState.value.episodesAll.isNotEmpty() || _uiState.value.isLoadingEpisodes) return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingEpisodes = true, episodesError = null) }
@@ -319,15 +354,36 @@ class PlayerViewModel @Inject constructor(
                     .first { it !is NetworkResult.Loading }
             ) {
                 is NetworkResult.Success -> {
-                    val seasonNumber = currentSeason ?: initialSeason ?: 1
-                    val episodes = result.data.videos
-                        .filter { (it.season ?: -1) == seasonNumber }
+                    val allEpisodes = result.data.videos
+                        .sortedWith(
+                            compareBy<Video> { it.season ?: Int.MAX_VALUE }
+                                .thenBy { it.episode ?: Int.MAX_VALUE }
+                                .thenBy { it.title }
+                        )
+
+                    val seasons = allEpisodes
+                        .mapNotNull { it.season }
+                        .distinct()
+                        .sorted()
+
+                    val preferredSeason = when {
+                        currentSeason != null && seasons.contains(currentSeason) -> currentSeason
+                        initialSeason != null && seasons.contains(initialSeason) -> initialSeason
+                        else -> seasons.firstOrNull { it > 0 } ?: seasons.firstOrNull() ?: 1
+                    }
+
+                    val selectedSeason = preferredSeason ?: 1
+                    val episodesForSeason = allEpisodes
+                        .filter { (it.season ?: -1) == selectedSeason }
                         .sortedWith(compareBy<Video> { it.episode ?: Int.MAX_VALUE }.thenBy { it.title })
 
                     _uiState.update {
                         it.copy(
                             isLoadingEpisodes = false,
-                            episodes = episodes,
+                            episodesAll = allEpisodes,
+                            episodesAvailableSeasons = seasons,
+                            episodesSelectedSeason = selectedSeason,
+                            episodes = episodesForSeason,
                             episodesError = null
                         )
                     }
@@ -437,6 +493,7 @@ class PlayerViewModel @Inject constructor(
                 currentSeason = currentSeason,
                 currentEpisode = currentEpisode,
                 currentEpisodeTitle = currentEpisodeTitle,
+                currentStreamName = stream.name ?: stream.addonName, // Track the stream source name
                 showEpisodesPanel = false,
                 showEpisodeStreams = false,
                 isLoadingEpisodeStreams = false,
@@ -712,6 +769,9 @@ class PlayerViewModel @Inject constructor(
                         episodeStreamsTitle = null
                     )
                 }
+            }
+            is PlayerEvent.OnEpisodeSeasonSelected -> {
+                selectEpisodesSeason(event.season)
             }
             is PlayerEvent.OnEpisodeSelected -> {
                 loadStreamsForEpisode(event.video)

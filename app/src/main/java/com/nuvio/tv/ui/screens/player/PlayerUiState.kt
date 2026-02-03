@@ -11,6 +11,9 @@ data class PlayerUiState(
     val currentPosition: Long = 0L,
     val duration: Long = 0L,
     val title: String = "",
+    val contentName: String? = null, // Series/show name (for series content)
+    val releaseYear: String? = null, // Release year for movies
+    val currentStreamName: String? = null, // Name of the current stream source
     val showControls: Boolean = true,
     val playbackSpeed: Float = 1f,
     val audioTracks: List<TrackInfo> = emptyList(),
@@ -24,6 +27,9 @@ data class PlayerUiState(
     val showEpisodesPanel: Boolean = false,
     val isLoadingEpisodes: Boolean = false,
     val episodesError: String? = null,
+    val episodesAll: List<Video> = emptyList(),
+    val episodesAvailableSeasons: List<Int> = emptyList(),
+    val episodesSelectedSeason: Int? = null,
     val episodes: List<Video> = emptyList(),
     val currentSeason: Int? = null,
     val currentEpisode: Int? = null,
@@ -66,6 +72,7 @@ sealed class PlayerEvent {
     data object OnShowEpisodesPanel : PlayerEvent()
     data object OnDismissEpisodesPanel : PlayerEvent()
     data object OnBackFromEpisodeStreams : PlayerEvent()
+    data class OnEpisodeSeasonSelected(val season: Int) : PlayerEvent()
     data class OnEpisodeSelected(val video: Video) : PlayerEvent()
     data class OnEpisodeAddonFilterSelected(val addonName: String?) : PlayerEvent()
     data class OnEpisodeStreamSelected(val stream: Stream) : PlayerEvent()

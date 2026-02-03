@@ -138,6 +138,8 @@ class StreamScreenViewModel @Inject constructor(
         return StreamPlaybackInfo(
             url = stream.getStreamUrl(),
             title = _uiState.value.title,
+            streamName = stream.name ?: stream.addonName,
+            year = year,
             isExternal = stream.isExternal(),
             isTorrent = stream.isTorrent(),
             infoHash = stream.infoHash,
@@ -160,6 +162,8 @@ class StreamScreenViewModel @Inject constructor(
 data class StreamPlaybackInfo(
     val url: String?,
     val title: String,
+    val streamName: String,
+    val year: String?,
     val isExternal: Boolean,
     val isTorrent: Boolean,
     val infoHash: String?,

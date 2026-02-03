@@ -127,18 +127,19 @@ fun PlayerScreen(
         }
     }
 
-    // Request focus for key events when controls are hidden
+    // Request focus for key events when controls visibility changes
     LaunchedEffect(uiState.showControls) {
         if (uiState.showControls && !uiState.showEpisodesPanel &&
             !uiState.showAudioDialog && !uiState.showSubtitleDialog && !uiState.showSpeedDialog
         ) {
-            // When controls are shown, focus the play/pause button
+            // Wait for AnimatedVisibility animation to complete before focusing play/pause button
+            kotlinx.coroutines.delay(250)
             try {
                 playPauseFocusRequester.requestFocus()
             } catch (e: Exception) {
                 // Focus requester may not be ready yet
             }
-        } else {
+        } else if (!uiState.showControls) {
             // When controls are hidden, focus the container for key events
             try {
                 containerFocusRequester.requestFocus()
@@ -148,7 +149,7 @@ fun PlayerScreen(
         }
     }
 
-    // Initial focus
+    // Initial focus on container - the LaunchedEffect above will handle focusing controls
     LaunchedEffect(Unit) {
         containerFocusRequester.requestFocus()
     }
@@ -287,6 +288,7 @@ fun PlayerScreen(
                 streamsFocusRequester = streamsFocusRequester,
                 onClose = { viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel) },
                 onBackToEpisodes = { viewModel.onEvent(PlayerEvent.OnBackFromEpisodeStreams) },
+                onSeasonSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeSeasonSelected(it)) },
                 onAddonFilterSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeAddonFilterSelected(it)) },
                 onEpisodeSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeSelected(it)) },
                 onStreamSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeStreamSelected(it)) }
@@ -373,22 +375,60 @@ private fun PlayerControlsOverlay(
                 )
         )
 
-        // Top bar - Title
-        Row(
+        // Top bar - Title and episode info
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp, vertical = 24.dp)
-                .align(Alignment.TopStart),
-            verticalAlignment = Alignment.CenterVertically
+                .align(Alignment.TopStart)
         ) {
+            // For series content, show series name; for movies, show title
+            val displayName = if (uiState.currentSeason != null && uiState.currentEpisode != null) {
+                uiState.contentName ?: uiState.title
+            } else {
+                uiState.title
+            }
+            
             Text(
-                text = uiState.title,
+                text = displayName,
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
+                overflow = TextOverflow.Ellipsis
             )
+            
+            // Show episode info for series (S1E3 • Episode Title)
+            if (uiState.currentSeason != null && uiState.currentEpisode != null) {
+                val episodeInfo = buildString {
+                    append("S${uiState.currentSeason}E${uiState.currentEpisode}")
+                    if (!uiState.currentEpisodeTitle.isNullOrBlank()) {
+                        append(" • ${uiState.currentEpisodeTitle}")
+                    }
+                }
+                Text(
+                    text = episodeInfo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            // Show stream source if available
+            if (!uiState.currentStreamName.isNullOrBlank()) {
+                val sourceText = if (!uiState.releaseYear.isNullOrBlank()) {
+                    "${uiState.releaseYear} - via ${uiState.currentStreamName}"
+                } else {
+                    "via ${uiState.currentStreamName}"
+                }
+                Text(
+                    text = sourceText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         // Bottom controls
