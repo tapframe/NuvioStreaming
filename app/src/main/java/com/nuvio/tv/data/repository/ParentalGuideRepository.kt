@@ -1,6 +1,7 @@
 package com.nuvio.tv.data.repository
 
 import android.util.Log
+import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.data.remote.api.ParentalGuideApi
 import com.nuvio.tv.data.remote.api.ParentalGuideResponse
 import java.util.concurrent.ConcurrentHashMap
@@ -12,8 +13,10 @@ class ParentalGuideRepository @Inject constructor(
     private val api: ParentalGuideApi
 ) {
     private val cache = ConcurrentHashMap<String, ParentalGuideResponse>()
+    private val isConfigured = BuildConfig.PARENTAL_GUIDE_API_URL.isNotEmpty()
 
     suspend fun getMovieGuide(imdbId: String): ParentalGuideResponse? {
+        if (!isConfigured) return null
         if (!imdbId.startsWith("tt")) return null
 
         val cacheKey = "movie:$imdbId"
@@ -33,6 +36,7 @@ class ParentalGuideRepository @Inject constructor(
     }
 
     suspend fun getTVGuide(imdbId: String, season: Int, episode: Int): ParentalGuideResponse? {
+        if (!isConfigured) return null
         if (!imdbId.startsWith("tt")) return null
         if (season < 0 || episode < 0) return null
 

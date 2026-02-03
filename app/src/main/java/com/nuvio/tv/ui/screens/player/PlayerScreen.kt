@@ -140,12 +140,16 @@ fun PlayerScreen(
                 // Focus requester may not be ready yet
             }
         } else if (!uiState.showControls) {
-            // When controls are hidden, focus the container for key events
-            try {
-                containerFocusRequester.requestFocus()
-            } catch (e: Exception) {
-                // Focus requester may not be ready yet
+            // When controls are hidden, let skip intro button take focus if visible
+            val skipVisible = uiState.activeSkipInterval != null && !uiState.skipIntervalDismissed
+            if (!skipVisible) {
+                try {
+                    containerFocusRequester.requestFocus()
+                } catch (e: Exception) {
+                    // Focus requester may not be ready yet
+                }
             }
+            // If skip button is visible, its own LaunchedEffect will request focus
         }
     }
 
@@ -248,6 +252,18 @@ fun PlayerScreen(
                 onBack = onBackPress
             )
         }
+
+        // Skip Intro button (bottom-left, independent of controls)
+        SkipIntroButton(
+            interval = uiState.activeSkipInterval,
+            dismissed = uiState.skipIntervalDismissed,
+            controlsVisible = uiState.showControls,
+            onSkip = { viewModel.onEvent(PlayerEvent.OnSkipIntro) },
+            onDismiss = { viewModel.onEvent(PlayerEvent.OnDismissSkipIntro) },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 32.dp, bottom = if (uiState.showControls) 120.dp else 32.dp)
+        )
 
         // Parental guide overlay (shows when video first starts playing)
         ParentalGuideOverlay(

@@ -2,6 +2,7 @@ package com.nuvio.tv.ui.screens.player
 
 import androidx.media3.common.C
 import androidx.media3.common.TrackGroup
+import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.Video
 
@@ -50,7 +51,10 @@ data class PlayerUiState(
     // Parental guide overlay
     val parentalWarnings: List<ParentalWarning> = emptyList(),
     val showParentalGuide: Boolean = false,
-    val parentalGuideHasShown: Boolean = false
+    val parentalGuideHasShown: Boolean = false,
+    // Skip intro
+    val activeSkipInterval: SkipInterval? = null,
+    val skipIntervalDismissed: Boolean = false
 )
 
 data class TrackInfo(
@@ -83,6 +87,8 @@ sealed class PlayerEvent {
     data object OnDismissDialog : PlayerEvent()
     data object OnRetry : PlayerEvent()
     data object OnParentalGuideHide : PlayerEvent()
+    data object OnSkipIntro : PlayerEvent()
+    data object OnDismissSkipIntro : PlayerEvent()
 }
 
 data class ParentalWarning(

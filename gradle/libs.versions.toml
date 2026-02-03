@@ -1,5 +1,6 @@
 [versions]
 agp = "8.13.2"
+cryptoJs = "4.2.0"
 kotlin = "2.3.0"
 coreKtx = "1.10.1"
 appcompat = "1.6.1"
@@ -42,6 +43,7 @@ androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecyc
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 
 # Hilt
+crypto-js = { module = "org.webjars.npm:crypto-js", version.ref = "cryptoJs" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }

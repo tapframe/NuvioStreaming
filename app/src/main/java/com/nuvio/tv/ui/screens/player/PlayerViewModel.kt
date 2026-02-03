@@ -23,6 +23,8 @@ import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.data.repository.ParentalGuideRepository
+import com.nuvio.tv.data.repository.SkipIntroRepository
+import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.domain.repository.MetaRepository
 import com.nuvio.tv.domain.repository.StreamRepository
 import com.nuvio.tv.domain.repository.WatchProgressRepository
@@ -48,6 +50,7 @@ class PlayerViewModel @Inject constructor(
     private val metaRepository: MetaRepository,
     private val streamRepository: StreamRepository,
     private val parentalGuideRepository: ParentalGuideRepository,
+    private val skipIntroRepository: SkipIntroRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -130,10 +133,15 @@ class PlayerViewModel @Inject constructor(
     // Track whether playback has started (for parental guide trigger)
     private var playbackStartedForParentalGuide = false
 
+    // Skip intro
+    private var skipIntervals: List<SkipInterval> = emptyList()
+    private var lastActiveSkipType: String? = null
+
     init {
         initializePlayer(currentStreamUrl, currentHeaders)
         loadSavedProgressFor(currentSeason, currentEpisode)
         fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
+        fetchSkipIntervals(contentId, currentSeason, currentEpisode)
     }
 
     private fun loadSavedProgressFor(season: Int?, episode: Int?) {
@@ -160,6 +168,44 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    private fun fetchSkipIntervals(id: String?, season: Int?, episode: Int?) {
+        if (id.isNullOrBlank()) return
+        val imdbId = id.split(":").firstOrNull()?.takeIf { it.startsWith("tt") } ?: return
+        if (season == null || episode == null) return
+
+        viewModelScope.launch {
+            val intervals = skipIntroRepository.getSkipIntervals(imdbId, season, episode)
+            skipIntervals = intervals
+        }
+    }
+
+    private fun updateActiveSkipInterval(positionMs: Long) {
+        if (skipIntervals.isEmpty()) {
+            if (_uiState.value.activeSkipInterval != null) {
+                _uiState.update { it.copy(activeSkipInterval = null) }
+            }
+            return
+        }
+
+        val positionSec = positionMs / 1000.0
+        val active = skipIntervals.find { interval ->
+            positionSec >= interval.startTime && positionSec < (interval.endTime - 0.5)
+        }
+
+        val currentActive = _uiState.value.activeSkipInterval
+
+        if (active != null) {
+            // New interval or different interval
+            if (currentActive == null || active.type != currentActive.type || active.startTime != currentActive.startTime) {
+                lastActiveSkipType = active.type
+                _uiState.update { it.copy(activeSkipInterval = active, skipIntervalDismissed = false) }
+            }
+        } else if (currentActive != null) {
+            // Exited interval
+            _uiState.update { it.copy(activeSkipInterval = null, skipIntervalDismissed = false) }
         }
     }
 
@@ -579,14 +625,20 @@ class PlayerViewModel @Inject constructor(
                 // Reset parental guide for new episode
                 parentalWarnings = emptyList(),
                 showParentalGuide = false,
-                parentalGuideHasShown = false
+                parentalGuideHasShown = false,
+                // Reset skip intro
+                activeSkipInterval = null,
+                skipIntervalDismissed = false
             )
         }
 
         playbackStartedForParentalGuide = false
+        skipIntervals = emptyList()
+        lastActiveSkipType = null
 
         // Fetch parental guide for new episode
         fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
+        fetchSkipIntervals(contentId, currentSeason, currentEpisode)
 
         _exoPlayer?.let { player ->
             try {
@@ -664,12 +716,14 @@ class PlayerViewModel @Inject constructor(
         progressJob = viewModelScope.launch {
             while (isActive) {
                 _exoPlayer?.let { player ->
+                    val pos = player.currentPosition.coerceAtLeast(0L)
                     _uiState.update {
                         it.copy(
-                            currentPosition = player.currentPosition.coerceAtLeast(0L),
+                            currentPosition = pos,
                             duration = player.duration.coerceAtLeast(0L)
                         )
                     }
+                    updateActiveSkipInterval(pos)
                 }
                 delay(500)
             }
@@ -878,6 +932,15 @@ class PlayerViewModel @Inject constructor(
             }
             PlayerEvent.OnParentalGuideHide -> {
                 _uiState.update { it.copy(showParentalGuide = false) }
+            }
+            PlayerEvent.OnSkipIntro -> {
+                _uiState.value.activeSkipInterval?.let { interval ->
+                    _exoPlayer?.seekTo((interval.endTime * 1000).toLong())
+                    _uiState.update { it.copy(activeSkipInterval = null, skipIntervalDismissed = true) }
+                }
+            }
+            PlayerEvent.OnDismissSkipIntro -> {
+                _uiState.update { it.copy(skipIntervalDismissed = true) }
             }
         }
     }
