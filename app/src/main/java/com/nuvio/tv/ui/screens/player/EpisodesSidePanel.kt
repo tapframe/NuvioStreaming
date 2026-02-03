@@ -76,7 +76,8 @@ internal fun EpisodesSidePanel(
     onSeasonSelected: (Int) -> Unit,
     onAddonFilterSelected: (String?) -> Unit,
     onEpisodeSelected: (Video) -> Unit,
-    onStreamSelected: (Stream) -> Unit
+    onStreamSelected: (Stream) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     LaunchedEffect(
         uiState.showEpisodeStreams,
@@ -94,21 +95,15 @@ internal fun EpisodesSidePanel(
         }
     }
 
-    // Scrim + right panel
+    // Right panel only (scrim is handled in PlayerScreen)
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
+        modifier = modifier
+            .fillMaxHeight()
+            .width(520.dp)
+            .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+            .background(NuvioColors.BackgroundElevated)
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .width(520.dp)
-                .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
-                .background(NuvioColors.BackgroundElevated)
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -147,7 +142,6 @@ internal fun EpisodesSidePanel(
                 }
             }
         }
-    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)

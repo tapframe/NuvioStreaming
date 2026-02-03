@@ -165,7 +165,7 @@ fun PlayerScreen(
                     when (keyEvent.nativeKeyEvent.keyCode) {
                         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                             if (!uiState.showControls) {
-                                viewModel.onEvent(PlayerEvent.OnToggleControls)
+                                viewModel.onEvent(PlayerEvent.OnPlayPause)
                                 true
                             } else {
                                 // Let the focused button handle it
@@ -249,6 +249,16 @@ fun PlayerScreen(
             )
         }
 
+        // Parental guide overlay (shows when video first starts playing)
+        ParentalGuideOverlay(
+            warnings = uiState.parentalWarnings,
+            isVisible = uiState.showParentalGuide,
+            onAnimationComplete = {
+                viewModel.onEvent(PlayerEvent.OnParentalGuideHide)
+            },
+            modifier = Modifier.align(Alignment.TopStart)
+        )
+
         // Controls overlay
         AnimatedVisibility(
             visible = uiState.showControls && uiState.error == null,
@@ -258,6 +268,7 @@ fun PlayerScreen(
             PlayerControlsOverlay(
                 uiState = uiState,
                 playPauseFocusRequester = playPauseFocusRequester,
+                hideTopInfo = uiState.showParentalGuide,
                 onPlayPause = { viewModel.onEvent(PlayerEvent.OnPlayPause) },
                 onSeekForward = { viewModel.onEvent(PlayerEvent.OnSeekForward) },
                 onSeekBackward = { viewModel.onEvent(PlayerEvent.OnSeekBackward) },
@@ -273,26 +284,43 @@ fun PlayerScreen(
         // Episodes/streams side panel (slides in from right)
         AnimatedVisibility(
             visible = uiState.showEpisodesPanel && uiState.error == null,
-            enter = fadeIn(animationSpec = tween(120)) + slideInHorizontally(
+            enter = fadeIn(animationSpec = tween(120)),
+            exit = fadeOut(animationSpec = tween(120))
+        ) {
+            // Scrim (fades in/out, no slide)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+        }
+
+        // Panel itself (slides in from right)
+        AnimatedVisibility(
+            visible = uiState.showEpisodesPanel && uiState.error == null,
+            enter = slideInHorizontally(
                 animationSpec = tween(220),
                 initialOffsetX = { it }
             ),
-            exit = fadeOut(animationSpec = tween(120)) + slideOutHorizontally(
+            exit = slideOutHorizontally(
                 animationSpec = tween(220),
                 targetOffsetX = { it }
             )
         ) {
-            EpisodesSidePanel(
-                uiState = uiState,
-                episodesFocusRequester = episodesFocusRequester,
-                streamsFocusRequester = streamsFocusRequester,
-                onClose = { viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel) },
-                onBackToEpisodes = { viewModel.onEvent(PlayerEvent.OnBackFromEpisodeStreams) },
-                onSeasonSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeSeasonSelected(it)) },
-                onAddonFilterSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeAddonFilterSelected(it)) },
-                onEpisodeSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeSelected(it)) },
-                onStreamSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeStreamSelected(it)) }
-            )
+            Box(modifier = Modifier.fillMaxSize()) {
+                EpisodesSidePanel(
+                    uiState = uiState,
+                    episodesFocusRequester = episodesFocusRequester,
+                    streamsFocusRequester = streamsFocusRequester,
+                    onClose = { viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel) },
+                    onBackToEpisodes = { viewModel.onEvent(PlayerEvent.OnBackFromEpisodeStreams) },
+                    onSeasonSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeSeasonSelected(it)) },
+                    onAddonFilterSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeAddonFilterSelected(it)) },
+                    onEpisodeSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeSelected(it)) },
+                    onStreamSelected = { viewModel.onEvent(PlayerEvent.OnEpisodeStreamSelected(it)) },
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
+            }
         }
 
         // Audio track dialog
@@ -332,6 +360,7 @@ fun PlayerScreen(
 private fun PlayerControlsOverlay(
     uiState: PlayerUiState,
     playPauseFocusRequester: FocusRequester,
+    hideTopInfo: Boolean,
     onPlayPause: () -> Unit,
     onSeekForward: () -> Unit,
     onSeekBackward: () -> Unit,
@@ -375,59 +404,63 @@ private fun PlayerControlsOverlay(
                 )
         )
 
-        // Top bar - Title and episode info
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp, vertical = 24.dp)
-                .align(Alignment.TopStart)
+        // Top bar - Title and episode info (hidden when parental guide overlay is showing)
+        AnimatedVisibility(
+            visible = !hideTopInfo,
+            enter = fadeIn(animationSpec = tween(200)),
+            exit = fadeOut(animationSpec = tween(200)),
+            modifier = Modifier.align(Alignment.TopStart)
         ) {
-            // For series content, show series name; for movies, show title
-            val displayName = if (uiState.currentSeason != null && uiState.currentEpisode != null) {
-                uiState.contentName ?: uiState.title
-            } else {
-                uiState.title
-            }
-            
-            Text(
-                text = displayName,
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            // Show episode info for series (S1E3 • Episode Title)
-            if (uiState.currentSeason != null && uiState.currentEpisode != null) {
-                val episodeInfo = buildString {
-                    append("S${uiState.currentSeason}E${uiState.currentEpisode}")
-                    if (!uiState.currentEpisodeTitle.isNullOrBlank()) {
-                        append(" • ${uiState.currentEpisodeTitle}")
-                    }
-                }
-                Text(
-                    text = episodeInfo,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.9f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            
-            // Show stream source if available
-            if (!uiState.currentStreamName.isNullOrBlank()) {
-                val sourceText = if (!uiState.releaseYear.isNullOrBlank()) {
-                    "${uiState.releaseYear} - via ${uiState.currentStreamName}"
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp, vertical = 24.dp)
+            ) {
+                // For series content, show series name; for movies, show title
+                val displayName = if (uiState.currentSeason != null && uiState.currentEpisode != null) {
+                    uiState.contentName ?: uiState.title
                 } else {
-                    "via ${uiState.currentStreamName}"
+                    uiState.title
                 }
+
                 Text(
-                    text = sourceText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.6f),
+                    text = displayName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+
+                // Show episode info for series (S1E3 • Episode Title)
+                if (uiState.currentSeason != null && uiState.currentEpisode != null) {
+                    val episodeInfo = buildString {
+                        append("S${uiState.currentSeason}E${uiState.currentEpisode}")
+                        if (!uiState.currentEpisodeTitle.isNullOrBlank()) {
+                            append(" • ${uiState.currentEpisodeTitle}")
+                        }
+                    }
+                    Text(
+                        text = episodeInfo,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.9f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Show stream source if available
+                if (!uiState.currentStreamName.isNullOrBlank()) {
+                    val sourceText = if (!uiState.releaseYear.isNullOrBlank()) {
+                        "${uiState.releaseYear} - via ${uiState.currentStreamName}"
+                    } else {
+                        "via ${uiState.currentStreamName}"
+                    }
+                    Text(
+                        text = sourceText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
             }
         }
 

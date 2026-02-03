@@ -1,6 +1,7 @@
 package com.nuvio.tv.core.di
 
 import com.nuvio.tv.data.remote.api.AddonApi
+import com.nuvio.tv.data.remote.api.ParentalGuideApi
 import com.nuvio.tv.data.remote.api.TmdbApi
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -64,4 +65,19 @@ object NetworkModule {
     @Singleton
     fun provideTmdbApi(@Named("tmdb") retrofit: Retrofit): TmdbApi =
         retrofit.create(TmdbApi::class.java)
+
+    @Provides
+    @Singleton
+    @Named("parentalGuide")
+    fun provideParentalGuideRetrofit(okHttpClient: OkHttpClient, moshi: Moshi): Retrofit =
+        Retrofit.Builder()
+            .baseUrl("https://parental.nuvioapp.space/")
+            .client(okHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideParentalGuideApi(@Named("parentalGuide") retrofit: Retrofit): ParentalGuideApi =
+        retrofit.create(ParentalGuideApi::class.java)
 }

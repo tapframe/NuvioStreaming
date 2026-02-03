@@ -22,6 +22,7 @@ import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
+import com.nuvio.tv.data.repository.ParentalGuideRepository
 import com.nuvio.tv.domain.repository.MetaRepository
 import com.nuvio.tv.domain.repository.StreamRepository
 import com.nuvio.tv.domain.repository.WatchProgressRepository
@@ -46,6 +47,7 @@ class PlayerViewModel @Inject constructor(
     private val watchProgressRepository: WatchProgressRepository,
     private val metaRepository: MetaRepository,
     private val streamRepository: StreamRepository,
+    private val parentalGuideRepository: ParentalGuideRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -125,9 +127,13 @@ class PlayerViewModel @Inject constructor(
     private var lastSavedPosition: Long = 0L
     private val saveThresholdMs = 5000L // Save every 5 seconds of playback change
 
+    // Track whether playback has started (for parental guide trigger)
+    private var playbackStartedForParentalGuide = false
+
     init {
         initializePlayer(currentStreamUrl, currentHeaders)
         loadSavedProgressFor(currentSeason, currentEpisode)
+        fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
     }
 
     private fun loadSavedProgressFor(season: Int?, episode: Int?) {
@@ -152,6 +158,69 @@ class PlayerViewModel @Inject constructor(
                             _uiState.update { it.copy(pendingSeekPosition = saved.position) }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    private fun tryShowParentalGuide() {
+        val state = _uiState.value
+        if (!state.parentalGuideHasShown && state.parentalWarnings.isNotEmpty() && !playbackStartedForParentalGuide) {
+            playbackStartedForParentalGuide = true
+            _uiState.update { it.copy(showParentalGuide = true, parentalGuideHasShown = true) }
+        }
+    }
+
+    private fun fetchParentalGuide(id: String?, type: String?, season: Int?, episode: Int?) {
+        if (id.isNullOrBlank()) return
+        // Extract base IMDB ID (contentId may be like "tt1234567:1:2")
+        val imdbId = id.split(":").firstOrNull()?.takeIf { it.startsWith("tt") } ?: return
+
+        viewModelScope.launch {
+            val response = if (type in listOf("series", "tv") && season != null && episode != null) {
+                parentalGuideRepository.getTVGuide(imdbId, season, episode)
+            } else {
+                parentalGuideRepository.getMovieGuide(imdbId)
+            }
+
+            if (response?.parentalGuide != null) {
+                val guide = response.parentalGuide
+                val labels = mapOf(
+                    "nudity" to "Nudity",
+                    "violence" to "Violence",
+                    "profanity" to "Profanity",
+                    "alcohol" to "Alcohol/Drugs",
+                    "frightening" to "Frightening"
+                )
+                val severityOrder = mapOf(
+                    "severe" to 0, "moderate" to 1, "mild" to 2
+                )
+
+                val entries = listOfNotNull(
+                    guide.nudity?.let { "nudity" to it },
+                    guide.violence?.let { "violence" to it },
+                    guide.profanity?.let { "profanity" to it },
+                    guide.alcohol?.let { "alcohol" to it },
+                    guide.frightening?.let { "frightening" to it }
+                )
+
+                val warnings = entries
+                    .filter { it.second.lowercase() != "none" }
+                    .map { ParentalWarning(label = labels[it.first] ?: it.first, severity = it.second) }
+                    .sortedBy { severityOrder[it.severity.lowercase()] ?: 3 }
+                    .take(5)
+
+                _uiState.update {
+                    it.copy(
+                        parentalWarnings = warnings,
+                        showParentalGuide = false,
+                        parentalGuideHasShown = false
+                    )
+                }
+
+                // If playback already started, show now
+                if (_uiState.value.isPlaying) {
+                    tryShowParentalGuide()
                 }
             }
         }
@@ -205,6 +274,7 @@ class PlayerViewModel @Inject constructor(
                             startProgressUpdates()
                             startWatchProgressSaving()
                             scheduleHideControls()
+                            tryShowParentalGuide()
                         } else {
                             stopProgressUpdates()
                             stopWatchProgressSaving()
@@ -505,9 +575,18 @@ class PlayerViewModel @Inject constructor(
                 episodeStreamsForVideoId = null,
                 episodeStreamsSeason = null,
                 episodeStreamsEpisode = null,
-                episodeStreamsTitle = null
+                episodeStreamsTitle = null,
+                // Reset parental guide for new episode
+                parentalWarnings = emptyList(),
+                showParentalGuide = false,
+                parentalGuideHasShown = false
             )
         }
+
+        playbackStartedForParentalGuide = false
+
+        // Fetch parental guide for new episode
+        fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
 
         _exoPlayer?.let { player ->
             try {
@@ -796,6 +875,9 @@ class PlayerViewModel @Inject constructor(
                 _uiState.update { it.copy(error = null) }
                 releasePlayer()
                 initializePlayer(currentStreamUrl, currentHeaders)
+            }
+            PlayerEvent.OnParentalGuideHide -> {
+                _uiState.update { it.copy(showParentalGuide = false) }
             }
         }
     }

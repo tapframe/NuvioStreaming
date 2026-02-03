@@ -46,7 +46,11 @@ data class PlayerUiState(
     val episodeStreamsEpisode: Int? = null,
     val episodeStreamsTitle: String? = null,
     val error: String? = null,
-    val pendingSeekPosition: Long? = null  // For resuming from saved progress
+    val pendingSeekPosition: Long? = null,  // For resuming from saved progress
+    // Parental guide overlay
+    val parentalWarnings: List<ParentalWarning> = emptyList(),
+    val showParentalGuide: Boolean = false,
+    val parentalGuideHasShown: Boolean = false
 )
 
 data class TrackInfo(
@@ -78,6 +82,12 @@ sealed class PlayerEvent {
     data class OnEpisodeStreamSelected(val stream: Stream) : PlayerEvent()
     data object OnDismissDialog : PlayerEvent()
     data object OnRetry : PlayerEvent()
+    data object OnParentalGuideHide : PlayerEvent()
 }
+
+data class ParentalWarning(
+    val label: String,
+    val severity: String
+)
 
 val PLAYBACK_SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
