@@ -4,7 +4,11 @@ package com.nuvio.tv.ui.screens.stream
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,7 +31,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,9 +45,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.foundation.lazy.list.TvLazyColumn
@@ -62,7 +67,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import com.nuvio.tv.domain.model.Stream
-import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.theme.NuvioTheme
 
@@ -301,22 +305,26 @@ private fun RightStreamSection(
         modifier = modifier
             .padding(top = 48.dp, end = 48.dp, bottom = 48.dp)
     ) {
+        val chipRowHeight = 56.dp
+
         // Addon filter chips
-        AnimatedVisibility(
-            visible = !isLoading && availableAddons.isNotEmpty(),
-            enter = fadeIn(animationSpec = tween(300)),
-            exit = fadeOut(animationSpec = tween(300))
-        ) {
-            AddonFilterChips(
-                addons = availableAddons,
-                selectedAddon = selectedAddonFilter,
-                onAddonSelected = onAddonFilterSelected
-            )
+        Box(modifier = Modifier.height(chipRowHeight)) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !isLoading && availableAddons.isNotEmpty(),
+                enter = fadeIn(animationSpec = tween(300)),
+                exit = fadeOut(animationSpec = tween(300))
+            ) {
+                AddonFilterChips(
+                    addons = availableAddons,
+                    selectedAddon = selectedAddonFilter,
+                    onAddonSelected = onAddonFilterSelected
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        AnimatedVisibility(
+        androidx.compose.animation.AnimatedVisibility(
             visible = enter,
             enter = fadeIn(animationSpec = tween(260)) +
                 slideInHorizontally(
@@ -446,20 +454,7 @@ private fun AddonChip(
 
 @Composable
 private fun LoadingState() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        LoadingIndicator()
-        
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "Fetching streams from addons...",
-            style = MaterialTheme.typography.bodyLarge,
-            color = NuvioTheme.extendedColors.textSecondary
-        )
-    }
+    StreamsSkeletonList()
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -571,13 +566,10 @@ private fun StreamCard(
     stream: Stream,
     onClick: () -> Unit
 ) {
-    var isFocused by remember { mutableStateOf(false) }
-
     Card(
         onClick = onClick,
         modifier = Modifier
-            .fillMaxWidth()
-            .onFocusChanged { isFocused = it.isFocused },
+            .fillMaxWidth(),
         colors = CardDefaults.colors(
             containerColor = NuvioColors.BackgroundElevated,
             focusedContainerColor = NuvioColors.FocusBackground
@@ -598,24 +590,6 @@ private fun StreamCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Play icon
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isFocused) NuvioColors.Primary else NuvioColors.Primary.copy(alpha = 0.2f)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    modifier = Modifier.size(28.dp),
-                    tint = if (isFocused) NuvioColors.OnPrimary else NuvioColors.Primary
-                )
-            }
-
             // Stream info
             Column(
                 modifier = Modifier.weight(1f),
@@ -679,6 +653,104 @@ private fun StreamCard(
             }
         }
     }
+}
+
+@Composable
+private fun StreamsSkeletonList() {
+    TvLazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 8.dp)
+    ) {
+        items(6) {
+            StreamCardSkeleton()
+        }
+    }
+}
+
+@Composable
+private fun StreamCardSkeleton() {
+    val shimmerBrush = rememberShimmerBrush()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(NuvioColors.BackgroundElevated)
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SkeletonBar(width = 180.dp, height = 16.dp, brush = shimmerBrush)
+                SkeletonBar(width = 140.dp, height = 12.dp, brush = shimmerBrush)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SkeletonBar(width = 64.dp, height = 16.dp, brush = shimmerBrush)
+                    SkeletonBar(width = 52.dp, height = 16.dp, brush = shimmerBrush)
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerBrush)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                SkeletonBar(width = 64.dp, height = 10.dp, brush = shimmerBrush)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SkeletonBar(
+    width: Dp,
+    height: Dp,
+    brush: Brush
+) {
+    Box(
+        modifier = Modifier
+            .width(width)
+            .height(height)
+            .clip(RoundedCornerShape(4.dp))
+            .background(brush)
+    )
+}
+
+
+@Composable
+private fun rememberShimmerBrush(): Brush {
+    val shimmerColors = listOf(
+        NuvioColors.SurfaceVariant.copy(alpha = 0.35f),
+        NuvioColors.SurfaceVariant.copy(alpha = 0.65f),
+        NuvioColors.SurfaceVariant.copy(alpha = 0.35f)
+    )
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translate by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = LinearEasing)
+        ),
+        label = "shimmer_translate"
+    )
+
+    return Brush.linearGradient(
+        colors = shimmerColors,
+        start = Offset(translate - 1000f, 0f),
+        end = Offset(translate, 0f)
+    )
 }
 
 @Composable

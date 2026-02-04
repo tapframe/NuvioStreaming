@@ -8,6 +8,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
@@ -65,7 +66,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            val currentTheme by themeDataStore.selectedTheme.collectAsState(initial = AppTheme.CRIMSON)
+            val currentTheme by themeDataStore.selectedTheme.collectAsState(initial = AppTheme.OCEAN)
 
             NuvioTheme(appTheme = currentTheme) {
                 Surface(
@@ -125,8 +126,7 @@ class MainActivity : ComponentActivity() {
                                             )
                                         )
                                         .padding(12.dp)
-                                        .selectableGroup(),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        .selectableGroup()
                                 ) {
                                     if (drawerValue == DrawerValue.Open) {
                                         Image(
@@ -147,39 +147,47 @@ class MainActivity : ComponentActivity() {
                                             contentScale = ContentScale.Fit
                                         )
                                     }
-                                    drawerItems.forEach { (route, item) ->
-                                        val (label, icon) = item
-                                        NavigationDrawerItem(
-                                            selected = currentRoute == route,
-                                            onClick = {
-                                                if (currentRoute != route) {
-                                                    navController.navigate(route) {
-                                                        popUpTo(navController.graph.startDestinationId) {
-                                                            saveState = true
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        drawerItems.forEach { (route, item) ->
+                                            val (label, icon) = item
+                                            NavigationDrawerItem(
+                                                selected = currentRoute == route,
+                                                onClick = {
+                                                    if (currentRoute != route) {
+                                                        navController.navigate(route) {
+                                                            popUpTo(navController.graph.startDestinationId) {
+                                                                saveState = true
+                                                            }
+                                                            launchSingleTop = true
+                                                            restoreState = true
                                                         }
-                                                        launchSingleTop = true
-                                                        restoreState = true
                                                     }
+                                                    drawerState.setValue(DrawerValue.Closed)
+                                                },
+                                                colors = NavigationDrawerItemDefaults.colors(
+                                                    selectedContainerColor = NuvioColors.FocusBackground,
+                                                    focusedContainerColor = NuvioColors.FocusBackground,
+                                                    pressedContainerColor = NuvioColors.FocusBackground,
+                                                    selectedContentColor = NuvioColors.FocusRing,
+                                                    focusedContentColor = NuvioColors.FocusRing,
+                                                    pressedContentColor = NuvioColors.FocusRing
+                                                ),
+                                                leadingContent = {
+                                                    Icon(imageVector = icon, contentDescription = null)
                                                 }
-                                                drawerState.setValue(DrawerValue.Closed)
-                                            },
-                                            colors = NavigationDrawerItemDefaults.colors(
-                                                selectedContainerColor = NuvioColors.FocusBackground,
-                                                focusedContainerColor = NuvioColors.FocusBackground,
-                                                pressedContainerColor = NuvioColors.FocusBackground,
-                                                selectedContentColor = NuvioColors.FocusRing,
-                                                focusedContentColor = NuvioColors.FocusRing,
-                                                pressedContentColor = NuvioColors.FocusRing
-                                            ),
-                                            leadingContent = {
-                                                Icon(imageVector = icon, contentDescription = null)
-                                            }
-                                        ) {
-                                            if (drawerValue == DrawerValue.Open) {
-                                                Text(label)
+                                            ) {
+                                                if (drawerValue == DrawerValue.Open) {
+                                                    Text(label)
+                                                }
                                             }
                                         }
                                     }
+                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         ) {

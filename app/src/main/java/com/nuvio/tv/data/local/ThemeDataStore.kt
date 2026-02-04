@@ -24,11 +24,11 @@ class ThemeDataStore @Inject constructor(
     private val themeKey = stringPreferencesKey("selected_theme")
 
     val selectedTheme: Flow<AppTheme> = dataStore.data.map { prefs ->
-        val themeName = prefs[themeKey] ?: AppTheme.CRIMSON.name
+        val themeName = prefs[themeKey] ?: AppTheme.OCEAN.name
         try {
             AppTheme.valueOf(themeName)
         } catch (e: IllegalArgumentException) {
-            AppTheme.CRIMSON
+            AppTheme.OCEAN
         }
     }
 
