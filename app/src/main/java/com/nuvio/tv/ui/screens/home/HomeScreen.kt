@@ -27,6 +27,8 @@ import com.nuvio.tv.ui.components.ErrorState
 import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.theme.NuvioColors
 
+private const val CONTINUE_WATCHING_ROW_INDEX = -1
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -51,10 +53,30 @@ fun HomeScreen(
         }
     }
 
-    // Track which row and item have focus
+    // One-shot restore target: set once, consumed after focus is restored
+    // When no focus has been saved, use Int.MIN_VALUE so no row grabs focus prematurely.
+    // The LaunchedEffect below will set the correct target once continue watching items arrive.
+    var restoreRowIndex by remember {
+        mutableStateOf(if (focusState.hasSavedFocus) focusState.focusedRowIndex else Int.MIN_VALUE)
+    }
+    var restoreItemIndex by remember {
+        mutableStateOf(if (focusState.hasSavedFocus) focusState.focusedItemIndex else -1)
+    }
+
+    // Track which row and item currently have focus (updated during navigation)
     var currentFocusedRowIndex by remember { mutableStateOf(focusState.focusedRowIndex) }
     var currentFocusedItemIndex by remember { mutableStateOf(focusState.focusedItemIndex) }
     val catalogRowScrollStates = remember { mutableMapOf<String, Int>() }
+
+    // On first launch (no saved focus), redirect focus to continue watching when items arrive
+    LaunchedEffect(uiState.continueWatchingItems.isNotEmpty()) {
+        if (!focusState.hasSavedFocus && uiState.continueWatchingItems.isNotEmpty() && restoreRowIndex != CONTINUE_WATCHING_ROW_INDEX) {
+            restoreRowIndex = CONTINUE_WATCHING_ROW_INDEX
+            restoreItemIndex = 0
+            currentFocusedRowIndex = CONTINUE_WATCHING_ROW_INDEX
+            currentFocusedItemIndex = 0
+        }
+    }
 
     // Save scroll position when leaving screen
     DisposableEffect(Unit) {
@@ -99,6 +121,7 @@ fun HomeScreen(
                     // Continue Watching section at the top
                     if (uiState.continueWatchingItems.isNotEmpty()) {
                         item(key = "continue_watching") {
+                            val shouldRestoreFocus = restoreRowIndex == CONTINUE_WATCHING_ROW_INDEX
                             ContinueWatchingSection(
                                 items = uiState.continueWatchingItems,
                                 onItemClick = { progress ->
@@ -107,18 +130,27 @@ fun HomeScreen(
                                         progress.contentType,
                                         ""  // No specific addon
                                     )
+                                },
+                                focusedItemIndex = if (shouldRestoreFocus) restoreItemIndex else -1,
+                                onItemFocused = { itemIndex ->
+                                    currentFocusedRowIndex = CONTINUE_WATCHING_ROW_INDEX
+                                    currentFocusedItemIndex = itemIndex
+                                    // Consume restore target once focus lands
+                                    if (restoreRowIndex == CONTINUE_WATCHING_ROW_INDEX) {
+                                        restoreRowIndex = Int.MIN_VALUE
+                                    }
                                 }
                             )
                         }
                     }
-                    
+
                     itemsIndexed(
                         items = uiState.catalogRows,
                         key = { _, item -> "${item.addonId}_${item.type}_${item.catalogId}" }
                     ) { index, catalogRow ->
                         val catalogKey = "${catalogRow.addonId}_${catalogRow.type.toApiString()}_${catalogRow.catalogId}"
-                        val shouldRestoreFocus = index == focusState.focusedRowIndex
-                        val focusedItemIndex = if (shouldRestoreFocus) focusState.focusedItemIndex else -1
+                        val shouldRestoreFocus = index == restoreRowIndex
+                        val focusedItemIndex = if (shouldRestoreFocus) restoreItemIndex else -1
 
                         CatalogRowSection(
                             catalogRow = catalogRow,
@@ -140,6 +172,10 @@ fun HomeScreen(
                                 currentFocusedRowIndex = index
                                 currentFocusedItemIndex = itemIndex
                                 catalogRowScrollStates[catalogKey] = itemIndex
+                                // Consume restore target once focus lands
+                                if (restoreRowIndex == index) {
+                                    restoreRowIndex = Int.MIN_VALUE
+                                }
                             }
                         )
                     }

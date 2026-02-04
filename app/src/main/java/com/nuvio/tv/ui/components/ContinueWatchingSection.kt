@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -31,7 +32,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.foundation.lazy.list.TvLazyRow
-import androidx.tv.foundation.lazy.list.items
+import androidx.tv.foundation.lazy.list.itemsIndexed
 import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -50,9 +51,25 @@ import java.util.concurrent.TimeUnit
 fun ContinueWatchingSection(
     items: List<WatchProgress>,
     onItemClick: (WatchProgress) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    focusedItemIndex: Int = -1,
+    onItemFocused: (itemIndex: Int) -> Unit = {}
 ) {
     if (items.isEmpty()) return
+
+    val itemFocusRequester = remember { FocusRequester() }
+
+    // Restore focus to specific item if requested
+    LaunchedEffect(focusedItemIndex) {
+        if (focusedItemIndex >= 0 && focusedItemIndex < items.size) {
+            kotlinx.coroutines.delay(100)
+            try {
+                itemFocusRequester.requestFocus()
+            } catch (e: IllegalStateException) {
+                // Item not yet composed, ignore
+            }
+        }
+    }
 
     Column(modifier = modifier) {
         Text(
@@ -67,16 +84,25 @@ fun ContinueWatchingSection(
             contentPadding = PaddingValues(horizontal = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(
-                items = items, 
-                key = { progress ->
-                    // Create unique key using videoId which is always unique per episode
+            itemsIndexed(
+                items = items,
+                key = { _, progress ->
                     progress.videoId
                 }
-            ) { progress ->
+            ) { index, progress ->
                 ContinueWatchingCard(
                     progress = progress,
-                    onClick = { onItemClick(progress) }
+                    onClick = { onItemClick(progress) },
+                    modifier = Modifier
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                onItemFocused(index)
+                            }
+                        }
+                        .then(
+                            if (index == focusedItemIndex) Modifier.focusRequester(itemFocusRequester)
+                            else Modifier
+                        )
                 )
             }
         }
@@ -87,13 +113,14 @@ fun ContinueWatchingSection(
 @Composable
 private fun ContinueWatchingCard(
     progress: WatchProgress,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     Card(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .width(320.dp)
             .onFocusChanged { isFocused = it.isFocused },
         shape = CardDefaults.shape(

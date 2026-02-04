@@ -23,7 +23,7 @@ class SkipIntroRepository @Inject constructor(
     private val armApi: ArmApi
 ) {
     private val cache = ConcurrentHashMap<String, List<SkipInterval>>()
-    private val malIdCache = ConcurrentHashMap<String, String?>()
+    private val malIdCache = ConcurrentHashMap<String, String>()
     private val introDbConfigured = BuildConfig.INTRODB_API_URL.isNotEmpty()
 
     suspend fun getSkipIntervals(
@@ -103,7 +103,9 @@ class SkipIntroRepository @Inject constructor(
     }
 
     private suspend fun resolveMalId(imdbId: String): String? {
-        malIdCache[imdbId]?.let { return it }
+        // Use a sentinel value for "not found" since ConcurrentHashMap doesn't allow null values
+        val cached = malIdCache[imdbId]
+        if (cached != null) return cached.takeIf { it != NO_MAL_ID }
 
         val malId = try {
             val response = armApi.resolve(imdbId)
@@ -114,7 +116,11 @@ class SkipIntroRepository @Inject constructor(
             null
         }
 
-        malIdCache[imdbId] = malId
+        malIdCache[imdbId] = malId ?: NO_MAL_ID
         return malId
+    }
+
+    companion object {
+        private const val NO_MAL_ID = "__none__"
     }
 }

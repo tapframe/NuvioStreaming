@@ -796,7 +796,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun scheduleHideControls() {
+    fun scheduleHideControls() {
         hideControlsJob?.cancel()
         hideControlsJob = viewModelScope.launch {
             delay(3000)

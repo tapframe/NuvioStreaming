@@ -17,6 +17,7 @@ data class HomeScreenFocusState(
 
     /**
      * Index of the catalog row that had focus when navigating away.
+     * -1 means continue watching section.
      */
     val focusedRowIndex: Int = 0,
 
@@ -29,5 +30,10 @@ data class HomeScreenFocusState(
      * Map of catalog row keys to their horizontal scroll positions.
      * Key format: "${addonId}_${type}_${catalogId}"
      */
-    val catalogRowScrollStates: Map<String, Int> = emptyMap()
+    val catalogRowScrollStates: Map<String, Int> = emptyMap(),
+
+    /**
+     * Whether focus state has been explicitly saved (vs still at defaults).
+     */
+    val hasSavedFocus: Boolean = false
 )

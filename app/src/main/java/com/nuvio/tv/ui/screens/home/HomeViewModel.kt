@@ -209,7 +209,8 @@ class HomeViewModel @Inject constructor(
             verticalScrollOffset = verticalScrollOffset,
             focusedRowIndex = focusedRowIndex,
             focusedItemIndex = focusedItemIndex,
-            catalogRowScrollStates = catalogRowScrollStates
+            catalogRowScrollStates = catalogRowScrollStates,
+            hasSavedFocus = true
         )
     }
 

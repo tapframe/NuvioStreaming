@@ -10,15 +10,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -77,7 +74,6 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.theme.NuvioColors
@@ -293,6 +289,7 @@ fun PlayerScreen(
                 onShowAudioDialog = { viewModel.onEvent(PlayerEvent.OnShowAudioDialog) },
                 onShowSubtitleDialog = { viewModel.onEvent(PlayerEvent.OnShowSubtitleDialog) },
                 onShowSpeedDialog = { viewModel.onEvent(PlayerEvent.OnShowSpeedDialog) },
+                onResetHideTimer = { viewModel.scheduleHideControls() },
                 onBack = onBackPress
             )
         }
@@ -385,6 +382,7 @@ private fun PlayerControlsOverlay(
     onShowAudioDialog: () -> Unit,
     onShowSubtitleDialog: () -> Unit,
     onShowSpeedDialog: () -> Unit,
+    onResetHideTimer: () -> Unit,
     onBack: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -502,59 +500,62 @@ private fun PlayerControlsOverlay(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left side - Playback controls
+                // Left side - All controls in a flat row
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Play/Pause
+                    ControlButton(
+                        icon = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                        onClick = onPlayPause,
+                        focusRequester = playPauseFocusRequester,
+                        onFocused = onResetHideTimer
+                    )
+
+                    // Rewind 10s
                     ControlButton(
                         icon = Icons.Default.Replay10,
                         contentDescription = "Rewind 10 seconds",
-                        onClick = onSeekBackward
+                        onClick = onSeekBackward,
+                        onFocused = onResetHideTimer
                     )
 
-                    // Play/Pause button (larger)
-                    PlayPauseButton(
-                        isPlaying = uiState.isPlaying,
-                        focusRequester = playPauseFocusRequester,
-                        onClick = onPlayPause
-                    )
-
+                    // Forward 10s
                     ControlButton(
                         icon = Icons.Default.Forward10,
                         contentDescription = "Forward 10 seconds",
-                        onClick = onSeekForward
+                        onClick = onSeekForward,
+                        onFocused = onResetHideTimer
                     )
 
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    // Time display
-                    Text(
-                        text = "${formatTime(uiState.currentPosition)} / ${formatTime(uiState.duration)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.9f)
-                    )
-                }
-
-                // Right side - Settings controls
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Speed indicator
-                    if (uiState.playbackSpeed != 1f) {
-                        Text(
-                            text = "${uiState.playbackSpeed}x",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = NuvioColors.Secondary,
-                            modifier = Modifier.padding(end = 4.dp)
+                    // Subtitles
+                    if (uiState.subtitleTracks.isNotEmpty()) {
+                        ControlButton(
+                            icon = Icons.Default.ClosedCaption,
+                            contentDescription = "Subtitles",
+                            onClick = onShowSubtitleDialog,
+                            onFocused = onResetHideTimer
                         )
                     }
 
+                    // Audio tracks
+                    if (uiState.audioTracks.isNotEmpty()) {
+                        ControlButton(
+                            icon = Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = "Audio tracks",
+                            onClick = onShowAudioDialog,
+                            onFocused = onResetHideTimer
+                        )
+                    }
+
+                    // Speed
                     ControlButton(
                         icon = Icons.Default.Speed,
                         contentDescription = "Playback speed",
-                        onClick = onShowSpeedDialog
+                        onClick = onShowSpeedDialog,
+                        onFocused = onResetHideTimer
                     )
 
                     // Episodes (only show when playing a specific episode)
@@ -562,60 +563,20 @@ private fun PlayerControlsOverlay(
                         ControlButton(
                             icon = Icons.AutoMirrored.Filled.List,
                             contentDescription = "Episodes",
-                            onClick = onShowEpisodesPanel
-                        )
-                    }
-
-                    if (uiState.audioTracks.isNotEmpty()) {
-                        ControlButton(
-                            icon = Icons.AutoMirrored.Filled.VolumeUp,
-                            contentDescription = "Audio tracks",
-                            onClick = onShowAudioDialog
-                        )
-                    }
-
-                    if (uiState.subtitleTracks.isNotEmpty()) {
-                        ControlButton(
-                            icon = Icons.Default.ClosedCaption,
-                            contentDescription = "Subtitles",
-                            onClick = onShowSubtitleDialog
+                            onClick = onShowEpisodesPanel,
+                            onFocused = onResetHideTimer
                         )
                     }
                 }
+
+                // Right side - Time display only
+                Text(
+                    text = "${formatTime(uiState.currentPosition)} / ${formatTime(uiState.duration)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
             }
         }
-    }
-}
-
-
-
-@Composable
-private fun PlayPauseButton(
-    isPlaying: Boolean,
-    focusRequester: FocusRequester,
-    onClick: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(64.dp)
-            .focusRequester(focusRequester)
-            .onFocusChanged { isFocused = it.isFocused },
-        colors = IconButtonDefaults.colors(
-            containerColor = Color.White.copy(alpha = 0.2f),
-            focusedContainerColor = NuvioColors.Secondary,
-            contentColor = Color.White,
-            focusedContentColor = Color.White
-        ),
-        shape = IconButtonDefaults.shape(shape = CircleShape)
-    ) {
-        Icon(
-            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-            contentDescription = if (isPlaying) "Pause" else "Play",
-            modifier = Modifier.size(36.dp)
-        )
     }
 }
 
@@ -623,7 +584,9 @@ private fun PlayPauseButton(
 private fun ControlButton(
     icon: ImageVector,
     contentDescription: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
+    onFocused: (() -> Unit)? = null
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
@@ -631,7 +594,14 @@ private fun ControlButton(
         onClick = onClick,
         modifier = Modifier
             .size(48.dp)
-            .onFocusChanged { isFocused = it.isFocused },
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester)
+                else Modifier
+            )
+            .onFocusChanged {
+                isFocused = it.isFocused
+                if (it.isFocused) onFocused?.invoke()
+            },
         colors = IconButtonDefaults.colors(
             containerColor = Color.Transparent,
             focusedContainerColor = NuvioColors.FocusBackground,
