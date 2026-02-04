@@ -163,7 +163,7 @@ private fun MetaHeroSkeleton(shimmerBrush: Brush) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SkeletonPill(width = 220.dp, height = 48.dp, brush = shimmerBrush)
+                SkeletonPill(width = 100.dp, height = 48.dp, brush = shimmerBrush)
                 Box(
                     modifier = Modifier
                         .size(48.dp)
