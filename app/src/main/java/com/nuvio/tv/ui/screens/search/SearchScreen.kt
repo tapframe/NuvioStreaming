@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -53,6 +54,7 @@ fun SearchScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 48.dp),
                     singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
                     placeholder = {
                         Text(
                             text = "Search movies & series (installed addons)",

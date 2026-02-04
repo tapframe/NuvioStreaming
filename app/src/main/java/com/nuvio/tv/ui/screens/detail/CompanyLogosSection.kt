@@ -53,8 +53,8 @@ fun CompanyLogosSection(
             contentPadding = PaddingValues(horizontal = 48.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(companies, key = { it.name }) { company ->
-                CompanyLogoCard(company = company)
+            items(companies.size, key = { index -> "$title-${companies[index].name}-$index" }) { index ->
+                CompanyLogoCard(company = companies[index])
             }
         }
     }

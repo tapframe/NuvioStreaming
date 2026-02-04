@@ -15,11 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.foundation.lazy.list.TvLazyColumn
 import androidx.tv.foundation.lazy.list.items
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -69,7 +70,7 @@ fun AddonManagerScreen(
                         .fillMaxWidth()
                         .animateContentSize(),
                     colors = CardDefaults.cardColors(containerColor = NuvioColors.BackgroundCard),
-                    shape = RoundedCornerShape(18.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
@@ -87,15 +88,25 @@ fun AddonManagerScreen(
                                 value = uiState.installUrl,
                                 onValueChange = viewModel::onInstallUrlChange,
                                 placeholder = { Text(text = "https://example.com") },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = NuvioColors.BackgroundElevated,
+                                    unfocusedContainerColor = NuvioColors.BackgroundElevated,
+                                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                                )
                             )
                             Button(
                                 onClick = viewModel::installAddon,
                                 enabled = !uiState.isInstalling,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = NuvioColors.Primary,
-                                    contentColor = NuvioColors.OnPrimary
-                                )
+                                colors = ButtonDefaults.colors(
+                                    containerColor = NuvioColors.BackgroundCard,
+                                    contentColor = NuvioColors.TextPrimary,
+                                    focusedContainerColor = NuvioColors.FocusBackground,
+                                    focusedContentColor = NuvioColors.Primary
+                                ),
+                                shape = ButtonDefaults.shape(RoundedCornerShape(12.dp))
                             ) {
                                 Text(text = if (uiState.isInstalling) "Installing" else "Install")
                             }
@@ -164,7 +175,7 @@ private fun AddonCard(
             .fillMaxWidth()
             .animateContentSize(),
         colors = CardDefaults.cardColors(containerColor = NuvioColors.BackgroundCard),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -186,10 +197,13 @@ private fun AddonCard(
                 }
                 Button(
                     onClick = onRemove,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = NuvioColors.TextSecondary
-                    )
+                    colors = ButtonDefaults.colors(
+                        containerColor = NuvioColors.BackgroundCard,
+                        contentColor = NuvioColors.TextSecondary,
+                        focusedContainerColor = NuvioColors.FocusBackground,
+                        focusedContentColor = NuvioColors.Error
+                    ),
+                    shape = ButtonDefaults.shape(RoundedCornerShape(12.dp))
                 ) {
                     Text(text = "Remove")
                 }

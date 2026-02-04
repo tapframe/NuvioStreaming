@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,9 +38,12 @@ fun ErrorState(
         Button(
             onClick = onRetry,
             colors = ButtonDefaults.colors(
-                containerColor = NuvioColors.Primary,
-                contentColor = NuvioColors.OnPrimary
-            )
+                containerColor = NuvioColors.BackgroundCard,
+                contentColor = NuvioColors.TextPrimary,
+                focusedContainerColor = NuvioColors.FocusBackground,
+                focusedContentColor = NuvioColors.Primary
+            ),
+            shape = ButtonDefaults.shape(RoundedCornerShape(12.dp))
         ) {
             Text("Retry")
         }

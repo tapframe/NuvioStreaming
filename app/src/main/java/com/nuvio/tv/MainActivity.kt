@@ -126,7 +126,8 @@ class MainActivity : ComponentActivity() {
                                             contentDescription = "Nuvio",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(48.dp),
+                                                .height(48.dp)
+                                                .padding(top = 12.dp),
                                             contentScale = ContentScale.Fit
                                         )
                                     } else {
@@ -135,7 +136,8 @@ class MainActivity : ComponentActivity() {
                                             contentDescription = "Nuvio",
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(48.dp),
+                                                .height(48.dp)
+                                                .padding(top = 12.dp),
                                             contentScale = ContentScale.Fit
                                         )
                                     }
