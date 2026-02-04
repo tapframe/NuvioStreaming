@@ -102,6 +102,7 @@ fun StreamScreen(
                 season = uiState.season,
                 episode = uiState.episode,
                 episodeName = uiState.episodeName,
+                runtime = uiState.runtime,
                 genres = uiState.genres,
                 year = uiState.year,
                 modifier = Modifier
@@ -205,6 +206,7 @@ private fun LeftContentSection(
     season: Int?,
     episode: Int?,
     episodeName: String?,
+    runtime: Int?,
     genres: String?,
     year: String?,
     modifier: Modifier = Modifier
@@ -239,8 +241,6 @@ private fun LeftContentSection(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Show episode info or movie info
             if (isEpisode && season != null && episode != null) {
                 // Episode info
@@ -258,6 +258,15 @@ private fun LeftContentSection(
                         color = NuvioColors.TextPrimary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                if (runtime != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${runtime}m",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = NuvioTheme.extendedColors.textSecondary,
                         textAlign = TextAlign.Center
                     )
                 }

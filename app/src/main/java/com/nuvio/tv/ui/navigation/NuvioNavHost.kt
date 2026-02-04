@@ -49,7 +49,7 @@ fun NuvioNavHost(
         ) { backStackEntry ->
             MetaDetailsScreen(
                 onBackPress = { navController.popBackStack() },
-                onPlayClick = { videoId, contentType, contentId, title, poster, backdrop, logo, season, episode, episodeName, genres, year ->
+                onPlayClick = { videoId, contentType, contentId, title, poster, backdrop, logo, season, episode, episodeName, genres, year, runtime ->
                     navController.navigate(
                         Screen.Stream.createRoute(
                             videoId = videoId,
@@ -64,7 +64,8 @@ fun NuvioNavHost(
                             genres = genres,
                             year = year,
                             contentId = contentId,
-                            contentName = title
+                            contentName = title,
+                            runtime = runtime
                         )
                     )
                 }
@@ -123,6 +124,11 @@ fun NuvioNavHost(
                     defaultValue = null
                 },
                 navArgument("contentName") { 
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("runtime") { 
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null

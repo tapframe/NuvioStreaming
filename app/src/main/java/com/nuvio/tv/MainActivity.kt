@@ -116,15 +116,7 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .fillMaxHeight()
                                         .width(drawerWidth)
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                colors = listOf(
-                                                    Color.Black.copy(alpha = 0.7f),
-                                                    Color.Black.copy(alpha = 0.35f),
-                                                    Color.Transparent
-                                                )
-                                            )
-                                        )
+                                        .background(NuvioColors.Background)
                                         .padding(12.dp)
                                         .selectableGroup()
                                 ) {

@@ -29,6 +29,7 @@ class StreamScreenViewModel @Inject constructor(
     private val season: Int? = savedStateHandle.get<String>("season")?.toIntOrNull()
     private val episode: Int? = savedStateHandle.get<String>("episode")?.toIntOrNull()
     private val episodeName: String? = savedStateHandle["episodeName"]
+    private val runtime: Int? = savedStateHandle.get<String>("runtime")?.toIntOrNull()
     private val genres: String? = savedStateHandle["genres"]
     private val year: String? = savedStateHandle["year"]
     private val contentId: String? = savedStateHandle["contentId"]
@@ -45,6 +46,7 @@ class StreamScreenViewModel @Inject constructor(
             season = season,
             episode = episode,
             episodeName = episodeName,
+            runtime = runtime,
             genres = genres,
             year = year
         )

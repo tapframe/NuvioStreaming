@@ -15,6 +15,7 @@ data class StreamScreenUiState(
     val season: Int? = null,
     val episode: Int? = null,
     val episodeName: String? = null,
+    val runtime: Int? = null,
     // Movie-specific fields
     val genres: String? = null,
     val year: String? = null,

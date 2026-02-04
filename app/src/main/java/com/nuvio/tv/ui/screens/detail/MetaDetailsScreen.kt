@@ -54,8 +54,9 @@ fun MetaDetailsScreen(
         episode: Int?,
         episodeName: String?,
         genres: String?,
-        year: String?
-    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _ -> }
+        year: String?,
+        runtime: Int?
+    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -106,7 +107,8 @@ fun MetaDetailsScreen(
                             video.episode,
                             video.title,
                             null,
-                            null
+                            null,
+                            video.runtime
                         )
                     },
                     onPlayClick = { videoId ->
@@ -123,7 +125,8 @@ fun MetaDetailsScreen(
                             null,
                             null,
                             genresString,
-                            yearString
+                            yearString,
+                            null
                         )
                     },
                     onToggleLibrary = { viewModel.onEvent(MetaDetailsEvent.OnToggleLibrary) }

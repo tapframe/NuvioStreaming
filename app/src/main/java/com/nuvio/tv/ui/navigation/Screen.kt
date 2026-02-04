@@ -13,7 +13,7 @@ sealed class Screen(val route: String) {
             return "detail/$itemId/$itemType?addonBaseUrl=$encodedAddon"
         }
     }
-    data object Stream : Screen("stream/{videoId}/{contentType}/{title}?poster={poster}&backdrop={backdrop}&logo={logo}&season={season}&episode={episode}&episodeName={episodeName}&genres={genres}&year={year}&contentId={contentId}&contentName={contentName}") {
+    data object Stream : Screen("stream/{videoId}/{contentType}/{title}?poster={poster}&backdrop={backdrop}&logo={logo}&season={season}&episode={episode}&episodeName={episodeName}&genres={genres}&year={year}&contentId={contentId}&contentName={contentName}&runtime={runtime}") {
         private fun encode(value: String): String = 
             URLEncoder.encode(value, "UTF-8").replace("+", "%20")
         
@@ -30,7 +30,8 @@ sealed class Screen(val route: String) {
             genres: String? = null,
             year: String? = null,
             contentId: String? = null,
-            contentName: String? = null
+            contentName: String? = null,
+            runtime: Int? = null
         ): String {
             val encodedTitle = encode(title)
             val encodedPoster = poster?.let { encode(it) } ?: ""
@@ -41,7 +42,7 @@ sealed class Screen(val route: String) {
             val encodedYear = year?.let { encode(it) } ?: ""
             val encodedContentId = contentId?.let { encode(it) } ?: ""
             val encodedContentName = contentName?.let { encode(it) } ?: ""
-            return "stream/$videoId/$contentType/$encodedTitle?poster=$encodedPoster&backdrop=$encodedBackdrop&logo=$encodedLogo&season=${season ?: ""}&episode=${episode ?: ""}&episodeName=$encodedEpisodeName&genres=$encodedGenres&year=$encodedYear&contentId=$encodedContentId&contentName=$encodedContentName"
+            return "stream/$videoId/$contentType/$encodedTitle?poster=$encodedPoster&backdrop=$encodedBackdrop&logo=$encodedLogo&season=${season ?: ""}&episode=${episode ?: ""}&episodeName=$encodedEpisodeName&genres=$encodedGenres&year=$encodedYear&contentId=$encodedContentId&contentName=$encodedContentName&runtime=${runtime ?: ""}"
         }
     }
     data object Player : Screen("player/{streamUrl}/{title}?streamName={streamName}&year={year}&headers={headers}&contentId={contentId}&contentType={contentType}&contentName={contentName}&poster={poster}&backdrop={backdrop}&logo={logo}&videoId={videoId}&season={season}&episode={episode}&episodeTitle={episodeTitle}") {
