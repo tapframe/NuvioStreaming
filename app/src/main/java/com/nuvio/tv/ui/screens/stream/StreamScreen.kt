@@ -4,11 +4,7 @@ package com.nuvio.tv.ui.screens.stream
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -45,7 +41,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +63,7 @@ import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.ui.theme.NuvioColors
+import com.nuvio.tv.ui.components.StreamsSkeletonList
 import com.nuvio.tv.ui.theme.NuvioTheme
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -500,13 +496,14 @@ private fun ErrorState(
                     shape = RoundedCornerShape(8.dp)
                 )
             ),
-            shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp))
+            shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
+            scale = CardDefaults.scale(focusedScale = 1.02f)
         ) {
             Text(
                 text = "Retry",
                 style = MaterialTheme.typography.labelLarge,
                 color = if (isFocused) NuvioColors.OnPrimary else NuvioColors.TextPrimary,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
             )
         }
     }
@@ -520,12 +517,13 @@ private fun EmptyState() {
         modifier = Modifier.padding(32.dp)
     ) {
         Text(
-            text = "No streams available",
-            style = MaterialTheme.typography.headlineSmall,
-            color = NuvioColors.TextPrimary
+            text = "No streams found",
+            style = MaterialTheme.typography.bodyLarge,
+            color = NuvioTheme.extendedColors.textSecondary,
+            textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = "Try installing more addons to find streams",
@@ -549,7 +547,7 @@ private fun StreamsList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(vertical = 8.dp)
     ) {
-        itemsIndexed(streams, key = { index, stream -> 
+        itemsIndexed(streams, key = { index, stream ->
             "${stream.addonName}_${stream.url ?: stream.infoHash ?: stream.ytId ?: "unknown"}_$index"
         }) { _, stream ->
             StreamCard(
@@ -590,7 +588,6 @@ private fun StreamCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Stream info
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -611,7 +608,6 @@ private fun StreamCard(
                     }
                 }
 
-                // Stream type indicators
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -627,7 +623,6 @@ private fun StreamCard(
                 }
             }
 
-            // Addon info
             Column(
                 horizontalAlignment = Alignment.End
             ) {
@@ -656,113 +651,15 @@ private fun StreamCard(
 }
 
 @Composable
-private fun StreamsSkeletonList() {
-    TvLazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 8.dp)
-    ) {
-        items(6) {
-            StreamCardSkeleton()
-        }
-    }
-}
-
-@Composable
-private fun StreamCardSkeleton() {
-    val shimmerBrush = rememberShimmerBrush()
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(NuvioColors.BackgroundElevated)
-            .padding(16.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SkeletonBar(width = 180.dp, height = 16.dp, brush = shimmerBrush)
-                SkeletonBar(width = 140.dp, height = 12.dp, brush = shimmerBrush)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SkeletonBar(width = 64.dp, height = 16.dp, brush = shimmerBrush)
-                    SkeletonBar(width = 52.dp, height = 16.dp, brush = shimmerBrush)
-                }
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(shimmerBrush)
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                SkeletonBar(width = 64.dp, height = 10.dp, brush = shimmerBrush)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SkeletonBar(
-    width: Dp,
-    height: Dp,
-    brush: Brush
-) {
-    Box(
-        modifier = Modifier
-            .width(width)
-            .height(height)
-            .clip(RoundedCornerShape(4.dp))
-            .background(brush)
-    )
-}
-
-
-@Composable
-private fun rememberShimmerBrush(): Brush {
-    val shimmerColors = listOf(
-        NuvioColors.SurfaceVariant.copy(alpha = 0.35f),
-        NuvioColors.SurfaceVariant.copy(alpha = 0.65f),
-        NuvioColors.SurfaceVariant.copy(alpha = 0.35f)
-    )
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translate by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = LinearEasing)
-        ),
-        label = "shimmer_translate"
-    )
-
-    return Brush.linearGradient(
-        colors = shimmerColors,
-        start = Offset(translate - 1000f, 0f),
-        end = Offset(translate, 0f)
-    )
-}
-
-@Composable
 private fun StreamTypeChip(
     text: String,
     color: Color
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(color.copy(alpha = 0.2f))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
     ) {
         Text(
             text = text,

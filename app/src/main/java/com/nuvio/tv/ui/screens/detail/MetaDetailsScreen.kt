@@ -34,7 +34,7 @@ import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.ui.components.ErrorState
 import com.nuvio.tv.ui.components.FadeInAsyncImage
-import com.nuvio.tv.ui.components.LoadingIndicator
+import com.nuvio.tv.ui.components.MetaDetailsSkeleton
 import com.nuvio.tv.ui.theme.NuvioColors
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -70,12 +70,7 @@ fun MetaDetailsScreen(
     ) {
         when {
             uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LoadingIndicator()
-                }
+                MetaDetailsSkeleton()
             }
             uiState.error != null -> {
                 ErrorState(
@@ -87,7 +82,7 @@ fun MetaDetailsScreen(
                 val meta = uiState.meta!!
                 val genresString = meta.genres.takeIf { it.isNotEmpty() }?.joinToString(" • ")
                 val yearString = meta.releaseInfo
-                
+
                 MetaDetailsContent(
                     meta = meta,
                     seasons = uiState.seasons,
