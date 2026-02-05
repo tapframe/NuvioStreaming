@@ -644,6 +644,7 @@
         "hebrew": "Hebrajski",
         "bulgarian": "Bułgarski",
         "polish": "Polski",
+        "czech": "Czeski",
         "account": "Konto",
         "content_discovery": "Treści i odkrywanie",
         "appearance": "Wygląd",
@@ -1419,4 +1420,5 @@
         }
     }
 }
+
 
