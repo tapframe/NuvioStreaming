@@ -54,6 +54,7 @@ class PlayerViewModel @Inject constructor(
     private val watchProgressRepository: WatchProgressRepository,
     private val metaRepository: MetaRepository,
     private val streamRepository: StreamRepository,
+    private val subtitleRepository: com.nuvio.tv.domain.repository.SubtitleRepository,
     private val parentalGuideRepository: ParentalGuideRepository,
     private val skipIntroRepository: SkipIntroRepository,
     private val playerSettingsDataStore: PlayerSettingsDataStore,
@@ -143,6 +144,7 @@ class PlayerViewModel @Inject constructor(
     private var skipIntervals: List<SkipInterval> = emptyList()
     private var lastActiveSkipType: String? = null
     private var autoSubtitleSelected: Boolean = false
+    private var pendingAddonSubtitleLanguage: String? = null
 
     init {
         initializePlayer(currentStreamUrl, currentHeaders)
@@ -150,6 +152,45 @@ class PlayerViewModel @Inject constructor(
         fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
         fetchSkipIntervals(contentId, currentSeason, currentEpisode)
         observeSubtitleSettings()
+        fetchAddonSubtitles()
+    }
+    
+    private fun fetchAddonSubtitles() {
+        val id = contentId ?: return
+        val type = contentType ?: return
+        
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingAddonSubtitles = true, addonSubtitlesError = null) }
+            
+            try {
+                // For series, construct videoId with season:episode
+                val videoId = if (type == "series" && currentSeason != null && currentEpisode != null) {
+                    "${id.split(":").firstOrNull() ?: id}:$currentSeason:$currentEpisode"
+                } else {
+                    null
+                }
+                
+                val subtitles = subtitleRepository.getSubtitles(
+                    type = type,
+                    id = id.split(":").firstOrNull() ?: id, // Use base IMDB ID
+                    videoId = videoId
+                )
+                
+                _uiState.update { 
+                    it.copy(
+                        addonSubtitles = subtitles,
+                        isLoadingAddonSubtitles = false
+                    ) 
+                }
+            } catch (e: Exception) {
+                _uiState.update { 
+                    it.copy(
+                        isLoadingAddonSubtitles = false,
+                        addonSubtitlesError = e.message
+                    ) 
+                }
+            }
+        }
     }
     
     private fun observeSubtitleSettings() {
@@ -912,14 +953,22 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
-        if (selectedSubtitleIndex == -1 && subtitleTracks.isNotEmpty() && !autoSubtitleSelected) {
+        fun matchesLanguage(track: TrackInfo, target: String): Boolean {
+            val lang = track.language?.lowercase() ?: return false
+            return lang == target || lang.startsWith(target) || lang.contains(target)
+        }
+
+        val pendingLang = pendingAddonSubtitleLanguage
+        if (pendingLang != null && subtitleTracks.isNotEmpty()) {
+            val preferredIndex = subtitleTracks.indexOfFirst { matchesLanguage(it, pendingLang) }
+            val fallbackIndex = if (preferredIndex >= 0) preferredIndex else 0
+
+            selectSubtitleTrack(fallbackIndex)
+            selectedSubtitleIndex = if (_uiState.value.selectedAddonSubtitle != null) -1 else fallbackIndex
+            pendingAddonSubtitleLanguage = null
+        } else if (selectedSubtitleIndex == -1 && subtitleTracks.isNotEmpty() && !autoSubtitleSelected) {
             val preferred = _uiState.value.subtitleStyle.preferredLanguage.lowercase()
             val secondary = _uiState.value.subtitleStyle.secondaryPreferredLanguage?.lowercase()
-
-            fun matchesLanguage(track: TrackInfo, target: String): Boolean {
-                val lang = track.language?.lowercase() ?: return false
-                return lang == target || lang.startsWith(target) || lang.contains(target)
-            }
 
             val preferredMatch = subtitleTracks.indexOfFirst { matchesLanguage(it, preferred) }
             val secondaryMatch = secondary?.let { target ->
@@ -1101,10 +1150,25 @@ class PlayerViewModel @Inject constructor(
             }
             is PlayerEvent.OnSelectSubtitleTrack -> {
                 selectSubtitleTrack(event.index)
-                _uiState.update { it.copy(showSubtitleDialog = false) }
+                _uiState.update { 
+                    it.copy(
+                        showSubtitleDialog = false,
+                        selectedAddonSubtitle = null // Clear addon subtitle when selecting internal
+                    ) 
+                }
             }
             PlayerEvent.OnDisableSubtitles -> {
                 disableSubtitles()
+                _uiState.update { 
+                    it.copy(
+                        showSubtitleDialog = false,
+                        selectedAddonSubtitle = null,
+                        selectedSubtitleTrackIndex = -1
+                    ) 
+                }
+            }
+            is PlayerEvent.OnSelectAddonSubtitle -> {
+                selectAddonSubtitle(event.subtitle)
                 _uiState.update { it.copy(showSubtitleDialog = false) }
             }
             is PlayerEvent.OnSetPlaybackSpeed -> {
@@ -1279,6 +1343,105 @@ class PlayerViewModel @Inject constructor(
                 .buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                 .build()
+        }
+    }
+    
+    private fun selectAddonSubtitle(subtitle: com.nuvio.tv.domain.model.Subtitle) {
+        _exoPlayer?.let { player ->
+            if (_uiState.value.selectedAddonSubtitle?.id == subtitle.id) {
+                return@let
+            }
+
+            val normalizedLang = normalizeLanguageCode(subtitle.lang)
+            pendingAddonSubtitleLanguage = normalizedLang
+
+            // Add the addon subtitle as a side-loaded subtitle
+            val currentItem = player.currentMediaItem ?: return@let
+            val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(
+                android.net.Uri.parse(subtitle.url)
+            )
+                .setMimeType(getMimeTypeFromUrl(subtitle.url))
+                .setLanguage(subtitle.lang)
+                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                .build()
+            
+            val newMediaItem = currentItem.buildUpon()
+                .setSubtitleConfigurations(listOf(subtitleConfig))
+                .build()
+            
+            val currentPosition = player.currentPosition
+            val playWhenReady = player.playWhenReady
+
+            player.setMediaItem(newMediaItem, currentPosition)
+            player.prepare()
+            player.playWhenReady = playWhenReady
+
+            // Ensure text tracks are enabled and prefer the addon subtitle language
+            player.trackSelectionParameters = player.trackSelectionParameters
+                .buildUpon()
+                .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                .setPreferredTextLanguage(normalizedLang)
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .build()
+            
+            _uiState.update { 
+                it.copy(
+                    selectedAddonSubtitle = subtitle,
+                    selectedSubtitleTrackIndex = -1 // Clear internal track selection
+                )
+            }
+        }
+    }
+
+    private fun normalizeLanguageCode(lang: String): String {
+        val code = lang.lowercase()
+        return when (code) {
+            "eng" -> "en"
+            "spa" -> "es"
+            "fre", "fra" -> "fr"
+            "ger", "deu" -> "de"
+            "ita" -> "it"
+            "por" -> "pt"
+            "rus" -> "ru"
+            "jpn" -> "ja"
+            "kor" -> "ko"
+            "chi", "zho" -> "zh"
+            "ara" -> "ar"
+            "hin" -> "hi"
+            "nld", "dut" -> "nl"
+            "pol" -> "pl"
+            "swe" -> "sv"
+            "nor" -> "no"
+            "dan" -> "da"
+            "fin" -> "fi"
+            "tur" -> "tr"
+            "ell", "gre" -> "el"
+            "heb" -> "he"
+            "tha" -> "th"
+            "vie" -> "vi"
+            "ind" -> "id"
+            "msa", "may" -> "ms"
+            "ces", "cze" -> "cs"
+            "hun" -> "hu"
+            "ron", "rum" -> "ro"
+            "ukr" -> "uk"
+            "bul" -> "bg"
+            "hrv" -> "hr"
+            "srp" -> "sr"
+            "slk", "slo" -> "sk"
+            "slv" -> "sl"
+            else -> code
+        }
+    }
+    
+    private fun getMimeTypeFromUrl(url: String): String {
+        val lowerUrl = url.lowercase()
+        return when {
+            lowerUrl.endsWith(".srt") -> MimeTypes.APPLICATION_SUBRIP
+            lowerUrl.endsWith(".vtt") || lowerUrl.endsWith(".webvtt") -> MimeTypes.TEXT_VTT
+            lowerUrl.endsWith(".ass") || lowerUrl.endsWith(".ssa") -> MimeTypes.TEXT_SSA
+            lowerUrl.endsWith(".ttml") || lowerUrl.endsWith(".dfxp") -> MimeTypes.APPLICATION_TTML
+            else -> MimeTypes.APPLICATION_SUBRIP // Default to SRT
         }
     }
 

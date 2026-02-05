@@ -5,6 +5,7 @@ import androidx.media3.common.TrackGroup
 import com.nuvio.tv.data.local.SubtitleStyleSettings
 import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.domain.model.Stream
+import com.nuvio.tv.domain.model.Subtitle
 import com.nuvio.tv.domain.model.Video
 
 data class PlayerUiState(
@@ -27,6 +28,11 @@ data class PlayerUiState(
     val showSpeedDialog: Boolean = false,
     // Subtitle style settings
     val subtitleStyle: SubtitleStyleSettings = SubtitleStyleSettings(),
+    // Addon subtitles
+    val addonSubtitles: List<Subtitle> = emptyList(),
+    val isLoadingAddonSubtitles: Boolean = false,
+    val selectedAddonSubtitle: Subtitle? = null,
+    val addonSubtitlesError: String? = null,
     // Episodes/streams side panel (for series)
     val showEpisodesPanel: Boolean = false,
     val isLoadingEpisodes: Boolean = false,
@@ -83,6 +89,7 @@ sealed class PlayerEvent {
     data class OnSelectAudioTrack(val index: Int) : PlayerEvent()
     data class OnSelectSubtitleTrack(val index: Int) : PlayerEvent()
     data object OnDisableSubtitles : PlayerEvent()
+    data class OnSelectAddonSubtitle(val subtitle: Subtitle) : PlayerEvent()
     data class OnSetPlaybackSpeed(val speed: Float) : PlayerEvent()
     data object OnToggleControls : PlayerEvent()
     data object OnShowAudioDialog : PlayerEvent()
