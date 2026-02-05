@@ -16,4 +16,5 @@ export const LOCALES = [
     { code: 'pl', key: 'polish' }
     { code: 'cs', key: 'czech' }
     { code: 'tr', key: 'turkish' }
+    { code: 'sl', key: 'slovenian' }
 ];
