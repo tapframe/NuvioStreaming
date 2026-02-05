@@ -12,6 +12,7 @@ import hi from './locales/hi.json';
 import zhCN from './locales/zh-CN.json';
 import sr from './locales/sr.json';
 import he from './locales/he.json';
+import bg from './locales/bg.json';
 
 export const resources = {
     en: { translation: en },
@@ -27,4 +28,5 @@ export const resources = {
     hi: { translation: hi },
     sr: { translation: sr },
     he: { translation: he },
+    bg: { translation: bg }, 
 };
