@@ -48,7 +48,8 @@ fun SettingsScreen(
     onNavigateToPlugins: () -> Unit = {},
     onNavigateToTmdb: () -> Unit = {},
     onNavigateToTheme: () -> Unit = {},
-    onNavigateToPlayback: () -> Unit = {}
+    onNavigateToPlayback: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -119,7 +120,7 @@ fun SettingsScreen(
                     icon = Icons.Default.Info,
                     title = "About",
                     subtitle = "App version and information",
-                    onClick = { }
+                    onClick = onNavigateToAbout
                 )
             }
         }
