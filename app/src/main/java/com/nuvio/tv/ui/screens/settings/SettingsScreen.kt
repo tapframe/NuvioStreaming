@@ -75,7 +75,7 @@ fun SettingsScreen(
         
         // Settings list
         TvLazyColumn(
-            contentPadding = PaddingValues(bottom = 32.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {

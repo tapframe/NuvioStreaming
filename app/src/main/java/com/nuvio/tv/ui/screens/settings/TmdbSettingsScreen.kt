@@ -71,7 +71,7 @@ fun TmdbSettingsScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         TvLazyColumn(
-            contentPadding = PaddingValues(bottom = 32.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {

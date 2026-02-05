@@ -99,7 +99,7 @@ fun PlaybackSettingsScreen(
         
         // Settings list
         TvLazyColumn(
-            contentPadding = PaddingValues(bottom = 32.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Subtitle Settings Section Header
@@ -232,7 +232,8 @@ private fun ToggleSettingsItem(
                 shape = RoundedCornerShape(12.dp)
             )
         ),
-        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp))
+        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        scale = CardDefaults.scale(focusedScale = 1.02f)
     ) {
         Row(
             modifier = Modifier
@@ -246,9 +247,9 @@ private fun ToggleSettingsItem(
                 tint = if (isFocused) NuvioColors.Primary else NuvioColors.TextSecondary,
                 modifier = Modifier.size(28.dp)
             )
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -262,9 +263,9 @@ private fun ToggleSettingsItem(
                     color = NuvioColors.TextSecondary
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(16.dp))
-            
+
             Switch(
                 checked = isChecked,
                 onCheckedChange = null, // Handled by Card onClick
@@ -307,7 +308,8 @@ private fun RenderTypeSettingsItem(
                 shape = RoundedCornerShape(12.dp)
             ) else Border.None
         ),
-        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp))
+        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        scale = CardDefaults.scale(focusedScale = 1.02f)
     ) {
         Row(
             modifier = Modifier
