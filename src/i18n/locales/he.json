@@ -643,6 +643,7 @@
         "serbian": "סרבית",
         "hebrew": "עברית",
         "bulgarian": "בולגרית",
+        "polish": "פולנית",
         "account": "חשבון",
         "content_discovery": "תוכן וגילוי",
         "appearance": "מראה",
@@ -1419,3 +1420,4 @@
     }
 
 }
+
