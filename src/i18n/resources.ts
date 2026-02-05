@@ -14,6 +14,7 @@ import sr from './locales/sr.json';
 import he from './locales/he.json';
 import bg from './locales/bg.json';
 import pl from './locales/pl.json';
+import cs from './locales/cs.json';
 
 export const resources = {
     en: { translation: en },
@@ -31,4 +32,5 @@ export const resources = {
     he: { translation: he },
     bg: { translation: bg },
     pl: { translation: pl },
+    cs: { translation: cs },
 };
