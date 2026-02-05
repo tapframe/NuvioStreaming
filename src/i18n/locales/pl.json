@@ -646,6 +646,7 @@
         "polish": "Polski",
         "czech": "Czeski",
         "turkish": "Turecki",
+        "slovenian": "Słoweński",
         "account": "Konto",
         "content_discovery": "Treści i odkrywanie",
         "appearance": "Wygląd",
@@ -1421,6 +1422,7 @@
         }
     }
 }
+
 
 
 
