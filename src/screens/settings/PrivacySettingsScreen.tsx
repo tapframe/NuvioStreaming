@@ -89,8 +89,8 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
             
             if (enabled) {
                 showAlert(
-                    t('privacy.analytics_enabled_title', 'Analytics Enabled'),
-                    t('privacy.analytics_enabled_message', 'Usage data will be collected to help improve the app. You can disable this at any time.')
+                    t('privacy.analytics_enabled_title'),
+                    t('privacy.analytics_enabled_message')
                 );
             }
         } catch (error) {
@@ -102,8 +102,8 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
     const handleErrorReportingToggle = async (enabled: boolean) => {
         if (!enabled) {
             showAlert(
-                t('privacy.disable_error_reporting_title', 'Disable Error Reporting?'),
-                t('privacy.disable_error_reporting_message', 'Disabling error reporting means we won\'t be notified of crashes or issues you experience. This may affect our ability to fix bugs.'),
+                t('privacy.disable_error_reporting_title'),
+                t('privacy.disable_error_reporting_message'),
                 [
                     { label: t('common.cancel', 'Cancel'), onPress: () => { } },
                     {
@@ -125,12 +125,12 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
     const handleSessionReplayToggle = async (enabled: boolean) => {
         if (enabled) {
             showAlert(
-                t('privacy.enable_session_replay_title', 'Enable Session Replay?'),
-                t('privacy.enable_session_replay_message', 'Session replay records your screen when errors occur to help us understand what happened. This may capture visible content on your screen.'),
+                t('privacy.enable_session_replay_title'),
+                t('privacy.enable_session_replay_message'),
                 [
                     { label: t('common.cancel', 'Cancel'), onPress: () => { } },
                     {
-                        label: t('common.enable', 'Enable'),
+                        label: t('common.enable'),
                         onPress: async () => {
                             await telemetryService.setSessionReplayEnabled(true);
                             setSettings(prev => ({ ...prev, sessionReplayEnabled: true }));
@@ -148,12 +148,12 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
     const handlePiiToggle = async (enabled: boolean) => {
         if (enabled) {
             showAlert(
-                t('privacy.enable_pii_title', 'Enable PII Collection?'),
-                t('privacy.enable_pii_message', 'This allows collection of personally identifiable information like IP address and device details. This data helps diagnose issues but increases privacy exposure.'),
+                t('privacy.enable_pii_title'),
+                t('privacy.enable_pii_message'),
                 [
                     { label: t('common.cancel', 'Cancel'), onPress: () => { } },
                     {
-                        label: t('common.enable', 'Enable'),
+                        label: t('common.enable'),
                         onPress: async () => {
                             await telemetryService.setPiiEnabled(true);
                             setSettings(prev => ({ ...prev, piiEnabled: true }));
@@ -170,12 +170,12 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
     // Disable all telemetry
     const handleDisableAll = () => {
         showAlert(
-            t('privacy.disable_all_title', 'Disable All Telemetry?'),
-            t('privacy.disable_all_message', 'This will disable all analytics, error reporting, and session replay. We won\'t receive any data about app usage or crashes.'),
+            t('privacy.disable_all_title'),
+            t('privacy.disable_all_message'),
             [
                 { label: t('common.cancel', 'Cancel'), onPress: () => { } },
                 {
-                    label: t('privacy.disable_all_button', 'Disable All'),
+                    label: t('privacy.disable_all_button'),
                     onPress: async () => {
                         await telemetryService.disableAllTelemetry();
                         setSettings({
@@ -187,8 +187,8 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
                         // Delay showing the next alert to avoid Reanimated conflicts
                         setTimeout(() => {
                             showAlert(
-                                t('privacy.all_disabled_title', 'All Telemetry Disabled'),
-                                t('privacy.all_disabled_message', 'All data collection has been disabled. Changes take effect on next app restart.')
+                                t('privacy.all_disabled_title'),
+                                t('privacy.all_disabled_message')
                             );
                         }, 300);
                     }
@@ -208,8 +208,8 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
         });
         // No chained alert here, this is direct so it's fine
         showAlert(
-            t('privacy.reset_title', 'Reset to Recommended'),
-            t('privacy.reset_message', 'Privacy settings have been reset to recommended defaults (error reporting enabled, analytics disabled).')
+            t('privacy.reset_title'),
+            t('privacy.reset_message')
         );
     };
 
@@ -228,18 +228,18 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
             {/* Info Card */}
             <View style={[styles.infoCard, { backgroundColor: currentTheme.colors.elevation1, borderColor: currentTheme.colors.elevation2 }]}>
                 <Text style={[styles.infoTitle, { color: currentTheme.colors.highEmphasis }]}>
-                    {t('privacy.info_title', 'Your Privacy Matters')}
+                    {t('privacy.info_title')}
                 </Text>
                 <Text style={[styles.infoText, { color: currentTheme.colors.mediumEmphasis }]}>
-                    {t('privacy.info_description', 'Control what data is collected and shared. All settings take effect on the next app restart. By default, only anonymous error reporting is enabled to help us fix crashes.')}
+                    {t('privacy.info_description')}
                 </Text>
             </View>
 
             {/* Analytics Section */}
-            <SettingsCard title={t('privacy.section_analytics', 'ANALYTICS')} isTablet={isTablet}>
+            <SettingsCard title={t('privacy.section_analytics')} isTablet={isTablet}>
                 <SettingItem
-                    title={t('privacy.analytics_title', 'Usage Analytics')}
-                    description={t('privacy.analytics_description', 'Collect anonymous usage patterns and screen views')}
+                    title={t('privacy.analytics_title')}
+                    description={t('privacy.analytics_description')}
                     icon="bar-chart-2"
                     renderControl={() => (
                         <CustomSwitch
@@ -247,16 +247,17 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
                             onValueChange={handleAnalyticsToggle}
                         />
                     )}
+                    descriptionNumberOfLines={2}
                     isLast
                     isTablet={isTablet}
                 />
             </SettingsCard>
 
             {/* Error Reporting Section */}
-            <SettingsCard title={t('privacy.section_error_reporting', 'ERROR REPORTING')} isTablet={isTablet}>
+            <SettingsCard title={t('privacy.section_error_reporting')} isTablet={isTablet}>
                 <SettingItem
-                    title={t('privacy.error_reporting_title', 'Crash Reports')}
-                    description={t('privacy.error_reporting_description', 'Send anonymous crash reports to improve stability')}
+                    title={t('privacy.error_reporting_title')}
+                    description={t('privacy.error_reporting_description')}
                     icon="alert-circle"
                     renderControl={() => (
                         <CustomSwitch
@@ -264,11 +265,12 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
                             onValueChange={handleErrorReportingToggle}
                         />
                     )}
+                    descriptionNumberOfLines={2}
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title={t('privacy.session_replay_title', 'Session Replay')}
-                    description={t('privacy.session_replay_description', 'Record screen when errors occur')}
+                    title={t('privacy.session_replay_title')}
+                    description={t('privacy.session_replay_description')}
                     icon="video"
                     renderControl={() => (
                         <CustomSwitch
@@ -276,11 +278,12 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
                             onValueChange={handleSessionReplayToggle}
                         />
                     )}
+                    descriptionNumberOfLines={2}
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title={t('privacy.pii_title', 'Include Device Info')}
-                    description={t('privacy.pii_description', 'Send IP address and device details with reports')}
+                    title={t('privacy.pii_title')}
+                    description={t('privacy.pii_description')}
                     icon="user"
                     renderControl={() => (
                         <CustomSwitch
@@ -288,36 +291,39 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
                             onValueChange={handlePiiToggle}
                         />
                     )}
+                    descriptionNumberOfLines={2}
                     isLast
                     isTablet={isTablet}
                 />
             </SettingsCard>
 
             {/* Quick Actions */}
-            <SettingsCard title={t('privacy.section_quick_actions', 'QUICK ACTIONS')} isTablet={isTablet}>
+            <SettingsCard title={t('privacy.section_quick_actions')} isTablet={isTablet}>
                 <SettingItem
-                    title={t('privacy.disable_all', 'Disable All Telemetry')}
-                    description={t('privacy.disable_all_desc', 'Turn off all data collection')}
+                    title={t('privacy.disable_all')}
+                    description={t('privacy.disable_all_desc')}
                     icon="shield-off"
                     onPress={handleDisableAll}
                     renderControl={() => <ChevronRight />}
+                    descriptionNumberOfLines={2}
                     isTablet={isTablet}
                 />
                 <SettingItem
-                    title={t('privacy.reset_recommended', 'Reset to Recommended')}
-                    description={t('privacy.reset_recommended_desc', 'Privacy-first defaults with error reporting')}
+                    title={t('privacy.reset_recommended')}
+                    description={t('privacy.reset_recommended_desc')}
                     icon="refresh-cw"
                     onPress={handleResetToRecommended}
                     renderControl={() => <ChevronRight />}
+                    descriptionNumberOfLines={2}
                     isLast
                     isTablet={isTablet}
                 />
             </SettingsCard>
 
             {/* Learn More */}
-            <SettingsCard title={t('privacy.section_learn_more', 'LEARN MORE')} isTablet={isTablet}>
+            <SettingsCard title={t('privacy.section_learn_more')} isTablet={isTablet}>
                 <SettingItem
-                    title={t('privacy.privacy_policy', 'Privacy Policy')}
+                    title={t('privacy.privacy_policy')}
                     icon="file-text"
                     onPress={() => Linking.openURL('https://tapframe.github.io/NuvioStreaming/#privacy-policy')}
                     renderControl={() => <ChevronRight />}
@@ -328,34 +334,34 @@ export const PrivacySettingsContent: React.FC<PrivacySettingsContentProps> = ({
             {/* Data Summary */}
             <View style={[styles.summaryCard, { backgroundColor: currentTheme.colors.elevation1, borderColor: currentTheme.colors.elevation2 }]}>
                 <Text style={[styles.summaryTitle, { color: currentTheme.colors.highEmphasis }]}>
-                    {t('privacy.current_settings', 'Current Settings Summary')}
+                    {t('privacy.current_settings')}
                 </Text>
                 <View style={styles.summaryRow}>
                     <View style={[styles.statusDot, { backgroundColor: settings.analyticsEnabled ? '#4CAF50' : '#9E9E9E' }]} />
                     <Text style={[styles.summaryText, { color: currentTheme.colors.mediumEmphasis }]}>
-                        {t('privacy.summary_analytics', 'Analytics')}: {settings.analyticsEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
+                        {t('privacy.summary_analytics')}: {settings.analyticsEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
                     </Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <View style={[styles.statusDot, { backgroundColor: settings.errorReportingEnabled ? '#4CAF50' : '#9E9E9E' }]} />
                     <Text style={[styles.summaryText, { color: currentTheme.colors.mediumEmphasis }]}>
-                        {t('privacy.summary_errors', 'Error Reports')}: {settings.errorReportingEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
+                        {t('privacy.summary_errors')}: {settings.errorReportingEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
                     </Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <View style={[styles.statusDot, { backgroundColor: settings.sessionReplayEnabled ? '#FF9800' : '#9E9E9E' }]} />
                     <Text style={[styles.summaryText, { color: currentTheme.colors.mediumEmphasis }]}>
-                        {t('privacy.summary_replay', 'Session Replay')}: {settings.sessionReplayEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
+                        {t('privacy.summary_replay')}: {settings.sessionReplayEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
                     </Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <View style={[styles.statusDot, { backgroundColor: settings.piiEnabled ? '#FF9800' : '#9E9E9E' }]} />
                     <Text style={[styles.summaryText, { color: currentTheme.colors.mediumEmphasis }]}>
-                        {t('privacy.summary_pii', 'Device Info')}: {settings.piiEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
+                        {t('privacy.summary_pii')}: {settings.piiEnabled ? t('common.on', 'On') : t('common.off', 'Off')}
                     </Text>
                 </View>
                 <Text style={[styles.restartNote, { color: currentTheme.colors.mediumEmphasis }]}>
-                    {t('privacy.restart_note_detailed', '* Analytics and error reporting changes take effect immediately. Session replay and PII settings require app restart.')}
+                    {t('privacy.restart_note_detailed')}
                 </Text>
             </View>
 
@@ -377,7 +383,7 @@ const PrivacySettingsScreen: React.FC = () => {
         <View style={[styles.container, { backgroundColor: currentTheme.colors.darkBackground }]}>
             <StatusBar barStyle="light-content" />
             <ScreenHeader
-                title={t('privacy.title', 'Privacy & Data')}
+                title={t('privacy.title')}
                 showBackButton
                 onBackPress={() => navigation.goBack()}
             />

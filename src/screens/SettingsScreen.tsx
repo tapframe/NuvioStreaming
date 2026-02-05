@@ -149,7 +149,7 @@ const SettingsScreen: React.FC = () => {
     { id: 'playback', title: t('settings.playback'), icon: 'play-circle' },
     { id: 'backup', title: t('settings.backup_restore'), icon: 'archive' },
     { id: 'updates', title: t('settings.updates'), icon: 'refresh-ccw' },
-    { id: 'privacy', title: t('privacy.title', 'Privacy & Data'), icon: 'shield' },
+    { id: 'privacy', title: t('privacy.title'), icon: 'shield' },
     { id: 'about', title: t('settings.about'), icon: 'info' },
     { id: 'developer', title: t('settings.developer'), icon: 'code' },
     { id: 'cache', title: t('settings.cache'), icon: 'database' },
@@ -820,8 +820,8 @@ const SettingsScreen: React.FC = () => {
                 onPress={() => navigation.navigate('Contributors')}
               />
               <SettingItem
-                title={t('privacy.title', 'Privacy & Data')}
-                description={t('privacy.settings_desc', 'Control telemetry and data collection')}
+                title={t('privacy.title')}
+                description={t('privacy.settings_desc')}
                 icon="shield"
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('PrivacySettings')}
