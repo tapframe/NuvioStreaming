@@ -78,7 +78,7 @@ val AVAILABLE_SUBTITLE_LANGUAGES = listOf(
 data class SubtitleStyleSettings(
     val preferredLanguage: String = "en",
     val secondaryPreferredLanguage: String? = null,
-    val size: Int = 140, // Percentage (50-200)
+    val size: Int = 120, // Percentage (50-200)
     val verticalOffset: Int = 5, // Percentage from bottom (0-50)
     val bold: Boolean = false,
     val textColor: Int = Color.White.toArgb(),
