@@ -11,6 +11,7 @@ import hr from './locales/hr.json';
 import hi from './locales/hi.json';
 import zhCN from './locales/zh-CN.json';
 import sr from './locales/sr.json';
+import he from './locales/he.json';
 
 export const resources = {
     en: { translation: en },
