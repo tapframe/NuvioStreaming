@@ -642,6 +642,7 @@
         "hindi": "הינדי",
         "serbian": "סרבית",
         "hebrew": "עברית",
+        "bulgarian": "בולגרית",
         "account": "חשבון",
         "content_discovery": "תוכן וגילוי",
         "appearance": "מראה",
@@ -1416,4 +1417,5 @@
             "no_logs_captured": "לא נלכדו לוגים."
         }
     }
+
 }
