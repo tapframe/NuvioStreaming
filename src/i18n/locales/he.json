@@ -646,6 +646,7 @@
         "polish": "פולנית",
         "czech": "צ'כית",
         "turkish": "טורקית",
+        "slovenian": "סلوفينية",
         "account": "חשבון",
         "content_discovery": "תוכן וגילוי",
         "appearance": "מראה",
@@ -1422,6 +1423,7 @@
     }
 
 }
+
 
 
 
