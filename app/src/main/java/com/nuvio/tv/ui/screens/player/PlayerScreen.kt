@@ -224,6 +224,22 @@ fun PlayerScreen(
                         this.player = player
                         useController = false
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                        
+                        // Remove subtitle background
+                        subtitleView?.apply {
+                            setStyle(
+                                androidx.media3.ui.CaptionStyleCompat(
+                                    android.graphics.Color.WHITE,
+                                    android.graphics.Color.TRANSPARENT,
+                                    android.graphics.Color.TRANSPARENT,
+                                    androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE,
+                                    android.graphics.Color.TRANSPARENT,
+                                    null
+                                )
+                            )
+                            setApplyEmbeddedStyles(false)
+                            setBottomPaddingFraction(0.08f)
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize()

@@ -2,5 +2,15 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/ass" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/expat" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/fontconfig" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/freetype" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/freetype/subprojects/dlg" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/fribidi" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/harfbuzz" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/libass-android/lib_ass/src/main/cpp/libass-cmake/src/unibreak" vcs="Git" />
   </component>
 </project>

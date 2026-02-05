@@ -110,6 +110,9 @@ dependencies {
     // Media3 FFmpeg Decoder Extension (locally built AAR)
     implementation(files("libs/media3-decoder-ffmpeg.aar"))
 
+    // libass-android for ASS/SSA subtitle support (from Maven Central)
+    implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
+
     // Local Plugin System
     implementation(libs.quickjs.kt)
     implementation(libs.jsoup)

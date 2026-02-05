@@ -47,7 +47,8 @@ import com.nuvio.tv.ui.theme.NuvioColors
 fun SettingsScreen(
     onNavigateToPlugins: () -> Unit = {},
     onNavigateToTmdb: () -> Unit = {},
-    onNavigateToTheme: () -> Unit = {}
+    onNavigateToTheme: () -> Unit = {},
+    onNavigateToPlayback: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -109,7 +110,7 @@ fun SettingsScreen(
                     icon = Icons.Default.Settings,
                     title = "Playback",
                     subtitle = "Video quality, subtitles, and player settings",
-                    onClick = { }
+                    onClick = onNavigateToPlayback
                 )
             }
             

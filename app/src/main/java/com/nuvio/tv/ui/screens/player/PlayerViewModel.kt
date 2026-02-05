@@ -10,6 +10,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
@@ -19,6 +20,8 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.common.MimeTypes
 import com.nuvio.tv.core.network.NetworkResult
+import com.nuvio.tv.data.local.LibassRenderType
+import com.nuvio.tv.data.local.PlayerSettingsDataStore
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
@@ -30,6 +33,8 @@ import com.nuvio.tv.domain.repository.StreamRepository
 import com.nuvio.tv.domain.repository.WatchProgressRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.peerless2012.ass.media.kt.buildWithAssSupport
+import io.github.peerless2012.ass.media.type.AssRenderType
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,6 +56,7 @@ class PlayerViewModel @Inject constructor(
     private val streamRepository: StreamRepository,
     private val parentalGuideRepository: ParentalGuideRepository,
     private val skipIntroRepository: SkipIntroRepository,
+    private val playerSettingsDataStore: PlayerSettingsDataStore,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -272,76 +278,109 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    @OptIn(UnstableApi::class)
     private fun initializePlayer(url: String, headers: Map<String, String>) {
         if (url.isEmpty()) {
             _uiState.update { it.copy(error = "No stream URL provided") }
             return
         }
 
-        try {
-            val renderersFactory = DefaultRenderersFactory(context)
-                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        viewModelScope.launch {
+            try {
+                val playerSettings = playerSettingsDataStore.playerSettings.first()
+                val useLibass = playerSettings.useLibass
+                val libassRenderType = playerSettings.libassRenderType.toAssRenderType()
 
-            _exoPlayer = ExoPlayer.Builder(context)
-                .setRenderersFactory(renderersFactory)
-                .build().apply {
-                setMediaSource(createMediaSource(url, headers))
+                val renderersFactory = DefaultRenderersFactory(context)
+                    .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
-                playWhenReady = true
-                prepare()
+                _exoPlayer = if (useLibass) {
+                    // Build ExoPlayer with libass support for ASS/SSA subtitles
+                    ExoPlayer.Builder(context)
+                        .buildWithAssSupport(
+                            context = context,
+                            renderType = libassRenderType,
+                            renderersFactory = renderersFactory
+                        )
+                } else {
+                    // Standard ExoPlayer without libass
+                    ExoPlayer.Builder(context)
+                        .setRenderersFactory(renderersFactory)
+                        .build()
+                }
 
-                addListener(object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        val isBuffering = playbackState == Player.STATE_BUFFERING
-                        _uiState.update { 
-                            it.copy(
-                                isBuffering = isBuffering,
-                                duration = duration.coerceAtLeast(0L)
-                            )
-                        }
+                _exoPlayer?.apply {
+                    setMediaSource(createMediaSource(url, headers))
+
+                    playWhenReady = true
+                    prepare()
+
+                    addListener(object : Player.Listener {
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            val isBuffering = playbackState == Player.STATE_BUFFERING
+                            _uiState.update { 
+                                it.copy(
+                                    isBuffering = isBuffering,
+                                    duration = duration.coerceAtLeast(0L)
+                                )
+                            }
                         
-                        // Handle pending seek position when player is ready
-                        if (playbackState == Player.STATE_READY) {
-                            _uiState.value.pendingSeekPosition?.let { position ->
-                                seekTo(position)
-                                _uiState.update { it.copy(pendingSeekPosition = null) }
+                            // Handle pending seek position when player is ready
+                            if (playbackState == Player.STATE_READY) {
+                                _uiState.value.pendingSeekPosition?.let { position ->
+                                    seekTo(position)
+                                    _uiState.update { it.copy(pendingSeekPosition = null) }
+                                }
+                            }
+                        
+                            // Save progress when playback ends
+                            if (playbackState == Player.STATE_ENDED) {
+                                saveWatchProgress()
                             }
                         }
-                        
-                        // Save progress when playback ends
-                        if (playbackState == Player.STATE_ENDED) {
-                            saveWatchProgress()
-                        }
-                    }
 
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        _uiState.update { it.copy(isPlaying = isPlaying) }
-                        if (isPlaying) {
-                            startProgressUpdates()
-                            startWatchProgressSaving()
-                            scheduleHideControls()
-                            tryShowParentalGuide()
-                        } else {
-                            stopProgressUpdates()
-                            stopWatchProgressSaving()
-                            // Save progress when paused
-                            saveWatchProgress()
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            _uiState.update { it.copy(isPlaying = isPlaying) }
+                            if (isPlaying) {
+                                startProgressUpdates()
+                                startWatchProgressSaving()
+                                scheduleHideControls()
+                                tryShowParentalGuide()
+                            } else {
+                                stopProgressUpdates()
+                                stopWatchProgressSaving()
+                                // Save progress when paused
+                                saveWatchProgress()
+                            }
                         }
-                    }
 
-                    override fun onTracksChanged(tracks: Tracks) {
-                        updateAvailableTracks(tracks)
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        _uiState.update { 
-                            it.copy(error = error.message ?: "Playback error occurred")
+                        override fun onTracksChanged(tracks: Tracks) {
+                            updateAvailableTracks(tracks)
                         }
-                    }
-                })
+
+                        override fun onPlayerError(error: PlaybackException) {
+                            _uiState.update { 
+                                it.copy(error = error.message ?: "Playback error occurred")
+                            }
+                        }
+                    })
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message ?: "Failed to initialize player") }
             }
-        } catch (e: Exception) {
-            _uiState.update { it.copy(error = e.message ?: "Failed to initialize player") }
+        }
+    }
+
+    /**
+     * Convert LibassRenderType to AssRenderType
+     */
+    private fun LibassRenderType.toAssRenderType(): AssRenderType {
+        return when (this) {
+            LibassRenderType.CUES -> AssRenderType.CUES
+            LibassRenderType.EFFECTS_CANVAS -> AssRenderType.EFFECTS_CANVAS
+            LibassRenderType.EFFECTS_OPEN_GL -> AssRenderType.EFFECTS_OPEN_GL
+            LibassRenderType.OVERLAY_CANVAS -> AssRenderType.OVERLAY_CANVAS
+            LibassRenderType.OVERLAY_OPEN_GL -> AssRenderType.OVERLAY_OPEN_GL
         }
     }
 
