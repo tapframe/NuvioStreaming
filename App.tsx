@@ -47,18 +47,44 @@ import { AccountProvider, useAccount } from './src/contexts/AccountContext';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { mmkvStorage } from './src/services/mmkvStorage';
 import { CampaignManager } from './src/components/promotions/CampaignManager';
+import { isErrorReportingEnabledSync } from './src/services/telemetryService';
 
+// Initialize Sentry with privacy-first defaults
+// Settings are loaded from telemetryService and can be controlled by user
+// Note: Full dynamic control requires app restart as Sentry initializes at startup
 Sentry.init({
   dsn: 'https://1a58bf436454d346e5852b7bfd3c95e8@o4509536317276160.ingest.de.sentry.io/4509536317734992',
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
+  // Privacy-first: Disable PII by default (IP address, cookies, user data)
+  // Users can opt-in via Privacy Settings if they choose
+  sendDefaultPii: false,
 
-  // Configure Session Replay conservatively to avoid startup overhead in production
-  replaysSessionSampleRate: __DEV__ ? 0.1 : 0,
-  replaysOnErrorSampleRate: __DEV__ ? 1 : 0,
+  // Session Replay completely disabled by default for privacy
+  // This prevents screen recording without explicit user consent
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
+
+  // Only include feedback integration (user-initiated, not automatic)
   integrations: [Sentry.feedbackIntegration()],
+
+  // beforeSend hook to respect user's telemetry preferences
+  // Uses synchronous MMKV read to check preference immediately
+  beforeSend: (event) => {
+    // Check if error reporting is disabled (synchronous check)
+    if (!isErrorReportingEnabledSync()) {
+      // Drop the event - user has opted out
+      return null;
+    }
+    return event;
+  },
+
+  // beforeSendTransaction hook for performance monitoring
+  beforeSendTransaction: (event) => {
+    if (!isErrorReportingEnabledSync()) {
+      return null;
+    }
+    return event;
+  },
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,

@@ -15,8 +15,9 @@ import { HeaderVisibility } from '../contexts/HeaderVisibility';
 import { Stream } from '../types/streams';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import { PostHogProvider } from 'posthog-react-native';
+import { PostHogProvider, usePostHog } from 'posthog-react-native';
 import { ScrollToTopProvider, useScrollToTopEmitter } from '../contexts/ScrollToTopContext';
+import { telemetryService, TELEMETRY_EVENTS } from '../services/telemetryService';
 import { useTranslation } from 'react-i18next';
 
 // Optional iOS Glass effect (expo-glass-effect) with safe fallback
@@ -82,6 +83,7 @@ import {
   AboutSettingsScreen,
   DeveloperSettingsScreen,
   LegalScreen,
+  PrivacySettingsScreen,
 } from '../screens/settings';
 
 
@@ -222,6 +224,7 @@ export type RootStackParamList = {
   PlaybackSettings: undefined;
   AboutSettings: undefined;
   DeveloperSettings: undefined;
+  PrivacySettings: undefined;
   Legal: undefined;
 };
 
@@ -1836,6 +1839,21 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
                 },
               }}
             />
+            <Stack.Screen
+              name="PrivacySettings"
+              component={PrivacySettingsScreen}
+              options={{
+                animation: Platform.OS === 'android' ? 'default' : 'slide_from_right',
+                animationDuration: Platform.OS === 'android' ? 250 : 300,
+                presentation: 'card',
+                gestureEnabled: true,
+                gestureDirection: 'horizontal',
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: currentTheme.colors.darkBackground,
+                },
+              }}
+            />
           </Stack.Navigator>
         </View>
       </PaperProvider>
@@ -1843,19 +1861,118 @@ const InnerNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootSta
   );
 };
 
+/**
+ * Conditional PostHog Provider Wrapper
+ * 
+ * Only initializes PostHog analytics if user has opted in via Privacy Settings.
+ * By default, analytics is disabled for privacy.
+ * Uses PostHog's optIn/optOut API for runtime control.
+ */
+const ConditionalPostHogProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const posthogRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Initialize telemetry service and check analytics preference
+    const initializeTelemetry = async () => {
+      try {
+        await telemetryService.initialize();
+        setAnalyticsEnabled(telemetryService.isAnalyticsEnabled());
+      } catch (error) {
+        console.error('Failed to initialize telemetry service:', error);
+        setAnalyticsEnabled(false);
+      } finally {
+        setIsInitialized(true);
+      }
+    };
+
+    initializeTelemetry();
+
+    // Listen for telemetry setting changes
+    const subscription = DeviceEventEmitter.addListener(
+      TELEMETRY_EVENTS.SETTINGS_CHANGED,
+      (settings) => {
+        setAnalyticsEnabled(settings.analyticsEnabled);
+        // If PostHog is available, update its opt-in/out state immediately
+        if (posthogRef.current) {
+          if (settings.analyticsEnabled) {
+            posthogRef.current.optIn();
+            console.log('[Telemetry] PostHog opted in');
+          } else {
+            posthogRef.current.optOut();
+            console.log('[Telemetry] PostHog opted out');
+          }
+        }
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // Wait for initialization before rendering
+  if (!isInitialized) {
+    return <>{children}</>;
+  }
+
+  // Always wrap with PostHogProvider but control via optOut
+  // This allows runtime toggling without remounting the tree
+  return (
+    <PostHogProvider
+      apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
+      options={{
+        host: "https://us.i.posthog.com",
+        autocapture: analyticsEnabled,
+        // Start opted out if analytics is disabled
+        defaultOptIn: analyticsEnabled,
+      }}
+      autocapture={analyticsEnabled}
+    >
+      <PostHogOptController 
+        enabled={analyticsEnabled} 
+        onPostHogReady={(posthog) => { posthogRef.current = posthog; }}
+      />
+      {children}
+    </PostHogProvider>
+  );
+};
+
+/**
+ * Internal component to handle PostHog opt-in/opt-out
+ * Uses the official usePostHog hook for reliable API access
+ */
+const PostHogOptController: React.FC<{ 
+  enabled: boolean; 
+  onPostHogReady: (posthog: any) => void;
+}> = ({ enabled, onPostHogReady }) => {
+  const posthog = usePostHog();
+  
+  useEffect(() => {
+    if (posthog) {
+      onPostHogReady(posthog);
+      if (enabled) {
+        posthog.optIn();
+        console.log('[Telemetry] PostHog opted in');
+      } else {
+        posthog.optOut();
+        console.log('[Telemetry] PostHog opted out');
+      }
+    }
+  }, [enabled, posthog, onPostHogReady]);
+  
+  return null;
+};
+
 const AppNavigator = ({ initialRouteName }: { initialRouteName?: keyof RootStackParamList }) => (
-  <PostHogProvider
-    apiKey="phc_sk6THCtV3thEAn6cTaA9kL2cHuKDBnlYiSL40ywdS6C"
-    options={{
-      host: "https://us.i.posthog.com",
-    }}
-  >
+  <ConditionalPostHogProvider>
     <ScrollToTopProvider>
       <LoadingProvider>
         <InnerNavigator initialRouteName={initialRouteName} />
       </LoadingProvider>
     </ScrollToTopProvider>
-  </PostHogProvider>
+  </ConditionalPostHogProvider>
 );
 
 export default AppNavigator;

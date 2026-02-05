@@ -68,8 +68,6 @@ export const CustomAlert = ({
   const handleActionPress = useCallback((action: { label: string; onPress: () => void; style?: object }) => {
     try {
       action.onPress();
-      // Don't auto-close here if the action handles it, or check if we should
-      // Standard behavior is to close
       onClose();
     } catch (error) {
       console.warn('[CustomAlert] Error in action handler:', error);

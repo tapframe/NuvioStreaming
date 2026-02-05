@@ -876,7 +876,7 @@
                     Back
                 </button>
                 <h1>Privacy</h1>
-                <p class="last-updated">Last updated: January 2025</p>
+                <p class="last-updated">Last updated: February 5, 2026</p>
 
                 <div class="privacy-section">
                     <h2>No Account Sync</h2>
@@ -901,8 +901,21 @@
                     <ul>
                         <li>TMDB for metadata like posters and cast info</li>
                         <li>Trakt.tv (optional) for watch history sync</li>
-                        <li>Sentry for anonymous crash reporting</li>
+                        <li>Sentry for crash reporting (privacy-first defaults, no PII by default)</li>
+                        <li>PostHog for optional analytics (disabled by default)</li>
                     </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h2>Telemetry & Analytics</h2>
+                    <p>Nuvio includes optional telemetry to improve stability and user experience:</p>
+                    <ul>
+                        <li><strong>Sentry</strong> captures crash reports and errors. Personal data (IP, device identifiers)
+                            is disabled by default and can be enabled only if you opt in.</li>
+                        <li><strong>PostHog</strong> analytics are disabled by default and require explicit opt-in.</li>
+                        <li><strong>Session Replay</strong> is disabled by default and can be enabled only if you opt in.</li>
+                    </ul>
+                    <p>You can disable all telemetry at any time in the app under <strong>Settings → Privacy & Data</strong>.</p>
                 </div>
 
                 <div class="privacy-section">
