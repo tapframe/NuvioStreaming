@@ -640,6 +640,7 @@
         "polish": "Пољски",
         "czech": "Чешки",
         "turkish": "Турски",
+        "slovenian": "Словеначки",
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1415,6 +1416,7 @@
         }
     }
 }
+
 
 
 
