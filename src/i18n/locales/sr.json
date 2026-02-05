@@ -639,6 +639,7 @@
         "bulgarian": "бугарски",
         "polish": "Пољски",
         "czech": "Чешки",
+        "turkish": "Турски",
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1414,6 +1415,7 @@
         }
     }
 }
+
 
 
 
