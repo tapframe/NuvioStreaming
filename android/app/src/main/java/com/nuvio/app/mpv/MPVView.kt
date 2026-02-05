@@ -172,7 +172,7 @@ class MPVView @JvmOverloads constructor(
         MPVLib.setOptionString("http-reconnect", "yes")
         MPVLib.setOptionString("stream-reconnect", "yes")
         
-        MPVLib.setOptionString("demuxer-lavf-o", "live_start_index=0,prefer_x_start=1,http_persistent=0")
+        MPVLib.setOptionString("demuxer-lavf-o", "live_start_index=0,prefer_x_start=1,http_persistent=1")
         MPVLib.setOptionString("demuxer-seekable-cache", "yes")
         MPVLib.setOptionString("force-seekable", "yes")
         
@@ -235,6 +235,10 @@ class MPVView @JvmOverloads constructor(
         Log.d(TAG, "Loading file: $url")
         // Reset load event flag for new file
         hasLoadEventFired = false
+        
+        // Re-apply headers before loading to ensure segments/keys use the correct headers
+        applyHttpHeadersAsOptions()
+        
         MPVLib.command(arrayOf("loadfile", url))
     }
 
@@ -252,25 +256,39 @@ class MPVView @JvmOverloads constructor(
     fun setHeaders(headers: Map<String, String>?) {
         httpHeaders = headers
         Log.d(TAG, "Headers set: $headers")
+        if (isMpvInitialized) {
+            applyHttpHeadersAsOptions()
+        }
     }
 
     private fun applyHttpHeadersAsOptions() {
-        // Always set user-agent (this works reliably)
-        val userAgent = httpHeaders?.get("User-Agent") 
+        // Find User-Agent (case-insensitive)
+        val userAgentKey = httpHeaders?.keys?.find { it.equals("User-Agent", ignoreCase = true) }
+        val userAgent = userAgentKey?.let { httpHeaders?.get(it) } 
             ?: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         
         Log.d(TAG, "Setting User-Agent: $userAgent")
-        MPVLib.setOptionString("user-agent", userAgent)
         
-        // Additionally, set other headers via http-header-fields if present
-        // This is needed for streams that require Referer, Origin, Cookie, etc.
+        if (isMpvInitialized) {
+            MPVLib.setPropertyString("user-agent", userAgent)
+        } else {
+            MPVLib.setOptionString("user-agent", userAgent)
+        }
+        
         httpHeaders?.let { headers ->
-            val otherHeaders = headers.filterKeys { it != "User-Agent" }
+            val otherHeaders = headers.filterKeys { !it.equals("User-Agent", ignoreCase = true) }
             if (otherHeaders.isNotEmpty()) {
-                // Format as comma-separated "Key: Value" pairs
-                val headerString = otherHeaders.map { (key, value) -> "$key: $value" }.joinToString(",")
-                Log.d(TAG, "Setting additional headers: $headerString")
-                MPVLib.setOptionString("http-header-fields", headerString)
+                // Use newline separator for http-header-fields as it's the standard for mpv
+                val headerString = otherHeaders.map { (key, value) -> "$key: $value" }.joinToString("\n")
+                Log.d(TAG, "Setting additional headers:\n$headerString")
+                
+                if (isMpvInitialized) {
+                    MPVLib.setPropertyString("http-header-fields", headerString)
+                } else {
+                    MPVLib.setOptionString("http-header-fields", headerString)
+                }
+            } else if (isMpvInitialized) {
+                MPVLib.setPropertyString("http-header-fields", "")
             }
         }
     }

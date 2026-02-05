@@ -335,7 +335,7 @@ const ActionButtons = memo(({
     return isWatched ? t('metadata.play') : playButtonText;
   }, [isWatched, playButtonText, type, watchProgress, groupedEpisodes]);
 
-  // Count additional buttons (excluding Play and Save) - AI Chat no longer counted
+  // Count additional buttons (AI Chat removed - now in top right corner)
   const hasTraktCollection = isAuthenticated;
   const hasRatings = type === 'series';
 
@@ -1880,25 +1880,25 @@ const HeroSection: React.FC<HeroSectionProps> = memo(({
             {/* Optimized Action Buttons */}
             <ActionButtons
               handleShowStreams={handleShowStreams}
-              toggleLibrary={handleToggleLibrary}
-              inLibrary={inLibrary}
-              type={type}
-              id={id}
-              navigation={navigation}
-              playButtonText={playButtonText}
-              animatedStyle={buttonsAnimatedStyle}
-              isWatched={isWatched}
-              watchProgress={watchProgress}
-              groupedEpisodes={groupedEpisodes}
-              metadata={metadata}
-              settings={settings}
-              // Trakt integration props
-              isAuthenticated={isAuthenticated}
-              isInWatchlist={isInWatchlist}
-              isInCollection={isInCollection}
-              onToggleWatchlist={onToggleWatchlist}
-              onToggleCollection={onToggleCollection}
-            />
+                toggleLibrary={handleToggleLibrary}
+                inLibrary={inLibrary}
+                type={type}
+                id={id}
+                navigation={navigation}
+                playButtonText={playButtonText}
+                animatedStyle={buttonsAnimatedStyle}
+                isWatched={isWatched}
+                watchProgress={watchProgress}
+                groupedEpisodes={groupedEpisodes}
+                metadata={metadata}
+                settings={settings}
+                // Trakt integration props
+                isAuthenticated={isAuthenticated}
+                isInWatchlist={isInWatchlist}
+                isInCollection={isInCollection}
+                onToggleWatchlist={onToggleWatchlist}
+                onToggleCollection={onToggleCollection}
+              />
           </View>
         </LinearGradient>
       </Animated.View>
