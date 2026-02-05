@@ -645,6 +645,7 @@
         "bulgarian": "Bułgarski",
         "polish": "Polski",
         "czech": "Czeski",
+        "turkish": "Turecki",
         "account": "Konto",
         "content_discovery": "Treści i odkrywanie",
         "appearance": "Wygląd",
@@ -1420,5 +1421,6 @@
         }
     }
 }
+
 
 
