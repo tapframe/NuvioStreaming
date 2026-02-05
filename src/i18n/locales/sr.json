@@ -634,6 +634,7 @@
         "croatian": "Хрватски",
         "chinese": "Кинески (поједностављени)",
         "hindi": "Хинди",
+        "serbian": "Srpski", 
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1409,3 +1410,4 @@
         }
     }
 }
+
