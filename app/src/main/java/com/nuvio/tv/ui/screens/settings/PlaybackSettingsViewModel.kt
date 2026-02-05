@@ -31,4 +31,46 @@ class PlaybackSettingsViewModel @Inject constructor(
     suspend fun setLibassRenderType(renderType: LibassRenderType) {
         playerSettingsDataStore.setLibassRenderType(renderType)
     }
+    
+    // Subtitle style settings functions
+    
+    suspend fun setSubtitlePreferredLanguage(language: String) {
+        playerSettingsDataStore.setSubtitlePreferredLanguage(language)
+    }
+    
+    suspend fun setSubtitleSecondaryLanguage(language: String?) {
+        playerSettingsDataStore.setSubtitleSecondaryLanguage(language)
+    }
+    
+    suspend fun setSubtitleSize(size: Int) {
+        playerSettingsDataStore.setSubtitleSize(size)
+    }
+    
+    suspend fun setSubtitleVerticalOffset(offset: Int) {
+        playerSettingsDataStore.setSubtitleVerticalOffset(offset)
+    }
+    
+    suspend fun setSubtitleBold(bold: Boolean) {
+        playerSettingsDataStore.setSubtitleBold(bold)
+    }
+    
+    suspend fun setSubtitleTextColor(color: Int) {
+        playerSettingsDataStore.setSubtitleTextColor(color)
+    }
+    
+    suspend fun setSubtitleBackgroundColor(color: Int) {
+        playerSettingsDataStore.setSubtitleBackgroundColor(color)
+    }
+    
+    suspend fun setSubtitleOutlineEnabled(enabled: Boolean) {
+        playerSettingsDataStore.setSubtitleOutlineEnabled(enabled)
+    }
+    
+    suspend fun setSubtitleOutlineColor(color: Int) {
+        playerSettingsDataStore.setSubtitleOutlineColor(color)
+    }
+    
+    suspend fun setSubtitleOutlineWidth(width: Int) {
+        playerSettingsDataStore.setSubtitleOutlineWidth(width)
+    }
 }

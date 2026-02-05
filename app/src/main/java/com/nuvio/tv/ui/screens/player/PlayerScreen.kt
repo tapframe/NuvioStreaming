@@ -231,27 +231,60 @@ fun PlayerScreen(
     ) {
         // Video Player
         viewModel.exoPlayer?.let { player ->
+            val subtitleStyle = uiState.subtitleStyle
+            
             AndroidView(
                 factory = { context ->
                     PlayerView(context).apply {
                         this.player = player
                         useController = false
                         setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    }
+                },
+                update = { playerView ->
+                    playerView.subtitleView?.apply {
+                        // Calculate font size based on percentage (100% = 24sp base)
+                        val baseFontSize = 24f
+                        val scaledFontSize = baseFontSize * (subtitleStyle.size / 100f)
+                        setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, scaledFontSize)
+                        setApplyEmbeddedFontSizes(false)
                         
-                        // Remove subtitle background
-                        subtitleView?.apply {
-                            setStyle(
-                                androidx.media3.ui.CaptionStyleCompat(
-                                    android.graphics.Color.WHITE,
-                                    android.graphics.Color.TRANSPARENT,
-                                    android.graphics.Color.TRANSPARENT,
-                                    androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE,
-                                    android.graphics.Color.TRANSPARENT,
-                                    null
-                                )
+                        // Apply bold style via typeface
+                        val typeface = if (subtitleStyle.bold) {
+                            android.graphics.Typeface.DEFAULT_BOLD
+                        } else {
+                            android.graphics.Typeface.DEFAULT
+                        }
+                        
+                        // Calculate edge type based on outline setting
+                        val edgeType = if (subtitleStyle.outlineEnabled) {
+                            androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE
+                        } else {
+                            androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE
+                        }
+                        
+                        setStyle(
+                            androidx.media3.ui.CaptionStyleCompat(
+                                subtitleStyle.textColor,
+                                subtitleStyle.backgroundColor,
+                                android.graphics.Color.TRANSPARENT, // Window color
+                                edgeType,
+                                subtitleStyle.outlineColor,
+                                typeface
                             )
-                            setApplyEmbeddedStyles(false)
-                            setBottomPaddingFraction(0.08f)
+                        )
+                        
+                        setApplyEmbeddedStyles(false)
+                        
+                        // Apply vertical offset (0% = bottom, 50% = middle)
+                        // Convert percentage to fraction (5% offset = 0.05 padding from bottom)
+                        val bottomPaddingFraction = (0.06f + (subtitleStyle.verticalOffset / 250f)).coerceIn(0.02f, 0.4f)
+                        setBottomPaddingFraction(bottomPaddingFraction)
+
+                        // Also apply explicit bottom padding based on view height for stronger offset effect
+                        post {
+                            val extraPadding = (height * (subtitleStyle.verticalOffset / 400f)).toInt()
+                            setPadding(paddingLeft, paddingTop, paddingRight, extraPadding)
                         }
                     }
                 },

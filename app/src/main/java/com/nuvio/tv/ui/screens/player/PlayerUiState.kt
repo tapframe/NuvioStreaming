@@ -2,6 +2,7 @@ package com.nuvio.tv.ui.screens.player
 
 import androidx.media3.common.C
 import androidx.media3.common.TrackGroup
+import com.nuvio.tv.data.local.SubtitleStyleSettings
 import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.Video
@@ -24,6 +25,8 @@ data class PlayerUiState(
     val showAudioDialog: Boolean = false,
     val showSubtitleDialog: Boolean = false,
     val showSpeedDialog: Boolean = false,
+    // Subtitle style settings
+    val subtitleStyle: SubtitleStyleSettings = SubtitleStyleSettings(),
     // Episodes/streams side panel (for series)
     val showEpisodesPanel: Boolean = false,
     val isLoadingEpisodes: Boolean = false,

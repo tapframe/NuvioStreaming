@@ -142,12 +142,26 @@ class PlayerViewModel @Inject constructor(
     // Skip intro
     private var skipIntervals: List<SkipInterval> = emptyList()
     private var lastActiveSkipType: String? = null
+    private var autoSubtitleSelected: Boolean = false
 
     init {
         initializePlayer(currentStreamUrl, currentHeaders)
         loadSavedProgressFor(currentSeason, currentEpisode)
         fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
         fetchSkipIntervals(contentId, currentSeason, currentEpisode)
+        observeSubtitleSettings()
+    }
+    
+    private fun observeSubtitleSettings() {
+        viewModelScope.launch {
+            playerSettingsDataStore.playerSettings.collect { settings ->
+                _uiState.update { it.copy(subtitleStyle = settings.subtitleStyle) }
+                applySubtitlePreferences(
+                    settings.subtitleStyle.preferredLanguage,
+                    settings.subtitleStyle.secondaryPreferredLanguage
+                )
+            }
+        }
     }
 
     private fun loadSavedProgressFor(season: Int?, episode: Int?) {
@@ -287,6 +301,7 @@ class PlayerViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                autoSubtitleSelected = false
                 val playerSettings = playerSettingsDataStore.playerSettings.first()
                 val useLibass = playerSettings.useLibass
                 val libassRenderType = playerSettings.libassRenderType.toAssRenderType()
@@ -310,6 +325,9 @@ class PlayerViewModel @Inject constructor(
                 }
 
                 _exoPlayer?.apply {
+                    val preferred = playerSettings.subtitleStyle.preferredLanguage
+                    val secondary = playerSettings.subtitleStyle.secondaryPreferredLanguage
+                    applySubtitlePreferences(preferred, secondary)
                     setMediaSource(createMediaSource(url, headers))
 
                     playWhenReady = true
@@ -894,6 +912,31 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
+        if (selectedSubtitleIndex == -1 && subtitleTracks.isNotEmpty() && !autoSubtitleSelected) {
+            val preferred = _uiState.value.subtitleStyle.preferredLanguage.lowercase()
+            val secondary = _uiState.value.subtitleStyle.secondaryPreferredLanguage?.lowercase()
+
+            fun matchesLanguage(track: TrackInfo, target: String): Boolean {
+                val lang = track.language?.lowercase() ?: return false
+                return lang == target || lang.startsWith(target) || lang.contains(target)
+            }
+
+            val preferredMatch = subtitleTracks.indexOfFirst { matchesLanguage(it, preferred) }
+            val secondaryMatch = secondary?.let { target ->
+                subtitleTracks.indexOfFirst { matchesLanguage(it, target) }
+            } ?: -1
+
+            val autoIndex = when {
+                preferredMatch >= 0 -> preferredMatch
+                secondaryMatch >= 0 -> secondaryMatch
+                else -> 0
+            }
+
+            autoSubtitleSelected = true
+            selectSubtitleTrack(autoIndex)
+            selectedSubtitleIndex = autoIndex
+        }
+
         _uiState.update {
             it.copy(
                 audioTracks = audioTracks,
@@ -901,6 +944,18 @@ class PlayerViewModel @Inject constructor(
                 selectedAudioTrackIndex = selectedAudioIndex,
                 selectedSubtitleTrackIndex = selectedSubtitleIndex
             )
+        }
+    }
+
+    private fun applySubtitlePreferences(preferred: String, secondary: String?) {
+        _exoPlayer?.let { player ->
+            val builder = player.trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+
+            builder.setPreferredTextLanguage(preferred)
+
+            player.trackSelectionParameters = builder.build()
         }
     }
 
