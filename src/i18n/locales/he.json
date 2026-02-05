@@ -644,6 +644,7 @@
         "hebrew": "עברית",
         "bulgarian": "בולגרית",
         "polish": "פולנית",
+        "czech": "צ'כית",
         "account": "חשבון",
         "content_discovery": "תוכן וגילוי",
         "appearance": "מראה",
@@ -1420,4 +1421,5 @@
     }
 
 }
+
 
