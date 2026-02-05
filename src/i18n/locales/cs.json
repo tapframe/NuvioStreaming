@@ -636,6 +636,7 @@
         "polish": "Polština",
         "czech": "Čeština",
         "turkish": "Turečtina",
+        "slovenian": "Slovinština",
         "account": "Účet",
         "content_discovery": "Obsah a objevování",
         "appearance": "Vzhled",
@@ -1411,4 +1412,5 @@
         }
     }
 }
+
 
