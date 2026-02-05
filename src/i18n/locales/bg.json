@@ -647,6 +647,7 @@
         "czech": "Чешки",
         "turkish": "Турски",
         "slovenian": "Словенски",
+        "macedonian": "Македонски",
         "account": "Профил",
         "content_discovery": "Съдържание и откриване",
         "appearance": "Външен вид",
@@ -1422,6 +1423,7 @@
         }
     }
 }
+
 
 
 
