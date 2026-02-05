@@ -26,4 +26,5 @@ export const resources = {
     'zh-CN': { translation: zhCN },
     hi: { translation: hi },
     sr: { translation: sr },
+    he: { translation: he },
 };
