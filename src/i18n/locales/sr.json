@@ -637,6 +637,7 @@
         "serbian": "Српски", 
         "hebrew": "Хебрејски",
         "bulgarian": "бугарски",
+        "polish": "Пољски",
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1412,6 +1413,7 @@
         }
     }
 }
+
 
 
 
