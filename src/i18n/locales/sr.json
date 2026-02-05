@@ -97,12 +97,12 @@
   "navigation": {
     "home": "Почетна",
     "library": "Библиотека",
-    "search": "Претражи",
+    "search": "Претрага", 
     "downloads": "Преузимања",
     "settings": "Подешавања"
   },
   "search": {
-    "title": "Претражи",
+    "title": "Претрага", 
     "recent_searches": "Недавне претраге",
     "discover": "Откриј",
     "movies": "Филмови",
@@ -634,7 +634,7 @@
         "croatian": "Хрватски",
         "chinese": "Кинески (поједностављени)",
         "hindi": "Хинди",
-        "serbian": "Srpski", 
+        "serbian": "Српски", 
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1410,4 +1410,5 @@
         }
     }
 }
+
 
