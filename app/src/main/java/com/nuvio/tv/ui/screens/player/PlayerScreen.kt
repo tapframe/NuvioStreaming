@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -91,9 +92,12 @@ fun PlayerScreen(
     val playPauseFocusRequester = remember { FocusRequester() }
     val episodesFocusRequester = remember { FocusRequester() }
     val streamsFocusRequester = remember { FocusRequester() }
+    val sourceStreamsFocusRequester = remember { FocusRequester() }
 
     BackHandler {
-        if (uiState.showEpisodesPanel) {
+        if (uiState.showSourcesPanel) {
+            viewModel.onEvent(PlayerEvent.OnDismissSourcesPanel)
+        } else if (uiState.showEpisodesPanel) {
             viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel)
         } else if (uiState.showControls) {
             // If controls are visible, hide them instead of going back
@@ -123,9 +127,9 @@ fun PlayerScreen(
         }
     }
 
-    // Request focus for key events when controls visibility changes
-    LaunchedEffect(uiState.showControls) {
-        if (uiState.showControls && !uiState.showEpisodesPanel &&
+    // Request focus for key events when controls visibility or panel state changes
+    LaunchedEffect(uiState.showControls, uiState.showEpisodesPanel, uiState.showSourcesPanel) {
+        if (uiState.showControls && !uiState.showEpisodesPanel && !uiState.showSourcesPanel &&
             !uiState.showAudioDialog && !uiState.showSubtitleDialog && !uiState.showSpeedDialog
         ) {
             // Wait for AnimatedVisibility animation to complete before focusing play/pause button
@@ -302,6 +306,7 @@ fun PlayerScreen(
                 onSeekBackward = { viewModel.onEvent(PlayerEvent.OnSeekBackward) },
                 onSeekTo = { viewModel.onEvent(PlayerEvent.OnSeekTo(it)) },
                 onShowEpisodesPanel = { viewModel.onEvent(PlayerEvent.OnShowEpisodesPanel) },
+                onShowSourcesPanel = { viewModel.onEvent(PlayerEvent.OnShowSourcesPanel) },
                 onShowAudioDialog = { viewModel.onEvent(PlayerEvent.OnShowAudioDialog) },
                 onShowSubtitleDialog = { viewModel.onEvent(PlayerEvent.OnShowSubtitleDialog) },
                 onShowSpeedDialog = { viewModel.onEvent(PlayerEvent.OnShowSpeedDialog) },
@@ -352,6 +357,43 @@ fun PlayerScreen(
             }
         }
 
+        // Sources panel scrim
+        AnimatedVisibility(
+            visible = uiState.showSourcesPanel && uiState.error == null,
+            enter = fadeIn(animationSpec = tween(120)),
+            exit = fadeOut(animationSpec = tween(120))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+        }
+
+        // Sources panel (slides in from right)
+        AnimatedVisibility(
+            visible = uiState.showSourcesPanel && uiState.error == null,
+            enter = slideInHorizontally(
+                animationSpec = tween(220),
+                initialOffsetX = { it }
+            ),
+            exit = slideOutHorizontally(
+                animationSpec = tween(220),
+                targetOffsetX = { it }
+            )
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                StreamSourcesSidePanel(
+                    uiState = uiState,
+                    streamsFocusRequester = sourceStreamsFocusRequester,
+                    onClose = { viewModel.onEvent(PlayerEvent.OnDismissSourcesPanel) },
+                    onAddonFilterSelected = { viewModel.onEvent(PlayerEvent.OnSourceAddonFilterSelected(it)) },
+                    onStreamSelected = { viewModel.onEvent(PlayerEvent.OnSourceStreamSelected(it)) },
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                )
+            }
+        }
+
         // Audio track dialog
         if (uiState.showAudioDialog) {
             TrackSelectionDialog(
@@ -395,6 +437,7 @@ private fun PlayerControlsOverlay(
     onSeekBackward: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onShowEpisodesPanel: () -> Unit,
+    onShowSourcesPanel: () -> Unit,
     onShowAudioDialog: () -> Unit,
     onShowSubtitleDialog: () -> Unit,
     onShowSpeedDialog: () -> Unit,
@@ -571,6 +614,14 @@ private fun PlayerControlsOverlay(
                         icon = Icons.Default.Speed,
                         contentDescription = "Playback speed",
                         onClick = onShowSpeedDialog,
+                        onFocused = onResetHideTimer
+                    )
+
+                    // Sources - switch stream source
+                    ControlButton(
+                        icon = Icons.Default.SwapHoriz,
+                        contentDescription = "Sources",
+                        onClick = onShowSourcesPanel,
                         onFocused = onResetHideTimer
                     )
 

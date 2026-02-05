@@ -455,6 +455,160 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    private fun showSourcesPanel() {
+        _uiState.update {
+            it.copy(
+                showSourcesPanel = true,
+                showControls = true,
+                showAudioDialog = false,
+                showSubtitleDialog = false,
+                showSpeedDialog = false,
+                showEpisodesPanel = false,
+                showEpisodeStreams = false
+            )
+        }
+        loadSourceStreams()
+    }
+
+    private fun loadSourceStreams() {
+        val type: String
+        val vid: String
+
+        if (contentType in listOf("series", "tv") && currentSeason != null && currentEpisode != null) {
+            type = contentType ?: return
+            vid = currentVideoId ?: contentId ?: return
+        } else {
+            type = contentType ?: "movie"
+            vid = contentId ?: return
+        }
+
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoadingSourceStreams = true,
+                    sourceStreamsError = null,
+                    sourceAllStreams = emptyList(),
+                    sourceSelectedAddonFilter = null,
+                    sourceFilteredStreams = emptyList(),
+                    sourceAvailableAddons = emptyList()
+                )
+            }
+
+            streamRepository.getStreamsFromAllAddons(
+                type = type,
+                videoId = vid,
+                season = if (contentType in listOf("series", "tv")) currentSeason else null,
+                episode = if (contentType in listOf("series", "tv")) currentEpisode else null
+            ).collect { result ->
+                when (result) {
+                    is NetworkResult.Success -> {
+                        val addonStreams = result.data
+                        val allStreams = addonStreams.flatMap { it.streams }
+                        val availableAddons = addonStreams.map { it.addonName }
+                        _uiState.update {
+                            it.copy(
+                                isLoadingSourceStreams = false,
+                                sourceAllStreams = allStreams,
+                                sourceSelectedAddonFilter = null,
+                                sourceFilteredStreams = allStreams,
+                                sourceAvailableAddons = availableAddons,
+                                sourceStreamsError = null
+                            )
+                        }
+                    }
+
+                    is NetworkResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isLoadingSourceStreams = false,
+                                sourceStreamsError = result.message
+                            )
+                        }
+                    }
+
+                    NetworkResult.Loading -> {
+                        _uiState.update { it.copy(isLoadingSourceStreams = true) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun dismissSourcesPanel() {
+        _uiState.update {
+            it.copy(
+                showSourcesPanel = false,
+                isLoadingSourceStreams = false,
+                sourceStreamsError = null,
+                sourceAllStreams = emptyList(),
+                sourceSelectedAddonFilter = null,
+                sourceFilteredStreams = emptyList(),
+                sourceAvailableAddons = emptyList()
+            )
+        }
+        scheduleHideControls()
+    }
+
+    private fun filterSourceStreamsByAddon(addonName: String?) {
+        val allStreams = _uiState.value.sourceAllStreams
+        val filteredStreams = if (addonName == null) {
+            allStreams
+        } else {
+            allStreams.filter { it.addonName == addonName }
+        }
+        _uiState.update {
+            it.copy(
+                sourceSelectedAddonFilter = addonName,
+                sourceFilteredStreams = filteredStreams
+            )
+        }
+    }
+
+    private fun switchToSourceStream(stream: Stream) {
+        val url = stream.getStreamUrl()
+        if (url.isNullOrBlank()) {
+            _uiState.update { it.copy(sourceStreamsError = "Invalid stream URL") }
+            return
+        }
+
+        saveWatchProgress()
+
+        val newHeaders = stream.behaviorHints?.proxyHeaders?.request ?: emptyMap()
+        currentStreamUrl = url
+        currentHeaders = newHeaders
+        lastSavedPosition = 0L
+
+        _uiState.update {
+            it.copy(
+                isBuffering = true,
+                error = null,
+                currentStreamName = stream.name ?: stream.addonName,
+                showSourcesPanel = false,
+                isLoadingSourceStreams = false,
+                sourceStreamsError = null,
+                sourceAllStreams = emptyList(),
+                sourceSelectedAddonFilter = null,
+                sourceFilteredStreams = emptyList(),
+                sourceAvailableAddons = emptyList()
+            )
+        }
+
+        _exoPlayer?.let { player ->
+            try {
+                player.setMediaSource(createMediaSource(url, newHeaders))
+                player.prepare()
+                player.playWhenReady = true
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message ?: "Failed to play selected stream") }
+                return
+            }
+        } ?: run {
+            initializePlayer(url, newHeaders)
+        }
+
+        loadSavedProgressFor(currentSeason, currentEpisode)
+    }
+
     private fun dismissEpisodesPanel() {
         _uiState.update {
             it.copy(
@@ -839,9 +993,9 @@ class PlayerViewModel @Inject constructor(
         hideControlsJob?.cancel()
         hideControlsJob = viewModelScope.launch {
             delay(3000)
-            if (_uiState.value.isPlaying && !_uiState.value.showAudioDialog && 
+            if (_uiState.value.isPlaying && !_uiState.value.showAudioDialog &&
                 !_uiState.value.showSubtitleDialog && !_uiState.value.showSpeedDialog &&
-                !_uiState.value.showEpisodesPanel) {
+                !_uiState.value.showEpisodesPanel && !_uiState.value.showSourcesPanel) {
                 _uiState.update { it.copy(showControls = false) }
             }
         }
@@ -953,6 +1107,18 @@ class PlayerViewModel @Inject constructor(
             }
             is PlayerEvent.OnEpisodeStreamSelected -> {
                 switchToEpisodeStream(event.stream)
+            }
+            PlayerEvent.OnShowSourcesPanel -> {
+                showSourcesPanel()
+            }
+            PlayerEvent.OnDismissSourcesPanel -> {
+                dismissSourcesPanel()
+            }
+            is PlayerEvent.OnSourceAddonFilterSelected -> {
+                filterSourceStreamsByAddon(event.addonName)
+            }
+            is PlayerEvent.OnSourceStreamSelected -> {
+                switchToSourceStream(event.stream)
             }
             PlayerEvent.OnDismissDialog -> {
                 _uiState.update { 

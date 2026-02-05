@@ -46,6 +46,14 @@ data class PlayerUiState(
     val episodeStreamsSeason: Int? = null,
     val episodeStreamsEpisode: Int? = null,
     val episodeStreamsTitle: String? = null,
+    // Stream sources side panel (for switching streams during playback)
+    val showSourcesPanel: Boolean = false,
+    val isLoadingSourceStreams: Boolean = false,
+    val sourceStreamsError: String? = null,
+    val sourceAllStreams: List<Stream> = emptyList(),
+    val sourceSelectedAddonFilter: String? = null, // null means "All"
+    val sourceFilteredStreams: List<Stream> = emptyList(),
+    val sourceAvailableAddons: List<String> = emptyList(),
     val error: String? = null,
     val pendingSeekPosition: Long? = null,  // For resuming from saved progress
     // Parental guide overlay
@@ -84,6 +92,10 @@ sealed class PlayerEvent {
     data class OnEpisodeSelected(val video: Video) : PlayerEvent()
     data class OnEpisodeAddonFilterSelected(val addonName: String?) : PlayerEvent()
     data class OnEpisodeStreamSelected(val stream: Stream) : PlayerEvent()
+    data object OnShowSourcesPanel : PlayerEvent()
+    data object OnDismissSourcesPanel : PlayerEvent()
+    data class OnSourceAddonFilterSelected(val addonName: String?) : PlayerEvent()
+    data class OnSourceStreamSelected(val stream: Stream) : PlayerEvent()
     data object OnDismissDialog : PlayerEvent()
     data object OnRetry : PlayerEvent()
     data object OnParentalGuideHide : PlayerEvent()
