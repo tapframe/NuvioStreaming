@@ -67,7 +67,7 @@ internal fun StreamItem(
             )
         ),
         shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
-        scale = CardDefaults.scale(focusedScale = 1.05f)
+        scale = CardDefaults.scale(focusedScale = 1.02f)
     ) {
         Row(
             modifier = Modifier
@@ -210,7 +210,7 @@ internal fun AddonChip(
             focusedSelectedContainerColor = NuvioColors.Secondary,
             contentColor = NuvioColors.TextSecondary,
             focusedContentColor = NuvioColors.OnPrimary,
-            selectedContentColor = NuvioColors.Secondary,
+            selectedContentColor = Color.White,
             focusedSelectedContentColor = NuvioColors.OnPrimary
         ),
         border = FilterChipDefaults.border(

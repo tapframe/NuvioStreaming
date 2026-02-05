@@ -295,6 +295,7 @@ private fun EpisodesListView(
 
                 TvLazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 4.dp),
                     modifier = Modifier
                         .fillMaxHeight()
                         .focusProperties { up = seasonTabFocusRequester }

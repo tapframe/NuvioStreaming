@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -194,7 +195,15 @@ fun PlayerScreen(
                                 false
                             }
                         }
-                        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        KeyEvent.KEYCODE_DPAD_UP -> {
+                            if (!uiState.showControls) {
+                                viewModel.onEvent(PlayerEvent.OnToggleControls)
+                            } else {
+                                viewModel.hideControls()
+                            }
+                            true
+                        }
+                        KeyEvent.KEYCODE_DPAD_DOWN -> {
                             if (!uiState.showControls) {
                                 viewModel.onEvent(PlayerEvent.OnToggleControls)
                                 true
@@ -796,6 +805,7 @@ private fun TrackSelectionDialog(
 
                 TvLazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(top = 4.dp),
                     modifier = Modifier.height(300.dp)
                 ) {
                     items(tracks) { track ->
@@ -838,6 +848,7 @@ private fun SubtitleSelectionDialog(
 
                 TvLazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(top = 4.dp),
                     modifier = Modifier.height(300.dp)
                 ) {
                     // Off option
@@ -886,7 +897,8 @@ private fun SpeedSelectionDialog(
                 )
 
                 TvLazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(top = 4.dp)
                 ) {
                     items(PLAYBACK_SPEEDS) { speed ->
                         SpeedItem(
