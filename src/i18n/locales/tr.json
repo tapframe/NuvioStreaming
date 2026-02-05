@@ -646,6 +646,7 @@
         "polish": "Polonyaca",
         "czech": "Çekçe",
         "turkish": "Türkçe",
+        "slovenian": "Slovence",
         "account": "Hesap",
         "content_discovery": "İçerik ve Keşif",
         "appearance": "Görünüm",
@@ -1421,3 +1422,4 @@
         }
     }
 }
+
