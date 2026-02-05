@@ -636,6 +636,7 @@
         "hindi": "Хинди",
         "serbian": "Српски", 
         "hebrew": "Хебрејски",
+        "bulgarian": "бугарски",
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1411,6 +1412,7 @@
         }
     }
 }
+
 
 
 
