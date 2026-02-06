@@ -40,6 +40,7 @@ import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { ErrorModal } from './modals/ErrorModal';
+import VisualEnhancementModal from './modals/VisualEnhancementModal';
 import { CustomSubtitles } from './subtitles/CustomSubtitles';
 import ParentalGuideOverlay from './overlays/ParentalGuideOverlay';
 import SkipIntroButton from './overlays/SkipIntroButton';
@@ -57,6 +58,8 @@ import { styles } from './utils/playerStyles';
 import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSRT } from './utils/playerUtils';
 import { storageService } from '../../services/storageService';
 import stremioService from '../../services/stremioService';
+import { shaderService, ShaderMode } from '../../services/shaderService';
+import { visualEnhancementService, VideoSettings } from '../../services/colorProfileService';
 import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
 import { findBestSubtitleTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -144,6 +147,50 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Subtitle sync modal state
   const [showSyncModal, setShowSyncModal] = useState(false);
+
+  // Shader / Video Enhancement State
+  const [showEnhancementModal, setShowEnhancementModal] = useState(false);
+  const [shaderMode, setShaderModeState] = useState<ShaderMode>('none');
+  const [glslShaders, setGlslShaders] = useState<string>('');
+
+  // Color Profile State
+  const [activeProfile, setActiveProfile] = useState<string>('natural');
+  const [customSettings, setCustomSettings] = useState<VideoSettings>(visualEnhancementService.getCustomSettings());
+  const [currentVideoSettings, setCurrentVideoSettings] = useState<VideoSettings>(visualEnhancementService.getCurrentSettings());
+
+  // Initialize shader and color services
+  useEffect(() => {
+    // Shaders
+    shaderService.initialize().catch(e => {
+        logger.error('[AndroidVideoPlayer] Failed to init shader service', e);
+    });
+
+    // Visual Enhancements
+    setActiveProfile(visualEnhancementService.getActiveProfile());
+    setCustomSettings(visualEnhancementService.getCustomSettings());
+    setCurrentVideoSettings(visualEnhancementService.getCurrentSettings());
+  }, []);
+
+  const setShaderMode = useCallback((mode: ShaderMode) => {
+    setShaderModeState(mode);
+    const config = shaderService.getShaderConfig(mode, settings.shaderProfile as any || 'MID-END');
+    setGlslShaders(config);
+    // Don't close modal here, let user close it
+    // setShowEnhancementModal(false);
+  }, [settings.shaderProfile]);
+
+  const handleSetProfile = useCallback(async (profile: string) => {
+    await visualEnhancementService.setProfile(profile);
+    setActiveProfile(profile);
+    setCurrentVideoSettings(visualEnhancementService.getCurrentSettings());
+  }, []);
+
+  const handleUpdateCustomSettings = useCallback(async (newSettings: Partial<VideoSettings>) => {
+    await visualEnhancementService.updateCustomSettings(newSettings);
+    setCustomSettings(visualEnhancementService.getCustomSettings());
+    setActiveProfile('custom');
+    setCurrentVideoSettings(visualEnhancementService.getCurrentSettings());
+  }, []);
 
   // Track auto-selection ref to prevent duplicate selections
   const hasAutoSelectedTracks = useRef(false);
@@ -814,6 +861,13 @@ const AndroidVideoPlayer: React.FC = () => {
             screenDimensions={playerState.screenDimensions}
             decoderMode={settings.decoderMode}
             gpuMode={settings.gpuMode}
+            glslShaders={glslShaders}
+            // Color Profile Props
+            brightness={currentVideoSettings.brightness}
+            contrast={currentVideoSettings.contrast}
+            saturation={currentVideoSettings.saturation}
+            gamma={currentVideoSettings.gamma}
+            hue={currentVideoSettings.hue}
             // Dual video engine props
             useExoPlayer={useExoPlayer}
             onCodecError={handleCodecError}
@@ -922,6 +976,7 @@ const AndroidVideoPlayer: React.FC = () => {
           isSubtitleModalOpen={modals.showSubtitleModal}
           setShowSourcesModal={modals.setShowSourcesModal}
           setShowEpisodesModal={type === 'series' ? modals.setShowEpisodesModal : undefined}
+          setShowEnhancementModal={setShowEnhancementModal}
           onSliderValueChange={(val) => { playerState.isDragging.current = true; }}
           onSlidingStart={() => { playerState.isDragging.current = true; }}
           onSlidingComplete={(val) => {
@@ -1096,6 +1151,17 @@ const AndroidVideoPlayer: React.FC = () => {
         availableStreams={availableStreams}
         currentStreamUrl={currentStreamUrl}
         onSelectStream={(stream) => handleSelectStream(stream)}
+      />
+
+      <VisualEnhancementModal
+        visible={showEnhancementModal}
+        onClose={() => setShowEnhancementModal(false)}
+        shaderMode={shaderMode}
+        setShaderMode={setShaderMode}
+        activeProfile={activeProfile}
+        setProfile={handleSetProfile}
+        customSettings={customSettings}
+        updateCustomSettings={handleUpdateCustomSettings}
       />
 
       <SpeedModal

@@ -45,6 +45,7 @@ interface PlayerControlsProps {
   isSubtitleModalOpen?: boolean;
   setShowSourcesModal?: (show: boolean) => void;
   setShowEpisodesModal?: (show: boolean) => void;
+  setShowEnhancementModal?: (show: boolean) => void;
   // Slider-specific props
   onSliderValueChange: (value: number) => void;
   onSlidingStart: () => void;
@@ -95,6 +96,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
   isSubtitleModalOpen,
   setShowSourcesModal,
   setShowEpisodesModal,
+  setShowEnhancementModal,
   onSliderValueChange,
   onSlidingStart,
   onSlidingComplete,
@@ -598,6 +600,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
                 <TouchableOpacity style={styles.iconButton} onPress={cycleAspectRatio}>
                   <Ionicons name="expand-outline" size={24} color="white" />
                 </TouchableOpacity>
+
+                {/* Video Enhancement Button (MPV Only) */}
+                {playerBackend === 'MPV' && setShowEnhancementModal && (
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => setShowEnhancementModal(true)}
+                  >
+                    <Ionicons name="sparkles-outline" size={24} color="white" />
+                  </TouchableOpacity>
+                )}
 
                 {/* Subtitle Button */}
                 <TouchableOpacity
