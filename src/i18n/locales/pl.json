@@ -649,6 +649,7 @@
         "slovenian": "Słoweński",
         "macedonian": "Macedoński",
         "russian": "Rosyjski",
+        "filipino": "Filipiński",
         "account": "Konto",
         "content_discovery": "Treści i odkrywanie",
         "appearance": "Wygląd",
@@ -1424,6 +1425,7 @@
         }
     }
 }
+
 
 
 
