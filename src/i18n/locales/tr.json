@@ -649,6 +649,7 @@
         "slovenian": "Slovence",
         "macedonian": "Makedonca",
         "russian": "Rusça",
+        "filipino": "Filipince",
         "account": "Hesap",
         "content_discovery": "İçerik ve Keşif",
         "appearance": "Görünüm",
@@ -1424,6 +1425,7 @@
         }
     }
 }
+
 
 
 
