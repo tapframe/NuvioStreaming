@@ -648,6 +648,7 @@
         "turkish": "טורקית",
         "slovenian": "סلوفينية",
         "macedonian": "מקדונית",
+        "russian": "רוסית",
         "account": "חשבון",
         "content_discovery": "תוכן וגילוי",
         "appearance": "מראה",
@@ -1424,6 +1425,7 @@
     }
 
 }
+
 
 
 
