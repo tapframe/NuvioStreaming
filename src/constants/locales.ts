@@ -18,4 +18,5 @@ export const LOCALES = [
     { code: 'tr', key: 'turkish' }
     { code: 'sl', key: 'slovenian' }
     { code: 'mk', key: 'macedonian' }
+    { code: 'ru', key: 'russian' }
 ];
