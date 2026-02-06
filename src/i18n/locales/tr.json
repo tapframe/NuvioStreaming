@@ -648,6 +648,7 @@
         "turkish": "Türkçe",
         "slovenian": "Slovence",
         "macedonian": "Makedonca",
+        "russian": "Rusça",
         "account": "Hesap",
         "content_discovery": "İçerik ve Keşif",
         "appearance": "Görünüm",
@@ -1423,5 +1424,6 @@
         }
     }
 }
+
 
 
