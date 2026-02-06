@@ -643,6 +643,7 @@
         "slovenian": "Словеначки",
         "macedonian": "Македонски",
         "russian": "Руски",
+        "filipino": "Филипински",
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1418,6 +1419,7 @@
         }
     }
 }
+
 
 
 
