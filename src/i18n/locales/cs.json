@@ -639,6 +639,7 @@
         "slovenian": "Slovinština",
         "macedonian": "Makedonský",
         "russian": "Ruština",
+        "filipino": "Filipínština",
         "account": "Účet",
         "content_discovery": "Obsah a objevování",
         "appearance": "Vzhled",
@@ -1414,6 +1415,7 @@
         }
     }
 }
+
 
 
 
