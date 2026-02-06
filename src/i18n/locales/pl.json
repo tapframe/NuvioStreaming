@@ -648,6 +648,7 @@
         "turkish": "Turecki",
         "slovenian": "Słoweński",
         "macedonian": "Macedoński",
+        "russian": "Rosyjski",
         "account": "Konto",
         "content_discovery": "Treści i odkrywanie",
         "appearance": "Wygląd",
@@ -1423,6 +1424,7 @@
         }
     }
 }
+
 
 
 
