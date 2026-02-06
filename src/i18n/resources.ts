@@ -18,6 +18,7 @@ import cs from './locales/cs.json';
 import tr from './locales/tr.json';
 import sl from './locales/sl.json';
 import mk from './locales/mk.json';
+import ru from './locales/ru.json';
 
 export const resources = {
     en: { translation: en },
@@ -39,4 +40,5 @@ export const resources = {
     tr: { translation: tr },
     sl: { translation: sl },
     mk: { translation: mk },
+    ru: { translation: ru },
 };
