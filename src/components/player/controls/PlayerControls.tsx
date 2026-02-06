@@ -297,6 +297,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
     >
       {/* Progress slider with native iOS slider */}
       <View style={styles.sliderContainer}>
+        <View style={[styles.timeDisplay, { paddingHorizontal: 14 }]}>
+          <View style={styles.timeContainer}>
+            <Text style={styles.duration}>{formatTime(previewTime)}</Text>
+          </View>
+          <View style={styles.timeContainer}>
+            <Text style={styles.duration}>{formatTime(duration)}</Text>
+          </View>
+        </View>
         <Slider
           style={{
             width: '100%',
@@ -326,14 +334,6 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           thumbTintColor={Platform.OS === 'android' ? currentTheme.colors.white : undefined}
           tapToSeek={Platform.OS === 'ios'}
         />
-        <View style={[styles.timeDisplay, { paddingHorizontal: 14 }]}>
-          <View style={styles.timeContainer}>
-            <Text style={styles.duration}>{formatTime(previewTime)}</Text>
-          </View>
-          <View style={styles.timeContainer}>
-            <Text style={styles.duration}>{formatTime(duration)}</Text>
-          </View>
-        </View>
       </View>
 
       {/* Controls Overlay */}
@@ -590,75 +590,82 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
           pointerEvents="box-none"
         >
           <View style={styles.bottomControls} pointerEvents="box-none">
-            {/* Center Buttons Container with rounded background - wraps all buttons */}
+            {/* Center Buttons Container with split layout */}
             <View style={styles.centerControlsContainer} pointerEvents="box-none">
-              {/* Left Side: Aspect Ratio Button */}
-              <TouchableOpacity style={styles.iconButton} onPress={cycleAspectRatio}>
-                <Ionicons name="expand-outline" size={24} color="white" />
-              </TouchableOpacity>
-
-              {/* Subtitle Button */}
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => setShowSubtitleModal(!isSubtitleModalOpen)}
-              >
-                <Ionicons name="text" size={24} color="white" />
-              </TouchableOpacity>
-
-              {/* Change Source Button */}
-              {setShowSourcesModal && (
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={() => setShowSourcesModal(true)}
-                >
-                  <Ionicons name="cloud-outline" size={24} color="white" />
+              {/* Left Group */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {/* Aspect Ratio Button */}
+                <TouchableOpacity style={styles.iconButton} onPress={cycleAspectRatio}>
+                  <Ionicons name="expand-outline" size={24} color="white" />
                 </TouchableOpacity>
-              )}
 
-              {/* Playback Speed Button */}
-              <TouchableOpacity style={styles.iconButton} onPress={() => setShowSpeedModal(true)}>
-                <Ionicons name="speedometer-outline" size={24} color="white" />
-              </TouchableOpacity>
-
-              {/* Audio Button */}
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => setShowAudioModal(true)}
-                disabled={ksAudioTracks.length <= 1}
-              >
-                <Ionicons
-                  name="musical-notes-outline"
-                  size={24}
-                  color={ksAudioTracks.length <= 1 ? 'grey' : 'white'}
-                />
-              </TouchableOpacity>
-
-              {/* Submit Intro Button */}
-              {season !== undefined && episode !== undefined && settings.introSubmitEnabled && settings.introDbApiKey && (
+                {/* Subtitle Button */}
                 <TouchableOpacity
                   style={styles.iconButton}
-                  onPress={handleIntroPress}
+                  onPress={() => setShowSubtitleModal(!isSubtitleModalOpen)}
+                >
+                  <Ionicons name="text" size={24} color="white" />
+                </TouchableOpacity>
+
+                {/* Playback Speed Button */}
+                <TouchableOpacity style={styles.iconButton} onPress={() => setShowSpeedModal(true)}>
+                  <Ionicons name="speedometer-outline" size={24} color="white" />
+                </TouchableOpacity>
+
+                {/* Audio Button */}
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => setShowAudioModal(true)}
+                  disabled={ksAudioTracks.length <= 1}
                 >
                   <Ionicons
-                    name="flag-outline"
+                    name="musical-notes-outline"
                     size={24}
-                    color="white"
+                    color={ksAudioTracks.length <= 1 ? 'grey' : 'white'}
                   />
                 </TouchableOpacity>
-              )}
 
-              {/* Right Side: Episodes Button */}
-              {setShowEpisodesModal && (
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={() => setShowEpisodesModal(true)}
-                >
-                  <Ionicons name="list" size={24} color="white" />
-                </TouchableOpacity>
-              )}
+                {/* Submit Intro Button */}
+                {season !== undefined && episode !== undefined && settings.introSubmitEnabled && settings.introDbApiKey && (
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={handleIntroPress}
+                  >
+                    <Ionicons
+                      name="flag-outline"
+                      size={24}
+                      color="white"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Right Group */}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {/* Change Source Button */}
+                {setShowSourcesModal && (
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => setShowSourcesModal(true)}
+                  >
+                    <Ionicons name="cloud-outline" size={24} color="white" />
+                  </TouchableOpacity>
+                )}
+
+                {/* Episodes Button */}
+                {setShowEpisodesModal && (
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => setShowEpisodesModal(true)}
+                  >
+                    <Ionicons name="list" size={24} color="white" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
         </LinearGradient>
+
       </View>
     </Animated.View>
   );
