@@ -642,6 +642,7 @@
         "turkish": "Турски",
         "slovenian": "Словеначки",
         "macedonian": "Македонски",
+        "russian": "Руски",
         "account": "Налог",
         "content_discovery": "Садржај и откривање",
         "appearance": "Изглед",
@@ -1417,6 +1418,7 @@
         }
     }
 }
+
 
 
 
