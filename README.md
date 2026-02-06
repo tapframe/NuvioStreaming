@@ -11,16 +11,16 @@
   [![License][license-shield]][license-url]
 
   <p>
-    A modern media hub built with React Native and Expo.
+    A modern media hub for Android and iOS built with React Native and Expo.
     <br />
-    Stremio Addon ecosystem • Cross-platform • Offline metadata & sync
+    Stremio Addon ecosystem • Cross-platform
   </p>
 
 </div>
 
 ## About
 
-Nuvio Media Hub is a cross-platform app for managing, discovering, and streaming your media via a flexible addon ecosystem. Built with React Native and Expo.
+Nuvio Media Hub is a cross-platform app for managing and discovering media, with a playback-focused interface that can integrate with the Stremio addon ecosystem through user-installed extensions.
 
 ## Installation
 
@@ -30,9 +30,9 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 
 ### iOS
 
-* [TestFlight](https://testflight.apple.com/join/QkKMGRqp)
-* [AltStore](https://tinyurl.com/NuvioAltstore)
-* [SideStore](https://tinyurl.com/NuvioSidestore)
+- [TestFlight](https://testflight.apple.com/join/QkKMGRqp)
+- [AltStore](https://tinyurl.com/NuvioAltstore)
+- [SideStore](https://tinyurl.com/NuvioSidestore)
 
 **Manual source:** `https://raw.githubusercontent.com/tapframe/NuvioStreaming/main/nuvio-source.json`
 
@@ -41,7 +41,8 @@ Download the latest APK from [GitHub Releases](https://github.com/tapframe/Nuvio
 ```bash
 git clone https://github.com/tapframe/NuvioStreaming.git
 cd NuvioStreaming
-npm install
+npm install --legacy-peer-deps
+npx expo prebuild
 npx expo run:android
 # or
 npx expo run:ios
@@ -49,15 +50,17 @@ npx expo run:ios
 
 ## Legal & DMCA
 
-Nuvio functions solely as a client-side interface for browsing metadata and playing media files provided by user-installed extensions. It does not host, store, or distribute any media content.
+Nuvio functions solely as a client-side interface for browsing metadata and playing media provided by user-installed extensions and/or user-provided sources. It is intended for content the user owns or is otherwise authorized to access.
+
+Nuvio is not affiliated with any third-party extensions, catalogs, sources, or content providers. It does not host, store, or distribute any media content.
 
 For comprehensive legal information, including our full disclaimer, third-party extension policy, and DMCA/Copyright information, please visit our **[Legal & Disclaimer Page](https://tapframe.github.io/NuvioStreaming/#legal)**.
 
 ## Built With
 
-* React Native
-* Expo
-* TypeScript
+- React Native
+- Expo
+- TypeScript
 
 ## Star History
 
