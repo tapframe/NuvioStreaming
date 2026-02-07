@@ -37,6 +37,7 @@ import { SubtitleSyncModal } from './modals/SubtitleSyncModal';
 import SpeedModal from './modals/SpeedModal';
 import { SubmitIntroModal } from './modals/SubmitIntroModal';
 import { SourcesModal } from './modals/SourcesModal';
+import { ResolutionModal } from './modals/ResolutionModal';
 import { EpisodesModal } from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
 import { ErrorModal } from './modals/ErrorModal';

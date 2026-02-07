@@ -225,16 +225,23 @@ class ShaderService {
         for (const cat of Object.keys(SHADER_PROFILES)) {
              const list = SHADER_PROFILES[cat as ShaderCategory] as Record<string, string[]>;
              if (list[profileName]) {
-                 return list[profileName].map(name => `${this.shaderDir}${name}`).join(':');
+                 const cleanDir = this.shaderDir.replace('file://', '');
+                 return list[profileName].map(name => `${cleanDir}${name}`).join(':');
              }
         }
         return "";
     }
 
     // Map filenames to full local paths and join with ':' (MPV separator)
-    return shaderNames
-        .map(name => `${this.shaderDir}${name}`)
+    // IMPORTANT: Strip 'file://' prefix for MPV native path compatibility
+    const cleanDir = this.shaderDir.replace('file://', '');
+    
+    const config = shaderNames
+        .map(name => `${cleanDir}${name}`)
         .join(':');
+        
+    logger.info(`[ShaderService] Generated config for ${profileName}:`, config);
+    return config;
   }
 }
 
