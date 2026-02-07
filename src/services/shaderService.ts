@@ -6,7 +6,7 @@ import JSZip from 'jszip';
 // Local Shader Pack Asset
 const SHADER_ZIP = require('../../assets/shaders/shaders_new.zip');
 
-// Key files to verify installation (matches AnymeX zip contents)
+// Key files to verify installation
 const ESSENTIAL_SHADERS = [
   'Anime4K_Clamp_Highlights.glsl',
   'Anime4K_Restore_CNN_M.glsl',
@@ -15,7 +15,7 @@ const ESSENTIAL_SHADERS = [
   'SSimSuperRes.glsl',
 ];
 
-// Exact profiles from AnymeX
+// Exact profiles
 export const SHADER_PROFILES = {
   "MID-END": {
     'Anime4K: Mode A (Fast)': [
