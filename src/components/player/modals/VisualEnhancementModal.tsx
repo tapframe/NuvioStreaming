@@ -54,15 +54,15 @@ const ShaderTab = ({ currentMode, setMode }: { currentMode: string, setMode: (m:
   const { settings } = useSettings();
   const selectedCategory = (settings?.shaderProfile || 'MID-END') as ShaderCategory;
   
-  const animeModes = Object.keys(SHADER_PROFILES[selectedCategory]);
-  const cinemaModes = Object.keys(SHADER_PROFILES['CINEMA']);
+  const animeModes = SHADER_PROFILES[selectedCategory] ? Object.keys(SHADER_PROFILES[selectedCategory]) : [];
+  const cinemaModes = SHADER_PROFILES['CINEMA'] ? Object.keys(SHADER_PROFILES['CINEMA']) : [];
 
   const getModeDescription = (name: string) => {
     if (name.includes('Mode A')) return 'Best for high-quality sources.';
     if (name.includes('Mode B')) return 'Soft restore for noisy videos.';
     if (name.includes('Mode C')) return 'Balanced restore and upscale.';
     if (name.includes('FSR')) return 'Sharp upscaling for live-action.';
-    if (name.includes('SSim')) return 'Natural reconstruction.';
+    if (name.includes('SSimSuperRes')) return 'Natural sharpness and anti-ringing.';
     return '';
   };
 
@@ -96,20 +96,24 @@ const ShaderTab = ({ currentMode, setMode }: { currentMode: string, setMode: (m:
         />
       ))}
 
-      <View style={styles.sectionHeader}>
-        <Ionicons name="film-outline" size={16} color="rgba(255,255,255,0.4)" style={{ marginRight: 8 }} />
-        <Text style={styles.sectionTitle}>CINEMA</Text>
-      </View>
+      {cinemaModes.length > 0 && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="film-outline" size={16} color="rgba(255,255,255,0.4)" style={{ marginRight: 8 }} />
+            <Text style={styles.sectionTitle}>CINEMA</Text>
+          </View>
 
-      {cinemaModes.map((mode) => (
-        <PresetItem
-          key={mode}
-          label={mode}
-          description={getModeDescription(mode)}
-          isSelected={currentMode === mode}
-          onPress={() => setMode(mode)}
-        />
-      ))}
+          {cinemaModes.map((mode) => (
+            <PresetItem
+              key={mode}
+              label={mode}
+              description={getModeDescription(mode)}
+              isSelected={currentMode === mode}
+              onPress={() => setMode(mode)}
+            />
+          ))}
+        </>
+      )}
     </ScrollView>
   );
 };

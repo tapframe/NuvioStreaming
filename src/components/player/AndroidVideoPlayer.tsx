@@ -85,7 +85,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const playerState = usePlayerState();
   const modals = usePlayerModals();
   const speedControl = useSpeedControl();
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
 
   const videoRef = useRef<any>(null);
   const mpvPlayerRef = useRef<MpvPlayerRef>(null);
@@ -151,7 +151,7 @@ const AndroidVideoPlayer: React.FC = () => {
 
   // Shader / Video Enhancement State
   const [showEnhancementModal, setShowEnhancementModal] = useState(false);
-  const [shaderMode, setShaderModeState] = useState<ShaderMode>('none');
+  const [shaderMode, setShaderModeState] = useState<ShaderMode>(settings.defaultShaderMode || 'none');
   const [glslShaders, setGlslShaders] = useState<string>('');
 
   // Color Profile State
@@ -172,13 +172,22 @@ const AndroidVideoPlayer: React.FC = () => {
     setCurrentVideoSettings(visualEnhancementService.getCurrentSettings());
   }, []);
 
+  // Initialize shader config from persisted setting
+  useEffect(() => {
+    if (settings.defaultShaderMode && settings.defaultShaderMode !== 'none') {
+        const config = shaderService.getShaderConfig(settings.defaultShaderMode, settings.shaderProfile as any || 'MID-END');
+        setGlslShaders(config);
+    }
+  }, [settings.defaultShaderMode, settings.shaderProfile]);
+
   const setShaderMode = useCallback((mode: ShaderMode) => {
     setShaderModeState(mode);
+    updateSetting('defaultShaderMode', mode); // Persist selection
     const config = shaderService.getShaderConfig(mode, settings.shaderProfile as any || 'MID-END');
     setGlslShaders(config);
     // Don't close modal here, let user close it
     // setShowEnhancementModal(false);
-  }, [settings.shaderProfile]);
+  }, [settings.shaderProfile, updateSetting]);
 
   const handleSetProfile = useCallback(async (profile: string) => {
     await visualEnhancementService.setProfile(profile);

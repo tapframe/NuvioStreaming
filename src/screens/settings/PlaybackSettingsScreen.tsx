@@ -107,6 +107,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
         if (isMounted.current) {
             setIsDownloadingEnhancement(false);
             if (success) {
+                shaderService.setInitialized(true); // Force update service state
                 setIsEnhancementDownloaded(true);
                 toastService.success(t('settings.enhancement_download_success', { defaultValue: 'Enhancement assets installed!' }));
             } else {
@@ -338,14 +339,14 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                 )}
             </SettingsCard>
 
-            {/* Experimental Settings Section - AnymeX Style */}
-            <SettingsCard title={t('settings.sections.experimental', { defaultValue: 'Experimental Settings' })} isTablet={isTablet}>
+            {/* Shaders Section */}
+            <SettingsCard title="Shaders" isTablet={isTablet}>
                 
                 {/* Enable Shaders Toggle */}
                 <SettingItem
                     title={t('settings.items.enable_shaders', { defaultValue: 'Enable Shaders' })}
                     description={t('settings.items.enable_shaders_desc', { defaultValue: 'Apply real-time shaders (Anime4K/FSR) to the player.' })}
-                    icon="color-filter"
+                    icon="eye"
                     renderControl={() => (
                         <CustomSwitch
                             value={settings?.enableShaders ?? false}
@@ -361,7 +362,7 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                         <SettingItem
                             title={t('settings.items.shader_profile', { defaultValue: 'Shader Profile' })}
                             description={t('settings.items.shader_profile_desc', { defaultValue: 'Choose based on your device performance.' })}
-                            icon="hardware-chip"
+                            icon="activity"
                             renderControl={() => (
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     <Text style={{ color: currentTheme.colors.primary, marginRight: 8, fontWeight: '700' }}>
@@ -447,9 +448,28 @@ export const PlaybackSettingsContent: React.FC<PlaybackSettingsContentProps> = (
                             )}
                             
                             {isEnhancementDownloaded && (
-                                <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 }}>
-                                    All required shader files are ready. You can switch profiles in the video player menu.
-                                </Text>
+                                <View style={{ marginTop: 8 }}>
+                                    <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 12, marginBottom: 12 }}>
+                                        All required shader files are ready. You can switch profiles in the video player menu.
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={{
+                                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                            borderRadius: 8,
+                                            paddingVertical: 10,
+                                            alignItems: 'center',
+                                            borderWidth: 1,
+                                            borderColor: 'rgba(255, 255, 255, 0.1)'
+                                        }}
+                                        onPress={async () => {
+                                            await shaderService.clearShaders();
+                                            setIsEnhancementDownloaded(false);
+                                            toastService.success('Shader assets cleared');
+                                        }}
+                                    >
+                                        <Text style={{ color: 'rgba(255, 255, 255, 0.6)', fontWeight: '600', fontSize: 13 }}>Reset Assets</Text>
+                                    </TouchableOpacity>
+                                </View>
                             )}
                         </View>
                     </>

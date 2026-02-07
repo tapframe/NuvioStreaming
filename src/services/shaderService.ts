@@ -12,6 +12,7 @@ const ESSENTIAL_SHADERS = [
   'Anime4K_Restore_CNN_M.glsl',
   'Anime4K_Upscale_CNN_x2_M.glsl',
   'FSR.glsl',
+  'SSimSuperRes.glsl',
 ];
 
 // Exact profiles from AnymeX
@@ -105,7 +106,7 @@ export const SHADER_PROFILES = {
   },
   "CINEMA": {
     'FidelityFX Super Resolution': ['FSR.glsl'],
-    'SSimSuperRes': ['SSimSuperRes.glsl'],
+    'SSimSuperRes (Natural)': ['SSimSuperRes.glsl'],
   }
 };
 
@@ -127,23 +128,16 @@ class ShaderService {
   }
 
   /**
-   * Check if all shaders are already extracted and available
+   * Check if shaders are available
    */
   async checkAvailability(): Promise<boolean> {
     try {
       const dirInfo = await FileSystem.getInfoAsync(this.shaderDir);
       if (!dirInfo.exists) return false;
 
-      // Check key files
-      const results = await Promise.all(
-        ESSENTIAL_SHADERS.map(async (filename) => {
-          const path = `${this.shaderDir}${filename}`;
-          const info = await FileSystem.getInfoAsync(path);
-          return info.exists;
-        })
-      );
-
-      this.initialized = results.every(v => v === true);
+      const files = await FileSystem.readDirectoryAsync(this.shaderDir);
+      // As long as we have some files, consider it initialized
+      this.initialized = files.length >= 3;
       return this.initialized;
     } catch {
       return false;
@@ -155,6 +149,27 @@ class ShaderService {
    */
   async initialize(): Promise<void> {
     await this.checkAvailability();
+  }
+
+  // Manually update initialization state (e.g. after download)
+  setInitialized(value: boolean) {
+    this.initialized = value;
+  }
+
+  /**
+   * Delete extracted shaders (troubleshooting)
+   */
+  async clearShaders(): Promise<void> {
+    try {
+      const dirInfo = await FileSystem.getInfoAsync(this.shaderDir);
+      if (dirInfo.exists) {
+        await FileSystem.deleteAsync(this.shaderDir, { idempotent: true });
+        this.initialized = false;
+        logger.info('[ShaderService] Shaders cleared');
+      }
+    } catch (e) {
+      logger.error('[ShaderService] Failed to clear shaders', e);
+    }
   }
 
   /**
@@ -176,12 +191,19 @@ class ShaderService {
       
       if (onProgress) onProgress(0.3);
 
-      // 2. Read Zip
-      const zipContent = await FileSystem.readAsStringAsync(asset.localUri || asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+      // Use copyAsync to avoid loading entire binary into memory as string
+      const tempZip = `${FileSystem.cacheDirectory}shaders_temp.zip`;
+      await FileSystem.copyAsync({
+          from: asset.localUri || asset.uri,
+          to: tempZip
+      });
+
+      // 2. Read Zip (Small file so Base64 is okay, but using safer approach)
+      const zipContent = await FileSystem.readAsStringAsync(tempZip, { encoding: FileSystem.EncodingType.Base64 });
       const zip = await JSZip.loadAsync(zipContent, { base64: true });
 
       if (onProgress) onProgress(0.6);
-      logger.info('[ShaderService] Extracting shader files...');
+      logger.info(`[ShaderService] Extracting ${Object.keys(zip.files).length} files...`);
 
       // 3. Extract Files
       const files = Object.keys(zip.files);
@@ -189,16 +211,22 @@ class ShaderService {
 
       for (const filename of files) {
         if (!zip.files[filename].dir) {
-          const content = await zip.files[filename].async('base64');
+          const content = await zip.files[filename].async('uint8array');
+          // For binary data, writing as base64 is safest in expo-file-system
+          const base64 = this.uint8ToBase64(content);
+          
           await FileSystem.writeAsStringAsync(
             `${this.shaderDir}${filename}`,
-            content,
+            base64,
             { encoding: FileSystem.EncodingType.Base64 }
           );
         }
         extractedCount++;
         if (onProgress) onProgress(0.6 + (extractedCount / files.length) * 0.4);
       }
+
+      // Clean up temp zip
+      await FileSystem.deleteAsync(tempZip, { idempotent: true });
 
       this.initialized = true;
       logger.info('[ShaderService] Shaders installed successfully');
@@ -207,6 +235,16 @@ class ShaderService {
       logger.error('[ShaderService] Extraction failed', error);
       return false;
     }
+  }
+
+  // Helper for binary conversion
+  private uint8ToBase64(arr: Uint8Array): string {
+    let binary = '';
+    const len = arr.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(arr[i]);
+    }
+    return btoa(binary);
   }
 
   /**

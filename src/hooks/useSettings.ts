@@ -118,6 +118,7 @@ export interface AppSettings {
   // Upscaler settings
   enableShaders: boolean; // Enable/disable real-time upscalers
   shaderProfile: 'MID-END' | 'HIGH-END'; // Hardware profile for upscalers
+  defaultShaderMode: string; // Persisted shader preset (e.g. 'Anime4K: Mode A')
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -209,6 +210,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Upscaler defaults
   enableShaders: false,
   shaderProfile: 'MID-END',
+  defaultShaderMode: 'none',
 };
 
 const SETTINGS_STORAGE_KEY = 'app_settings';
