@@ -395,7 +395,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({
               )}
 
               {/* Video Enhancement Button (Top Access) */}
-              {playerBackend === 'MPV' && setShowEnhancementModal && (
+              {playerBackend === 'MPV' && setShowEnhancementModal && settings.enableShaders && (
                 <TouchableOpacity
                   style={{ padding: 8 }}
                   onPress={() => setShowEnhancementModal(true)}
