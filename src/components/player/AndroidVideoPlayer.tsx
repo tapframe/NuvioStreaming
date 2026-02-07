@@ -171,22 +171,35 @@ const AndroidVideoPlayer: React.FC = () => {
     setCurrentVideoSettings(visualEnhancementService.getCurrentSettings());
   }, []);
 
-  // Initialize shader config from persisted setting
+  // Initialize shader config from persisted setting.
+  // Respect global shader toggle at runtime.
   useEffect(() => {
-    if (settings.defaultShaderMode && settings.defaultShaderMode !== 'none') {
-        const config = shaderService.getShaderConfig(settings.defaultShaderMode, settings.shaderProfile as any || 'MID-END');
-        setGlslShaders(config);
+    if (!settings.enableShaders) {
+      setGlslShaders('');
+      return;
     }
-  }, [settings.defaultShaderMode, settings.shaderProfile]);
+
+    if (settings.defaultShaderMode && settings.defaultShaderMode !== 'none') {
+      const config = shaderService.getShaderConfig(settings.defaultShaderMode, settings.shaderProfile as any || 'MID-END');
+      setGlslShaders(config);
+    } else {
+      setGlslShaders('');
+    }
+  }, [settings.enableShaders, settings.defaultShaderMode, settings.shaderProfile]);
 
   const setShaderMode = useCallback((mode: ShaderMode) => {
     setShaderModeState(mode);
     updateSetting('defaultShaderMode', mode); // Persist selection
+    if (!settings.enableShaders) {
+      setGlslShaders('');
+      return;
+    }
+
     const config = shaderService.getShaderConfig(mode, settings.shaderProfile as any || 'MID-END');
     setGlslShaders(config);
     // Don't close modal here, let user close it
     // setShowEnhancementModal(false);
-  }, [settings.shaderProfile, updateSetting]);
+  }, [settings.enableShaders, settings.shaderProfile, updateSetting]);
 
   const handleSetProfile = useCallback(async (profile: string) => {
     await visualEnhancementService.setProfile(profile);

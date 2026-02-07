@@ -136,8 +136,8 @@ class ShaderService {
       if (!dirInfo.exists) return false;
 
       const files = await FileSystem.readDirectoryAsync(this.shaderDir);
-      // As long as we have some files, consider it initialized
-      this.initialized = files.length >= 3;
+      // Ensure essential files exist to avoid false positives on partial extraction
+      this.initialized = ESSENTIAL_SHADERS.every((name) => files.includes(name));
       return this.initialized;
     } catch {
       return false;
@@ -211,10 +211,8 @@ class ShaderService {
 
       for (const filename of files) {
         if (!zip.files[filename].dir) {
-          const content = await zip.files[filename].async('uint8array');
-          // For binary data, writing as base64 is safest in expo-file-system
-          const base64 = this.uint8ToBase64(content);
-          
+          const base64 = await zip.files[filename].async('base64');
+
           await FileSystem.writeAsStringAsync(
             `${this.shaderDir}${filename}`,
             base64,
@@ -235,16 +233,6 @@ class ShaderService {
       logger.error('[ShaderService] Extraction failed', error);
       return false;
     }
-  }
-
-  // Helper for binary conversion
-  private uint8ToBase64(arr: Uint8Array): string {
-    let binary = '';
-    const len = arr.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(arr[i]);
-    }
-    return btoa(binary);
   }
 
   /**
