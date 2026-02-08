@@ -650,6 +650,7 @@
         "macedonian": "Makedonca",
         "russian": "Rusça",
         "filipino": "Filipince",
+        "dutch_nl": "Felemenkçe (Hollanda)",
         "account": "Hesap",
         "content_discovery": "İçerik ve Keşif",
         "appearance": "Görünüm",
@@ -1425,6 +1426,7 @@
         }
     }
 }
+
 
 
 
