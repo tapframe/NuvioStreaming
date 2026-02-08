@@ -20,5 +20,5 @@ export const LOCALES = [
     { code: 'mk', key: 'macedonian' },
     { code: 'ru', key: 'russian' },
     { code: 'fil', key: 'filipino' },
-    { code: 'nl', key: 'dutch' },
+    { code: 'nl-NL', key: 'dutch_nl' },
 ];
