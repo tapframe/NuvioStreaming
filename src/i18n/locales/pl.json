@@ -650,6 +650,7 @@
         "macedonian": "Macedoński",
         "russian": "Rosyjski",
         "filipino": "Filipiński",
+        "dutch_nl": "Holenderski (Niderlandy)",
         "account": "Konto",
         "content_discovery": "Treści i odkrywanie",
         "appearance": "Wygląd",
@@ -1425,6 +1426,7 @@
         }
     }
 }
+
 
 
 
