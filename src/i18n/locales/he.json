@@ -650,6 +650,7 @@
         "macedonian": "מקדונית",
         "russian": "רוסית",
         "filipino": "פיליפינית",
+        "dutch_nl": "הולנדית (הולנד)",
         "account": "חשבון",
         "content_discovery": "תוכן וגילוי",
         "appearance": "מראה",
@@ -1426,6 +1427,7 @@
     }
 
 }
+
 
 
 
