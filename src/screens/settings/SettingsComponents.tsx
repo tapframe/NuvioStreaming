@@ -58,6 +58,7 @@ interface SettingItemProps {
     onPress?: () => void;
     badge?: string | number;
     isTablet?: boolean;
+    descriptionNumberOfLines?: number;
 }
 
 export const SettingItem: React.FC<SettingItemProps> = ({
@@ -69,7 +70,8 @@ export const SettingItem: React.FC<SettingItemProps> = ({
     isLast = false,
     onPress,
     badge,
-    isTablet: isTabletProp = false
+    isTablet: isTabletProp = false,
+    descriptionNumberOfLines = 1
 }) => {
     const { currentTheme } = useTheme();
     const useTabletStyle = isTabletProp || isTablet;
@@ -116,7 +118,7 @@ export const SettingItem: React.FC<SettingItemProps> = ({
                             styles.settingDescription,
                             { color: currentTheme.colors.mediumEmphasis },
                             useTabletStyle && styles.tabletSettingDescription
-                        ]} numberOfLines={1}>
+                        ]} numberOfLines={descriptionNumberOfLines}>
                             {description}
                         </Text>
                     )}

@@ -22,7 +22,7 @@ const BREAKPOINTS = {
   tv: 1440,
 };
 
-const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg';
+const IMDb_LOGO = 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/69/IMDB_Logo_2016.svg/575px-IMDB_Logo_2016.svg.png';
 
 export const RATING_PROVIDERS = {
   imdb: {
@@ -95,21 +95,41 @@ export const RatingsSection: React.FC<RatingsSectionProps> = ({ imdbId, type }) 
   }, [deviceType]);
 
   const iconSize = useMemo(() => {
-    switch (deviceType) {
-      case 'tv':
-        return 20;
-      case 'largeTablet':
-        return 18;
-      case 'tablet':
-        return 16;
-      default:
-        return 16;
+    const baseSize = deviceType === 'tv' ? 20 : deviceType === 'largeTablet' ? 18 : deviceType === 'tablet' ? 16 : 16;
+    const numRatings = ratings ? Object.keys(ratings).length : 0;
+    // Reduce size if many ratings to fit in one line
+    if (numRatings > 4) {
+      return Math.max(baseSize - 2, 12);
     }
-  }, [deviceType]);
+    return baseSize;
+  }, [deviceType, ratings]);
 
-  const textSize = useMemo(() => (isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14), [isTV, isLargeTablet, isTablet]);
-  const itemSpacing = useMemo(() => (isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12), [isTV, isLargeTablet, isTablet]);
-  const iconTextGap = useMemo(() => (isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4), [isTV, isLargeTablet, isTablet]);
+  const textSize = useMemo(() => {
+    const baseSize = isTV ? 16 : isLargeTablet ? 15 : isTablet ? 14 : 14;
+    const numRatings = ratings ? Object.keys(ratings).length : 0;
+    if (numRatings > 4) {
+      return Math.max(baseSize - 1, 12);
+    }
+    return baseSize;
+  }, [isTV, isLargeTablet, isTablet, ratings]);
+
+  const itemSpacing = useMemo(() => {
+    const baseSpacing = isTV ? 16 : isLargeTablet ? 14 : isTablet ? 12 : 12;
+    const numRatings = ratings ? Object.keys(ratings).length : 0;
+    if (numRatings > 4) {
+      return Math.max(baseSpacing - 2, 8);
+    }
+    return baseSpacing;
+  }, [isTV, isLargeTablet, isTablet, ratings]);
+
+  const iconTextGap = useMemo(() => {
+    const baseGap = isTV ? 6 : isLargeTablet ? 5 : isTablet ? 4 : 4;
+    const numRatings = ratings ? Object.keys(ratings).length : 0;
+    if (numRatings > 4) {
+      return Math.max(baseGap - 1, 2);
+    }
+    return baseGap;
+  }, [isTV, isLargeTablet, isTablet, ratings]);
 
   useEffect(() => {
     loadProviderSettings();

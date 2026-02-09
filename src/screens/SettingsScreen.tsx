@@ -45,6 +45,7 @@ import { ContentDiscoverySettingsContent } from './settings/ContentDiscoverySett
 import { AppearanceSettingsContent } from './settings/AppearanceSettingsScreen';
 import { IntegrationsSettingsContent } from './settings/IntegrationsSettingsScreen';
 import { AboutSettingsContent, AboutFooter } from './settings/AboutSettingsScreen';
+import { PrivacySettingsContent } from './settings/PrivacySettingsScreen';
 import { SettingsCard, SettingItem, ChevronRight, CustomSwitch } from './settings/SettingsComponents';
 import { useBottomSheetBackHandler } from '../hooks/useBottomSheetBackHandler';
 import { LOCALES } from '../constants/locales';
@@ -149,6 +150,7 @@ const SettingsScreen: React.FC = () => {
     { id: 'playback', title: t('settings.playback'), icon: 'play-circle' },
     { id: 'backup', title: t('settings.backup_restore'), icon: 'archive' },
     { id: 'updates', title: t('settings.updates'), icon: 'refresh-ccw' },
+    { id: 'privacy', title: t('privacy.title'), icon: 'shield' },
     { id: 'about', title: t('settings.about'), icon: 'info' },
     { id: 'developer', title: t('settings.developer'), icon: 'code' },
     { id: 'cache', title: t('settings.cache'), icon: 'database' },
@@ -441,6 +443,9 @@ const SettingsScreen: React.FC = () => {
 
       case 'about':
         return <AboutSettingsContent isTablet={isTablet} displayDownloads={displayDownloads} />;
+
+      case 'privacy':
+        return <PrivacySettingsContent isTablet={isTablet} />;
 
       case 'developer':
         return (__DEV__ || developerModeEnabled) ? (
@@ -836,6 +841,13 @@ const SettingsScreen: React.FC = () => {
                 icon="users"
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('Contributors')}
+              />
+              <SettingItem
+                title={t('privacy.title')}
+                description={t('privacy.settings_desc')}
+                icon="shield"
+                renderControl={() => <ChevronRight />}
+                onPress={() => navigation.navigate('PrivacySettings')}
               />
               <SettingItem
                 title={t('settings.about_nuvio')}

@@ -35,6 +35,7 @@ import { AudioTrackModal } from './modals/AudioTrackModal';
 import { SubtitleModals } from './modals/SubtitleModals';
 import { SubtitleSyncModal } from './modals/SubtitleSyncModal';
 import SpeedModal from './modals/SpeedModal';
+import { SubmitIntroModal } from './modals/SubmitIntroModal';
 import { SourcesModal } from './modals/SourcesModal';
 import { EpisodesModal } from './modals/EpisodesModal';
 import { EpisodeStreamsModal } from './modals/EpisodeStreamsModal';
@@ -967,6 +968,7 @@ const AndroidVideoPlayer: React.FC = () => {
           setShowAudioModal={modals.setShowAudioModal}
           setShowSubtitleModal={modals.setShowSubtitleModal}
           setShowSpeedModal={modals.setShowSpeedModal}
+          setShowSubmitIntroModal={modals.setShowSubmitIntroModal}
           isSubtitleModalOpen={modals.showSubtitleModal}
           setShowSourcesModal={modals.setShowSourcesModal}
           setShowEpisodesModal={type === 'series' ? modals.setShowEpisodesModal : undefined}
@@ -982,6 +984,7 @@ const AndroidVideoPlayer: React.FC = () => {
           onSwitchToMPV={handleManualSwitchToMPV}
           useExoPlayer={useExoPlayer}
           isBuffering={playerState.isBuffering}
+          imdbId={imdbId}
         />
 
         <SpeedActivatedOverlay
@@ -1155,6 +1158,15 @@ const AndroidVideoPlayer: React.FC = () => {
         setHoldToSpeedEnabled={speedControl.setHoldToSpeedEnabled}
         holdToSpeedValue={speedControl.holdToSpeedValue}
         setHoldToSpeedValue={speedControl.setHoldToSpeedValue}
+      />
+
+      <SubmitIntroModal
+        visible={modals.showSubmitIntroModal}
+        onClose={() => modals.setShowSubmitIntroModal(false)}
+        currentTime={playerState.currentTime}
+        imdbId={imdbId}
+        season={season}
+        episode={episode}
       />
 
       <EpisodesModal
