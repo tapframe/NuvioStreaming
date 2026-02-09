@@ -36,7 +36,8 @@ import {
   usePlayerControls,
   usePlayerSetup,
   useWatchProgress,
-  useNextEpisode
+  useNextEpisode,
+  useSkipSegments
 } from './hooks';
 
 // Platform-specific hooks
@@ -207,6 +208,16 @@ const KSPlayerCore: React.FC = () => {
     episode,
     groupedEpisodes: groupedEpisodes as any,
     episodeId
+  });
+
+  const { outroSegment } = useSkipSegments({
+    imdbId: imdbId || (id?.startsWith('tt') ? id : undefined),
+    type,
+    season,
+    episode,
+    malId: (metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id,
+    kitsuId: id?.startsWith('kitsu:') ? id.split(':')[1] : undefined,
+    enabled: settings.skipIntroEnabled
   });
 
   const controls = usePlayerControls({
@@ -972,6 +983,7 @@ const KSPlayerCore: React.FC = () => {
         metadata={metadata ? { poster: metadata.poster, id: metadata.id } : undefined}
         controlsVisible={showControls}
         controlsFixedOffset={126}
+        outroSegment={outroSegment}
       />
 
       {/* Modals */}

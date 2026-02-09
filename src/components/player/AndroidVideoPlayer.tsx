@@ -11,7 +11,8 @@ import {
   usePlayerModals,
   useSpeedControl,
   useOpeningAnimation,
-  useWatchProgress
+  useWatchProgress,
+  useSkipSegments
 } from './hooks';
 
 // Android-specific hooks
@@ -221,6 +222,16 @@ const AndroidVideoPlayer: React.FC = () => {
   });
 
   const nextEpisodeHook = useNextEpisode(type, season, episode, groupedEpisodes, (metadataResult as any)?.groupedEpisodes, episodeId);
+
+  const { outroSegment } = useSkipSegments({
+    imdbId: imdbId || (id?.startsWith('tt') ? id : undefined),
+    type,
+    season,
+    episode,
+    malId: (metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id,
+    kitsuId: id?.startsWith('kitsu:') ? id.split(':')[1] : undefined,
+    enabled: settings.skipIntroEnabled
+  });
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -1002,6 +1013,7 @@ const AndroidVideoPlayer: React.FC = () => {
           metadata={metadataResult?.metadata ? { poster: metadataResult.metadata.poster, id: metadataResult.metadata.id } : undefined}
           controlsVisible={playerState.showControls}
           controlsFixedOffset={100}
+          outroSegment={outroSegment}
         />
       </View>
 
