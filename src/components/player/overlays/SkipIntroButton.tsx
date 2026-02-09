@@ -23,6 +23,7 @@ interface SkipIntroButtonProps {
     episode?: number;
     malId?: string;
     kitsuId?: string;
+    skipIntervals?: SkipInterval[] | null;
     currentTime: number;
     onSkip: (endTime: number) => void;
     controlsVisible?: boolean;
@@ -36,6 +37,7 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
     episode,
     malId,
     kitsuId,
+    skipIntervals: externalSkipIntervals,
     currentTime,
     onSkip,
     controlsVisible = false,
@@ -47,15 +49,17 @@ export const SkipIntroButton: React.FC<SkipIntroButtonProps> = ({
 
     const skipIntroEnabled = settings.skipIntroEnabled;
 
-    const { segments: skipIntervals } = useSkipSegments({
+    const { segments: fetchedSkipIntervals } = useSkipSegments({
         imdbId,
         type,
         season,
         episode,
         malId,
         kitsuId,
-        enabled: skipIntroEnabled
+        // Allow parent components to provide pre-fetched intervals to avoid duplicate requests.
+        enabled: skipIntroEnabled && !externalSkipIntervals
     });
+    const skipIntervals = externalSkipIntervals ?? fetchedSkipIntervals;
 
     // State
     const [currentInterval, setCurrentInterval] = useState<SkipInterval | null>(null);

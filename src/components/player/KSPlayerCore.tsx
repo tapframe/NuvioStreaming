@@ -210,7 +210,7 @@ const KSPlayerCore: React.FC = () => {
     episodeId
   });
 
-  const { outroSegment } = useSkipSegments({
+  const { segments: skipIntervals, outroSegment } = useSkipSegments({
     imdbId: imdbId || (id?.startsWith('tt') ? id : undefined),
     type,
     season,
@@ -956,6 +956,7 @@ const KSPlayerCore: React.FC = () => {
         episode={episode}
         malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
         kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+        skipIntervals={skipIntervals}
         currentTime={currentTime}
         onSkip={(endTime) => controls.seekToTime(endTime)}
         controlsVisible={showControls}

@@ -28,10 +28,12 @@ export const useSkipSegments = ({
 
     useEffect(() => {
         const key = `${imdbId}-${season}-${episode}-${malId}-${kitsuId}`;
-        
+
         if (!enabled || type !== 'series' || (!imdbId && !malId && !kitsuId) || !season || !episode) {
             setSegments([]);
+            setIsLoading(false);
             fetchedRef.current = false;
+            lastKeyRef.current = '';
             return;
         }
 
@@ -39,23 +41,41 @@ export const useSkipSegments = ({
             return;
         }
 
+        // Clear stale intervals while resolving a new episode/key.
+        if (lastKeyRef.current !== key) {
+            setSegments([]);
+            fetchedRef.current = false;
+        }
+
         lastKeyRef.current = key;
-        fetchedRef.current = true;
         setIsLoading(true);
+        let cancelled = false;
 
         const fetchSegments = async () => {
             try {
                 const intervals = await introService.getSkipTimes(imdbId, season, episode, malId, kitsuId);
+
+                // Ignore stale responses from old requests.
+                if (cancelled || lastKeyRef.current !== key) return;
                 setSegments(intervals);
+                fetchedRef.current = true;
             } catch (error) {
+                if (cancelled || lastKeyRef.current !== key) return;
                 logger.error('[useSkipSegments] Error fetching skip data:', error);
                 setSegments([]);
+                // Keep this key retryable on transient failures.
+                fetchedRef.current = false;
             } finally {
+                if (cancelled || lastKeyRef.current !== key) return;
                 setIsLoading(false);
             }
         };
 
         fetchSegments();
+
+        return () => {
+            cancelled = true;
+        };
     }, [imdbId, type, season, episode, malId, kitsuId, enabled]);
 
     const getActiveSegment = (currentTime: number) => {
@@ -64,7 +84,12 @@ export const useSkipSegments = ({
         );
     };
 
-    const outroSegment = segments.find(s => ['ed', 'outro', 'mixed-ed'].includes(s.type));
+    const outroSegment = segments
+        .filter(s => ['ed', 'outro', 'mixed-ed'].includes(s.type))
+        .reduce<SkipInterval | null>((latest, interval) => {
+            if (!latest || interval.endTime > latest.endTime) return interval;
+            return latest;
+        }, null);
 
     return {
         segments,
