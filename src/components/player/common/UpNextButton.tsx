@@ -80,17 +80,16 @@ const UpNextButton: React.FC<UpNextButtonProps> = ({
   const shouldShow = useMemo(() => {
     if (!nextEpisode || duration <= 0) return false;
 
-    // 1. Check for Outro-based trigger
-    if (outroSegment) {
-      const timeRemainingAtOutroEnd = duration - outroSegment.endTime;
-      // Only trigger if the outro ends within the last 5 minutes (300s)
-      // This prevents mid-episode "fake" outros from triggering it too early
-      if (timeRemainingAtOutroEnd < 300 && currentTime >= outroSegment.endTime) {
-        return true;
-      }
+    // 1. Determine if we have a valid ending outro (within last 5 mins)
+    const hasValidEndingOutro = outroSegment && (duration - outroSegment.endTime < 300);
+
+    if (hasValidEndingOutro) {
+      // If we have a valid outro, ONLY show after it finishes
+      // This prevents the 60s fallback from "jumping the gun"
+      return currentTime >= outroSegment.endTime;
     }
 
-    // 2. Standard Fallback (60s remaining)
+    // 2. Standard Fallback (only if no valid ending outro was found)
     const timeRemaining = duration - currentTime;
     return timeRemaining < 61 && timeRemaining > 0;
   }, [nextEpisode, duration, currentTime, outroSegment]);
