@@ -87,7 +87,7 @@ export const MalEditModal: React.FC<MalEditModalProps> = ({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.container}
         >
-          <View style={[styles.modalContent, { backgroundColor: currentTheme.colors.elevation2 }]}>
+          <View style={[styles.modalContent, { backgroundColor: currentTheme.colors.darkGray || '#1A1A1A' }]}>
             <View style={styles.header}>
               <Text style={[styles.title, { color: currentTheme.colors.highEmphasis }]} numberOfLines={1}>
                 Edit {anime.node.title}
