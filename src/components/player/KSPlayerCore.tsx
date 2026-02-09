@@ -78,6 +78,7 @@ interface PlayerRouteParams {
   backdrop?: string;
   availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
   headers?: Record<string, string>;
+  releaseDate?: string;
   initialPosition?: number;
 }
 
@@ -232,7 +233,7 @@ const KSPlayerCore: React.FC = () => {
     imdbId,
     season,
     episode,
-    undefined // releaseDate not yet implemented for iOS
+    releaseDate
   );
 
   // Gestures

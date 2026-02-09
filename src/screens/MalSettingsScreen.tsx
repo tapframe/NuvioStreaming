@@ -203,12 +203,20 @@ const MalSettingsScreen: React.FC = () => {
 
                     <TouchableOpacity
                         style={[styles.button, { backgroundColor: currentTheme.colors.primary, marginTop: 12 }]}
-                        onPress={() => {
+                        onPress={async () => {
                             setIsLoading(true);
-                            MalSync.syncMalToLibrary().then(() => {
+                            try {
+                                const synced = await MalSync.syncMalToLibrary();
+                                if (synced) {
+                                    openAlert('Sync Complete', 'MAL data has been refreshed.');
+                                } else {
+                                    openAlert('Sync Failed', 'Could not refresh MAL data.');
+                                }
+                            } catch {
+                                openAlert('Sync Failed', 'Could not refresh MAL data.');
+                            } finally {
                                 setIsLoading(false);
-                                openAlert('Sync Complete', 'MAL data has been refreshed.');
-                            });
+                            }
                         }}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>

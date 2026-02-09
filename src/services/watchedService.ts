@@ -53,7 +53,7 @@ class WatchedService {
             const malToken = MalAuth.getToken();
             if (malToken) {
                 MalSync.scrobbleEpisode(
-                    'Movie', 
+                    imdbId, 
                     1, 
                     1, 
                     'movie', 
@@ -93,7 +93,8 @@ class WatchedService {
         season: number,
         episode: number,
         watchedAt: Date = new Date(),
-        releaseDate?: string // Optional release date for precise matching
+        releaseDate?: string, // Optional release date for precise matching
+        showTitle?: string
     ): Promise<{ success: boolean; syncedToTrakt: boolean }> {
         try {
             logger.log(`[WatchedService] Marking episode as watched: ${showImdbId} S${season}E${episode}`);
@@ -132,7 +133,7 @@ class WatchedService {
                 // Strategy 2: Offline Mapping Fallback
                 if (!synced) {
                     MalSync.scrobbleEpisode(
-                        'Anime', // Title fallback
+                        showTitle || showImdbId || 'Anime',
                         episode,
                         0,
                         'series',
@@ -407,10 +408,6 @@ class WatchedService {
 
             if (isTraktAuth) {
                 // Remove entire season from Trakt
-                syncedToTrakt = await this.traktService.removeSeasonFromHistory(
-                    showImdbId,
-                    season
-                );
                 syncedToTrakt = await this.traktService.removeSeasonFromHistory(
                     showImdbId,
                     season

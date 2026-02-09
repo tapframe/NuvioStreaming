@@ -1476,7 +1476,6 @@ class LocalScraperService {
         }
       };
 
->>>>>>> upstream/main
       // Execution timeout (1 minute)
       const PLUGIN_TIMEOUT_MS = 60000;
       const functionName = params.functionName || 'getStreams';

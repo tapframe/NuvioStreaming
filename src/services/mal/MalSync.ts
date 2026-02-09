@@ -6,6 +6,10 @@ import { ArmSyncService } from './ArmSyncService';
 import axios from 'axios';
 
 const MAPPING_PREFIX = 'mal_map_';
+const getTitleCacheKey = (title: string, type: 'movie' | 'series', season = 1) =>
+  `${MAPPING_PREFIX}${title.trim()}_${type}_${season}`;
+const getLegacyTitleCacheKey = (title: string, type: 'movie' | 'series') =>
+  `${MAPPING_PREFIX}${title.trim()}_${type}`;
 
 export const MalSync = {
   /**
@@ -44,14 +48,23 @@ export const MalSync = {
   getMalId: async (title: string, type: 'movie' | 'series' = 'series', year?: number, season?: number, imdbId?: string, episode: number = 1, releaseDate?: string): Promise<number | null> => {
     // Safety check: Never perform a MAL search for generic placeholders or empty strings.
     // This prevents "cache poisoning" where a generic term matches a random anime.
-    const normalizedTitle = title.trim().toLowerCase();
+    const cleanTitle = title.trim();
+    const normalizedTitle = cleanTitle.toLowerCase();
     const isGenericTitle = !normalizedTitle || normalizedTitle === 'anime' || normalizedTitle === 'movie';
-    
-    if (isGenericTitle) {
-        // If we have an offline mapping, we can still try it below, 
-        // but we MUST skip the fuzzy search logic at the end.
-        if (!imdbId) return null;
+
+    const seasonNumber = season || 1;
+    const cacheKey = getTitleCacheKey(cleanTitle, type, seasonNumber);
+    const legacyCacheKey = getLegacyTitleCacheKey(cleanTitle, type);
+    const cachedId = mmkvStorage.getNumber(cacheKey) || mmkvStorage.getNumber(legacyCacheKey);
+    if (cachedId) {
+      // Backfill to season-aware key for future lookups.
+      if (!mmkvStorage.getNumber(cacheKey)) {
+        mmkvStorage.setNumber(cacheKey, cachedId);
+      }
+      return cachedId;
     }
+
+    if (isGenericTitle && !imdbId) return null;
 
     // 1. Try ARM + Jikan Sync (Most accurate for perfect season/episode matching)
     if (imdbId && type === 'series' && releaseDate) {
@@ -72,13 +85,11 @@ export const MalSync = {
         }
     }
 
-    // 2. Try IMDb ID first (Via online MalSync API) - BUT only for Season 1 or Movies.
-
-    // 2. Check Cache for Title
-    const cleanTitle = title.trim();
-    const cacheKey = `${MAPPING_PREFIX}${cleanTitle}_${type}_${season || 1}`;
-    const cachedId = mmkvStorage.getNumber(cacheKey);
-    if (cachedId) return cachedId;
+    // 2. Try IMDb ID mapping when it is likely to be accurate, or when title is generic.
+    if (imdbId && (type === 'movie' || seasonNumber <= 1 || isGenericTitle)) {
+      const idFromImdb = await MalSync.getMalIdFromImdb(imdbId);
+      if (idFromImdb) return idFromImdb;
+    }
 
     // 3. Search MAL (Skip if generic title)
     if (isGenericTitle) return null;
@@ -120,6 +131,7 @@ export const MalSync = {
 
         // Save to cache
         mmkvStorage.setNumber(cacheKey, bestMatch.id);
+        mmkvStorage.setNumber(legacyCacheKey, bestMatch.id);
         return bestMatch.id;
       }
     } catch (e) {
@@ -290,8 +302,10 @@ export const MalSync = {
           
           for (const item of allItems) {
               const type = item.node.media_type === 'movie' ? 'movie' : 'series';
-              const cacheKey = `${MAPPING_PREFIX}${item.node.title.trim()}_${type}`;
-              mmkvStorage.setNumber(cacheKey, item.node.id);
+              const title = item.node.title.trim();
+              mmkvStorage.setNumber(getTitleCacheKey(title, type, 1), item.node.id);
+              // Keep legacy key for backwards compatibility with old cache readers.
+              mmkvStorage.setNumber(getLegacyTitleCacheKey(title, type), item.node.id);
           }
           console.log(`[MalSync] Synced ${allItems.length} items to mapping cache.`);
           return true;
@@ -304,9 +318,11 @@ export const MalSync = {
   /**
    * Manually map an ID if auto-detection fails
    */
-  setMapping: (title: string, malId: number, type: 'movie' | 'series' = 'series') => {
-      const cacheKey = `${MAPPING_PREFIX}${title.trim()}_${type}`;
-      mmkvStorage.setNumber(cacheKey, malId);
+  setMapping: (title: string, malId: number, type: 'movie' | 'series' = 'series', season: number = 1) => {
+      const cleanTitle = title.trim();
+      mmkvStorage.setNumber(getTitleCacheKey(cleanTitle, type, season), malId);
+      // Keep legacy key for compatibility.
+      mmkvStorage.setNumber(getLegacyTitleCacheKey(cleanTitle, type), malId);
   },
 
   /**
@@ -449,4 +465,3 @@ export const MalSync = {
       }
   }
 };
-

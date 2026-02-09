@@ -579,23 +579,11 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         showImdbId,
         metadata.id,
         episode.season_number,
-        episode.episode_number
+        episode.episode_number,
+        new Date(),
+        episode.air_date,
+        metadata?.name
       );
-
-      // Sync to MAL
-      const malEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
-      if (malEnabled && metadata?.name) {
-          const totalEpisodes = Object.values(groupedEpisodes).reduce((acc, curr) => acc + (curr?.length || 0), 0);
-          MalSync.scrobbleEpisode(
-              metadata.name, 
-              episode.episode_number, 
-              totalEpisodes, 
-              'series', 
-              episode.season_number, 
-              imdbId,
-              episode.air_date // Pass release date for ARM Sync converter
-          );
-      }
 
       // Reload to ensure consistency (e.g. if optimistic update was slightly off or for other effects)
       // But we don't strictly *need* to wait for this to update UI
