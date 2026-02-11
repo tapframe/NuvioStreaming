@@ -8,27 +8,7 @@ import { logger } from '../utils/logger';
 import { memoryManager } from '../utils/memoryManager';
 import { parseISO, isBefore, isAfter, startOfToday, addWeeks, isThisWeek } from 'date-fns';
 import { StreamingContent } from '../services/catalogService';
-
-interface CalendarEpisode {
-  id: string;
-  seriesId: string;
-  title: string;
-  seriesName: string;
-  poster: string;
-  releaseDate: string;
-  season: number;
-  episode: number;
-  overview: string;
-  vote_average: number;
-  still_path: string | null;
-  season_poster_path: string | null;
-  addonId?: string;
-}
-
-interface CalendarSection {
-  title: string;
-  data: CalendarEpisode[];
-}
+import { CalendarEpisode, CalendarSection } from '../types/calendar';
 
 interface UseCalendarDataReturn {
   calendarData: CalendarSection[];
@@ -303,6 +283,8 @@ export const useCalendarData = (): UseCalendarDataReturn => {
       // Sort episodes by release date with error handling
       allEpisodes.sort((a, b) => {
         try {
+          if (!a.releaseDate) return 1;
+          if (!b.releaseDate) return -1;
           const dateA = new Date(a.releaseDate).getTime();
           const dateB = new Date(b.releaseDate).getTime();
           return dateA - dateB;

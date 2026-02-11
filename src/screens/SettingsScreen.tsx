@@ -13,6 +13,7 @@ import {
   Dimensions,
   Linking,
   FlatList,
+  Image,
 } from 'react-native';
 import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useTranslation } from 'react-i18next';
@@ -377,23 +378,34 @@ const SettingsScreen: React.FC = () => {
         return (
           <SettingsCard title={t('settings.sections.account')} isTablet={isTablet}>
             {isItemVisible('trakt') && (
-                    <SettingItem
-                      title={t('trakt.title')}
-                      description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
-                      customIcon={<TraktIcon size={isTablet ? 24 : 20} />}
+              <SettingItem
+                title={t('trakt.title')}
+                description={isAuthenticated ? `@${userProfile?.username || 'User'}` : t('settings.sign_in_sync')}
+                customIcon={<TraktIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('TraktSettings')}
-                isLast={!isItemVisible('simkl')}
+                isLast={!isItemVisible('simkl') && !isItemVisible('mal')}
                 isTablet={isTablet}
               />
             )}
             {isItemVisible('simkl') && (
-                    <SettingItem
-                      title={t('settings.items.simkl')}
-                      description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
-                      customIcon={<SimklIcon size={isTablet ? 24 : 20} />}
+              <SettingItem
+                title={t('settings.items.simkl')}
+                description={isSimklAuthenticated ? t('settings.items.simkl_connected') : t('settings.items.simkl_desc')}
+                customIcon={<SimklIcon size={isTablet ? 24 : 20} />}
                 renderControl={() => <ChevronRight />}
                 onPress={() => navigation.navigate('SimklSettings')}
+                isLast={!isItemVisible('mal')}
+                isTablet={isTablet}
+              />
+            )}
+            {isItemVisible('mal') && (
+              <SettingItem
+                title="MyAnimeList"
+                description="Sync with MyAnimeList"
+                customIcon={<Image source={require('../../assets/rating-icons/mal-icon.png')} style={{ width: isTablet ? 24 : 20, height: isTablet ? 24 : 20, borderRadius: 4 }} resizeMode="contain" />}
+                renderControl={() => <ChevronRight />}
+                onPress={() => navigation.navigate('MalSettings')}
                 isLast={true}
                 isTablet={isTablet}
               />
@@ -682,7 +694,7 @@ const SettingsScreen: React.FC = () => {
             contentContainerStyle={styles.scrollContent}
           >
             {/* Account */}
-            {(settingsConfig?.categories?.['account']?.visible !== false) && (isItemVisible('trakt') || isItemVisible('simkl')) && (
+            {(settingsConfig?.categories?.['account']?.visible !== false) && (isItemVisible('trakt') || isItemVisible('simkl') || isItemVisible('mal')) && (
               <SettingsCard title={t('settings.account').toUpperCase()}>
                 {isItemVisible('trakt') && (
                   <SettingItem
@@ -691,7 +703,7 @@ const SettingsScreen: React.FC = () => {
                     customIcon={<TraktIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('TraktSettings')}
-                    isLast={!isItemVisible('simkl')}
+                    isLast={!isItemVisible('simkl') && !isItemVisible('mal')}
                   />
                 )}
                 {isItemVisible('simkl') && (
@@ -701,7 +713,17 @@ const SettingsScreen: React.FC = () => {
                     customIcon={<SimklIcon size={20} />}
                     renderControl={() => <ChevronRight />}
                     onPress={() => navigation.navigate('SimklSettings')}
-                    isLast={true}
+                    isLast={!isItemVisible('mal')}
+                  />
+                )}
+                {isItemVisible('mal') && (
+                  <SettingItem
+                    title="MyAnimeList"
+                    description="Sync with MyAnimeList"
+                    customIcon={<Image source={require('../../assets/rating-icons/mal-icon.png')} style={{ width: 20, height: 20, borderRadius: 4 }} resizeMode="contain" />}
+                    renderControl={() => <ChevronRight />}
+                    onPress={() => navigation.navigate('MalSettings')}
+                    isLast
                   />
                 )}
               </SettingsCard>

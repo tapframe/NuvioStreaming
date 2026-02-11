@@ -3,13 +3,13 @@ import { SimklService } from './simklService';
 import { storageService } from './storageService';
 import { mmkvStorage } from './mmkvStorage';
 import { logger } from '../utils/logger';
+import { MalSync } from './mal/MalSync';
+import { MalAuth } from './mal/MalAuth';
+import { ArmSyncService } from './mal/ArmSyncService';
 
 /**
  * WatchedService - Manages "watched" status for movies, episodes, and seasons.
- * Handles both local storage and Trakt sync transparently.
- * 
- * When Trakt is authenticated, it syncs to Trakt.
- * When not authenticated, it stores locally.
+ * Handles both local storage and Trakt/MAL sync transparently.
  */
 class WatchedService {
     private static instance: WatchedService;
@@ -40,14 +40,26 @@ class WatchedService {
         try {
             logger.log(`[WatchedService] Marking movie as watched: ${imdbId}`);
 
-            // Check if Trakt is authenticated
             const isTraktAuth = await this.traktService.isAuthenticated();
             let syncedToTrakt = false;
 
+            // Sync to Trakt
             if (isTraktAuth) {
-                // Sync to Trakt
                 syncedToTrakt = await this.traktService.addToWatchedMovies(imdbId, watchedAt);
                 logger.log(`[WatchedService] Trakt sync result for movie: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            const malToken = MalAuth.getToken();
+            if (malToken) {
+                MalSync.scrobbleEpisode(
+                    imdbId, 
+                    1, 
+                    1, 
+                    'movie', 
+                    undefined, 
+                    imdbId
+                ).catch(err => logger.error('[WatchedService] MAL movie sync failed:', err));
             }
 
             // Sync to Simkl
@@ -80,17 +92,18 @@ class WatchedService {
         showId: string,
         season: number,
         episode: number,
-        watchedAt: Date = new Date()
+        watchedAt: Date = new Date(),
+        releaseDate?: string, // Optional release date for precise matching
+        showTitle?: string
     ): Promise<{ success: boolean; syncedToTrakt: boolean }> {
         try {
             logger.log(`[WatchedService] Marking episode as watched: ${showImdbId} S${season}E${episode}`);
 
-            // Check if Trakt is authenticated
             const isTraktAuth = await this.traktService.isAuthenticated();
             let syncedToTrakt = false;
 
+            // Sync to Trakt
             if (isTraktAuth) {
-                // Sync to Trakt
                 syncedToTrakt = await this.traktService.addToWatchedEpisodes(
                     showImdbId,
                     season,
@@ -98,6 +111,37 @@ class WatchedService {
                     watchedAt
                 );
                 logger.log(`[WatchedService] Trakt sync result for episode: ${syncedToTrakt}`);
+            }
+
+            // Sync to MAL
+            const malToken = MalAuth.getToken();
+            if (malToken && showImdbId) {
+                // Strategy 1: "Perfect Match" using ARM + Release Date
+                let synced = false;
+                if (releaseDate) {
+                    try {
+                        const armResult = await ArmSyncService.resolveByDate(showImdbId, releaseDate);
+                        if (armResult) {
+                            await MalSync.scrobbleDirect(armResult.malId, armResult.episode);
+                            synced = true;
+                        }
+                    } catch (e) {
+                        logger.warn('[WatchedService] ARM Sync failed, falling back to offline map:', e);
+                    }
+                }
+
+                // Strategy 2: Offline Mapping Fallback
+                if (!synced) {
+                    MalSync.scrobbleEpisode(
+                        showTitle || showImdbId || 'Anime',
+                        episode,
+                        0,
+                        'series',
+                        season,
+                        showImdbId,
+                        releaseDate // Pass releaseDate for better matching
+                    ).catch(err => logger.error('[WatchedService] MAL sync failed:', err));
+                }
             }
 
             // Sync to Simkl
@@ -364,10 +408,6 @@ class WatchedService {
 
             if (isTraktAuth) {
                 // Remove entire season from Trakt
-                syncedToTrakt = await this.traktService.removeSeasonFromHistory(
-                    showImdbId,
-                    season
-                );
                 syncedToTrakt = await this.traktService.removeSeasonFromHistory(
                     showImdbId,
                     season

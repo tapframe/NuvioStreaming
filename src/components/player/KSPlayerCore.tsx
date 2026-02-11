@@ -51,8 +51,10 @@ import { logger } from '../../utils/logger';
 
 // Utils
 import { formatTime } from './utils/playerUtils';
+import { localScraperService } from '../../services/pluginService';
+import { TMDBService } from '../../services/tmdbService';
 import { WyzieSubtitle } from './utils/playerTypes';
-import { parseSRT } from './utils/subtitleParser';
+import { parseSubtitle } from './utils/subtitleParser';
 import { findBestSubtitleTrack, autoSelectAudioTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import { useSettings } from '../../hooks/useSettings';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -76,6 +78,7 @@ interface PlayerRouteParams {
   backdrop?: string;
   availableStreams?: { [providerId: string]: { streams: any[]; addonName: string } };
   headers?: Record<string, string>;
+  releaseDate?: string;
   initialPosition?: number;
 }
 
@@ -90,7 +93,7 @@ const KSPlayerCore: React.FC = () => {
   const {
     uri, title, episodeTitle, season, episode, id, type, quality, year,
     episodeId, imdbId, backdrop, availableStreams,
-    headers, streamProvider, streamName,
+    headers, streamProvider, streamName, releaseDate,
     initialPosition: routeInitialPosition
   } = params;
 
@@ -225,7 +228,12 @@ const KSPlayerCore: React.FC = () => {
     duration,
     paused,
     traktAutosync,
-    controls.seekToTime
+    controls.seekToTime,
+    undefined,
+    imdbId,
+    season,
+    episode,
+    releaseDate
   );
 
   // Gestures
@@ -314,32 +322,80 @@ const KSPlayerCore: React.FC = () => {
   // Subtitle Fetching Logic
   const fetchAvailableSubtitles = async (imdbIdParam?: string, autoSelectEnglish = true) => {
     const targetImdbId = imdbIdParam || imdbId;
-    if (!targetImdbId) return;
-
+    
     customSubs.setIsLoadingSubtitleList(true);
     try {
       const stremioType = type === 'series' ? 'series' : 'movie';
-      const stremioVideoId = stremioType === 'series' && season && episode ? `series:${targetImdbId}:${season}:${episode}` : undefined;
-      const results = await stremioService.getSubtitles(stremioType, targetImdbId, stremioVideoId);
+      const stremioVideoId = stremioType === 'series' && season && episode
+        ? `series:${targetImdbId}:${season}:${episode}`
+        : undefined;
 
-      const subs: WyzieSubtitle[] = (results || []).map((sub: any) => ({
-        id: sub.id || `${sub.lang}-${sub.url}`,
-        url: sub.url,
-        flagUrl: '',
-        format: 'srt',
-        encoding: 'utf-8',
-        media: sub.addonName || sub.addon || '',
-        display: sub.lang || 'Unknown',
-        language: (sub.lang || '').toLowerCase(),
-        isHearingImpaired: false,
-        source: sub.addonName || sub.addon || 'Addon',
-      }));
+      // 1. Fetch from Stremio addons
+      const stremioPromise = stremioService.getSubtitles(stremioType, targetImdbId || '', stremioVideoId)
+        .then(results => (results || []).map((sub: any) => ({
+          id: sub.id || `${sub.lang}-${sub.url}`,
+          url: sub.url,
+          flagUrl: '',
+          format: 'srt',
+          encoding: 'utf-8',
+          media: sub.addonName || sub.addon || '',
+          display: sub.lang || 'Unknown',
+          language: (sub.lang || '').toLowerCase(),
+          isHearingImpaired: false,
+          source: sub.addonName || sub.addon || 'Addon',
+        })))
+        .catch(e => {
+          logger.error('[KSPlayerCore] Error fetching Stremio subtitles', e);
+          return [];
+        });
 
-      customSubs.setAvailableSubtitles(subs);
-      // Auto-selection is now handled by useEffect that waits for internal tracks
-      // This ensures internal tracks are considered before falling back to external
-    } catch (e) {
-      logger.error('[VideoPlayer] Error fetching subtitles', e);
+      // 2. Fetch from Local Plugins
+      const pluginPromise = (async () => {
+        try {
+          let tmdbIdStr: string | null = null;
+          
+          if (id && id.startsWith('tmdb:')) {
+            tmdbIdStr = id.split(':')[1];
+          } else if (targetImdbId) {
+            const resolvedId = await TMDBService.getInstance().findTMDBIdByIMDB(targetImdbId);
+            if (resolvedId) tmdbIdStr = resolvedId.toString();
+          }
+
+          if (tmdbIdStr) {
+            const results = await localScraperService.getSubtitles(
+              stremioType === 'series' ? 'tv' : 'movie',
+              tmdbIdStr,
+              season,
+              episode
+            );
+            
+            return results.map((sub: any) => ({
+              id: sub.url,
+              url: sub.url,
+              flagUrl: '',
+              format: sub.format || 'srt',
+              encoding: 'utf-8',
+              media: sub.label || sub.addonName || 'Plugin',
+              display: sub.label || sub.lang || 'Plugin',
+              language: (sub.lang || 'en').toLowerCase(),
+              isHearingImpaired: false,
+              source: sub.addonName || 'Plugin'
+            }));
+          }
+        } catch (e) {
+          logger.warn('[KSPlayerCore] Error fetching plugin subtitles', e);
+        }
+        return [];
+      })();
+
+      const [stremioSubs, pluginSubs] = await Promise.all([stremioPromise, pluginPromise]);
+      const allSubs = [...pluginSubs, ...stremioSubs];
+
+      customSubs.setAvailableSubtitles(allSubs);
+      logger.info(`[KSPlayerCore] Fetched ${allSubs.length} subtitles (${stremioSubs.length} Stremio, ${pluginSubs.length} Plugins)`);
+      
+    } catch (error) {
+      logger.error('[KSPlayerCore] Error in fetchAvailableSubtitles', error);
     } finally {
       customSubs.setIsLoadingSubtitleList(false);
     }
@@ -357,7 +413,8 @@ const KSPlayerCore: React.FC = () => {
         const resp = await fetch(subtitle.url);
         srtContent = await resp.text();
       }
-      const parsedCues = parseSRT(srtContent);
+      // Parse subtitle file
+      const parsedCues = parseSubtitle(srtContent, subtitle.url);
       customSubs.setCustomSubtitles(parsedCues);
       customSubs.setUseCustomSubtitles(true);
       customSubs.setSelectedExternalSubtitleId(subtitle.id); // Track the selected external subtitle
@@ -945,6 +1002,7 @@ const KSPlayerCore: React.FC = () => {
         episode={episode}
         malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
         kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+        releaseDate={releaseDate}
         currentTime={currentTime}
         onSkip={(endTime) => controls.seekToTime(endTime)}
         controlsVisible={showControls}

@@ -13,16 +13,11 @@ import { useTranslation } from 'react-i18next';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isSameDay } from 'date-fns';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTheme } from '../../contexts/ThemeContext';
+import { CalendarEpisode } from '../../types/calendar';
 
 const { width } = Dimensions.get('window');
 const COLUMN_COUNT = 7; // 7 days in a week
 const DAY_ITEM_SIZE = (width - 32 - 56) / 7; // Slightly smaller than 1/7 to fit all days
-
-interface CalendarEpisode {
-  id: string;
-  releaseDate: string;
-  // Other properties can be included but aren't needed for the calendar
-}
 
 interface DayItemProps {
   date: Date;
@@ -45,8 +40,7 @@ const DayItem = ({
   isSelected,
   hasEvents, 
   onPress 
-}: DayItemProps) => {
-  const { currentTheme } = useTheme();
+}: DayItemProps) => {  const { currentTheme } = useTheme();
   return (
   <TouchableOpacity 
     style={[

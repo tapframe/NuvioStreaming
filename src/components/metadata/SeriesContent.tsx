@@ -17,8 +17,9 @@ import { TraktService } from '../../services/traktService';
 import { watchedService } from '../../services/watchedService';
 import { logger } from '../../utils/logger';
 import { mmkvStorage } from '../../services/mmkvStorage';
+import { MalSync } from '../../services/mal/MalSync';
 
-// Enhanced responsive breakpoints for Seasons Section
+// ... other imports
 const BREAKPOINTS = {
   phone: 0,
   tablet: 768,
@@ -33,7 +34,7 @@ interface SeriesContentProps {
   onSeasonChange: (season: number) => void;
   onSelectEpisode: (episode: Episode) => void;
   groupedEpisodes?: { [seasonNumber: number]: Episode[] };
-  metadata?: { poster?: string; id?: string };
+  metadata?: { poster?: string; id?: string; name?: string };
   imdbId?: string; // IMDb ID for Trakt sync
 }
 
@@ -578,7 +579,10 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         showImdbId,
         metadata.id,
         episode.season_number,
-        episode.episode_number
+        episode.episode_number,
+        new Date(),
+        episode.air_date,
+        metadata?.name
       );
 
       // Reload to ensure consistency (e.g. if optimistic update was slightly off or for other effects)
@@ -663,6 +667,24 @@ const SeriesContentComponent: React.FC<SeriesContentProps> = ({
         currentSeason,
         episodeNumbers
       );
+
+      // Sync to MAL (last episode of the season)
+      const malEnabled = mmkvStorage.getBoolean('mal_enabled') ?? true;
+      if (malEnabled && metadata?.name && episodeNumbers.length > 0) {
+          const lastEp = Math.max(...episodeNumbers);
+          const lastEpisodeData = seasonEpisodes.find(e => e.episode_number === lastEp);
+          const totalEpisodes = Object.values(groupedEpisodes).reduce((acc, curr) => acc + (curr?.length || 0), 0);
+          
+          MalSync.scrobbleEpisode(
+              metadata.name, 
+              lastEp, 
+              totalEpisodes, 
+              'series', 
+              currentSeason, 
+              imdbId,
+              lastEpisodeData?.air_date // Pass release date for accuracy
+          );
+      }
 
       // Re-sync with source of truth
       loadEpisodesProgress();

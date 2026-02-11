@@ -54,9 +54,11 @@ import { MpvPlayerRef } from './android/MpvPlayer';
 // Utils
 import { logger } from '../../utils/logger';
 import { styles } from './utils/playerStyles';
-import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSRT } from './utils/playerUtils';
+import { formatTime, isHlsStream, getHlsHeaders, defaultAndroidHeaders, parseSubtitle } from './utils/playerUtils';
 import { storageService } from '../../services/storageService';
 import stremioService from '../../services/stremioService';
+import { localScraperService } from '../../services/pluginService';
+import { TMDBService } from '../../services/tmdbService';
 import { WyzieSubtitle, SubtitleCue } from './utils/playerTypes';
 import { findBestSubtitleTrack, findBestAudioTrack } from './utils/trackSelectionUtils';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -73,7 +75,7 @@ const AndroidVideoPlayer: React.FC = () => {
   const {
     uri, title = 'Episode Name', season, episode, episodeTitle, quality, year,
     streamProvider, streamName, headers, id, type, episodeId, imdbId,
-    availableStreams: passedAvailableStreams, backdrop, groupedEpisodes
+    availableStreams: passedAvailableStreams, backdrop, groupedEpisodes, releaseDate
   } = route.params;
 
   // --- State & Custom Hooks ---
@@ -208,7 +210,11 @@ const AndroidVideoPlayer: React.FC = () => {
     playerState.paused,
     traktAutosync,
     controlsHook.seekToTime,
-    currentStreamProvider
+    currentStreamProvider,
+    imdbId,
+    season,
+    episode,
+    releaseDate
   );
 
   const gestureControls = usePlayerGestureControls({
@@ -615,41 +621,85 @@ const AndroidVideoPlayer: React.FC = () => {
   // Subtitle addon fetching
   const fetchAvailableSubtitles = useCallback(async () => {
     const targetImdbId = imdbId;
-    if (!targetImdbId) {
-      logger.warn('[AndroidVideoPlayer] No IMDB ID for subtitle fetch');
-      return;
-    }
-
+    
     setIsLoadingSubtitleList(true);
     try {
       const stremioType = type === 'series' ? 'series' : 'movie';
       const stremioVideoId = stremioType === 'series' && season && episode
         ? `series:${targetImdbId}:${season}:${episode}`
         : undefined;
-      const results = await stremioService.getSubtitles(stremioType, targetImdbId, stremioVideoId);
 
-      const subs: WyzieSubtitle[] = (results || []).map((sub: any) => ({
-        id: sub.id || `${sub.lang}-${sub.url}`,
-        url: sub.url,
-        flagUrl: '',
-        format: 'srt',
-        encoding: 'utf-8',
-        media: sub.addonName || sub.addon || '',
-        display: sub.lang || 'Unknown',
-        language: (sub.lang || '').toLowerCase(),
-        isHearingImpaired: false,
-        source: sub.addonName || sub.addon || 'Addon',
-      }));
+      // 1. Fetch from Stremio addons
+      const stremioPromise = stremioService.getSubtitles(stremioType, targetImdbId || '', stremioVideoId)
+        .then(results => (results || []).map((sub: any) => ({
+          id: sub.id || `${sub.lang}-${sub.url}`,
+          url: sub.url,
+          flagUrl: '',
+          format: 'srt',
+          encoding: 'utf-8',
+          media: sub.addonName || sub.addon || '',
+          display: sub.lang || 'Unknown',
+          language: (sub.lang || '').toLowerCase(),
+          isHearingImpaired: false,
+          source: sub.addonName || sub.addon || 'Addon',
+        })))
+        .catch(e => {
+          logger.error('[AndroidVideoPlayer] Error fetching Stremio subtitles', e);
+          return [];
+        });
 
-      setAvailableSubtitles(subs);
-      logger.info(`[AndroidVideoPlayer] Fetched ${subs.length} addon subtitles`);
-      // Auto-selection is now handled by useEffect that waits for internal tracks
+      // 2. Fetch from Local Plugins
+      const pluginPromise = (async () => {
+        try {
+          let tmdbIdStr: string | null = null;
+          
+          // Try to resolve TMDB ID
+          if (id && id.startsWith('tmdb:')) {
+            tmdbIdStr = id.split(':')[1];
+          } else if (targetImdbId) {
+            const resolvedId = await TMDBService.getInstance().findTMDBIdByIMDB(targetImdbId);
+            if (resolvedId) tmdbIdStr = resolvedId.toString();
+          }
+
+          if (tmdbIdStr) {
+            const results = await localScraperService.getSubtitles(
+              stremioType === 'series' ? 'tv' : 'movie',
+              tmdbIdStr,
+              season,
+              episode
+            );
+            
+            return results.map((sub: any) => ({
+              id: sub.url, // Use URL as ID for simple deduplication
+              url: sub.url,
+              flagUrl: '',
+              format: sub.format || 'srt',
+              encoding: 'utf-8',
+              media: sub.label || sub.addonName || 'Plugin',
+              display: sub.label || sub.lang || 'Plugin',
+              language: (sub.lang || 'en').toLowerCase(),
+              isHearingImpaired: false,
+              source: sub.addonName || 'Plugin'
+            }));
+          }
+        } catch (e) {
+          logger.warn('[AndroidVideoPlayer] Error fetching plugin subtitles', e);
+        }
+        return [];
+      })();
+
+      const [stremioSubs, pluginSubs] = await Promise.all([stremioPromise, pluginPromise]);
+      const allSubs = [...pluginSubs, ...stremioSubs];
+
+      setAvailableSubtitles(allSubs);
+      logger.info(`[AndroidVideoPlayer] Fetched ${allSubs.length} subtitles (${stremioSubs.length} Stremio, ${pluginSubs.length} Plugins)`);
+      
     } catch (e) {
-      logger.error('[AndroidVideoPlayer] Error fetching addon subtitles', e);
+      logger.error('[AndroidVideoPlayer] Error in fetchAvailableSubtitles', e);
     } finally {
       setIsLoadingSubtitleList(false);
     }
-  }, [imdbId, type, season, episode]);
+  }, [imdbId, type, season, episode, id]);
 
   const loadWyzieSubtitle = useCallback(async (subtitle: WyzieSubtitle) => {
     if (!subtitle.url) return;
@@ -668,7 +718,7 @@ const AndroidVideoPlayer: React.FC = () => {
       }
 
       // Parse subtitle file
-      const parsedCues = parseSRT(srtContent);
+      const parsedCues = parseSubtitle(srtContent, subtitle.url);
       setCustomSubtitles(parsedCues);
       setUseCustomSubtitles(true);
       setSelectedExternalSubtitleId(subtitle.id); // Track the selected external subtitle
@@ -975,6 +1025,7 @@ const AndroidVideoPlayer: React.FC = () => {
           episode={episode}
           malId={(metadata as any)?.mal_id || (metadata as any)?.external_ids?.mal_id}
           kitsuId={id?.startsWith('kitsu:') ? id.split(':')[1] : undefined}
+          releaseDate={releaseDate}
           currentTime={playerState.currentTime}
           onSkip={(endTime) => controlsHook.seekToTime(endTime)}
           controlsVisible={playerState.showControls}

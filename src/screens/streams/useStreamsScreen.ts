@@ -364,6 +364,7 @@ export const useStreamsScreen = () => {
       const streamsToPass = selectedEpisode ? episodeStreams : groupedStreams;
       const streamName = stream.name || stream.title || 'Unnamed Stream';
       const resolvedStreamProvider = streamProvider;
+      const releaseDate = type === 'movie' ? metadata?.released : currentEpisode?.air_date;
 
       // Save stream to cache
       try {
@@ -432,6 +433,7 @@ export const useStreamsScreen = () => {
         availableStreams: streamsToPass,
         backdrop: metadata?.banner || bannerImage,
         videoType,
+        releaseDate,
       } as any);
     },
     [metadata, type, currentEpisode, navigation, id, selectedEpisode, imdbId, episodeStreams, groupedStreams, bannerImage, settings.streamCacheTTL]
@@ -646,8 +648,7 @@ export const useStreamsScreen = () => {
       hasDoneInitialLoadRef.current = true;
 
       try {
-        const stremioType = type === 'tv' ? 'series' : type;
-        const hasStremioProviders = await stremioService.hasStreamProviders(stremioType);
+        const hasStremioProviders = await stremioService.hasStreamProviders(type);
         const hasLocalScrapers = settings.enableLocalScrapers && (await localScraperService.hasScrapers());
         const hasProviders = hasStremioProviders || hasLocalScrapers;
 
