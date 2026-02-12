@@ -652,6 +652,7 @@
         "russian": "Russisch",
         "filipino": "Filipijns"
         "dutch_nl": "Nederlands (Nederland)",
+        "romanian": "Roemeens",
         "account": "Account",
         "content_discovery": "Inhoud & Ontdekken",
         "appearance": "Uiterlijk",
@@ -1428,6 +1429,7 @@
         }
     }
 }
+
 
 
 
