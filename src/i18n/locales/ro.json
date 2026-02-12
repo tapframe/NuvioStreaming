@@ -653,6 +653,7 @@
         "filipino": "Filipineză",
         "dutch_nl": "Olandeză (Olanda)",
         "romanian": "Română",
+        "albanian": "Albaneză", 
         "account": "Cont",
         "content_discovery": "Conținut și Descoperire",
         "appearance": "Aspect",
@@ -1429,5 +1430,6 @@
         }
     }
 }
+
 
 
