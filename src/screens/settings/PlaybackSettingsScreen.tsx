@@ -59,7 +59,9 @@ const AVAILABLE_LANGUAGES = [
     { code: 'bg', name: 'Bulgarian' }, 
     { code: 'sl', name: 'Slovenian' }, 
     { code: 'mk', name: 'Macedonian' }, 
-    { code: 'fil', name: 'Filipino' }, 
+    { code: 'fil', name: 'Filipino' },
+    { code: 'ro', name: 'Romanian' },
+    { code: 'sq', name: 'Albanian' }, 
 ];
 
 const SUBTITLE_SOURCE_OPTIONS = [
