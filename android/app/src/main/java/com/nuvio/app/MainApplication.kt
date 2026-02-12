@@ -18,6 +18,7 @@ import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 import com.nuvio.app.mpv.MpvPackage
 import com.nuvio.app.network.DoHOkHttpFactory
+import com.nuvio.app.network.DoHState
 import com.nuvio.app.network.NetworkPrivacyPackage
 
 class MainApplication : Application(), ReactApplication {
