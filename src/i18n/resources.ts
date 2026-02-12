@@ -21,6 +21,7 @@ import mk from './locales/mk.json';
 import ru from './locales/ru.json';
 import fil from './locales/fil.json';
 import nlNL from './locales/nl-NL.json';
+import ro from './locales/ro.json';
 
 export const resources = {
     en: { translation: en },
@@ -45,4 +46,5 @@ export const resources = {
     ru: { translation: ru },
     fil: { translation: fil },
     'nl-NL': { translation: nlNL },
+    ro: { translation: ro },
 };
