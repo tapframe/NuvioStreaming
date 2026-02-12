@@ -651,6 +651,7 @@
         "russian": "Ruso",
         "filipino": "Filipino",
         "dutch_nl": "Dutch (Netherlands)",
+        "romanian": "Romanyano",
         "account": "Account",
         "content_discovery": "Content at Discovery",
         "appearance": "Appearance",
@@ -1426,5 +1427,6 @@
         }
     }
 }
+
 
 
