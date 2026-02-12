@@ -50,13 +50,6 @@ interface VideoSurfaceProps {
     selectedTextTrack?: SelectedTrack;
     decoderMode?: 'auto' | 'sw' | 'hw' | 'hw+';
     gpuMode?: 'gpu' | 'gpu-next';
-    glslShaders?: string;
-    // Video EQ Props
-    brightness?: number;
-    contrast?: number;
-    saturation?: number;
-    gamma?: number;
-    hue?: number;
 
     // Dual Engine Props
     useExoPlayer?: boolean;
@@ -112,12 +105,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
     selectedTextTrack,
     decoderMode,
     gpuMode,
-    glslShaders,
-    brightness,
-    contrast,
-    saturation,
-    gamma,
-    hue,
     // Dual Engine
     useExoPlayer = true,
     onCodecError,
@@ -414,12 +401,6 @@ export const VideoSurface: React.FC<VideoSurfaceProps> = ({
                     onTracksChanged={onTracksChanged}
                     decoderMode={decoderMode}
                     gpuMode={gpuMode}
-                    glslShaders={glslShaders}
-                    brightness={brightness}
-                    contrast={contrast}
-                    saturation={saturation}
-                    gamma={gamma}
-                    hue={hue}
                     subtitleSize={subtitleSize}
                     subtitleColor={subtitleColor}
                     subtitleBackgroundOpacity={subtitleBackgroundOpacity}
