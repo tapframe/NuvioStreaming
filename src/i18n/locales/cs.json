@@ -642,6 +642,7 @@
         "filipino": "Filipínština",
         "dutch_nl": "Nizozemština (Nizozemsko)",
         "romanian": "Rumanština",
+        "albanian": "Albánština",
         "account": "Účet",
         "content_discovery": "Obsah a objevování",
         "appearance": "Vzhled",
@@ -1417,6 +1418,7 @@
         }
     }
 }
+
 
 
 
