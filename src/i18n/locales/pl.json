@@ -652,6 +652,7 @@
         "filipino": "Filipiński",
         "dutch_nl": "Holenderski (Niderlandy)",
         "romanian": "Rumuński",
+        "albanian": "Albański",
         "account": "Konto",
         "content_discovery": "Treści i odkrywanie",
         "appearance": "Wygląd",
@@ -1427,6 +1428,7 @@
         }
     }
 }
+
 
 
 
