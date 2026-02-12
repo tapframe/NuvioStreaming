@@ -652,6 +652,7 @@
         "filipino": "Filipince",
         "dutch_nl": "Felemenkçe (Hollanda)",
         "romanian": "Rumence",
+        "albanian": "Arnavutça",
         "account": "Hesap",
         "content_discovery": "İçerik ve Keşif",
         "appearance": "Görünüm",
@@ -1427,6 +1428,7 @@
         }
     }
 }
+
 
 
 
