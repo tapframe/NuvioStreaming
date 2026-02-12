@@ -22,4 +22,5 @@ export const LOCALES = [
     { code: 'fil', key: 'filipino' },
     { code: 'nl-NL', key: 'dutch_nl' },
     { code: 'ro', key: 'romanian' },
+    { code: 'sq', key: 'albanian' },
 ];
