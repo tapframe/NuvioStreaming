@@ -93,6 +93,18 @@ object StreamsRepository {
             )
         }
 
+        // For series episodes the Stremio protocol requires the id in the request URL to
+        // be "parentId:season:episode" (e.g. tt1234567:1:2). If the videoId coming from
+        // the addon meta doesn't already carry the suffix, append it here so that every
+        // addon gets a correctly-formed stream request.
+        val effectiveAddonVideoId = if (type == "series" && season != null && episode != null) {
+            val suffix = ":$season:$episode"
+            if (videoId.endsWith(suffix)) videoId else "$videoId$suffix"
+        } else {
+            videoId
+        }
+        log.d { "Effective addon videoId: $effectiveAddonVideoId (original: $videoId, season=$season, episode=$episode)" }
+
         val embeddedStreams = MetaDetailsRepository.findEmbeddedStreams(videoId)
         if (embeddedStreams.isNotEmpty()) {
             log.d { "Using ${embeddedStreams.size} embedded streams for type=$type id=$videoId" }
@@ -129,6 +141,15 @@ object StreamsRepository {
             return
         }
 
+        // When checking idPrefixes, also test the bare parent ID (without :season:episode)
+        // so that addons with idPrefixes=["tt"] still match when effectiveAddonVideoId is
+        // "tt1234567:1:2".
+        val baseVideoIdForPrefixCheck = if (season != null && episode != null) {
+            effectiveAddonVideoId.removeSuffix(":$season:$episode")
+        } else {
+            effectiveAddonVideoId
+        }
+
         val streamAddons = installedAddons
             .mapNotNull { addon ->
                 val manifest = addon.manifest ?: return@mapNotNull null
@@ -136,7 +157,10 @@ object StreamsRepository {
                     resource.name == "stream" &&
                         resource.types.contains(type) &&
                         (resource.idPrefixes.isEmpty() ||
-                            resource.idPrefixes.any { videoId.startsWith(it) })
+                            resource.idPrefixes.any { prefix ->
+                                effectiveAddonVideoId.startsWith(prefix) ||
+                                    baseVideoIdForPrefixCheck.startsWith(prefix)
+                            })
                 }
                 if (!supportsRequestedStream) return@mapNotNull null
 
@@ -147,7 +171,7 @@ object StreamsRepository {
                 )
             }
 
-        log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId" }
+        log.d { "Found ${streamAddons.size} addons for stream type=$type effectiveId=$effectiveAddonVideoId" }
 
             if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
             _uiState.value = StreamsUiState(
@@ -243,7 +267,7 @@ object StreamsRepository {
                         manifestUrl = addon.manifest.transportUrl,
                         resource = "stream",
                         type = type,
-                        id = videoId,
+                        id = effectiveAddonVideoId,
                     )
                     log.d { "Fetching streams from: $url" }
 

@@ -151,6 +151,23 @@ object PlayerStreamsRepository {
             return
         }
 
+        // For series episodes the Stremio protocol requires the id in the request URL to
+        // be "parentId:season:episode" (e.g. tt1234567:1:2). Append if missing.
+        val effectiveAddonVideoId = if (type == "series" && season != null && episode != null) {
+            val suffix = ":$season:$episode"
+            if (videoId.endsWith(suffix)) videoId else "$videoId$suffix"
+        } else {
+            videoId
+        }
+
+        // Strip the suffix when checking idPrefixes so addons with prefix "tt" still match
+        // when effectiveAddonVideoId is "tt1234567:1:2".
+        val baseVideoIdForPrefixCheck = if (season != null && episode != null) {
+            effectiveAddonVideoId.removeSuffix(":$season:$episode")
+        } else {
+            effectiveAddonVideoId
+        }
+
         val installedAddons = AddonRepository.uiState.value.addons
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
@@ -174,7 +191,10 @@ object PlayerStreamsRepository {
                     resource.name == "stream" &&
                         resource.types.contains(type) &&
                         (resource.idPrefixes.isEmpty() ||
-                            resource.idPrefixes.any { videoId.startsWith(it) })
+                            resource.idPrefixes.any { prefix ->
+                                effectiveAddonVideoId.startsWith(prefix) ||
+                                    baseVideoIdForPrefixCheck.startsWith(prefix)
+                            })
                 }
                 if (!supportsRequestedStream) return@mapNotNull null
 
@@ -221,7 +241,7 @@ object PlayerStreamsRepository {
                         manifestUrl = addon.manifest.transportUrl,
                         resource = "stream",
                         type = type,
-                        id = videoId,
+                        id = effectiveAddonVideoId,
                     )
 
                     val displayName = addon.addonName
