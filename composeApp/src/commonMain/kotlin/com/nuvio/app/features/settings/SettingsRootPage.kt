@@ -98,19 +98,19 @@ internal fun LazyListScope.settingsRootContent(
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
-                        title = "Playback",
-                        description = "Control player behavior and viewing defaults.",
-                        icon = Icons.Rounded.PlayArrow,
-                        isTablet = isTablet,
-                        onClick = onPlaybackClick,
-                    )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
                         title = "Downloads",
                         description = "Manage your downloaded movies and episodes.",
                         icon = Icons.Rounded.CloudDownload,
                         isTablet = isTablet,
                         onClick = onDownloadsClick,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Playback",
+                        description = "Control player behavior and viewing defaults.",
+                        icon = Icons.Rounded.PlayArrow,
+                        isTablet = isTablet,
+                        onClick = onPlaybackClick,
                     )
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
