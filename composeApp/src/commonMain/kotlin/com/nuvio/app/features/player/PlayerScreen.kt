@@ -79,10 +79,10 @@ private val PlayerActionRowHeight = 50.dp
 
 private fun sliderOverlayBottomPadding(metrics: PlayerLayoutMetrics) =
     metrics.sliderBottomOffset +
-        metrics.sliderTouchHeight +
-        PlayerTimeRowHeight +
-        PlayerActionRowHeight +
-        PlayerSliderOverlayGap
+            metrics.sliderTouchHeight +
+            PlayerTimeRowHeight +
+            PlayerActionRowHeight +
+            PlayerSliderOverlayGap
 
 private enum class PlayerSideGesture {
     Brightness,
@@ -195,6 +195,7 @@ fun PlayerScreen(
         var gestureMessageJob by remember { mutableStateOf<Job?>(null) }
         var accumulatedSeekResetJob by remember { mutableStateOf<Job?>(null) }
         var accumulatedSeekState by remember { mutableStateOf<PlayerAccumulatedSeekState?>(null) }
+        var speedIndicatorJob by remember { mutableStateOf<Job?>(null) }
         var initialLoadCompleted by remember(activeSourceUrl) { mutableStateOf(false) }
         var speedBoostRestoreSpeed by remember(activeSourceUrl) { mutableStateOf<Float?>(null) }
         var isHoldToSpeedGestureActive by remember(activeSourceUrl) { mutableStateOf(false) }
@@ -202,7 +203,7 @@ fun PlayerScreen(
             val initialProgressFraction = activeInitialProgressFraction
             mutableStateOf(
                 activeInitialPositionMs <= 0L &&
-                    (initialProgressFraction == null || initialProgressFraction <= 0f),
+                        (initialProgressFraction == null || initialProgressFraction <= 0f),
             )
         }
         var lastProgressPersistEpochMs by remember(activeSourceUrl) { mutableStateOf(0L) }
@@ -680,9 +681,18 @@ fun PlayerScreen(
                 icon = GestureFeedbackIcon.Speed,
             )
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+
+            // Hide the speed indicator after 2 seconds, but keep speed active
+            speedIndicatorJob?.cancel()
+            speedIndicatorJob = scope.launch {
+                delay(2_000L)
+                liveGestureFeedback = null
+            }
         }
 
         fun deactivateHoldToSpeed() {
+            speedIndicatorJob?.cancel()
+            speedIndicatorJob = null
             isHoldToSpeedGestureActive = false
             val restoreSpeed = speedBoostRestoreSpeed ?: return
             playerController?.setPlaybackSpeed(restoreSpeed)
@@ -910,10 +920,10 @@ fun PlayerScreen(
             val settings = playerSettingsUiState
             val shouldAutoSelectInManualMode =
                 settings.streamAutoPlayMode == StreamAutoPlayMode.MANUAL &&
-                    (
-                        settings.streamAutoPlayNextEpisodeEnabled ||
-                            settings.streamAutoPlayPreferBingeGroup
-                        )
+                        (
+                                settings.streamAutoPlayNextEpisodeEnabled ||
+                                        settings.streamAutoPlayPreferBingeGroup
+                                )
 
             // Determine auto-play mode for next episode
             val effectiveMode = if (shouldAutoSelectInManualMode) {
@@ -1387,8 +1397,8 @@ fun PlayerScreen(
                             if (gestureMode == null) {
                                 val horizontalDominant =
                                     !isHoldToSpeedGestureActiveState.value &&
-                                        abs(totalDx) > viewConfiguration.touchSlop &&
-                                        abs(totalDx) > abs(totalDy)
+                                            abs(totalDx) > viewConfiguration.touchSlop &&
+                                            abs(totalDx) > abs(totalDy)
                                 val verticalDominant =
                                     abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
 
