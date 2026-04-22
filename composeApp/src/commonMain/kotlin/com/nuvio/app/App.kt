@@ -114,6 +114,7 @@ import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
+import com.nuvio.app.features.library.toMetaPreview
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
@@ -944,6 +945,10 @@ private fun MainAppContent(
                                     },
                                     onLibraryPosterClick = { item ->
                                         navController.navigate(DetailRoute(type = item.type, id = item.id))
+                                    },
+                                    onLibraryPosterLongClick = { item ->
+                                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedPosterForActions = item.toMetaPreview()   // reuse existing sheet
                                     },
                                     onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
                                     onContinueWatchingClick = onContinueWatchingClick,
@@ -1864,6 +1869,7 @@ private fun AppTabHost(
     onCollectionsSettingsClick: () -> Unit = {},
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
     onInitialHomeContentRendered: () -> Unit = {},
+    onLibraryPosterLongClick: ((LibraryItem) -> Unit)? = null,
 ) {
     val tabStateHolder = rememberSaveableStateHolder()
 
@@ -1895,6 +1901,7 @@ private fun AppTabHost(
                     LibraryScreen(
                         modifier = Modifier.fillMaxSize(),
                         onPosterClick = onLibraryPosterClick,
+                        onPosterLongClick = onLibraryPosterLongClick,
                         onSectionViewAllClick = onLibrarySectionViewAllClick,
                     )
                 }
