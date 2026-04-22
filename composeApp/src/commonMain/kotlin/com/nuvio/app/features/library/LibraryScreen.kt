@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 fun LibraryScreen(
     modifier: Modifier = Modifier,
     onPosterClick: ((LibraryItem) -> Unit)? = null,
+    onPosterLongClick: ((LibraryItem) -> Unit)? = null,
     onSectionViewAllClick: ((LibrarySection) -> Unit)? = null,
 ) {
     val uiState by remember {
@@ -44,10 +45,11 @@ fun LibraryScreen(
         LibraryRepository.uiState
     }.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
-    var pendingRemovalItem by remember { mutableStateOf<LibraryItem?>(null) }
+//    var pendingRemovalItem by remember { mutableStateOf<LibraryItem?>(null) }
     var observedOfflineState by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isTraktSource = uiState.sourceMode == LibrarySourceMode.TRAKT
+
 
     LaunchedEffect(networkStatusUiState.condition, isTraktSource) {
         when (networkStatusUiState.condition) {
@@ -156,27 +158,12 @@ fun LibraryScreen(
                     onPosterClick = onPosterClick,
                     onSectionViewAllClick = onSectionViewAllClick,
                     onPosterLongClick = { item ->
-                        if (!isTraktSource) {
-                            pendingRemovalItem = item
-                        }
+                        onPosterLongClick?.invoke(item)
                     },
                 )
             }
         }
     }
-
-    NuvioStatusModal(
-        title = "Remove from Library?",
-        message = pendingRemovalItem?.let { "Remove ${it.name} from your library?" }.orEmpty(),
-        isVisible = pendingRemovalItem != null,
-        confirmText = "Remove",
-        dismissText = "Cancel",
-        onConfirm = {
-            pendingRemovalItem?.id?.let(LibraryRepository::remove)
-            pendingRemovalItem = null
-        },
-        onDismiss = { pendingRemovalItem = null },
-    )
 }
 
 private fun LazyListScope.librarySections(
