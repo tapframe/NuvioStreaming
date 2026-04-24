@@ -166,9 +166,9 @@ fun MetaDetailsScreen(
     var pickerError by remember(type, id) { mutableStateOf<String?>(null) }
 
     val shouldShowComments = commentsEnabled &&
-        traktAuthUiState.mode == TraktConnectionMode.CONNECTED &&
-        displayedMeta != null &&
-        displayedMeta.type.lowercase().let { it == "movie" || it == "series" || it == "show" || it == "tv" }
+            traktAuthUiState.mode == TraktConnectionMode.CONNECTED &&
+            displayedMeta != null &&
+            displayedMeta.type.lowercase().let { it == "movie" || it == "series" || it == "show" || it == "tv" }
 
     LaunchedEffect(displayedMeta?.id, shouldShowComments) {
         if (!shouldShowComments || displayedMeta == null) {
@@ -202,7 +202,7 @@ fun MetaDetailsScreen(
         when (networkStatusUiState.condition) {
             NetworkCondition.NoInternet,
             NetworkCondition.ServersUnreachable,
-            -> {
+                -> {
                 observedOfflineState = true
             }
 
@@ -216,7 +216,7 @@ fun MetaDetailsScreen(
 
             NetworkCondition.Unknown,
             NetworkCondition.Checking,
-            -> Unit
+                -> Unit
         }
     }
 
@@ -284,29 +284,55 @@ fun MetaDetailsScreen(
                     {
                         val libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L)
                         if (!isTraktConnected) {
+                            // Not on Trakt — toggle local library directly
                             LibraryRepository.toggleSaved(libraryItem)
                         } else {
-                            pickerTabs = LibraryRepository.traktListTabs()
-                            pickerMembership = pickerTabs.associate { it.key to false }
-                            pickerPending = true
-                            pickerError = null
-                            showLibraryListPicker = true
+                            // On Trakt — tap directly toggles the watchlist (first list tab)
                             detailsScope.launch {
                                 runCatching {
                                     val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
                                     val tabs = LibraryRepository.traktListTabs()
-                                    pickerTabs = tabs
-                                    pickerMembership = tabs.associate { tab ->
-                                        tab.key to (snapshot[tab.key] == true)
+                                    // Use the first tab (watchlist) as the quick-save target
+                                    val watchlistKey = tabs.firstOrNull()?.key
+                                    if (watchlistKey != null) {
+                                        val currentlyIn = snapshot[watchlistKey] == true
+                                        val desired = tabs.associate { tab ->
+                                            tab.key to if (tab.key == watchlistKey) !currentlyIn else (snapshot[tab.key] == true)
+                                        }
+                                        LibraryRepository.applyMembershipChanges(libraryItem, desired)
                                     }
-                                }.onFailure { error ->
-                                    pickerError = error.message ?: "Failed to load Trakt lists"
+                                }.onFailure { e ->
+                                    // Fallback: toggle via standard path
+                                    LibraryRepository.toggleSaved(libraryItem)
                                 }
-                                pickerPending = false
                             }
                             Unit
                         }
                     }
+                }
+                val openListPicker = remember(meta, isTraktConnected) {
+                    if (!isTraktConnected) null else ({
+                        val libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L)
+                        pickerTabs = LibraryRepository.traktListTabs()
+                        pickerMembership = pickerTabs.associate { it.key to false }
+                        pickerPending = true
+                        pickerError = null
+                        showLibraryListPicker = true
+                        detailsScope.launch {
+                            runCatching {
+                                val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
+                                val tabs = LibraryRepository.traktListTabs()
+                                pickerTabs = tabs
+                                pickerMembership = tabs.associate { tab ->
+                                    tab.key to (snapshot[tab.key] == true)
+                                }
+                            }.onFailure { error ->
+                                pickerError = error.message ?: "Failed to load Trakt lists"
+                            }
+                            pickerPending = false
+                        }
+                        Unit
+                    })
                 }
                 val movieProgress = watchProgressUiState.byVideoId[meta.id]
                     ?.takeUnless { it.isCompleted }
@@ -324,7 +350,7 @@ fun MetaDetailsScreen(
                     meta.videos.firstOrNull { video ->
                         if (action.seasonNumber != null && action.episodeNumber != null) {
                             video.season == action.seasonNumber &&
-                                video.episode == action.episodeNumber
+                                    video.episode == action.episodeNumber
                         } else {
                             buildPlaybackVideoId(
                                 parentMetaId = meta.id,
@@ -348,11 +374,11 @@ fun MetaDetailsScreen(
                 }
                 val hasAdditionalInfoSection = remember(meta) {
                     meta.status != null ||
-                        meta.releaseInfo != null ||
-                        meta.runtime != null ||
-                        meta.ageRating != null ||
-                        meta.country != null ||
-                        meta.language != null
+                            meta.releaseInfo != null ||
+                            meta.runtime != null ||
+                            meta.ageRating != null ||
+                            meta.country != null ||
+                            meta.language != null
                 }
                 val hasCollectionSection = remember(meta) {
                     meta.collectionName != null && meta.collectionItems.isNotEmpty()
@@ -634,6 +660,7 @@ fun MetaDetailsScreen(
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                     onSaveClick = toggleSaved,
+                                    onSaveLongClick = openListPicker,
                                     showManualPlayOption = showManualPlayOption,
                                     preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
                                     preferredEpisodeNumber = seriesAction?.episodeNumber,
@@ -939,6 +966,7 @@ private fun ConfiguredMetaSections(
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
+    onSaveLongClick: (() -> Unit)?,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -999,6 +1027,7 @@ private fun ConfiguredMetaSections(
                     onPlayClick = onPrimaryPlayClick,
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
                     onSaveClick = onSaveClick,
+                    onSaveLongClick = onSaveLongClick,
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {
