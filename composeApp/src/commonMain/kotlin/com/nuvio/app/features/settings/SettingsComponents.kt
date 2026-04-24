@@ -335,6 +335,57 @@ internal fun SettingsSwitchRow(
 }
 
 @Composable
+internal fun SettingsRadioRow(
+    title: String,
+    description: String? = null,
+    selected: Boolean,
+    enabled: Boolean = true,
+    isTablet: Boolean,
+    onClick: () -> Unit,
+) {
+    val verticalPadding = if (isTablet) 16.dp else 14.dp
+    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled) { onClick() }
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp)
+                .widthIn(max = if (isTablet) 560.dp else androidx.compose.ui.unit.Dp.Unspecified)
+                .alpha(if (enabled) 1f else 0.55f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            if (!description.isNullOrBlank()) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        androidx.compose.material3.RadioButton(
+            selected = selected,
+            onClick = null,
+            enabled = enabled,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+    }
+}
+
+@Composable
 internal fun HomescreenCatalogRow(
     item: HomeCatalogSettingsItem,
     isTablet: Boolean,

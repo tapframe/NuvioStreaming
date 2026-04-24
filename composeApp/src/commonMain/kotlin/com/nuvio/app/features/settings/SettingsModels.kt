@@ -31,6 +31,11 @@ internal enum class SettingsPage(
         category = SettingsCategory.Account,
         parentPage = Root,
     ),
+    Network(
+        title = "Network",
+        category = SettingsCategory.General,
+        parentPage = Root,
+    ),
     SupportersContributors(
         title = "Supporters & Contributors",
         category = SettingsCategory.About,

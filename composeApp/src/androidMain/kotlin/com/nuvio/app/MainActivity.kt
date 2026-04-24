@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
         SeasonViewModeStorage.initialize(applicationContext)
         ThemeSettingsStorage.initialize(applicationContext)
         PosterCardStyleStorage.initialize(applicationContext)
+        com.nuvio.app.features.settings.globalNetworkSettingsRepository = com.nuvio.app.features.settings.NetworkSettingsRepository(com.nuvio.app.features.settings.AndroidNetworkSettingsStorage(applicationContext))
         TmdbSettingsStorage.initialize(applicationContext)
         MdbListSettingsStorage.initialize(applicationContext)
         TraktAuthStorage.initialize(applicationContext)

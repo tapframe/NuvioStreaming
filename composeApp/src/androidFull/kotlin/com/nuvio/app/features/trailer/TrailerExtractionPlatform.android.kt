@@ -24,7 +24,7 @@ internal object TrailerExtractionPlatform {
     )
 
     private val httpClient = OkHttpClient.Builder()
-        .dns(IPv4FirstDns())
+        .dns(com.nuvio.app.core.network.AndroidDnsProvider)
         .connectTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .readTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .writeTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)
@@ -33,7 +33,7 @@ internal object TrailerExtractionPlatform {
         .build()
 
     private val probeClient = OkHttpClient.Builder()
-        .dns(IPv4FirstDns())
+        .dns(com.nuvio.app.core.network.AndroidDnsProvider)
         .connectTimeout(2, TimeUnit.SECONDS)
         .readTimeout(2, TimeUnit.SECONDS)
         .followRedirects(true)

@@ -302,6 +302,7 @@ private fun MobileSettingsScreen(
                 onAppearanceClick = { onPageChange(SettingsPage.Appearance) },
                 onNotificationsClick = { onPageChange(SettingsPage.Notifications) },
                 onContentDiscoveryClick = { onPageChange(SettingsPage.ContentDiscovery) },
+                onNetworkClick = { onPageChange(SettingsPage.Network) },
                 onIntegrationsClick = { onPageChange(SettingsPage.Integrations) },
                 onTraktClick = { onPageChange(SettingsPage.TraktAuthentication) },
                 onSupportersContributorsClick = onSupportersContributorsClick,
@@ -395,6 +396,9 @@ private fun MobileSettingsScreen(
                 uiState = traktAuthUiState,
                 commentsEnabled = traktCommentsEnabled,
                 onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+            )
+            SettingsPage.Network -> networkSettingsContent(
+                isTablet = false,
             )
         }
     }
@@ -521,6 +525,7 @@ private fun TabletSettingsScreen(
                     onAppearanceClick = { openInlinePage(SettingsPage.Appearance) },
                     onNotificationsClick = { openInlinePage(SettingsPage.Notifications) },
                     onContentDiscoveryClick = { openInlinePage(SettingsPage.ContentDiscovery) },
+                    onNetworkClick = { openInlinePage(SettingsPage.Network) },
                     onIntegrationsClick = { openInlinePage(SettingsPage.Integrations) },
                     onTraktClick = { openInlinePage(SettingsPage.TraktAuthentication) },
                     onSupportersContributorsClick = { openInlinePage(SettingsPage.SupportersContributors) },
@@ -617,6 +622,9 @@ private fun TabletSettingsScreen(
                     uiState = traktAuthUiState,
                     commentsEnabled = traktCommentsEnabled,
                     onCommentsEnabledChange = TraktCommentsSettings::setEnabled,
+                )
+                SettingsPage.Network -> networkSettingsContent(
+                    isTablet = true,
                 )
             }
         }
