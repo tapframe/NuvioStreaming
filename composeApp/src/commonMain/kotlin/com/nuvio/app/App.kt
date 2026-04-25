@@ -656,66 +656,7 @@ private fun MainAppContent(
                     AppDeepLinkRepository.markConsumed(deepLink)
                 }
 
-        fun launchPlaybackWithDownloadPreference(
-            type: String,
-            videoId: String,
-            parentMetaId: String,
-            parentMetaType: String,
-            title: String,
-            logo: String?,
-            poster: String?,
-            background: String?,
-            seasonNumber: Int?,
-            episodeNumber: Int?,
-            episodeTitle: String?,
-            episodeThumbnail: String?,
-            pauseDescription: String?,
-            resumePositionMs: Long?,
-            resumeProgressFraction: Float?,
-            manualSelection: Boolean,
-            startFromBeginning: Boolean,
-        ) {
-            val targetResumePositionMs = if (startFromBeginning) 0L else (resumePositionMs ?: 0L)
-            val targetResumeProgressFraction = if (startFromBeginning) null else resumeProgressFraction
-
-            if (!manualSelection) {
-                val downloadedItem = DownloadsRepository.findPlayableDownload(
-                    parentMetaId = parentMetaId,
-                    seasonNumber = seasonNumber,
-                    episodeNumber = episodeNumber,
-                    videoId = videoId,
-                )
-                val localSourceUrl = downloadedItem?.localFileUri
-                if (!localSourceUrl.isNullOrBlank()) {
-                    val launchId = PlayerLaunchStore.put(
-                        PlayerLaunch(
-                            title = title,
-                            sourceUrl = localSourceUrl,
-                            sourceHeaders = emptyMap(),
-                            sourceResponseHeaders = emptyMap(),
-                            logo = logo,
-                            poster = poster,
-                            background = background,
-                            seasonNumber = seasonNumber,
-                            episodeNumber = episodeNumber,
-                            episodeTitle = episodeTitle,
-                            episodeThumbnail = episodeThumbnail,
-                            streamTitle = downloadedItem.streamTitle.ifBlank { title },
-                            streamSubtitle = downloadedItem.streamSubtitle,
-                            pauseDescription = pauseDescription,
-                            providerName = downloadedItem.providerName.ifBlank { downloadedProviderLabel },
-                            providerAddonId = downloadedItem.providerAddonId,
-                            contentType = type,
-                            videoId = videoId,
-                            parentMetaId = parentMetaId,
-                            parentMetaType = parentMetaType,
-                            initialPositionMs = targetResumePositionMs,
-                            initialProgressFraction = targetResumeProgressFraction,
-                        ),
-                    )
-                    navController.navigate(PlayerRoute(launchId = launchId))
-                    return
-                }
+                null -> Unit
             }
         }
     }
@@ -767,7 +708,7 @@ private fun MainAppContent(
                         streamTitle = downloadedItem.streamTitle.ifBlank { title },
                         streamSubtitle = downloadedItem.streamSubtitle,
                         pauseDescription = pauseDescription,
-                        providerName = downloadedItem.providerName.ifBlank { "Downloaded" },
+                        providerName = downloadedItem.providerName.ifBlank { downloadedProviderLabel },
                         providerAddonId = downloadedItem.providerAddonId,
                         contentType = type,
                         videoId = videoId,
@@ -782,22 +723,52 @@ private fun MainAppContent(
             }
         }
 
-        val librarySectionSubtitle = if (libraryUiState.sourceMode == LibrarySourceMode.TRAKT) {
-            stringResource(Res.string.compose_catalog_subtitle_trakt_library)
-        } else {
-            stringResource(Res.string.compose_catalog_subtitle_library)
-        }
+        val streamLaunchId = StreamLaunchStore.put(
+            StreamLaunch(
+                type = type,
+                videoId = videoId,
+                parentMetaId = parentMetaId,
+                parentMetaType = parentMetaType,
+                title = title,
+                logo = logo,
+                poster = poster,
+                background = background,
+                seasonNumber = seasonNumber,
+                episodeNumber = episodeNumber,
+                episodeTitle = episodeTitle,
+                episodeThumbnail = episodeThumbnail,
+                pauseDescription = pauseDescription,
+                resumePositionMs = if (startFromBeginning) 0L else resumePositionMs,
+                resumeProgressFraction = targetResumeProgressFraction,
+                manualSelection = manualSelection,
+                startFromBeginning = startFromBeginning,
+            ),
+        )
+        navController.navigate(
+            StreamRoute(launchId = streamLaunchId),
+        )
+    }
 
-        val onLibrarySectionViewAllClick: (LibrarySection) -> Unit = { section ->
-            navController.navigate(
-                CatalogRoute(
-                    title = section.displayTitle,
-                    subtitle = librarySectionSubtitle,
-                    manifestUrl = INTERNAL_LIBRARY_MANIFEST_URL,
-                    type = section.items.firstOrNull()?.type ?: "movie",
-                    catalogId = section.type,
-                    supportsPagination = false,
-                ),
+    val onPlay: (String, String, String, String, String, String?, String?, String?, Int?, Int?, String?, String?, String?, Long?) -> Unit =
+        { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail, pauseDescription, resumePositionMs ->
+            launchPlaybackWithDownloadPreference(
+                type = type,
+                videoId = videoId,
+                parentMetaId = parentMetaId,
+                parentMetaType = parentMetaType,
+                title = title,
+                logo = logo,
+                poster = poster,
+                background = background,
+                seasonNumber = seasonNumber,
+                episodeNumber = episodeNumber,
+                episodeTitle = episodeTitle,
+                episodeThumbnail = episodeThumbnail,
+                pauseDescription = pauseDescription,
+                resumePositionMs = resumePositionMs,
+                resumeProgressFraction = null,
+                manualSelection = false,
+                startFromBeginning = false,
             )
         }
 
@@ -837,15 +808,17 @@ private fun MainAppContent(
         )
     }
 
+    val librarySectionSubtitle = if (libraryUiState.sourceMode == LibrarySourceMode.TRAKT) {
+        stringResource(Res.string.compose_catalog_subtitle_trakt_library)
+    } else {
+        stringResource(Res.string.compose_catalog_subtitle_library)
+    }
+
     val onLibrarySectionViewAllClick: (LibrarySection) -> Unit = { section ->
         navController.navigate(
             CatalogRoute(
                 title = section.displayTitle,
-                subtitle = if (libraryUiState.sourceMode == LibrarySourceMode.TRAKT) {
-                    "Trakt Library"
-                } else {
-                    "Library"
-                },
+                subtitle = librarySectionSubtitle,
                 manifestUrl = INTERNAL_LIBRARY_MANIFEST_URL,
                 type = section.items.firstOrNull()?.type ?: "movie",
                 catalogId = section.type,
@@ -986,7 +959,7 @@ private fun MainAppContent(
                                     },
                                     onLibraryPosterLongClick = { item ->
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        selectedPosterForActions = item.toMetaPreview()   // reuse existing sheet
+                                        selectedPosterForActions = item.toMetaPreview()
                                     },
                                     onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
                                     onContinueWatchingClick = onContinueWatchingClick,
@@ -1080,11 +1053,11 @@ private fun MainAppContent(
                                         castAvatarTransitionKey = avatarTransitionKey,
                                         preferCrew = person.role?.let {
                                             it.equals("Director", ignoreCase = true) ||
-                                                it.equals(directorRole, ignoreCase = true) ||
-                                                it.equals("Writer", ignoreCase = true) ||
-                                                it.equals(writerRole, ignoreCase = true) ||
-                                                it.equals("Creator", ignoreCase = true)
-                                                || it.equals(creatorRole, ignoreCase = true)
+                                                    it.equals(directorRole, ignoreCase = true) ||
+                                                    it.equals("Writer", ignoreCase = true) ||
+                                                    it.equals(writerRole, ignoreCase = true) ||
+                                                    it.equals("Creator", ignoreCase = true)
+                                                    || it.equals(creatorRole, ignoreCase = true)
                                         } ?: false,
                                     ),
                                 )
@@ -1689,34 +1662,15 @@ private fun MainAppContent(
                 )
             } == true,
             onDismiss = { selectedPosterForActions = null },
+            // TAP → direct save/remove (watchlist or local library)
             onToggleLibrary = {
                 selectedPosterForActions?.let { preview ->
                     val libraryItem = preview.toLibraryItem(savedAtEpochMs = 0L)
-                    if (!isTraktConnected) {
-                        LibraryRepository.toggleSaved(libraryItem)
-                    } else {
-                        // Tap = directly toggle watchlist (first tab)
-                        coroutineScope.launch {
-                            runCatching {
-                                val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                val tabs = LibraryRepository.traktListTabs()
-                                val watchlistKey = tabs.firstOrNull()?.key
-                                if (watchlistKey != null) {
-                                    val currentlyIn = snapshot[watchlistKey] == true
-                                    val desired = tabs.associate { tab ->
-                                        tab.key to if (tab.key == watchlistKey) !currentlyIn else (snapshot[tab.key] == true)
-                                    }
-                                }.onFailure { error ->
-                                    pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
-                                }
-                            }.onFailure {
-                                LibraryRepository.toggleSaved(libraryItem)
-                            }
-                        }
-                    }
+                    LibraryRepository.toggleSaved(libraryItem)
                 }
             },
-            onOpenListPicker = if (isTraktConnected) {
+            // LONG PRESS → open Trakt list picker (only when Trakt is connected)
+            onToggleLibraryLongClick = if (isTraktConnected) {
                 {
                     selectedPosterForActions?.let { preview ->
                         val libraryItem = preview.toLibraryItem(savedAtEpochMs = 0L)
@@ -1736,7 +1690,7 @@ private fun MainAppContent(
                                     tab.key to (snapshot[tab.key] == true)
                                 }
                             }.onFailure { error ->
-                                pickerError = error.message ?: "Failed to load Trakt lists"
+                                pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
                             }
                             pickerPending = false
                         }
@@ -1822,45 +1776,27 @@ private fun MainAppContent(
                         pickerItem = null
                         pickerError = null
                     }.onFailure { error ->
-                        pickerError = error.message ?: "Failed to update Trakt lists"
+                        pickerError = error.message ?: getString(Res.string.trakt_lists_update_failed)
                     }
-                },
-                onSave = {
-                    val item = pickerItem ?: return@TraktListPickerDialog
-                    coroutineScope.launch {
-                        pickerPending = true
-                        pickerError = null
-                        runCatching {
-                            LibraryRepository.applyMembershipChanges(
-                                item = item,
-                                desiredMembership = pickerMembership,
-                            )
-                        }.onSuccess {
-                            showLibraryListPicker = false
-                            pickerItem = null
-                            pickerError = null
-                        }.onFailure { error ->
-                            pickerError = error.message ?: getString(Res.string.trakt_lists_update_failed)
-                        }
-                        pickerPending = false
-                    }
-                },
-            )
+                    pickerPending = false
+                }
+            },
+        )
 
-            NuvioStatusModal(
-                title = stringResource(Res.string.app_exit_title),
-                message = stringResource(Res.string.app_exit_message),
-                isVisible = showExitConfirmation,
-                confirmText = stringResource(Res.string.action_yes),
-                dismissText = stringResource(Res.string.action_no),
-                onConfirm = {
-                    showExitConfirmation = false
-                    platformExitApp()
-                },
-                onDismiss = {
-                    showExitConfirmation = false
-                },
-            )
+        NuvioStatusModal(
+            title = stringResource(Res.string.app_exit_title),
+            message = stringResource(Res.string.app_exit_message),
+            isVisible = showExitConfirmation,
+            confirmText = stringResource(Res.string.action_yes),
+            dismissText = stringResource(Res.string.action_no),
+            onConfirm = {
+                showExitConfirmation = false
+                platformExitApp()
+            },
+            onDismiss = {
+                showExitConfirmation = false
+            },
+        )
 
         androidx.compose.animation.AnimatedVisibility(
             visible = !initialHomeReady || profileSwitchLoading,
@@ -1879,23 +1815,23 @@ private fun MainAppContent(
             }
         }
 
-            NuvioFloatingPrompt(
-                visible = resumePromptItem != null,
-                imageUrl = resumePromptItem?.poster ?: resumePromptItem?.imageUrl,
-                title = resumePromptItem?.title.orEmpty(),
-                subtitle = resumePromptItem?.let { localizedContinueWatchingSubtitle(it) }.orEmpty(),
-                progressFraction = resumePromptItem?.progressFraction ?: 0f,
-                actionLabel = stringResource(Res.string.resume_prompt_action),
-                onAction = {
-                    val item = resumePromptItem ?: return@NuvioFloatingPrompt
-                    resumePromptItem = null
-                    openContinueWatching(item, false, false)
-                },
-                onDismiss = { resumePromptItem = null },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .zIndex(15f),
-            )
+        NuvioFloatingPrompt(
+            visible = resumePromptItem != null,
+            imageUrl = resumePromptItem?.poster ?: resumePromptItem?.imageUrl,
+            title = resumePromptItem?.title.orEmpty(),
+            subtitle = resumePromptItem?.let { localizedContinueWatchingSubtitle(it) }.orEmpty(),
+            progressFraction = resumePromptItem?.progressFraction ?: 0f,
+            actionLabel = stringResource(Res.string.resume_prompt_action),
+            onAction = {
+                val item = resumePromptItem ?: return@NuvioFloatingPrompt
+                resumePromptItem = null
+                openContinueWatching(item, false, false)
+            },
+            onDismiss = { resumePromptItem = null },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .zIndex(15f),
+        )
 
         NuvioToastHost(
             modifier = Modifier
@@ -1940,6 +1876,7 @@ private fun AppTabHost(
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onLibraryPosterClick: ((LibraryItem) -> Unit)? = null,
+    onLibraryPosterLongClick: ((LibraryItem) -> Unit)? = null,
     onLibrarySectionViewAllClick: ((LibrarySection) -> Unit)? = null,
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
@@ -1956,7 +1893,6 @@ private fun AppTabHost(
     onCollectionsSettingsClick: () -> Unit = {},
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
     onInitialHomeContentRendered: () -> Unit = {},
-    onLibraryPosterLongClick: ((LibraryItem) -> Unit)? = null,
 ) {
     val tabStateHolder = rememberSaveableStateHolder()
 
