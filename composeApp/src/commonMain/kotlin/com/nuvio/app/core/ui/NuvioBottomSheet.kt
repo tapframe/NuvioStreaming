@@ -1,6 +1,8 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,18 +68,23 @@ fun NuvioBottomSheetDivider(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NuvioBottomSheetActionRow(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     icon: ImageVector? = null,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
