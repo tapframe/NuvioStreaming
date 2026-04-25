@@ -283,37 +283,15 @@ fun MetaDetailsScreen(
                     LibraryRepository.isSaved(meta.id, meta.type)
                 }
                 val isTraktConnected = traktAuthUiState.mode == TraktConnectionMode.CONNECTED
-                val toggleSaved = remember(meta, isTraktConnected) {
+                // TAP → always direct save/remove (toggles Trakt watchlist or local library)
+                val directToggleSaved = remember(meta) {
                     {
-                        val libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L)
-                        if (!isTraktConnected) {
-                            // Not on Trakt — toggle local library directly
-                            LibraryRepository.toggleSaved(libraryItem)
-                        } else {
-                            // On Trakt — tap directly toggles the watchlist (first list tab)
-                            detailsScope.launch {
-                                runCatching {
-                                    val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                    val tabs = LibraryRepository.traktListTabs()
-                                    // Use the first tab (watchlist) as the quick-save target
-                                    val watchlistKey = tabs.firstOrNull()?.key
-                                    if (watchlistKey != null) {
-                                        val currentlyIn = snapshot[watchlistKey] == true
-                                        val desired = tabs.associate { tab ->
-                                            tab.key to if (tab.key == watchlistKey) !currentlyIn else (snapshot[tab.key] == true)
-                                        }
-                                        LibraryRepository.applyMembershipChanges(libraryItem, desired)
-                                    }
-                                }.onFailure { error ->
-                                    pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
-                                }
-                            }
-                            Unit
-                        }
+                        LibraryRepository.toggleSaved(meta.toLibraryItem(savedAtEpochMs = 0L))
                     }
                 }
-                val openListPicker = remember(meta, isTraktConnected) {
-                    if (!isTraktConnected) null else ({
+                // LONG PRESS → open Trakt list picker (only when Trakt is connected)
+                val openListPicker: (() -> Unit)? = if (isTraktConnected) remember(meta) {
+                    {
                         val libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L)
                         pickerTabs = LibraryRepository.traktListTabs()
                         pickerMembership = pickerTabs.associate { it.key to false }
@@ -329,13 +307,12 @@ fun MetaDetailsScreen(
                                     tab.key to (snapshot[tab.key] == true)
                                 }
                             }.onFailure { error ->
-                                pickerError = error.message ?: "Failed to load Trakt lists"
+                                pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
                             }
                             pickerPending = false
                         }
-                        Unit
-                    })
-                }
+                    }
+                } else null
                 val movieProgress = watchProgressUiState.byVideoId[meta.id]
                     ?.takeUnless { it.isCompleted }
                 val cwPrefs by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
@@ -663,7 +640,7 @@ fun MetaDetailsScreen(
                                     isSaved = isSaved,
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
-                                    onSaveClick = toggleSaved,
+                                    onSaveClick = directToggleSaved,
                                     onSaveLongClick = openListPicker,
                                     showManualPlayOption = showManualPlayOption,
                                     preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
@@ -768,7 +745,7 @@ fun MetaDetailsScreen(
                             isSaved = isSaved,
                             progress = headerProgress,
                             onBack = onBack,
-                            onToggleSaved = toggleSaved,
+                            onToggleSaved = directToggleSaved,
                             modifier = Modifier.zIndex(2f),
                         )
 
