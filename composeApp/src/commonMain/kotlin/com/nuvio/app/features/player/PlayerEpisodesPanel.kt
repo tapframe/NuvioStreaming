@@ -60,6 +60,8 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Episode selection panel shown inside the player.
@@ -232,12 +234,12 @@ private fun EpisodesListSubView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Episodes",
+                text = stringResource(Res.string.compose_player_panel_episodes),
                 color = colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            PanelChipButton(label = "Close", onClick = onDismiss)
+            PanelChipButton(label = stringResource(Res.string.action_close), onClick = onDismiss)
         }
 
         // Season tabs
@@ -251,7 +253,11 @@ private fun EpisodesListSubView(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(availableSeasons, key = { season -> season }) { season ->
-                    val label = if (season == 0) "Specials" else "Season $season"
+                    val label = if (season == 0) {
+                        stringResource(Res.string.episodes_specials)
+                    } else {
+                        stringResource(Res.string.episodes_season, season)
+                    }
                     AddonFilterChip(
                         label = label,
                         isSelected = selectedSeason == season,
@@ -273,7 +279,7 @@ private fun EpisodesListSubView(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No episodes available",
+                    text = stringResource(Res.string.compose_player_no_episodes_available),
                     color = colorScheme.onSurfaceVariant,
                     fontSize = 14.sp,
                 )
@@ -345,9 +351,15 @@ private fun EpisodeRow(
             ) {
                 val episodeLabel = buildString {
                     if (episode.season != null && episode.episode != null) {
-                        append("S${episode.season}E${episode.episode}")
+                        append(
+                            stringResource(
+                                Res.string.compose_player_episode_code_full,
+                                episode.season,
+                                episode.episode,
+                            ),
+                        )
                     } else if (episode.episode != null) {
-                        append("E${episode.episode}")
+                        append(stringResource(Res.string.compose_player_episode_code_episode_only, episode.episode))
                     }
                 }
                 if (episodeLabel.isNotBlank()) {
@@ -366,7 +378,7 @@ private fun EpisodeRow(
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
-                            text = "Playing",
+                            text = stringResource(Res.string.compose_player_playing),
                             color = colorScheme.onPrimaryContainer,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -421,12 +433,12 @@ private fun EpisodeStreamsSubView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Streams",
+                text = stringResource(Res.string.compose_player_panel_streams),
                 color = colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            PanelChipButton(label = "Close", onClick = onDismiss)
+            PanelChipButton(label = stringResource(Res.string.action_close), onClick = onDismiss)
         }
 
         // Back + reload + episode info
@@ -439,19 +451,25 @@ private fun EpisodeStreamsSubView(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PanelChipButton(
-                label = "Back",
+                label = stringResource(Res.string.action_back),
                 icon = Icons.AutoMirrored.Rounded.ArrowBack,
                 onClick = onBack,
             )
             PanelChipButton(
-                label = "Reload",
+                label = stringResource(Res.string.compose_action_reload),
                 icon = Icons.Rounded.Refresh,
                 onClick = onReload,
             )
             Text(
                 text = buildString {
                     if (episode.season != null && episode.episode != null) {
-                        append("S${episode.season} E${episode.episode}")
+                        append(
+                            stringResource(
+                                Res.string.compose_player_episode_code_full,
+                                episode.season,
+                                episode.episode,
+                            ),
+                        )
                     }
                     if (episode.title.isNotBlank()) {
                         if (isNotEmpty()) append(" • ")
@@ -480,7 +498,7 @@ private fun EpisodeStreamsSubView(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 AddonFilterChip(
-                    label = "All",
+                    label = stringResource(Res.string.collections_tab_all),
                     isSelected = streamsUiState.selectedFilter == null,
                     onClick = { onFilterSelected(null) },
                 )
@@ -522,7 +540,7 @@ private fun EpisodeStreamsSubView(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No streams found",
+                        text = stringResource(Res.string.compose_player_no_streams_found),
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                     )

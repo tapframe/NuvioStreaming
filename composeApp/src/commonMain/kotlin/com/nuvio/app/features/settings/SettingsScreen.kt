@@ -58,6 +58,9 @@ import com.nuvio.app.features.tmdb.TmdbSettings
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesUiState
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_settings_page_root
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SettingsScreen(
@@ -87,6 +90,7 @@ fun SettingsScreen(
             ThemeSettingsRepository.selectedTheme
         }.collectAsStateWithLifecycle()
         val amoledEnabled by remember { ThemeSettingsRepository.amoledEnabled }.collectAsStateWithLifecycle()
+        val selectedAppLanguage by remember { ThemeSettingsRepository.selectedAppLanguage }.collectAsStateWithLifecycle()
         val tmdbSettings by remember {
             TmdbSettingsRepository.ensureLoaded()
             TmdbSettingsRepository.uiState
@@ -178,6 +182,8 @@ fun SettingsScreen(
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
                 onAmoledToggle = ThemeSettingsRepository::setAmoled,
+                selectedAppLanguage = selectedAppLanguage,
+                onAppLanguageSelected = ThemeSettingsRepository::setAppLanguage,
                 episodeReleaseNotificationsUiState = episodeReleaseNotificationsUiState,
                 tmdbSettings = tmdbSettings,
                 mdbListSettings = mdbListSettings,
@@ -216,6 +222,8 @@ fun SettingsScreen(
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
                 onAmoledToggle = ThemeSettingsRepository::setAmoled,
+                selectedAppLanguage = selectedAppLanguage,
+                onAppLanguageSelected = ThemeSettingsRepository::setAppLanguage,
                 episodeReleaseNotificationsUiState = episodeReleaseNotificationsUiState,
                 tmdbSettings = tmdbSettings,
                 mdbListSettings = mdbListSettings,
@@ -264,6 +272,8 @@ private fun MobileSettingsScreen(
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
     onAmoledToggle: (Boolean) -> Unit,
+    selectedAppLanguage: AppLanguage,
+    onAppLanguageSelected: (AppLanguage) -> Unit,
     episodeReleaseNotificationsUiState: EpisodeReleaseNotificationsUiState,
     tmdbSettings: TmdbSettings,
     mdbListSettings: MdbListSettings,
@@ -290,7 +300,7 @@ private fun MobileSettingsScreen(
         stickyHeader {
             val previousPage = page.previousPage()
             NuvioScreenHeader(
-                title = page.title,
+                title = stringResource(page.titleRes),
                 onBack = previousPage?.let { { onPageChange(it) } },
             )
         }
@@ -339,6 +349,8 @@ private fun MobileSettingsScreen(
                 onThemeSelected = onThemeSelected,
                 amoledEnabled = amoledEnabled,
                 onAmoledToggle = onAmoledToggle,
+                selectedAppLanguage = selectedAppLanguage,
+                onAppLanguageSelected = onAppLanguageSelected,
                 onContinueWatchingClick = onContinueWatchingClick,
                 onPosterCustomizationClick = { onPageChange(SettingsPage.PosterCustomization) },
             )
@@ -422,6 +434,8 @@ private fun TabletSettingsScreen(
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
     onAmoledToggle: (Boolean) -> Unit,
+    selectedAppLanguage: AppLanguage,
+    onAppLanguageSelected: (AppLanguage) -> Unit,
     episodeReleaseNotificationsUiState: EpisodeReleaseNotificationsUiState,
     tmdbSettings: TmdbSettings,
     mdbListSettings: MdbListSettings,
@@ -468,7 +482,7 @@ private fun TabletSettingsScreen(
                     .padding(top = topOffset),
             ) {
                 Text(
-                    text = "Settings",
+                    text = stringResource(Res.string.compose_settings_page_root),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
@@ -482,7 +496,7 @@ private fun TabletSettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 SettingsCategory.entries.forEach { category ->
                     SettingsSidebarItem(
-                        label = category.label,
+                        label = stringResource(category.labelRes),
                         icon = category.icon,
                         selected = category == activeCategory,
                         onClick = {
@@ -509,7 +523,11 @@ private fun TabletSettingsScreen(
             item {
                 val previousPage = page.previousPage()
                 TabletPageHeader(
-                    title = if (page == SettingsPage.Root) activeCategory.label else page.title,
+                    title = if (page == SettingsPage.Root) {
+                        stringResource(activeCategory.labelRes)
+                    } else {
+                        stringResource(page.titleRes)
+                    },
                     showBack = previousPage != null,
                     onBack = { previousPage?.let(onPageChange) },
                 )
@@ -561,6 +579,8 @@ private fun TabletSettingsScreen(
                     onThemeSelected = onThemeSelected,
                     amoledEnabled = amoledEnabled,
                     onAmoledToggle = onAmoledToggle,
+                    selectedAppLanguage = selectedAppLanguage,
+                    onAppLanguageSelected = onAppLanguageSelected,
                     onContinueWatchingClick = { openInlinePage(SettingsPage.ContinueWatching) },
                     onPosterCustomizationClick = { openInlinePage(SettingsPage.PosterCustomization) },
                 )

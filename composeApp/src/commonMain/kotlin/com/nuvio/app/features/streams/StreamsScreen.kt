@@ -71,6 +71,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
@@ -87,6 +88,8 @@ import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.launch
 import kotlin.math.round
 import kotlin.math.roundToInt
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 // ---------------------------------------------------------------------------
 // Streams Screen
@@ -124,6 +127,8 @@ fun StreamsScreen(
     }
     val isEpisode = seasonNumber != null && episodeNumber != null
     val clipboardManager = LocalClipboardManager.current
+    val streamLinkCopiedText = stringResource(Res.string.streams_link_copied)
+    val noDirectStreamLinkText = stringResource(Res.string.streams_no_direct_link)
     var streamActionsTarget by remember(videoId) { mutableStateOf<StreamItem?>(null) }
     var preferredFilterApplied by remember(videoId) { mutableStateOf(false) }
     val storedProgress = if (startFromBeginning) {
@@ -257,7 +262,7 @@ fun StreamsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
-                    contentDescription = "Refresh streams",
+                    contentDescription = stringResource(Res.string.streams_refresh),
                     tint = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.size(20.dp),
                 )
@@ -295,7 +300,7 @@ fun StreamsScreen(
                         strokeWidth = 2.5.dp,
                     )
                     Text(
-                        text = "Finding source...",
+                        text = stringResource(Res.string.streams_finding_source),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f),
                     )
@@ -310,9 +315,9 @@ fun StreamsScreen(
                 val directUrl = stream.directPlaybackUrl
                 if (!directUrl.isNullOrBlank()) {
                     clipboardManager.setText(AnnotatedString(directUrl))
-                    NuvioToastController.show("Stream link copied")
+                    NuvioToastController.show(streamLinkCopiedText)
                 } else {
-                    NuvioToastController.show("No direct stream link available")
+                    NuvioToastController.show(noDirectStreamLinkText)
                 }
             },
             onDownload = { stream ->
@@ -331,7 +336,7 @@ fun StreamsScreen(
                     episodeThumbnail = episodeThumbnail,
                     stream = stream,
                 )
-                NuvioToastController.show(result.toastMessage)
+                NuvioToastController.show(result.toastMessage())
             },
         )
     }
@@ -446,8 +451,14 @@ internal fun ResumeBanner(
     modifier: Modifier = Modifier,
 ) {
     val resumeText = when {
-        progressFraction != null && progressFraction > 0f -> "Resume from ${(progressFraction * 100f).roundToInt()}%"
-        positionMs != null && positionMs > 0L -> "Resume from ${positionMs.toPlaybackClock()}"
+        progressFraction != null && progressFraction > 0f -> stringResource(
+            Res.string.streams_resume_from_percent,
+            (progressFraction * 100f).roundToInt(),
+        )
+        positionMs != null && positionMs > 0L -> stringResource(
+            Res.string.streams_resume_from_time,
+            positionMs.toPlaybackClock(),
+        )
         else -> null
     } ?: return
 
@@ -576,7 +587,7 @@ private fun EpisodeHeroBlock(
         ) {
             // Episode label
             Text(
-                text = "S${seasonNumber} E${episodeNumber}",
+                text = stringResource(Res.string.streams_episode_badge, seasonNumber, episodeNumber),
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
@@ -634,7 +645,7 @@ internal fun ProviderFilterRow(
     ) {
         // "All" chip
         FilterChip(
-            label = "All",
+            label = stringResource(Res.string.collections_tab_all),
             isSelected = selectedFilter == null,
             onClick = { onFilterSelected(null) },
         )
@@ -888,7 +899,7 @@ private fun StreamSectionHeader(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Fetching…",
+                    text = stringResource(Res.string.streams_fetching),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp),
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -1036,7 +1047,7 @@ private fun StreamActionsSheet(
             NuvioBottomSheetDivider()
             NuvioBottomSheetActionRow(
                 icon = Icons.Rounded.ContentCopy,
-                title = "Copy stream link",
+                title = stringResource(Res.string.streams_copy_link),
                 onClick = {
                     onCopyLink(stream)
                     coroutineScope.launch {
@@ -1047,7 +1058,7 @@ private fun StreamActionsSheet(
             NuvioBottomSheetDivider()
             NuvioBottomSheetActionRow(
                 icon = Icons.Rounded.Download,
-                title = "Download file",
+                title = stringResource(Res.string.streams_download_file),
                 onClick = {
                     onDownload(stream)
                     coroutineScope.launch {
@@ -1065,10 +1076,10 @@ private fun StreamFileSizeBadge(stream: StreamItem) {
     val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
     val sizeLabel = if (gib >= 1.0) {
         val roundedGiB = round(gib * 10.0) / 10.0
-        "$roundedGiB GB"
+        "$roundedGiB ${localizedByteUnit("GB")}"
     } else {
         val mib = bytes.toDouble() / (1024.0 * 1024.0)
-        "${round(mib).toInt()} MB"
+        "${round(mib).toInt()} ${localizedByteUnit("MB")}"
     }
 
     Box(
@@ -1078,7 +1089,7 @@ private fun StreamFileSizeBadge(stream: StreamItem) {
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Text(
-            text = "SIZE $sizeLabel",
+            text = stringResource(Res.string.streams_size, sizeLabel),
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -1129,7 +1140,7 @@ private fun LoadingStateBlock(modifier: Modifier = Modifier) {
             modifier = Modifier.size(32.dp),
         )
         Text(
-            text = "Finding streams…",
+            text = stringResource(Res.string.streams_finding_streams),
             style = MaterialTheme.typography.bodySmall.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
@@ -1149,23 +1160,23 @@ private fun EmptyStateBlock(
 
     when (reason) {
         StreamsEmptyStateReason.NoAddonsInstalled -> {
-            title = "No addons installed"
-            message = "Install an addon first to load streams for this title."
+            title = stringResource(Res.string.compose_search_empty_no_active_addons_title)
+            message = stringResource(Res.string.streams_empty_no_addons_message)
         }
 
         StreamsEmptyStateReason.NoCompatibleAddons -> {
-            title = "No stream addon available"
-            message = "Your installed addons do not provide streams for this type of title."
+            title = stringResource(Res.string.streams_empty_no_stream_addon_title)
+            message = stringResource(Res.string.streams_empty_no_stream_addon_message)
         }
 
         StreamsEmptyStateReason.StreamFetchFailed -> {
-            title = "Could not load streams"
-            message = "The installed stream addons failed to return a valid stream response."
+            title = stringResource(Res.string.streams_empty_load_failed_title)
+            message = stringResource(Res.string.streams_empty_load_failed_message)
         }
 
         StreamsEmptyStateReason.NoStreamsFound, null -> {
-            title = "No streams found"
-            message = "None of your installed addons returned streams for this title."
+            title = stringResource(Res.string.compose_player_no_streams_found)
+            message = stringResource(Res.string.streams_empty_no_streams_message)
         }
     }
 
@@ -1216,7 +1227,7 @@ private fun FooterLoadingBlock(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "Checking more addons…",
+            text = stringResource(Res.string.streams_checking_more_addons),
             style = MaterialTheme.typography.bodySmall.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,

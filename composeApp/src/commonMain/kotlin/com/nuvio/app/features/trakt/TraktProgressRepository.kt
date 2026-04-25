@@ -23,6 +23,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
@@ -93,7 +95,10 @@ object TraktProgressRepository {
         }.getOrNull()
 
         if (playbackEntries == null) {
-            _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Failed to load Trakt progress")
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                errorMessage = getString(Res.string.trakt_progress_load_failed),
+            )
             return
         }
 

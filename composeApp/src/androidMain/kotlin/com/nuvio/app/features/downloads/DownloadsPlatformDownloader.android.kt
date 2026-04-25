@@ -8,9 +8,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URI
@@ -44,7 +47,7 @@ internal actual object DownloadsPlatformDownloader {
         scope.launch {
             val context = appContext
             if (context == null) {
-                onFailure("Download system is not initialized")
+                onFailure(runBlocking { getString(Res.string.downloads_error_not_initialized) })
                 return@launch
             }
 
@@ -69,7 +72,9 @@ internal actual object DownloadsPlatformDownloader {
                 var attemptedRangeRequest = resumeFromBytes > 0L
                 var httpRequest = buildRequest(if (attemptedRangeRequest) resumeFromBytes else null)
                 call = downloadHttpClient.newCall(httpRequest)
-                var response = call?.execute() ?: error("Download request failed")
+                var response = call?.execute() ?: error(
+                    runBlocking { getString(Res.string.downloads_error_request_failed) },
+                )
 
                 if (attemptedRangeRequest && response.code == 416) {
                     response.close()
@@ -78,12 +83,18 @@ internal actual object DownloadsPlatformDownloader {
                     attemptedRangeRequest = false
                     httpRequest = buildRequest(null)
                     call = downloadHttpClient.newCall(httpRequest)
-                    response = call?.execute() ?: error("Download request failed")
+                    response = call?.execute() ?: error(
+                        runBlocking { getString(Res.string.downloads_error_request_failed) },
+                    )
                 }
 
                 response.use { response ->
                     if (!response.isSuccessful) {
-                        error("Request failed with HTTP ${response.code}")
+                        error(
+                            runBlocking {
+                                getString(Res.string.downloads_error_http_failed, response.code)
+                            },
+                        )
                     }
 
                     val isPartialResume = attemptedRangeRequest && response.code == 206 && resumeFromBytes > 0L
@@ -94,7 +105,9 @@ internal actual object DownloadsPlatformDownloader {
                         tempFile.delete()
                     }
 
-                    val body = response.body ?: error("Empty response body")
+                    val body = response.body ?: error(
+                        runBlocking { getString(Res.string.downloads_error_empty_body) },
+                    )
                     val totalBytes = resolveTotalBytes(
                         startingBytes = startingBytes,
                         isPartialResume = isPartialResume,
@@ -131,7 +144,7 @@ internal actual object DownloadsPlatformDownloader {
                     onSuccess(destination.toURI().toString(), totalBytes ?: finalSize)
                 }
             } catch (error: Throwable) {
-                onFailure(error.message ?: "Download failed")
+                onFailure(error.message ?: runBlocking { getString(Res.string.download_failed) })
             }
         }
 

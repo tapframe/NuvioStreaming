@@ -29,8 +29,11 @@ import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.features.details.MetaVideo
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +74,11 @@ fun EpisodeWatchedActionSheet(
             NuvioBottomSheetDivider()
             NuvioBottomSheetActionRow(
                 icon = Icons.Default.CheckCircle,
-                title = if (isEpisodeWatched) "Mark as unwatched" else "Mark as watched",
+                title = if (isEpisodeWatched) {
+                    stringResource(Res.string.episode_mark_unwatched)
+                } else {
+                    stringResource(Res.string.episode_mark_watched)
+                },
                 onClick = {
                     onToggleWatched()
                     coroutineScope.launch {
@@ -84,9 +91,9 @@ fun EpisodeWatchedActionSheet(
                 NuvioBottomSheetActionRow(
                     icon = Icons.Default.DoneAll,
                     title = if (arePreviousEpisodesWatched) {
-                        "Mark previous as unwatched"
+                        stringResource(Res.string.episode_mark_previous_unwatched)
                     } else {
-                        "Mark previous as watched"
+                        stringResource(Res.string.episode_mark_previous_watched)
                     },
                     onClick = {
                         onTogglePreviousWatched()
@@ -100,9 +107,9 @@ fun EpisodeWatchedActionSheet(
             NuvioBottomSheetActionRow(
                 icon = Icons.Default.PlaylistAddCheckCircle,
                 title = if (isSeasonWatched) {
-                    "Mark $seasonLabel as unwatched"
+                    stringResource(Res.string.episode_mark_season_unwatched, seasonLabel)
                 } else {
-                    "Mark $seasonLabel as watched"
+                    stringResource(Res.string.episode_mark_season_watched, seasonLabel)
                 },
                 onClick = {
                     onToggleSeasonWatched()
@@ -115,7 +122,7 @@ fun EpisodeWatchedActionSheet(
                 NuvioBottomSheetDivider()
                 NuvioBottomSheetActionRow(
                     icon = Icons.Default.PlayArrow,
-                    title = "Play manually",
+                    title = stringResource(Res.string.play_manually),
                     onClick = {
                         onPlayManually()
                         coroutineScope.launch {
@@ -149,8 +156,11 @@ private fun EpisodeActionSheetHeader(
         )
         Text(
             text = buildString {
-                if (episode.season != null && episode.episode != null) {
-                    append("S${episode.season}E${episode.episode}")
+                localizedSeasonEpisodeCode(
+                    seasonNumber = episode.season,
+                    episodeNumber = episode.episode,
+                )?.let {
+                    append(it)
                     append(" • ")
                 }
                 append(seasonLabel)
@@ -162,4 +172,3 @@ private fun EpisodeActionSheetHeader(
         )
     }
 }
-

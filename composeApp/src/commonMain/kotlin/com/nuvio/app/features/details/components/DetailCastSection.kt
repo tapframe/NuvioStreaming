@@ -34,6 +34,8 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.nuvio.app.features.details.MetaPerson
 import com.nuvio.app.features.details.castAvatarSharedTransitionKey
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -48,7 +50,7 @@ fun DetailCastSection(
     if (cast.isEmpty()) return
 
     DetailSection(
-        title = "Cast",
+        title = stringResource(Res.string.settings_meta_cast),
         modifier = modifier,
         showHeader = showHeader,
     ) {

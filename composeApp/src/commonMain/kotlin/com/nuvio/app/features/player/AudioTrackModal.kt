@@ -38,6 +38,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_player_audio_tracks
+import nuvio.composeapp.generated.resources.compose_player_no_audio_tracks_available
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AudioTrackModal(
@@ -93,7 +97,7 @@ fun AudioTrackModal(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Audio Tracks",
+                                text = stringResource(Res.string.compose_player_audio_tracks),
                                 color = colorScheme.onSurface,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
@@ -148,7 +152,7 @@ private fun AudioTrackRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = getTrackDisplayName(track.label, track.language, track.index),
+            text = localizedTrackDisplayName(track.label, track.language, track.index),
             color = textColor,
             fontSize = 15.sp,
             fontWeight = weight,
@@ -184,7 +188,7 @@ private fun AudioEmptyState() {
                 .then(Modifier),
         )
         Text(
-            text = "No audio tracks available",
+            text = stringResource(Res.string.compose_player_no_audio_tracks_available),
             color = colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 10.dp),
         )

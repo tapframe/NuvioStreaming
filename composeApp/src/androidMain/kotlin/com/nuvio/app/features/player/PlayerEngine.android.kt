@@ -23,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
@@ -184,7 +187,7 @@ actual fun PlatformPlayerSurface(
 
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                latestOnError.value(error.localizedMessage ?: "Unable to play this stream.")
+                latestOnError.value(error.localizedMessage ?: runBlocking { getString(Res.string.player_unable_to_play_stream) })
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -585,7 +588,10 @@ private fun ExoPlayer.extractAudioTracks(): List<AudioTrack> {
             else -> null
         }
         val resolvedLanguage = format.language?.let { lang -> Locale(lang).displayLanguage.takeIf { name -> name.isNotBlank() && name != lang } }
-        val baseName = format.label?.takeIf { it.isNotBlank() } ?: resolvedLanguage ?: format.language ?: "Track ${idx + 1}"
+        val baseName = format.label?.takeIf { it.isNotBlank() }
+            ?: resolvedLanguage
+            ?: format.language
+            ?: runBlocking { getString(Res.string.compose_player_track_number, idx + 1) }
         val suffix = listOfNotNull(channelLabel, codecLabel)
             .joinToString(" ")
             .let { if (it.isNotBlank()) " ($it)" else "" }

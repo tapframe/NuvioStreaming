@@ -30,6 +30,12 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.cw_action_go_to_details
+import nuvio.composeapp.generated.resources.cw_action_remove
+import nuvio.composeapp.generated.resources.cw_action_start_from_beginning
+import nuvio.composeapp.generated.resources.play_manually
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,14 +76,14 @@ fun NuvioContinueWatchingActionSheet(
             NuvioBottomSheetDivider()
             NuvioBottomSheetActionRow(
                 icon = Icons.Default.Info,
-                title = "Go to details",
+                title = stringResource(Res.string.cw_action_go_to_details),
                 onClick = { dismissAfter(onOpenDetails) },
             )
             if (showManualPlayOption && onPlayManually != null) {
                 NuvioBottomSheetDivider()
                 NuvioBottomSheetActionRow(
                     icon = Icons.Default.PlayArrow,
-                    title = "Play manually",
+                    title = stringResource(Res.string.play_manually),
                     onClick = { dismissAfter(onPlayManually) },
                 )
             }
@@ -85,14 +91,14 @@ fun NuvioContinueWatchingActionSheet(
                 NuvioBottomSheetDivider()
                 NuvioBottomSheetActionRow(
                     icon = Icons.Default.Replay,
-                    title = "Start from beginning",
+                    title = stringResource(Res.string.cw_action_start_from_beginning),
                     onClick = { dismissAfter(onStartFromBeginning) },
                 )
             }
             NuvioBottomSheetDivider()
             NuvioBottomSheetActionRow(
                 icon = Icons.Default.DeleteOutline,
-                title = "Remove",
+                title = stringResource(Res.string.cw_action_remove),
                 onClick = { dismissAfter(onRemove) },
             )
         }
@@ -152,7 +158,7 @@ private fun ContinueWatchingSheetHeader(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = item.subtitle,
+                text = localizedContinueWatchingSubtitle(item),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,

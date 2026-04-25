@@ -38,6 +38,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_player_episode_title_format
+import nuvio.composeapp.generated.resources.detail_btn_play
+import nuvio.composeapp.generated.resources.player_next_episode
+import nuvio.composeapp.generated.resources.player_next_episode_finding_source
+import nuvio.composeapp.generated.resources.player_next_episode_playing_via_countdown
+import nuvio.composeapp.generated.resources.player_next_episode_thumbnail
+import nuvio.composeapp.generated.resources.player_next_episode_unaired
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun NextEpisodeCard(
@@ -81,7 +90,7 @@ fun NextEpisodeCard(
             ) {
                 AsyncImage(
                     model = nextEpisode.thumbnail,
-                    contentDescription = "Next episode thumbnail",
+                    contentDescription = stringResource(Res.string.player_next_episode_thumbnail),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
@@ -107,14 +116,19 @@ fun NextEpisodeCard(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = "Next Episode",
+                    text = stringResource(Res.string.player_next_episode),
                     color = Color.White.copy(alpha = 0.8f),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "S${nextEpisode.season}E${nextEpisode.episode} • ${nextEpisode.title}",
+                    text = stringResource(
+                        Res.string.compose_player_episode_title_format,
+                        nextEpisode.season,
+                        nextEpisode.episode,
+                        nextEpisode.title,
+                    ),
                     color = Color.White,
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -123,9 +137,13 @@ fun NextEpisodeCard(
                 )
                 val autoPlayStatus = when {
                     !isPlayable && !nextEpisode.unairedMessage.isNullOrBlank() -> nextEpisode.unairedMessage
-                    isAutoPlaySearching -> "Finding source…"
+                    isAutoPlaySearching -> stringResource(Res.string.player_next_episode_finding_source)
                     !autoPlaySourceName.isNullOrBlank() && autoPlayCountdownSec != null ->
-                        "Playing via $autoPlaySourceName in $autoPlayCountdownSec…"
+                        stringResource(
+                            Res.string.player_next_episode_playing_via_countdown,
+                            autoPlaySourceName,
+                            autoPlayCountdownSec,
+                        )
                     else -> null
                 }
                 if (autoPlayStatus != null) {
@@ -156,7 +174,11 @@ fun NextEpisodeCard(
                     modifier = Modifier.size(13.dp),
                 )
                 Text(
-                    text = if (isPlayable) "Play" else "Unaired",
+                    text = if (isPlayable) {
+                        stringResource(Res.string.detail_btn_play)
+                    } else {
+                        stringResource(Res.string.player_next_episode_unaired)
+                    },
                     color = if (isPlayable) Color.White else Color.White.copy(alpha = 0.72f),
                     fontSize = 11.sp,
                     modifier = Modifier.padding(start = 3.dp),

@@ -185,27 +185,12 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
         ?.takeIf { durationMs <= 0L && it > 0f }
         ?.let { explicitPercent -> (explicitPercent / 100f).coerceIn(0f, 1f) }
 
-    val subtitle = if (normalizedEntry.seasonNumber != null && normalizedEntry.episodeNumber != null) {
-        buildString {
-            append("S")
-            append(normalizedEntry.seasonNumber)
-            append("E")
-            append(normalizedEntry.episodeNumber)
-            normalizedEntry.episodeTitle?.takeIf { it.isNotBlank() }?.let {
-                append(" • ")
-                append(it)
-            }
-        }
-    } else {
-        "Movie"
-    }
-
     return ContinueWatchingItem(
         parentMetaId = normalizedEntry.parentMetaId,
         parentMetaType = normalizedEntry.parentMetaType,
         videoId = normalizedEntry.videoId,
         title = normalizedEntry.title,
-        subtitle = subtitle,
+        subtitle = normalizedEntry.episodeTitle.orEmpty(),
         imageUrl = normalizedEntry.episodeThumbnail ?: normalizedEntry.background ?: normalizedEntry.poster,
         logo = normalizedEntry.logo,
         poster = normalizedEntry.poster,
@@ -228,20 +213,6 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
 internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
     nextEpisode: MetaVideo,
 ): ContinueWatchingItem {
-    val subtitle = buildString {
-        append("Up Next")
-        if (nextEpisode.season != null && nextEpisode.episode != null) {
-            append(" • S")
-            append(nextEpisode.season)
-            append("E")
-            append(nextEpisode.episode)
-        }
-        nextEpisode.title.takeIf { it.isNotBlank() }?.let {
-            append(" • ")
-            append(it)
-        }
-    }
-
     return ContinueWatchingItem(
         parentMetaId = parentMetaId,
         parentMetaType = parentMetaType,
@@ -252,7 +223,7 @@ internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
             fallbackVideoId = nextEpisode.id,
         ),
         title = title,
-        subtitle = subtitle,
+        subtitle = nextEpisode.title,
         imageUrl = nextEpisode.thumbnail ?: episodeThumbnail ?: background ?: poster,
         logo = logo,
         poster = poster,

@@ -48,6 +48,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +78,7 @@ fun PinEntryDialog(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Enter PIN",
+                    text = stringResource(Res.string.pin_enter),
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
@@ -128,9 +131,12 @@ fun PinEntryDialog(
                                     } else {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         error = result.message ?: if (result.retryAfterSeconds > 0) {
-                                            "Locked. Try again in ${result.retryAfterSeconds}s"
+                                            getString(
+                                                Res.string.pin_locked_try_again,
+                                                result.retryAfterSeconds,
+                                            )
                                         } else {
-                                            "Incorrect PIN"
+                                            getString(Res.string.pin_incorrect)
                                         }
                                         pin = ""
                                     }
@@ -151,7 +157,7 @@ fun PinEntryDialog(
                 if (onForgotPin != null) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Forgot PIN?",
+                        text = stringResource(Res.string.pin_forgot),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium,

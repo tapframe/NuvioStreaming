@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 
 object AuthRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -89,7 +91,7 @@ object AuthRepository {
         Unit
     }.onFailure { e ->
         log.e(e) { "Email sign-up failed" }
-        _error.value = e.message ?: "Sign-up failed"
+        _error.value = e.message ?: getString(Res.string.auth_sign_up_failed)
     }
 
     suspend fun signInWithEmail(email: String, password: String): Result<Unit> = runCatching {
@@ -100,7 +102,7 @@ object AuthRepository {
         }
     }.onFailure { e ->
         log.e(e) { "Email sign-in failed" }
-        _error.value = e.message ?: "Sign-in failed"
+        _error.value = e.message ?: getString(Res.string.auth_sign_in_failed)
     }
 
     suspend fun signOut(): Result<Unit> = runCatching {
@@ -114,7 +116,7 @@ object AuthRepository {
         LocalAccountDataCleaner.wipe()
     }.onFailure { e ->
         log.e(e) { "Sign-out failed" }
-        _error.value = e.message ?: "Sign-out failed"
+        _error.value = e.message ?: getString(Res.string.auth_sign_out_failed)
     }
 
     suspend fun deleteAccount(): Result<Unit> = runCatching {
@@ -124,7 +126,7 @@ object AuthRepository {
         LocalAccountDataCleaner.wipe()
     }.onFailure { e ->
         log.e(e) { "Account deletion failed" }
-        _error.value = e.message ?: "Account deletion failed"
+        _error.value = e.message ?: getString(Res.string.auth_account_deletion_failed)
     }
 
     fun clearError() {

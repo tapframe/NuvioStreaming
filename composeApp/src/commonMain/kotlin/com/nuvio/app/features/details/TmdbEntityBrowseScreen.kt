@@ -43,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
@@ -73,6 +75,7 @@ fun TmdbEntityBrowseScreen(
     var uiState by remember(entityKind, entityId) {
         mutableStateOf<EntityBrowseUiState>(EntityBrowseUiState.Loading)
     }
+    val loadFailedMessage = stringResource(Res.string.details_browse_load_failed, entityName)
 
     LaunchedEffect(entityKind, entityId) {
         uiState = EntityBrowseUiState.Loading
@@ -85,7 +88,7 @@ fun TmdbEntityBrowseScreen(
         uiState = if (data != null) {
             EntityBrowseUiState.Success(data)
         } else {
-            EntityBrowseUiState.Error("Could not load $entityName")
+            EntityBrowseUiState.Error(loadFailedMessage)
         }
     }
 
@@ -117,7 +120,7 @@ fun TmdbEntityBrowseScreen(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = stringResource(Res.string.action_back),
                 tint = MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -170,7 +173,7 @@ private fun EntityBrowseContent(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No titles found",
+                    text = stringResource(Res.string.catalog_empty_title),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -191,18 +194,16 @@ private fun EntityBrowseContent(
                 )
 
                 data.rails.forEach { rail ->
-                    val railTitle = remember(rail.mediaType, rail.railType) {
-                        val mediaLabel = when (rail.mediaType) {
-                            TmdbEntityMediaType.MOVIE -> "Movies"
-                            TmdbEntityMediaType.TV -> "Series"
-                        }
-                        val railLabel = when (rail.railType) {
-                            TmdbEntityRailType.POPULAR -> "Popular"
-                            TmdbEntityRailType.TOP_RATED -> "Top Rated"
-                            TmdbEntityRailType.RECENT -> "Recent"
-                        }
-                        "$mediaLabel • $railLabel"
+                    val mediaLabel = when (rail.mediaType) {
+                        TmdbEntityMediaType.MOVIE -> stringResource(Res.string.media_movies)
+                        TmdbEntityMediaType.TV -> stringResource(Res.string.media_series)
                     }
+                    val railLabel = when (rail.railType) {
+                        TmdbEntityRailType.POPULAR -> stringResource(Res.string.details_browse_rail_popular)
+                        TmdbEntityRailType.TOP_RATED -> stringResource(Res.string.details_browse_rail_top_rated)
+                        TmdbEntityRailType.RECENT -> stringResource(Res.string.details_browse_rail_recent)
+                    }
+                    val railTitle = stringResource(Res.string.details_browse_rail_title, mediaLabel, railLabel)
 
                     DetailPosterRailSection(
                         title = railTitle,
@@ -230,8 +231,8 @@ private fun EntityHeroSection(
     Column(modifier = modifier.padding(horizontal = 20.dp)) {
         Text(
             text = when (header.kind) {
-                TmdbEntityKind.COMPANY -> "Production Company"
-                TmdbEntityKind.NETWORK -> "Network"
+                TmdbEntityKind.COMPANY -> stringResource(Res.string.details_browse_kind_company)
+                TmdbEntityKind.NETWORK -> stringResource(Res.string.details_browse_kind_network)
             },
             style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = FontWeight.Medium,
@@ -405,7 +406,7 @@ private fun EntityBrowseError(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
             ) {
-                Text("Retry")
+                Text(stringResource(Res.string.action_retry))
             }
         }
     }

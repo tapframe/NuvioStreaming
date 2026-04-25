@@ -63,6 +63,11 @@ import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.collections_folder_empty_items
+import nuvio.composeapp.generated.resources.collections_folder_not_found
+import nuvio.composeapp.generated.resources.collections_tab_all
+import org.jetbrains.compose.resources.stringResource
 
 private val FolderCoverHeight = 176.dp
 
@@ -143,7 +148,7 @@ fun FolderDetailScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "Folder not found",
+                    text = stringResource(Res.string.collections_folder_not_found),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -229,7 +234,11 @@ private fun TabbedGridContent(
                             onClick = { onTabSelected(index) },
                             text = {
                                 Text(
-                                    text = tab.label,
+                                    text = if (tab.isAllTab) {
+                                        stringResource(Res.string.collections_tab_all)
+                                    } else {
+                                        tab.label
+                                    },
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -395,7 +404,7 @@ private fun EmptyMessage() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "No items found",
+            text = stringResource(Res.string.collections_folder_empty_items),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

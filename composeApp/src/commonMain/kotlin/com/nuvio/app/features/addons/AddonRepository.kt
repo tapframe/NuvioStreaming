@@ -23,6 +23,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 
 @Serializable
 private data class AddonRow(
@@ -198,17 +200,17 @@ object AddonRepository {
 
     suspend fun addAddon(rawUrl: String): AddAddonResult {
         if (isUsingPrimaryAddonsFromSecondaryProfile()) {
-            return AddAddonResult.Error("This profile uses primary addons.")
+            return AddAddonResult.Error(getString(Res.string.profile_primary_addons_required))
         }
         log.i { "addAddon() — rawUrl=$rawUrl" }
         val manifestUrl = try {
             normalizeManifestUrl(rawUrl)
         } catch (error: IllegalArgumentException) {
-            return AddAddonResult.Error(error.message ?: "Enter a valid addon URL")
+            return AddAddonResult.Error(error.message ?: getString(Res.string.addon_invalid_url))
         }
 
         if (_uiState.value.addons.any { it.manifestUrl == manifestUrl }) {
-            return AddAddonResult.Error("That addon is already installed.")
+            return AddAddonResult.Error(getString(Res.string.addon_already_installed))
         }
 
         val manifest = try {
@@ -220,7 +222,7 @@ object AddonRepository {
                 )
             }
         } catch (error: Throwable) {
-            return AddAddonResult.Error(error.message ?: "Unable to load manifest")
+            return AddAddonResult.Error(error.message ?: getString(Res.string.addon_load_manifest_failed))
         }
 
         _uiState.update { current ->
@@ -310,7 +312,7 @@ object AddonRepository {
                                     onFailure = { error ->
                                         addon.copy(
                                             isRefreshing = false,
-                                            errorMessage = error.message ?: "Unable to load manifest",
+                                            errorMessage = error.message ?: getString(Res.string.addon_load_manifest_failed),
                                         )
                                     },
                                 )

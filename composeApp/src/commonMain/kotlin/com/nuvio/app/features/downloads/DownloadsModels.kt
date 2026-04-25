@@ -1,6 +1,13 @@
 package com.nuvio.app.features.downloads
 
 import kotlinx.serialization.Serializable
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.downloads_enqueue_missing_url
+import nuvio.composeapp.generated.resources.downloads_enqueue_replaced
+import nuvio.composeapp.generated.resources.downloads_enqueue_started
+import nuvio.composeapp.generated.resources.downloads_enqueue_unsupported_format
+import org.jetbrains.compose.resources.getString
 
 @Serializable
 enum class DownloadStatus {
@@ -48,22 +55,7 @@ data class DownloadItem(
         get() = status == DownloadStatus.Completed && !localFileUri.isNullOrBlank()
 
     val displaySubtitle: String
-        get() = if (isEpisode) {
-            buildString {
-                append("S")
-                append(seasonNumber)
-                append("E")
-                append(episodeNumber)
-                episodeTitle
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let {
-                        append(" • ")
-                        append(it)
-                    }
-            }
-        } else {
-            "Movie"
-        }
+        get() = episodeTitle.orEmpty()
 
     val progressFraction: Float
         get() {
@@ -91,11 +83,18 @@ data class DownloadsUiState(
         get() = items.filter { it.status == DownloadStatus.Completed }
 }
 
-enum class DownloadEnqueueResult(
-    val toastMessage: String,
-) {
-    Started("Download started"),
-    Replaced("Replaced previous download"),
-    MissingUrl("No direct stream link available"),
-    UnsupportedFormat("Unsupported stream format for downloads"),
+enum class DownloadEnqueueResult {
+    Started,
+    Replaced,
+    MissingUrl,
+    UnsupportedFormat;
+
+    fun toastMessage(): String = runBlocking {
+        when (this@DownloadEnqueueResult) {
+            Started -> getString(Res.string.downloads_enqueue_started)
+            Replaced -> getString(Res.string.downloads_enqueue_replaced)
+            MissingUrl -> getString(Res.string.downloads_enqueue_missing_url)
+            UnsupportedFormat -> getString(Res.string.downloads_enqueue_unsupported_format)
+        }
+    }
 }

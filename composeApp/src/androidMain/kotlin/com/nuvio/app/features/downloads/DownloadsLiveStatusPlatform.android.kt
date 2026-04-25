@@ -12,12 +12,13 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.nuvio.app.core.deeplink.buildDownloadsDeepLinkUrl
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlin.math.abs
 
 internal actual object DownloadsLiveStatusPlatform {
     private const val channelId = "downloads_live_status"
-    private const val channelName = "Downloads"
-    private const val channelDescription = "Shows live download progress and controls."
     private const val notificationsPrefName = "nuvio_download_live_notifications"
     private const val trackedDownloadIdsKey = "tracked_download_ids"
 
@@ -143,7 +144,7 @@ internal actual object DownloadsLiveStatusPlatform {
                     .setProgress(0, 0, false)
                     .addAction(
                         0,
-                        "Resume",
+                        runBlocking { getString(Res.string.action_resume) },
                         buildActionPendingIntent(
                             context = context,
                             action = DownloadsNotificationActionReceiver.actionResume,
@@ -163,15 +164,15 @@ internal actual object DownloadsLiveStatusPlatform {
                 val downloaded = formatBytes(item.downloadedBytes)
                 val total = item.totalBytes?.let(::formatBytes)
                 if (total != null) {
-                    "Downloading $detail • $downloaded / $total"
+                    runBlocking { getString(Res.string.downloads_live_downloading_with_total, detail, downloaded, total) }
                 } else {
-                    "Downloading $detail • $downloaded"
+                    runBlocking { getString(Res.string.downloads_live_downloading, detail, downloaded) }
                 }
             }
 
-            DownloadStatus.Paused -> "Paused $detail"
-            DownloadStatus.Failed -> item.errorMessage?.takeIf { it.isNotBlank() } ?: "Download failed"
-            DownloadStatus.Completed -> "Download completed"
+            DownloadStatus.Paused -> runBlocking { getString(Res.string.downloads_live_paused, detail) }
+            DownloadStatus.Failed -> item.errorMessage?.takeIf { it.isNotBlank() } ?: runBlocking { getString(Res.string.downloads_live_failed) }
+            DownloadStatus.Completed -> runBlocking { getString(Res.string.downloads_live_completed) }
         }
     }
 
@@ -224,8 +225,12 @@ internal actual object DownloadsLiveStatusPlatform {
         if (manager.getNotificationChannel(channelId) != null) return
 
         manager.createNotificationChannel(
-            NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW).apply {
-                description = channelDescription
+            NotificationChannel(
+                channelId,
+                runBlocking { getString(Res.string.downloads_channel_name) },
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = runBlocking { getString(Res.string.downloads_channel_description) }
             },
         )
     }

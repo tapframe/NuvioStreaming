@@ -52,6 +52,8 @@ import com.nuvio.app.core.ui.AppIconResource
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.nuvioTypeScale
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun PlayerControlsShell(
@@ -212,7 +214,12 @@ private fun PlayerHeader(
                 )
                 if (seasonNumber != null && episodeNumber != null && !episodeTitle.isNullOrBlank()) {
                     Text(
-                        text = "S${seasonNumber}E${episodeNumber} • $episodeTitle",
+                        text = stringResource(
+                            Res.string.compose_player_episode_title_format,
+                            seasonNumber,
+                            episodeNumber,
+                            episodeTitle,
+                        ),
                         style = typeScale.bodyMd.copy(
                             fontSize = metrics.episodeInfoSize,
                             lineHeight = metrics.episodeInfoSize * 1.3f,
@@ -256,7 +263,11 @@ private fun PlayerHeader(
             ) {
                 PlayerHeaderIconButton(
                     icon = if (isLocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
-                    contentDescription = if (isLocked) "Unlock player controls" else "Lock player controls",
+                    contentDescription = if (isLocked) {
+                        stringResource(Res.string.compose_player_unlock_controls)
+                    } else {
+                        stringResource(Res.string.compose_player_lock_controls)
+                    },
                     buttonSize = metrics.headerIconSize + 16.dp,
                     iconSize = metrics.headerIconSize,
                     onClick = onLockToggle,
@@ -267,7 +278,7 @@ private fun PlayerHeader(
                     contentColor = Color.White,
                     buttonSize = metrics.headerIconSize + 16.dp,
                     iconSize = metrics.headerIconSize,
-                    contentDescription = "Close player",
+                    contentDescription = stringResource(Res.string.compose_player_close),
                 )
             }
         }
@@ -315,7 +326,7 @@ private fun CenterControls(
     ) {
         SideControlButton(
             icon = Icons.Rounded.Replay10,
-            contentDescription = "Seek backward 10 seconds",
+            contentDescription = stringResource(Res.string.compose_player_seek_back_10),
             metrics = metrics,
             onClick = onSeekBack,
         )
@@ -327,7 +338,7 @@ private fun CenterControls(
         )
         SideControlButton(
             icon = Icons.Rounded.Forward10,
-            contentDescription = "Seek forward 10 seconds",
+            contentDescription = stringResource(Res.string.compose_player_seek_forward_10),
             metrics = metrics,
             onClick = onSeekForward,
         )
@@ -384,7 +395,11 @@ private fun PlayPauseControlButton(
         } else {
             Icon(
                 painter = playPausePainter,
-                contentDescription = if (isPlaying) "Pause" else "Play",
+                contentDescription = if (isPlaying) {
+                    stringResource(Res.string.compose_action_pause)
+                } else {
+                    stringResource(Res.string.detail_btn_play)
+                },
                 tint = Color.White,
                 modifier = Modifier.size(metrics.playIconSize),
             )
@@ -454,7 +469,7 @@ private fun ProgressControls(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PlayerActionPillButton(
-                        label = resizeMode.label,
+                        label = stringResource(resizeMode.labelRes),
                         painter = aspectRatioPainter,
                         onClick = onResizeModeClick,
                     )
@@ -464,25 +479,25 @@ private fun ProgressControls(
                         onClick = onSpeedClick,
                     )
                     PlayerActionPillButton(
-                        label = "Subs",
+                        label = stringResource(Res.string.compose_player_subs),
                         painter = subtitlesPainter,
                         onClick = onSubtitleClick,
                     )
                     PlayerActionPillButton(
-                        label = "Audio",
+                        label = stringResource(Res.string.compose_player_audio),
                         painter = audioPainter,
                         onClick = onAudioClick,
                     )
                     if (onSourcesClick != null) {
                         PlayerActionPillButton(
-                            label = "Sources",
+                            label = stringResource(Res.string.compose_player_sources),
                             icon = Icons.Rounded.SwapHoriz,
                             onClick = onSourcesClick,
                         )
                     }
                     if (onEpisodesClick != null) {
                         PlayerActionPillButton(
-                            label = "Episodes",
+                            label = stringResource(Res.string.compose_player_episodes),
                             icon = Icons.Rounded.VideoLibrary,
                             onClick = onEpisodesClick,
                         )
@@ -545,14 +560,14 @@ internal fun LockedPlayerOverlay(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Lock,
-                    contentDescription = "Unlock player controls",
+                    contentDescription = stringResource(Res.string.compose_player_unlock_controls),
                     tint = Color.White,
                     modifier = Modifier.size(34.dp),
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Tap to unlock",
+                text = stringResource(Res.string.compose_player_tap_to_unlock),
                 style = MaterialTheme.nuvioTypeScale.bodyMd.copy(fontWeight = FontWeight.SemiBold),
                 color = Color.White.copy(alpha = 0.92f),
             )

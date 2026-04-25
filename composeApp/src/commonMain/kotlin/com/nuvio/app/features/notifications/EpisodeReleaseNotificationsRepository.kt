@@ -28,6 +28,8 @@ import kotlin.concurrent.Volatile
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.serialization.json.Json
 
 object EpisodeReleaseNotificationsRepository {
@@ -149,7 +151,7 @@ object EpisodeReleaseNotificationsRepository {
                     permissionGranted = false,
                     scheduledCount = 0,
                     statusMessage = null,
-                    errorMessage = "Notifications permission is disabled for Nuvio.",
+                    errorMessage = getString(Res.string.settings_notifications_permission_disabled),
                 )
                 persist()
                 return@launch
@@ -175,7 +177,7 @@ object EpisodeReleaseNotificationsRepository {
                 _uiState.value = _uiState.value.copy(
                     isSendingTest = false,
                     statusMessage = null,
-                    errorMessage = "Save a show to your library first to test a deeplink notification.",
+                    errorMessage = getString(Res.string.settings_notifications_test_requires_saved_show),
                 )
                 return@launch
             }
@@ -197,7 +199,7 @@ object EpisodeReleaseNotificationsRepository {
                     isSendingTest = false,
                     permissionGranted = false,
                     statusMessage = null,
-                    errorMessage = "Notifications permission is disabled for Nuvio.",
+                    errorMessage = getString(Res.string.settings_notifications_permission_disabled),
                 )
                 return@launch
             }
@@ -205,7 +207,7 @@ object EpisodeReleaseNotificationsRepository {
             val request = EpisodeReleaseNotificationRequest(
                 requestId = "episode-release-test-${ProfileRepository.activeProfileId}-${TraktPlatformClock.nowEpochMs()}",
                 notificationTitle = target.name,
-                notificationBody = "Preview episode release alert.",
+                notificationBody = getString(Res.string.notifications_test_preview_body),
                 releaseDateIso = CurrentDateProvider.todayIsoDate(),
                 deepLinkUrl = buildMetaDeepLinkUrl(type = target.type, id = target.id),
                 backdropUrl = target.banner ?: target.poster,
@@ -219,7 +221,7 @@ object EpisodeReleaseNotificationsRepository {
                 _uiState.value = _uiState.value.copy(
                     isSendingTest = false,
                     permissionGranted = true,
-                    statusMessage = "Test notification sent for ${target.name}.",
+                    statusMessage = getString(Res.string.notifications_test_sent_for, target.name),
                     errorMessage = null,
                 )
             }.onFailure {
@@ -227,7 +229,7 @@ object EpisodeReleaseNotificationsRepository {
                     isSendingTest = false,
                     permissionGranted = true,
                     statusMessage = null,
-                    errorMessage = "Failed to send a test notification.",
+                    errorMessage = getString(Res.string.notifications_test_send_failed),
                 )
             }
         }

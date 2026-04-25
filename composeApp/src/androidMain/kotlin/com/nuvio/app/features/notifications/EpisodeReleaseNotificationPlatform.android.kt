@@ -23,6 +23,9 @@ import androidx.work.WorkManager
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import java.time.LocalDate
@@ -285,10 +288,10 @@ internal actual object EpisodeReleaseNotificationPlatform {
 
         val channel = NotificationChannel(
             channelId,
-            "Episode Releases",
+            runBlocking { getString(Res.string.notifications_channel_episode_releases_name) },
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply {
-            description = "Alerts when a saved show's new episode is released."
+            description = runBlocking { getString(Res.string.notifications_channel_episode_releases_description) }
         }
         notificationManager.createNotificationChannel(channel)
     }

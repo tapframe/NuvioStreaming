@@ -56,6 +56,8 @@ import com.nuvio.app.features.home.stableKey
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun CatalogScreen(
@@ -329,12 +331,12 @@ private fun CatalogEmptyState(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
-            text = "No titles found",
+            text = stringResource(Res.string.catalog_empty_title),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = errorMessage ?: "This catalog did not return any items.",
+            text = errorMessage ?: stringResource(Res.string.catalog_empty_message),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

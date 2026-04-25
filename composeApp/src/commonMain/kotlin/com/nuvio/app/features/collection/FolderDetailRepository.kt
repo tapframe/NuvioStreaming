@@ -6,6 +6,7 @@ import com.nuvio.app.features.catalog.CATALOG_PAGE_SIZE
 import com.nuvio.app.features.catalog.fetchCatalogPage
 import com.nuvio.app.features.catalog.mergeCatalogItems
 import com.nuvio.app.features.catalog.supportsPagination
+import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.stableKey
@@ -17,6 +18,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.collections_folder_addon_not_found
+import nuvio.composeapp.generated.resources.collections_tab_all
+import org.jetbrains.compose.resources.getString
 
 data class FolderTab(
     val label: String,
@@ -113,7 +119,13 @@ object FolderDetailRepository {
 
         val tabs = buildList {
             if (showAll) {
-                add(FolderTab(label = "All", isAllTab = true, isLoading = true))
+                add(
+                    FolderTab(
+                        label = runBlocking { getString(Res.string.collections_tab_all) },
+                        isAllTab = true,
+                        isLoading = true,
+                    ),
+                )
             }
             folder.catalogSources.forEach { source ->
                 val addon = addons.find { it.manifest?.id == source.addonId }
@@ -121,9 +133,7 @@ object FolderDetailRepository {
                     it.id == source.catalogId && it.type == source.type
                 }
                 val label = catalog?.name ?: source.catalogId
-                val typeLabel = source.type.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase() else it.toString()
-                }
+                val typeLabel = localizedMediaTypeLabel(source.type)
                 val genreSuffix = if (source.genre != null) " · ${source.genre}" else ""
                 add(
                     FolderTab(
@@ -155,7 +165,14 @@ object FolderDetailRepository {
             val tabIndex = if (showAll) sourceIndex + 1 else sourceIndex
             val addon = addons.find { it.manifest?.id == source.addonId }
             if (addon == null) {
-                updateTab(tabIndex) { it.copy(isLoading = false, error = "Addon not found: ${source.addonId}") }
+                updateTab(tabIndex) {
+                    it.copy(
+                        isLoading = false,
+                        error = runBlocking {
+                            getString(Res.string.collections_folder_addon_not_found, source.addonId)
+                        },
+                    )
+                }
                 return@forEachIndexed
             }
 

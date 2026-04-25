@@ -66,6 +66,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProfileSwitcherTab(
@@ -305,7 +308,7 @@ private fun PopupAddProfileBubble(
         ) {
             Icon(
                 imageVector = Icons.Rounded.Add,
-                contentDescription = "Add Profile",
+                contentDescription = stringResource(Res.string.compose_profile_add_profile),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp),
             )
@@ -314,7 +317,7 @@ private fun PopupAddProfileBubble(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "Add",
+            text = stringResource(Res.string.compose_profile_add_profile),
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,
@@ -466,7 +469,9 @@ private fun PopupProfileBubble(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = profile.name.ifBlank { "Profile ${profile.profileIndex}" },
+            text = profile.name.ifBlank {
+                stringResource(Res.string.profile_label_number, profile.profileIndex)
+            },
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = if (isSelected) MaterialTheme.colorScheme.primary
             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -501,7 +506,7 @@ private fun InlinePinEntry(
         modifier = Modifier.padding(top = 16.dp),
     ) {
         Text(
-            text = "Enter PIN for $profileName",
+            text = stringResource(Res.string.pin_enter_for, profileName),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -579,9 +584,9 @@ private fun InlinePinEntry(
                                 onVerified()
                             } else {
                                 error = if (result.retryAfterSeconds > 0) {
-                                    "Locked. Try again in ${result.retryAfterSeconds}s"
+                                    getString(Res.string.pin_locked_try_again, result.retryAfterSeconds)
                                 } else {
-                                    "Wrong PIN"
+                                    getString(Res.string.pin_incorrect)
                                 }
                                 pin = ""
                             }
@@ -601,7 +606,7 @@ private fun InlinePinEntry(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Cancel",
+            text = stringResource(Res.string.pin_cancel),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold,
@@ -645,7 +650,7 @@ private fun CompactPinKeypad(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.Backspace,
-                                    contentDescription = "Backspace",
+                                    contentDescription = stringResource(Res.string.pin_backspace),
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -685,7 +690,7 @@ fun ActiveProfileMiniAvatar(
     if (profile == null) {
         Icon(
             imageVector = Icons.Rounded.Person,
-            contentDescription = "Profile",
+            contentDescription = stringResource(Res.string.compose_nav_profile),
             modifier = Modifier.size(size.dp),
         )
         return

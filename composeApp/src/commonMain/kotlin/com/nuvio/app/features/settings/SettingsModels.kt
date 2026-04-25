@@ -6,103 +6,125 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_settings_category_about
+import nuvio.composeapp.generated.resources.compose_settings_category_general
+import nuvio.composeapp.generated.resources.compose_settings_page_account
+import nuvio.composeapp.generated.resources.compose_settings_page_addons
+import nuvio.composeapp.generated.resources.compose_settings_page_appearance
+import nuvio.composeapp.generated.resources.compose_settings_page_content_discovery
+import nuvio.composeapp.generated.resources.compose_settings_page_continue_watching
+import nuvio.composeapp.generated.resources.compose_settings_page_homescreen
+import nuvio.composeapp.generated.resources.compose_settings_page_integrations
+import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
+import nuvio.composeapp.generated.resources.compose_settings_page_meta_screen
+import nuvio.composeapp.generated.resources.compose_settings_page_notifications
+import nuvio.composeapp.generated.resources.compose_settings_page_playback
+import nuvio.composeapp.generated.resources.compose_settings_page_plugins
+import nuvio.composeapp.generated.resources.compose_settings_page_poster_customization
+import nuvio.composeapp.generated.resources.compose_settings_page_root
+import nuvio.composeapp.generated.resources.compose_settings_page_supporters_contributors
+import nuvio.composeapp.generated.resources.compose_settings_page_tmdb_enrichment
+import nuvio.composeapp.generated.resources.compose_settings_page_trakt
+import nuvio.composeapp.generated.resources.settings_account
+import org.jetbrains.compose.resources.StringResource
 
 internal enum class SettingsCategory(
-    val label: String,
+    val labelRes: StringResource,
     val icon: ImageVector,
 ) {
-    Account("Account", Icons.Rounded.AccountCircle),
-    General("General", Icons.Rounded.Settings),
-    About("About", Icons.Rounded.Info),
+    Account(Res.string.settings_account, Icons.Rounded.AccountCircle),
+    General(Res.string.compose_settings_category_general, Icons.Rounded.Settings),
+    About(Res.string.compose_settings_category_about, Icons.Rounded.Info),
 }
 
 internal enum class SettingsPage(
-    val title: String,
+    val titleRes: StringResource,
     val category: SettingsCategory,
     val parentPage: SettingsPage?,
 ) {
     Root(
-        title = "Settings",
+        titleRes = Res.string.compose_settings_page_root,
         category = SettingsCategory.General,
         parentPage = null,
     ),
     Account(
-        title = "Account",
+        titleRes = Res.string.compose_settings_page_account,
         category = SettingsCategory.Account,
         parentPage = Root,
     ),
     SupportersContributors(
-        title = "Supporters & Contributors",
+        titleRes = Res.string.compose_settings_page_supporters_contributors,
         category = SettingsCategory.About,
         parentPage = Root,
     ),
     Playback(
-        title = "Playback",
+        titleRes = Res.string.compose_settings_page_playback,
         category = SettingsCategory.General,
         parentPage = Root,
     ),
     Appearance(
-        title = "Appearance",
+        titleRes = Res.string.compose_settings_page_appearance,
         category = SettingsCategory.General,
         parentPage = Root,
     ),
     Notifications(
-        title = "Notifications",
+        titleRes = Res.string.compose_settings_page_notifications,
         category = SettingsCategory.General,
         parentPage = Root,
     ),
     ContinueWatching(
-        title = "Continue Watching",
+        titleRes = Res.string.compose_settings_page_continue_watching,
         category = SettingsCategory.General,
         parentPage = Appearance,
     ),
     PosterCustomization(
-        title = "Poster Customization",
+        titleRes = Res.string.compose_settings_page_poster_customization,
         category = SettingsCategory.General,
         parentPage = Appearance,
     ),
     ContentDiscovery(
-        title = "Content & Discovery",
+        titleRes = Res.string.compose_settings_page_content_discovery,
         category = SettingsCategory.General,
         parentPage = Root,
     ),
     Addons(
-        title = "Addons",
+        titleRes = Res.string.compose_settings_page_addons,
         category = SettingsCategory.General,
         parentPage = ContentDiscovery,
     ),
     Plugins(
-        title = "Plugins",
+        titleRes = Res.string.compose_settings_page_plugins,
         category = SettingsCategory.General,
         parentPage = ContentDiscovery,
     ),
     Homescreen(
-        title = "Homescreen",
+        titleRes = Res.string.compose_settings_page_homescreen,
         category = SettingsCategory.General,
         parentPage = ContentDiscovery,
     ),
     MetaScreen(
-        title = "Meta Screen",
+        titleRes = Res.string.compose_settings_page_meta_screen,
         category = SettingsCategory.General,
         parentPage = ContentDiscovery,
     ),
     Integrations(
-        title = "Integrations",
+        titleRes = Res.string.compose_settings_page_integrations,
         category = SettingsCategory.General,
         parentPage = Root,
     ),
     TmdbEnrichment(
-        title = "TMDB Enrichment",
+        titleRes = Res.string.compose_settings_page_tmdb_enrichment,
         category = SettingsCategory.General,
         parentPage = Integrations,
     ),
     MdbListRatings(
-        title = "MDBList Ratings",
+        titleRes = Res.string.compose_settings_page_mdblist_ratings,
         category = SettingsCategory.General,
         parentPage = Integrations,
     ),
     TraktAuthentication(
-        title = "Trakt",
+        titleRes = Res.string.compose_settings_page_trakt,
         category = SettingsCategory.Account,
         parentPage = Root,
     ),

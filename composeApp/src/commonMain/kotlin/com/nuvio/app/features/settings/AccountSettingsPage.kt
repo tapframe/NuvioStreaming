@@ -30,6 +30,23 @@ import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_cancel
+import nuvio.composeapp.generated.resources.action_delete
+import nuvio.composeapp.generated.resources.compose_settings_page_account
+import nuvio.composeapp.generated.resources.settings_account_delete_account
+import nuvio.composeapp.generated.resources.settings_account_delete_account_description
+import nuvio.composeapp.generated.resources.settings_account_delete_confirm_message
+import nuvio.composeapp.generated.resources.settings_account_delete_confirm_title
+import nuvio.composeapp.generated.resources.settings_account_email
+import nuvio.composeapp.generated.resources.settings_account_not_signed_in
+import nuvio.composeapp.generated.resources.settings_account_sign_out
+import nuvio.composeapp.generated.resources.settings_account_sign_out_confirm_message
+import nuvio.composeapp.generated.resources.settings_account_sign_out_confirm_title
+import nuvio.composeapp.generated.resources.settings_account_status
+import nuvio.composeapp.generated.resources.settings_account_status_anonymous
+import nuvio.composeapp.generated.resources.settings_account_status_signed_in
+import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.accountSettingsContent(
     isTablet: Boolean,
@@ -51,7 +68,7 @@ private fun AccountSettingsBody(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         NuvioSurfaceCard {
             Text(
-                text = "Account",
+                text = stringResource(Res.string.compose_settings_page_account),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
@@ -65,12 +82,16 @@ private fun AccountSettingsBody(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(
-                            text = "Status",
+                            text = stringResource(Res.string.settings_account_status),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = if (state.isAnonymous) "Anonymous" else "Signed In",
+                            text = if (state.isAnonymous) {
+                                stringResource(Res.string.settings_account_status_anonymous)
+                            } else {
+                                stringResource(Res.string.settings_account_status_signed_in)
+                            },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium,
@@ -83,7 +104,7 @@ private fun AccountSettingsBody(
                             horizontalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Text(
-                                text = "Email",
+                                text = stringResource(Res.string.settings_account_email),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -98,7 +119,7 @@ private fun AccountSettingsBody(
                 }
                 else -> {
                     Text(
-                        text = "Not signed in",
+                        text = stringResource(Res.string.settings_account_not_signed_in),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -107,7 +128,7 @@ private fun AccountSettingsBody(
         }
 
         NuvioPrimaryButton(
-            text = "Sign Out",
+            text = stringResource(Res.string.settings_account_sign_out),
             onClick = { showSignOutConfirm = true },
         )
 
@@ -126,13 +147,13 @@ private fun AccountSettingsBody(
                 ),
             ) {
                 Text(
-                    text = "Delete Account",
+                    text = stringResource(Res.string.settings_account_delete_account),
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center,
                 )
             }
             Text(
-                text = "This will permanently delete your account and all associated data.",
+                text = stringResource(Res.string.settings_account_delete_account_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
@@ -142,11 +163,11 @@ private fun AccountSettingsBody(
     }
 
     NuvioStatusModal(
-        title = "Sign Out?",
-        message = "You will be returned to the login screen.",
+        title = stringResource(Res.string.settings_account_sign_out_confirm_title),
+        message = stringResource(Res.string.settings_account_sign_out_confirm_message),
         isVisible = showSignOutConfirm,
-        confirmText = "Sign Out",
-        dismissText = "Cancel",
+        confirmText = stringResource(Res.string.settings_account_sign_out),
+        dismissText = stringResource(Res.string.action_cancel),
         onConfirm = {
             showSignOutConfirm = false
             scope.launch { AuthRepository.signOut() }
@@ -155,11 +176,11 @@ private fun AccountSettingsBody(
     )
 
     NuvioStatusModal(
-        title = "Delete Account?",
-        message = "This action cannot be undone. All your data, profiles, and sync history will be permanently removed.",
+        title = stringResource(Res.string.settings_account_delete_confirm_title),
+        message = stringResource(Res.string.settings_account_delete_confirm_message),
         isVisible = showDeleteConfirm,
-        confirmText = "Delete",
-        dismissText = "Cancel",
+        confirmText = stringResource(Res.string.action_delete),
+        dismissText = stringResource(Res.string.action_cancel),
         onConfirm = {
             showDeleteConfirm = false
             scope.launch { AuthRepository.deleteAccount() }
