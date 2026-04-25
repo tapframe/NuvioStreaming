@@ -3,7 +3,9 @@ package com.nuvio.app.core.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,8 +56,9 @@ fun NuvioPosterActionSheet(
     isWatched: Boolean,
     onDismiss: () -> Unit,
     onToggleLibrary: () -> Unit,
-    onOpenListPicker: (() -> Unit)? = null,
     onToggleWatched: () -> Unit,
+    // Long-press on the library row opens the list/collection picker (Trakt lists etc.)
+    onToggleLibraryLongClick: (() -> Unit)? = null,
 ) {
     if (item == null) return
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -78,13 +82,8 @@ fun NuvioPosterActionSheet(
         ) {
             PosterSheetHeader(item = item)
             NuvioBottomSheetDivider()
-            NuvioBottomSheetActionRow(
-                icon = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                title = if (isSaved) {
-                    stringResource(Res.string.hero_remove_from_library)
-                } else {
-                    stringResource(Res.string.hero_add_to_library)
-                },
+            LibraryActionRow(
+                isSaved = isSaved,
                 onClick = {
                     onToggleLibrary()
                     coroutineScope.launch {
@@ -94,9 +93,9 @@ fun NuvioPosterActionSheet(
                         )
                     }
                 },
-                onLongClick = if (onOpenListPicker != null) {
+                onLongClick = if (onToggleLibraryLongClick != null) {
                     {
-                        onOpenListPicker()
+                        onToggleLibraryLongClick()
                         coroutineScope.launch {
                             dismissNuvioBottomSheet(
                                 sheetState = sheetState,
@@ -125,6 +124,51 @@ fun NuvioPosterActionSheet(
                 },
             )
         }
+    }
+}
+
+/**
+ * Library row that supports both tap (direct save/remove) and long-press (open list picker).
+ * Mirrors the layout of [NuvioBottomSheetActionRow] but uses [combinedClickable] to capture
+ * long-press without adding that capability to the generic row composable.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LibraryActionRow(
+    isSaved: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                role = Role.Button,
+            )
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            text = if (isSaved) {
+                stringResource(Res.string.hero_remove_from_library)
+            } else {
+                stringResource(Res.string.hero_add_to_library)
+            },
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
