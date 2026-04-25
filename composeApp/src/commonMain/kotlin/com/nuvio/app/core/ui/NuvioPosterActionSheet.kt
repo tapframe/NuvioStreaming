@@ -46,6 +46,7 @@ fun NuvioPosterActionSheet(
     isWatched: Boolean,
     onDismiss: () -> Unit,
     onToggleLibrary: () -> Unit,
+    onOpenListPicker: (() -> Unit)? = null,
     onToggleWatched: () -> Unit,
 ) {
     if (item == null) return
@@ -82,6 +83,17 @@ fun NuvioPosterActionSheet(
                         )
                     }
                 },
+                onLongClick = if (onOpenListPicker != null) {
+                    {
+                        onOpenListPicker()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(
+                                sheetState = sheetState,
+                                onDismiss = onDismiss,
+                            )
+                        }
+                    }
+                } else null,
             )
             NuvioBottomSheetDivider()
             NuvioBottomSheetActionRow(
@@ -200,4 +212,3 @@ private fun PosterSheetHeader(
         }
     }
 }
-
