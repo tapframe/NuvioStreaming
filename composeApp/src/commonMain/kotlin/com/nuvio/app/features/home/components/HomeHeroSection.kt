@@ -52,6 +52,8 @@ import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 
 private const val HERO_BACKGROUND_PARALLAX = 0.055f
@@ -256,7 +258,7 @@ fun HomeHeroSection(
                             shape = RoundedCornerShape(40.dp),
                         ) {
                             Text(
-                                text = "View Details",
+                                text = stringResource(Res.string.home_view_details),
                                 modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,

@@ -25,6 +25,23 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.home.components.ContinueWatchingStylePreview
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.settings_continue_watching_resume_prompt_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_resume_prompt_title
+import nuvio.composeapp.generated.resources.settings_continue_watching_section_card_style
+import nuvio.composeapp.generated.resources.settings_continue_watching_section_on_launch
+import nuvio.composeapp.generated.resources.settings_continue_watching_section_up_next_behavior
+import nuvio.composeapp.generated.resources.settings_continue_watching_section_visibility
+import nuvio.composeapp.generated.resources.settings_continue_watching_show_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_show_title
+import nuvio.composeapp.generated.resources.settings_continue_watching_style_poster
+import nuvio.composeapp.generated.resources.settings_continue_watching_style_poster_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_style_wide
+import nuvio.composeapp.generated.resources.settings_continue_watching_style_wide_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_up_next_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_up_next_title
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.continueWatchingSettingsContent(
     isTablet: Boolean,
@@ -35,13 +52,13 @@ internal fun LazyListScope.continueWatchingSettingsContent(
 ) {
     item {
         SettingsSection(
-            title = "VISIBILITY",
+            title = stringResource(Res.string.settings_continue_watching_section_visibility),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
-                    title = "Show Continue Watching",
-                    description = "Display the Continue Watching shelf on the Home screen.",
+                    title = stringResource(Res.string.settings_continue_watching_show_title),
+                    description = stringResource(Res.string.settings_continue_watching_show_description),
                     checked = isVisible,
                     isTablet = isTablet,
                     onCheckedChange = ContinueWatchingPreferencesRepository::setVisible,
@@ -51,7 +68,7 @@ internal fun LazyListScope.continueWatchingSettingsContent(
     }
     item {
         SettingsSection(
-            title = "CARD STYLE",
+            title = stringResource(Res.string.settings_continue_watching_section_card_style),
             isTablet = isTablet,
         ) {
             ContinueWatchingStyleSelector(
@@ -63,13 +80,13 @@ internal fun LazyListScope.continueWatchingSettingsContent(
     }
     item {
         SettingsSection(
-            title = "UP NEXT BEHAVIOR",
+            title = stringResource(Res.string.settings_continue_watching_section_up_next_behavior),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
-                    title = "Up Next from furthest episode",
-                    description = "When enabled, Up Next always continues from the furthest watched episode. When disabled, it follows from the most recently watched episode. useful if you rewatch earlier episodes.",
+                    title = stringResource(Res.string.settings_continue_watching_up_next_title),
+                    description = stringResource(Res.string.settings_continue_watching_up_next_description),
                     checked = upNextFromFurthestEpisode,
                     isTablet = isTablet,
                     onCheckedChange = ContinueWatchingPreferencesRepository::setUpNextFromFurthestEpisode,
@@ -79,13 +96,13 @@ internal fun LazyListScope.continueWatchingSettingsContent(
     }
     item {
         SettingsSection(
-            title = "ON LAUNCH",
+            title = stringResource(Res.string.settings_continue_watching_section_on_launch),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
-                    title = "Resume prompt on launch",
-                    description = "Show a popup to continue where you left off when opening the app after leaving from the player.",
+                    title = stringResource(Res.string.settings_continue_watching_resume_prompt_title),
+                    description = stringResource(Res.string.settings_continue_watching_resume_prompt_description),
                     checked = showResumePromptOnLaunch,
                     isTablet = isTablet,
                     onCheckedChange = ContinueWatchingPreferencesRepository::setShowResumePromptOnLaunch,
@@ -173,20 +190,28 @@ private fun ContinueWatchingStyleOption(
                 )
             }
             Text(
-                text = style.name.lowercase().replaceFirstChar(Char::uppercase),
+                text = stringResource(style.labelRes),
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = if (style == ContinueWatchingSectionStyle.Wide) {
-                    "Info-dense horizontal card"
-                } else {
-                    "Artwork-first poster card"
-                },
+                text = stringResource(style.descriptionRes),
                 style = if (isTablet) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
+
+private val ContinueWatchingSectionStyle.labelRes: StringResource
+    get() = when (this) {
+        ContinueWatchingSectionStyle.Wide -> Res.string.settings_continue_watching_style_wide
+        ContinueWatchingSectionStyle.Poster -> Res.string.settings_continue_watching_style_poster
+    }
+
+private val ContinueWatchingSectionStyle.descriptionRes: StringResource
+    get() = when (this) {
+        ContinueWatchingSectionStyle.Wide -> Res.string.settings_continue_watching_style_wide_description
+        ContinueWatchingSectionStyle.Poster -> Res.string.settings_continue_watching_style_poster_description
+    }

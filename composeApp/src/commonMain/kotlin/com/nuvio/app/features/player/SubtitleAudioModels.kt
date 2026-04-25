@@ -1,6 +1,10 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_player_track_number
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 data class AudioTrack(
@@ -109,103 +113,9 @@ data class SubtitleAudioUiState(
     val activeSubtitleTab: SubtitleTab = SubtitleTab.BuiltIn,
 )
 
-fun getTrackDisplayName(label: String?, language: String?, index: Int): String {
+@Composable
+fun localizedTrackDisplayName(label: String?, language: String?, index: Int): String {
     if (!label.isNullOrBlank()) return label
-    if (!language.isNullOrBlank()) return formatLanguage(language)
-    return "Track ${index + 1}"
+    if (!language.isNullOrBlank()) return languageLabelForCode(language)
+    return stringResource(Res.string.compose_player_track_number, index + 1)
 }
-
-fun formatLanguage(code: String): String {
-    val lower = code.lowercase()
-    return LanguageNames[lower] ?: lower.replaceFirstChar { it.uppercase() }
-}
-
-private val LanguageNames = mapOf(
-    "en" to "English",
-    "eng" to "English",
-    "es" to "Spanish",
-    "spa" to "Spanish",
-    "fr" to "French",
-    "fre" to "French",
-    "fra" to "French",
-    "de" to "German",
-    "ger" to "German",
-    "deu" to "German",
-    "it" to "Italian",
-    "ita" to "Italian",
-    "pt" to "Portuguese",
-    "por" to "Portuguese",
-    "ru" to "Russian",
-    "rus" to "Russian",
-    "ja" to "Japanese",
-    "jpn" to "Japanese",
-    "ko" to "Korean",
-    "kor" to "Korean",
-    "zh" to "Chinese",
-    "chi" to "Chinese",
-    "zho" to "Chinese",
-    "ar" to "Arabic",
-    "ara" to "Arabic",
-    "hi" to "Hindi",
-    "hin" to "Hindi",
-    "nl" to "Dutch",
-    "nld" to "Dutch",
-    "dut" to "Dutch",
-    "pl" to "Polish",
-    "pol" to "Polish",
-    "sv" to "Swedish",
-    "swe" to "Swedish",
-    "tr" to "Turkish",
-    "tur" to "Turkish",
-    "he" to "Hebrew",
-    "heb" to "Hebrew",
-    "th" to "Thai",
-    "tha" to "Thai",
-    "vi" to "Vietnamese",
-    "vie" to "Vietnamese",
-    "cs" to "Czech",
-    "ces" to "Czech",
-    "cze" to "Czech",
-    "ro" to "Romanian",
-    "ron" to "Romanian",
-    "rum" to "Romanian",
-    "hu" to "Hungarian",
-    "hun" to "Hungarian",
-    "el" to "Greek",
-    "ell" to "Greek",
-    "gre" to "Greek",
-    "da" to "Danish",
-    "dan" to "Danish",
-    "fi" to "Finnish",
-    "fin" to "Finnish",
-    "no" to "Norwegian",
-    "nor" to "Norwegian",
-    "uk" to "Ukrainian",
-    "ukr" to "Ukrainian",
-    "bg" to "Bulgarian",
-    "bul" to "Bulgarian",
-    "hr" to "Croatian",
-    "hrv" to "Croatian",
-    "sr" to "Serbian",
-    "srp" to "Serbian",
-    "sk" to "Slovak",
-    "slk" to "Slovak",
-    "slo" to "Slovak",
-    "sl" to "Slovenian",
-    "slv" to "Slovenian",
-    "id" to "Indonesian",
-    "ind" to "Indonesian",
-    "ms" to "Malay",
-    "msa" to "Malay",
-    "may" to "Malay",
-    "ta" to "Tamil",
-    "tam" to "Tamil",
-    "te" to "Telugu",
-    "tel" to "Telugu",
-    "ml" to "Malayalam",
-    "mal" to "Malayalam",
-    "bn" to "Bengali",
-    "ben" to "Bengali",
-    "ur" to "Urdu",
-    "urd" to "Urdu",
-)

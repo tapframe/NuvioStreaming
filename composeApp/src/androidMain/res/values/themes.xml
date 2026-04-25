@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Nuvio" parent="@android:style/Theme.Material.NoActionBar">
+    <style name="Theme.Nuvio" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/nuvio_background</item>
     </style>
 

@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 
 object MetaDetailsRepository {
     private data class CachedMetaEntry(
@@ -112,7 +114,7 @@ object MetaDetailsRepository {
             if (manifests.isEmpty()) {
                 log.w { "No addon provides meta for type=$type id=$id" }
                 _uiState.value = MetaDetailsUiState(
-                    errorMessage = "No addon provides meta for this content.",
+                    errorMessage = getString(Res.string.details_no_addon_meta),
                 )
                 activeRequestKey = null
                 return@launch
@@ -157,7 +159,7 @@ object MetaDetailsRepository {
             }
 
             _uiState.value = MetaDetailsUiState(
-                errorMessage = "Could not load details from any addon.",
+                errorMessage = getString(Res.string.details_load_failed_all_addons),
             )
             activeRequestKey = null
         }

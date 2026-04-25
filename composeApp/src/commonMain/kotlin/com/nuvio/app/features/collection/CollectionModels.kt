@@ -39,7 +39,7 @@ data class CollectionFolder(
     val focusGifUrl: String? = null,
     val focusGifEnabled: Boolean = true,
     val coverEmoji: String? = null,
-    val tileShape: String = "Poster",
+    val tileShape: String = "poster",
     val hideTitle: Boolean = false,
     val catalogSources: List<CollectionCatalogSource> = emptyList(),
 ) {

@@ -62,6 +62,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlin.math.roundToInt
@@ -153,6 +155,12 @@ fun PlayerScreen(
         val overlayBottomPadding = sliderOverlayBottomPadding(metrics)
         val scope = rememberCoroutineScope()
         val hapticFeedback = LocalHapticFeedback.current
+        val resizeModeFitLabel = stringResource(Res.string.compose_player_resize_fit)
+        val resizeModeFillLabel = stringResource(Res.string.compose_player_resize_fill)
+        val resizeModeZoomLabel = stringResource(Res.string.compose_player_resize_zoom)
+        val downloadedLabel = stringResource(Res.string.compose_player_downloaded)
+        val airsPrefix = stringResource(Res.string.compose_player_airs_prefix)
+        val tbaLabel = stringResource(Res.string.compose_player_tba)
         val gestureController = rememberPlayerGestureController()
         var controlsVisible by rememberSaveable { mutableStateOf(true) }
         var playerControlsLocked by rememberSaveable { mutableStateOf(false) }
@@ -534,7 +542,12 @@ fun PlayerScreen(
             if (seconds <= 0L) return
             showGestureFeedback(
                 GestureFeedbackState(
-                    message = if (direction == PlayerSeekDirection.Forward) "+${seconds}s" else "-${seconds}s",
+                    messageRes = if (direction == PlayerSeekDirection.Forward) {
+                        Res.string.compose_player_seek_feedback_forward
+                    } else {
+                        Res.string.compose_player_seek_feedback_backward
+                    },
+                    messageArgs = listOf(seconds),
                     icon = if (direction == PlayerSeekDirection.Forward) {
                         GestureFeedbackIcon.SeekForward
                     } else {
@@ -554,11 +567,12 @@ fun PlayerScreen(
                 } else {
                     GestureFeedbackIcon.SeekBackward
                 },
-                secondaryMessage = buildString {
-                    if (deltaMs >= 0L) append("+")
-                    append((abs(deltaMs) / 1000f).roundToInt())
-                    append("s")
+                secondaryMessageRes = if (deltaMs >= 0L) {
+                    Res.string.compose_player_seek_delta_forward
+                } else {
+                    Res.string.compose_player_seek_delta_backward
                 },
+                secondaryMessageArgs = listOf((abs(deltaMs) / 1000f).roundToInt()),
                 secondaryMessageColor = if (direction == PlayerSeekDirection.Forward) {
                     Color(0xFF6EE7A8)
                 } else {
@@ -571,7 +585,8 @@ fun PlayerScreen(
             val percentage = (level.coerceIn(0f, 1f) * 100f).roundToInt()
             showGestureFeedback(
                 GestureFeedbackState(
-                    message = "Brightness $percentage%",
+                    messageRes = Res.string.compose_player_brightness_level,
+                    messageArgs = listOf(percentage),
                     icon = GestureFeedbackIcon.Brightness,
                 ),
             )
@@ -581,7 +596,12 @@ fun PlayerScreen(
             val percentage = (level.fraction.coerceIn(0f, 1f) * 100f).roundToInt()
             showGestureFeedback(
                 GestureFeedbackState(
-                    message = if (level.isMuted) "Muted" else "Volume $percentage%",
+                    messageRes = if (level.isMuted) {
+                        Res.string.compose_player_muted
+                    } else {
+                        Res.string.compose_player_volume_level
+                    },
+                    messageArgs = if (level.isMuted) emptyList() else listOf(percentage),
                     icon = if (level.isMuted) GestureFeedbackIcon.VolumeMuted else GestureFeedbackIcon.Volume,
                     isDanger = level.isMuted,
                 ),
@@ -650,7 +670,13 @@ fun PlayerScreen(
             val nextMode = resizeMode.next()
             resizeMode = nextMode
             PlayerSettingsRepository.setResizeMode(nextMode)
-            showGestureMessage(nextMode.label)
+            showGestureMessage(
+                when (nextMode) {
+                    PlayerResizeMode.Fit -> resizeModeFitLabel
+                    PlayerResizeMode.Fill -> resizeModeFillLabel
+                    PlayerResizeMode.Zoom -> resizeModeZoomLabel
+                },
+            )
             controlsVisible = true
         }
 
@@ -872,7 +898,7 @@ fun PlayerScreen(
                 episode.title.ifBlank { title }
             }
             activeStreamSubtitle = downloadItem.streamSubtitle
-            activeProviderName = downloadItem.providerName.ifBlank { "Downloaded" }
+            activeProviderName = downloadItem.providerName.ifBlank { downloadedLabel }
             activeProviderAddonId = downloadItem.providerAddonId
             currentStreamBingeGroup = null
             activeSeasonNumber = episode.season
@@ -1268,7 +1294,7 @@ fun PlayerScreen(
                     released = nextVideo.released,
                     hasAired = PlayerNextEpisodeRules.hasEpisodeAired(nextVideo.released),
                     unairedMessage = if (!PlayerNextEpisodeRules.hasEpisodeAired(nextVideo.released)) {
-                        "Airs ${nextVideo.released ?: "TBA"}"
+                        "$airsPrefix ${nextVideo.released ?: tbaLabel}"
                     } else null,
                 )
             } else null

@@ -13,7 +13,8 @@ import platform.Foundation.NSUserDefaults
 actual object ThemeSettingsStorage {
     private const val selectedThemeKey = "selected_theme"
     private const val amoledEnabledKey = "amoled_enabled"
-    private val syncKeys = listOf(selectedThemeKey, amoledEnabledKey)
+    private const val selectedAppLanguageKey = "selected_app_language"
+    private val syncKeys = listOf(selectedThemeKey, amoledEnabledKey, selectedAppLanguageKey)
 
     actual fun loadSelectedTheme(): String? =
         NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(selectedThemeKey))
@@ -36,9 +37,19 @@ actual object ThemeSettingsStorage {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(amoledEnabledKey))
     }
 
+    actual fun loadSelectedAppLanguage(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(selectedAppLanguageKey))
+
+    actual fun saveSelectedAppLanguage(languageCode: String) {
+        NSUserDefaults.standardUserDefaults.setObject(languageCode, forKey = ProfileScopedKey.of(selectedAppLanguageKey))
+    }
+
+    actual fun applySelectedAppLanguage(languageCode: String) = Unit
+
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {
         loadSelectedTheme()?.let { put(selectedThemeKey, encodeSyncString(it)) }
         loadAmoledEnabled()?.let { put(amoledEnabledKey, encodeSyncBoolean(it)) }
+        loadSelectedAppLanguage()?.let { put(selectedAppLanguageKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -48,5 +59,6 @@ actual object ThemeSettingsStorage {
 
         payload.decodeSyncString(selectedThemeKey)?.let(::saveSelectedTheme)
         payload.decodeSyncBoolean(amoledEnabledKey)?.let(::saveAmoledEnabled)
+        payload.decodeSyncString(selectedAppLanguageKey)?.let(::saveSelectedAppLanguage)
     }
 }

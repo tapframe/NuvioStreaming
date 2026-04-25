@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.build.AppVersionConfig
+import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.addons.httpRequestRaw
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +49,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 private const val gitHubOwner = "NuvioMedia"
 private const val gitHubRepo = "NuvioMobile"
@@ -232,7 +236,9 @@ class AppUpdaterController internal constructor(
     fun checkForUpdates(force: Boolean, showNoUpdateFeedback: Boolean) {
         if (!AppFeaturePolicy.inAppUpdaterEnabled || !AppUpdaterPlatform.isSupported) {
             if (showNoUpdateFeedback) {
-                NuvioToastController.show("In-app updates are not available on this build.")
+                scope.launch {
+                    NuvioToastController.show(getString(Res.string.updates_not_available))
+                }
             }
             return
         }
@@ -269,7 +275,7 @@ class AppUpdaterController internal constructor(
                 }
 
                 if (showNoUpdateFeedback && !remoteNewer) {
-                    NuvioToastController.show("You're using the latest version.")
+                    NuvioToastController.show(getString(Res.string.updates_latest_version))
                 }
             }.onFailure { error ->
                 _uiState.update { state ->
@@ -283,7 +289,7 @@ class AppUpdaterController internal constructor(
                         showDialog = force && error !is NoChannelReleaseException,
                         showUnknownSourcesDialog = false,
                         errorMessage = if (force && error !is NoChannelReleaseException) {
-                            error.message ?: "Update check failed"
+                            error.message ?: getString(Res.string.updates_check_failed)
                         } else {
                             null
                         },
@@ -291,7 +297,7 @@ class AppUpdaterController internal constructor(
                 }
 
                 if (showNoUpdateFeedback || error is NoChannelReleaseException) {
-                    NuvioToastController.show(error.message ?: "Update check failed")
+                    NuvioToastController.show(error.message ?: getString(Res.string.updates_check_failed))
                 }
             }
         }
@@ -351,7 +357,7 @@ class AppUpdaterController internal constructor(
                         isDownloading = false,
                         downloadProgress = null,
                         downloadedApkPath = null,
-                        errorMessage = error.message ?: "Download failed",
+                        errorMessage = error.message ?: getString(Res.string.updates_download_failed),
                         showDialog = true,
                     )
                 }
@@ -369,11 +375,14 @@ class AppUpdaterController internal constructor(
         AppUpdaterPlatform.installDownloadedApk(apkPath).onSuccess {
             _uiState.update { state -> state.copy(showUnknownSourcesDialog = false) }
         }.onFailure { error ->
-            _uiState.update { state ->
-                state.copy(
-                    errorMessage = error.message ?: "Unable to start installation",
-                    showDialog = true,
-                )
+            scope.launch {
+                val fallbackMessage = error.message ?: getString(Res.string.updates_install_failed)
+                _uiState.update { state ->
+                    state.copy(
+                        errorMessage = fallbackMessage,
+                        showDialog = true,
+                    )
+                }
             }
         }
     }
@@ -437,9 +446,9 @@ fun AppUpdaterHost(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = when {
-                            state.showUnknownSourcesDialog -> "Allow installs to continue"
-                            state.isUpdateAvailable -> state.update?.title ?: "Update available"
-                            else -> "Update status"
+                            state.showUnknownSourcesDialog -> stringResource(Res.string.updates_title_allow_installs)
+                            state.isUpdateAvailable -> state.update?.title ?: stringResource(Res.string.updates_title_available)
+                            else -> stringResource(Res.string.updates_title_status)
                         },
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -449,10 +458,10 @@ fun AppUpdaterHost(
                     )
                     Text(
                         text = when {
-                            state.showUnknownSourcesDialog -> "Enable app installs for Nuvio, then come back and continue."
-                            state.isDownloading -> "Downloading update..."
-                            state.isUpdateAvailable -> "A new version is ready to install."
-                            else -> "No updates found."
+                            state.showUnknownSourcesDialog -> stringResource(Res.string.updates_message_allow_installs)
+                            state.isDownloading -> stringResource(Res.string.updates_message_downloading)
+                            state.isUpdateAvailable -> stringResource(Res.string.updates_message_ready)
+                            else -> stringResource(Res.string.updates_message_no_updates)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -492,7 +501,7 @@ fun AppUpdaterHost(
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 val assetLine = update.assetSizeBytes?.let(::formatFileSize)?.let { size ->
-                                    "$size • ${update.assetName}"
+                                    stringResource(Res.string.updates_asset_line, size, update.assetName)
                                 } ?: update.assetName
                                 Text(
                                     text = assetLine,
@@ -510,9 +519,12 @@ fun AppUpdaterHost(
                                 )
                                 Text(
                                     text = if (state.downloadProgress != null) {
-                                        "Downloading ${((state.downloadProgress ?: 0f) * 100).toInt().coerceIn(0, 100)}%"
+                                        stringResource(
+                                            Res.string.updates_downloading_progress,
+                                            ((state.downloadProgress ?: 0f) * 100).toInt().coerceIn(0, 100),
+                                        )
                                     } else {
-                                        "Preparing download"
+                                        stringResource(Res.string.updates_preparing_download)
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -523,7 +535,7 @@ fun AppUpdaterHost(
                         if (update.notes.isNotBlank()) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    text = "Release notes",
+                                    text = stringResource(Res.string.updates_release_notes),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Medium,
@@ -567,10 +579,10 @@ fun AppUpdaterHost(
                         ) {
                             Text(
                                 when {
-                                    state.showUnknownSourcesDialog -> "Continue"
-                                    state.downloadedApkPath != null -> "Install"
-                                    state.isDownloading -> "Downloading"
-                                    else -> "Update"
+                                    state.showUnknownSourcesDialog -> stringResource(Res.string.action_continue)
+                                    state.downloadedApkPath != null -> stringResource(Res.string.action_install)
+                                    state.isDownloading -> stringResource(Res.string.updates_message_downloading)
+                                    else -> stringResource(Res.string.action_update)
                                 },
                             )
                         }
@@ -586,7 +598,7 @@ fun AppUpdaterHost(
                                 modifier = Modifier.weight(1f),
                                 onClick = controller::ignoreThisVersion,
                             ) {
-                                Text("Ignore")
+                                Text(stringResource(Res.string.action_ignore))
                             }
 
                             OutlinedButton(
@@ -594,7 +606,13 @@ fun AppUpdaterHost(
                                 onClick = controller::dismissDialog,
                                 enabled = !state.isDownloading,
                             ) {
-                                Text(if (state.isDownloading) "Downloading" else "Later")
+                                Text(
+                                    if (state.isDownloading) {
+                                        stringResource(Res.string.updates_message_downloading)
+                                    } else {
+                                        stringResource(Res.string.action_later)
+                                    },
+                                )
                             }
                         }
                     } else {
@@ -603,7 +621,13 @@ fun AppUpdaterHost(
                             onClick = controller::dismissDialog,
                             enabled = !state.isDownloading,
                         ) {
-                            Text(if (state.isDownloading) "Downloading" else "Later")
+                            Text(
+                                if (state.isDownloading) {
+                                    stringResource(Res.string.updates_message_downloading)
+                                } else {
+                                    stringResource(Res.string.action_later)
+                                },
+                            )
                         }
                     }
                 }
@@ -613,7 +637,7 @@ fun AppUpdaterHost(
 }
 
 private fun formatFileSize(sizeBytes: Long): String {
-    if (sizeBytes <= 0L) return "0 B"
+    if (sizeBytes <= 0L) return "0 ${localizedByteUnit("B")}"
     val units = listOf("B", "KB", "MB", "GB")
     var value = sizeBytes.toDouble()
     var unitIndex = 0
@@ -626,5 +650,5 @@ private fun formatFileSize(sizeBytes: Long): String {
     } else {
         ((value * 10).toInt() / 10.0).toString()
     }
-    return "$roundedValue ${units[unitIndex]}"
+    return "$roundedValue ${localizedByteUnit(units[unitIndex])}"
 }

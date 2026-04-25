@@ -22,6 +22,44 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.tmdb.TmdbSettings
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.normalizeLanguage
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_save
+import nuvio.composeapp.generated.resources.settings_tmdb_add_api_key_first
+import nuvio.composeapp.generated.resources.settings_tmdb_api_key_label
+import nuvio.composeapp.generated.resources.settings_tmdb_enable_enrichment
+import nuvio.composeapp.generated.resources.settings_tmdb_enable_enrichment_description
+import nuvio.composeapp.generated.resources.settings_tmdb_enter_api_key
+import nuvio.composeapp.generated.resources.settings_tmdb_language_code_label
+import nuvio.composeapp.generated.resources.settings_tmdb_module_artwork
+import nuvio.composeapp.generated.resources.settings_tmdb_module_artwork_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_basic_info
+import nuvio.composeapp.generated.resources.settings_tmdb_module_basic_info_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_collections
+import nuvio.composeapp.generated.resources.settings_tmdb_module_collections_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_credits
+import nuvio.composeapp.generated.resources.settings_tmdb_module_credits_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_details
+import nuvio.composeapp.generated.resources.settings_tmdb_module_details_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_episodes
+import nuvio.composeapp.generated.resources.settings_tmdb_module_episodes_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_more_like_this
+import nuvio.composeapp.generated.resources.settings_tmdb_module_more_like_this_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_networks
+import nuvio.composeapp.generated.resources.settings_tmdb_module_networks_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_production_companies
+import nuvio.composeapp.generated.resources.settings_tmdb_module_production_companies_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_season_posters
+import nuvio.composeapp.generated.resources.settings_tmdb_module_season_posters_description
+import nuvio.composeapp.generated.resources.settings_tmdb_module_trailers
+import nuvio.composeapp.generated.resources.settings_tmdb_module_trailers_description
+import nuvio.composeapp.generated.resources.settings_tmdb_personal_api_key
+import nuvio.composeapp.generated.resources.settings_tmdb_preferred_language
+import nuvio.composeapp.generated.resources.settings_tmdb_preferred_language_description
+import nuvio.composeapp.generated.resources.settings_tmdb_section_credentials
+import nuvio.composeapp.generated.resources.settings_tmdb_section_localization
+import nuvio.composeapp.generated.resources.settings_tmdb_section_modules
+import nuvio.composeapp.generated.resources.settings_tmdb_section_title
+import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.tmdbSettingsContent(
     isTablet: Boolean,
@@ -32,13 +70,13 @@ internal fun LazyListScope.tmdbSettingsContent(
 
     item {
         SettingsSection(
-            title = "TMDB",
+            title = stringResource(Res.string.settings_tmdb_section_title),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
-                    title = "Enable TMDB enrichment",
-                    description = "Use your TMDB API key to enrich addon metadata on the details screen when a TMDB or IMDb ID is available.",
+                    title = stringResource(Res.string.settings_tmdb_enable_enrichment),
+                    description = stringResource(Res.string.settings_tmdb_enable_enrichment_description),
                     checked = settings.enabled,
                     enabled = settings.hasApiKey,
                     isTablet = isTablet,
@@ -48,7 +86,7 @@ internal fun LazyListScope.tmdbSettingsContent(
                     SettingsGroupDivider(isTablet = isTablet)
                     TmdbInfoRow(
                         isTablet = isTablet,
-                        text = "Add your own TMDB API key below before turning enrichment on.",
+                        text = stringResource(Res.string.settings_tmdb_add_api_key_first),
                     )
                 }
             }
@@ -57,7 +95,7 @@ internal fun LazyListScope.tmdbSettingsContent(
 
     item {
         SettingsSection(
-            title = "CREDENTIALS",
+            title = stringResource(Res.string.settings_tmdb_section_credentials),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
@@ -72,7 +110,7 @@ internal fun LazyListScope.tmdbSettingsContent(
 
     item {
         SettingsSection(
-            title = "LOCALIZATION",
+            title = stringResource(Res.string.settings_tmdb_section_localization),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
@@ -88,14 +126,14 @@ internal fun LazyListScope.tmdbSettingsContent(
 
     item {
         SettingsSection(
-            title = "MODULES",
+            title = stringResource(Res.string.settings_tmdb_section_modules),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Trailers",
-                    description = "Fetch and show TMDB trailer videos section on detail pages.",
+                    title = stringResource(Res.string.settings_tmdb_module_trailers),
+                    description = stringResource(Res.string.settings_tmdb_module_trailers_description),
                     checked = settings.useTrailers,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseTrailers,
@@ -103,8 +141,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Artwork",
-                    description = "Replace backdrop, poster, and logo with TMDB artwork.",
+                    title = stringResource(Res.string.settings_tmdb_module_artwork),
+                    description = stringResource(Res.string.settings_tmdb_module_artwork_description),
                     checked = settings.useArtwork,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseArtwork,
@@ -112,8 +150,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Basic info",
-                    description = "Use TMDB title, synopsis, genres, and rating.",
+                    title = stringResource(Res.string.settings_tmdb_module_basic_info),
+                    description = stringResource(Res.string.settings_tmdb_module_basic_info_description),
                     checked = settings.useBasicInfo,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseBasicInfo,
@@ -121,8 +159,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Details",
-                    description = "Use TMDB release info, runtime, age rating, status, country, and language.",
+                    title = stringResource(Res.string.settings_tmdb_module_details),
+                    description = stringResource(Res.string.settings_tmdb_module_details_description),
                     checked = settings.useDetails,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseDetails,
@@ -130,8 +168,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Credits",
-                    description = "Use TMDB creators, directors, writers, and cast photos.",
+                    title = stringResource(Res.string.settings_tmdb_module_credits),
+                    description = stringResource(Res.string.settings_tmdb_module_credits_description),
                     checked = settings.useCredits,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseCredits,
@@ -139,8 +177,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Production companies",
-                    description = "Use TMDB production company metadata on the details screen.",
+                    title = stringResource(Res.string.settings_tmdb_module_production_companies),
+                    description = stringResource(Res.string.settings_tmdb_module_production_companies_description),
                     checked = settings.useProductions,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseProductions,
@@ -148,8 +186,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Networks",
-                    description = "Use TMDB network metadata for TV titles.",
+                    title = stringResource(Res.string.settings_tmdb_module_networks),
+                    description = stringResource(Res.string.settings_tmdb_module_networks_description),
                     checked = settings.useNetworks,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseNetworks,
@@ -157,8 +195,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Episodes",
-                    description = "Use TMDB episode titles, thumbnails, descriptions, and runtimes for series.",
+                    title = stringResource(Res.string.settings_tmdb_module_episodes),
+                    description = stringResource(Res.string.settings_tmdb_module_episodes_description),
                     checked = settings.useEpisodes,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseEpisodes,
@@ -166,8 +204,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Season posters",
-                    description = "Use TMDB season posters in the metadata screen season selector for series.",
+                    title = stringResource(Res.string.settings_tmdb_module_season_posters),
+                    description = stringResource(Res.string.settings_tmdb_module_season_posters_description),
                     checked = settings.useSeasonPosters,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseSeasonPosters,
@@ -175,8 +213,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "More like this",
-                    description = "Show TMDB recommendations at the bottom of detail pages.",
+                    title = stringResource(Res.string.settings_tmdb_module_more_like_this),
+                    description = stringResource(Res.string.settings_tmdb_module_more_like_this_description),
                     checked = settings.useMoreLikeThis,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseMoreLikeThis,
@@ -184,8 +222,8 @@ internal fun LazyListScope.tmdbSettingsContent(
                 SettingsGroupDivider(isTablet = isTablet)
                 TmdbToggleRow(
                     isTablet = isTablet,
-                    title = "Collections",
-                    description = "Show franchise and collection rails for movies when TMDB provides them.",
+                    title = stringResource(Res.string.settings_tmdb_module_collections),
+                    description = stringResource(Res.string.settings_tmdb_module_collections_description),
                     checked = settings.useCollections,
                     enabled = enrichmentControlsEnabled,
                     onCheckedChange = TmdbSettingsRepository::setUseCollections,
@@ -213,13 +251,13 @@ private fun TmdbApiKeyRow(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "Personal API key",
+                text = stringResource(Res.string.settings_tmdb_personal_api_key),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = "Enter your TMDB v3 API key.",
+                text = stringResource(Res.string.settings_tmdb_enter_api_key),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -234,7 +272,7 @@ private fun TmdbApiKeyRow(
             },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("TMDB API key") },
+            label = { Text(stringResource(Res.string.settings_tmdb_api_key_label)) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
@@ -252,7 +290,7 @@ private fun TmdbApiKeyRow(
                 },
                 enabled = normalizedDraft != value,
             ) {
-                Text("Save Key")
+                Text(stringResource(Res.string.action_save))
             }
         }
     }
@@ -278,13 +316,13 @@ private fun TmdbLanguageRow(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "Preferred language",
+                text = stringResource(Res.string.settings_tmdb_preferred_language),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = "Set the TMDB language code used for localized metadata, for example `en`, `en-US`, or `pt-BR`.",
+                text = stringResource(Res.string.settings_tmdb_preferred_language_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -298,7 +336,7 @@ private fun TmdbLanguageRow(
             enabled = enabled,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("Language code") },
+            label = { Text(stringResource(Res.string.settings_tmdb_language_code_label)) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
@@ -316,7 +354,7 @@ private fun TmdbLanguageRow(
                 },
                 enabled = enabled && normalizedDraft != value,
             ) {
-                Text("Save Language")
+                Text(stringResource(Res.string.action_save))
             }
         }
     }

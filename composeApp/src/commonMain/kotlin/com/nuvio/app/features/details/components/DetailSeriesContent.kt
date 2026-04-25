@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
+import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.features.details.MetaDetails
@@ -71,6 +72,10 @@ import com.nuvio.app.features.details.seasonSortKey
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watching.application.WatchingState
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 private val log = Logger.withTag("SeriesContent")
 
@@ -92,16 +97,16 @@ fun DetailSeriesContent(
 
     if (meta.videos.isEmpty()) {
         DetailSection(
-            title = "Episodes",
+            title = stringResource(Res.string.settings_meta_episodes),
             modifier = modifier,
             showHeader = showHeader,
         ) {
             Text(
                 text = when {
                     meta.status.equals("Not yet aired", ignoreCase = true) || meta.hasScheduledVideos ->
-                        "Episodes have not been published by this addon yet."
+                        stringResource(Res.string.details_series_unpublished)
                     else ->
-                        "This addon did not provide episode metadata for this series."
+                        stringResource(Res.string.details_series_no_metadata)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -132,12 +137,12 @@ fun DetailSeriesContent(
     if (groupedEpisodes.isEmpty()) {
         if (meta.type == "series") {
             DetailSection(
-                title = "Episodes",
+                title = stringResource(Res.string.settings_meta_episodes),
                 modifier = modifier,
                 showHeader = showHeader,
             ) {
                 Text(
-                    text = "This addon returned videos for the series, but none included season or episode numbers.",
+                    text = stringResource(Res.string.details_series_missing_numbers),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -182,7 +187,7 @@ fun DetailSeriesContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Seasons",
+                            text = stringResource(Res.string.details_seasons),
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontSize = sizing.seasonHeaderSize,
                                 fontWeight = FontWeight.SemiBold,
@@ -250,7 +255,7 @@ fun DetailSeriesContent(
                 label = "season_episodes",
             ) { seasonForContent ->
                 val sectionTitle = if (meta.type != "series" && seasons.size == 1 && seasonForContent <= 0) {
-                    "Videos"
+                    stringResource(Res.string.details_videos)
                 } else {
                     seasonForContent.label()
                 }
@@ -336,7 +341,11 @@ private fun SeasonViewModeToggle(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = if (isPosters) "Posters" else "Text",
+            text = if (isPosters) {
+                stringResource(Res.string.details_season_view_posters)
+            } else {
+                stringResource(Res.string.details_season_view_text)
+            },
             style = MaterialTheme.typography.labelLarge.copy(
                 fontSize = sizing.seasonToggleTextSize,
                 fontWeight = FontWeight.SemiBold,
@@ -1187,14 +1196,14 @@ private fun seriesContentSizing(maxWidthDp: Float): SeriesContentSizing =
 
 private fun Int.label(): String =
     if (this <= 0) {
-        "Specials"
+        runBlocking { getString(Res.string.episodes_specials) }
     } else {
-        "Season $this"
+        runBlocking { getString(Res.string.episodes_season, this@label) }
     }
 
 private fun MetaVideo.episodeBadge(): String =
     when {
-        episode != null -> "E${episode.toString().padStart(2, '0')}"
-        season != null -> "S${season.toString().padStart(2, '0')}"
-        else -> "FILE"
+        episode != null || season != null ->
+            localizedSeasonEpisodeCode(seasonNumber = season, episodeNumber = episode).orEmpty()
+        else -> runBlocking { getString(Res.string.details_episode_badge_file) }
     }

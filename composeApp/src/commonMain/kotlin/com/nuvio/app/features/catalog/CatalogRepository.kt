@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 
 const val INTERNAL_LIBRARY_MANIFEST_URL = "nuvio://library"
 
@@ -92,7 +94,7 @@ object CatalogRepository {
                         items = emptyList(),
                         isLoading = false,
                         nextSkip = null,
-                        errorMessage = error.message ?: "Unable to load catalog items.",
+                        errorMessage = error.message ?: getString(Res.string.catalog_load_failed),
                     )
                 },
             )
@@ -148,7 +150,7 @@ object CatalogRepository {
                         items = if (reset) emptyList() else current.items,
                         isLoading = false,
                         nextSkip = null,
-                        errorMessage = error.message ?: "Unable to load catalog items.",
+                        errorMessage = error.message ?: getString(Res.string.catalog_load_failed),
                     )
                 },
             )

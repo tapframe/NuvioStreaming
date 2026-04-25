@@ -18,6 +18,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_player_no_subtitles_found
+import org.jetbrains.compose.resources.getString
 
 object SubtitleRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -76,7 +79,7 @@ object SubtitleRepository {
                                 id = id,
                                 url = url,
                                 language = lang,
-                                display = "${formatLanguage(lang)} (${addon.displayTitle})",
+                                display = "${getLanguageLabelForCode(lang)} (${addon.displayTitle})",
                             )
                         )
                     }
@@ -86,7 +89,7 @@ object SubtitleRepository {
 
             _addonSubtitles.value = allSubs
             if (allSubs.isEmpty() && addons.any { it.manifest?.resources?.any { r -> r.name == "subtitles" } == true }) {
-                _error.value = "No subtitles found"
+                _error.value = getString(Res.string.compose_player_no_subtitles_found)
             }
             _isLoading.value = false
         }

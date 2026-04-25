@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.launch
 
 object StreamsRepository {
@@ -313,7 +315,7 @@ object StreamsRepository {
                                 StreamLoadCompletion.PluginScraper(
                                     addonId = providerGroup.addonId,
                                     streams = emptyList(),
-                                    error = error.message ?: "Failed to load ${scraper.name}",
+                                    error = error.message ?: getString(Res.string.streams_failed_to_load_scraper, scraper.name),
                                 )
                             },
                         )

@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SubtitleStylePanel(
@@ -73,7 +75,7 @@ private fun StyleControlsCard(
     ) {
         SectionHeader(
             icon = Icons.Rounded.Tune,
-            label = "Style",
+            label = stringResource(Res.string.compose_player_style),
         )
 
         Row(
@@ -82,13 +84,13 @@ private fun StyleControlsCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Font Size",
+                text = stringResource(Res.string.compose_player_font_size),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
             )
             StepperControl(
-                value = "${style.fontSizeSp}sp",
+                value = stringResource(Res.string.compose_player_font_size_value, style.fontSizeSp),
                 onMinus = {
                     onStyleChanged(style.copy(fontSizeSp = (style.fontSizeSp - 2).coerceAtLeast(12)))
                 },
@@ -109,7 +111,7 @@ private fun StyleControlsCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Outline",
+                text = stringResource(Res.string.compose_player_outline),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -126,7 +128,8 @@ private fun StyleControlsCard(
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 Text(
-                    text = if (style.outlineEnabled) "On" else "Off",
+                    text = if (style.outlineEnabled) stringResource(Res.string.compose_action_on)
+                    else stringResource(Res.string.compose_action_off),
                     color = if (style.outlineEnabled) colorScheme.onPrimaryContainer else colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
@@ -140,7 +143,7 @@ private fun StyleControlsCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Bottom Offset",
+                text = stringResource(Res.string.compose_player_bottom_offset),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -163,7 +166,7 @@ private fun StyleControlsCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Color",
+                text = stringResource(Res.string.compose_player_color),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -203,7 +206,7 @@ private fun StyleControlsCard(
                     .padding(horizontal = if (isCompact) 8.dp else 12.dp, vertical = if (isCompact) 6.dp else 8.dp),
             ) {
                 Text(
-                    text = "Reset Defaults",
+                    text = stringResource(Res.string.compose_player_reset_defaults),
                     color = colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = if (isCompact) 12.sp else 14.sp,

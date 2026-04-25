@@ -80,7 +80,7 @@ object CollectionSyncService {
 
             if (remoteCollections != null) {
                 isSyncingFromRemote = true
-                CollectionRepository.applyFromRemote(remoteCollections)
+                CollectionRepository.applyFromRemote(remoteCollections, blob.collectionsJson)
                 isSyncingFromRemote = false
                 log.i { "pullFromServer — applied ${remoteCollections.size} collections from remote" }
             } else {

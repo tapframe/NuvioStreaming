@@ -23,6 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
@@ -182,7 +184,7 @@ object TraktLibraryRepository {
                 _uiState.value = current.copy(
                     isLoading = false,
                     hasLoaded = true,
-                    errorMessage = "Failed to load Trakt library",
+                    errorMessage = getString(Res.string.trakt_library_load_failed),
                 )
                 return
             }
@@ -487,7 +489,7 @@ object TraktLibraryRepository {
         val watchlistTabs = listOf(
             TraktListTab(
                 key = WATCHLIST_KEY,
-                title = "Watchlist",
+                title = getString(Res.string.trakt_watchlist),
                 type = TraktListType.WATCHLIST,
             ),
         )
@@ -629,7 +631,7 @@ object TraktLibraryRepository {
             val traktId = list.ids?.trakt ?: return@mapNotNull null
             TraktListTab(
                 key = "$PERSONAL_LIST_PREFIX$traktId",
-                title = list.name?.ifBlank { null } ?: "List $traktId",
+                title = list.name?.ifBlank { null } ?: getString(Res.string.trakt_list_fallback_title, traktId),
                 type = TraktListType.PERSONAL,
                 traktListId = traktId,
                 slug = list.ids.slug,
@@ -934,4 +936,3 @@ private data class TraktListShowRequestItemDto(
     val year: Int? = null,
     val ids: TraktIdsDto? = null,
 )
-

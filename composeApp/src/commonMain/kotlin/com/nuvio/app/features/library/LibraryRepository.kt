@@ -11,6 +11,7 @@ import io.github.jan.supabase.postgrest.rpc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.library_other
+import org.jetbrains.compose.resources.getString
 
 @Serializable
 private data class StoredLibraryPayload(
@@ -366,7 +370,7 @@ private fun LibraryItem.toSyncItem(): LibrarySyncItem = LibrarySyncItem(
 
 internal fun String.toLibraryDisplayTitle(): String {
     val normalized = trim()
-    if (normalized.isBlank()) return "Other"
+    if (normalized.isBlank()) return runBlocking { getString(Res.string.library_other) }
 
     return normalized
         .split('-', '_', ' ')
@@ -374,5 +378,5 @@ internal fun String.toLibraryDisplayTitle(): String {
         .joinToString(" ") { token ->
             token.lowercase().replaceFirstChar { char -> char.uppercase() }
         }
-        .ifBlank { "Other" }
+        .ifBlank { runBlocking { getString(Res.string.library_other) } }
 }

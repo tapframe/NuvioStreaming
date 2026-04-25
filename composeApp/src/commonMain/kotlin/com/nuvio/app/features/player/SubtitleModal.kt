@@ -43,6 +43,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.addon_title
+import nuvio.composeapp.generated.resources.compose_player_built_in
+import nuvio.composeapp.generated.resources.compose_player_fetch_subtitles
+import nuvio.composeapp.generated.resources.compose_player_none
+import nuvio.composeapp.generated.resources.compose_player_style
+import nuvio.composeapp.generated.resources.compose_player_subtitles
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun SubtitleModal(
@@ -110,7 +118,7 @@ fun SubtitleModal(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                text = "Subtitles",
+                                text = stringResource(Res.string.compose_player_subtitles),
                                 color = colorScheme.onSurface,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
@@ -191,9 +199,9 @@ private fun SubtitleTabBar(
             ) {
                 Text(
                     text = when (tab) {
-                        SubtitleTab.BuiltIn -> "Built-in"
-                        SubtitleTab.Addons -> "Addons"
-                        SubtitleTab.Style -> "Style"
+                        SubtitleTab.BuiltIn -> stringResource(Res.string.compose_player_built_in)
+                        SubtitleTab.Addons -> stringResource(Res.string.addon_title)
+                        SubtitleTab.Style -> stringResource(Res.string.compose_player_style)
                     },
                     color = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
@@ -230,7 +238,7 @@ private fun BuiltInSubtitleList(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "None",
+                text = stringResource(Res.string.compose_player_none),
                 color = if (isNoneSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -258,7 +266,7 @@ private fun BuiltInSubtitleList(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = getTrackDisplayName(track.label, track.language, track.index),
+                    text = localizedTrackDisplayName(track.label, track.language, track.index),
                     color = if (isSelected) colorScheme.onPrimaryContainer else colorScheme.onSurface,
                     fontSize = 15.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -324,7 +332,7 @@ private fun AddonSubtitleList(
                     modifier = Modifier.size(32.dp),
                 )
                 Text(
-                    text = "Tap to fetch subtitles",
+                    text = stringResource(Res.string.compose_player_fetch_subtitles),
                     color = colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 10.dp),
                 )
@@ -360,7 +368,7 @@ private fun AddonSubtitleList(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = formatLanguage(sub.language),
+                        text = languageLabelForCode(sub.language),
                         color = if (isSelected) colorScheme.onPrimaryContainer.copy(alpha = 0.72f) else colorScheme.onSurfaceVariant,
                         fontSize = 11.sp,
                         modifier = Modifier.padding(bottom = 3.dp),

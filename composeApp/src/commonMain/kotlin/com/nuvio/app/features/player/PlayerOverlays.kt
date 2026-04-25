@@ -59,6 +59,14 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.nuvioTypeScale
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_player_close
+import nuvio.composeapp.generated.resources.compose_player_episode_code_full
+import nuvio.composeapp.generated.resources.compose_player_go_back
+import nuvio.composeapp.generated.resources.compose_player_playback_error
+import nuvio.composeapp.generated.resources.compose_player_youre_watching
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.max
 
 internal enum class GestureFeedbackIcon {
@@ -71,10 +79,14 @@ internal enum class GestureFeedbackIcon {
 }
 
 internal data class GestureFeedbackState(
-    val message: String,
+    val message: String? = null,
+    val messageRes: StringResource? = null,
+    val messageArgs: List<Any> = emptyList(),
     val icon: GestureFeedbackIcon = GestureFeedbackIcon.Speed,
     val isDanger: Boolean = false,
     val secondaryMessage: String? = null,
+    val secondaryMessageRes: StringResource? = null,
+    val secondaryMessageArgs: List<Any> = emptyList(),
     val secondaryMessageColor: Color? = null,
 )
 
@@ -141,7 +153,7 @@ internal fun OpeningOverlay(
             contentColor = Color.White,
             buttonSize = 44.dp,
             iconSize = 24.dp,
-            contentDescription = "Close player",
+            contentDescription = stringResource(Res.string.compose_player_close),
         )
 
         Column(
@@ -218,6 +230,12 @@ internal fun GestureFeedbackPill(
         GestureFeedbackIcon.SeekBackward -> Icons.Rounded.FastRewind
     }
     val iconTint = if (feedback.isDanger) Color(0xFFFFC1C1) else Color.White
+    val messageText = feedback.messageRes?.let { resource ->
+        stringResource(resource, *feedback.messageArgs.toTypedArray())
+    } ?: feedback.message.orEmpty()
+    val secondaryMessageText = feedback.secondaryMessageRes?.let { resource ->
+        stringResource(resource, *feedback.secondaryMessageArgs.toTypedArray())
+    } ?: feedback.secondaryMessage
 
     Row(
         modifier = modifier
@@ -242,11 +260,11 @@ internal fun GestureFeedbackPill(
             )
         }
         Text(
-            text = feedback.message,
+            text = messageText,
             style = MaterialTheme.nuvioTypeScale.bodyLg.copy(fontWeight = FontWeight.SemiBold),
             color = Color.White,
         )
-        feedback.secondaryMessage?.let { secondaryMessage ->
+        secondaryMessageText?.let { secondaryMessage ->
             Text(
                 text = secondaryMessage,
                 style = MaterialTheme.nuvioTypeScale.bodyMd.copy(fontWeight = FontWeight.SemiBold),
@@ -290,7 +308,7 @@ internal fun PauseMetadataOverlay(
         verticalArrangement = Arrangement.Bottom,
     ) {
         Text(
-            text = "You're watching",
+            text = stringResource(Res.string.compose_player_youre_watching),
             style = MaterialTheme.nuvioTypeScale.bodyLg,
             color = Color(0xFFB8B8B8),
         )
@@ -318,7 +336,7 @@ internal fun PauseMetadataOverlay(
         }
 
         val episodeInfo = if (isEpisode && seasonNumber != null && episodeNumber != null) {
-            "S${seasonNumber}E${episodeNumber}"
+            stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)
         } else {
             providerName
         }
@@ -377,7 +395,7 @@ internal fun ErrorModal(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Playback error",
+                text = stringResource(Res.string.compose_player_playback_error),
                 style = MaterialTheme.nuvioTypeScale.displaySm.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 textAlign = TextAlign.Center,
@@ -399,7 +417,7 @@ internal fun ErrorModal(
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(
-                    text = "Go back",
+                    text = stringResource(Res.string.compose_player_go_back),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),

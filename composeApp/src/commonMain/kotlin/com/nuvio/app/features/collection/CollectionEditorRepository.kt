@@ -93,10 +93,10 @@ object CollectionEditorRepository {
     }
 
     @OptIn(ExperimentalUuidApi::class)
-    fun addFolder() {
+    fun addFolder(defaultTitle: String) {
         val newFolder = CollectionFolder(
             id = Uuid.random().toString(),
-            title = "New Folder",
+            title = defaultTitle,
         )
         _uiState.value = _uiState.value.copy(
             editingFolder = newFolder,
@@ -177,13 +177,8 @@ object CollectionEditorRepository {
 
     fun updateFolderTileShape(shape: PosterShape) {
         val folder = _uiState.value.editingFolder ?: return
-        val shapeStr = when (shape) {
-            PosterShape.Poster -> "Poster"
-            PosterShape.Landscape -> "Landscape"
-            PosterShape.Square -> "Square"
-        }
         _uiState.value = _uiState.value.copy(
-            editingFolder = folder.copy(tileShape = shapeStr),
+            editingFolder = folder.copy(tileShape = shape.name.lowercase()),
         )
     }
 

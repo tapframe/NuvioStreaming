@@ -63,6 +63,8 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.discoverContent(
     state: DiscoverUiState,
@@ -91,7 +93,11 @@ internal fun LazyListScope.discoverContent(
     state.selectedCatalog?.let { selectedCatalog ->
         item {
             Text(
-                text = "${selectedCatalog.addonName} • ${selectedCatalog.type.displayTypeLabel()}",
+                text = stringResource(
+                    Res.string.discover_catalog_context,
+                    selectedCatalog.addonName,
+                    selectedCatalog.type.displayTypeLabel(),
+                ),
                 modifier = Modifier.padding(horizontal = 16.dp),
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontSize = 14.sp,
@@ -149,7 +155,7 @@ internal fun LazyListScope.discoverContent(
 @Composable
 private fun DiscoverSectionHeader(modifier: Modifier = Modifier) {
     Text(
-        text = "Discover",
+        text = stringResource(Res.string.compose_search_discover_title),
         modifier = modifier,
         style = MaterialTheme.typography.displaySmall,
         color = MaterialTheme.colorScheme.onBackground,
@@ -169,16 +175,16 @@ private fun DiscoverFilterRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DiscoverDropdownChip(
-            title = "Select Type",
-            label = state.selectedType?.displayTypeLabel() ?: "Type",
+            title = stringResource(Res.string.discover_select_type),
+            label = state.selectedType?.displayTypeLabel() ?: stringResource(Res.string.discover_type),
             selectedKey = state.selectedType,
             options = state.typeOptions.map { DiscoverOptionItem(key = it, label = it.displayTypeLabel()) },
             enabled = state.typeOptions.isNotEmpty(),
             onSelected = { onTypeSelected(it.key) },
         )
         DiscoverDropdownChip(
-            title = "Select Catalog",
-            label = state.selectedCatalog?.catalogName ?: "Catalog",
+            title = stringResource(Res.string.discover_select_catalog),
+            label = state.selectedCatalog?.catalogName ?: stringResource(Res.string.discover_catalog),
             selectedKey = state.selectedCatalogKey,
             options = state.catalogOptions.map { option -> DiscoverOptionItem(key = option.key, label = option.catalogName) },
             enabled = state.catalogOptions.isNotEmpty(),
@@ -188,13 +194,13 @@ private fun DiscoverFilterRow(
         val selectedCatalog = state.selectedCatalog
         val genreOptions = buildList {
             if (selectedCatalog?.genreRequired != true) {
-                add(DiscoverOptionItem(key = "", label = "All Genres"))
+                add(DiscoverOptionItem(key = "", label = stringResource(Res.string.discover_all_genres)))
             }
             addAll(state.genreOptions.map { genre -> DiscoverOptionItem(key = genre, label = genre) })
         }
         DiscoverDropdownChip(
-            title = "Select Genre",
-            label = state.selectedGenre ?: "All Genres",
+            title = stringResource(Res.string.discover_select_genre),
+            label = state.selectedGenre ?: stringResource(Res.string.discover_all_genres),
             selectedKey = state.selectedGenre ?: "",
             options = genreOptions,
             enabled = genreOptions.size > 1 || selectedCatalog?.genreRequired == true,
@@ -490,23 +496,23 @@ private fun DiscoverEmptyStateCard(
 
     when (reason) {
         DiscoverEmptyStateReason.NoActiveAddons -> {
-            title = "No active addons"
-            message = "Install and validate at least one addon before browsing discover catalogs."
+            title = stringResource(Res.string.compose_search_empty_no_active_addons_title)
+            message = stringResource(Res.string.discover_empty_no_active_addons_message)
         }
 
         DiscoverEmptyStateReason.NoDiscoverCatalogs -> {
-            title = "No discover catalogs"
-            message = "Installed addons do not expose board-compatible catalogs for discover."
+            title = stringResource(Res.string.discover_empty_no_catalogs_title)
+            message = stringResource(Res.string.discover_empty_no_catalogs_message)
         }
 
         DiscoverEmptyStateReason.RequestFailed -> {
-            title = "Could not load discover"
-            message = errorMessage ?: "The selected catalog failed to return discover items."
+            title = stringResource(Res.string.discover_empty_load_failed_title)
+            message = errorMessage ?: stringResource(Res.string.discover_empty_load_failed_message)
         }
 
         DiscoverEmptyStateReason.NoResults, null -> {
-            title = "No titles found"
-            message = "The selected catalog and filters did not return any items."
+            title = stringResource(Res.string.discover_empty_no_results_title)
+            message = stringResource(Res.string.discover_empty_no_results_message)
         }
     }
 
@@ -522,13 +528,14 @@ private data class DiscoverOptionItem(
     val label: String,
 )
 
+@Composable
 private fun String.displayTypeLabel(): String =
     when (lowercase()) {
-        "movie" -> "Movies"
-        "series" -> "Series"
-        "anime" -> "Anime"
-        "channel" -> "Channels"
-        "tv" -> "TV"
+        "movie" -> stringResource(Res.string.media_movies)
+        "series" -> stringResource(Res.string.media_series)
+        "anime" -> stringResource(Res.string.media_anime)
+        "channel" -> stringResource(Res.string.media_channels)
+        "tv" -> stringResource(Res.string.media_tv)
         else -> replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
     }
 

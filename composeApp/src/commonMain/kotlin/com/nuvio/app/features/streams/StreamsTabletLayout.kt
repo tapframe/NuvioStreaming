@@ -45,6 +45,8 @@ import com.nuvio.app.isIos
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun TabletStreamsLayout(
@@ -250,7 +252,7 @@ private fun TabletMovieInfoPanel(
             )
         } else {
             Text(
-                text = "No metadata available",
+                text = stringResource(Res.string.streams_no_metadata),
                 style = MaterialTheme.typography.bodyLarge.copy(
                     fontSize = 16.sp,
                     fontStyle = FontStyle.Italic,
@@ -309,7 +311,12 @@ private fun TabletEpisodeInfoPanel(
 
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "S${seasonNumber}E${episodeNumber} - ${episodeTitle?.takeIf { it.isNotBlank() } ?: "Episode"}",
+            text = stringResource(
+                Res.string.streams_episode_title_with_name,
+                seasonNumber,
+                episodeNumber,
+                episodeTitle?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.streams_episode_fallback_title),
+            ),
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontSize = 16.sp,
                 lineHeight = 24.sp,
@@ -340,7 +347,7 @@ private fun ActiveScrapersStatusBlock(
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Text(
-            text = "Active scrapers",
+            text = stringResource(Res.string.streams_active_scrapers),
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
@@ -375,4 +382,3 @@ private fun ActiveScrapersStatusBlock(
         }
     }
 }
-

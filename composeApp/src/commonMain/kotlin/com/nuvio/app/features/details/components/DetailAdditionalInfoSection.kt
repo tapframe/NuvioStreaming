@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.formatRuntimeForDisplay
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun DetailAdditionalInfoSection(
@@ -27,14 +29,24 @@ fun DetailAdditionalInfoSection(
     showHeader: Boolean = true,
 ) {
     val isSeriesLike = meta.type == "series" || meta.videos.any { it.season != null || it.episode != null }
-    val title = if (isSeriesLike) "Show Details" else "Movie Details"
+    val title = if (isSeriesLike) {
+        stringResource(Res.string.details_show_details)
+    } else {
+        stringResource(Res.string.details_movie_details)
+    }
     val rows = buildList {
-        meta.status?.let { add("Status" to it) }
-        meta.releaseInfo?.let { add("Release Info" to formatReleaseDateForDisplay(it)) }
-        formatRuntimeForDisplay(meta.runtime)?.let { add("Runtime" to it) }
-        meta.ageRating?.let { add("Certification" to it) }
-        meta.country?.let { add("Origin Country" to it) }
-        meta.language?.let { add("Original Language" to it.uppercase()) }
+        meta.status?.let { add(stringResource(Res.string.details_status) to it) }
+        meta.releaseInfo?.let {
+            add(stringResource(Res.string.details_release_info) to formatReleaseDateForDisplay(it))
+        }
+        formatRuntimeForDisplay(meta.runtime)?.let {
+            add(stringResource(Res.string.details_runtime) to it)
+        }
+        meta.ageRating?.let { add(stringResource(Res.string.details_certification) to it) }
+        meta.country?.let { add(stringResource(Res.string.details_origin_country) to it) }
+        meta.language?.let {
+            add(stringResource(Res.string.details_original_language) to it.uppercase())
+        }
     }
     if (rows.isEmpty()) return
 
