@@ -5,6 +5,7 @@ import nuvio.composeapp.generated.resources.lang_english
 import nuvio.composeapp.generated.resources.lang_spanish
 import nuvio.composeapp.generated.resources.lang_turkish
 import nuvio.composeapp.generated.resources.lang_italian
+import nuvio.composeapp.generated.resources.lang_portuguese_portugal
 import nuvio.composeapp.generated.resources.lang_greek
 import org.jetbrains.compose.resources.StringResource
 
