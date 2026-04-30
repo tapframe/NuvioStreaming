@@ -46,6 +46,8 @@ enum class TmdbBuilderMode {
     PRODUCTION,
     NETWORK,
     COLLECTION,
+    PERSON,
+    DIRECTOR,
     DISCOVER,
 }
 
@@ -340,9 +342,15 @@ object CollectionEditorRepository {
         } else {
             _uiState.value.tmdbMediaType
         }
+        val sortBy = when (mode) {
+            TmdbBuilderMode.LIST,
+            TmdbBuilderMode.COLLECTION -> TmdbCollectionSort.ORIGINAL.value
+            else -> TmdbCollectionSort.POPULAR_DESC.value
+        }
         _uiState.value = _uiState.value.copy(
             tmdbBuilderMode = mode,
             tmdbMediaType = mediaType,
+            tmdbSortBy = sortBy,
             tmdbMediaBoth = if (
                 mode == TmdbBuilderMode.NETWORK ||
                 mode == TmdbBuilderMode.LIST ||
@@ -459,6 +467,8 @@ object CollectionEditorRepository {
             TmdbBuilderMode.COLLECTION -> TmdbCollectionSourceType.COLLECTION
             TmdbBuilderMode.PRODUCTION -> TmdbCollectionSourceType.COMPANY
             TmdbBuilderMode.NETWORK -> TmdbCollectionSourceType.NETWORK
+            TmdbBuilderMode.PERSON -> TmdbCollectionSourceType.PERSON
+            TmdbBuilderMode.DIRECTOR -> TmdbCollectionSourceType.DIRECTOR
             TmdbBuilderMode.DISCOVER -> TmdbCollectionSourceType.DISCOVER
         }
         val id = TmdbCollectionSourceResolver.parseTmdbId(state.tmdbInput)
@@ -473,6 +483,8 @@ object CollectionEditorRepository {
                 TmdbCollectionSourceType.COLLECTION -> "TMDB Collection ${id ?: ""}".trim()
                 TmdbCollectionSourceType.COMPANY -> "TMDB Production ${id ?: ""}".trim()
                 TmdbCollectionSourceType.NETWORK -> "TMDB Network ${id ?: ""}".trim()
+                TmdbCollectionSourceType.PERSON -> "TMDB Person ${id ?: ""}".trim()
+                TmdbCollectionSourceType.DIRECTOR -> "TMDB Director ${id ?: ""}".trim()
                 TmdbCollectionSourceType.DISCOVER -> "TMDB Discover"
             }
         }
@@ -561,6 +573,8 @@ private val coverMetadataSourceTypes = setOf(
     TmdbCollectionSourceType.COLLECTION,
     TmdbCollectionSourceType.COMPANY,
     TmdbCollectionSourceType.NETWORK,
+    TmdbCollectionSourceType.PERSON,
+    TmdbCollectionSourceType.DIRECTOR,
 )
 
 private fun CollectionCatalogSource.toCollectionSource(): CollectionSource =
@@ -591,6 +605,8 @@ private fun selectedMediaTypes(
 ): List<TmdbCollectionMediaType> =
     when (sourceType) {
         TmdbCollectionSourceType.COMPANY,
+        TmdbCollectionSourceType.PERSON,
+        TmdbCollectionSourceType.DIRECTOR,
         TmdbCollectionSourceType.DISCOVER -> if (state.tmdbMediaBoth) {
             listOf(TmdbCollectionMediaType.MOVIE, TmdbCollectionMediaType.TV)
         } else {

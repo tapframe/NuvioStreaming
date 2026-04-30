@@ -140,16 +140,19 @@ object FolderDetailRepository {
                             source = source,
                             type = type,
                             catalogId = tmdbCatalogId(source),
-                            supportsPagination = source.tmdbSourceType != TmdbCollectionSourceType.COLLECTION.name,
+                            supportsPagination = source.tmdbSourceType !in setOf(
+                                TmdbCollectionSourceType.COLLECTION.name,
+                                TmdbCollectionSourceType.PERSON.name,
+                                TmdbCollectionSourceType.DIRECTOR.name,
+                            ),
                             isLoading = true,
                         ),
                     )
                 } else {
                     val catalogSource = source.addonCatalogSource() ?: return@forEach
-                    val addon = addons.find { it.manifest?.id == catalogSource.addonId }
-                    val catalog = addon?.manifest?.catalogs?.find {
-                        it.id == catalogSource.catalogId && it.type == catalogSource.type
-                    }
+                    val resolvedCatalog = addons.findCollectionCatalog(catalogSource)
+                    val addon = resolvedCatalog?.addon
+                    val catalog = resolvedCatalog?.catalog
                     val label = catalog?.name ?: catalogSource.catalogId
                     val typeLabel = localizedMediaTypeLabel(catalogSource.type)
                     val genreSuffix = if (catalogSource.genre != null) " · ${catalogSource.genre}" else ""
@@ -184,8 +187,8 @@ object FolderDetailRepository {
         sources.forEachIndexed { sourceIndex, source ->
             val tabIndex = if (showAll) sourceIndex + 1 else sourceIndex
             val catalogSource = source.addonCatalogSource()
-            val addon = catalogSource?.let { value -> addons.find { it.manifest?.id == value.addonId } }
-            if (!source.isTmdb && addon == null) {
+            val resolvedCatalog = catalogSource?.let { addons.findCollectionCatalog(it) }
+            if (!source.isTmdb && resolvedCatalog == null) {
                 updateTab(tabIndex) {
                     it.copy(
                         isLoading = false,

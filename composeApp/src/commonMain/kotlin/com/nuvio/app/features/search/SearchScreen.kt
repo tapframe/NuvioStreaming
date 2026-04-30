@@ -44,6 +44,7 @@ import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
@@ -303,9 +304,10 @@ fun SearchScreen(
 
                 else -> {
                     items(
-                        items = uiState.sections,
-                        key = { section -> section.key },
-                    ) { section ->
+                        items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
+                        key = { section -> section.lazyKey },
+                    ) { keyedSection ->
+                        val section = keyedSection.value
                         HomeCatalogRowSection(
                             section = section,
                             modifier = Modifier.padding(bottom = 12.dp),

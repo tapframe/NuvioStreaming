@@ -1,39 +1,52 @@
 package com.nuvio.app.features.downloads
 
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.darwin.Darwin
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readAvailable
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import platform.Foundation.NSError
+import platform.Foundation.NSDate
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSHTTPURLResponse
 import platform.Foundation.NSHomeDirectory
+import platform.Foundation.NSMutableURLRequest
+import platform.Foundation.NSOperationQueue
 import platform.Foundation.NSURL
-import platform.posix.fclose
+import platform.Foundation.NSURLRequestReloadIgnoringLocalCacheData
+import platform.Foundation.NSURLResponse
+import platform.Foundation.NSURLSession
+import platform.Foundation.NSURLSessionConfiguration
+import platform.Foundation.NSURLSessionDownloadDelegateProtocol
+import platform.Foundation.NSURLSessionDownloadTask
+import platform.Foundation.NSURLSessionTask
+import platform.Foundation.setHTTPMethod
+import platform.Foundation.setValue
+import platform.Foundation.timeIntervalSince1970
+import platform.darwin.NSObject
 import platform.posix.fopen
+import platform.posix.fclose
+import platform.posix.fread
 import platform.posix.fwrite
 
-private val downloadHttpClient = HttpClient(Darwin) {
-    install(HttpTimeout) {
-        requestTimeoutMillis = 60_000
-        connectTimeoutMillis = 60_000
-        socketTimeoutMillis = 60_000
-    }
-    expectSuccess = false
+private const val DOWNLOAD_REQUEST_TIMEOUT_SECONDS = 60.0
+private const val DOWNLOAD_RESOURCE_TIMEOUT_SECONDS = 24.0 * 60.0 * 60.0
+private const val PROGRESS_MIN_INTERVAL_SECONDS = 0.5
+private const val PROGRESS_MIN_BYTE_DELTA = 512L * 1024L
+
+private val backgroundSessionCompletionHandlers = mutableMapOf<String, () -> Unit>()
+
+fun handleDownloadsBackgroundEvents(
+    identifier: String,
+    completionHandler: () -> Unit,
+) {
+    backgroundSessionCompletionHandlers[identifier] = completionHandler
 }
 
 @OptIn(ExperimentalForeignApi::class)
@@ -46,6 +59,7 @@ internal actual object DownloadsPlatformDownloader {
     ): DownloadsTaskHandle {
         val job = SupervisorJob()
         val scope = CoroutineScope(job + Dispatchers.Default)
+        val handle = IosDownloadsTaskHandle(job)
 
         scope.launch {
             val downloadsDirectory = downloadsDirectoryPath()
@@ -55,55 +69,42 @@ internal actual object DownloadsPlatformDownloader {
             try {
                 var resumeFromBytes = fileSizeOrNull(tempPath)?.coerceAtLeast(0L) ?: 0L
 
-                suspend fun performRequest(rangeStart: Long?) = downloadHttpClient.get(request.sourceUrl) {
-                    request.sourceHeaders.forEach { (key, value) ->
-                        header(key, value)
-                    }
-                    if (rangeStart != null && rangeStart > 0L) {
-                        header("Range", "bytes=$rangeStart-")
-                    }
-                }
-
                 var attemptedRangeRequest = resumeFromBytes > 0L
-                var response = performRequest(if (attemptedRangeRequest) resumeFromBytes else null)
+                var result = performDownloadRequest(
+                    request = request,
+                    rangeStart = if (attemptedRangeRequest) resumeFromBytes else null,
+                    resumeFromBytes = resumeFromBytes,
+                    tempPath = tempPath,
+                    handle = handle,
+                    onProgress = onProgress,
+                )
 
-                if (attemptedRangeRequest && response.status.value == 416) {
+                if (attemptedRangeRequest && result.statusCode == 416) {
                     removePathIfExists(tempPath)
                     resumeFromBytes = 0L
                     attemptedRangeRequest = false
-                    response = performRequest(null)
+                    result = performDownloadRequest(
+                        request = request,
+                        rangeStart = null,
+                        resumeFromBytes = 0L,
+                        tempPath = tempPath,
+                        handle = handle,
+                        onProgress = onProgress,
+                    )
                 }
 
-                if (!response.status.isSuccess()) {
-                    error("Request failed with HTTP ${response.status.value}")
+                if (result.statusCode !in 200..299) {
+                    error("Request failed with HTTP ${result.statusCode}")
                 }
 
-                val isPartialResume = attemptedRangeRequest && response.status.value == 206 && resumeFromBytes > 0L
-                val appendToTemp = isPartialResume
-                val startingBytes = if (appendToTemp) resumeFromBytes else 0L
-
-                if (!appendToTemp) {
-                    removePathIfExists(tempPath)
-                }
-
+                val isPartialResume = attemptedRangeRequest && result.statusCode == 206 && resumeFromBytes > 0L
+                val startingBytes = if (isPartialResume) resumeFromBytes else 0L
                 val totalBytes = resolveTotalBytes(
                     startingBytes = startingBytes,
                     isPartialResume = isPartialResume,
-                    contentRangeHeader = response.headers["Content-Range"],
-                    contentLength = response.headers["Content-Length"]?.toLongOrNull()?.takeIf { it > 0L },
+                    contentRangeHeader = result.contentRange,
+                    contentLength = result.contentLength,
                 )
-                val channel = response.bodyAsChannel()
-                val wrote = writeChannelToFile(
-                    channel = channel,
-                    path = tempPath,
-                    append = appendToTemp,
-                    initialDownloadedBytes = startingBytes,
-                    totalBytes = totalBytes,
-                    onProgress = onProgress,
-                )
-                if (!wrote) {
-                    error("Failed to write download file")
-                }
 
                 removePathIfExists(destinationPath)
                 val moved = NSFileManager.defaultManager.moveItemAtPath(
@@ -118,12 +119,14 @@ internal actual object DownloadsPlatformDownloader {
                 val localFileUri = NSURL.fileURLWithPath(destinationPath).absoluteString ?: "file://$destinationPath"
                 val finalSize = fileSizeOrNull(destinationPath)
                 onSuccess(localFileUri, totalBytes ?: finalSize)
+            } catch (_: CancellationException) {
+                handle.cancelNativeTask()
             } catch (error: Throwable) {
                 onFailure(error.message ?: "Download failed")
             }
         }
 
-        return IosDownloadsTaskHandle(job)
+        return handle
     }
 
     actual fun removeFile(localFileUri: String?): Boolean {
@@ -141,9 +144,172 @@ internal actual object DownloadsPlatformDownloader {
 private class IosDownloadsTaskHandle(
     private val job: Job,
 ) : DownloadsTaskHandle {
+    private var task: NSURLSessionDownloadTask? = null
+    private var session: NSURLSession? = null
+
+    fun attach(task: NSURLSessionDownloadTask, session: NSURLSession) {
+        this.task = task
+        this.session = session
+    }
+
     override fun cancel() {
+        cancelNativeTask()
         job.cancel()
     }
+
+    fun cancelNativeTask() {
+        task?.cancel()
+        session?.invalidateAndCancel()
+        task = null
+        session = null
+    }
+}
+
+private data class IosDownloadResult(
+    val statusCode: Int,
+    val contentRange: String?,
+    val contentLength: Long?,
+)
+
+@OptIn(ExperimentalForeignApi::class)
+private class IosDownloadDelegate(
+    private val attemptedRangeRequest: Boolean,
+    private val resumeFromBytes: Long,
+    private val tempPath: String,
+    private val onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
+) : NSObject(), NSURLSessionDownloadDelegateProtocol {
+    private val completion = CompletableDeferred<IosDownloadResult>()
+    private var result: IosDownloadResult? = null
+    private var fileError: Throwable? = null
+    private var lastProgressBytes = -1L
+    private var lastProgressTimestampSeconds = 0.0
+
+    suspend fun awaitCompletion(): IosDownloadResult = completion.await()
+
+    override fun URLSession(
+        session: NSURLSession,
+        downloadTask: NSURLSessionDownloadTask,
+        didFinishDownloadingToURL: NSURL,
+    ) {
+        val httpResponse = downloadTask.response as? NSHTTPURLResponse
+        val statusCode = httpResponse?.statusCode?.toInt() ?: 200
+        result = IosDownloadResult(
+            statusCode = statusCode,
+            contentRange = httpResponse?.valueForHTTPHeaderField("Content-Range"),
+            contentLength = httpResponse
+                ?.valueForHTTPHeaderField("Content-Length")
+                ?.toLongOrNull()
+                ?.takeIf { it > 0L },
+        )
+
+        if (statusCode !in 200..299) return
+
+        val sourcePath = didFinishDownloadingToURL.path
+        if (sourcePath.isNullOrBlank()) {
+            fileError = IllegalStateException("Downloaded file was not available")
+            return
+        }
+
+        val isPartialResume = attemptedRangeRequest && statusCode == 206 && resumeFromBytes > 0L
+        val stored = if (isPartialResume) {
+            appendFile(sourcePath, tempPath)
+        } else {
+            removePathIfExists(tempPath) &&
+                NSFileManager.defaultManager.moveItemAtPath(
+                    srcPath = sourcePath,
+                    toPath = tempPath,
+                    error = null,
+                )
+        }
+
+        if (!stored) {
+            fileError = IllegalStateException("Failed to store download file")
+        }
+    }
+
+    override fun URLSession(
+        session: NSURLSession,
+        downloadTask: NSURLSessionDownloadTask,
+        didWriteData: Long,
+        totalBytesWritten: Long,
+        totalBytesExpectedToWrite: Long,
+    ) {
+        val statusCode = (downloadTask.response as? NSHTTPURLResponse)?.statusCode?.toInt()
+        val startingBytes = if (attemptedRangeRequest && statusCode == 206 && resumeFromBytes > 0L) {
+            resumeFromBytes
+        } else {
+            0L
+        }
+        val expectedTotal = totalBytesExpectedToWrite
+            .takeIf { it > 0L }
+            ?.let { startingBytes + it }
+        reportProgress(
+            downloadedBytes = startingBytes + totalBytesWritten.coerceAtLeast(0L),
+            totalBytes = expectedTotal,
+        )
+    }
+
+    override fun URLSession(
+        session: NSURLSession,
+        task: NSURLSessionTask,
+        didCompleteWithError: NSError?,
+    ) {
+        if (didCompleteWithError != null) {
+            completion.completeExceptionally(
+                IllegalStateException(didCompleteWithError.localizedDescription),
+            )
+            return
+        }
+
+        val error = fileError
+        if (error != null) {
+            completion.completeExceptionally(error)
+            return
+        }
+
+        completion.complete(result ?: task.response.toDownloadResult())
+    }
+
+    override fun URLSessionDidFinishEventsForBackgroundURLSession(session: NSURLSession) {
+        val identifier = session.configuration.identifier ?: return
+        backgroundSessionCompletionHandlers.remove(identifier)?.invoke()
+    }
+
+    private fun reportProgress(
+        downloadedBytes: Long,
+        totalBytes: Long?,
+    ) {
+        val normalizedDownloadedBytes = downloadedBytes.coerceAtLeast(0L)
+        val now = NSDate().timeIntervalSince1970
+        val byteDelta = normalizedDownloadedBytes - lastProgressBytes
+        val timeDelta = now - lastProgressTimestampSeconds
+        val reachedEnd = totalBytes != null && normalizedDownloadedBytes >= totalBytes
+
+        if (
+            lastProgressBytes >= 0L &&
+            !reachedEnd &&
+            byteDelta < PROGRESS_MIN_BYTE_DELTA &&
+            timeDelta < PROGRESS_MIN_INTERVAL_SECONDS
+        ) {
+            return
+        }
+
+        lastProgressBytes = normalizedDownloadedBytes
+        lastProgressTimestampSeconds = now
+        onProgress(normalizedDownloadedBytes, totalBytes)
+    }
+}
+
+private fun NSURLResponse?.toDownloadResult(): IosDownloadResult {
+    val httpResponse = this as? NSHTTPURLResponse
+    return IosDownloadResult(
+        statusCode = httpResponse?.statusCode?.toInt() ?: 200,
+        contentRange = httpResponse?.valueForHTTPHeaderField("Content-Range"),
+        contentLength = httpResponse
+            ?.valueForHTTPHeaderField("Content-Length")
+            ?.toLongOrNull()
+            ?.takeIf { it > 0L },
+    )
 }
 
 @OptIn(ExperimentalForeignApi::class)
@@ -166,45 +332,98 @@ private fun removePathIfExists(path: String): Boolean {
 }
 
 @OptIn(ExperimentalForeignApi::class)
-private suspend fun writeChannelToFile(
-    channel: ByteReadChannel,
-    path: String,
-    append: Boolean,
-    initialDownloadedBytes: Long,
-    totalBytes: Long?,
+private suspend fun performDownloadRequest(
+    request: DownloadPlatformRequest,
+    rangeStart: Long?,
+    resumeFromBytes: Long,
+    tempPath: String,
+    handle: IosDownloadsTaskHandle,
     onProgress: (downloadedBytes: Long, totalBytes: Long?) -> Unit,
-): Boolean {
-    val file = fopen(path, if (append) "ab" else "wb") ?: return false
+): IosDownloadResult {
+    val url = NSURL(string = request.sourceUrl)
+    val nativeRequest = NSMutableURLRequest(
+        uRL = url,
+        cachePolicy = NSURLRequestReloadIgnoringLocalCacheData,
+        timeoutInterval = DOWNLOAD_REQUEST_TIMEOUT_SECONDS,
+    )
+    nativeRequest.setHTTPMethod("GET")
+    nativeRequest.setAllowsCellularAccess(true)
+    nativeRequest.setAllowsExpensiveNetworkAccess(true)
+    nativeRequest.setAllowsConstrainedNetworkAccess(true)
+    request.sourceHeaders.forEach { (key, value) ->
+        nativeRequest.setValue(value, forHTTPHeaderField = key)
+    }
+    if (rangeStart != null && rangeStart > 0L) {
+        nativeRequest.setValue("bytes=$rangeStart-", forHTTPHeaderField = "Range")
+    }
+
+    val delegate = IosDownloadDelegate(
+        attemptedRangeRequest = rangeStart != null && rangeStart > 0L,
+        resumeFromBytes = resumeFromBytes,
+        tempPath = tempPath,
+        onProgress = onProgress,
+    )
+    val configuration = NSURLSessionConfiguration.defaultSessionConfiguration().apply {
+        timeoutIntervalForRequest = DOWNLOAD_REQUEST_TIMEOUT_SECONDS
+        timeoutIntervalForResource = DOWNLOAD_RESOURCE_TIMEOUT_SECONDS
+        waitsForConnectivity = true
+        allowsCellularAccess = true
+        allowsExpensiveNetworkAccess = true
+        allowsConstrainedNetworkAccess = true
+    }
+    val session = NSURLSession.sessionWithConfiguration(
+        configuration = configuration,
+        delegate = delegate,
+        delegateQueue = NSOperationQueue(),
+    )
+    val task = session.downloadTaskWithRequest(nativeRequest)
+
+    handle.attach(task, session)
+    onProgress(resumeFromBytes.coerceAtLeast(0L), null)
+    task.resume()
+
+    return try {
+        delegate.awaitCompletion()
+    } finally {
+        session.finishTasksAndInvalidate()
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun appendFile(sourcePath: String, destinationPath: String): Boolean {
+    val source = fopen(sourcePath, "rb") ?: return false
+    val destination = fopen(destinationPath, "ab") ?: run {
+        fclose(source)
+        return false
+    }
     val buffer = ByteArray(16 * 1024)
-    var downloadedBytes = initialDownloadedBytes
-    onProgress(downloadedBytes, totalBytes)
 
     return try {
         while (true) {
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            val read = channel.readAvailable(buffer, 0, buffer.size)
-            if (read < 0) break
-            if (read == 0) continue
+            val read = buffer.usePinned { pinned ->
+                fread(
+                    pinned.addressOf(0),
+                    1.convert(),
+                    buffer.size.convert(),
+                    source,
+                ).toInt()
+            }
+            if (read <= 0) break
 
-            val wroteChunk = buffer.usePinned { pinned ->
-                val written = fwrite(
+            val wrote = buffer.usePinned { pinned ->
+                fwrite(
                     pinned.addressOf(0),
                     1.convert(),
                     read.convert(),
-                    file,
-                )
-                written.toInt() == read
+                    destination,
+                ).toInt()
             }
-            if (!wroteChunk) {
-                return false
-            }
-
-            downloadedBytes += read.toLong()
-            onProgress(downloadedBytes, totalBytes)
+            if (wrote != read) return false
         }
         true
     } finally {
-        fclose(file)
+        fclose(source)
+        fclose(destination)
     }
 }
 

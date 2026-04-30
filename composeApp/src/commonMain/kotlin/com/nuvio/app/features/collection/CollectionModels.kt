@@ -69,6 +69,8 @@ enum class TmdbCollectionSourceType {
     COMPANY,
     NETWORK,
     DISCOVER,
+    PERSON,
+    DIRECTOR,
 }
 
 @Serializable
@@ -86,6 +88,7 @@ enum class TmdbCollectionMediaType(val value: String) {
 }
 
 enum class TmdbCollectionSort(val value: String) {
+    ORIGINAL("original"),
     POPULAR_DESC("popularity.desc"),
     VOTE_AVERAGE_DESC("vote_average.desc"),
     RELEASE_DATE_DESC("primary_release_date.desc"),

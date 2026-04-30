@@ -82,10 +82,10 @@ fun <T> NuvioShelfSection(
         ) {
             if (key != null) {
                 items(
-                    items = entries,
-                    key = key,
-                ) { entry ->
-                    itemContent(entry)
+                    items = entries.withDuplicateSafeLazyKeys(key),
+                    key = { entry -> entry.lazyKey },
+                ) { keyedEntry ->
+                    itemContent(keyedEntry.value)
                 }
             } else {
                 items(entries) { entry ->

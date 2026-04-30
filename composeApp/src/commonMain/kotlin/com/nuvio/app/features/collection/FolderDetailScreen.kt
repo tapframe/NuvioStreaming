@@ -54,6 +54,7 @@ import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
@@ -275,9 +276,10 @@ private fun TabbedGridContent(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         items(
-                            items = selectedTab.items,
-                            key = { item -> item.stableKey() },
-                        ) { item ->
+                            items = selectedTab.items.withDuplicateSafeLazyKeys { item -> item.stableKey() },
+                            key = { item -> item.lazyKey },
+                        ) { keyedItem ->
+                            val item = keyedItem.value
                             NuvioPosterCard(
                                 title = item.name,
                                 imageUrl = item.poster,
@@ -326,9 +328,10 @@ private fun RowsContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         items(
-            items = sections,
-            key = { it.key },
-        ) { section ->
+            items = sections.withDuplicateSafeLazyKeys { it.key },
+            key = { it.lazyKey },
+        ) { keyedSection ->
+            val section = keyedSection.value
             HomeCatalogRowSection(
                 section = section,
                 entries = section.items.take(18),

@@ -111,9 +111,7 @@ fun CollectionEditorScreen(
         val genrePickerSource = genrePickerIndex?.let { editingFolder.resolvedSources.getOrNull(it) }
         val genrePickerCatalogSource = genrePickerSource?.addonCatalogSource()
         val genrePickerCatalog = genrePickerCatalogSource?.let { source ->
-            state.availableCatalogs.find {
-                it.addonId == source.addonId && it.type == source.type && it.catalogId == source.catalogId
-            }
+            state.availableCatalogs.findAvailableCatalog(source)
         }
 
         FolderEditorPage(
@@ -757,11 +755,7 @@ private fun FolderEditorPage(
                                 } else if (addonSource != null) {
                                     FolderCatalogSourceCard(
                                         source = addonSource,
-                                        matchingCatalog = state.availableCatalogs.find {
-                                            it.addonId == addonSource.addonId &&
-                                                it.type == addonSource.type &&
-                                                it.catalogId == addonSource.catalogId
-                                        },
+                                        matchingCatalog = state.availableCatalogs.findAvailableCatalog(addonSource),
                                         onRemove = { CollectionEditorRepository.removeCatalogSource(index) },
                                         onOpenGenrePicker = { CollectionEditorRepository.showGenrePicker(index) },
                                     )
@@ -897,13 +891,19 @@ private fun TmdbSourcePickerScreen(
         TmdbBuilderMode.COLLECTION -> TmdbCollectionSourceType.COLLECTION
         TmdbBuilderMode.PRODUCTION -> TmdbCollectionSourceType.COMPANY
         TmdbBuilderMode.NETWORK -> TmdbCollectionSourceType.NETWORK
+        TmdbBuilderMode.PERSON -> TmdbCollectionSourceType.PERSON
+        TmdbBuilderMode.DIRECTOR -> TmdbCollectionSourceType.DIRECTOR
         TmdbBuilderMode.DISCOVER -> TmdbCollectionSourceType.DISCOVER
     }
     val requiresId = sourceType != TmdbCollectionSourceType.DISCOVER
     val showMediaControls = state.tmdbBuilderMode == TmdbBuilderMode.PRODUCTION ||
+        state.tmdbBuilderMode == TmdbBuilderMode.PERSON ||
+        state.tmdbBuilderMode == TmdbBuilderMode.DIRECTOR ||
         state.tmdbBuilderMode == TmdbBuilderMode.DISCOVER
     val showSortControls = state.tmdbBuilderMode == TmdbBuilderMode.PRODUCTION ||
         state.tmdbBuilderMode == TmdbBuilderMode.NETWORK ||
+        state.tmdbBuilderMode == TmdbBuilderMode.PERSON ||
+        state.tmdbBuilderMode == TmdbBuilderMode.DIRECTOR ||
         state.tmdbBuilderMode == TmdbBuilderMode.DISCOVER
     val showFilterControls = state.tmdbBuilderMode == TmdbBuilderMode.DISCOVER
 
@@ -1892,6 +1892,8 @@ private fun tmdbBuilderModeLabel(mode: TmdbBuilderMode): String =
         TmdbBuilderMode.PRODUCTION -> stringResource(Res.string.collections_editor_tmdb_production_mode)
         TmdbBuilderMode.NETWORK -> stringResource(Res.string.collections_editor_tmdb_network_mode)
         TmdbBuilderMode.COLLECTION -> stringResource(Res.string.collections_editor_tmdb_collection_mode)
+        TmdbBuilderMode.PERSON -> stringResource(Res.string.collections_editor_tmdb_person_mode)
+        TmdbBuilderMode.DIRECTOR -> stringResource(Res.string.collections_editor_tmdb_director_mode)
         TmdbBuilderMode.DISCOVER -> stringResource(Res.string.collections_editor_tmdb_custom_mode)
     }
 
@@ -1903,6 +1905,8 @@ private fun tmdbModeHelpText(mode: TmdbBuilderMode): String =
         TmdbBuilderMode.PRODUCTION -> stringResource(Res.string.collections_editor_tmdb_help_production)
         TmdbBuilderMode.NETWORK -> stringResource(Res.string.collections_editor_tmdb_help_network)
         TmdbBuilderMode.COLLECTION -> stringResource(Res.string.collections_editor_tmdb_help_collection)
+        TmdbBuilderMode.PERSON -> stringResource(Res.string.collections_editor_tmdb_help_person)
+        TmdbBuilderMode.DIRECTOR -> stringResource(Res.string.collections_editor_tmdb_help_director)
         TmdbBuilderMode.DISCOVER -> stringResource(Res.string.collections_editor_tmdb_help_discover)
     }
 
@@ -1913,6 +1917,8 @@ private fun tmdbInputLabel(mode: TmdbBuilderMode): String =
         TmdbBuilderMode.NETWORK -> stringResource(Res.string.collections_editor_tmdb_network_id)
         TmdbBuilderMode.COLLECTION -> stringResource(Res.string.collections_editor_tmdb_collection_id)
         TmdbBuilderMode.PRODUCTION -> stringResource(Res.string.collections_editor_tmdb_company_search)
+        TmdbBuilderMode.PERSON,
+        TmdbBuilderMode.DIRECTOR -> stringResource(Res.string.collections_editor_tmdb_person_id)
         else -> stringResource(Res.string.collections_editor_tmdb_id_or_url)
     }
 
@@ -1923,6 +1929,8 @@ private fun tmdbInputPlaceholder(mode: TmdbBuilderMode): String =
         TmdbBuilderMode.NETWORK -> stringResource(Res.string.collections_editor_tmdb_network_placeholder)
         TmdbBuilderMode.COLLECTION -> stringResource(Res.string.collections_editor_tmdb_collection_placeholder)
         TmdbBuilderMode.PRODUCTION -> stringResource(Res.string.collections_editor_tmdb_company_placeholder)
+        TmdbBuilderMode.PERSON,
+        TmdbBuilderMode.DIRECTOR -> stringResource(Res.string.collections_editor_tmdb_person_placeholder)
         else -> stringResource(Res.string.collections_editor_tmdb_id_or_url)
     }
 
@@ -1933,6 +1941,8 @@ private fun tmdbInputHelper(mode: TmdbBuilderMode): String =
         TmdbBuilderMode.COLLECTION -> stringResource(Res.string.collections_editor_tmdb_collection_helper)
         TmdbBuilderMode.NETWORK -> stringResource(Res.string.collections_editor_tmdb_network_helper)
         TmdbBuilderMode.LIST -> stringResource(Res.string.collections_editor_tmdb_list_helper)
+        TmdbBuilderMode.PERSON,
+        TmdbBuilderMode.DIRECTOR -> stringResource(Res.string.collections_editor_tmdb_person_helper)
         else -> ""
     }
 
@@ -1940,12 +1950,15 @@ private fun tmdbInputHelper(mode: TmdbBuilderMode): String =
 private fun tmdbTitlePlaceholder(mode: TmdbBuilderMode): String =
     when (mode) {
         TmdbBuilderMode.DISCOVER -> stringResource(Res.string.collections_editor_tmdb_discover_title_placeholder)
+        TmdbBuilderMode.PERSON -> stringResource(Res.string.collections_editor_tmdb_person_title_placeholder)
+        TmdbBuilderMode.DIRECTOR -> stringResource(Res.string.collections_editor_tmdb_director_title_placeholder)
         else -> stringResource(Res.string.collections_editor_tmdb_title_placeholder)
     }
 
 @Composable
 private fun tmdbSortLabel(sort: TmdbCollectionSort): String =
     when (sort) {
+        TmdbCollectionSort.ORIGINAL -> stringResource(Res.string.collections_editor_tmdb_sort_original)
         TmdbCollectionSort.POPULAR_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_popular)
         TmdbCollectionSort.VOTE_AVERAGE_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_top_rated)
         TmdbCollectionSort.RELEASE_DATE_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_recent)
@@ -1977,6 +1990,16 @@ private fun tmdbSourceSubtitle(source: CollectionSource): String {
         TmdbCollectionSourceType.NETWORK -> listOf(
             stringResource(Res.string.collections_editor_tmdb_subtitle_network),
             stringResource(Res.string.collections_editor_tmdb_series),
+            sort,
+        ).joinToString(" • ")
+        TmdbCollectionSourceType.PERSON -> listOf(
+            stringResource(Res.string.collections_editor_tmdb_subtitle_person),
+            media,
+            sort,
+        ).joinToString(" • ")
+        TmdbCollectionSourceType.DIRECTOR -> listOf(
+            stringResource(Res.string.collections_editor_tmdb_subtitle_director),
+            media,
             sort,
         ).joinToString(" • ")
         TmdbCollectionSourceType.DISCOVER -> listOf(

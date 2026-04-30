@@ -272,7 +272,7 @@ kotlin {
 
 afterEvaluate {
     dependencies {
-        add("fullImplementation", libs.quickjs.kt)
+        add("fullImplementation", files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
         add("fullImplementation", libs.ksoup)
     }
 }
