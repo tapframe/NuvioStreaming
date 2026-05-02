@@ -111,7 +111,7 @@ fun CatalogScreen(
                 lastVisible >= layoutInfo.totalItemsCount - 6
             }
             .distinctUntilChanged()
-            .filter { it && uiState.canLoadMore && !uiState.isLoading }
+            .filter { it && uiState.canLoadMore && !uiState.isLoading && selectedFilter == 0 } // Prevent aggressive fetching when filtered
             .collect {
                 CatalogRepository.loadMore()
             }

@@ -1,0 +1,12 @@
+--- composeApp/src/commonMain/kotlin/com/nuvio/app/features/catalog/CatalogScreen.kt
++++ composeApp/src/commonMain/kotlin/com/nuvio/app/features/catalog/CatalogScreen.kt
+@@ -107,7 +107,7 @@
+                 val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                 lastVisible >= layoutInfo.totalItemsCount - 6
+             }
+             .distinctUntilChanged()
+-            .filter { it && uiState.canLoadMore && !uiState.isLoading }
++            .filter { it && uiState.canLoadMore && !uiState.isLoading && selectedFilter == 0 } // Prevent aggressive fetching when filtered
+             .collect {
+                 CatalogRepository.loadMore()
+             }
