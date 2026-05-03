@@ -59,7 +59,7 @@ import org.jetbrains.compose.resources.stringResource
 private const val TrailerControlsAutoHideMs = 3500L
 
 @Composable
-fun FullscreenTrailerPlayer(
+fun TrailerPlayer(
     visible: Boolean,
     trailerTitle: String,
     trailerType: String,
