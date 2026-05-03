@@ -75,7 +75,7 @@ import com.nuvio.app.features.details.components.DetailProductionSection
 import com.nuvio.app.features.details.components.DetailSeriesContent
 import com.nuvio.app.features.details.components.DetailTrailersSection
 import com.nuvio.app.features.details.components.EpisodeWatchedActionSheet
-import com.nuvio.app.features.details.components.TrailerPlayerPopup
+import com.nuvio.app.features.details.components.FullscreenTrailerPlayer
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toLibraryItem
@@ -822,7 +822,7 @@ fun MetaDetailsScreen(
                         }
 
                         if (inAppTrailerPlaybackEnabled) {
-                            TrailerPlayerPopup(
+                            FullscreenTrailerPlayer(
                                 visible = selectedTrailer != null,
                                 trailerTitle = selectedTrailer?.displayName ?: selectedTrailer?.name.orEmpty(),
                                 trailerType = selectedTrailer?.type.orEmpty(),
