@@ -137,12 +137,22 @@ struct TrackInfo {
     let selected: Bool
 }
 
+private struct PendingLoadRequest {
+    let urlString: String
+    let audioUrl: String?
+    let requestHeaders: [String: String]
+    let queuedAtUptime: TimeInterval
+}
+
 // MARK: - MPV Player View Controller
 
 final class MPVPlayerViewController: UIViewController {
 
     private let errorStateLock = NSLock()
     private var metalLayer = MetalLayer()
+    private var lastAppliedDrawableSize: CGSize = .zero
+    private var pendingLoadRequest: PendingLoadRequest?
+    private var pendingLoadRetryWorkItem: DispatchWorkItem?
     private var mpv: OpaquePointer?
     private lazy var eventQueue = DispatchQueue(label: "mpv-events", qos: .userInitiated)
     private var recentPlaybackLogs: [String] = []
@@ -188,12 +198,14 @@ final class MPVPlayerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        view.layer.masksToBounds = true
 
-        metalLayer.frame = view.bounds
-        metalLayer.contentsScale = UIScreen.main.nativeScale
+        metalLayer.contentsGravity = .resize
+        metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
         metalLayer.framebufferOnly = true
         metalLayer.backgroundColor = UIColor.black.cgColor
         view.layer.addSublayer(metalLayer)
+        layoutMetalLayer()
 
         setupMpv()
         setupNotifications()
@@ -207,17 +219,42 @@ final class MPVPlayerViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        metalLayer.frame = view.bounds
+        layoutMetalLayer()
+        attemptStartPendingLoad()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         refreshImmersiveSystemUI()
+        attemptStartPendingLoad()
     }
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
+        layoutMetalLayer()
         refreshImmersiveSystemUI()
+        attemptStartPendingLoad()
+    }
+
+    private func layoutMetalLayer() {
+        let bounds = view.bounds
+        guard bounds.width > 1, bounds.height > 1 else { return }
+
+        let scale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
+        let drawableSize = CGSize(
+            width: (bounds.width * scale).rounded(.toNearestOrAwayFromZero),
+            height: (bounds.height * scale).rounded(.toNearestOrAwayFromZero)
+        )
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        metalLayer.contentsScale = scale
+        metalLayer.frame = CGRect(origin: .zero, size: bounds.size)
+        if drawableSize != lastAppliedDrawableSize {
+            metalLayer.drawableSize = drawableSize
+            lastAppliedDrawableSize = drawableSize
+        }
+        CATransaction.commit()
     }
 
     // MARK: - MPV Setup
@@ -287,19 +324,78 @@ final class MPVPlayerViewController: UIViewController {
     // MARK: - Playback API
 
     func loadFile(_ urlString: String, audioUrl: String? = nil, requestHeaders: [String: String] = [:]) {
+        let request = PendingLoadRequest(
+            urlString: urlString,
+            audioUrl: audioUrl,
+            requestHeaders: requestHeaders,
+            queuedAtUptime: ProcessInfo.processInfo.systemUptime
+        )
+
+        if Thread.isMainThread {
+            queueLoad(request)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.queueLoad(request)
+            }
+        }
+    }
+
+    private func queueLoad(_ request: PendingLoadRequest) {
+        pendingLoadRequest = request
+        attemptStartPendingLoad()
+    }
+
+    private func attemptStartPendingLoad() {
+        guard let request = pendingLoadRequest else { return }
         guard mpv != nil else { return }
+        layoutMetalLayer()
+        guard isViewportReadyForPlayback(queuedAtUptime: request.queuedAtUptime) else {
+            schedulePendingLoadRetry()
+            return
+        }
+
+        pendingLoadRequest = nil
+        pendingLoadRetryWorkItem?.cancel()
+        pendingLoadRetryWorkItem = nil
+        startLoad(request)
+    }
+
+    private func startLoad(_ request: PendingLoadRequest) {
+        guard mpv != nil else { return }
+        layoutMetalLayer()
         clearPlaybackError()
-        let sanitizedHeaders = sanitizeRequestHeaders(requestHeaders)
+        let sanitizedHeaders = sanitizeRequestHeaders(request.requestHeaders)
         activeRequestHeaders = sanitizedHeaders
         applyRequestHeaders(sanitizedHeaders)
         isPlayerLoading = true
         isPlayerEnded = false
-        command("loadfile", args: [urlString, "replace"])
-        if let audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        command("loadfile", args: [request.urlString, "replace"])
+        if let audioUrl = request.audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 self?.command("audio-add", args: [audioUrl, "select"], checkForErrors: false)
             }
         }
+    }
+
+    private func isViewportReadyForPlayback(queuedAtUptime: TimeInterval) -> Bool {
+        guard isViewLoaded, view.window != nil else { return false }
+        let bounds = view.bounds
+        guard bounds.width > 1, bounds.height > 1 else { return false }
+        if bounds.width >= bounds.height { return true }
+
+        let age = ProcessInfo.processInfo.systemUptime - queuedAtUptime
+        return age >= 0.9
+    }
+
+    private func schedulePendingLoadRetry() {
+        guard pendingLoadRetryWorkItem == nil else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.pendingLoadRetryWorkItem = nil
+            self?.attemptStartPendingLoad()
+        }
+        pendingLoadRetryWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
     func playPlayback() {
@@ -350,8 +446,8 @@ final class MPVPlayerViewController: UIViewController {
             checkError(mpv_set_option_string(mpv, "panscan", "1.0"))
             checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
         case 2: // Zoom
-            checkError(mpv_set_option_string(mpv, "panscan", "0.0"))
-            checkError(mpv_set_option_string(mpv, "video-unscaled", "downscale-big"))
+            checkError(mpv_set_option_string(mpv, "panscan", "1.0"))
+            checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
         default: // Fit
             checkError(mpv_set_option_string(mpv, "panscan", "0.0"))
             checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
@@ -432,6 +528,9 @@ final class MPVPlayerViewController: UIViewController {
 
     func destroyPlayer() {
         NotificationCenter.default.removeObserver(self)
+        pendingLoadRetryWorkItem?.cancel()
+        pendingLoadRetryWorkItem = nil
+        pendingLoadRequest = nil
         clearPlaybackError()
         guard let ctx = mpv else { return }
         mpv = nil  // nil first so event loop stops reading

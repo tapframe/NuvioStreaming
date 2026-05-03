@@ -365,7 +365,7 @@ private fun ContinueWatchingWideCard(
                     Text(
                         text = stringResource(
                             Res.string.home_continue_watching_watched,
-                            continueWatchingProgressPercent(item.progressFraction),
+                            "${continueWatchingProgressPercent(item.progressFraction)}%",
                         ),
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = layout.progressLabelSize,

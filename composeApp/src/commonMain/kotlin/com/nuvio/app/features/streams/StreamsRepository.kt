@@ -424,8 +424,32 @@ object StreamsRepository {
         }
     }
 
+    fun cancelLoading() {
+        activeJob?.cancel()
+        activeJob = null
+        _uiState.update { current ->
+            if (!current.isAnyLoading && current.groups.none { it.isLoading }) {
+                current
+            } else {
+                val updatedGroups = current.groups.map { group ->
+                    if (group.isLoading) group.copy(isLoading = false) else group
+                }
+                current.copy(
+                    groups = updatedGroups,
+                    isAnyLoading = false,
+                    emptyStateReason = if (updatedGroups.isEmpty()) {
+                        current.emptyStateReason
+                    } else {
+                        updatedGroups.toEmptyStateReason(anyLoading = false)
+                    },
+                )
+            }
+        }
+    }
+
     fun clear() {
         activeJob?.cancel()
+        activeJob = null
         activeRequestKey = null
         _uiState.value = StreamsUiState()
     }

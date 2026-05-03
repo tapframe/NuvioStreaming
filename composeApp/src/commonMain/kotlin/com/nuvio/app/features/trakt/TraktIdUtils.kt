@@ -7,6 +7,7 @@ internal data class TraktExternalIds(
     val trakt: Int? = null,
     val imdb: String? = null,
     val tmdb: Int? = null,
+    val slug: String? = null,
 )
 
 internal fun parseTraktContentIds(contentId: String?): TraktExternalIds {

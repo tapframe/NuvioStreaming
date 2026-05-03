@@ -70,6 +70,7 @@ object ProfileRepository {
         val stored = decodeStoredPayload() ?: return false
         loadedCacheForUserId = stored.userId
         applyStoredPayload(stored)
+        ThemeSettingsRepository.onProfileChanged()
         return _state.value.profiles.isNotEmpty()
     }
 

@@ -48,8 +48,8 @@ object ThemeSettingsRepository {
         _selectedTheme.value = theme
         _amoledEnabled.value = ThemeSettingsStorage.loadAmoledEnabled() ?: false
         val appLanguage = AppLanguage.fromCode(ThemeSettingsStorage.loadSelectedAppLanguage())
-        _selectedAppLanguage.value = appLanguage
         ThemeSettingsStorage.applySelectedAppLanguage(appLanguage.code)
+        _selectedAppLanguage.value = appLanguage
     }
 
     fun setTheme(theme: AppTheme) {
@@ -69,8 +69,8 @@ object ThemeSettingsRepository {
     fun setAppLanguage(language: AppLanguage) {
         ensureLoaded()
         if (_selectedAppLanguage.value == language) return
-        _selectedAppLanguage.value = language
         ThemeSettingsStorage.saveSelectedAppLanguage(language.code)
         ThemeSettingsStorage.applySelectedAppLanguage(language.code)
+        _selectedAppLanguage.value = language
     }
 }

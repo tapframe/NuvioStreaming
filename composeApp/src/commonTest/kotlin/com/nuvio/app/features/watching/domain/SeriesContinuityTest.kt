@@ -39,7 +39,7 @@ class SeriesContinuityTest {
         )
 
         assertNotNull(action)
-        assertEquals("Up Next S1E3", action.label)
+        assertEquals("Up Next • S1E3", action.label)
         assertEquals("show:1:3", action.videoId)
         assertEquals(3, action.episodeNumber)
     }
@@ -142,7 +142,7 @@ class SeriesContinuityTest {
         )
 
         assertNotNull(action)
-        assertEquals("Up Next S2E2", action.label)
+        assertEquals("Up Next • S2E2", action.label)
         assertEquals("show:2:2", action.videoId)
     }
 }

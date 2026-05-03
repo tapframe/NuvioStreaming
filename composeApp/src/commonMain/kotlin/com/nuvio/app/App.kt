@@ -596,7 +596,9 @@ private fun MainAppContent(
             NetworkCondition.ServersUnreachable,
             -> {
                 offlineLaunchRouteHandled = true
-                val hasPlayableDownload = downloadsUiState.completedItems.any { it.isPlayable }
+                val hasPlayableDownload = downloadsUiState.completedItems.any {
+                    DownloadsRepository.playableLocalFileUri(it) != null
+                }
                 if (hasPlayableDownload) {
                     selectedTab = AppScreenTab.Settings
                     navController.navigate(DownloadsSettingsRoute) {
@@ -689,7 +691,7 @@ private fun MainAppContent(
                     episodeNumber = episodeNumber,
                     videoId = videoId,
                 )
-                val localSourceUrl = downloadedItem?.localFileUri
+                val localSourceUrl = downloadedItem?.let(DownloadsRepository::playableLocalFileUri)
                 if (!localSourceUrl.isNullOrBlank()) {
                     val launchId = PlayerLaunchStore.put(
                         PlayerLaunch(
@@ -1327,6 +1329,7 @@ private fun MainAppContent(
                             )
                         )
                         StreamsRepository.consumeAutoPlay()
+                        StreamsRepository.cancelLoading()
                         navController.navigate(PlayerRoute(launchId = launchId)) {
                             popUpTo<StreamRoute> { inclusive = true }
                         }
@@ -1405,6 +1408,7 @@ private fun MainAppContent(
                                         initialProgressFraction = resolvedResumeProgressFraction,
                                     )
                                 )
+                                StreamsRepository.cancelLoading()
                                 navController.navigate(
                                     PlayerRoute(launchId = launchId)
                                 )
@@ -1531,7 +1535,7 @@ private fun MainAppContent(
                     DownloadsScreen(
                         onBack = onBack,
                         onOpenDownload = { item ->
-                            val sourceUrl = item.localFileUri ?: return@DownloadsScreen
+                            val sourceUrl = DownloadsRepository.playableLocalFileUri(item) ?: return@DownloadsScreen
                             val resumeEntry = item.videoId
                                 .takeIf { it.isNotBlank() }
                                 ?.let(WatchProgressRepository::progressForVideo)

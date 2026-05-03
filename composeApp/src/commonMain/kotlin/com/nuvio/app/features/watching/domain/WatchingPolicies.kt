@@ -166,7 +166,11 @@ fun latestCompletedSeriesEpisode(
             { it.markedAtEpochMs },
         )
     } else {
-        compareBy<WatchingCompletedEpisode> { it.markedAtEpochMs }
+        compareBy<WatchingCompletedEpisode>(
+            { it.markedAtEpochMs },
+            { normalizeSeasonNumber(it.seasonNumber) },
+            { it.episodeNumber },
+        )
     }
     val allMarkers = buildList {
         progressRecords

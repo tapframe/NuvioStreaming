@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
@@ -79,6 +80,7 @@ internal fun PlayerControlsShell(
     onAudioClick: () -> Unit,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
+    onSubmitIntroClick: (() -> Unit)? = null,
     onScrubChange: (Long) -> Unit,
     onScrubFinished: (Long) -> Unit,
     horizontalSafePadding: androidx.compose.ui.unit.Dp,
@@ -166,6 +168,7 @@ internal fun PlayerControlsShell(
                 onAudioClick = onAudioClick,
                 onSourcesClick = onSourcesClick,
                 onEpisodesClick = onEpisodesClick,
+                onSubmitIntroClick = onSubmitIntroClick,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
@@ -421,6 +424,7 @@ private fun ProgressControls(
     onAudioClick: () -> Unit,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
+    onSubmitIntroClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val durationMs = playbackSnapshot.durationMs.coerceAtLeast(1L)
@@ -500,6 +504,13 @@ private fun ProgressControls(
                             label = stringResource(Res.string.compose_player_episodes),
                             icon = Icons.Rounded.VideoLibrary,
                             onClick = onEpisodesClick,
+                        )
+                    }
+                    if (onSubmitIntroClick != null) {
+                        PlayerActionPillButton(
+                            label = "Submit Intro",
+                            icon = Icons.Rounded.Flag,
+                            onClick = onSubmitIntroClick,
                         )
                     }
                 }

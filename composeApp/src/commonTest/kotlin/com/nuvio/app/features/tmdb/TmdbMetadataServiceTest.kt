@@ -9,6 +9,47 @@ import kotlin.test.assertEquals
 
 class TmdbMetadataServiceTest {
     @Test
+    fun `buildStandaloneMeta maps tmdb enrichment without addon meta`() {
+        val enrichment = TmdbEnrichment(
+            localizedTitle = "TMDB Movie",
+            description = "TMDB description",
+            genres = listOf("Adventure"),
+            backdrop = "backdrop",
+            logo = "logo",
+            poster = "poster",
+            people = listOf(MetaPerson(name = "Cast Member", role = "Hero")),
+            director = listOf("Director"),
+            writer = listOf("Writer"),
+            releaseInfo = "2026-01-01",
+            rating = 8.4,
+            runtimeMinutes = 105,
+            ageRating = "PG-13",
+            status = "Released",
+            countries = listOf("US", "GB"),
+            language = "en",
+            productionCompanies = listOf(MetaCompany(name = "Studio")),
+            networks = emptyList(),
+        )
+
+        val result = TmdbMetadataService.buildStandaloneMeta(
+            type = "movie",
+            id = "tmdb:123",
+            tmdbId = 123,
+            enrichment = enrichment,
+        )
+
+        assertEquals("tmdb:123", result.id)
+        assertEquals("movie", result.type)
+        assertEquals("TMDB Movie", result.name)
+        assertEquals("TMDB description", result.description)
+        assertEquals("8.4", result.imdbRating)
+        assertEquals("105m", result.runtime)
+        assertEquals("US, GB", result.country)
+        assertEquals(listOf("Cast Member"), result.cast.map { it.name })
+        assertEquals(listOf("Studio"), result.productionCompanies.map { it.name })
+    }
+
+    @Test
     fun `applyEnrichment replaces enabled metadata groups`() {
         val base = MetaDetails(
             id = "tt1234567",

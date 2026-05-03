@@ -65,7 +65,7 @@ private const val HERO_SCROLL_UP_SCALE_MULTIPLIER = 0.002f
 private const val HERO_SCROLL_MAX_SCALE = 1.3f
 private const val HERO_SWIPE_THRESHOLD_FRACTION = 0.16f
 private const val HERO_SWIPE_VELOCITY_THRESHOLD = 300f
-private const val MOBILE_HERO_VIEWPORT_RATIO = 0.78f
+private const val MOBILE_HERO_VIEWPORT_RATIO = 0.82f
 private const val MOBILE_HERO_MIN_HEIGHT_DP = 360f
 private const val MOBILE_HERO_MAX_HEIGHT_DP = 760f
 

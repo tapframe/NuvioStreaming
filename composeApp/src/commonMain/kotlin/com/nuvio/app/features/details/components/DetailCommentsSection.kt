@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.trakt.TraktCommentReview
 import kotlinx.coroutines.flow.distinctUntilChanged
 import nuvio.composeapp.generated.resources.*
@@ -122,7 +123,11 @@ fun DetailCommentsSection(
                     state = listState,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(comments, key = { it.id }) { review ->
+                    items(
+                        items = comments.withDuplicateSafeLazyKeys { it.id },
+                        key = { it.lazyKey },
+                    ) { keyedReview ->
+                        val review = keyedReview.value
                         CommentCard(
                             review = review,
                             onClick = { onCommentClick(review) },

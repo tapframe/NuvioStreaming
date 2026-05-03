@@ -169,6 +169,24 @@ internal actual object DownloadsPlatformDownloader {
         if (!tempFile.exists()) return true
         return runCatching { tempFile.delete() }.getOrDefault(false)
     }
+
+    actual fun resolveLocalFileUri(localFileUri: String?, destinationFileName: String): String? {
+        localFileUri
+            ?.toLocalFileOrNull()
+            ?.takeIf { it.exists() }
+            ?.let { return it.toURI().toString() }
+
+        val context = appContext ?: return null
+        val fileName = destinationFileName.trim().takeIf { it.isNotBlank() }
+            ?: localFileUri
+                ?.toLocalFileOrNull()
+                ?.name
+                ?.takeIf { it.isNotBlank() }
+            ?: return null
+        val downloadsDir = File(context.filesDir, "downloads")
+        val localFile = File(downloadsDir, fileName)
+        return localFile.takeIf { it.exists() }?.toURI()?.toString()
+    }
 }
 
 private class AndroidDownloadsTaskHandle(

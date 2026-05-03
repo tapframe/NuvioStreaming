@@ -638,6 +638,69 @@ object TmdbMetadataService {
         )
     }
 
+    suspend fun fetchStandaloneMeta(
+        type: String,
+        id: String,
+        settings: TmdbSettings,
+    ): MetaDetails? {
+        if (!settings.hasApiKey) return null
+
+        val tmdbId = id
+            .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
+            ?.substringAfter(':')
+            ?.substringBefore(':')
+            ?.toIntOrNull()
+            ?: return null
+        val tmdbType = normalizeMetaType(type)
+        val enrichment = fetchEnrichment(
+            tmdbId = tmdbId.toString(),
+            mediaType = tmdbType,
+            language = settings.language,
+            settings = settings,
+        ) ?: return null
+
+        return buildStandaloneMeta(
+            type = type,
+            id = id,
+            tmdbId = tmdbId,
+            enrichment = enrichment,
+        )
+    }
+
+    internal fun buildStandaloneMeta(
+        type: String,
+        id: String,
+        tmdbId: Int,
+        enrichment: TmdbEnrichment,
+    ): MetaDetails =
+        MetaDetails(
+            id = id,
+            type = type,
+            name = enrichment.localizedTitle ?: "TMDB $tmdbId",
+            poster = enrichment.poster,
+            background = enrichment.backdrop,
+            logo = enrichment.logo,
+            description = enrichment.description,
+            releaseInfo = enrichment.releaseInfo,
+            lastAirDate = enrichment.lastAirDate,
+            status = enrichment.status,
+            imdbRating = enrichment.rating?.formatRating(),
+            ageRating = enrichment.ageRating,
+            runtime = enrichment.runtimeMinutes?.formatRuntime(),
+            genres = enrichment.genres,
+            director = enrichment.director,
+            writer = enrichment.writer,
+            cast = enrichment.people,
+            productionCompanies = enrichment.productionCompanies,
+            networks = enrichment.networks,
+            country = enrichment.countries.takeIf { it.isNotEmpty() }?.joinToString(", "),
+            language = enrichment.language,
+            moreLikeThis = enrichment.moreLikeThis,
+            collectionName = enrichment.collectionName,
+            collectionItems = enrichment.collectionItems,
+            trailers = enrichment.trailers,
+        )
+
     internal fun applyEnrichment(
         meta: MetaDetails,
         enrichment: TmdbEnrichment?,

@@ -40,6 +40,7 @@ import com.nuvio.app.features.watchprogress.nextUpDismissKey
 import com.nuvio.app.features.watchprogress.WatchProgressClock
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import com.nuvio.app.features.watchprogress.buildContinueWatchingEpisodeSubtitle
 import com.nuvio.app.features.watchprogress.toContinueWatchingItem
 import com.nuvio.app.features.watchprogress.toUpNextContinueWatchingItem
 import com.nuvio.app.features.watching.application.WatchingState
@@ -617,7 +618,11 @@ private fun CachedNextUpItem.toContinueWatchingItem(): ContinueWatchingItem? {
         parentMetaType = contentType,
         videoId = videoId,
         title = name,
-        subtitle = episodeTitle.orEmpty(),
+        subtitle = buildContinueWatchingEpisodeSubtitle(
+            seasonNumber = season,
+            episodeNumber = episode,
+            episodeTitle = episodeTitle,
+        ),
         imageUrl = episodeThumbnail ?: backdrop ?: poster,
         logo = logo,
         poster = poster,
@@ -654,7 +659,11 @@ private fun CachedInProgressItem.toContinueWatchingItem(): ContinueWatchingItem 
         parentMetaType = contentType,
         videoId = videoId,
         title = name,
-        subtitle = episodeTitle.orEmpty(),
+        subtitle = buildContinueWatchingEpisodeSubtitle(
+            seasonNumber = season,
+            episodeNumber = episode,
+            episodeTitle = episodeTitle,
+        ),
         imageUrl = episodeThumbnail ?: backdrop ?: poster,
         logo = logo,
         poster = poster,

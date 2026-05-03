@@ -4,7 +4,10 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.ManagedAddon
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.decodeFromString
@@ -20,6 +23,7 @@ import nuvio.composeapp.generated.resources.collections_import_error_folder_blan
 import nuvio.composeapp.generated.resources.collections_import_error_folder_blank_title
 import nuvio.composeapp.generated.resources.collections_import_error_invalid_json
 import nuvio.composeapp.generated.resources.collections_import_error_source_blank_fields
+import nuvio.composeapp.generated.resources.collections_import_error_trakt_list_id
 import org.jetbrains.compose.resources.getString
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -33,6 +37,8 @@ object CollectionRepository {
 
     private val _collections = MutableStateFlow<List<Collection>>(emptyList())
     val collections: StateFlow<List<Collection>> = _collections.asStateFlow()
+    private val _localChangeEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    internal val localChangeEvents: SharedFlow<Unit> = _localChangeEvents.asSharedFlow()
     private var rawCollectionsJson: JsonElement = JsonArray(emptyList())
 
     private var hasLoaded = false
@@ -179,8 +185,25 @@ object CollectionRepository {
                             },
                         )
                     }
-                    f.catalogSources.forEachIndexed { si, s ->
-                        if (s.addonId.isBlank() || s.type.isBlank() || s.catalogId.isBlank()) {
+                    f.resolvedSources.forEachIndexed { si, s ->
+                        if (s.hasInvalidTraktListId()) {
+                            return ValidationResult(
+                                valid = false,
+                                error = runBlocking {
+                                    getString(
+                                        Res.string.collections_import_error_trakt_list_id,
+                                        si + 1,
+                                        f.title,
+                                    )
+                                },
+                            )
+                        }
+
+                        val invalidAddon = !s.isTmdb && !s.isTrakt &&
+                            (s.addonId.isNullOrBlank() || s.type.isNullOrBlank() || s.catalogId.isNullOrBlank())
+                        val invalidTmdb = s.isTmdb &&
+                            s.tmdbSourceType.isNullOrBlank()
+                        if (invalidAddon || invalidTmdb) {
                             return ValidationResult(
                                 valid = false,
                                 error = runBlocking {
@@ -240,16 +263,19 @@ object CollectionRepository {
     internal fun applyFromRemote(collections: List<Collection>, rawJson: JsonElement) {
         rawCollectionsJson = rawJson
         _collections.value = collections
-        persist()
+        persist(sync = false)
     }
 
     private fun ensureLoaded() {
         if (!hasLoaded) initialize()
     }
 
-    private fun persist() {
+    private fun persist(sync: Boolean = true) {
         runCatching {
             CollectionStorage.savePayload(mergedCollectionsJson().toString())
+            if (sync) {
+                _localChangeEvents.tryEmit(Unit)
+            }
         }.onFailure { e ->
             log.e(e) { "Failed to persist collections" }
         }

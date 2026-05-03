@@ -43,7 +43,7 @@ object DownloadsRepository {
         val normalizedVideoId = videoId?.trim().orEmpty()
         if (normalizedVideoId.isBlank()) return null
         return _uiState.value.items.firstOrNull { item ->
-            item.videoId == normalizedVideoId && item.isPlayable && !item.localFileUri.isNullOrBlank()
+            item.videoId == normalizedVideoId && item.hasPlayableLocalFile()
         }
     }
 
@@ -64,18 +64,40 @@ object DownloadsRepository {
                 item.parentMetaId == normalizedParentMetaId &&
                     item.seasonNumber == seasonNumber &&
                     item.episodeNumber == episodeNumber &&
-                    item.isPlayable &&
-                    !item.localFileUri.isNullOrBlank()
+                    item.hasPlayableLocalFile()
             }
         } else {
             items.firstOrNull { item ->
                 item.parentMetaId == normalizedParentMetaId &&
                     item.seasonNumber == null &&
                     item.episodeNumber == null &&
-                    item.isPlayable &&
-                    !item.localFileUri.isNullOrBlank()
+                    item.hasPlayableLocalFile()
             }
         }
+    }
+
+    fun playableLocalFileUri(item: DownloadItem): String? {
+        ensureLoaded()
+        if (item.status != DownloadStatus.Completed) return null
+        val resolvedUri = DownloadsPlatformDownloader.resolveLocalFileUri(
+            localFileUri = item.localFileUri,
+            destinationFileName = item.fileName,
+        ) ?: return null
+
+        if (resolvedUri != item.localFileUri) {
+            mutateItem(item.id) { current ->
+                if (current.fileName == item.fileName) {
+                    current.copy(
+                        localFileUri = resolvedUri,
+                        updatedAtEpochMs = DownloadsClock.nowEpochMs(),
+                    )
+                } else {
+                    current
+                }
+            }
+        }
+
+        return resolvedUri
     }
 
     fun enqueueFromStream(
@@ -117,7 +139,7 @@ object DownloadsRepository {
         if (existing != null) {
             replacedExisting = true
             activeHandles.remove(existing.id)?.cancel()
-            DownloadsPlatformDownloader.removeFile(existing.localFileUri)
+            DownloadsPlatformDownloader.removeFile(playableLocalFileUri(existing) ?: existing.localFileUri)
             DownloadsPlatformDownloader.removePartialFile(existing.fileName)
             currentItems.removeAll { it.id == existing.id }
         }
@@ -191,6 +213,14 @@ object DownloadsRepository {
         }
     }
 
+    fun pauseActiveDownloads() {
+        ensureLoaded()
+        _uiState.value.items
+            .filter { it.status == DownloadStatus.Downloading }
+            .map { it.id }
+            .forEach(::pauseDownload)
+    }
+
     fun resumeDownload(downloadId: String) {
         ensureLoaded()
         val item = _uiState.value.items.firstOrNull { it.id == downloadId } ?: return
@@ -217,7 +247,7 @@ object DownloadsRepository {
         val item = _uiState.value.items.firstOrNull { it.id == downloadId } ?: return
 
         activeHandles.remove(downloadId)?.cancel()
-        DownloadsPlatformDownloader.removeFile(item.localFileUri)
+        DownloadsPlatformDownloader.removeFile(playableLocalFileUri(item) ?: item.localFileUri)
         DownloadsPlatformDownloader.removePartialFile(item.fileName)
 
         publish(_uiState.value.items.filterNot { it.id == downloadId })
@@ -233,9 +263,10 @@ object DownloadsRepository {
             return
         }
 
+        var shouldPersistNormalized = false
         val normalized = DownloadsCodec.decodeItems(payload)
             .map { item ->
-                if (item.status == DownloadStatus.Downloading) {
+                val statusNormalized = if (item.status == DownloadStatus.Downloading) {
                     item.copy(
                         status = DownloadStatus.Paused,
                         errorMessage = null,
@@ -243,10 +274,19 @@ object DownloadsRepository {
                 } else {
                     item
                 }
+
+                val localUriNormalized = normalizeCompletedLocalFileUri(statusNormalized)
+                if (localUriNormalized != item) {
+                    shouldPersistNormalized = true
+                }
+                localUriNormalized
             }
 
         _uiState.value = DownloadsUiState(normalized)
         notifyLiveStatusPlatform()
+        if (shouldPersistNormalized) {
+            persist()
+        }
     }
 
     private fun startDownload(item: DownloadItem) {
@@ -359,6 +399,26 @@ object DownloadsRepository {
             append(nextDownloadOrdinal.toString(36))
         }
     }
+
+    private fun normalizeCompletedLocalFileUri(item: DownloadItem): DownloadItem {
+        if (item.status != DownloadStatus.Completed) return item
+        val resolvedUri = DownloadsPlatformDownloader.resolveLocalFileUri(
+            localFileUri = item.localFileUri,
+            destinationFileName = item.fileName,
+        ) ?: return item
+        return if (resolvedUri != item.localFileUri) {
+            item.copy(localFileUri = resolvedUri)
+        } else {
+            item
+        }
+    }
+
+    private fun DownloadItem.hasPlayableLocalFile(): Boolean =
+        status == DownloadStatus.Completed &&
+            DownloadsPlatformDownloader.resolveLocalFileUri(
+                localFileUri = localFileUri,
+                destinationFileName = fileName,
+            ) != null
 }
 
 @Serializable

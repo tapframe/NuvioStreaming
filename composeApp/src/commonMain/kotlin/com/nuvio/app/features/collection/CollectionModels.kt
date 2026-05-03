@@ -32,6 +32,136 @@ data class CollectionCatalogSource(
 
 @Immutable
 @Serializable
+data class CollectionSource(
+    val provider: String = "addon",
+    val addonId: String? = null,
+    val type: String? = null,
+    val catalogId: String? = null,
+    val genre: String? = null,
+    val tmdbSourceType: String? = null,
+    val title: String? = null,
+    val tmdbId: Int? = null,
+    val traktListId: Long? = null,
+    val mediaType: String? = null,
+    val sortBy: String? = null,
+    val sortHow: String? = null,
+    val filters: TmdbCollectionFilters? = null,
+) {
+    val isTmdb: Boolean
+        get() = provider.equals("tmdb", ignoreCase = true)
+
+    val isTrakt: Boolean
+        get() = provider.equals("trakt", ignoreCase = true)
+
+    fun addonCatalogSource(): CollectionCatalogSource? {
+        if (isTmdb || isTrakt) return null
+        val sourceAddonId = addonId?.takeIf { it.isNotBlank() } ?: return null
+        val sourceType = type?.takeIf { it.isNotBlank() } ?: return null
+        val sourceCatalogId = catalogId?.takeIf { it.isNotBlank() } ?: return null
+        return CollectionCatalogSource(
+            addonId = sourceAddonId,
+            type = sourceType,
+            catalogId = sourceCatalogId,
+            genre = genre,
+        )
+    }
+}
+
+internal fun CollectionSource.hasInvalidTraktListId(): Boolean =
+    isTrakt && (traktListId == null || traktListId <= 0L)
+
+@Serializable
+enum class TmdbCollectionSourceType {
+    LIST,
+    COLLECTION,
+    COMPANY,
+    NETWORK,
+    DISCOVER,
+    PERSON,
+    DIRECTOR,
+}
+
+@Serializable
+enum class TmdbCollectionMediaType(val value: String) {
+    MOVIE("movie"),
+    TV("tv");
+
+    companion object {
+        fun fromString(value: String?): TmdbCollectionMediaType =
+            when (value?.trim()?.lowercase()) {
+                "tv", "series" -> TV
+                else -> MOVIE
+            }
+    }
+}
+
+enum class TmdbCollectionSort(val value: String) {
+    ORIGINAL("original"),
+    POPULAR_DESC("popularity.desc"),
+    VOTE_AVERAGE_DESC("vote_average.desc"),
+    RELEASE_DATE_DESC("primary_release_date.desc"),
+    FIRST_AIR_DATE_DESC("first_air_date.desc"),
+}
+
+enum class TraktListSort(val value: String) {
+    RANK("rank"),
+    ADDED("added"),
+    TITLE("title"),
+    RELEASED("released"),
+    RUNTIME("runtime"),
+    POPULARITY("popularity"),
+    PERCENTAGE("percentage"),
+    VOTES("votes");
+
+    companion object {
+        fun normalize(value: String?): String {
+            val raw = value?.trim()?.lowercase().orEmpty()
+            return entries.firstOrNull { it.value == raw }?.value ?: RANK.value
+        }
+    }
+}
+
+enum class TraktSortHow(val value: String) {
+    ASC("asc"),
+    DESC("desc");
+
+    companion object {
+        fun normalize(value: String?): String {
+            val raw = value?.trim()?.lowercase().orEmpty()
+            return entries.firstOrNull { it.value == raw }?.value ?: ASC.value
+        }
+    }
+}
+
+@Immutable
+@Serializable
+data class TmdbCollectionFilters(
+    val withGenres: String? = null,
+    val releaseDateGte: String? = null,
+    val releaseDateLte: String? = null,
+    val voteAverageGte: Double? = null,
+    val voteAverageLte: Double? = null,
+    val voteCountGte: Int? = null,
+    val withOriginalLanguage: String? = null,
+    val withOriginCountry: String? = null,
+    val withKeywords: String? = null,
+    val withCompanies: String? = null,
+    val withNetworks: String? = null,
+    val year: Int? = null,
+)
+
+data class TmdbSourceImportMetadata(
+    val title: String? = null,
+    val coverImageUrl: String? = null,
+)
+
+data class TmdbPresetSource(
+    val label: String,
+    val source: CollectionSource,
+)
+
+@Immutable
+@Serializable
 data class CollectionFolder(
     val id: String,
     val title: String,
@@ -41,7 +171,11 @@ data class CollectionFolder(
     val coverEmoji: String? = null,
     val tileShape: String = "poster",
     val hideTitle: Boolean = false,
+    val sources: List<CollectionSource> = emptyList(),
     val catalogSources: List<CollectionCatalogSource> = emptyList(),
+    val heroBackdropUrl: String? = null,
+    val heroVideoUrl: String? = null,
+    val titleLogoUrl: String? = null,
 ) {
     val posterShape: PosterShape
         get() = when (tileShape.lowercase()) {
@@ -50,6 +184,22 @@ data class CollectionFolder(
             "square" -> PosterShape.Square
             else -> PosterShape.Poster
         }
+
+    val resolvedSources: List<CollectionSource>
+        get() = sources.ifEmpty {
+            catalogSources.map { source ->
+                CollectionSource(
+                    provider = "addon",
+                    addonId = source.addonId,
+                    type = source.type,
+                    catalogId = source.catalogId,
+                    genre = source.genre,
+                )
+            }
+        }
+
+    val resolvedCatalogSources: List<CollectionCatalogSource>
+        get() = resolvedSources.mapNotNull { it.addonCatalogSource() }
 }
 
 @Immutable

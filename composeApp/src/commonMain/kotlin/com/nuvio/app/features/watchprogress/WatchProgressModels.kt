@@ -190,7 +190,11 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
         parentMetaType = normalizedEntry.parentMetaType,
         videoId = normalizedEntry.videoId,
         title = normalizedEntry.title,
-        subtitle = normalizedEntry.episodeTitle.orEmpty(),
+        subtitle = buildContinueWatchingEpisodeSubtitle(
+            seasonNumber = normalizedEntry.seasonNumber,
+            episodeNumber = normalizedEntry.episodeNumber,
+            episodeTitle = normalizedEntry.episodeTitle,
+        ),
         imageUrl = normalizedEntry.episodeThumbnail ?: normalizedEntry.background ?: normalizedEntry.poster,
         logo = normalizedEntry.logo,
         poster = normalizedEntry.poster,
@@ -223,7 +227,11 @@ internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
             fallbackVideoId = nextEpisode.id,
         ),
         title = title,
-        subtitle = nextEpisode.title,
+        subtitle = buildContinueWatchingEpisodeSubtitle(
+            seasonNumber = nextEpisode.season,
+            episodeNumber = nextEpisode.episode,
+            episodeTitle = nextEpisode.title,
+        ),
         imageUrl = nextEpisode.thumbnail ?: episodeThumbnail ?: background ?: poster,
         logo = logo,
         poster = poster,
@@ -241,6 +249,20 @@ internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
         durationMs = 0L,
         progressFraction = 0f,
     )
+}
+
+internal fun buildContinueWatchingEpisodeSubtitle(
+    seasonNumber: Int?,
+    episodeNumber: Int?,
+    episodeTitle: String?,
+): String {
+    val episodeCode = when {
+        seasonNumber != null && episodeNumber != null -> "S${seasonNumber}E${episodeNumber}"
+        episodeNumber != null -> "E${episodeNumber}"
+        else -> null
+    }
+    val title = episodeTitle.orEmpty()
+    return listOfNotNull(episodeCode, title.takeIf { it.isNotBlank() }).joinToString(" • ")
 }
 
 fun buildPlaybackVideoId(

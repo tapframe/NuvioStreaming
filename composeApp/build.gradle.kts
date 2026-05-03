@@ -97,6 +97,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.settings
                 |
                 |object CommunityConfig {
+                |    const val CONTRIBUTIONS_URL = "${props.getProperty("CONTRIBUTIONS_URL", "")}" 
                 |    const val DONATIONS_BASE_URL = "${props.getProperty("DONATIONS_BASE_URL", "")}" 
                 |    const val DONATIONS_DONATE_URL = "${props.getProperty("DONATIONS_DONATE_URL", "")}" 
                 |}
@@ -272,7 +273,7 @@ kotlin {
 
 afterEvaluate {
     dependencies {
-        add("fullImplementation", libs.quickjs.kt)
+        add("fullImplementation", files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
         add("fullImplementation", libs.ksoup)
     }
 }

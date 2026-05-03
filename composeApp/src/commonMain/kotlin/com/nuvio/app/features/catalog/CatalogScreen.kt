@@ -50,6 +50,7 @@ import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.stableKey
@@ -175,9 +176,10 @@ fun CatalogScreen(
                     }
                 } else {
                     items(
-                        items = uiState.items,
-                        key = { item -> item.stableKey() },
-                    ) { item ->
+                        items = uiState.items.withDuplicateSafeLazyKeys { item -> item.stableKey() },
+                        key = { item -> item.lazyKey },
+                    ) { keyedItem ->
+                        val item = keyedItem.value
                         CatalogPosterTile(
                             item = item,
                             cornerRadiusDp = posterCardStyle.cornerRadiusDp,

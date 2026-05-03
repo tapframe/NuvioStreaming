@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +60,7 @@ import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.isIos
+import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
@@ -469,6 +472,35 @@ private fun PlaybackSettingsSection(
                                 showAnimeSkipClientIdDialog = false
                             },
                             onDismiss = { showAnimeSkipClientIdDialog = false },
+                        )
+                    }
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_intro_submit_enabled),
+                    description = stringResource(Res.string.settings_playback_intro_submit_enabled_description),
+                    checked = autoPlayPlayerSettings.introSubmitEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setIntroSubmitEnabled,
+                )
+                if (autoPlayPlayerSettings.introSubmitEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    var showIntroDbApiKeyDialog by remember { mutableStateOf(false) }
+                    val notSetLabel = stringResource(Res.string.settings_playback_not_set)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_introdb_api_key),
+                        description = autoPlayPlayerSettings.introDbApiKey.ifBlank { notSetLabel },
+                        isTablet = isTablet,
+                        onClick = { showIntroDbApiKeyDialog = true },
+                    )
+                    if (showIntroDbApiKeyDialog) {
+                        IntroDbApiKeyDialog(
+                            initialValue = autoPlayPlayerSettings.introDbApiKey,
+                            onSave = {
+                                PlayerSettingsRepository.setIntroDbApiKey(it)
+                                showIntroDbApiKeyDialog = false
+                            },
+                            onDismiss = { showIntroDbApiKeyDialog = false },
                         )
                     }
                 }
@@ -1897,6 +1929,118 @@ private fun AnimeSkipClientIdDialog(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
+private fun IntroDbApiKeyDialog(
+    initialValue: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var value by remember { mutableStateOf(initialValue) }
+    var isVerifying by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    BasicAlertDialog(onDismissRequest = { if (!isVerifying) onDismiss() }) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_playback_introdb_api_key),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_playback_introdb_api_key_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (errorMessage != null) 1f else 0.3f)),
+                ) {
+                    BasicTextField(
+                        value = value,
+                        onValueChange = { 
+                            value = it 
+                            errorMessage = null
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        singleLine = true,
+                    )
+                }
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss, enabled = !isVerifying) { 
+                        Text(stringResource(Res.string.action_cancel)) 
+                    }
+                    TextButton(
+                        onClick = { 
+                            val trimmed = value.trim()
+                            if (trimmed.isEmpty()) {
+                                onSave(trimmed)
+                                return@TextButton
+                            }
+                            
+                            if (trimmed == initialValue) {
+                                onDismiss()
+                                return@TextButton
+                            }
+
+                            isVerifying = true
+                            errorMessage = null
+                            scope.launch {
+                                val isValid = com.nuvio.app.features.player.skip.SkipIntroRepository.verifyIntroDbApiKey(trimmed)
+                                isVerifying = false
+                                if (isValid) {
+                                    onSave(trimmed)
+                                } else {
+                                    errorMessage = "Invalid API Key or connection failed"
+                                }
+                            }
+                        },
+                        enabled = !isVerifying
+                    ) { 
+                        if (isVerifying) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(stringResource(Res.string.action_save)) 
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun NextEpisodeThresholdModeDialog(
     selected: com.nuvio.app.features.player.skip.NextEpisodeThresholdMode,
     onSelect: (com.nuvio.app.features.player.skip.NextEpisodeThresholdMode) -> Unit,
@@ -2018,3 +2162,4 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
 
 @Composable
 private fun libassRenderTypeLabel(renderType: String): String = stringResource(libassRenderTypeRes(renderType))
+

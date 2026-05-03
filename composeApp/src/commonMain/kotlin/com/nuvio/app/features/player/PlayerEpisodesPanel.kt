@@ -291,7 +291,10 @@ private fun EpisodesListSubView(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
             ) {
-                items(seasonEpisodes, key = { "${it.season}:${it.episode}:${it.id}" }) { episode ->
+                itemsIndexed(
+                    items = seasonEpisodes,
+                    key = { index, episode -> "${episode.season}:${episode.episode}:${episode.id}#$index" },
+                ) { _, episode ->
                     val isCurrent = episode.season == currentSeason && episode.episode == currentEpisode
                     EpisodeRow(
                         episode = episode,

@@ -46,12 +46,30 @@ fun nextReleasedEpisodeAfter(
         compareBy<WatchingReleasedEpisode>({ normalizeSeasonNumber(it.seasonNumber) }, { it.episodeNumber ?: 0 }),
     )
     val watchedVideoId = buildPlaybackVideoId(content, seasonNumber, episodeNumber)
+    var watchedIndex = sortedEpisodes.indexOfFirst { episode ->
+        buildPlaybackVideoId(content, episode.seasonNumber, episode.episodeNumber, episode.videoId) == watchedVideoId
+    }
+
+    // Fallback: if the seed wasn't found by season+episode (anime with absolute
+    // numbering on Trakt vs multi-season on addon), try global index matching.
+    if (watchedIndex < 0 && seasonNumber != null && episodeNumber != null) {
+        val addonSeasons = sortedEpisodes.mapTo(mutableSetOf()) { it.seasonNumber }
+        if (seasonNumber == 1 && addonSeasons.size > 1 && episodeNumber > 0) {
+            val globalIndex = episodeNumber - 1
+            if (globalIndex in sortedEpisodes.indices) {
+                watchedIndex = globalIndex
+            }
+        }
+    }
+
+    if (watchedIndex < 0) return null
+
+    val watchedEpisodeSeason = sortedEpisodes[watchedIndex].seasonNumber
     val candidates = sortedEpisodes
-        .dropWhile { episode -> buildPlaybackVideoId(content, episode.seasonNumber, episode.episodeNumber, episode.videoId) != watchedVideoId }
-        .drop(1)
+        .drop(watchedIndex + 1)
         .filter { episode ->
             shouldSurfaceNextEpisode(
-                watchedSeasonNumber = seasonNumber,
+                watchedSeasonNumber = watchedEpisodeSeason,
                 candidateSeasonNumber = episode.seasonNumber,
                 todayIsoDate = todayIsoDate,
                 releasedDate = episode.releasedDate,

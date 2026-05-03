@@ -434,9 +434,31 @@ object TraktProgressRepository {
 
         entries.map { entry ->
             val meta = metadataByContent[entry.parentMetaType to entry.parentMetaId] ?: return@map entry
-            val episode = if (entry.seasonNumber != null && entry.episodeNumber != null) {
-                meta.videos.firstOrNull { video ->
-                    video.season == entry.seasonNumber && video.episode == entry.episodeNumber
+            var resolvedSeason = entry.seasonNumber
+            var resolvedEpisode = entry.episodeNumber
+
+            val episode = if (resolvedSeason != null && resolvedEpisode != null) {
+                // Try direct match first
+                val directMatch = meta.videos.firstOrNull { video ->
+                    video.season == resolvedSeason && video.episode == resolvedEpisode
+                }
+                if (directMatch != null) {
+                    directMatch
+                } else {
+                    // Fallback: reverse-remap from Trakt numbering to addon numbering
+                    val addonSeasons = meta.videos.mapTo(mutableSetOf()) { it.season }
+                    if (resolvedSeason == 1 && addonSeasons.size > 1 && resolvedEpisode!! > 0) {
+                        val sorted = meta.videos
+                            .filter { it.season != null && it.episode != null }
+                            .sortedWith(compareBy({ it.season }, { it.episode }))
+                        val globalIndex = resolvedEpisode!! - 1
+                        if (globalIndex in sorted.indices) {
+                            val remapped = sorted[globalIndex]
+                            resolvedSeason = remapped.season
+                            resolvedEpisode = remapped.episode
+                            remapped
+                        } else null
+                    } else null
                 }
             } else {
                 null
@@ -447,6 +469,8 @@ object TraktProgressRepository {
                 logo = entry.logo ?: meta.logo,
                 poster = entry.poster ?: meta.poster,
                 background = entry.background ?: meta.background,
+                seasonNumber = resolvedSeason ?: entry.seasonNumber,
+                episodeNumber = resolvedEpisode ?: entry.episodeNumber,
                 episodeTitle = entry.episodeTitle ?: episode?.title,
                 episodeThumbnail = entry.episodeThumbnail ?: episode?.thumbnail,
                 pauseDescription = entry.pauseDescription

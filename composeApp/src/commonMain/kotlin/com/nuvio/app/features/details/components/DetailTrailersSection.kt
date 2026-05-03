@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
@@ -158,10 +158,10 @@ fun DetailTrailersSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(sizing.cardSpacing),
             ) {
-                items(
+                itemsIndexed(
                     items = selectedTrailers,
-                    key = { trailer -> "${trailer.type}-${trailer.id}-${trailer.seasonNumber ?: 0}" },
-                ) { trailer ->
+                    key = { index, trailer -> "${trailer.type}-${trailer.id}-${trailer.seasonNumber ?: 0}#$index" },
+                ) { _, trailer ->
                     TrailerCard(
                         trailer = trailer,
                         cardWidth = sizing.cardWidth,
