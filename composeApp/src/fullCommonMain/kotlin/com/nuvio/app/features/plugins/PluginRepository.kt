@@ -386,6 +386,13 @@ actual object PluginRepository {
         val manifest = PluginManifestParser.parse(payload)
         val baseUrl = manifestUrl.substringBefore("?").removeSuffix("/manifest.json")
 
+        // When a manifest lists the same `info.id` more than once (different
+        // names / filenames but colliding id), appending an occurrence suffix
+        // keeps every scraper's id unique. The first occurrence stays in the
+        // original `manifestUrl:id` format so existing stored state keeps
+        // matching; subsequent duplicates get `#1`, `#2`, ... so toggleScraper
+        // can flip each entry independently.
+        val scraperIdOccurrences = mutableMapOf<String, Int>()
         val scrapers = manifest.scrapers
             .filter { scraper -> scraper.isSupportedOnCurrentPlatform() }
             .mapNotNull { info ->
@@ -396,7 +403,10 @@ actual object PluginRepository {
                 }
                 runCatching {
                     val code = httpGetText(codeUrl)
-                    val scraperId = "${manifestUrl.lowercase()}:${info.id}"
+                    val baseScraperId = "${manifestUrl.lowercase()}:${info.id}"
+                    val occurrence = scraperIdOccurrences.getOrElse(baseScraperId) { 0 }
+                    val scraperId = if (occurrence == 0) baseScraperId else "$baseScraperId#$occurrence"
+                    scraperIdOccurrences[baseScraperId] = occurrence + 1
                     val previous = previousScrapers[scraperId]
                     val enabled = when {
                         !info.enabled -> false
