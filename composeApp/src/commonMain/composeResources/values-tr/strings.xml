@@ -814,6 +814,10 @@
     <string name="pin_forgot">PIN\'i mi unuttun?</string>
     <string name="pin_incorrect">PIN hatalı</string>
     <string name="pin_locked_try_again">Kilitli. %1$dsn sonra tekrar dene</string>
+    <string name="plugin_duplicates_disable">%1$d tanesini kapat</string>
+    <string name="plugin_duplicates_later">Daha sonra</string>
+    <string name="plugin_duplicates_subtitle">Aşağıdaki sağlayıcıların birden fazla aktif kopyası var. Yinelenen kopyaları devre dışı bırakalım mı?</string>
+    <string name="plugin_duplicates_title">Yinelenen sağlayıcılar tespit edildi</string>
     <string name="profile_avatar_options_pending">Katalog yüklenince avatar seçenekleri burada görünecek.</string>
     <string name="profile_avatar_selected">Avatar: %1$s</string>
     <string name="profile_choose_avatar">Avatar seç</string>

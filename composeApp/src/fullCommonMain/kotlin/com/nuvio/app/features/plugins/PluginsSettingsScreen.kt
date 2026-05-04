@@ -50,6 +50,9 @@ fun PluginsSettingsPageContent(
     }
 
     val uiState by PluginRepository.uiState.collectAsStateWithLifecycle()
+
+    PluginDuplicateGuard(uiState)
+
     val tmdbSettings by remember {
         TmdbSettingsRepository.ensureLoaded()
         TmdbSettingsRepository.uiState

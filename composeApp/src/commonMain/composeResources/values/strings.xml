@@ -969,6 +969,10 @@
     <string name="pin_forgot">Forgot PIN?</string>
     <string name="pin_incorrect">Incorrect PIN</string>
     <string name="pin_locked_try_again">Locked. Try again in %1$ds</string>
+    <string name="plugin_duplicates_disable">Disable %1$d</string>
+    <string name="plugin_duplicates_later">Later</string>
+    <string name="plugin_duplicates_subtitle">The following providers have more than one active copy across your repositories. Disable the duplicates?</string>
+    <string name="plugin_duplicates_title">Duplicate providers detected</string>
     <string name="profile_avatar_options_pending">Avatar options will appear here when the catalog loads.</string>
     <string name="profile_avatar_selected">Avatar: %1$s</string>
     <string name="profile_choose_avatar">Choose an avatar</string>
