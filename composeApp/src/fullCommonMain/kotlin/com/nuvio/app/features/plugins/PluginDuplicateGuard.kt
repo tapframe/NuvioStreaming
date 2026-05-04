@@ -138,7 +138,10 @@ internal fun computeDuplicateGroups(
             val b = enabled[j]
             val nameEq = a.name.isNotBlank() && a.name.equals(b.name, ignoreCase = true)
             val fileEq = a.filename.isNotBlank() && a.filename.equals(b.filename, ignoreCase = true)
-            if (nameEq || fileEq) union(i, j)
+            // Require both the visible name AND the source filename to match
+            // so scrapers that merely share a JS file (e.g. PlayIMDb Series
+            // vs PlayIMDb Premium Series) are not falsely grouped as duplicates.
+            if (nameEq && fileEq) union(i, j)
         }
     }
 
