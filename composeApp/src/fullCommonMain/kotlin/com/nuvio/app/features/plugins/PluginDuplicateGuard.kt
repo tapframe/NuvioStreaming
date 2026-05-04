@@ -87,9 +87,23 @@ internal fun PluginDuplicateGuard(uiState: PluginsUiState) {
     DuplicateResolutionDialog(
         groups = stableGroups,
         onConfirm = {
+            // If any duplicate shares the same id as its keep, it means the
+            // same scraper appears twice within a single repo (manifest lists
+            // the same id more than once). toggleScraper(id, _) can't disable
+            // just one of those, so delegate to the helper that mutates the
+            // 2nd+ occurrence directly. Different-id duplicates go through
+            // the regular toggle path.
+            val needsInRepoCollapse = stableGroups.any { group ->
+                group.duplicates.any { it.id == group.keep.id }
+            }
+            if (needsInRepoCollapse) {
+                PluginRepository.disableInRepoIdDuplicates()
+            }
             stableGroups.forEach { group ->
                 group.duplicates.forEach { duplicate ->
-                    PluginRepository.toggleScraper(duplicate.id, false)
+                    if (duplicate.id != group.keep.id) {
+                        PluginRepository.toggleScraper(duplicate.id, false)
+                    }
                 }
             }
         },

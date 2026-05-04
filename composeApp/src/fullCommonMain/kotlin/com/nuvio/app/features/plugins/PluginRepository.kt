@@ -271,6 +271,38 @@ actual object PluginRepository {
         persist()
     }
 
+    /**
+     * Force every 2nd+ occurrence of the same (repositoryUrl, id) pair to be
+     * `enabled = false`. Exists so the PluginDuplicateGuard can resolve in-repo
+     * id collisions without relying on [toggleScraper], which would flip every
+     * matching entry at once. This is intentionally additive and is not part of
+     * the `expect` contract so play-store / app-store actuals are untouched.
+     */
+    fun disableInRepoIdDuplicates() {
+        initialize()
+        var mutated = false
+        _uiState.update { state ->
+            val seen = mutableSetOf<Pair<String, String>>()
+            var localChanged = false
+            val newScrapers = state.scrapers.map { scraper ->
+                val key = scraper.repositoryUrl to scraper.id
+                if (!seen.add(key) && scraper.enabled) {
+                    localChanged = true
+                    scraper.copy(enabled = false)
+                } else {
+                    scraper
+                }
+            }
+            if (localChanged) {
+                mutated = true
+                state.copy(scrapers = newScrapers)
+            } else {
+                state
+            }
+        }
+        if (mutated) persist()
+    }
+
     actual fun setPluginsEnabled(enabled: Boolean) {
         initialize()
         _uiState.update { it.copy(pluginsEnabled = enabled) }
