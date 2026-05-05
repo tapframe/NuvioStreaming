@@ -57,6 +57,10 @@ final class RootComposeViewController: UIViewController {
         immersiveController(in: contentController)?.prefersStatusBarHidden ?? false
     }
 
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        .lightContent
+    }
+
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
         .fade
     }
