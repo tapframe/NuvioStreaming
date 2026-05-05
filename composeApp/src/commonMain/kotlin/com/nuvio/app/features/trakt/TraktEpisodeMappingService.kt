@@ -180,9 +180,9 @@ object TraktEpisodeMappingService {
         addonEpisodes: List<EpisodeMappingEntry>,
         traktEpisodes: List<EpisodeMappingEntry>,
     ): Boolean {
-        val addonSeasons = addonEpisodes.mapTo(mutableSetOf()) { it.season }
-        val traktSeasons = traktEpisodes.mapTo(mutableSetOf()) { it.season }
-        return addonSeasons == traktSeasons
+        val addonCountBySeason = addonEpisodes.groupingBy { it.season }.eachCount()
+        val traktCountBySeason = traktEpisodes.groupingBy { it.season }.eachCount()
+        return addonCountBySeason == traktCountBySeason
     }
 
     // ── Forward mapping: addon → Trakt ──────────────────────────────────
