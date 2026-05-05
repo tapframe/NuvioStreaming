@@ -3,6 +3,7 @@ package com.nuvio.app.features.watching.sync
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
+import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktEpisodeMappingService
 import com.nuvio.app.features.watched.WatchedItem
@@ -130,10 +131,10 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
         val movies = mutableListOf<TraktHistoryMovieRequestDto>()
         val shows = mutableListOf<TraktHistoryShowRequestDto>()
 
-        items.forEach { item ->
-            if (!item.shouldSyncToTraktHistory()) return@forEach
+        for (item in items) {
+            if (!item.shouldSyncToTraktHistory()) continue
 
-            val ids = parseIds(item.id) ?: return@forEach
+            val ids = resolveIds(item.id, item.type) ?: continue
             val normalizedType = item.type.trim().lowercase()
 
             if (normalizedType == "movie" || normalizedType == "film") {
@@ -241,7 +242,7 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
             ) ?: continue
             if (mapped.season == season && mapped.episode == episode) continue
 
-            val ids = parseIds(item.id) ?: continue
+            val ids = resolveIds(item.id, item.type) ?: continue
             val existing = remappedShows.firstOrNull { it.ids == ids }
             if (existing != null) {
                 val seasonDto = existing.seasons?.firstOrNull { it.number == mapped.season }
@@ -432,6 +433,17 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
+
+    private suspend fun resolveIds(rawId: String, mediaType: String): TraktSyncIdsDto? {
+        val ids = parseIds(rawId) ?: return null
+        if (ids.tmdb != null && ids.imdb.isNullOrBlank()) {
+            val imdb = runCatching {
+                TmdbService.tmdbToImdb(ids.tmdb, mediaType)
+            }.getOrNull()
+            if (!imdb.isNullOrBlank()) return ids.copy(imdb = imdb)
+        }
+        return ids
+    }
 
     private fun normalizeId(ids: TraktSyncIdsDto?): String? {
         if (ids == null) return null
