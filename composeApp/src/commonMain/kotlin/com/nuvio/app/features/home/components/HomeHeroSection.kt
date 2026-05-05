@@ -358,7 +358,7 @@ private fun HeroContentBlock(
                 modifier = Modifier
                     .fillMaxWidth(layout.logoWidthFraction)
                     .aspectRatio(2.6f)
-                    .clickable(enabled = !layout.isTablet && onItemClick != null) {
+                    .clickable(enabled = onItemClick != null) {
                         onItemClick?.invoke(item)
                     },
                 alignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
@@ -369,7 +369,7 @@ private fun HeroContentBlock(
                 text = item.name,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = !layout.isTablet && onItemClick != null) {
+                    .clickable(enabled = onItemClick != null) {
                         onItemClick?.invoke(item)
                     },
                 style = if (layout.isTablet) {

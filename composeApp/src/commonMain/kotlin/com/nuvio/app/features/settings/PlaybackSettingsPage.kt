@@ -1960,27 +1960,16 @@ private fun IntroDbApiKeyDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (errorMessage != null) 1f else 0.3f)),
-                ) {
-                    BasicTextField(
-                        value = value,
-                        onValueChange = { 
-                            value = it 
-                            errorMessage = null
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        singleLine = true,
-                    )
-                }
+                SettingsSecretTextField(
+                    value = value,
+                    onValueChange = {
+                        value = it
+                        errorMessage = null
+                    },
+                    label = stringResource(Res.string.settings_playback_introdb_api_key),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = errorMessage != null,
+                )
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage!!,
@@ -2162,4 +2151,3 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
 
 @Composable
 private fun libassRenderTypeLabel(renderType: String): String = stringResource(libassRenderTypeRes(renderType))
-

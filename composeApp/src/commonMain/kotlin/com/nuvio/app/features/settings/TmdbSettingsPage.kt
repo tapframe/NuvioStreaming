@@ -265,21 +265,13 @@ private fun TmdbApiKeyRow(
 
         val normalizedDraft = draft.trim()
 
-        OutlinedTextField(
+        SettingsSecretTextField(
             value = draft,
             onValueChange = {
                 draft = it
             },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text(stringResource(Res.string.settings_tmdb_api_key_label)) },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
-            ),
+            label = stringResource(Res.string.settings_tmdb_api_key_label),
         )
 
         Row(modifier = Modifier.fillMaxWidth()) {

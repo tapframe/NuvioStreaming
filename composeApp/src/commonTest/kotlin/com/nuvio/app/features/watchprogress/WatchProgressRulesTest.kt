@@ -26,17 +26,17 @@ class WatchProgressRulesTest {
     }
 
     @Test
-    fun `save threshold uses max of thirty seconds and two percent`() {
-        assertFalse(shouldStoreWatchProgress(positionMs = 29_999L, durationMs = 600_000L))
-        assertTrue(shouldStoreWatchProgress(positionMs = 30_000L, durationMs = 600_000L))
-        assertFalse(shouldStoreWatchProgress(positionMs = 119_999L, durationMs = 6_000_000L))
-        assertTrue(shouldStoreWatchProgress(positionMs = 120_000L, durationMs = 6_000_000L))
+    fun `save threshold starts after one second`() {
+        assertFalse(shouldStoreWatchProgress(positionMs = 999L, durationMs = 600_000L))
+        assertTrue(shouldStoreWatchProgress(positionMs = 1_000L, durationMs = 600_000L))
+        assertTrue(shouldStoreWatchProgress(positionMs = 1_000L, durationMs = 0L))
     }
 
     @Test
     fun `completion detects watched threshold remaining time and ended state`() {
         assertTrue(isWatchProgressComplete(positionMs = 920_000L, durationMs = 1_000_000L, isEnded = false))
-        assertTrue(isWatchProgressComplete(positionMs = 850_000L, durationMs = 1_000_000L, isEnded = false))
+        assertTrue(isWatchProgressComplete(positionMs = 900_000L, durationMs = 1_000_000L, isEnded = false))
+        assertFalse(isWatchProgressComplete(positionMs = 899_999L, durationMs = 1_000_000L, isEnded = false))
         assertTrue(isWatchProgressComplete(positionMs = 1L, durationMs = 0L, isEnded = true))
         assertFalse(isWatchProgressComplete(positionMs = 200_000L, durationMs = 1_000_000L, isEnded = false))
     }

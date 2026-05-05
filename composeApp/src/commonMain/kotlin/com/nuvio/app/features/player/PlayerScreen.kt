@@ -139,7 +139,6 @@ fun PlayerScreen(
     initialProgressFraction: Float? = null,
 ) {
     LockPlayerToLandscape()
-    EnterImmersivePlayerMode()
     val playerSettingsUiState by remember {
         PlayerSettingsRepository.ensureLoaded()
         PlayerSettingsRepository.uiState
@@ -195,6 +194,9 @@ fun PlayerScreen(
         var playerController by remember { mutableStateOf<PlayerEngineController?>(null) }
         var playerControllerSourceUrl by remember { mutableStateOf<String?>(null) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        val keepScreenAwake = errorMessage == null &&
+            (playbackSnapshot.isPlaying || (shouldPlay && playbackSnapshot.isLoading))
+        EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
         var scrubbingPositionMs by remember { mutableStateOf<Long?>(null) }
         var pausedOverlayVisible by remember { mutableStateOf(false) }
         var gestureFeedback by remember { mutableStateOf<GestureFeedbackState?>(null) }

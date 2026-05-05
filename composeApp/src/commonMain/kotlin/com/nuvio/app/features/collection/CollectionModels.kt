@@ -62,7 +62,7 @@ data class CollectionSource(
             addonId = sourceAddonId,
             type = sourceType,
             catalogId = sourceCatalogId,
-            genre = genre,
+            genre = genre.normalizedOptionalGenre(),
         )
     }
 }
@@ -193,7 +193,7 @@ data class CollectionFolder(
                     addonId = source.addonId,
                     type = source.type,
                     catalogId = source.catalogId,
-                    genre = source.genre,
+                    genre = source.genre.normalizedOptionalGenre(),
                 )
             }
         }
@@ -216,6 +216,11 @@ data class Collection(
     val folderViewMode: FolderViewMode
         get() = FolderViewMode.fromString(viewMode)
 }
+
+private fun String?.normalizedOptionalGenre(): String? =
+    this
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() && !it.equals("none", ignoreCase = true) }
 
 data class AvailableCatalog(
     val addonId: String,
