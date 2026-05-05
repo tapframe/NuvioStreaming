@@ -102,14 +102,15 @@ object TraktProgressRepository {
             return
         }
 
+        val afterPlayback = mergeNewestByVideoId(_uiState.value.entries + playbackEntries)
         _uiState.value = TraktProgressUiState(
-            entries = playbackEntries,
+            entries = afterPlayback,
             isLoading = false,
             errorMessage = null,
         )
 
-        if (playbackEntries.isNotEmpty()) {
-            launchHydration(requestId = requestId, entries = playbackEntries)
+        if (afterPlayback.isNotEmpty()) {
+            launchHydration(requestId = requestId, entries = afterPlayback)
         }
 
         scope.launch {
@@ -122,7 +123,7 @@ object TraktProgressRepository {
 
             if (!isLatestRefreshRequest(requestId)) return@launch
 
-            val merged = mergeNewestByVideoId(playbackEntries + historyEntries)
+            val merged = mergeNewestByVideoId(_uiState.value.entries + historyEntries)
             _uiState.value = _uiState.value.copy(
                 entries = merged.sortedByDescending { it.lastUpdatedEpochMs },
                 isLoading = false,
