@@ -51,6 +51,7 @@ object TraktEpisodeMappingService {
         videoId: String?,
         season: Int?,
         episode: Int?,
+        episodeTitle: String? = null,
     ): EpisodeMappingEntry? {
         val key = cacheKey(contentId, contentType, videoId, season, episode) ?: return null
         cacheMutex.withLock {
@@ -77,7 +78,7 @@ object TraktEpisodeMappingService {
             requestedSeason = requestedSeason,
             requestedEpisode = requestedEpisode,
             requestedVideoId = videoId,
-            requestedTitle = null,
+            requestedTitle = episodeTitle,
             addonEpisodes = addonEpisodes,
             traktEpisodes = traktEpisodes,
         ) ?: return null
@@ -163,8 +164,9 @@ object TraktEpisodeMappingService {
         videoId: String?,
         season: Int?,
         episode: Int?,
+        episodeTitle: String? = null,
     ): EpisodeMappingEntry? {
-        return resolveEpisodeMapping(contentId, contentType, videoId, season, episode)
+        return resolveEpisodeMapping(contentId, contentType, videoId, season, episode, episodeTitle)
     }
 
     fun clearCache() {

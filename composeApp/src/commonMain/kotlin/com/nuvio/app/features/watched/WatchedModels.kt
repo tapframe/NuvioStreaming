@@ -14,6 +14,7 @@ data class WatchedItem(
     val releaseInfo: String? = null,
     val season: Int? = null,
     val episode: Int? = null,
+    val episodeTitle: String? = null,
     val markedAtEpochMs: Long,
 )
 

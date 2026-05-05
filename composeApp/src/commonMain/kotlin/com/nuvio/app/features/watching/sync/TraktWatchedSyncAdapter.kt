@@ -239,6 +239,7 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
                 videoId = null,
                 season = season,
                 episode = episode,
+                episodeTitle = item.episodeTitle,
             ) ?: continue
             if (mapped.season == season && mapped.episode == episode) continue
 
