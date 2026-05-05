@@ -204,22 +204,18 @@ object TraktEpisodeMappingService {
             !requestedVideoId.isNullOrBlank() && it.videoId == requestedVideoId
         } ?: return null
 
-        // Try title match first
-        val titleToMatch = addonEntry.title?.takeIf { it.isNotBlank() } ?: requestedTitle
-        if (!titleToMatch.isNullOrBlank()) {
-            val titleMatch = traktEpisodes.firstOrNull { target ->
+        val titleToMatch = normalizeTitle(addonEntry.title ?: requestedTitle)
+        if (isUsefulTitle(titleToMatch)) {
+            val matches = traktEpisodes.filter { target ->
                 !target.title.isNullOrBlank() &&
-                    normalizeTitle(target.title) == normalizeTitle(titleToMatch)
+                    normalizeTitle(target.title) == titleToMatch
             }
-            if (titleMatch != null) {
-                return titleMatch
-            }
+            if (matches.size == 1) return matches[0]
         }
 
-        // Fallback: global index mapping
+        // Fallback: global index — only reliable when per-season counts are identical
         val addonIndex = addonEpisodes.indexOf(addonEntry)
         if (addonIndex < 0 || addonIndex >= traktEpisodes.size) return null
-
         return traktEpisodes[addonIndex]
     }
 
@@ -237,23 +233,15 @@ object TraktEpisodeMappingService {
             it.season == requestedSeason && it.episode == requestedEpisode
         } ?: return null
 
-        // Try title match first
+        // Title match only — global index is unreliable when per-season episode counts differ
+        // between Trakt and the addon (e.g. One Piece), causing cross-season wrong mappings.
         val titleToMatch = traktEntry.title?.takeIf { it.isNotBlank() } ?: requestedTitle
-        if (!titleToMatch.isNullOrBlank()) {
-            val titleMatch = addonEpisodes.firstOrNull { target ->
-                !target.title.isNullOrBlank() &&
-                    normalizeTitle(target.title) == normalizeTitle(titleToMatch)
-            }
-            if (titleMatch != null) {
-                return titleMatch
-            }
+        if (titleToMatch.isNullOrBlank()) return null
+
+        return addonEpisodes.firstOrNull { target ->
+            !target.title.isNullOrBlank() &&
+                normalizeTitle(target.title) == normalizeTitle(titleToMatch)
         }
-
-        // Fallback: global index mapping
-        val traktIndex = traktEpisodes.indexOf(traktEntry)
-        if (traktIndex < 0 || traktIndex >= addonEpisodes.size) return null
-
-        return addonEpisodes[traktIndex]
     }
 
     // ── Addon episodes fetching (with dedup) ───────────────────────────
@@ -466,6 +454,13 @@ object TraktEpisodeMappingService {
     private fun normalizeTitle(title: String?): String =
         title.orEmpty().trim().lowercase()
             .replace(Regex("[^a-z0-9]"), "")
+
+    private fun isUsefulTitle(normalizedTitle: String): Boolean {
+        if (normalizedTitle.isBlank()) return false
+        if (normalizedTitle.matches(Regex("episode\\d+"))) return false
+        if (normalizedTitle.matches(Regex("ep\\d+"))) return false
+        return true
+    }
 }
 
 // ── Data classes ────────────────────────────────────────────────────────

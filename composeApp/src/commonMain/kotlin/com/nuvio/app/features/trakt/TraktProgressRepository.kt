@@ -140,6 +140,7 @@ object TraktProgressRepository {
         requestId: Long,
         entries: List<WatchProgressEntry>,
     ) {
+        val inputVideoIds = entries.mapTo(mutableSetOf()) { it.videoId }
         scope.launch {
             val hydrated = runCatching {
                 hydrateEntriesFromAddonMeta(entries)
@@ -150,8 +151,11 @@ object TraktProgressRepository {
 
             if (!isLatestRefreshRequest(requestId)) return@launch
 
+            // Entries dropped by hydrateEntriesFromAddonMeta (unresolvable episode numbers)
+            // must not be re-added from current state — exclude them from the merge base.
+            val untouched = _uiState.value.entries.filter { it.videoId !in inputVideoIds }
             val merged = mergeEntriesPreferRichMetadata(
-                current = _uiState.value.entries,
+                current = untouched,
                 hydrated = hydrated,
             )
             _uiState.value = _uiState.value.copy(
@@ -306,8 +310,10 @@ object TraktProgressRepository {
         val inProgressMovies = moviePlayback.mapIndexedNotNull { index, item ->
             mapPlaybackMovie(item = item, fallbackIndex = index)
         }
-        val inProgressEpisodes = episodePlayback.mapIndexedNotNull { index, item ->
-            mapPlaybackEpisode(item = item, fallbackIndex = index)
+        val inProgressEpisodes = coroutineScope {
+            episodePlayback.mapIndexed { index, item ->
+                async { mapPlaybackEpisode(item = item, fallbackIndex = index) }
+            }.awaitAll().filterNotNull()
         }
 
         mergeNewestByVideoId(inProgressMovies + inProgressEpisodes)
@@ -336,9 +342,11 @@ object TraktProgressRepository {
         val episodeHistory = json.decodeFromString<List<TraktHistoryEpisodeItem>>(historyPayload)
         val movieHistory = json.decodeFromString<List<TraktHistoryMovieItem>>(movieHistoryPayload)
 
-        val completedEpisodes = episodeHistory
-            .mapIndexedNotNull { index, item -> mapHistoryEpisode(item = item, fallbackIndex = index) }
-            .distinctBy { entry -> entry.videoId }
+        val completedEpisodes = coroutineScope {
+            episodeHistory.mapIndexed { index, item ->
+                async { mapHistoryEpisode(item = item, fallbackIndex = index) }
+            }.awaitAll().filterNotNull()
+        }.distinctBy { entry -> entry.videoId }
         val completedMovies = movieHistory
             .mapIndexedNotNull { index, item -> mapHistoryMovie(item = item, fallbackIndex = index) }
             .distinctBy { entry -> entry.videoId }
@@ -433,39 +441,57 @@ object TraktProgressRepository {
             .awaitAll()
             .toMap()
 
-        entries.map { entry ->
-            val meta = metadataByContent[entry.parentMetaType to entry.parentMetaId] ?: return@map entry
+        entries.mapNotNull { entry ->
+            val meta = metadataByContent[entry.parentMetaType to entry.parentMetaId] ?: run {
+                val isEpisode = entry.seasonNumber != null && entry.episodeNumber != null
+                if (isEpisode) return@mapNotNull null else return@mapNotNull entry
+            }
             var resolvedSeason = entry.seasonNumber
             var resolvedEpisode = entry.episodeNumber
 
             val episode = if (resolvedSeason != null && resolvedEpisode != null) {
-                // Try direct match first
-                val directMatch = meta.videos.firstOrNull { video ->
+                val direct = meta.videos.firstOrNull { video ->
                     video.season == resolvedSeason && video.episode == resolvedEpisode
                 }
-                if (directMatch != null) {
-                    directMatch
+                if (direct != null) {
+                    direct
                 } else {
-                    // Fallback: reverse-remap from Trakt numbering to addon numbering
-                    val addonSeasons = meta.videos.mapTo(mutableSetOf()) { it.season }
-                    if (resolvedSeason == 1 && addonSeasons.size > 1 && resolvedEpisode!! > 0) {
-                        val sorted = meta.videos
-                            .filter { it.season != null && it.episode != null }
-                            .sortedWith(compareBy({ it.season }, { it.episode }))
-                        val globalIndex = resolvedEpisode!! - 1
-                        if (globalIndex in sorted.indices) {
-                            val remapped = sorted[globalIndex]
-                            resolvedSeason = remapped.season
-                            resolvedEpisode = remapped.episode
-                            remapped
-                        } else null
+                    // Boundary remapping failed (cold cache / network) — try title match.
+                    val titleToFind = entry.episodeTitle?.takeIf { it.isNotBlank() }
+                    val normalized = titleToFind?.trim()?.lowercase()?.replace(Regex("[^a-z0-9]"), "")
+                    val titleMatch = if (!normalized.isNullOrBlank()) {
+                        meta.videos.filter { v ->
+                            !v.title.isNullOrBlank() &&
+                                v.title!!.trim().lowercase().replace(Regex("[^a-z0-9]"), "") == normalized
+                        }.singleOrNull()
                     } else null
+
+                    if (titleMatch != null) {
+                        resolvedSeason = titleMatch.season
+                        resolvedEpisode = titleMatch.episode
+                        titleMatch
+                    } else {
+                        // Can't resolve episode to an addon video — drop this entry.
+                        // The local WatchProgressRepository entry (persisted to disk) handles resume.
+                        return@mapNotNull null
+                    }
                 }
             } else {
                 null
             }
 
+            val correctedVideoId = if (resolvedSeason != entry.seasonNumber || resolvedEpisode != entry.episodeNumber) {
+                buildPlaybackVideoId(
+                    parentMetaId = entry.parentMetaId,
+                    seasonNumber = resolvedSeason,
+                    episodeNumber = resolvedEpisode,
+                )
+            } else {
+                entry.videoId
+            }
+
             entry.copy(
+                videoId = correctedVideoId,
                 title = entry.title.takeIf { it.isNotBlank() } ?: meta.name,
                 logo = entry.logo ?: meta.logo,
                 poster = entry.poster ?: meta.poster,
@@ -503,7 +529,7 @@ object TraktProgressRepository {
         ).normalizedCompletion()
     }
 
-    private fun mapPlaybackEpisode(item: TraktPlaybackItem, fallbackIndex: Int): WatchProgressEntry? {
+    private suspend fun mapPlaybackEpisode(item: TraktPlaybackItem, fallbackIndex: Int): WatchProgressEntry? {
         val show = item.show ?: return null
         val episode = item.episode ?: return null
         val season = episode.season ?: return null
@@ -515,20 +541,32 @@ object TraktProgressRepository {
         val progressPercent = normalizeTraktProgressPercent(item.progress) ?: return null
         if (progressPercent <= 0f) return null
 
+        val remapped = runCatching {
+            TraktEpisodeMappingService.resolveAddonEpisodeMapping(
+                contentId = parentMetaId,
+                contentType = "series",
+                season = season,
+                episode = number,
+                episodeTitle = episode.title,
+            )
+        }.getOrNull()
+        val resolvedSeason = remapped?.season ?: season
+        val resolvedNumber = remapped?.episode ?: number
+
         return WatchProgressEntry(
             contentType = "series",
             parentMetaId = parentMetaId,
             parentMetaType = "series",
             videoId = buildPlaybackVideoId(
                 parentMetaId = parentMetaId,
-                seasonNumber = season,
-                episodeNumber = number,
+                seasonNumber = resolvedSeason,
+                episodeNumber = resolvedNumber,
                 fallbackVideoId = episode.ids?.trakt?.let { "trakt:$it" },
             ),
             title = show.title ?: parentMetaId,
-            seasonNumber = season,
-            episodeNumber = number,
-            episodeTitle = episode.title,
+            seasonNumber = resolvedSeason,
+            episodeNumber = resolvedNumber,
+            episodeTitle = remapped?.title ?: episode.title,
             lastPositionMs = 0L,
             durationMs = 0L,
             lastUpdatedEpochMs = rankedTimestamp(item.pausedAt, fallbackIndex),
@@ -537,7 +575,7 @@ object TraktProgressRepository {
         ).normalizedCompletion()
     }
 
-    private fun mapHistoryEpisode(item: TraktHistoryEpisodeItem, fallbackIndex: Int): WatchProgressEntry? {
+    private suspend fun mapHistoryEpisode(item: TraktHistoryEpisodeItem, fallbackIndex: Int): WatchProgressEntry? {
         val show = item.show ?: return null
         val episode = item.episode ?: return null
         val season = episode.season ?: return null
@@ -546,20 +584,32 @@ object TraktProgressRepository {
         val parentMetaId = normalizeTraktContentId(show.ids, fallback = show.title)
         if (parentMetaId.isBlank()) return null
 
+        val remapped = runCatching {
+            TraktEpisodeMappingService.resolveAddonEpisodeMapping(
+                contentId = parentMetaId,
+                contentType = "series",
+                season = season,
+                episode = number,
+                episodeTitle = episode.title,
+            )
+        }.getOrNull()
+        val resolvedSeason = remapped?.season ?: season
+        val resolvedNumber = remapped?.episode ?: number
+
         return WatchProgressEntry(
             contentType = "series",
             parentMetaId = parentMetaId,
             parentMetaType = "series",
             videoId = buildPlaybackVideoId(
                 parentMetaId = parentMetaId,
-                seasonNumber = season,
-                episodeNumber = number,
+                seasonNumber = resolvedSeason,
+                episodeNumber = resolvedNumber,
                 fallbackVideoId = episode.ids?.trakt?.let { "trakt:$it" },
             ),
             title = show.title ?: parentMetaId,
-            seasonNumber = season,
-            episodeNumber = number,
-            episodeTitle = episode.title,
+            seasonNumber = resolvedSeason,
+            episodeNumber = resolvedNumber,
+            episodeTitle = remapped?.title ?: episode.title,
             lastPositionMs = 1L,
             durationMs = 1L,
             lastUpdatedEpochMs = rankedTimestamp(item.watchedAt, fallbackIndex),
