@@ -597,16 +597,34 @@ object TraktProgressRepository {
         return normalized.coerceIn(0f, 100f)
     }
 
-    private fun rankedTimestamp(isoDate: String?, fallbackIndex: Int): Long {
-        val compactDigits = isoDate
-            ?.filter(Char::isDigit)
-            ?.take(14)
-            ?.takeIf { it.length >= 8 }
-            ?.padEnd(14, '0')
-            ?.toLongOrNull()
-        if (compactDigits != null) return compactDigits
+    private fun rankedTimestamp(isoDate: String?, fallbackIndex: Int): Long =
+        isoDate?.let { isoToEpochMs(it) } ?: (TraktPlatformClock.nowEpochMs() - (fallbackIndex * 1_000L))
 
-        return TraktPlatformClock.nowEpochMs() - (fallbackIndex * 1_000L)
+    private fun isoToEpochMs(iso: String): Long? {
+        if (iso.length < 19) return null
+        return runCatching {
+            val year = iso.substring(0, 4).toLong()
+            val month = iso.substring(5, 7).toLong()
+            val day = iso.substring(8, 10).toLong()
+            val hour = iso.substring(11, 13).toLong()
+            val minute = iso.substring(14, 16).toLong()
+            val second = iso.substring(17, 19).toLong()
+            val millis = if (iso.length > 20 && iso[19] == '.') {
+                iso.substring(20).filter(Char::isDigit).take(3).padEnd(3, '0').toLong()
+            } else 0L
+            epochDay(year, month, day) * 86_400_000L +
+                hour * 3_600_000L + minute * 60_000L + second * 1_000L + millis
+        }.getOrNull()
+    }
+
+    private fun epochDay(year: Long, month: Long, day: Long): Long {
+        val y = year - if (month <= 2L) 1L else 0L
+        val era = if (y >= 0L) y / 400L else (y - 399L) / 400L
+        val yoe = y - era * 400L
+        val m = month + if (month > 2L) -3L else 9L
+        val doy = (153L * m + 2L) / 5L + day - 1L
+        val doe = yoe * 365L + yoe / 4L - yoe / 100L + doy
+        return era * 146_097L + doe - 719_468L
     }
 }
 
