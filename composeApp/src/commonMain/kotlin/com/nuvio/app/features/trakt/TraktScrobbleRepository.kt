@@ -2,6 +2,7 @@ package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpRequestRaw
+import com.nuvio.app.features.tmdb.TmdbService
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -107,8 +108,9 @@ internal object TraktScrobbleRepository {
         val clampedProgress = progressPercent.coerceIn(0f, 100f)
         if (shouldSkip(action, item.itemKey, clampedProgress)) return
 
+        val resolvedItem = resolveItemIds(item)
         val url = "$BASE_URL/scrobble/$action"
-        val requestBody = json.encodeToString(buildRequestBody(item, clampedProgress))
+        val requestBody = json.encodeToString(buildRequestBody(resolvedItem, clampedProgress))
         val requestHeaders = mapOf(
             "Accept" to "application/json",
             "Content-Type" to "application/json",
@@ -208,6 +210,16 @@ internal object TraktScrobbleRepository {
                     log.w { "Failed to refresh Trakt progress after stop: ${error.message}" }
                 }
         }
+    }
+
+    private suspend fun resolveItemIds(item: TraktScrobbleItem): TraktScrobbleItem {
+        if (item !is TraktScrobbleItem.Episode) return item
+        val ids = item.showIds
+        if (ids.tmdb != null && ids.imdb.isNullOrBlank()) {
+            val imdb = runCatching { TmdbService.tmdbToImdb(ids.tmdb, "tv") }.getOrNull()
+            if (!imdb.isNullOrBlank()) return item.copy(showIds = ids.copy(imdb = imdb))
+        }
+        return item
     }
 
     private fun buildRequestBody(
