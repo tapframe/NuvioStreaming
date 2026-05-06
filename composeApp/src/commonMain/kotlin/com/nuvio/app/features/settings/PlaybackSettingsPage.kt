@@ -124,6 +124,27 @@ fun calculateSteps(
     val totalSteps = ((max - min) / stepSize).roundToInt()
     return (totalSteps - 1).coerceAtLeast(0)
 }
+
+@Composable
+fun ValueBox(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
 @Composable
 private fun PlaybackSettingsSection(
     isTablet: Boolean,
@@ -321,12 +342,7 @@ private fun PlaybackSettingsSection(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Text(
-                                text = timeoutLabel,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                            ValueBox(text = timeoutLabel, modifier = Modifier.wrapContentWidth())
                         }
                         var sliderValue by remember(timeoutSec) { mutableFloatStateOf(timeoutSec.toFloat()) }
                         var lastHapticStep by remember(timeoutSec) { mutableStateOf(timeoutSec) }
@@ -592,15 +608,9 @@ private fun PlaybackSettingsSection(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = stringResource(
-                                        Res.string.settings_playback_threshold_percentage_value,
-                                        thresholdPercent.toInt(),
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                ValueBox(text = stringResource(
+                                    Res.string.settings_playback_threshold_percentage_value,
+                                    formatStep(thresholdPercent)), modifier = Modifier.wrapContentWidth())
                             }
                             var sliderVal by remember(thresholdPercent) { mutableFloatStateOf(thresholdPercent) }
                             var lastHapticPercent by remember(thresholdPercent) { mutableStateOf(thresholdPercent.toInt()) }
@@ -651,8 +661,7 @@ private fun PlaybackSettingsSection(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = stringResource(
+                                ValueBox(text = stringResource(
                                         Res.string.settings_playback_minutes_value,
                                         thresholdMinutes.toInt(),
                                     ),
