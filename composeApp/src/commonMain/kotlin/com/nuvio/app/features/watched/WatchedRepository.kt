@@ -78,6 +78,8 @@ object WatchedRepository {
         publish()
     }
 
+    suspend fun refreshNow() = pullFromServer(currentProfileId)
+
     suspend fun pullFromServer(profileId: Int) {
         currentProfileId = profileId
         runCatching {

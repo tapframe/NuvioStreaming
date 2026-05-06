@@ -2,6 +2,8 @@ package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpRequestRaw
+import com.nuvio.app.features.tmdb.TmdbService
+import com.nuvio.app.features.watched.WatchedRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -107,8 +109,9 @@ internal object TraktScrobbleRepository {
         val clampedProgress = progressPercent.coerceIn(0f, 100f)
         if (shouldSkip(action, item.itemKey, clampedProgress)) return
 
+        val resolvedItem = remapEpisodeIfNeeded(resolveItemIds(item))
         val url = "$BASE_URL/scrobble/$action"
-        val requestBody = json.encodeToString(buildRequestBody(item, clampedProgress))
+        val requestBody = json.encodeToString(buildRequestBody(resolvedItem, clampedProgress))
         val requestHeaders = mapOf(
             "Accept" to "application/json",
             "Content-Type" to "application/json",
@@ -207,7 +210,39 @@ internal object TraktScrobbleRepository {
                     if (error is CancellationException) throw error
                     log.w { "Failed to refresh Trakt progress after stop: ${error.message}" }
                 }
+            runCatching { WatchedRepository.refreshNow() }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    log.w { "Failed to refresh watched items after stop: ${error.message}" }
+                }
         }
+    }
+
+    private suspend fun remapEpisodeIfNeeded(item: TraktScrobbleItem): TraktScrobbleItem {
+        if (item !is TraktScrobbleItem.Episode) return item
+        val contentId = normalizeTraktContentId(item.showIds)
+        if (contentId.isBlank()) return item
+        val mapped = runCatching {
+            TraktEpisodeMappingService.resolveEpisodeMapping(
+                contentId = contentId,
+                contentType = "series",
+                videoId = null,
+                season = item.season,
+                episode = item.number,
+                episodeTitle = item.episodeTitle,
+            )
+        }.getOrNull() ?: return item
+        return item.copy(season = mapped.season, number = mapped.episode)
+    }
+
+    private suspend fun resolveItemIds(item: TraktScrobbleItem): TraktScrobbleItem {
+        if (item !is TraktScrobbleItem.Episode) return item
+        val ids = item.showIds
+        if (ids.tmdb != null && ids.imdb.isNullOrBlank()) {
+            val imdb = runCatching { TmdbService.tmdbToImdb(ids.tmdb, "tv") }.getOrNull()
+            if (!imdb.isNullOrBlank()) return item.copy(showIds = ids.copy(imdb = imdb))
+        }
+        return item
     }
 
     private fun buildRequestBody(

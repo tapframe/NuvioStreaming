@@ -33,6 +33,7 @@ fun MetaDetails.toEpisodeWatchedItem(
         releaseInfo = releaseInfo,
         season = video.season,
         episode = video.episode,
+        episodeTitle = video.title.takeIf { it.isNotBlank() },
         markedAtEpochMs = markedAtEpochMs,
     )
 

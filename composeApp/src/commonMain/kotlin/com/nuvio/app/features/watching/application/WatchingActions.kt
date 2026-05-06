@@ -116,6 +116,7 @@ object WatchingActions {
             poster = entry.poster,
             season = entry.seasonNumber,
             episode = entry.episodeNumber,
+            episodeTitle = entry.episodeTitle,
             markedAtEpochMs = entry.lastUpdatedEpochMs,
         )
         WatchedRepository.markWatched(watchedItem)

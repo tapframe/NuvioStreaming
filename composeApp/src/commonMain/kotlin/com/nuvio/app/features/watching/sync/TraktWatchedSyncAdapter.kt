@@ -3,6 +3,7 @@ package com.nuvio.app.features.watching.sync
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
+import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktEpisodeMappingService
 import com.nuvio.app.features.watched.WatchedItem
@@ -130,10 +131,10 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
         val movies = mutableListOf<TraktHistoryMovieRequestDto>()
         val shows = mutableListOf<TraktHistoryShowRequestDto>()
 
-        items.forEach { item ->
-            if (!item.shouldSyncToTraktHistory()) return@forEach
+        for (item in items) {
+            if (!item.shouldSyncToTraktHistory()) continue
 
-            val ids = parseIds(item.id) ?: return@forEach
+            val ids = resolveIds(item.id, item.type) ?: continue
             val normalizedType = item.type.trim().lowercase()
 
             if (normalizedType == "movie" || normalizedType == "film") {
@@ -238,10 +239,11 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
                 videoId = null,
                 season = season,
                 episode = episode,
+                episodeTitle = item.episodeTitle,
             ) ?: continue
             if (mapped.season == season && mapped.episode == episode) continue
 
-            val ids = parseIds(item.id) ?: continue
+            val ids = resolveIds(item.id, item.type) ?: continue
             val existing = remappedShows.firstOrNull { it.ids == ids }
             if (existing != null) {
                 val seasonDto = existing.seasons?.firstOrNull { it.number == mapped.season }
@@ -433,6 +435,17 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
 
     // ── helpers ─────────────────────────────────────────────────────────
 
+    private suspend fun resolveIds(rawId: String, mediaType: String): TraktSyncIdsDto? {
+        val ids = parseIds(rawId) ?: return null
+        if (ids.tmdb != null && ids.imdb.isNullOrBlank()) {
+            val imdb = runCatching {
+                TmdbService.tmdbToImdb(ids.tmdb, mediaType)
+            }.getOrNull()
+            if (!imdb.isNullOrBlank()) return ids.copy(imdb = imdb)
+        }
+        return ids
+    }
+
     private fun normalizeId(ids: TraktSyncIdsDto?): String? {
         if (ids == null) return null
         ids.imdb?.takeIf { it.isNotBlank() }?.let { return it }
@@ -471,14 +484,34 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
         return yearRegex.find(value)?.value?.toIntOrNull()
     }
 
-    private fun rankedTimestamp(isoDate: String?): Long {
-        val digits = isoDate
-            ?.filter(Char::isDigit)
-            ?.take(14)
-            ?.takeIf { it.length >= 8 }
-            ?.padEnd(14, '0')
-            ?.toLongOrNull()
-        return digits ?: 0L
+    private fun rankedTimestamp(isoDate: String?): Long =
+        isoDate?.let { isoToEpochMs(it) } ?: 0L
+
+    private fun isoToEpochMs(iso: String): Long? {
+        if (iso.length < 19) return null
+        return runCatching {
+            val year = iso.substring(0, 4).toLong()
+            val month = iso.substring(5, 7).toLong()
+            val day = iso.substring(8, 10).toLong()
+            val hour = iso.substring(11, 13).toLong()
+            val minute = iso.substring(14, 16).toLong()
+            val second = iso.substring(17, 19).toLong()
+            val millis = if (iso.length > 20 && iso[19] == '.') {
+                iso.substring(20).filter(Char::isDigit).take(3).padEnd(3, '0').toLong()
+            } else 0L
+            epochDay(year, month, day) * 86_400_000L +
+                hour * 3_600_000L + minute * 60_000L + second * 1_000L + millis
+        }.getOrNull()
+    }
+
+    private fun epochDay(year: Long, month: Long, day: Long): Long {
+        val y = year - if (month <= 2L) 1L else 0L
+        val era = if (y >= 0L) y / 400L else (y - 399L) / 400L
+        val yoe = y - era * 400L
+        val m = month + if (month > 2L) -3L else 9L
+        val doy = (153L * m + 2L) / 5L + day - 1L
+        val doe = yoe * 365L + yoe / 4L - yoe / 100L + doy
+        return era * 146_097L + doe - 719_468L
     }
 
     private fun epochMsToIso(epochMs: Long): String {
