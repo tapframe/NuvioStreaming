@@ -64,6 +64,7 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 internal fun LazyListScope.playbackSettingsContent(
     isTablet: Boolean,
@@ -103,6 +104,26 @@ internal fun LazyListScope.playbackSettingsContent(
     }
 }
 
+private fun formatStep(value: Float): String {
+    return if (value % 1f == 0f) {
+        value.toInt().toString()
+    } else {
+        value.toString()
+    }
+}
+
+fun snapToStep(value: Float, step: Float): Float {
+    return (value / step).roundToInt() * step
+}
+
+fun calculateSteps(
+    min: Float,
+    max: Float,
+    stepSize: Float
+): Int {
+    val totalSteps = ((max - min) / stepSize).roundToInt()
+    return (totalSteps - 1).coerceAtLeast(0)
+}
 @Composable
 private fun PlaybackSettingsSection(
     isTablet: Boolean,
