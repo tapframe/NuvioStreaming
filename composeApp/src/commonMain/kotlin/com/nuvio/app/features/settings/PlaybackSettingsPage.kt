@@ -629,8 +629,8 @@ private fun PlaybackSettingsSection(
                                 onValueChangeFinished = {
                                     PlayerSettingsRepository.setNextEpisodeThresholdPercent(sliderValue)
                                 },
-                                valueRange = 50f..100f,
-                                steps = 49,
+                                valueRange = 97f..100f,
+                                steps = calculateSteps(97f, 100f, 0.5f),
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -682,8 +682,8 @@ private fun PlaybackSettingsSection(
                                 onValueChangeFinished = {
                                     PlayerSettingsRepository.setNextEpisodeThresholdMinutesBeforeEnd(sliderValue)
                                 },
-                                valueRange = 1f..15f,
-                                steps = 13,
+                                valueRange = 0f..3.5f,
+                                steps = calculateSteps(0f, 3.5f, 0.5f),
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary,
