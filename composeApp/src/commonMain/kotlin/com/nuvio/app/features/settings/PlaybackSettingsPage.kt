@@ -616,7 +616,7 @@ private fun PlaybackSettingsSection(
                             var sliderValue by remember(thresholdPercent) { mutableFloatStateOf(thresholdPercent) }
                             var lastHapticPercent by remember(thresholdPercent) { mutableStateOf(thresholdPercent) }
                             Slider(
-                                value = sliderVal,
+                                value = sliderValue,
                                 onValueChange = {
                                     val snapped = snapToStep(it, 0.5f)
                                     sliderValue = snapped
@@ -627,7 +627,7 @@ private fun PlaybackSettingsSection(
                                     }
                                 },
                                 onValueChangeFinished = {
-                                    PlayerSettingsRepository.setNextEpisodeThresholdPercent(sliderVal)
+                                    PlayerSettingsRepository.setNextEpisodeThresholdPercent(sliderValue)
                                 },
                                 valueRange = 50f..100f,
                                 steps = 49,
@@ -669,7 +669,7 @@ private fun PlaybackSettingsSection(
                             var sliderValue by remember(thresholdMinutes) { mutableFloatStateOf(thresholdMinutes) }
                             var lastHapticMin by remember(thresholdMinutes) { mutableStateOf(thresholdMinutes) }
                             Slider(
-                                value = sliderVal,
+                                value = sliderValue,
                                 onValueChange = {
                                     val snapped = snapToStep(it, 0.5f)
                                     sliderValue = snapped
@@ -680,7 +680,7 @@ private fun PlaybackSettingsSection(
                                     }
                                 },
                                 onValueChangeFinished = {
-                                    PlayerSettingsRepository.setNextEpisodeThresholdMinutesBeforeEnd(sliderVal)
+                                    PlayerSettingsRepository.setNextEpisodeThresholdMinutesBeforeEnd(sliderValue)
                                 },
                                 valueRange = 1f..15f,
                                 steps = 13,
