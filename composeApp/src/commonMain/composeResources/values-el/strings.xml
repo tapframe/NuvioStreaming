@@ -494,7 +494,7 @@
     <string name="settings_playback_map_dv7_to_hevc_description">Εναλλαγή Dolby Vision Profile 7 σε HEVC για μη υποστηριζόμενες συσκευές.</string>
     <string name="settings_playback_minutes_before_end">Λεπτά πριν το τέλος</string>
     <string name="settings_playback_minutes_before_end_description">Εμφάνιση κάρτας επόμενου επεισοδίου τόσα λεπτά πριν το τέλος.</string>
-    <string name="settings_playback_minutes_value">%1$d λεπτά</string>
+    <string name="settings_playback_minutes_value">%1$s λεπτά</string>
     <string name="settings_playback_no_items_available">Δεν υπάρχουν διαθέσιμα στοιχεία</string>
     <string name="settings_playback_not_set">Δεν έχει οριστεί</string>
     <string name="settings_playback_option_default">Προεπιλογή</string>
@@ -569,9 +569,9 @@
     <string name="settings_playback_threshold_mode_percentage">Ποσοστό</string>
     <string name="settings_playback_threshold_percentage">Ποσοστό κατωφλίου</string>
     <string name="settings_playback_threshold_percentage_description">Εμφάνιση κάρτας επόμενου επεισοδίου όταν η αναπαραγωγή φτάσει σε αυτό το ποσοστό.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$d%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
     <string name="settings_playback_timeout_instant">Άμεσα</string>
-    <string name="settings_playback_timeout_seconds">%1$ds</string>
+    <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Απεριόριστο</string>
     <string name="settings_playback_tunneled_playback">Tunneled αναπαραγωγή</string>
     <string name="settings_playback_tunneled_playback_description">Ενεργοποίηση tunneled αναπαραγωγής για χαμηλότερη καθυστέρηση συγχρονισμού ήχου/βίντεο.</string>

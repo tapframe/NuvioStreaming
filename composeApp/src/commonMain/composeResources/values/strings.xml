@@ -663,7 +663,7 @@
     <string name="settings_playback_map_dv7_to_hevc_description">Map Dolby Vision Profile 7 to standard HEVC for devices without DV hardware support</string>
     <string name="settings_playback_minutes_before_end">Threshold Minutes</string>
     <string name="settings_playback_minutes_before_end_description">Fallback when no outro timestamp exists.</string>
-    <string name="settings_playback_minutes_value">%1$d min</string>
+    <string name="settings_playback_minutes_value">%1$s min</string>
     <string name="settings_playback_no_items_available">No items available</string>
     <string name="settings_playback_not_set">Not set</string>
     <string name="settings_playback_option_default">Default (media file)</string>
@@ -738,9 +738,9 @@
     <string name="settings_playback_threshold_mode_percentage">Percentage</string>
     <string name="settings_playback_threshold_percentage">Threshold Percentage</string>
     <string name="settings_playback_threshold_percentage_description">Fallback when no outro timestamp exists.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$d%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
     <string name="settings_playback_timeout_instant">Instant</string>
-    <string name="settings_playback_timeout_seconds">%1$ds</string>
+    <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Unlimited</string>
     <string name="settings_playback_tunneled_playback">Tunneled Playback</string>
     <string name="settings_playback_tunneled_playback_description">Hardware-level audio/video sync. May improve playback on some Android TV devices</string>

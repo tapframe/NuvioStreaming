@@ -624,7 +624,7 @@
     <string name="settings_playback_map_dv7_to_hevc_description">Fallback de Dolby Vision Profile 7 para HEVC para dispositivos não suportados.</string>
     <string name="settings_playback_minutes_before_end">Minutos Antes do Fim</string>
     <string name="settings_playback_minutes_before_end_description">Mostra o cartão do próximo episódio estes minutos antes do fim.</string>
-    <string name="settings_playback_minutes_value">%1$d min</string>
+    <string name="settings_playback_minutes_value">%1$s min</string>
     <string name="settings_playback_no_items_available">Nenhum item disponível</string>
     <string name="settings_playback_not_set">Não definido</string>
     <string name="settings_playback_option_default">Padrão</string>
@@ -699,9 +699,9 @@
     <string name="settings_playback_threshold_mode_percentage">Percentagem</string>
     <string name="settings_playback_threshold_percentage">Percentagem Limite</string>
     <string name="settings_playback_threshold_percentage_description">Mostra o cartão do próximo episódio quando a reprodução atingir esta percentagem.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$d%%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
     <string name="settings_playback_timeout_instant">Instantâneo</string>
-    <string name="settings_playback_timeout_seconds">%1$ds</string>
+    <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Ilimitado</string>
     <string name="settings_playback_tunneled_playback">Reprodução em Túnel</string>
     <string name="settings_playback_tunneled_playback_description">Ativa a reprodução em túnel para menor latência na sincronização de áudio/vídeo.</string>

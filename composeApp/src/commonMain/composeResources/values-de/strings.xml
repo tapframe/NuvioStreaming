@@ -649,7 +649,7 @@
     <string name="settings_playback_map_dv7_to_hevc_description">Dolby Vision Profil 7 zu HEVC-Fallback für nicht unterstützte Geräte.</string>
     <string name="settings_playback_minutes_before_end">Minuten vor Ende</string>
     <string name="settings_playback_minutes_before_end_description">Karte für nächste Episode so viele Minuten vor dem Ende anzeigen.</string>
-    <string name="settings_playback_minutes_value">%1$d Min.</string>
+    <string name="settings_playback_minutes_value">%1$s Min.</string>
     <string name="settings_playback_no_items_available">Keine Einträge verfügbar</string>
     <string name="settings_playback_not_set">Nicht festgelegt</string>
     <string name="settings_playback_option_default">Standard</string>
@@ -724,9 +724,9 @@
     <string name="settings_playback_threshold_mode_percentage">Prozent</string>
     <string name="settings_playback_threshold_percentage">Schwellenwert in Prozent</string>
     <string name="settings_playback_threshold_percentage_description">Karte für nächste Episode anzeigen, wenn die Wiedergabe diesen Prozentsatz erreicht.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$d%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
     <string name="settings_playback_timeout_instant">Sofort</string>
-    <string name="settings_playback_timeout_seconds">%1$ds</string>
+    <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Unbegrenzt</string>
     <string name="settings_playback_tunneled_playback">Tunneled-Wiedergabe</string>
     <string name="settings_playback_tunneled_playback_description">Tunneled-Wiedergabe für niedrigere Latenz bei Audio-/Video-Synchronisation aktivieren.</string>
