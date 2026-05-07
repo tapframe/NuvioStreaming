@@ -121,7 +121,7 @@ private fun FullscreenTrailerPlayerContent(
     onRetry: (() -> Unit)?,
 ) {
     LockPlayerToLandscape()
-    EnterImmersivePlayerMode()
+    EnterImmersivePlayerMode(true)
     PlatformBackHandler(enabled = true, onBack = onDismiss)
 
     val headerType = trailerType.trim().ifBlank { stringResource(Res.string.detail_tab_trailer) }
