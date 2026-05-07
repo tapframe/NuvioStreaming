@@ -54,6 +54,8 @@ import nuvio.composeapp.generated.resources.settings_appearance_app_language_she
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_black
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_description
 import nuvio.composeapp.generated.resources.settings_appearance_continue_watching_description
+import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass
+import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass_description
 import nuvio.composeapp.generated.resources.settings_appearance_poster_customization_description
 import nuvio.composeapp.generated.resources.settings_appearance_section_display
 import nuvio.composeapp.generated.resources.settings_appearance_section_home
@@ -70,6 +72,9 @@ internal fun LazyListScope.appearanceSettingsContent(
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
     onAmoledToggle: (Boolean) -> Unit,
+    liquidGlassNativeTabBarSupported: Boolean,
+    liquidGlassNativeTabBarEnabled: Boolean,
+    onLiquidGlassNativeTabBarToggle: (Boolean) -> Unit,
     selectedAppLanguage: AppLanguage,
     onAppLanguageSelected: (AppLanguage) -> Unit,
     onContinueWatchingClick: () -> Unit,
@@ -118,6 +123,16 @@ internal fun LazyListScope.appearanceSettingsContent(
                     isTablet = isTablet,
                     onCheckedChange = onAmoledToggle,
                 )
+                if (liquidGlassNativeTabBarSupported) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_appearance_liquid_glass),
+                        description = stringResource(Res.string.settings_appearance_liquid_glass_description),
+                        checked = liquidGlassNativeTabBarEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = onLiquidGlassNativeTabBarToggle,
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_language),

@@ -98,3 +98,13 @@ enum class DownloadEnqueueResult {
         }
     }
 }
+
+internal fun List<DownloadItem>.sortedForSeriesDownloads(): List<DownloadItem> =
+    sortedWith(downloadSeriesEpisodeComparator)
+
+internal val downloadSeriesEpisodeComparator: Comparator<DownloadItem> =
+    compareBy<DownloadItem> { it.seasonNumber ?: Int.MAX_VALUE }
+        .thenBy { it.episodeNumber ?: Int.MAX_VALUE }
+        .thenBy { it.episodeTitle?.trim().orEmpty().lowercase() }
+        .thenBy { it.title.trim().lowercase() }
+        .thenBy { it.id }

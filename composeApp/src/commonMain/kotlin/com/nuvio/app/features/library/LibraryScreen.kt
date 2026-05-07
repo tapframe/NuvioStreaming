@@ -50,6 +50,12 @@ fun LibraryScreen(
     var observedOfflineState by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isTraktSource = uiState.sourceMode == LibrarySourceMode.TRAKT
+    val retryLibraryLoad: () -> Unit = {
+        NetworkStatusRepository.requestRefresh(force = true)
+        coroutineScope.launch {
+            LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
+        }
+    }
 
     LaunchedEffect(networkStatusUiState.condition, isTraktSource) {
         when (networkStatusUiState.condition) {
@@ -110,14 +116,7 @@ fun LibraryScreen(
                         NuvioNetworkOfflineCard(
                             condition = networkStatusUiState.condition,
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            onRetry = {
-                                NetworkStatusRepository.requestRefresh(force = true)
-                                if (isTraktSource) {
-                                    coroutineScope.launch {
-                                        LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
-                                    }
-                                }
-                            },
+                            onRetry = retryLibraryLoad,
                         )
                     } else {
                         HomeEmptyStateCard(
@@ -128,6 +127,8 @@ fun LibraryScreen(
                                 stringResource(Res.string.library_load_failed)
                             },
                             message = uiState.errorMessage.orEmpty(),
+                            actionLabel = stringResource(Res.string.action_retry),
+                            onActionClick = retryLibraryLoad,
                         )
                     }
                 }
@@ -139,12 +140,7 @@ fun LibraryScreen(
                         NuvioNetworkOfflineCard(
                             condition = networkStatusUiState.condition,
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            onRetry = {
-                                NetworkStatusRepository.requestRefresh(force = true)
-                                coroutineScope.launch {
-                                    LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
-                                }
-                            },
+                            onRetry = retryLibraryLoad,
                         )
                     } else {
                         HomeEmptyStateCard(

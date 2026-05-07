@@ -45,6 +45,8 @@ internal actual object PlatformLocalAccountDataCleaner {
         "mdblist_use_audience",
         "trakt_auth_payload",
         "trakt_library_payload",
+        "trakt_settings_payload",
+        "collections_payload",
     )
 
     actual fun wipe() {

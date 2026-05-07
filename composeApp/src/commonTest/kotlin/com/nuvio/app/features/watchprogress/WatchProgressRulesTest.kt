@@ -119,6 +119,61 @@ class WatchProgressRulesTest {
     }
 
     @Test
+    fun `continue watching keeps active resume even when a newer episode is completed`() {
+        val inProgress = entry(
+            videoId = "show:1:4",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 4,
+            lastUpdatedEpochMs = 10L,
+        )
+        val completed = entry(
+            videoId = "show:1:5",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 5,
+            lastUpdatedEpochMs = 20L,
+            isCompleted = true,
+        )
+
+        val result = listOf(inProgress, completed).continueWatchingEntries()
+
+        assertEquals(listOf("show:1:4"), result.map { it.videoId })
+    }
+
+    @Test
+    fun `Trakt playback next up seeds require TV percent threshold`() {
+        val belowSeedThreshold = entry(
+            videoId = "show:1:4",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 4,
+            progressPercent = 94f,
+            source = WatchProgressSourceTraktPlayback,
+        )
+        val seed = belowSeedThreshold.copy(progressPercent = 95f)
+
+        assertFalse(belowSeedThreshold.shouldUseAsCompletedSeedForContinueWatching())
+        assertTrue(seed.shouldUseAsCompletedSeedForContinueWatching())
+    }
+
+    @Test
+    fun `Trakt history is not treated as active resume`() {
+        val history = entry(
+            videoId = "show:1:4",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 4,
+            lastPositionMs = 1L,
+            durationMs = 0L,
+            progressPercent = 50f,
+            source = WatchProgressSourceTraktHistory,
+        )
+
+        assertFalse(history.shouldTreatAsInProgressForContinueWatching())
+    }
+
+    @Test
     fun `codec normalizes completed entries inferred from percent`() {
         val payload = WatchProgressCodec.encodeEntries(
             listOf(
@@ -174,6 +229,7 @@ class WatchProgressRulesTest {
         durationMs: Long = 1_000_000L,
         isCompleted: Boolean = false,
         progressPercent: Float? = null,
+        source: String = WatchProgressSourceLocal,
     ): WatchProgressEntry =
         WatchProgressEntry(
             contentType = if (seasonNumber != null && episodeNumber != null) "series" else "movie",
@@ -188,5 +244,6 @@ class WatchProgressRulesTest {
             lastUpdatedEpochMs = lastUpdatedEpochMs,
             isCompleted = isCompleted,
             progressPercent = progressPercent,
+            source = source,
         )
 }

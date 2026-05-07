@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.downloads.DownloadItem
 import com.nuvio.app.features.downloads.DownloadsRepository
@@ -55,6 +56,7 @@ import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.trakt.TraktScrobbleRepository
+import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressClock
 import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -142,6 +144,18 @@ fun PlayerScreen(
     val playerSettingsUiState by remember {
         PlayerSettingsRepository.ensureLoaded()
         PlayerSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val metaScreenSettingsUiState by remember {
+        MetaScreenSettingsRepository.ensureLoaded()
+        MetaScreenSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val watchProgressUiState by remember {
+        WatchProgressRepository.ensureLoaded()
+        WatchProgressRepository.uiState
     }.collectAsStateWithLifecycle()
 
     BoxWithConstraints(
@@ -1799,8 +1813,13 @@ fun PlayerScreen(
                 PlayerEpisodesPanel(
                     visible = showEpisodesPanel,
                     episodes = allEpisodes,
+                    parentMetaType = parentMetaType,
+                    parentMetaId = parentMetaId,
                     currentSeason = activeSeasonNumber,
                     currentEpisode = activeEpisodeNumber,
+                    progressByVideoId = watchProgressUiState.byVideoId,
+                    watchedKeys = watchedUiState.watchedKeys,
+                    blurUnwatchedEpisodes = metaScreenSettingsUiState.blurUnwatchedEpisodes,
                     episodeStreamsState = episodeStreamsPanelState.copy(
                         streamsUiState = episodeStreamsRepoState,
                     ),

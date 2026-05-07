@@ -28,6 +28,10 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_continue_watching_resume_prompt_description
 import nuvio.composeapp.generated.resources.settings_continue_watching_resume_prompt_title
+import nuvio.composeapp.generated.resources.settings_continue_watching_blur_next_up_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_blur_next_up_title
+import nuvio.composeapp.generated.resources.settings_continue_watching_show_unaired_next_up_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_show_unaired_next_up_title
 import nuvio.composeapp.generated.resources.settings_continue_watching_section_card_style
 import nuvio.composeapp.generated.resources.settings_continue_watching_section_on_launch
 import nuvio.composeapp.generated.resources.settings_continue_watching_section_up_next_behavior
@@ -40,6 +44,8 @@ import nuvio.composeapp.generated.resources.settings_continue_watching_style_wid
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_wide_description
 import nuvio.composeapp.generated.resources.settings_continue_watching_up_next_description
 import nuvio.composeapp.generated.resources.settings_continue_watching_up_next_title
+import nuvio.composeapp.generated.resources.settings_continue_watching_use_episode_thumbnails_description
+import nuvio.composeapp.generated.resources.settings_continue_watching_use_episode_thumbnails_title
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -48,6 +54,9 @@ internal fun LazyListScope.continueWatchingSettingsContent(
     isVisible: Boolean,
     style: ContinueWatchingSectionStyle,
     upNextFromFurthestEpisode: Boolean,
+    useEpisodeThumbnails: Boolean,
+    showUnairedNextUp: Boolean,
+    blurNextUp: Boolean,
     showResumePromptOnLaunch: Boolean,
 ) {
     item {
@@ -85,12 +94,38 @@ internal fun LazyListScope.continueWatchingSettingsContent(
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_continue_watching_use_episode_thumbnails_title),
+                    description = stringResource(Res.string.settings_continue_watching_use_episode_thumbnails_description),
+                    checked = useEpisodeThumbnails,
+                    isTablet = isTablet,
+                    onCheckedChange = ContinueWatchingPreferencesRepository::setUseEpisodeThumbnails,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
                     title = stringResource(Res.string.settings_continue_watching_up_next_title),
                     description = stringResource(Res.string.settings_continue_watching_up_next_description),
                     checked = upNextFromFurthestEpisode,
                     isTablet = isTablet,
                     onCheckedChange = ContinueWatchingPreferencesRepository::setUpNextFromFurthestEpisode,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_continue_watching_show_unaired_next_up_title),
+                    description = stringResource(Res.string.settings_continue_watching_show_unaired_next_up_description),
+                    checked = showUnairedNextUp,
+                    isTablet = isTablet,
+                    onCheckedChange = ContinueWatchingPreferencesRepository::setShowUnairedNextUp,
+                )
+                if (useEpisodeThumbnails) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_continue_watching_blur_next_up_title),
+                        description = stringResource(Res.string.settings_continue_watching_blur_next_up_description),
+                        checked = blurNextUp,
+                        isTablet = isTablet,
+                        onCheckedChange = ContinueWatchingPreferencesRepository::setBlurNextUp,
+                    )
+                }
             }
         }
     }

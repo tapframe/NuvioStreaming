@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -60,6 +61,9 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.features.watching.application.WatchingState
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -72,8 +76,13 @@ import org.jetbrains.compose.resources.stringResource
 fun PlayerEpisodesPanel(
     visible: Boolean,
     episodes: List<MetaVideo>,
+    parentMetaType: String,
+    parentMetaId: String,
     currentSeason: Int?,
     currentEpisode: Int?,
+    progressByVideoId: Map<String, WatchProgressEntry>,
+    watchedKeys: Set<String>,
+    blurUnwatchedEpisodes: Boolean,
     // episode stream sub-view state
     episodeStreamsState: EpisodeStreamsPanelState,
     onSeasonSelected: (Int) -> Unit,
@@ -134,8 +143,13 @@ fun PlayerEpisodesPanel(
                     } else {
                         EpisodesListSubView(
                             episodes = episodes,
+                            parentMetaType = parentMetaType,
+                            parentMetaId = parentMetaId,
                             currentSeason = currentSeason,
                             currentEpisode = currentEpisode,
+                            progressByVideoId = progressByVideoId,
+                            watchedKeys = watchedKeys,
+                            blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                             onSeasonSelected = onSeasonSelected,
                             onEpisodeSelected = onEpisodeSelected,
                             onDismiss = onDismiss,
@@ -158,8 +172,13 @@ data class EpisodeStreamsPanelState(
 @Composable
 private fun EpisodesListSubView(
     episodes: List<MetaVideo>,
+    parentMetaType: String,
+    parentMetaId: String,
     currentSeason: Int?,
     currentEpisode: Int?,
+    progressByVideoId: Map<String, WatchProgressEntry>,
+    watchedKeys: Set<String>,
+    blurUnwatchedEpisodes: Boolean,
     onSeasonSelected: (Int) -> Unit,
     onEpisodeSelected: (MetaVideo) -> Unit,
     onDismiss: () -> Unit,
@@ -296,9 +315,24 @@ private fun EpisodesListSubView(
                     key = { index, episode -> "${episode.season}:${episode.episode}:${episode.id}#$index" },
                 ) { _, episode ->
                     val isCurrent = episode.season == currentSeason && episode.episode == currentEpisode
+                    val episodeVideoId = buildPlaybackVideoId(
+                        parentMetaId = parentMetaId,
+                        seasonNumber = episode.season,
+                        episodeNumber = episode.episode,
+                        fallbackVideoId = episode.id,
+                    )
+                    val isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
+                        WatchingState.isEpisodeWatched(
+                            watchedKeys = watchedKeys,
+                            metaType = parentMetaType,
+                            metaId = parentMetaId,
+                            episode = episode,
+                        )
                     EpisodeRow(
                         episode = episode,
                         isCurrent = isCurrent,
+                        isWatched = isWatched,
+                        blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                         onClick = { onEpisodeSelected(episode) },
                     )
                 }
@@ -311,9 +345,12 @@ private fun EpisodesListSubView(
 private fun EpisodeRow(
     episode: MetaVideo,
     isCurrent: Boolean,
+    isWatched: Boolean,
+    blurUnwatchedEpisodes: Boolean,
     onClick: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched && !isCurrent
 
     Row(
         modifier = Modifier
@@ -342,7 +379,8 @@ private fun EpisodeRow(
                 modifier = Modifier
                     .width(80.dp)
                     .height(48.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(8.dp))
+                    .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
             )
         }

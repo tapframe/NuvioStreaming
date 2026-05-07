@@ -67,13 +67,48 @@ internal fun List<WatchProgressEntry>.resumeEntryForSeries(metaId: String): Watc
 internal fun List<WatchProgressEntry>.continueWatchingEntries(
     limit: Int = ContinueWatchingLimit,
 ): List<WatchProgressEntry> {
+    val inProgressEntries = filter { entry -> entry.shouldTreatAsInProgressForContinueWatching() }
     val domainEntries = continueWatchingProgressEntries(
-        progressRecords = map(WatchProgressEntry::toDomainProgressRecord),
+        progressRecords = inProgressEntries.map(WatchProgressEntry::toDomainProgressRecord),
         limit = limit,
     )
     val ids = domainEntries.map { record -> record.videoId }.toSet()
-    return filter { entry -> entry.videoId in ids }
+    return inProgressEntries.filter { entry -> entry.videoId in ids }
         .sortedByDescending { it.lastUpdatedEpochMs }
+}
+
+internal fun WatchProgressEntry.shouldTreatAsInProgressForContinueWatching(): Boolean {
+    val entry = normalizedCompletion()
+    if (entry.isEffectivelyCompleted) return false
+
+    val hasStartedPlayback = entry.lastPositionMs > 0L ||
+        entry.normalizedProgressPercent?.let { it > 0f } == true
+    if (!hasStartedPlayback) return false
+
+    return entry.source != WatchProgressSourceTraktHistory &&
+        entry.source != WatchProgressSourceTraktShowProgress
+}
+
+internal fun WatchProgressEntry.shouldUseAsCompletedSeedForContinueWatching(): Boolean {
+    val entry = normalizedCompletion()
+    if (isMalformedNextUpSeedContentId(entry.parentMetaId)) return false
+    if (!entry.isEffectivelyCompleted) return false
+    if (entry.source != WatchProgressSourceTraktPlayback) return true
+
+    val explicitPercent = entry.normalizedProgressPercent ?: return false
+    return explicitPercent >= WatchProgressTraktPlaybackNextUpSeedPercentThreshold
+}
+
+internal fun String?.isSeriesTypeForContinueWatching(): Boolean =
+    equals("series", ignoreCase = true) || equals("tv", ignoreCase = true)
+
+internal fun isMalformedNextUpSeedContentId(contentId: String?): Boolean {
+    val trimmed = contentId?.trim().orEmpty()
+    if (trimmed.isEmpty()) return true
+    return when (trimmed.lowercase()) {
+        "tmdb", "imdb", "trakt", "tmdb:", "imdb:", "trakt:" -> true
+        else -> false
+    }
 }
 
 private fun WatchProgressEntry.toDomainProgressRecord(): WatchingProgressRecord =

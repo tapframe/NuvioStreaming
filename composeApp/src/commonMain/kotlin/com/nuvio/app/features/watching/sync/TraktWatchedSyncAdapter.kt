@@ -5,7 +5,9 @@ import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktEpisodeMappingService
+import com.nuvio.app.features.trakt.TraktPlatformClock
 import com.nuvio.app.features.watched.WatchedItem
+import com.nuvio.app.features.watched.normalizeWatchedMarkedAtEpochMs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -472,26 +474,18 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
     }
 
     private fun rankedTimestamp(isoDate: String?): Long {
-        val digits = isoDate
-            ?.filter(Char::isDigit)
-            ?.take(14)
-            ?.takeIf { it.length >= 8 }
-            ?.padEnd(14, '0')
-            ?.toLongOrNull()
-        return digits ?: 0L
+        return isoDate
+            ?.takeIf { it.isNotBlank() }
+            ?.let(TraktPlatformClock::parseIsoDateTimeToEpochMs)
+            ?: 0L
     }
 
     private fun epochMsToIso(epochMs: Long): String {
-        // Convert to a compact ISO 8601 UTC string.
-        // Input is stored as a ranked-timestamp (YYYYMMDDHHmmss) in some places,
-        // or a real epoch-ms. We only send when it looks like real epoch-ms.
-        if (epochMs <= 0L) return "unknown"
-        if (epochMs < 10_000_000_000L) {
-            // Looks like seconds-based or ranked timestamp — send unknown
-            return "unknown"
-        }
+        val normalizedEpochMs = normalizeWatchedMarkedAtEpochMs(epochMs)
+        if (normalizedEpochMs <= 0L) return "unknown"
+        if (normalizedEpochMs < 10_000_000_000L) return "unknown"
         // Real epoch ms → simple ISO via arithmetic
-        val totalSeconds = epochMs / 1000
+        val totalSeconds = normalizedEpochMs / 1000
         val s = (totalSeconds % 60).toInt()
         val m = ((totalSeconds / 60) % 60).toInt()
         val h = ((totalSeconds / 3600) % 24).toInt()

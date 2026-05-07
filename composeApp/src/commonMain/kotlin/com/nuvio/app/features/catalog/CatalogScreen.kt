@@ -52,6 +52,7 @@ import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.stableKey
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -74,20 +75,21 @@ fun CatalogScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by CatalogRepository.uiState.collectAsStateWithLifecycle()
+    val homeCatalogSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
     val posterCardStyle = rememberPosterCardStyleUiState()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var observedOfflineState by remember { mutableStateOf(false) }
 
-    LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination) {
+    LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination, homeCatalogSettingsUiState.hideUnreleasedContent) {
         CatalogRepository.load(
             manifestUrl = manifestUrl,
             type = type,
             catalogId = catalogId,
             genre = genre,
             supportsPagination = supportsPagination,
-            force = false,
+            force = true,
         )
     }
 

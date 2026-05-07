@@ -341,6 +341,9 @@ private fun PopupProfileBubble(
     val avatarItem = remember(profile.avatarId, avatars) {
         profile.avatarId?.let { id -> avatars.find { it.id == id } }
     }
+    val avatarImageUrl = remember(profile.avatarUrl, avatarItem) {
+        profileAvatarImageUrl(profile, avatarItem)
+    }
 
     // Per-item entrance animation
     val itemAlpha = remember { Animatable(0f) }
@@ -393,8 +396,8 @@ private fun PopupProfileBubble(
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(
-                        if (avatarItem != null) {
-                            avatarItem.bgColor?.let { parseHexColor(it) } ?: avatarColor
+                        if (avatarImageUrl != null) {
+                            avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
                         } else {
                             avatarColor.copy(alpha = 0.15f)
                         },
@@ -411,7 +414,7 @@ private fun PopupProfileBubble(
                                 avatarColor.copy(alpha = 0.6f),
                                 CircleShape,
                             )
-                            avatarItem == null -> Modifier.border(
+                            avatarImageUrl == null -> Modifier.border(
                                 1.5.dp,
                                 avatarColor.copy(alpha = 0.3f),
                                 CircleShape,
@@ -421,9 +424,9 @@ private fun PopupProfileBubble(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (avatarItem != null) {
+                if (avatarImageUrl != null) {
                     AsyncImage(
-                        model = avatarStorageUrl(avatarItem.storagePath),
+                        model = avatarImageUrl,
                         contentDescription = profile.name,
                         modifier = Modifier.size(48.dp).clip(CircleShape),
                         contentScale = ContentScale.Crop,
@@ -700,6 +703,9 @@ fun ActiveProfileMiniAvatar(
     val avatarItem = remember(profile.avatarId, avatars) {
         profile.avatarId?.let { id -> avatars.find { it.id == id } }
     }
+    val avatarImageUrl = remember(profile.avatarUrl, avatarItem) {
+        profileAvatarImageUrl(profile, avatarItem)
+    }
 
     val borderColor = if (selected) {
         MaterialTheme.colorScheme.primary
@@ -712,8 +718,8 @@ fun ActiveProfileMiniAvatar(
             .size(size.dp)
             .clip(CircleShape)
             .background(
-                if (avatarItem != null) {
-                    avatarItem.bgColor?.let { parseHexColor(it) } ?: avatarColor
+                if (avatarImageUrl != null) {
+                    avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
                 } else {
                     avatarColor.copy(alpha = 0.15f)
                 },
@@ -721,9 +727,9 @@ fun ActiveProfileMiniAvatar(
             .border(1.5.dp, borderColor, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        if (avatarItem != null) {
+        if (avatarImageUrl != null) {
             AsyncImage(
-                model = avatarStorageUrl(avatarItem.storagePath),
+                model = avatarImageUrl,
                 contentDescription = profile.name,
                 modifier = Modifier.size(size.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop,

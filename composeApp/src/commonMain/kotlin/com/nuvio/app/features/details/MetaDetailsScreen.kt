@@ -79,6 +79,7 @@ import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
+import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentReview
 import com.nuvio.app.features.trakt.TraktCommentsRepository
@@ -165,6 +166,7 @@ fun MetaDetailsScreen(
     var pickerMembership by remember(type, id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var pickerPending by remember(type, id) { mutableStateOf(false) }
     var pickerError by remember(type, id) { mutableStateOf<String?>(null) }
+    var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
 
     val shouldShowComments = commentsEnabled &&
         traktAuthUiState.mode == TraktConnectionMode.CONNECTED &&
@@ -190,6 +192,30 @@ fun MetaDetailsScreen(
             commentsError = e.message ?: getString(Res.string.details_comments_load_failed)
         }
         isCommentsLoading = false
+    }
+
+    LaunchedEffect(displayedMeta?.id, displayedMeta?.videos) {
+        val metaForRatings = displayedMeta
+        if (metaForRatings == null || !metaForRatings.isSeriesLikeForEpisodeRatings()) {
+            episodeImdbRatings = emptyMap()
+            return@LaunchedEffect
+        }
+
+        val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
+        val tmdbId = extractTmdbId(metaForRatings.id)
+            ?: extractTmdbId(id)
+            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
+            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
+
+        if (imdbId == null && tmdbId == null) {
+            episodeImdbRatings = emptyMap()
+            return@LaunchedEffect
+        }
+
+        episodeImdbRatings = ImdbEpisodeRatingsRepository.getEpisodeRatings(
+            imdbId = imdbId,
+            tmdbId = tmdbId,
+        )
     }
 
     LaunchedEffect(type, id, displayedMeta, uiState.isLoading, autoLoadAttempted) {
@@ -274,39 +300,39 @@ fun MetaDetailsScreen(
                 val isSaved = remember(
                     libraryUiState.items,
                     libraryUiState.sections,
-                    traktAuthUiState.mode,
+                    libraryUiState.sourceMode,
                     meta.id,
                     meta.type,
                 ) {
                     LibraryRepository.isSaved(meta.id, meta.type)
                 }
-                val isTraktConnected = traktAuthUiState.mode == TraktConnectionMode.CONNECTED
-                val toggleSaved = remember(meta, isTraktConnected) {
+                val openLibraryListPicker = remember(meta) {
                     {
                         val libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L)
-                        if (!isTraktConnected) {
-                            LibraryRepository.toggleSaved(libraryItem)
-                        } else {
-                            pickerTabs = LibraryRepository.traktListTabs()
-                            pickerMembership = pickerTabs.associate { it.key to false }
-                            pickerPending = true
-                            pickerError = null
-                            showLibraryListPicker = true
-                            detailsScope.launch {
-                                runCatching {
-                                    val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                    val tabs = LibraryRepository.traktListTabs()
-                                    pickerTabs = tabs
-                                    pickerMembership = tabs.associate { tab ->
-                                        tab.key to (snapshot[tab.key] == true)
-                                    }
-                                }.onFailure { error ->
-                                    pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
+                        pickerTabs = LibraryRepository.libraryListTabs()
+                        pickerMembership = pickerTabs.associate { it.key to false }
+                        pickerPending = true
+                        pickerError = null
+                        showLibraryListPicker = true
+                        detailsScope.launch {
+                            runCatching {
+                                val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
+                                val tabs = LibraryRepository.libraryListTabs()
+                                pickerTabs = tabs
+                                pickerMembership = tabs.associate { tab ->
+                                    tab.key to (snapshot[tab.key] == true)
                                 }
-                                pickerPending = false
+                            }.onFailure { error ->
+                                pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
                             }
-                            Unit
+                            pickerPending = false
                         }
+                        Unit
+                    }
+                }
+                val toggleSaved = remember(meta) {
+                    {
+                        LibraryRepository.toggleSaved(meta.toLibraryItem(savedAtEpochMs = 0L))
                     }
                 }
                 val movieProgress = watchProgressUiState.byVideoId[meta.id]
@@ -637,6 +663,7 @@ fun MetaDetailsScreen(
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                     onSaveClick = toggleSaved,
+                                    onSaveLongClick = openLibraryListPicker,
                                     showManualPlayOption = showManualPlayOption,
                                     preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
                                     preferredEpisodeNumber = seriesAction?.episodeNumber,
@@ -653,6 +680,7 @@ fun MetaDetailsScreen(
                                     commentsCurrentPage = commentsCurrentPage,
                                     commentsPageCount = commentsPageCount,
                                     commentsError = commentsError,
+                                    episodeImdbRatings = episodeImdbRatings,
                                     onRetryComments = {
                                         detailsScope.launch {
                                             isCommentsLoading = true
@@ -687,6 +715,7 @@ fun MetaDetailsScreen(
                                     onTrailerClick = resolveTrailer,
                                     progressByVideoId = watchProgressUiState.byVideoId,
                                     watchedKeys = watchedUiState.watchedKeys,
+                                    blurUnwatchedEpisodes = metaScreenSettingsUiState.blurUnwatchedEpisodes,
                                     onEpisodeClick = onEpisodePlayClick,
                                     onEpisodeLongPress = { video -> selectedEpisodeForActions = video },
                                     onOpenMeta = onOpenMeta,
@@ -933,6 +962,30 @@ fun MetaDetailsScreen(
     }
 }
 
+private fun MetaDetails.isSeriesLikeForEpisodeRatings(): Boolean {
+    val normalizedType = type.trim().lowercase()
+    val hasNumberedEpisodes = videos.any { it.season != null && it.episode != null }
+    return hasNumberedEpisodes && normalizedType in setOf("series", "show", "tv", "tvshow")
+}
+
+private fun extractImdbId(value: String?): String? =
+    value
+        ?.trim()
+        ?.split(':', '/', '?', '&')
+        ?.firstOrNull { part -> part.startsWith("tt", ignoreCase = true) }
+        ?.takeIf { it.length > 2 }
+
+private fun extractTmdbId(value: String?): Int? {
+    val trimmed = value?.trim().orEmpty()
+    if (trimmed.isBlank()) return null
+    return trimmed
+        .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
+        ?.substringAfter(':')
+        ?.substringBefore(':')
+        ?.substringBefore('/')
+        ?.toIntOrNull()
+}
+
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun ConfiguredMetaSections(
@@ -944,6 +997,7 @@ private fun ConfiguredMetaSections(
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
+    onSaveLongClick: (() -> Unit)?,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -960,12 +1014,14 @@ private fun ConfiguredMetaSections(
     commentsCurrentPage: Int,
     commentsPageCount: Int,
     commentsError: String?,
+    episodeImdbRatings: Map<Pair<Int, Int>, Double>,
     onRetryComments: () -> Unit,
     onLoadMoreComments: () -> Unit,
     onCommentClick: (TraktCommentReview) -> Unit,
     onTrailerClick: (MetaTrailer) -> Unit,
     progressByVideoId: Map<String, WatchProgressEntry>,
     watchedKeys: Set<String>,
+    blurUnwatchedEpisodes: Boolean,
     onEpisodeClick: (MetaVideo) -> Unit,
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
@@ -1008,6 +1064,7 @@ private fun ConfiguredMetaSections(
                     onPlayClick = onPrimaryPlayClick,
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
                     onSaveClick = onSaveClick,
+                    onSaveLongClick = onSaveLongClick,
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {
@@ -1057,6 +1114,8 @@ private fun ConfiguredMetaSections(
                         episodeCardStyle = settings.episodeCardStyle,
                         progressByVideoId = progressByVideoId,
                         watchedKeys = watchedKeys,
+                        episodeRatings = episodeImdbRatings,
+                        blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                         onEpisodeClick = onEpisodeClick,
                         onEpisodeLongPress = onEpisodeLongPress,
                     )
