@@ -86,7 +86,7 @@ internal fun LazyListScope.appearanceSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                val themes = listOf(AppTheme.WHITE) + AppTheme.entries.filterNot { it == AppTheme.WHITE }
+                val themes = listOf(AppTheme.GLACIER) + AppTheme.entries.filterNot { it == AppTheme.GLACIER }
                 FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
