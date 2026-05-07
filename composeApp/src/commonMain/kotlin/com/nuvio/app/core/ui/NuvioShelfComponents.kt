@@ -107,6 +107,7 @@ fun NuvioPosterCard(
     bottomLeftLogoUrl: String? = null,
     bottomLeftText: String? = null,
     isWatched: Boolean = false,
+    isSaved: Boolean = false,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
@@ -183,6 +184,13 @@ fun NuvioPosterCard(
                 isVisible = isWatched,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
+                    .padding(6.dp),
+            )
+
+            NuvioAnimatedBookmarkedBadge(
+                isVisible = isSaved,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
                     .padding(6.dp),
             )
         }

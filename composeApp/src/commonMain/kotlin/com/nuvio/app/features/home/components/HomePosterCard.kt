@@ -1,13 +1,17 @@
 package com.nuvio.app.features.home.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.library.LibraryRepository
 
 @Composable
 fun HomePosterCard(
@@ -18,6 +22,19 @@ fun HomePosterCard(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val libraryUiState by remember {
+        LibraryRepository.ensureLoaded()
+        LibraryRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val isSaved = remember(
+        libraryUiState.items,
+        libraryUiState.sections,
+        libraryUiState.sourceMode,
+        item.id,
+        item.type,
+    ) {
+        LibraryRepository.isSaved(item.id, item.type)
+    }
     val posterCardStyle = rememberPosterCardStyleUiState()
     val isLandscapeMode = useLandscapeBackdropMode || posterCardStyle.catalogLandscapeModeEnabled
 
@@ -31,6 +48,7 @@ fun HomePosterCard(
         bottomLeftLogoUrl = if (isLandscapeMode) item.logo else null,
         bottomLeftText = if (isLandscapeMode && item.logo.isNullOrBlank() && !posterCardStyle.hideLabelsEnabled) item.name else null,
         isWatched = isWatched,
+        isSaved = isSaved,
         onClick = onClick,
         onLongClick = onLongClick,
     )
