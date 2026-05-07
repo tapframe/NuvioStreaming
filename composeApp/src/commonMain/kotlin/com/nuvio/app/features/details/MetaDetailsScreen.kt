@@ -93,6 +93,7 @@ import com.nuvio.app.features.trailer.TrailerPlaybackSource
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watched.previousReleasedEpisodesBefore
 import com.nuvio.app.features.watched.releasedEpisodesForSeason
+import com.nuvio.app.features.watched.watchedItemKey
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -662,10 +663,12 @@ fun MetaDetailsScreen(
                                     isTablet = isTablet,
                                     playButtonLabel = playButtonLabel,
                                     isSaved = isSaved,
+                                    isMarkedAsWatched = watchedUiState.watchedKeys.contains(watchedItemKey(meta.type, meta.id)),
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                     onSaveClick = toggleSaved,
                                     onSaveLongClick = openLibraryListPicker,
+                                    onWatchedClick = { WatchingActions.toggleMetaWatched(meta) },
                                     showManualPlayOption = showManualPlayOption,
                                     preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
                                     preferredEpisodeNumber = seriesAction?.episodeNumber,
@@ -996,10 +999,12 @@ private fun ConfiguredMetaSections(
     isTablet: Boolean,
     playButtonLabel: String,
     isSaved: Boolean,
+    isMarkedAsWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
+    onWatchedClick: () -> Unit,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -1062,11 +1067,13 @@ private fun ConfiguredMetaSections(
                         stringResource(Res.string.action_save)
                     },
                     isSaved = isSaved,
+                    isWatched = isMarkedAsWatched,
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
                     onSaveClick = onSaveClick,
                     onSaveLongClick = onSaveLongClick,
+                    onWatchedClick = onWatchedClick,
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {

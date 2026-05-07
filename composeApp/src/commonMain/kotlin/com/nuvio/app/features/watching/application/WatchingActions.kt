@@ -22,6 +22,42 @@ import kotlinx.coroutines.launch
 object WatchingActions {
     private val actionScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    fun toggleMetaWatched(meta: MetaDetails) {
+        if (meta.type != "series" && meta.type != "show" && meta.type != "tv") {
+            WatchedRepository.toggleWatched(
+                WatchedItem(
+                    id = meta.id,
+                    type = meta.type,
+                    name = meta.name,
+                    poster = meta.poster,
+                    releaseInfo = meta.releaseInfo,
+                    markedAtEpochMs = 0L
+                )
+            )
+            return
+        }
+
+        val isCurrentlyWatched = WatchedRepository.isWatched(
+            id = meta.id,
+            type = meta.type,
+        )
+
+        val todayIsoDate = CurrentDateProvider.todayIsoDate()
+        val seriesItems = buildList {
+            add(meta.toSeriesWatchedItem())
+            addAll(meta.releasedPlayableEpisodes(todayIsoDate).map(meta::toEpisodeWatchedItem))
+        }
+
+        if (isCurrentlyWatched) {
+            WatchedRepository.unmarkWatched(seriesItems)
+        } else {
+            WatchedRepository.markWatched(seriesItems)
+            WatchProgressRepository.clearProgress(
+                meta.releasedPlayableEpisodes(todayIsoDate).map(meta::episodePlaybackId),
+            )
+        }
+    }
+
     suspend fun togglePosterWatched(preview: MetaPreview) {
         if (preview.type != "series") {
             WatchedRepository.toggleWatched(preview.toWatchedItem(markedAtEpochMs = 0L))
