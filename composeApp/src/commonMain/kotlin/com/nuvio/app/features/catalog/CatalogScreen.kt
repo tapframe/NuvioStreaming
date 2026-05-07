@@ -58,6 +58,8 @@ import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.library.LibraryRepository
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -88,6 +90,7 @@ fun CatalogScreen(
         LibraryRepository.ensureLoaded()
         LibraryRepository.uiState
     }.collectAsStateWithLifecycle()
+    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination, homeCatalogSettingsUiState.hideUnreleasedContent) {
         CatalogRepository.load(
@@ -203,6 +206,10 @@ fun CatalogScreen(
                             cornerRadiusDp = posterCardStyle.cornerRadiusDp,
                             hideLabels = posterCardStyle.hideLabelsEnabled,
                             isSaved = isSaved,
+                            isWatched = WatchingState.isPosterWatched(
+                                watchedKeys = watchedUiState.watchedKeys,
+                                item = item,
+                            ),
                             onClick = onPosterClick?.let { { it(item) } },
                         )
                     }
@@ -273,6 +280,7 @@ private fun CatalogPosterTile(
     item: MetaPreview,
     cornerRadiusDp: Int,
     hideLabels: Boolean,
+    isWatched: Boolean = false,
     isSaved: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
@@ -295,6 +303,13 @@ private fun CatalogPosterTile(
                     contentScale = ContentScale.Crop,
                 )
             }
+
+            NuvioAnimatedWatchedBadge(
+                isVisible = isWatched,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp),
+            )
 
             NuvioAnimatedBookmarkedBadge(
                 isVisible = isSaved,
