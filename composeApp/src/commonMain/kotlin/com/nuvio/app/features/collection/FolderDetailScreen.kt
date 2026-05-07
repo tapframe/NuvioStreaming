@@ -332,6 +332,7 @@ private fun RowsContent(
     onPosterClick: (MetaPreview) -> Unit,
 ) {
     val sections = FolderDetailRepository.getCatalogSectionsForRows()
+    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
 
     if (uiState.isLoading && sections.isEmpty()) {
         LoadingIndicator()
@@ -358,6 +359,7 @@ private fun RowsContent(
             HomeCatalogRowSection(
                 section = section,
                 entries = section.items.take(18),
+                watchedKeys = watchedUiState.watchedKeys,
                 onViewAllClick = if (section.canOpenCatalog(18)) {
                     { onCatalogClick(section) }
                 } else {
