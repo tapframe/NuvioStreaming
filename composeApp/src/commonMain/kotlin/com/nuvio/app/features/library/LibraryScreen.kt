@@ -31,6 +31,8 @@ import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -56,6 +58,7 @@ fun LibraryScreen(
             LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
         }
     }
+    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(networkStatusUiState.condition, isTraktSource) {
         when (networkStatusUiState.condition) {
@@ -162,6 +165,7 @@ fun LibraryScreen(
 
             else -> {
                 librarySections(
+                    watchedKeys = watchedUiState.watchedKeys,
                     sections = uiState.sections,
                     onPosterClick = onPosterClick,
                     onSectionViewAllClick = onSectionViewAllClick,
@@ -193,6 +197,7 @@ fun LibraryScreen(
 
 private fun LazyListScope.librarySections(
     sections: List<LibrarySection>,
+    watchedKeys: Set<String>,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onSectionViewAllClick: ((LibrarySection) -> Unit)?,
     onPosterLongClick: (LibraryItem) -> Unit,
@@ -216,6 +221,10 @@ private fun LazyListScope.librarySections(
             key = { item -> "${item.type}:${item.id}" },
         ) { item ->
             HomePosterCard(
+                isWatched = WatchingState.isPosterWatched(
+                    watchedKeys = watchedKeys,
+                    item = item.toMetaPreview(),
+                ),
                 item = item.toMetaPreview(),
                 onClick = onPosterClick?.let { { it(item) } },
                 onLongClick = { onPosterLongClick(item) },
