@@ -63,6 +63,8 @@ import com.nuvio.app.features.home.canOpenCatalog
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.library.LibraryRepository
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -210,6 +212,7 @@ private fun TabbedGridContent(
         LibraryRepository.ensureLoaded()
         LibraryRepository.uiState
     }.collectAsStateWithLifecycle()
+    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(gridState, uiState.selectedTabIndex, uiState.selectedTabCanLoadMore, uiState.selectedTabIsLoadingMore) {
         snapshotFlow { gridState.layoutInfo }
@@ -300,6 +303,10 @@ private fun TabbedGridContent(
                                 imageUrl = item.poster,
                                 shape = NuvioPosterShape.Poster,
                                 detailLine = item.releaseInfo,
+                                isWatched = WatchingState.isPosterWatched(
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    item = item,
+                                ),
                                 isSaved = isSaved,
                                 onClick = { onPosterClick(item) },
                             )
