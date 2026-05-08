@@ -108,7 +108,7 @@
     <string name="collections_editor_tmdb_sources">Fontes TMDB</string>
     <string name="collections_editor_tmdb_public_list_mode">Lista Pública</string>
     <string name="collections_editor_tmdb_production_mode">Produção</string>
-    <string name="collections_editor_tmdb_network_mode">Rede"</string>
+    <string name="collections_editor_tmdb_network_mode">Rede</string>
     <string name="collections_editor_tmdb_collection_mode">Coleção</string>
     <string name="collections_editor_tmdb_person_mode">Pessoa</string>
     <string name="collections_editor_tmdb_director_mode">Diretor</string>
