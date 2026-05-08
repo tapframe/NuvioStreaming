@@ -74,6 +74,10 @@ internal expect object PlayerSettingsStorage {
     fun saveUseLibass(enabled: Boolean)
     fun loadLibassRenderType(): String?
     fun saveLibassRenderType(renderType: String)
+    fun loadSwipeToSeekEnabled(): Boolean?
+    fun saveSwipeToSeekEnabled(enabled: Boolean)
+    fun loadSwipeToSeekSensitivity(): String?
+    fun saveSwipeToSeekSensitivity(sensitivity: String)
     fun exportToSyncPayload(): JsonObject
     fun replaceFromSyncPayload(payload: JsonObject)
 }

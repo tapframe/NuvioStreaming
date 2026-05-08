@@ -54,6 +54,7 @@ import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.player.AudioLanguageOption
 import com.nuvio.app.features.player.AvailableLanguageOptions
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.SwipeToSeekSensitivity
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.formatPlaybackSpeedLabel
 import com.nuvio.app.features.player.languageLabelForCode
@@ -84,6 +85,8 @@ internal fun LazyListScope.playbackSettingsContent(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeToSeekEnabled: Boolean,
+    swipeToSeekSensitivity: SwipeToSeekSensitivity,
 ) {
     item {
         PlaybackSettingsSection(
@@ -102,6 +105,8 @@ internal fun LazyListScope.playbackSettingsContent(
             tunnelingEnabled = tunnelingEnabled,
             useLibass = useLibass,
             libassRenderType = libassRenderType,
+            swipeToSeekEnabled = swipeToSeekEnabled,
+            swipeToSeekSensitivity = swipeToSeekSensitivity,
         )
     }
 }
@@ -164,6 +169,8 @@ private fun PlaybackSettingsSection(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeToSeekEnabled: Boolean,
+    swipeToSeekSensitivity: SwipeToSeekSensitivity,
 ) {
     var showPreferredAudioDialog by remember { mutableStateOf(false) }
     var showSecondaryAudioDialog by remember { mutableStateOf(false) }
@@ -178,6 +185,7 @@ private fun PlaybackSettingsSection(
     var showAutoPlayAddonSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayPluginSelectionDialog by remember { mutableStateOf(false) }
     var showAutoPlayRegexDialog by remember { mutableStateOf(false) }
+    var showSwipeSensitivityDialog by remember { mutableStateOf(false) }
     val pluginsEnabled = AppFeaturePolicy.pluginsEnabled
     val autoPlayPlayerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     val addonUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
@@ -220,6 +228,27 @@ private fun PlaybackSettingsSection(
                         description = formatPlaybackSpeedLabel(holdToSpeedValue),
                         isTablet = isTablet,
                         onClick = { showHoldToSpeedValueDialog = true },
+                    )
+                }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_swipe_to_seek),
+                    description = stringResource(Res.string.settings_playback_swipe_to_seek_description),
+                    checked = swipeToSeekEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setSwipeToSeekEnabled,
+                )
+                if (swipeToSeekEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity),
+                        description = when (swipeToSeekSensitivity) {
+                            SwipeToSeekSensitivity.LOW -> stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_low)
+                            SwipeToSeekSensitivity.MEDIUM -> stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_medium)
+                            SwipeToSeekSensitivity.HIGH -> stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_high)
+                        },
+                        isTablet = isTablet,
+                        onClick = { showSwipeSensitivityDialog = true },
                     )
                 }
             }
@@ -810,6 +839,14 @@ private fun PlaybackSettingsSection(
                 showLibassRenderTypeDialog = false
             },
             onDismiss = { showLibassRenderTypeDialog = false },
+        )
+    }
+
+    if (showSwipeSensitivityDialog) {
+        SwipeToSeekSensitivityDialog(
+            selected = swipeToSeekSensitivity,
+            onSelect = PlayerSettingsRepository::setSwipeToSeekSensitivity,
+            onDismiss = { showSwipeSensitivityDialog = false },
         )
     }
 
@@ -2178,3 +2215,89 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
 
 @Composable
 private fun libassRenderTypeLabel(renderType: String): String = stringResource(libassRenderTypeRes(renderType))
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun SwipeToSeekSensitivityDialog(
+    selected: SwipeToSeekSensitivity,
+    onSelect: (SwipeToSeekSensitivity) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options = SwipeToSeekSensitivity.entries
+
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    options.forEach { option ->
+                        val isSelected = option == selected
+                        val containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSelect(option)
+                                    onDismiss()
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            color = containerColor,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = when (option) {
+                                        SwipeToSeekSensitivity.LOW -> stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_low)
+                                        SwipeToSeekSensitivity.MEDIUM -> stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_medium)
+                                        SwipeToSeekSensitivity.HIGH -> stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_high)
+                                        else -> stringResource(Res.string.settings_playback_swipe_to_seek_sensitivity_medium)
+                                    },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -55,6 +55,9 @@ import com.nuvio.app.features.mdblist.MdbListSettingsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsUiState
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.PlayerResizeMode
+import com.nuvio.app.features.player.SwipeToSeekSensitivity
+import com.nuvio.app.features.player.skip.NextEpisodeThresholdMode
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentsSettings
@@ -193,6 +196,8 @@ fun SettingsScreen(
                 tunnelingEnabled = playerSettingsUiState.tunnelingEnabled,
                 useLibass = playerSettingsUiState.useLibass,
                 libassRenderType = playerSettingsUiState.libassRenderType,
+                swipeToSeekEnabled = playerSettingsUiState.swipeToSeekEnabled,
+                swipeToSeekSensitivity = playerSettingsUiState.swipeToSeekSensitivity,
                 selectedTheme = selectedTheme,
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
@@ -238,6 +243,8 @@ fun SettingsScreen(
                 tunnelingEnabled = playerSettingsUiState.tunnelingEnabled,
                 useLibass = playerSettingsUiState.useLibass,
                 libassRenderType = playerSettingsUiState.libassRenderType,
+                swipeToSeekEnabled = playerSettingsUiState.swipeToSeekEnabled,
+                swipeToSeekSensitivity = playerSettingsUiState.swipeToSeekSensitivity,
                 selectedTheme = selectedTheme,
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
@@ -293,6 +300,8 @@ private fun MobileSettingsScreen(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeToSeekEnabled: Boolean,
+    swipeToSeekSensitivity: SwipeToSeekSensitivity,
     selectedTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
@@ -374,6 +383,8 @@ private fun MobileSettingsScreen(
                     tunnelingEnabled = tunnelingEnabled,
                     useLibass = useLibass,
                     libassRenderType = libassRenderType,
+                    swipeToSeekEnabled = swipeToSeekEnabled,
+                    swipeToSeekSensitivity = swipeToSeekSensitivity,
                 )
                 SettingsPage.Appearance -> appearanceSettingsContent(
                     isTablet = false,
@@ -471,6 +482,8 @@ private fun TabletSettingsScreen(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeToSeekEnabled: Boolean,
+    swipeToSeekSensitivity: SwipeToSeekSensitivity,
     selectedTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
@@ -624,6 +637,8 @@ private fun TabletSettingsScreen(
                         tunnelingEnabled = tunnelingEnabled,
                         useLibass = useLibass,
                         libassRenderType = libassRenderType,
+                        swipeToSeekEnabled = swipeToSeekEnabled,
+                        swipeToSeekSensitivity = swipeToSeekSensitivity,
                     )
                     SettingsPage.Appearance -> appearanceSettingsContent(
                         isTablet = true,
