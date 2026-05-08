@@ -1454,7 +1454,8 @@ fun PlayerScreen(
                                         abs(totalDx) > viewConfiguration.touchSlop &&
                                         abs(totalDx) > abs(totalDy)
                                 val verticalDominant =
-                                    abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
+                                    playerSettingsUiState.swipeGesturesEnabled &&
+                                        abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
 
                                 gestureMode = when {
                                     horizontalDominant -> {

@@ -41,6 +41,7 @@ data class PlayerSettingsUiState(
     val nextEpisodeThresholdMinutesBeforeEnd: Float = 2f,
     val useLibass: Boolean = false,
     val libassRenderType: String = "CUES",
+    val swipeGesturesEnabled: Boolean = true,
 )
 
 object PlayerSettingsRepository {
@@ -80,6 +81,7 @@ object PlayerSettingsRepository {
     private var nextEpisodeThresholdMinutesBeforeEnd = 2f
     private var useLibass = false
     private var libassRenderType = "CUES"
+    private var swipeGesturesEnabled = true
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -124,6 +126,7 @@ object PlayerSettingsRepository {
         nextEpisodeThresholdMinutesBeforeEnd = 2f
         useLibass = false
         libassRenderType = "CUES"
+        swipeGesturesEnabled = true
         publish()
     }
 
@@ -195,6 +198,7 @@ object PlayerSettingsRepository {
         nextEpisodeThresholdMinutesBeforeEnd = PlayerSettingsStorage.loadNextEpisodeThresholdMinutesBeforeEnd() ?: 2f
         useLibass = PlayerSettingsStorage.loadUseLibass() ?: false
         libassRenderType = PlayerSettingsStorage.loadLibassRenderType() ?: "CUES"
+        swipeGesturesEnabled = PlayerSettingsStorage.loadSwipeGesturesEnabled() ?: true
         publish()
     }
 
@@ -464,6 +468,14 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveLibassRenderType(renderType)
     }
 
+    fun setSwipeGesturesEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (swipeGesturesEnabled == enabled) return
+        swipeGesturesEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveSwipeGesturesEnabled(enabled)
+    }
+
     private fun publish() {
         _uiState.value = PlayerSettingsUiState(
             showLoadingOverlay = showLoadingOverlay,
@@ -498,6 +510,7 @@ object PlayerSettingsRepository {
             nextEpisodeThresholdMinutesBeforeEnd = nextEpisodeThresholdMinutesBeforeEnd,
             useLibass = useLibass,
             libassRenderType = libassRenderType,
+            swipeGesturesEnabled = swipeGesturesEnabled,
         )
     }
 
