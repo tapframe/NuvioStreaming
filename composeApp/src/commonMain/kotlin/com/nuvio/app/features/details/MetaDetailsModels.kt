@@ -38,6 +38,17 @@ data class MetaDetails(
     val videos: List<MetaVideo> = emptyList(),
 )
 
+fun MetaDetails.toMetaPreview(): MetaPreview = MetaPreview(
+    id = id,
+    type = type,
+    name = name,
+    poster = poster,
+    banner = background,
+    logo = logo,
+    description = description,
+    releaseInfo = releaseInfo,
+)
+
 data class MetaExternalRating(
     val source: String,
     val value: Double,

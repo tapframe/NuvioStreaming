@@ -3,6 +3,7 @@ package com.nuvio.app.features.watching.application
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.details.toMetaPreview
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.WatchedRepository
@@ -23,38 +24,8 @@ object WatchingActions {
     private val actionScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun toggleMetaWatched(meta: MetaDetails) {
-        if (meta.type != "series" && meta.type != "show" && meta.type != "tv") {
-            WatchedRepository.toggleWatched(
-                WatchedItem(
-                    id = meta.id,
-                    type = meta.type,
-                    name = meta.name,
-                    poster = meta.poster,
-                    releaseInfo = meta.releaseInfo,
-                    markedAtEpochMs = 0L
-                )
-            )
-            return
-        }
-
-        val isCurrentlyWatched = WatchedRepository.isWatched(
-            id = meta.id,
-            type = meta.type,
-        )
-
-        val todayIsoDate = CurrentDateProvider.todayIsoDate()
-        val seriesItems = buildList {
-            add(meta.toSeriesWatchedItem())
-            addAll(meta.releasedPlayableEpisodes(todayIsoDate).map(meta::toEpisodeWatchedItem))
-        }
-
-        if (isCurrentlyWatched) {
-            WatchedRepository.unmarkWatched(seriesItems)
-        } else {
-            WatchedRepository.markWatched(seriesItems)
-            WatchProgressRepository.clearProgress(
-                meta.releasedPlayableEpisodes(todayIsoDate).map(meta::episodePlaybackId),
-            )
+        actionScope.launch {
+            togglePosterWatched(meta.toMetaPreview())
         }
     }
 
