@@ -27,9 +27,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -157,6 +166,11 @@ fun PlayerScreen(
         WatchProgressRepository.ensureLoaded()
         WatchProgressRepository.uiState
     }.collectAsStateWithLifecycle()
+
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -436,6 +450,28 @@ fun PlayerScreen(
         val subtitleStyle = playerSettingsUiState.subtitleStyle
         val addonSubtitles by SubtitleRepository.addonSubtitles.collectAsStateWithLifecycle()
         val isLoadingAddonSubtitles by SubtitleRepository.isLoading.collectAsStateWithLifecycle()
+
+        // Maintain focus when modals are dismissed or controls visibility changes
+        val isAnyModalVisible = showAudioModal || showSubtitleModal || showSourcesPanel || showEpisodesPanel || showSubmitIntroModal
+        LaunchedEffect(isAnyModalVisible, controlsVisible) {
+            if (!isAnyModalVisible) {
+                focusRequester.requestFocus()
+            }
+            // Notify iOS native code about modal state for keyboard handling
+            playerController?.setKeyboardModalState(isAnyModalVisible)
+        }
+
+        // Periodically re-request focus while playing to ensure hardware keyboard stays connected to player
+        LaunchedEffect(playbackSnapshot.isPlaying) {
+            if (playbackSnapshot.isPlaying) {
+                while (true) {
+                    if (!isAnyModalVisible) {
+                        focusRequester.requestFocus()
+                    }
+                    delay(5000)
+                }
+            }
+        }
 
         fun refreshTracks() {
             val ctrl = playerController ?: return
@@ -1116,6 +1152,10 @@ fun PlayerScreen(
             playerController?.applySubtitleStyle(subtitleStyle)
         }
 
+        LaunchedEffect(playerController, onBackWithProgress) {
+            playerController?.setExitCallback(onBackWithProgress)
+        }
+
         LaunchedEffect(showSubtitleModal, activeSubtitleTab, contentType, activeVideoId) {
             if (!showSubtitleModal || activeSubtitleTab != SubtitleTab.Addons) return@LaunchedEffect
             if (!isLoadingAddonSubtitles && addonSubtitles.isEmpty()) {
@@ -1384,6 +1424,33 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { layoutSize = it }
+                .focusRequester(focusRequester)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    val isAnyModalVisible = showAudioModal || showSubtitleModal || showSourcesPanel || showEpisodesPanel || showSubmitIntroModal
+                    if (event.type == KeyEventType.KeyDown && !isAnyModalVisible) {
+                        println("[NuvioPlayer] KeyDown: ${event.key}")
+                        when (event.key) {
+                            Key.Escape -> {
+                                onBackWithProgress()
+                                true
+                            }
+                            Key.Spacebar -> {
+                                togglePlayback()
+                                true
+                            }
+                            Key.DirectionLeft -> {
+                                seekBy(-10_000L)
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                seekBy(10_000L)
+                                true
+                            }
+                            else -> false
+                        }
+                    } else false
+                }
                 .pointerInput(layoutSize) {
                     detectTapGestures(
                         onPress = {

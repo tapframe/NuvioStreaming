@@ -205,6 +205,14 @@ actual fun PlatformPlayerSurface(
                     subPos = style.toMpvSubtitlePosition(),
                 )
             }
+
+            override fun setKeyboardModalState(isAnyModalVisible: Boolean) {
+                bridge.setKeyboardModalState(isAnyModalVisible)
+            }
+
+            override fun setExitCallback(callback: (() -> Unit)?) {
+                bridge.setExitCallback(callback)
+            }
         }
     }
 

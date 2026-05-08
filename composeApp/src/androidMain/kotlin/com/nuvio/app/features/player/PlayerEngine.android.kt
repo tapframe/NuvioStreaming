@@ -415,6 +415,14 @@ actual fun PlatformPlayerSurface(
                     currentSubtitleStyle = style
                     playerViewRef?.applySubtitleStyle(style)
                 }
+
+                override fun setKeyboardModalState(isAnyModalVisible: Boolean) {
+                    // No-op on Android; keyboard handling is done at Compose layer
+                }
+
+                override fun setExitCallback(callback: (() -> Unit)?) {
+                    // No-op on Android; keyboard handling is done at Compose layer
+                }
             }
         )
     }

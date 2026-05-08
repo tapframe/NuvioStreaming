@@ -18,6 +18,8 @@ interface PlayerEngineController {
     fun clearExternalSubtitle()
     fun clearExternalSubtitleAndSelect(trackIndex: Int)
     fun applySubtitleStyle(style: SubtitleStyleState) {}
+    fun setKeyboardModalState(isAnyModalVisible: Boolean) {}
+    fun setExitCallback(callback: (() -> Unit)?) {}
 }
 
 internal fun sanitizePlaybackHeaders(headers: Map<String, String>?): Map<String, String> {
