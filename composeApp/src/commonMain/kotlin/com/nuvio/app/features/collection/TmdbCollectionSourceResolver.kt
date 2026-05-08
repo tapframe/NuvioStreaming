@@ -5,10 +5,15 @@ import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.catalog.CatalogPage
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.tmdb.TmdbLocalizedArtwork
+import com.nuvio.app.features.tmdb.TmdbMetadataService
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.buildTmdbUrl
 import com.nuvio.app.features.tmdb.normalizeTmdbLanguage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -228,8 +233,19 @@ object TmdbCollectionSourceResolver {
             apiKey = apiKey,
             query = mapOf("language" to language),
         ) ?: error("TMDB collection not found")
-        val items = body.parts.orEmpty()
-            .mapNotNull { it.toPreview(TmdbCollectionMediaType.MOVIE) }
+        val parts = body.parts.orEmpty()
+        val items = coroutineScope {
+            parts.map { part ->
+                async {
+                    val artwork = TmdbMetadataService.fetchLocalizedArtwork(
+                        tmdbId = part.id,
+                        mediaType = "movie",
+                        language = language,
+                    )
+                    part.toPreview(TmdbCollectionMediaType.MOVIE, artwork)
+                }
+            }.awaitAll().filterNotNull()
+        }
             .sortedFor(source.sortBy)
             .distinctBy { it.id }
         return CatalogPage(items = items, rawItemCount = items.size, nextSkip = null)
@@ -406,14 +422,21 @@ object TmdbCollectionSourceResolver {
         )
     }
 
-    private fun TmdbCollectionPart.toPreview(mediaType: TmdbCollectionMediaType): MetaPreview? {
+    private fun TmdbCollectionPart.toPreview(
+        mediaType: TmdbCollectionMediaType,
+        localizedArtwork: TmdbLocalizedArtwork = TmdbLocalizedArtwork(null, null),
+    ): MetaPreview? {
         val title = title?.takeIf { it.isNotBlank() } ?: return null
+        val localizedPoster = TmdbMetadataService.imageUrl(localizedArtwork.poster, "w500")
+        val localizedBackdrop = TmdbMetadataService.imageUrl(localizedArtwork.backdrop, "w1280")
         return MetaPreview(
             id = "tmdb:$id",
             type = if (mediaType == TmdbCollectionMediaType.TV) "series" else "movie",
             name = title,
-            poster = imageUrl(posterPath, "w500") ?: imageUrl(backdropPath, "w780"),
-            banner = imageUrl(backdropPath, "w1280"),
+            poster = localizedPoster
+                ?: imageUrl(posterPath, "w500")
+                ?: imageUrl(backdropPath, "w780"),
+            banner = localizedBackdrop ?: imageUrl(backdropPath, "w1280"),
             posterShape = PosterShape.Poster,
             description = overview?.takeIf { it.isNotBlank() },
             releaseInfo = releaseDate?.take(4),

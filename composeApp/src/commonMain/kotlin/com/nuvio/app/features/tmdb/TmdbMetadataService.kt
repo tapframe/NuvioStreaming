@@ -36,6 +36,7 @@ object TmdbMetadataService {
     private val entityHeaderCache = mutableMapOf<String, TmdbEntityHeader>()
     private val entityRailCache = mutableMapOf<String, List<MetaPreview>>()
     private val previewArtworkCache = mutableMapOf<String, TmdbPreviewArtwork>()
+    private val localizedArtworkCache = mutableMapOf<String, TmdbLocalizedArtwork>()
 
     suspend fun fetchPersonDetail(
         personId: Int,
@@ -529,6 +530,56 @@ object TmdbMetadataService {
         val backdrop: String?,
         val logo: String?,
     )
+
+    /**
+     * Fetches a localized poster + backdrop for a movie or TV id from
+     * `/{mediaType}/{id}/images?include_image_language=<lang>,null,en`.
+     *
+     * TMDB's collection / list / credits endpoints only return one default
+     * poster path per part — usually the English-favored one regardless of the
+     * `language=fr` query param. Calling `/images` separately is the only way
+     * to get artwork actually localized in the user's language. Results cached
+     * per `(tmdbId, mediaType, language)` to avoid hammering TMDB.
+     *
+     * For English locales the call is skipped: the default poster is already
+     * the English-favored one.
+     */
+    internal suspend fun fetchLocalizedArtwork(
+        tmdbId: Int,
+        mediaType: String,
+        language: String,
+    ): TmdbLocalizedArtwork = withContext(Dispatchers.Default) {
+        val normalizedLanguage = normalizeTmdbLanguage(language)
+        if (normalizedLanguage.startsWith("en", ignoreCase = true)) {
+            return@withContext TmdbLocalizedArtwork(poster = null, backdrop = null)
+        }
+        val cacheKey = "$tmdbId:$mediaType:$normalizedLanguage"
+        localizedArtworkCache[cacheKey]?.let { return@withContext it }
+
+        val includeImageLanguage = buildString {
+            append(normalizedLanguage.substringBefore("-"))
+            append(",")
+            append(normalizedLanguage)
+            append(",en,null")
+        }
+        val images = fetch<TmdbImagesResponse>(
+            endpoint = "$mediaType/$tmdbId/images",
+            query = mapOf("include_image_language" to includeImageLanguage),
+        )
+        val artwork = TmdbLocalizedArtwork(
+            poster = images?.posters.orEmpty().selectBestLocalizedImagePath(normalizedLanguage),
+            backdrop = images?.backdrops.orEmpty().selectBestLocalizedImagePath(normalizedLanguage),
+        )
+        localizedArtworkCache[cacheKey] = artwork
+        artwork
+    }
+
+    /**
+     * Builds an absolute TMDB image URL for the given relative `file_path`.
+     * Exposed for callers (e.g. collection resolvers) that need to construct
+     * URLs from paths returned by [fetchLocalizedArtwork].
+     */
+    internal fun imageUrl(filePath: String?, size: String): String? = buildImageUrl(filePath, size)
 
     private suspend fun fetchPreviewArtwork(
         tmdbId: Int,
@@ -1074,24 +1125,38 @@ object TmdbMetadataService {
             query = mapOf("language" to language),
         ) ?: return null to emptyList()
 
-        val items = response.parts
+        val sortedParts = response.parts
             .sortedBy { it.releaseDate ?: "9999" }
-            .mapNotNull { part ->
-                val title = part.title?.trim()?.takeIf(String::isNotBlank) ?: return@mapNotNull null
-                MetaPreview(
-                    id = "tmdb:${part.id}",
-                    type = "movie",
-                    name = title,
-                    poster = buildImageUrl(part.backdropPath, "w780")
-                        ?: buildImageUrl(part.posterPath, "w500"),
-                    banner = buildImageUrl(part.backdropPath, "w1280"),
-                    posterShape = PosterShape.Landscape,
-                    description = part.overview?.trim()?.takeIf(String::isNotBlank),
-                    releaseInfo = part.releaseDate?.take(4),
-                    rawReleaseDate = part.releaseDate,
-                    imdbRating = part.voteAverage?.formatRating(),
-                )
-            }
+        val items = coroutineScope {
+            sortedParts.map { part ->
+                async {
+                    val title = part.title?.trim()?.takeIf(String::isNotBlank) ?: return@async null
+                    val localized = fetchLocalizedArtwork(
+                        tmdbId = part.id,
+                        mediaType = "movie",
+                        language = language,
+                    )
+                    val poster = buildImageUrl(localized.backdrop, "w780")
+                        ?: buildImageUrl(part.backdropPath, "w780")
+                        ?: buildImageUrl(localized.poster, "w500")
+                        ?: buildImageUrl(part.posterPath, "w500")
+                    val banner = buildImageUrl(localized.backdrop, "w1280")
+                        ?: buildImageUrl(part.backdropPath, "w1280")
+                    MetaPreview(
+                        id = "tmdb:${part.id}",
+                        type = "movie",
+                        name = title,
+                        poster = poster,
+                        banner = banner,
+                        posterShape = PosterShape.Landscape,
+                        description = part.overview?.trim()?.takeIf(String::isNotBlank),
+                        releaseInfo = part.releaseDate?.take(4),
+                        rawReleaseDate = part.releaseDate,
+                        imdbRating = part.voteAverage?.formatRating(),
+                    )
+                }
+            }.awaitAll().filterNotNull()
+        }
 
         val result = response.name?.trim()?.takeIf(String::isNotBlank) to items
         collectionCache[cacheKey] = result
@@ -1606,6 +1671,13 @@ private data class TmdbCrewMember(
 @Serializable
 private data class TmdbImagesResponse(
     val logos: List<TmdbImage> = emptyList(),
+    val posters: List<TmdbImage> = emptyList(),
+    val backdrops: List<TmdbImage> = emptyList(),
+)
+
+internal data class TmdbLocalizedArtwork(
+    val poster: String?,
+    val backdrop: String?,
 )
 
 @Serializable
