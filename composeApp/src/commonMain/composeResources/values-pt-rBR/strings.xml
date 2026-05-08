@@ -97,7 +97,7 @@
     <string name="collections_editor_shape_square">Quadrado</string>
     <string name="collections_editor_shape_wide">Largo</string>
     <string name="collections_editor_show_all_tab_desc">Combinar todos os catálogos em uma única aba</string>
-    <string name="collections_editor_show_all_tab">Exibir Aba "Todos"</string>
+    <string name="collections_editor_show_all_tab">Exibir Aba \"Todos\"</string>
     <string name="collections_editor_show_gif_when_configured_desc">Reproduzir o GIF configurado em vez da capa estática quando disponível.</string>
     <string name="collections_editor_show_gif_when_configured">Exibir GIF Quando Configurado</string>
     <string name="collections_editor_source_count">%1$d fonte(s) · %2$s</string>
