@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.features.details.MetaCompany
 import com.nuvio.app.features.details.MetaDetails
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -54,7 +56,11 @@ fun DetailProductionSection(
     if (displayItems.isEmpty()) return
 
     DetailSection(
-        title = if (isSeriesLike) "Network" else "Production",
+        title = if (isSeriesLike) {
+            stringResource(Res.string.details_networks)
+        } else {
+            stringResource(Res.string.meta_section_production_title)
+        },
         modifier = modifier,
         showHeader = showHeader,
     ) {

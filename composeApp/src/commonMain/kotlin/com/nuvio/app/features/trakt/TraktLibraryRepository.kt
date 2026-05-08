@@ -1,20 +1,15 @@
 package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
-import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpPostJsonWithHeaders
-import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.tmdb.TmdbService
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,10 +18,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -36,12 +32,11 @@ import kotlinx.serialization.json.Json
 private const val BASE_URL = "https://api.trakt.tv"
 private const val WATCHLIST_KEY = "trakt:watchlist"
 private const val PERSONAL_LIST_PREFIX = "trakt:list:"
-private const val METADATA_FETCH_TIMEOUT_MS = 3_500L
-private const val METADATA_FETCH_CONCURRENCY = 5
 private const val LIST_FETCH_CONCURRENCY = 4
 private const val SNAPSHOT_CACHE_TTL_MS = 60_000L
 private const val LIST_TABS_CACHE_TTL_MS = 60_000L
 private const val FORCE_REFRESH_DEDUP_MS = 10_000L
+private const val MAX_VISIBLE_ERROR_MESSAGE_LENGTH = 240
 
 data class TraktLibraryUiState(
     val listTabs: List<TraktListTab> = emptyList(),
@@ -66,7 +61,6 @@ object TraktLibraryRepository {
 
     private var hasLoaded = false
     private val refreshMutex = Mutex()
-    private var hydrationJob: Job? = null
     private var lastRefreshAtMs: Long = 0L
     private var lastListTabsRefreshAtMs: Long = 0L
 
@@ -89,8 +83,6 @@ object TraktLibraryRepository {
     }
 
     fun onProfileChanged() {
-        hydrationJob?.cancel()
-        hydrationJob = null
         hasLoaded = false
         lastRefreshAtMs = 0L
         lastListTabsRefreshAtMs = 0L
@@ -99,8 +91,6 @@ object TraktLibraryRepository {
     }
 
     fun clearLocalState() {
-        hydrationJob?.cancel()
-        hydrationJob = null
         hasLoaded = false
         lastRefreshAtMs = 0L
         lastListTabsRefreshAtMs = 0L
@@ -152,8 +142,6 @@ object TraktLibraryRepository {
                 return
             }
 
-            AddonRepository.initialize()
-
             val headers = TraktAuthRepository.authorizedHeaders()
             if (headers == null) {
                 _uiState.value = TraktLibraryUiState()
@@ -171,29 +159,26 @@ object TraktLibraryRepository {
                         hasLoaded = true,
                         errorMessage = null,
                     )
-                    hydrateMissingMetadataAsync(_uiState.value)
                 }
-            }.onFailure { error ->
+            }
+            result.exceptionOrNull()?.let { error ->
                 if (error is CancellationException) throw error
-                log.w { "Failed to refresh Trakt library: ${error.message}" }
-            }.getOrNull()
-
-            if (result == null) {
-                _uiState.value = current.copy(
+                log.w(error) { "Failed to refresh Trakt library" }
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     hasLoaded = true,
-                    errorMessage = "Failed to load Trakt library",
+                    errorMessage = traktLibraryLoadErrorMessage(error),
                 )
                 return
             }
 
-            _uiState.value = result.copy(
+            val snapshot = result.getOrThrow()
+            _uiState.value = snapshot.copy(
                 isLoading = false,
                 hasLoaded = true,
                 errorMessage = null,
             )
             persistSnapshot(_uiState.value)
-            hydrateMissingMetadataAsync(_uiState.value)
             lastRefreshAtMs = now
         }
     }
@@ -419,7 +404,6 @@ object TraktLibraryRepository {
             entriesByList = cached.entriesByList,
         )
         _uiState.value = state.copy(isLoading = false, errorMessage = null, hasLoaded = true)
-        hydrateMissingMetadataAsync(_uiState.value)
     }
 
     private fun persistSnapshot(state: TraktLibraryUiState) {
@@ -430,56 +414,24 @@ object TraktLibraryRepository {
         TraktLibraryStorage.savePayload(json.encodeToString(payload))
     }
 
-    private fun hydrateMissingMetadataAsync(state: TraktLibraryUiState) {
-        if (state.entriesByList.isEmpty()) return
-        if (state.allItems.none(::shouldHydrateTraktLibraryItem)) return
-
-        hydrationJob?.cancel()
-        hydrationJob = scope.launch {
-            val hydratedEntriesByList = runCatching {
-                hydrateEntriesFromAddonMeta(state.entriesByList)
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                log.w { "Background Trakt metadata hydration failed: ${error.message}" }
-            }.getOrNull() ?: return@launch
-
-            refreshMutex.withLock {
-                val current = _uiState.value
-                if (current.entriesByList.isEmpty()) return@withLock
-
-                val mergedEntriesByList = mergeHydratedEntries(
-                    currentEntriesByList = current.entriesByList,
-                    hydratedEntriesByList = hydratedEntriesByList,
-                )
-                if (mergedEntriesByList == current.entriesByList) return@withLock
-
-                val rebuilt = rebuildUiState(
-                    listTabs = current.listTabs,
-                    entriesByList = mergedEntriesByList,
-                ).copy(
-                    isLoading = current.isLoading,
-                    hasLoaded = current.hasLoaded,
-                    errorMessage = current.errorMessage,
-                )
-
-                _uiState.value = rebuilt
-                persistSnapshot(rebuilt)
-            }
+    private suspend fun traktLibraryLoadErrorMessage(error: Throwable): String {
+        val fallback = getString(Res.string.trakt_library_load_failed)
+        val detail = error.userVisibleMessage()
+        return when {
+            detail.isBlank() -> fallback
+            detail.equals(fallback, ignoreCase = true) -> fallback
+            else -> detail
         }
     }
 
-    private fun mergeHydratedEntries(
-        currentEntriesByList: Map<String, List<LibraryItem>>,
-        hydratedEntriesByList: Map<String, List<LibraryItem>>,
-    ): Map<String, List<LibraryItem>> {
-        val hydratedByContentKey = hydratedEntriesByList.values
-            .flatten()
-            .associateBy { contentKey(it.id, it.type) }
-
-        return currentEntriesByList.mapValues { (_, entries) ->
-            entries.map { entry ->
-                hydratedByContentKey[contentKey(entry.id, entry.type)] ?: entry
-            }
+    private fun Throwable.userVisibleMessage(): String {
+        val raw = message?.trim()?.takeIf { it.isNotBlank() }
+            ?: toString().trim()
+        val firstLine = raw.lines().firstOrNull()?.trim().orEmpty()
+        return if (firstLine.length <= MAX_VISIBLE_ERROR_MESSAGE_LENGTH) {
+            firstLine
+        } else {
+            firstLine.take(MAX_VISIBLE_ERROR_MESSAGE_LENGTH).trimEnd() + "..."
         }
     }
 
@@ -487,7 +439,7 @@ object TraktLibraryRepository {
         val watchlistTabs = listOf(
             TraktListTab(
                 key = WATCHLIST_KEY,
-                title = "Watchlist",
+                title = getString(Res.string.trakt_watchlist),
                 type = TraktListType.WATCHLIST,
             ),
         )
@@ -542,83 +494,6 @@ object TraktLibraryRepository {
         entriesByList.toMap()
     }
 
-    private suspend fun hydrateEntriesFromAddonMeta(
-        entriesByList: Map<String, List<LibraryItem>>,
-    ): Map<String, List<LibraryItem>> = coroutineScope {
-        if (entriesByList.isEmpty()) return@coroutineScope entriesByList
-
-        val uniqueItems = entriesByList.values
-            .flatten()
-            .distinctBy { contentKey(it.id, it.type) }
-        if (uniqueItems.isEmpty()) return@coroutineScope entriesByList
-
-        val semaphore = Semaphore(METADATA_FETCH_CONCURRENCY)
-        val hydratedByKey = uniqueItems
-            .map { item ->
-                async {
-                    semaphore.withPermit {
-                        val hydrated = hydrateItemFromAddonMeta(item)
-                        contentKey(item.id, item.type) to hydrated
-                    }
-                }
-            }
-            .awaitAll()
-            .toMap()
-
-        entriesByList.mapValues { (_, entries) ->
-            entries.map { entry -> hydratedByKey[contentKey(entry.id, entry.type)] ?: entry }
-        }
-    }
-
-    private suspend fun hydrateItemFromAddonMeta(item: LibraryItem): LibraryItem {
-        if (!shouldHydrateTraktLibraryItem(item)) {
-            return item
-        }
-
-        val typeCandidates = if (normalizeType(item.type) == "movie") {
-            listOf("movie")
-        } else {
-            listOf("series", "tv")
-        }
-
-        val idCandidates = buildList {
-            add(item.id)
-            if (item.id.startsWith("tmdb:")) {
-                add(item.id.substringAfter(':'))
-            }
-            if (item.id.startsWith("trakt:")) {
-                add(item.id.substringAfter(':'))
-            }
-        }.distinct()
-
-        if (idCandidates.isEmpty()) {
-            return item
-        }
-
-        for (type in typeCandidates) {
-            for (id in idCandidates) {
-                val meta = withTimeoutOrNull(METADATA_FETCH_TIMEOUT_MS) {
-                    MetaDetailsRepository.fetch(type = type, id = id)
-                }
-                if (meta == null) continue
-
-                val shouldOverrideName = item.name.isBlank() || item.name == item.id
-                return item.copy(
-                    name = if (shouldOverrideName) meta.name else item.name,
-                    poster = item.poster.orValidImageUrl(meta.poster),
-                    banner = item.banner.orValidImageUrl(meta.background),
-                    logo = item.logo.orValidImageUrl(meta.logo),
-                    description = item.description.orIfBlank(meta.description),
-                    releaseInfo = item.releaseInfo.orIfBlank(meta.releaseInfo),
-                    imdbRating = item.imdbRating.orIfBlank(meta.imdbRating),
-                    genres = if (item.genres.isEmpty()) meta.genres else item.genres,
-                )
-            }
-        }
-
-        return item
-    }
-
     private suspend fun fetchPersonalLists(headers: Map<String, String>): List<TraktListTab> {
         val payload = httpGetTextWithHeaders(
             url = "$BASE_URL/users/me/lists",
@@ -629,7 +504,7 @@ object TraktLibraryRepository {
             val traktId = list.ids?.trakt ?: return@mapNotNull null
             TraktListTab(
                 key = "$PERSONAL_LIST_PREFIX$traktId",
-                title = list.name?.ifBlank { null } ?: "List $traktId",
+                title = list.name?.ifBlank { null } ?: getString(Res.string.trakt_list_fallback_title, traktId),
                 type = TraktListType.PERSONAL,
                 traktListId = traktId,
                 slug = list.ids.slug,
@@ -784,10 +659,9 @@ object TraktLibraryRepository {
             ?: ids?.trakt?.let { "trakt:$it" }
             ?: return null
 
-        val poster = media.images?.poster.firstNonBlankImageUrl()
-            ?: media.images?.fanart.firstNonBlankImageUrl()
-        val banner = media.images?.banner.firstNonBlankImageUrl()
-        val logo = media.images?.logo.firstNonBlankImageUrl()
+        val poster = media.images.traktBestPosterUrl()
+        val banner = media.images.traktBestBackdropUrl()
+        val logo = media.images.traktBestLogoUrl()
 
         val savedAt = item.listedAt
             ?.takeIf { it.isNotBlank() }
@@ -827,34 +701,6 @@ object TraktLibraryRepository {
         return yearText.toIntOrNull()
     }
 
-    private fun String?.orIfBlank(fallback: String?): String? {
-        val current = this?.trim().takeUnless { it.isNullOrBlank() }
-        if (current != null) return current
-        return fallback?.trim().takeUnless { it.isNullOrBlank() }
-    }
-
-    private fun String?.orValidImageUrl(fallback: String?): String? {
-        val current = this.normalizeImageUrl()
-        if (current != null) return current
-        return fallback.normalizeImageUrl()
-    }
-
-    private fun List<String>?.firstNonBlankImageUrl(): String? {
-        return this
-            ?.asSequence()
-            ?.mapNotNull { it.normalizeImageUrl() }
-            ?.firstOrNull()
-    }
-
-    private fun String?.normalizeImageUrl(): String? {
-        val value = this?.trim().takeUnless { it.isNullOrBlank() } ?: return null
-        val normalized = if (value.startsWith("//")) "https:$value" else value
-        return normalized.takeIf {
-            it.startsWith("https://", ignoreCase = true) ||
-                it.startsWith("http://", ignoreCase = true)
-        }
-    }
-
     private val imdbRegex = Regex("tt\\d+")
 }
 
@@ -863,11 +709,6 @@ private data class StoredTraktLibraryPayload(
     val listTabs: List<TraktListTab> = emptyList(),
     val entriesByList: Map<String, List<LibraryItem>> = emptyMap(),
 )
-
-internal fun shouldHydrateTraktLibraryItem(item: LibraryItem): Boolean {
-    val missingDisplayName = item.name.isBlank() || item.name == item.id
-    return missingDisplayName || item.poster.isNullOrBlank() || item.releaseInfo.isNullOrBlank()
-}
 
 @Serializable
 private data class TraktListSummaryDto(
@@ -901,14 +742,6 @@ private data class TraktMediaDto(
 )
 
 @Serializable
-private data class TraktImagesDto(
-    val fanart: List<String>? = null,
-    val poster: List<String>? = null,
-    val logo: List<String>? = null,
-    val banner: List<String>? = null,
-)
-
-@Serializable
 private data class TraktIdsDto(
     val trakt: Int? = null,
     val imdb: String? = null,
@@ -934,4 +767,3 @@ private data class TraktListShowRequestItemDto(
     val year: Int? = null,
     val ids: TraktIdsDto? = null,
 )
-

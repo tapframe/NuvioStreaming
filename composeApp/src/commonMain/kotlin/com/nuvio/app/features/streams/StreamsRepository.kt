@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.launch
 
 object StreamsRepository {
@@ -313,7 +315,7 @@ object StreamsRepository {
                                 StreamLoadCompletion.PluginScraper(
                                     addonId = providerGroup.addonId,
                                     streams = emptyList(),
-                                    error = error.message ?: "Failed to load ${scraper.name}",
+                                    error = error.message ?: getString(Res.string.streams_failed_to_load_scraper, scraper.name),
                                 )
                             },
                         )
@@ -422,8 +424,32 @@ object StreamsRepository {
         }
     }
 
+    fun cancelLoading() {
+        activeJob?.cancel()
+        activeJob = null
+        _uiState.update { current ->
+            if (!current.isAnyLoading && current.groups.none { it.isLoading }) {
+                current
+            } else {
+                val updatedGroups = current.groups.map { group ->
+                    if (group.isLoading) group.copy(isLoading = false) else group
+                }
+                current.copy(
+                    groups = updatedGroups,
+                    isAnyLoading = false,
+                    emptyStateReason = if (updatedGroups.isEmpty()) {
+                        current.emptyStateReason
+                    } else {
+                        updatedGroups.toEmptyStateReason(anyLoading = false)
+                    },
+                )
+            }
+        }
+    }
+
     fun clear() {
         activeJob?.cancel()
+        activeJob = null
         activeRequestKey = null
         _uiState.value = StreamsUiState()
     }

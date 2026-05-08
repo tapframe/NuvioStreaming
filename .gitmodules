@@ -1,0 +1,3 @@
+[submodule "MPVKit"]
+	path = MPVKit
+	url = https://github.com/tapframe/MPVNuvio.git

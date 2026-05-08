@@ -1,5 +1,9 @@
 package com.nuvio.app.features.streams
 
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+
 data class StreamItem(
     val name: String? = null,
     val description: String? = null,
@@ -13,7 +17,7 @@ data class StreamItem(
     val behaviorHints: StreamBehaviorHints = StreamBehaviorHints(),
 ) {
     val streamLabel: String
-        get() = name ?: "Stream"
+        get() = name ?: runBlocking { getString(Res.string.stream_default_name) }
 
     val streamSubtitle: String?
         get() = description
@@ -21,9 +25,17 @@ data class StreamItem(
     val directPlaybackUrl: String?
         get() = url ?: externalUrl
 
+    val isTorrentStream: Boolean
+        get() = !infoHash.isNullOrBlank() ||
+            url.isMagnetLink() ||
+            externalUrl.isMagnetLink()
+
     val hasPlayableSource: Boolean
         get() = url != null || infoHash != null || externalUrl != null
 }
+
+private fun String?.isMagnetLink(): Boolean =
+    this?.trimStart()?.startsWith("magnet:", ignoreCase = true) == true
 
 data class StreamBehaviorHints(
     val bingeGroup: String? = null,

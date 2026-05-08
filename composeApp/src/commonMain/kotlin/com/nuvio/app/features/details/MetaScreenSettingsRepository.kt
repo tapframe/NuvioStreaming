@@ -3,11 +3,15 @@ package com.nuvio.app.features.details
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
 
 enum class MetaScreenSectionKey {
     ACTIONS,
@@ -41,6 +45,7 @@ data class MetaScreenSettingsUiState(
     val cinematicBackground: Boolean = false,
     val tabLayout: Boolean = false,
     val episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
+    val blurUnwatchedEpisodes: Boolean = false,
 )
 
 enum class MetaEpisodeCardStyle {
@@ -77,12 +82,14 @@ private data class StoredMetaScreenSettingsPayload(
     @SerialName("tvStyleLayout")
     val tabLayout: Boolean = false,
     val episodeCardStyle: String = "horizontal",
+    @SerialName("blur_unwatched_episodes")
+    val blurUnwatchedEpisodes: Boolean = false,
 )
 
 private data class MetaScreenSectionDefinition(
     val key: MetaScreenSectionKey,
-    val title: String,
-    val description: String,
+    val titleRes: StringResource,
+    val descriptionRes: StringResource,
 )
 
 object MetaScreenSettingsRepository {
@@ -94,53 +101,53 @@ object MetaScreenSettingsRepository {
     private val definitions = listOf(
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.ACTIONS,
-            title = "Actions",
-            description = "Play and save controls.",
+            titleRes = Res.string.meta_section_actions_title,
+            descriptionRes = Res.string.meta_section_actions_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.OVERVIEW,
-            title = "Overview",
-            description = "Synopsis, ratings, genres, and core credits.",
+            titleRes = Res.string.meta_section_overview_title,
+            descriptionRes = Res.string.meta_section_overview_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.PRODUCTION,
-            title = "Production",
-            description = "Studios and networks.",
+            titleRes = Res.string.meta_section_production_title,
+            descriptionRes = Res.string.meta_section_production_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.CAST,
-            title = "Cast",
-            description = "Principal cast list.",
+            titleRes = Res.string.settings_meta_cast,
+            descriptionRes = Res.string.meta_section_cast_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.COMMENTS,
-            title = "Comments",
-            description = "Trakt comments section.",
+            titleRes = Res.string.settings_meta_comments,
+            descriptionRes = Res.string.meta_section_comments_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.TRAILERS,
-            title = "Trailers",
-            description = "Trailer rail and playback shortcuts.",
+            titleRes = Res.string.settings_meta_trailers,
+            descriptionRes = Res.string.meta_section_trailers_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.EPISODES,
-            title = "Episodes",
-            description = "Seasons and episode list for series.",
+            titleRes = Res.string.settings_meta_episodes,
+            descriptionRes = Res.string.meta_section_episodes_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.DETAILS,
-            title = "Details",
-            description = "Runtime, status, release, language, and related info.",
+            titleRes = Res.string.meta_section_details_title,
+            descriptionRes = Res.string.meta_section_details_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.COLLECTION,
-            title = "Collection",
-            description = "Related collection or franchise rail.",
+            titleRes = Res.string.meta_section_collection_title,
+            descriptionRes = Res.string.meta_section_collection_description,
         ),
         MetaScreenSectionDefinition(
             key = MetaScreenSectionKey.MORE_LIKE_THIS,
-            title = "More Like This",
-            description = "Recommendation rail.",
+            titleRes = Res.string.meta_section_more_like_this_title,
+            descriptionRes = Res.string.meta_section_more_like_this_description,
         ),
     )
 
@@ -152,6 +159,8 @@ object MetaScreenSettingsRepository {
     private var cinematicBackground: Boolean = false
     private var tabLayout: Boolean = false
     private var episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal
+    private var blurUnwatchedEpisodes: Boolean = false
+    private fun localizedString(resource: StringResource): String = runBlocking { getString(resource) }
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -167,6 +176,7 @@ object MetaScreenSettingsRepository {
                 tabLayout = parsed.tabLayout
                 episodeCardStyle = MetaEpisodeCardStyle.parse(parsed.episodeCardStyle)
                     ?: MetaEpisodeCardStyle.Horizontal
+                blurUnwatchedEpisodes = parsed.blurUnwatchedEpisodes
                 preferences = parsed.items.mapNotNull { item ->
                     val key = runCatching { MetaScreenSectionKey.valueOf(item.key) }.getOrNull() ?: return@mapNotNull null
                     key to item
@@ -185,6 +195,7 @@ object MetaScreenSettingsRepository {
         cinematicBackground = false
         tabLayout = false
         episodeCardStyle = MetaEpisodeCardStyle.Horizontal
+        blurUnwatchedEpisodes = false
         _uiState.value = MetaScreenSettingsUiState()
         ensureLoaded()
     }
@@ -210,6 +221,13 @@ object MetaScreenSettingsRepository {
         persist()
     }
 
+    fun setBlurUnwatchedEpisodes(enabled: Boolean) {
+        ensureLoaded()
+        blurUnwatchedEpisodes = enabled
+        publish()
+        persist()
+    }
+
     fun setTabGroup(key: MetaScreenSectionKey, groupId: Int?) {
         ensureLoaded()
         if (!key.canBeTabbed) return
@@ -228,6 +246,8 @@ object MetaScreenSettingsRepository {
         preferences.clear()
         cinematicBackground = false
         tabLayout = false
+        episodeCardStyle = MetaEpisodeCardStyle.Horizontal
+        blurUnwatchedEpisodes = false
         _uiState.value = MetaScreenSettingsUiState()
     }
 
@@ -236,11 +256,13 @@ object MetaScreenSettingsRepository {
         cinematicBackground: Boolean,
         tabLayout: Boolean,
         episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
+        blurUnwatchedEpisodes: Boolean = false,
     ) {
         ensureLoaded()
         this.cinematicBackground = cinematicBackground
         this.tabLayout = tabLayout
         this.episodeCardStyle = episodeCardStyle
+        this.blurUnwatchedEpisodes = blurUnwatchedEpisodes
         preferences = items.associate { item ->
             item.key to StoredMetaScreenSectionPreference(
                 key = item.key.name,
@@ -266,6 +288,7 @@ object MetaScreenSettingsRepository {
         cinematicBackground = false
         tabLayout = false
         episodeCardStyle = MetaEpisodeCardStyle.Horizontal
+        blurUnwatchedEpisodes = false
         normalizePreferences()
         publish()
         persist()
@@ -322,8 +345,8 @@ object MetaScreenSettingsRepository {
                     val preference = preferences[definition.key]
                     MetaScreenSectionItem(
                         key = definition.key,
-                        title = definition.title,
-                        description = definition.description,
+                        title = localizedString(definition.titleRes),
+                        description = localizedString(definition.descriptionRes),
                         enabled = preference?.enabled ?: true,
                         order = preference?.order ?: 0,
                         tabGroup = preference?.tabGroup,
@@ -332,6 +355,7 @@ object MetaScreenSettingsRepository {
             cinematicBackground = cinematicBackground,
             tabLayout = tabLayout,
             episodeCardStyle = episodeCardStyle,
+            blurUnwatchedEpisodes = blurUnwatchedEpisodes,
         )
     }
 
@@ -343,6 +367,7 @@ object MetaScreenSettingsRepository {
                     cinematicBackground = cinematicBackground,
                     tabLayout = tabLayout,
                     episodeCardStyle = MetaEpisodeCardStyle.persist(episodeCardStyle),
+                    blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                 ),
             ),
         )

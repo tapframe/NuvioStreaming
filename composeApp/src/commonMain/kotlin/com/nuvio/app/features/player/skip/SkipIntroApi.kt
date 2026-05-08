@@ -30,6 +30,62 @@ internal object SkipIntroApi {
         }
     }
 
+    suspend fun submitIntro(
+        apiKey: String,
+        request: SubmitIntroRequest,
+    ): Boolean {
+        val baseUrl = IntroDbConfig.URL.trimEnd('/')
+        if (baseUrl.isBlank() || apiKey.isBlank()) return false
+        val url = "$baseUrl/submit"
+        val body = json.encodeToString(SubmitIntroRequest.serializer(), request)
+        val headers = mapOf(
+            "Authorization" to "Bearer $apiKey",
+            "Content-Type" to "application/json"
+        )
+        return try {
+            val response = com.nuvio.app.features.addons.httpRequestRaw(
+                method = "POST",
+                url = url,
+                headers = headers,
+                body = body
+            )
+            response.status == 200 || response.status == 201
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    suspend fun verifyIntroDbApiKey(apiKey: String): Boolean {
+        val baseUrl = IntroDbConfig.URL.trimEnd('/')
+        if (baseUrl.isBlank() || apiKey.isBlank()) return false
+        val url = "$baseUrl/submit"
+        val headers = mapOf(
+            "Authorization" to "Bearer $apiKey",
+            "Content-Type" to "application/json"
+        )
+        return try {
+            val response = com.nuvio.app.features.addons.httpRequestRaw(
+                method = "POST",
+                url = url,
+                headers = headers,
+                body = "{}"
+            )
+            
+            // 400 means Auth passed but payload was empty/invalid -> Key is Valid
+            if (response.status == 400) return true
+            
+            // 200/201 would also mean valid (though unexpected with empty body)
+            if (response.status == 200 || response.status == 201) return true
+            
+            // Explicitly handle auth failures
+            if (response.status == 401 || response.status == 403) return false
+            
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     // --- AniSkip ---
 
     suspend fun getAniSkipTimes(

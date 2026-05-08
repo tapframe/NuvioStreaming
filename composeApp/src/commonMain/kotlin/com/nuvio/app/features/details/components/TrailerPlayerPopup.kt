@@ -39,6 +39,8 @@ import com.nuvio.app.features.player.PlatformPlayerSurface
 import com.nuvio.app.features.player.PlayerResizeMode
 import com.nuvio.app.features.trailer.TrailerPlaybackSource
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +57,7 @@ fun TrailerPlayerPopup(
 ) {
     if (!visible) return
 
-    val headerType = trailerType.trim().ifBlank { "Trailer" }
+    val headerType = trailerType.trim().ifBlank { stringResource(Res.string.detail_tab_trailer) }
     val headerSubtitle = buildList {
         if (trailerTitle.isNotBlank() && !trailerTitle.equals(headerType, ignoreCase = true)) {
             add(trailerTitle)
@@ -119,7 +121,7 @@ fun TrailerPlayerPopup(
                 IconButton(onClick = dismissSheet) {
                     Icon(
                         imageVector = Icons.Rounded.Close,
-                        contentDescription = "Close trailer",
+                        contentDescription = stringResource(Res.string.trailer_close),
                         tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
@@ -147,7 +149,7 @@ fun TrailerPlayerPopup(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
-                                text = "Unable to play trailer",
+                                text = stringResource(Res.string.trailer_unable_to_play),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
@@ -160,7 +162,7 @@ fun TrailerPlayerPopup(
                             )
                             if (onRetry != null) {
                                 TextButton(onClick = onRetry) {
-                                    Text("Retry")
+                                    Text(stringResource(Res.string.action_retry))
                                 }
                             }
                         }

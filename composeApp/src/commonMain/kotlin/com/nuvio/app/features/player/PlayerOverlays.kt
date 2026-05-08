@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -59,6 +60,14 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.nuvioTypeScale
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_player_close
+import nuvio.composeapp.generated.resources.compose_player_episode_code_full
+import nuvio.composeapp.generated.resources.compose_player_go_back
+import nuvio.composeapp.generated.resources.compose_player_playback_error
+import nuvio.composeapp.generated.resources.compose_player_youre_watching
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.max
 
 internal enum class GestureFeedbackIcon {
@@ -71,10 +80,14 @@ internal enum class GestureFeedbackIcon {
 }
 
 internal data class GestureFeedbackState(
-    val message: String,
+    val message: String? = null,
+    val messageRes: StringResource? = null,
+    val messageArgs: List<Any> = emptyList(),
     val icon: GestureFeedbackIcon = GestureFeedbackIcon.Speed,
     val isDanger: Boolean = false,
     val secondaryMessage: String? = null,
+    val secondaryMessageRes: StringResource? = null,
+    val secondaryMessageArgs: List<Any> = emptyList(),
     val secondaryMessageColor: Color? = null,
 )
 
@@ -141,7 +154,7 @@ internal fun OpeningOverlay(
             contentColor = Color.White,
             buttonSize = 44.dp,
             iconSize = 24.dp,
-            contentDescription = "Close player",
+            contentDescription = stringResource(Res.string.compose_player_close),
         )
 
         Column(
@@ -218,6 +231,12 @@ internal fun GestureFeedbackPill(
         GestureFeedbackIcon.SeekBackward -> Icons.Rounded.FastRewind
     }
     val iconTint = if (feedback.isDanger) Color(0xFFFFC1C1) else Color.White
+    val messageText = feedback.messageRes?.let { resource ->
+        stringResource(resource, *feedback.messageArgs.toTypedArray())
+    } ?: feedback.message.orEmpty()
+    val secondaryMessageText = feedback.secondaryMessageRes?.let { resource ->
+        stringResource(resource, *feedback.secondaryMessageArgs.toTypedArray())
+    } ?: feedback.secondaryMessage
 
     Row(
         modifier = modifier
@@ -242,11 +261,11 @@ internal fun GestureFeedbackPill(
             )
         }
         Text(
-            text = feedback.message,
+            text = messageText,
             style = MaterialTheme.nuvioTypeScale.bodyLg.copy(fontWeight = FontWeight.SemiBold),
             color = Color.White,
         )
-        feedback.secondaryMessage?.let { secondaryMessage ->
+        secondaryMessageText?.let { secondaryMessage ->
             Text(
                 text = secondaryMessage,
                 style = MaterialTheme.nuvioTypeScale.bodyMd.copy(fontWeight = FontWeight.SemiBold),
@@ -270,7 +289,7 @@ internal fun PauseMetadataOverlay(
     horizontalSafePadding: Dp,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    BoxWithConstraints(
         modifier = modifier
             .background(
                 Brush.horizontalGradient(
@@ -280,80 +299,107 @@ internal fun PauseMetadataOverlay(
                         Color.Transparent,
                     ),
                 ),
-            )
-            .padding(
-                start = horizontalSafePadding + metrics.horizontalPadding,
-                end = horizontalSafePadding + metrics.horizontalPadding,
-                top = 40.dp,
-                bottom = 120.dp,
             ),
-        verticalArrangement = Arrangement.Bottom,
     ) {
-        Text(
-            text = "You're watching",
-            style = MaterialTheme.nuvioTypeScale.bodyLg,
-            color = Color(0xFFB8B8B8),
-        )
-        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(12.dp))
-
-        if (!logo.isNullOrBlank()) {
-            AsyncImage(
-                model = logo,
-                contentDescription = title,
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.BottomStart,
-                modifier = Modifier.height(96.dp),
-            )
+        val compactHeight = maxHeight < 420.dp
+        val veryCompactHeight = maxHeight < 340.dp
+        val topPadding = if (compactHeight) 24.dp else 40.dp
+        val bottomPadding = when {
+            veryCompactHeight -> 24.dp
+            compactHeight -> 40.dp
+            else -> 120.dp
+        }
+        val logoHeight = when {
+            veryCompactHeight -> 48.dp
+            compactHeight -> 64.dp
+            else -> 96.dp
+        }
+        val titleFontScale = if (compactHeight) 1.35f else 1.8f
+        val descriptionStyle = if (compactHeight) {
+            MaterialTheme.nuvioTypeScale.bodyMd.copy(lineHeight = 20.sp)
         } else {
-            Text(
-                text = title,
-                style = MaterialTheme.nuvioTypeScale.displayMd.copy(
-                    fontSize = max(metrics.titleSize.value * 1.8f, 32f).sp,
-                    fontWeight = FontWeight.ExtraBold,
+            MaterialTheme.nuvioTypeScale.bodyLg.copy(lineHeight = 24.sp)
+        }
+        val descriptionMaxLines = if (compactHeight) 2 else 3
+        val descriptionWidthFraction = if (compactHeight) 0.82f else 0.62f
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    start = horizontalSafePadding + metrics.horizontalPadding,
+                    end = horizontalSafePadding + metrics.horizontalPadding,
+                    top = topPadding,
+                    bottom = bottomPadding,
                 ),
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-        val episodeInfo = if (isEpisode && seasonNumber != null && episodeNumber != null) {
-            "S${seasonNumber}E${episodeNumber}"
-        } else {
-            providerName
-        }
-
-        Text(
-            text = episodeInfo,
-            style = MaterialTheme.nuvioTypeScale.bodyLg,
-            color = Color(0xFFCCCCCC),
-            modifier = Modifier.padding(top = 8.dp),
-        )
-
-        if (!episodeTitle.isNullOrBlank()) {
+            verticalArrangement = Arrangement.Bottom,
+        ) {
             Text(
-                text = episodeTitle,
-                style = MaterialTheme.nuvioTypeScale.titleLg,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 12.dp),
+                text = stringResource(Res.string.compose_player_youre_watching),
+                style = MaterialTheme.nuvioTypeScale.bodyLg,
+                color = Color(0xFFB8B8B8),
             )
-        }
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(if (compactHeight) 8.dp else 12.dp))
 
-        if (!pauseDescription.isNullOrBlank()) {
+            if (!logo.isNullOrBlank()) {
+                AsyncImage(
+                    model = logo,
+                    contentDescription = title,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.BottomStart,
+                    modifier = Modifier.height(logoHeight),
+                )
+            } else {
+                Text(
+                    text = title,
+                    style = MaterialTheme.nuvioTypeScale.displayMd.copy(
+                        fontSize = max(metrics.titleSize.value * titleFontScale, 32f).sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    ),
+                    color = Color.White,
+                    maxLines = if (compactHeight) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            val episodeInfo = if (isEpisode && seasonNumber != null && episodeNumber != null) {
+                stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)
+            } else {
+                providerName
+            }
+
             Text(
-                text = pauseDescription,
-                style = MaterialTheme.nuvioTypeScale.bodyLg.copy(lineHeight = 24.sp),
-                color = Color(0xFFD6D6D6),
-                softWrap = true,
-                textAlign = TextAlign.Start,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .padding(top = 16.dp)
-                    .fillMaxWidth(0.62f),
+                text = episodeInfo,
+                style = MaterialTheme.nuvioTypeScale.bodyLg,
+                color = Color(0xFFCCCCCC),
+                modifier = Modifier.padding(top = if (compactHeight) 6.dp else 8.dp),
             )
+
+            if (!episodeTitle.isNullOrBlank()) {
+                Text(
+                    text = episodeTitle,
+                    style = MaterialTheme.nuvioTypeScale.titleLg,
+                    color = Color.White,
+                    maxLines = if (compactHeight) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = if (compactHeight) 8.dp else 12.dp),
+                )
+            }
+
+            if (!pauseDescription.isNullOrBlank()) {
+                Text(
+                    text = pauseDescription,
+                    style = descriptionStyle,
+                    color = Color(0xFFD6D6D6),
+                    softWrap = true,
+                    textAlign = TextAlign.Start,
+                    maxLines = descriptionMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(top = if (compactHeight) 10.dp else 16.dp)
+                        .fillMaxWidth(descriptionWidthFraction),
+                )
+            }
         }
     }
 }
@@ -377,7 +423,7 @@ internal fun ErrorModal(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Playback error",
+                text = stringResource(Res.string.compose_player_playback_error),
                 style = MaterialTheme.nuvioTypeScale.displaySm.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 textAlign = TextAlign.Center,
@@ -399,7 +445,7 @@ internal fun ErrorModal(
                 shape = RoundedCornerShape(12.dp),
             ) {
                 Text(
-                    text = "Go back",
+                    text = stringResource(Res.string.compose_player_go_back),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 12.dp),

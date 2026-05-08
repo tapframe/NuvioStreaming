@@ -6,11 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,11 +16,30 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.mdblist.MdbListMetadataService
 import com.nuvio.app.features.mdblist.MdbListSettings
 import com.nuvio.app.features.mdblist.MdbListSettingsRepository
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_save
+import nuvio.composeapp.generated.resources.settings_mdb_add_api_key_first
+import nuvio.composeapp.generated.resources.settings_mdb_api_key_description
+import nuvio.composeapp.generated.resources.settings_mdb_api_key_label
+import nuvio.composeapp.generated.resources.settings_mdb_api_key_title
+import nuvio.composeapp.generated.resources.settings_mdb_enable_ratings
+import nuvio.composeapp.generated.resources.settings_mdb_enable_ratings_description
+import nuvio.composeapp.generated.resources.settings_mdb_section_api_key
+import nuvio.composeapp.generated.resources.settings_mdb_section_rating_providers
+import nuvio.composeapp.generated.resources.settings_mdb_section_title
+import nuvio.composeapp.generated.resources.source_audience_score
+import nuvio.composeapp.generated.resources.source_imdb
+import nuvio.composeapp.generated.resources.source_letterboxd
+import nuvio.composeapp.generated.resources.source_metacritic
+import nuvio.composeapp.generated.resources.source_rotten_tomatoes
+import nuvio.composeapp.generated.resources.source_tmdb
+import nuvio.composeapp.generated.resources.source_trakt
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.mdbListSettingsContent(
     isTablet: Boolean,
@@ -33,13 +49,13 @@ internal fun LazyListScope.mdbListSettingsContent(
 
     item {
         SettingsSection(
-            title = "MDBLIST",
+            title = stringResource(Res.string.settings_mdb_section_title),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
                 SettingsSwitchRow(
-                    title = "Enable MDBList ratings",
-                    description = "Show external ratings from MDBList on metadata pages when an IMDb ID is available.",
+                    title = stringResource(Res.string.settings_mdb_enable_ratings),
+                    description = stringResource(Res.string.settings_mdb_enable_ratings_description),
                     checked = settings.enabled,
                     enabled = settings.hasApiKey,
                     isTablet = isTablet,
@@ -49,7 +65,7 @@ internal fun LazyListScope.mdbListSettingsContent(
                     SettingsGroupDivider(isTablet = isTablet)
                     MdbListInfoRow(
                         isTablet = isTablet,
-                        text = "Add your MDBList API key below before turning ratings on.",
+                        text = stringResource(Res.string.settings_mdb_add_api_key_first),
                     )
                 }
             }
@@ -58,7 +74,7 @@ internal fun LazyListScope.mdbListSettingsContent(
 
     item {
         SettingsSection(
-            title = "API KEY",
+            title = stringResource(Res.string.settings_mdb_section_api_key),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
@@ -73,7 +89,7 @@ internal fun LazyListScope.mdbListSettingsContent(
 
     item {
         SettingsSection(
-            title = "RATING PROVIDERS",
+            title = stringResource(Res.string.settings_mdb_section_rating_providers),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
@@ -94,18 +110,18 @@ private fun ProviderRows(
     controlsEnabled: Boolean,
 ) {
     val providers = listOf(
-        MdbListMetadataService.PROVIDER_IMDB to "IMDb",
-        MdbListMetadataService.PROVIDER_TMDB to "TMDB",
-        MdbListMetadataService.PROVIDER_TOMATOES to "Rotten Tomatoes",
-        MdbListMetadataService.PROVIDER_METACRITIC to "Metacritic",
-        MdbListMetadataService.PROVIDER_TRAKT to "Trakt",
-        MdbListMetadataService.PROVIDER_LETTERBOXD to "Letterboxd",
-        MdbListMetadataService.PROVIDER_AUDIENCE to "Audience Score",
+        MdbListMetadataService.PROVIDER_IMDB to Res.string.source_imdb,
+        MdbListMetadataService.PROVIDER_TMDB to Res.string.source_tmdb,
+        MdbListMetadataService.PROVIDER_TOMATOES to Res.string.source_rotten_tomatoes,
+        MdbListMetadataService.PROVIDER_METACRITIC to Res.string.source_metacritic,
+        MdbListMetadataService.PROVIDER_TRAKT to Res.string.source_trakt,
+        MdbListMetadataService.PROVIDER_LETTERBOXD to Res.string.source_letterboxd,
+        MdbListMetadataService.PROVIDER_AUDIENCE to Res.string.source_audience_score,
     )
 
-    providers.forEachIndexed { index, (providerId, providerLabel) ->
+    providers.forEachIndexed { index, (providerId, providerLabelRes) ->
         SettingsSwitchRow(
-            title = providerLabel,
+            title = stringResource(providerLabelRes),
             checked = settings.isProviderEnabled(providerId),
             enabled = controlsEnabled,
             isTablet = isTablet,
@@ -138,34 +154,25 @@ private fun MdbListApiKeyRow(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = "MDBList API key",
+                text = stringResource(Res.string.settings_mdb_api_key_title),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = "Get a key from https://mdblist.com/preferences and paste it here.",
+                text = stringResource(Res.string.settings_mdb_api_key_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        OutlinedTextField(
+        SettingsSecretTextField(
             value = draft,
             onValueChange = {
                 draft = it
             },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("API key") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
-            ),
+            label = stringResource(Res.string.settings_mdb_api_key_label),
         )
 
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -176,7 +183,7 @@ private fun MdbListApiKeyRow(
                 },
                 enabled = normalizedDraft != value,
             ) {
-                Text("Save Key")
+                Text(stringResource(Res.string.action_save))
             }
         }
     }

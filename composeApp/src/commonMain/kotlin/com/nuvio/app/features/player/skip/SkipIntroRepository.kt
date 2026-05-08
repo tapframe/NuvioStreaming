@@ -241,6 +241,36 @@ object SkipIntroRepository {
         } catch (_: Exception) { emptyList() }.also { imdbEntriesCache[imdbId] = it }
     }
 
+    suspend fun submitIntro(
+        imdbId: String,
+        season: Int,
+        episode: Int,
+        startSec: Double,
+        endSec: Double,
+        segmentType: String,
+    ): Boolean {
+        val settings = PlayerSettingsRepository.uiState.value
+        val apiKey = settings.introDbApiKey.trim()
+        if (!settings.introSubmitEnabled || apiKey.isBlank()) return false
+
+        val request = SubmitIntroRequest(
+            imdbId = imdbId,
+            season = season,
+            episode = episode,
+            startSec = startSec,
+            endSec = endSec,
+            startMs = (startSec * 1000).toLong(),
+            endMs = (endSec * 1000).toLong(),
+            segmentType = segmentType,
+        )
+
+        return SkipIntroApi.submitIntro(apiKey, request)
+    }
+
+    suspend fun verifyIntroDbApiKey(apiKey: String): Boolean {
+        return SkipIntroApi.verifyIntroDbApiKey(apiKey)
+    }
+
     fun clearCache() {
         cache.clear()
         imdbEntriesCache.clear()

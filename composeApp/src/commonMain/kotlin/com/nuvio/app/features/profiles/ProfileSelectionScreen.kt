@@ -61,6 +61,8 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun ProfileSelectionScreen(
@@ -132,7 +134,7 @@ fun ProfileSelectionScreen(
             Spacer(modifier = Modifier.height(if (isTabletLayout) 0.dp else 60.dp))
 
             Text(
-                text = "Who's watching?",
+                text = stringResource(Res.string.profile_who_is_watching),
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontSize = 30.sp,
                     letterSpacing = (-0.5).sp,
@@ -258,7 +260,11 @@ fun ProfileSelectionScreen(
                     .padding(horizontal = 24.dp, vertical = 10.dp),
             ) {
                 Text(
-                    text = if (isEditMode) "Done" else "Manage Profiles",
+                    text = if (isEditMode) {
+                        stringResource(Res.string.action_done)
+                    } else {
+                        stringResource(Res.string.profile_manage_profiles)
+                    },
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (isEditMode) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -298,6 +304,9 @@ private fun ProfileAvatarCard(
     val avatarItem = remember(profile.avatarId, avatars) {
         profile.avatarId?.let { id -> avatars.find { it.id == id } }
     }
+    val avatarImageUrl = remember(profile.avatarUrl, avatarItem) {
+        profileAvatarImageUrl(profile, avatarItem)
+    }
 
     val animAlpha = remember { Animatable(0f) }
     val animScale = remember { Animatable(0.85f) }
@@ -336,8 +345,8 @@ private fun ProfileAvatarCard(
             modifier = Modifier.size(110.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (avatarItem != null) {
-                val bgColor = avatarItem.bgColor?.let { parseHexColor(it) } ?: avatarColor
+            if (avatarImageUrl != null) {
+                val bgColor = avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
                 Box(
                     modifier = Modifier
                         .size(110.dp)
@@ -358,15 +367,15 @@ private fun ProfileAvatarCard(
                         },
                     )
                     .then(
-                        if (avatarItem == null) Modifier.border(2.dp, avatarColor.copy(alpha = 0.4f), CircleShape)
+                        if (avatarImageUrl == null) Modifier.border(2.dp, avatarColor.copy(alpha = 0.4f), CircleShape)
                         else Modifier,
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (avatarItem != null) {
+                if (avatarImageUrl != null) {
                     AsyncImage(
-                        model = avatarStorageUrl(avatarItem.storagePath),
-                        contentDescription = avatarItem.displayName,
+                        model = avatarImageUrl,
+                        contentDescription = avatarItem?.displayName ?: profile.name,
                         modifier = Modifier.size(100.dp).clip(CircleShape),
                         contentScale = ContentScale.Crop,
                     )
@@ -429,7 +438,9 @@ private fun ProfileAvatarCard(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = profile.name.ifBlank { "Profile ${profile.profileIndex}" },
+            text = profile.name.ifBlank {
+                stringResource(Res.string.profile_label_number, profile.profileIndex)
+            },
             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
@@ -506,7 +517,7 @@ private fun AddProfileCard(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Add Profile",
+            text = stringResource(Res.string.compose_profile_add_profile),
             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,

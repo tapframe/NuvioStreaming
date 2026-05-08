@@ -4,9 +4,13 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.details.MetaDetailsRepository
-import com.nuvio.app.features.watchprogress.WatchProgressCompletionPercentThreshold
+import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktHistory
+import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktPlayback
+import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktShowProgress
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.features.watchprogress.shouldTreatAsInProgressForContinueWatching
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,10 +28,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 private const val BASE_URL = "https://api.trakt.tv"
+private const val TRAKT_COMPLETION_PERCENT_THRESHOLD = 90f
 private const val HISTORY_LIMIT = 250
 private const val METADATA_FETCH_TIMEOUT_MS = 3_500L
 private const val METADATA_FETCH_CONCURRENCY = 5
@@ -93,7 +100,10 @@ object TraktProgressRepository {
         }.getOrNull()
 
         if (playbackEntries == null) {
-            _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Failed to load Trakt progress")
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                errorMessage = getString(Res.string.trakt_progress_load_failed),
+            )
             return
         }
 
@@ -108,8 +118,8 @@ object TraktProgressRepository {
         }
 
         scope.launch {
-            val historyEntries = runCatching {
-                fetchHistoryEntries(headers)
+            val completedEntries = runCatching {
+                fetchHistoryEntries(headers) + fetchWatchedShowSeedEntries(headers)
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 log.w { "Failed to fetch Trakt history snapshot: ${error.message}" }
@@ -117,7 +127,7 @@ object TraktProgressRepository {
 
             if (!isLatestRefreshRequest(requestId)) return@launch
 
-            val merged = mergeNewestByVideoId(playbackEntries + historyEntries)
+            val merged = mergeNewestByVideoId(playbackEntries + completedEntries)
             _uiState.value = _uiState.value.copy(
                 entries = merged.sortedByDescending { it.lastUpdatedEpochMs },
                 isLoading = false,
@@ -340,12 +350,32 @@ object TraktProgressRepository {
         mergeNewestByVideoId(completedEpisodes + completedMovies)
     }
 
+    private suspend fun fetchWatchedShowSeedEntries(
+        headers: Map<String, String>,
+    ): List<WatchProgressEntry> = withContext(Dispatchers.Default) {
+        ContinueWatchingPreferencesRepository.ensureLoaded()
+        val useFurthestEpisode = ContinueWatchingPreferencesRepository.uiState.value.upNextFromFurthestEpisode
+        val payload = httpGetTextWithHeaders(
+            url = "$BASE_URL/sync/watched/shows",
+            headers = headers,
+        )
+        val watchedShows = json.decodeFromString<List<TraktWatchedShowItem>>(payload)
+        watchedShows
+            .mapNotNull { item ->
+                mapWatchedShowSeed(
+                    item = item,
+                    useFurthestEpisode = useFurthestEpisode,
+                )
+            }
+            .sortedByDescending { entry -> entry.lastUpdatedEpochMs }
+    }
+
     private fun mergeNewestByVideoId(entries: List<WatchProgressEntry>): List<WatchProgressEntry> {
         val mergedByVideoId = linkedMapOf<String, WatchProgressEntry>()
         entries.forEach { rawEntry ->
             val entry = rawEntry.normalizedCompletion()
             val existing = mergedByVideoId[entry.videoId]
-            if (existing == null || entry.lastUpdatedEpochMs > existing.lastUpdatedEpochMs) {
+            if (existing == null || shouldReplaceProgressSnapshotEntry(existing = existing, candidate = entry)) {
                 mergedByVideoId[entry.videoId] = entry
             }
         }
@@ -353,6 +383,18 @@ object TraktProgressRepository {
         return mergedByVideoId.values
             .toList()
             .sortedByDescending { it.lastUpdatedEpochMs }
+    }
+
+    private fun shouldReplaceProgressSnapshotEntry(
+        existing: WatchProgressEntry,
+        candidate: WatchProgressEntry,
+    ): Boolean {
+        val existingInProgress = existing.shouldTreatAsInProgressForContinueWatching()
+        val candidateInProgress = candidate.shouldTreatAsInProgressForContinueWatching()
+        if (existingInProgress != candidateInProgress) {
+            return candidateInProgress
+        }
+        return candidate.lastUpdatedEpochMs > existing.lastUpdatedEpochMs
     }
 
     private fun mergeEntriesPreferRichMetadata(
@@ -429,9 +471,31 @@ object TraktProgressRepository {
 
         entries.map { entry ->
             val meta = metadataByContent[entry.parentMetaType to entry.parentMetaId] ?: return@map entry
-            val episode = if (entry.seasonNumber != null && entry.episodeNumber != null) {
-                meta.videos.firstOrNull { video ->
-                    video.season == entry.seasonNumber && video.episode == entry.episodeNumber
+            var resolvedSeason = entry.seasonNumber
+            var resolvedEpisode = entry.episodeNumber
+
+            val episode = if (resolvedSeason != null && resolvedEpisode != null) {
+                // Try direct match first
+                val directMatch = meta.videos.firstOrNull { video ->
+                    video.season == resolvedSeason && video.episode == resolvedEpisode
+                }
+                if (directMatch != null) {
+                    directMatch
+                } else {
+                    // Fallback: reverse-remap from Trakt numbering to addon numbering
+                    val addonSeasons = meta.videos.mapTo(mutableSetOf()) { it.season }
+                    if (resolvedSeason == 1 && addonSeasons.size > 1 && resolvedEpisode!! > 0) {
+                        val sorted = meta.videos
+                            .filter { it.season != null && it.episode != null }
+                            .sortedWith(compareBy({ it.season }, { it.episode }))
+                        val globalIndex = resolvedEpisode!! - 1
+                        if (globalIndex in sorted.indices) {
+                            val remapped = sorted[globalIndex]
+                            resolvedSeason = remapped.season
+                            resolvedEpisode = remapped.episode
+                            remapped
+                        } else null
+                    } else null
                 }
             } else {
                 null
@@ -442,6 +506,8 @@ object TraktProgressRepository {
                 logo = entry.logo ?: meta.logo,
                 poster = entry.poster ?: meta.poster,
                 background = entry.background ?: meta.background,
+                seasonNumber = resolvedSeason ?: entry.seasonNumber,
+                episodeNumber = resolvedEpisode ?: entry.episodeNumber,
                 episodeTitle = entry.episodeTitle ?: episode?.title,
                 episodeThumbnail = entry.episodeThumbnail ?: episode?.thumbnail,
                 pauseDescription = entry.pauseDescription
@@ -468,8 +534,9 @@ object TraktProgressRepository {
             lastPositionMs = 0L,
             durationMs = 0L,
             lastUpdatedEpochMs = rankedTimestamp(item.pausedAt, fallbackIndex),
-            isCompleted = progressPercent >= WatchProgressCompletionPercentThreshold,
+            isCompleted = progressPercent >= TRAKT_COMPLETION_PERCENT_THRESHOLD,
             progressPercent = progressPercent,
+            source = WatchProgressSourceTraktPlayback,
         ).normalizedCompletion()
     }
 
@@ -502,8 +569,9 @@ object TraktProgressRepository {
             lastPositionMs = 0L,
             durationMs = 0L,
             lastUpdatedEpochMs = rankedTimestamp(item.pausedAt, fallbackIndex),
-            isCompleted = progressPercent >= WatchProgressCompletionPercentThreshold,
+            isCompleted = progressPercent >= TRAKT_COMPLETION_PERCENT_THRESHOLD,
             progressPercent = progressPercent,
+            source = WatchProgressSourceTraktPlayback,
         ).normalizedCompletion()
     }
 
@@ -535,6 +603,7 @@ object TraktProgressRepository {
             lastUpdatedEpochMs = rankedTimestamp(item.watchedAt, fallbackIndex),
             isCompleted = true,
             progressPercent = 100f,
+            source = WatchProgressSourceTraktHistory,
         )
     }
 
@@ -554,6 +623,73 @@ object TraktProgressRepository {
             lastUpdatedEpochMs = rankedTimestamp(item.watchedAt, fallbackIndex),
             isCompleted = true,
             progressPercent = 100f,
+            source = WatchProgressSourceTraktHistory,
+        )
+    }
+
+    private fun mapWatchedShowSeed(
+        item: TraktWatchedShowItem,
+        useFurthestEpisode: Boolean,
+    ): WatchProgressEntry? {
+        val show = item.show ?: return null
+        val parentMetaId = normalizeTraktContentId(show.ids, fallback = show.title)
+        if (parentMetaId.isBlank()) return null
+
+        val completedEpisode = item.seasons.orEmpty()
+            .asSequence()
+            .filter { season -> (season.number ?: 0) > 0 }
+            .flatMap { season ->
+                val seasonNumber = season.number ?: return@flatMap emptySequence()
+                season.episodes.orEmpty()
+                    .asSequence()
+                    .filter { episode -> (episode.number ?: 0) > 0 && (episode.plays ?: 1) > 0 }
+                    .mapNotNull { episode ->
+                        val episodeNumber = episode.number ?: return@mapNotNull null
+                        TraktWatchedShowEpisodeSeed(
+                            season = seasonNumber,
+                            episode = episodeNumber,
+                            watchedAt = rankedTimestamp(
+                                isoDate = episode.lastWatchedAt ?: item.lastWatchedAt,
+                                fallbackIndex = 0,
+                            ),
+                        )
+                    }
+            }
+            .maxWithOrNull(
+                if (useFurthestEpisode) {
+                    compareBy<TraktWatchedShowEpisodeSeed>(
+                        { it.season },
+                        { it.episode },
+                        { it.watchedAt },
+                    )
+                } else {
+                    compareBy<TraktWatchedShowEpisodeSeed>(
+                        { it.watchedAt },
+                        { it.season },
+                        { it.episode },
+                    )
+                },
+            ) ?: return null
+
+        return WatchProgressEntry(
+            contentType = "series",
+            parentMetaId = parentMetaId,
+            parentMetaType = "series",
+            videoId = buildPlaybackVideoId(
+                parentMetaId = parentMetaId,
+                seasonNumber = completedEpisode.season,
+                episodeNumber = completedEpisode.episode,
+                fallbackVideoId = null,
+            ),
+            title = show.title ?: parentMetaId,
+            seasonNumber = completedEpisode.season,
+            episodeNumber = completedEpisode.episode,
+            lastPositionMs = 1L,
+            durationMs = 1L,
+            lastUpdatedEpochMs = completedEpisode.watchedAt,
+            isCompleted = true,
+            progressPercent = 100f,
+            source = WatchProgressSourceTraktShowProgress,
         )
     }
 
@@ -568,14 +704,10 @@ object TraktProgressRepository {
     }
 
     private fun rankedTimestamp(isoDate: String?, fallbackIndex: Int): Long {
-        val compactDigits = isoDate
-            ?.filter(Char::isDigit)
-            ?.take(14)
-            ?.takeIf { it.length >= 8 }
-            ?.padEnd(14, '0')
-            ?.toLongOrNull()
-        if (compactDigits != null) return compactDigits
-
+        isoDate
+            ?.takeIf { it.isNotBlank() }
+            ?.let(TraktPlatformClock::parseIsoDateTimeToEpochMs)
+            ?.let { return it }
         return TraktPlatformClock.nowEpochMs() - (fallbackIndex * 1_000L)
     }
 }
@@ -601,6 +733,32 @@ private data class TraktHistoryEpisodeItem(
 private data class TraktHistoryMovieItem(
     @SerialName("watched_at") val watchedAt: String? = null,
     @SerialName("movie") val movie: TraktMedia? = null,
+)
+
+@Serializable
+private data class TraktWatchedShowItem(
+    @SerialName("last_watched_at") val lastWatchedAt: String? = null,
+    @SerialName("show") val show: TraktMedia? = null,
+    @SerialName("seasons") val seasons: List<TraktWatchedShowSeason>? = null,
+)
+
+@Serializable
+private data class TraktWatchedShowSeason(
+    @SerialName("number") val number: Int? = null,
+    @SerialName("episodes") val episodes: List<TraktWatchedShowEpisode>? = null,
+)
+
+@Serializable
+private data class TraktWatchedShowEpisode(
+    @SerialName("number") val number: Int? = null,
+    @SerialName("plays") val plays: Int? = null,
+    @SerialName("last_watched_at") val lastWatchedAt: String? = null,
+)
+
+private data class TraktWatchedShowEpisodeSeed(
+    val season: Int,
+    val episode: Int,
+    val watchedAt: Long,
 )
 
 @Serializable

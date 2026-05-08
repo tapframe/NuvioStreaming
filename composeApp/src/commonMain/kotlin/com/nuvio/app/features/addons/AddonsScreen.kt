@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,17 +53,19 @@ import com.nuvio.app.core.ui.NuvioSectionLabel
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun AddonsScreen(
     modifier: Modifier = Modifier,
-    title: String = "Addons",
+    title: String? = null,
     onBack: (() -> Unit)? = null,
 ) {
     NuvioScreen(modifier = modifier) {
         stickyHeader {
             NuvioScreenHeader(
-                title = title,
+                title = title ?: stringResource(Res.string.addon_title),
                 onBack = onBack,
             ) {
             }
@@ -80,10 +85,12 @@ internal fun AddonsSettingsPageContent(
     }
 
     val uiState by AddonRepository.uiState.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
     val coroutineScope = rememberCoroutineScope()
     var addonUrl by rememberSaveable { mutableStateOf("") }
     var formMessage by rememberSaveable { mutableStateOf<String?>(null) }
     var installModalState by remember { mutableStateOf<AddonInstallModalState?>(null) }
+    val enterAddonUrlMessage = stringResource(Res.string.addons_error_enter_url)
 
     val overview = remember(uiState.addons) { uiState.addons.toOverview() }
 
@@ -91,10 +98,10 @@ internal fun AddonsSettingsPageContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SectionHeader("OVERVIEW")
+        SectionHeader(stringResource(Res.string.addons_section_overview))
         OverviewCard(overview = overview)
 
-        SectionHeader("ADD ADDON")
+        SectionHeader(stringResource(Res.string.addons_section_add_addon))
         AddAddonCard(
             addonUrl = addonUrl,
             formMessage = formMessage,
@@ -105,7 +112,7 @@ internal fun AddonsSettingsPageContent(
             onAddClick = {
                 val requestedUrl = addonUrl.trim()
                 if (requestedUrl.isBlank()) {
-                    formMessage = "Enter an addon URL."
+                    formMessage = enterAddonUrlMessage
                     return@AddAddonCard
                 }
 
@@ -127,14 +134,38 @@ internal fun AddonsSettingsPageContent(
             },
         )
 
-        SectionHeader("INSTALLED ADDONS")
+        SectionHeader(stringResource(Res.string.addons_section_installed))
         if (uiState.addons.isEmpty()) {
             EmptyStateCard()
         } else {
-            uiState.addons.forEach { addon ->
+            val lastIndex = uiState.addons.lastIndex
+            uiState.addons.forEachIndexed { index, addon ->
+                val manifest = addon.manifest
+                val behaviorHints = manifest?.behaviorHints
+                val showConfigureAction = behaviorHints?.configurable == true || behaviorHints?.configurationRequired == true
+                val configureUrl = addon.manifestUrl.toConfigureUrl()
                 InstalledAddonCard(
                     addon = addon,
+                    onMoveUpClick = if (index > 0) {
+                        { AddonRepository.moveAddon(index, index - 1) }
+                    } else {
+                        null
+                    },
+                    onMoveDownClick = if (index < lastIndex) {
+                        { AddonRepository.moveAddon(index, index + 1) }
+                    } else {
+                        null
+                    },
                     onRefreshClick = { AddonRepository.refreshAddon(addon.manifestUrl) },
+                    onConfigureClick = if (showConfigureAction && !configureUrl.isNullOrBlank()) {
+                        {
+                            runCatching {
+                                uriHandler.openUri(configureUrl)
+                            }
+                        }
+                    } else {
+                        null
+                    },
                     onDeleteClick = { AddonRepository.removeAddon(addon.manifestUrl) },
                 )
             }
@@ -143,12 +174,30 @@ internal fun AddonsSettingsPageContent(
 
     val modalState = installModalState
     if (modalState != null) {
+        val modalTitle = when (modalState) {
+            AddonInstallModalState.Checking -> stringResource(Res.string.addons_modal_checking_title)
+            is AddonInstallModalState.Success -> stringResource(Res.string.addons_modal_success_title)
+            is AddonInstallModalState.Error -> stringResource(Res.string.addons_modal_failure_title)
+        }
+        val modalMessage = when (modalState) {
+            AddonInstallModalState.Checking -> stringResource(Res.string.addons_modal_checking_message)
+            is AddonInstallModalState.Success -> stringResource(
+                Res.string.addons_modal_success_message,
+                modalState.addonName,
+            )
+            is AddonInstallModalState.Error -> modalState.reason
+        }
+        val modalConfirmText = when (modalState) {
+            AddonInstallModalState.Checking -> stringResource(Res.string.addon_installing)
+            is AddonInstallModalState.Success -> stringResource(Res.string.action_done)
+            is AddonInstallModalState.Error -> stringResource(Res.string.action_close)
+        }
         NuvioStatusModal(
-            title = modalState.title,
-            message = modalState.message,
+            title = modalTitle,
+            message = modalMessage,
             isVisible = true,
             isBusy = modalState.isBusy,
-            confirmText = modalState.confirmText,
+            confirmText = modalConfirmText,
             onConfirm = {
                 if (!modalState.isBusy) {
                     installModalState = null
@@ -172,19 +221,19 @@ private fun OverviewCard(overview: AddonOverview) {
         ) {
             OverviewStat(
                 value = overview.totalAddons.toString(),
-                label = "Addons",
+                label = stringResource(Res.string.addons_overview_addons),
                 modifier = Modifier.weight(1f),
             )
             VerticalSeparator()
             OverviewStat(
                 value = overview.activeAddons.toString(),
-                label = "Active",
+                label = stringResource(Res.string.addons_overview_active),
                 modifier = Modifier.weight(1f),
             )
             VerticalSeparator()
             OverviewStat(
                 value = overview.totalCatalogs.toString(),
-                label = "Catalogs",
+                label = stringResource(Res.string.addons_overview_catalogs),
                 modifier = Modifier.weight(1f),
             )
         }
@@ -236,11 +285,11 @@ private fun AddAddonCard(
         NuvioInputField(
             value = addonUrl,
             onValueChange = onAddonUrlChange,
-            placeholder = "Addon URL",
+            placeholder = stringResource(Res.string.addons_input_placeholder),
         )
         Spacer(modifier = Modifier.height(18.dp))
         NuvioPrimaryButton(
-            text = "Install Addon",
+            text = stringResource(Res.string.addons_install_button),
             enabled = addonUrl.isNotBlank(),
             onClick = onAddClick,
         )
@@ -256,33 +305,21 @@ private fun AddAddonCard(
 }
 
 private sealed interface AddonInstallModalState {
-    val title: String
-    val message: String
-    val confirmText: String
     val isBusy: Boolean
 
     data object Checking : AddonInstallModalState {
-        override val title: String = "Checking Addon"
-        override val message: String = "Validating the manifest URL and loading addon details before install."
-        override val confirmText: String = "Installing"
         override val isBusy: Boolean = true
     }
 
     data class Success(
-        private val addonName: String,
+        val addonName: String,
     ) : AddonInstallModalState {
-        override val title: String = "Addon Installed"
-        override val message: String = "$addonName was validated and added successfully."
-        override val confirmText: String = "Done"
         override val isBusy: Boolean = false
     }
 
     data class Error(
-        private val reason: String,
+        val reason: String,
     ) : AddonInstallModalState {
-        override val title: String = "Install Failed"
-        override val message: String = reason
-        override val confirmText: String = "Close"
         override val isBusy: Boolean = false
     }
 }
@@ -291,13 +328,13 @@ private sealed interface AddonInstallModalState {
 private fun EmptyStateCard() {
     NuvioSurfaceCard {
         Text(
-            text = "No addons installed yet.",
+            text = stringResource(Res.string.addons_empty_title),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Add a manifest URL to start loading catalogs, metadata, streams or subtitles into Nuvio.",
+            text = stringResource(Res.string.addons_empty_subtitle),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -307,7 +344,10 @@ private fun EmptyStateCard() {
 @Composable
 private fun InstalledAddonCard(
     addon: ManagedAddon,
+    onMoveUpClick: (() -> Unit)?,
+    onMoveDownClick: (() -> Unit)?,
     onRefreshClick: () -> Unit,
+    onConfigureClick: (() -> Unit)?,
     onDeleteClick: () -> Unit,
 ) {
     val manifest = addon.manifest
@@ -315,54 +355,79 @@ private fun InstalledAddonCard(
     NuvioSurfaceCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.Top,
-            ) {
-                AddonIconBadge(
-                    imageUrl = manifest?.logoUrl,
-                    icon = Icons.Rounded.Extension,
-                    tint = if (manifest != null) Color(0xFF71BDE8) else MaterialTheme.colorScheme.onSurfaceVariant,
+            AddonIconBadge(
+                imageUrl = manifest?.logoUrl,
+                icon = Icons.Rounded.Extension,
+                tint = if (manifest != null) Color(0xFF71BDE8) else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = addon.displayTitle,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                manifest?.version?.let { version ->
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = addon.displayTitle,
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        text = stringResource(Res.string.addons_version_format, version),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    manifest?.version?.let { version ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Version $version",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                NuvioIconActionButton(
-                    icon = Icons.Rounded.Refresh,
-                    contentDescription = "Refresh addon",
-                    tint = MaterialTheme.colorScheme.primary,
-                    onClick = onRefreshClick,
-                )
-                NuvioIconActionButton(
-                    icon = Icons.Rounded.Delete,
-                    contentDescription = "Delete addon",
-                    tint = MaterialTheme.colorScheme.error,
-                    onClick = onDeleteClick,
-                )
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            onMoveUpClick?.let { onMoveUp ->
+                NuvioIconActionButton(
+                    icon = Icons.Rounded.ArrowUpward,
+                    contentDescription = stringResource(Res.string.addons_move_up),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onClick = onMoveUp,
+                )
+            }
+            onMoveDownClick?.let { onMoveDown ->
+                NuvioIconActionButton(
+                    icon = Icons.Rounded.ArrowDownward,
+                    contentDescription = stringResource(Res.string.addons_move_down),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onClick = onMoveDown,
+                )
+            }
+            NuvioIconActionButton(
+                icon = Icons.Rounded.Refresh,
+                contentDescription = stringResource(Res.string.addons_refresh),
+                tint = MaterialTheme.colorScheme.primary,
+                onClick = onRefreshClick,
+            )
+            onConfigureClick?.let { onConfigure ->
+                NuvioIconActionButton(
+                    icon = Icons.Rounded.Settings,
+                    contentDescription = stringResource(Res.string.addons_configure),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    onClick = onConfigure,
+                )
+            }
+            NuvioIconActionButton(
+                icon = Icons.Rounded.Delete,
+                contentDescription = stringResource(Res.string.addons_delete),
+                tint = MaterialTheme.colorScheme.error,
+                onClick = onDeleteClick,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         Spacer(modifier = Modifier.height(18.dp))
 
@@ -373,16 +438,16 @@ private fun InstalledAddonCard(
         ) {
             NuvioInfoBadge(
                 text = when {
-                    addon.isRefreshing -> "Refreshing"
-                    manifest != null -> "Active"
-                    else -> "Unavailable"
+                    addon.isRefreshing -> stringResource(Res.string.addons_badge_refreshing)
+                    manifest != null -> stringResource(Res.string.addons_badge_active)
+                    else -> stringResource(Res.string.addons_badge_unavailable)
                 },
             )
             manifest?.let {
-                NuvioInfoBadge(text = "${it.resources.size} resources")
-                NuvioInfoBadge(text = "${it.catalogs.size} catalogs")
+                NuvioInfoBadge(text = stringResource(Res.string.addons_badge_resources, it.resources.size))
+                NuvioInfoBadge(text = stringResource(Res.string.addons_badge_catalogs, it.catalogs.size))
                 if (it.behaviorHints.configurable) {
-                    NuvioInfoBadge(text = "Configurable")
+                    NuvioInfoBadge(text = stringResource(Res.string.addons_badge_configurable))
                 }
             }
         }
@@ -391,7 +456,7 @@ private fun InstalledAddonCard(
             addon.isRefreshing -> {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Loading manifest details...",
+                    text = stringResource(Res.string.addons_loading_manifest_details),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -468,6 +533,7 @@ private fun AddonIconBadge(
     }
 }
 
+@Composable
 private fun manifestSummary(manifest: AddonManifest): String {
     val resources = manifest.resources.joinToString(separator = ", ") { it.name }
     val types = manifest.types.joinToString(separator = " / ") { it.replaceFirstChar(Char::uppercase) }
@@ -477,10 +543,19 @@ private fun manifestSummary(manifest: AddonManifest): String {
         append(resources)
         if (manifest.idPrefixes.isNotEmpty()) {
             append(" • ")
-            append("${manifest.idPrefixes.size} id rules")
+            append(stringResource(Res.string.addons_summary_id_rules, manifest.idPrefixes.size))
         }
         if (manifest.behaviorHints.p2p) {
             append(" • P2P")
         }
+    }
+}
+
+private fun String.toConfigureUrl(): String {
+    val base = substringBefore("?").trimEnd('/')
+    return if (base.endsWith("/manifest.json")) {
+        base.removeSuffix("/manifest.json") + "/configure"
+    } else {
+        "$base/configure"
     }
 }

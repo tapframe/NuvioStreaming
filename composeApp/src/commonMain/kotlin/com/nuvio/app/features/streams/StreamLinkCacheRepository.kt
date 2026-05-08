@@ -53,6 +53,10 @@ object StreamLinkCacheRepository {
         StreamLinkCacheStorage.saveEntry(hashedKey(contentKey), payload)
     }
 
+    fun remove(contentKey: String) {
+        StreamLinkCacheStorage.removeEntry(hashedKey(contentKey))
+    }
+
     fun getValid(contentKey: String, maxAgeMs: Long): CachedStreamLink? {
         if (maxAgeMs <= 0L) return null
         val raw = StreamLinkCacheStorage.loadEntry(hashedKey(contentKey)) ?: return null

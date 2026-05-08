@@ -132,6 +132,7 @@ actual suspend fun httpRequestRaw(
     url: String,
     headers: Map<String, String>,
     body: String,
+    followRedirects: Boolean,
 ): RawHttpResponse =
     addonHttpClient
         .request {

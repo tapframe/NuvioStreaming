@@ -50,12 +50,16 @@ import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.stableKey
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun CatalogScreen(
@@ -71,20 +75,21 @@ fun CatalogScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by CatalogRepository.uiState.collectAsStateWithLifecycle()
+    val homeCatalogSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
     val posterCardStyle = rememberPosterCardStyleUiState()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var observedOfflineState by remember { mutableStateOf(false) }
 
-    LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination) {
+    LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination, homeCatalogSettingsUiState.hideUnreleasedContent) {
         CatalogRepository.load(
             manifestUrl = manifestUrl,
             type = type,
             catalogId = catalogId,
             genre = genre,
             supportsPagination = supportsPagination,
-            force = false,
+            force = true,
         )
     }
 
@@ -173,9 +178,10 @@ fun CatalogScreen(
                     }
                 } else {
                     items(
-                        items = uiState.items,
-                        key = { item -> item.stableKey() },
-                    ) { item ->
+                        items = uiState.items.withDuplicateSafeLazyKeys { item -> item.stableKey() },
+                        key = { item -> item.lazyKey },
+                    ) { keyedItem ->
+                        val item = keyedItem.value
                         CatalogPosterTile(
                             item = item,
                             cornerRadiusDp = posterCardStyle.cornerRadiusDp,
@@ -329,12 +335,12 @@ private fun CatalogEmptyState(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
-            text = "No titles found",
+            text = stringResource(Res.string.catalog_empty_title),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = errorMessage ?: "This catalog did not return any items.",
+            text = errorMessage ?: stringResource(Res.string.catalog_empty_message),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

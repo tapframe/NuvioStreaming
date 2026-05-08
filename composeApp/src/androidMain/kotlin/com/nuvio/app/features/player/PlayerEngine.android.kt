@@ -23,6 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
@@ -55,7 +58,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.Locale
 
 private const val TAG = "NuvioPlayer"
 
@@ -177,6 +179,10 @@ actual fun PlatformPlayerSurface(
     var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
 
+    fun syncPlayerViewKeepScreenOn() {
+        playerViewRef?.keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
+    }
+
     DisposableEffect(exoPlayer) {
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
             exoPlayer.pause()
@@ -184,7 +190,8 @@ actual fun PlatformPlayerSurface(
 
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                latestOnError.value(error.localizedMessage ?: "Unable to play this stream.")
+                syncPlayerViewKeepScreenOn()
+                latestOnError.value(error.localizedMessage ?: runBlocking { getString(Res.string.player_unable_to_play_stream) })
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -200,10 +207,12 @@ actual fun PlatformPlayerSurface(
                     latestOnError.value(null)
                     exoPlayer.logCurrentTracks("STATE_READY")
                 }
+                syncPlayerViewKeepScreenOn()
                 latestOnSnapshot.value(exoPlayer.snapshot())
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                syncPlayerViewKeepScreenOn()
                 latestOnSnapshot.value(exoPlayer.snapshot())
             }
 
@@ -233,6 +242,7 @@ actual fun PlatformPlayerSurface(
         onDispose {
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
             exoPlayer.removeListener(listener)
+            playerViewRef?.keepScreenOn = false
             subtitleSelectionJob?.cancel()
         }
     }
@@ -262,6 +272,7 @@ actual fun PlatformPlayerSurface(
 
     LaunchedEffect(exoPlayer, playWhenReady) {
         exoPlayer.playWhenReady = playWhenReady
+        syncPlayerViewKeepScreenOn()
         latestOnSnapshot.value(exoPlayer.snapshot())
     }
 
@@ -295,10 +306,10 @@ actual fun PlatformPlayerSurface(
                 }
 
                 override fun getAudioTracks(): List<AudioTrack> =
-                    exoPlayer.extractAudioTracks()
+                    exoPlayer.extractAudioTracks(context)
 
                 override fun getSubtitleTracks(): List<SubtitleTrack> {
-                    val tracks = exoPlayer.extractSubtitleTracks()
+                    val tracks = exoPlayer.extractSubtitleTracks(context)
                     Log.d(TAG, "getSubtitleTracks: found ${tracks.size} tracks")
                     tracks.forEach { t ->
                         Log.d(TAG, "  track idx=${t.index} id=${t.id} label='${t.label}' lang=${t.language} selected=${t.isSelected}")
@@ -422,7 +433,7 @@ actual fun PlatformPlayerSurface(
                 useController = useNativeController
                 layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
                 player = exoPlayer
-                keepScreenOn = true
+                keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
                 this.resizeMode = resizeMode.toExoResizeMode()
                 setShutterBackgroundColor(android.graphics.Color.BLACK)
                 playerViewRef = this
@@ -439,6 +450,7 @@ actual fun PlatformPlayerSurface(
             playerView.useController = useNativeController
             playerView.resizeMode = resizeMode.toExoResizeMode()
             playerViewRef = playerView
+            syncPlayerViewKeepScreenOn()
             playerView.syncLibassOverlay(
                 player = exoPlayer,
                 enabled = useLibass,
@@ -466,6 +478,11 @@ private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot =
         bufferedPositionMs = bufferedPosition.coerceAtLeast(0L),
         playbackSpeed = playbackParameters.speed,
     )
+
+private fun ExoPlayer.shouldKeepPlayerScreenOn(): Boolean =
+    playerError == null &&
+        playWhenReady &&
+        playbackState in setOf(Player.STATE_BUFFERING, Player.STATE_READY)
 
 private fun PlayerResizeMode.toExoResizeMode(): Int =
     when (this) {
@@ -556,44 +573,20 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
     }
 }
 
-private fun ExoPlayer.extractAudioTracks(): List<AudioTrack> {
+private fun ExoPlayer.extractAudioTracks(context: Context): List<AudioTrack> {
     val tracks = mutableListOf<AudioTrack>()
+    val trackNameProvider = CustomDefaultTrackNameProvider(context.resources)
     var idx = 0
     for (group in currentTracks.groups) {
         if (group.type != C.TRACK_TYPE_AUDIO) continue
         val format = group.mediaTrackGroup.getFormat(0)
-        val channelLabel = when {
-            format.channelCount == 1 -> "Mono"
-            format.channelCount == 2 -> "Stereo"
-            format.channelCount == 6 -> "5.1"
-            format.channelCount == 8 -> "7.1"
-            format.channelCount > 0 -> "${format.channelCount}ch"
-            else -> null
-        }
-        val mime = format.sampleMimeType?.lowercase()
-        val codecLabel = when {
-            mime == null -> null
-            mime.contains("eac3-joc") -> "Dolby Atmos"
-            mime.contains("truehd") && format.channelCount >= 8 -> "Dolby Atmos"
-            mime.contains("truehd") -> "Dolby TrueHD"
-            mime.contains("eac3") -> "Dolby Digital Plus"
-            mime.contains("ac3") -> "Dolby Digital"
-            mime.contains("opus") -> "Opus"
-            mime.contains("aac") -> "AAC"
-            mime.contains("dts-hd") -> "DTS-HD"
-            mime.contains("dts") -> "DTS"
-            else -> null
-        }
-        val resolvedLanguage = format.language?.let { lang -> Locale(lang).displayLanguage.takeIf { name -> name.isNotBlank() && name != lang } }
-        val baseName = format.label?.takeIf { it.isNotBlank() } ?: resolvedLanguage ?: format.language ?: "Track ${idx + 1}"
-        val suffix = listOfNotNull(channelLabel, codecLabel)
-            .joinToString(" ")
-            .let { if (it.isNotBlank()) " ($it)" else "" }
+        val label = trackNameProvider.getTrackName(format).takeIf { it.isNotBlank() }
+            ?: runBlocking { getString(Res.string.compose_player_track_number, idx + 1) }
         tracks.add(
             AudioTrack(
                 index = idx,
                 id = format.id ?: idx.toString(),
-                label = "$baseName$suffix",
+                label = label,
                 language = format.language,
                 isSelected = group.isSelected,
             )
@@ -603,8 +596,9 @@ private fun ExoPlayer.extractAudioTracks(): List<AudioTrack> {
     return tracks
 }
 
-private fun ExoPlayer.extractSubtitleTracks(): List<SubtitleTrack> {
+private fun ExoPlayer.extractSubtitleTracks(context: Context): List<SubtitleTrack> {
     val tracks = mutableListOf<SubtitleTrack>()
+    val trackNameProvider = CustomDefaultTrackNameProvider(context.resources)
     var idx = 0
     for (group in currentTracks.groups) {
         if (group.type != C.TRACK_TYPE_TEXT) continue
@@ -614,7 +608,7 @@ private fun ExoPlayer.extractSubtitleTracks(): List<SubtitleTrack> {
             SubtitleTrack(
                 index = idx,
                 id = format.id ?: idx.toString(),
-                label = format.label ?: "",
+                label = trackNameProvider.getTrackName(format),
                 language = format.language,
                 isSelected = group.isSelected,
                 isForced = inferForcedSubtitleTrack(

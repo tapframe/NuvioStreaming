@@ -54,13 +54,13 @@ import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.features.addons.httpRequestRaw
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 private enum class CommunityTab {
     Contributors,
@@ -80,12 +80,16 @@ private data class CommunityUiState(
 )
 
 @Serializable
-private data class GitHubContributorDto(
-    val login: String? = null,
-    @SerialName("avatar_url") val avatarUrl: String? = null,
-    @SerialName("html_url") val htmlUrl: String? = null,
-    val contributions: Int? = null,
-    val type: String? = null,
+private data class ContributionsResponseDto(
+    val contributors: List<ContributionDto> = emptyList(),
+)
+
+@Serializable
+private data class ContributionDto(
+    val name: String? = null,
+    val avatar: String? = null,
+    val profile: String? = null,
+    val total: Int? = null,
 )
 
 @Serializable
@@ -105,9 +109,6 @@ internal data class CommunityContributor(
     val avatarUrl: String?,
     val profileUrl: String?,
     val totalContributions: Int,
-    val mobileContributions: Int,
-    val tvContributions: Int,
-    val webContributions: Int,
 )
 
 internal data class SupporterDonation(
@@ -119,45 +120,37 @@ internal data class SupporterDonation(
 )
 
 private object SupportersContributorsRepository {
-    private const val gitHubOwner = "nuviomedia"
-    private const val mobileRepository = "nuviomobile"
-    private const val tvRepository = "nuviotv"
-    private const val webRepository = "nuvioweb"
-    private const val gitHubApiBase = "https://api.github.com"
-
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     suspend fun getContributors(): Result<List<CommunityContributor>> = runCatching {
-        coroutineScope {
-            val mobileDeferred = async { fetchRepoContributors(mobileRepository) }
-            val tvDeferred = async { fetchRepoContributors(tvRepository) }
-            val webDeferred = async { fetchRepoContributors(webRepository) }
-
-            val mobileResult = mobileDeferred.await()
-            val tvResult = tvDeferred.await()
-            val webResult = webDeferred.await()
-
-            if (mobileResult.isFailure && tvResult.isFailure && webResult.isFailure) {
-                throw (
-                    mobileResult.exceptionOrNull()
-                        ?: tvResult.exceptionOrNull()
-                        ?: webResult.exceptionOrNull()
-                        ?: IllegalStateException("Unable to load contributors")
-                    )
-            }
-
-            mergeContributors(
-                mobileContributors = mobileResult.getOrDefault(emptyList()),
-                tvContributors = tvResult.getOrDefault(emptyList()),
-                webContributors = webResult.getOrDefault(emptyList()),
-            )
+        val contributionsUrl = CommunityConfig.CONTRIBUTIONS_URL.trim()
+        check(contributionsUrl.isNotBlank()) {
+            getString(Res.string.community_error_unable_load_contributors)
         }
+
+        val response = httpRequestRaw(
+            method = "GET",
+            url = contributionsUrl,
+            headers = emptyMap(),
+            body = "",
+        )
+        if (response.status !in 200..299) {
+            error(getString(Res.string.community_error_contributors_request_failed))
+        }
+
+        json.decodeFromString<ContributionsResponseDto>(response.body)
+            .contributors
+            .mapNotNull(::normalizeContributor)
+            .sortedWith(
+                compareByDescending<CommunityContributor> { it.totalContributions }
+                    .thenBy { it.login.lowercase() },
+            )
     }
 
     suspend fun getSupporters(limit: Int = 200): Result<List<SupporterDonation>> = runCatching {
         val baseUrl = CommunityConfig.DONATIONS_BASE_URL.trim().removeSuffix("/")
         check(baseUrl.isNotBlank()) {
-            "Supporters endpoint is not configured. Add DONATIONS_BASE_URL to local.properties."
+            getString(Res.string.community_supporters_not_configured)
         }
 
         val response = httpRequestRaw(
@@ -167,7 +160,7 @@ private object SupportersContributorsRepository {
             body = "",
         )
         if (response.status !in 200..299) {
-            error("Donations API error: ${response.status}")
+            error(getString(Res.string.community_error_supporters_request_failed))
         }
 
         json.decodeFromString<DonationsResponseDto>(response.body)
@@ -191,126 +184,18 @@ private object SupportersContributorsRepository {
             }
     }
 
-    private suspend fun fetchRepoContributors(repo: String): Result<List<GitHubContributorDto>> = runCatching {
-        val contributors = mutableListOf<GitHubContributorDto>()
-        var nextUrl: String? = "$gitHubApiBase/repos/$gitHubOwner/$repo/contributors?per_page=100"
-
-        while (nextUrl != null) {
-            val response = httpRequestRaw(
-                method = "GET",
-                url = nextUrl,
-                headers = mapOf(
-                    "Accept" to "application/vnd.github+json",
-                    "User-Agent" to "NuvioMobile",
-                ),
-                body = "",
-            )
-            if (response.status !in 200..299) {
-                error("GitHub contributors API error for $repo: ${response.status}")
-            }
-
-            contributors += json.decodeFromString<List<GitHubContributorDto>>(response.body)
-            nextUrl = response.headers.entries
-                .firstOrNull { it.key.equals("link", ignoreCase = true) }
-                ?.value
-                ?.let(::parseNextLink)
-        }
-
-        contributors
-    }
-
-    private fun mergeContributors(
-        mobileContributors: List<GitHubContributorDto>,
-        tvContributors: List<GitHubContributorDto>,
-        webContributors: List<GitHubContributorDto>,
-    ): List<CommunityContributor> {
-        val contributorsByLogin = linkedMapOf<String, MutableCommunityContributor>()
-
-        mobileContributors.forEach { dto ->
-            normalizeContributor(dto)?.let { contributor ->
-                val entry = contributorsByLogin.getOrPut(contributor.login.lowercase()) {
-                    MutableCommunityContributor(
-                        login = contributor.login,
-                        avatarUrl = contributor.avatarUrl,
-                        profileUrl = contributor.htmlUrl,
-                    )
-                }
-                entry.avatarUrl = entry.avatarUrl ?: contributor.avatarUrl
-                entry.profileUrl = entry.profileUrl ?: contributor.htmlUrl
-                entry.mobileContributions += contributor.contributions
-            }
-        }
-
-        tvContributors.forEach { dto ->
-            normalizeContributor(dto)?.let { contributor ->
-                val entry = contributorsByLogin.getOrPut(contributor.login.lowercase()) {
-                    MutableCommunityContributor(
-                        login = contributor.login,
-                        avatarUrl = contributor.avatarUrl,
-                        profileUrl = contributor.htmlUrl,
-                    )
-                }
-                entry.avatarUrl = entry.avatarUrl ?: contributor.avatarUrl
-                entry.profileUrl = entry.profileUrl ?: contributor.htmlUrl
-                entry.tvContributions += contributor.contributions
-            }
-        }
-
-        webContributors.forEach { dto ->
-            normalizeContributor(dto)?.let { contributor ->
-                val entry = contributorsByLogin.getOrPut(contributor.login.lowercase()) {
-                    MutableCommunityContributor(
-                        login = contributor.login,
-                        avatarUrl = contributor.avatarUrl,
-                        profileUrl = contributor.htmlUrl,
-                    )
-                }
-                entry.avatarUrl = entry.avatarUrl ?: contributor.avatarUrl
-                entry.profileUrl = entry.profileUrl ?: contributor.htmlUrl
-                entry.webContributions += contributor.contributions
-            }
-        }
-
-        return contributorsByLogin.values
-            .map { contributor ->
-                CommunityContributor(
-                    login = contributor.login,
-                    avatarUrl = contributor.avatarUrl,
-                    profileUrl = contributor.profileUrl,
-                    totalContributions = contributor.mobileContributions + contributor.tvContributions + contributor.webContributions,
-                    mobileContributions = contributor.mobileContributions,
-                    tvContributions = contributor.tvContributions,
-                    webContributions = contributor.webContributions,
-                )
-            }
-            .sortedWith(
-                compareByDescending<CommunityContributor> { it.totalContributions }
-                    .thenBy { it.login.lowercase() },
-            )
-    }
-
-    private fun normalizeContributor(dto: GitHubContributorDto): NormalizedContributor? {
-        val login = dto.login?.trim().orEmpty()
-        val contributions = dto.contributions ?: 0
-        val type = dto.type?.trim()
+    private fun normalizeContributor(dto: ContributionDto): CommunityContributor? {
+        val login = dto.name?.trim().orEmpty()
+        val contributions = dto.total ?: 0
         if (login.isBlank() || contributions <= 0) return null
-        if (type != null && !type.equals("User", ignoreCase = true)) return null
 
-        return NormalizedContributor(
+        return CommunityContributor(
             login = login,
-            avatarUrl = dto.avatarUrl?.trim()?.takeIf { it.isNotBlank() },
-            htmlUrl = dto.htmlUrl?.trim()?.takeIf { it.isNotBlank() },
-            contributions = contributions,
+            avatarUrl = dto.avatar?.trim()?.takeIf { it.isNotBlank() },
+            profileUrl = dto.profile?.trim()?.takeIf { it.isNotBlank() },
+            totalContributions = contributions,
         )
     }
-
-    private fun parseNextLink(linkHeader: String): String? =
-        linkHeader.split(',')
-            .map(String::trim)
-            .firstOrNull { it.contains("rel=\"next\"") }
-            ?.substringAfter('<')
-            ?.substringBefore('>')
-            ?.takeIf { it.isNotBlank() }
 
     private fun supporterSortTimestamp(rawDate: String): Long {
         val datePart = rawDate.substringBefore('T')
@@ -321,22 +206,6 @@ private object SupportersContributorsRepository {
         val day = parts[2].toLongOrNull() ?: return Long.MIN_VALUE
         return year * 10_000L + month * 100L + day
     }
-
-    private data class NormalizedContributor(
-        val login: String,
-        val avatarUrl: String?,
-        val htmlUrl: String?,
-        val contributions: Int,
-    )
-
-    private data class MutableCommunityContributor(
-        val login: String,
-        var avatarUrl: String?,
-        var profileUrl: String?,
-        var mobileContributions: Int = 0,
-        var tvContributions: Int = 0,
-        var webContributions: Int = 0,
-    )
 }
 
 @Composable
@@ -348,7 +217,7 @@ fun SupportersContributorsSettingsScreen(
     ) {
         stickyHeader {
             NuvioScreenHeader(
-                title = "Supporters & Contributors",
+                title = stringResource(Res.string.compose_settings_page_supporters_contributors),
                 onBack = onBack,
             )
         }
@@ -373,6 +242,8 @@ private fun SupportersContributorsBody(
     val donateUrl = remember { CommunityConfig.DONATIONS_DONATE_URL.trim().removeSuffix("/") }
     val donationsConfigured = remember { CommunityConfig.DONATIONS_BASE_URL.trim().isNotBlank() }
     val donateConfigured = donateUrl.isNotBlank()
+    val contributorsErrorFallback = stringResource(Res.string.community_error_unable_load_contributors)
+    val supportersErrorFallback = stringResource(Res.string.community_error_unable_load_supporters)
 
     var uiState by remember { mutableStateOf(CommunityUiState()) }
     var selectedContributor by remember { mutableStateOf<CommunityContributor?>(null) }
@@ -400,7 +271,7 @@ private fun SupportersContributorsBody(
                         isContributorsLoading = false,
                         hasLoadedContributors = false,
                         contributors = emptyList(),
-                        contributorsErrorMessage = error.message ?: "Unable to load contributors.",
+                        contributorsErrorMessage = error.message ?: contributorsErrorFallback,
                     )
                 }
         }
@@ -428,7 +299,7 @@ private fun SupportersContributorsBody(
                         isSupportersLoading = false,
                         hasLoadedSupporters = false,
                         supporters = emptyList(),
-                        supportersErrorMessage = error.message ?: "Unable to load supporters.",
+                        supportersErrorMessage = error.message ?: supportersErrorFallback,
                     )
                 }
         }
@@ -449,14 +320,14 @@ private fun SupportersContributorsBody(
     ) {
         NuvioSurfaceCard {
             Text(
-                text = "Community",
+                text = stringResource(Res.string.community_section_title),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = "See the people building and supporting Nuvio across Mobile, TV, and Web.",
+                text = stringResource(Res.string.community_section_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -472,12 +343,12 @@ private fun SupportersContributorsBody(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.size(8.dp))
-                Text("Donate")
+                Text(stringResource(Res.string.action_donate))
             }
             if (!donationsConfigured) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Supporters API is not configured. Add DONATIONS_BASE_URL to local.properties.",
+                    text = stringResource(Res.string.community_supporters_not_configured),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -512,13 +383,18 @@ private fun SupportersContributorsBody(
 
     selectedContributor?.let { contributor ->
         val supportUrl = contributorSupportLink(contributor.login)
+        val contributionSummary = contributorContributionSummary(contributor)
         CommunityDetailsDialog(
             title = contributor.login,
-            subtitle = contributorContributionSummary(contributor),
+            subtitle = contributionSummary,
             onDismiss = { selectedContributor = null },
-            primaryActionLabel = if (contributor.profileUrl != null) "Open GitHub" else null,
+            primaryActionLabel = if (contributor.profileUrl != null) {
+                stringResource(Res.string.community_open_github)
+            } else {
+                null
+            },
             onPrimaryAction = contributor.profileUrl?.let { url -> { uriHandler.openUri(url) } },
-            secondaryActionLabel = if (supportUrl != null) "Donate" else null,
+            secondaryActionLabel = if (supportUrl != null) stringResource(Res.string.action_donate) else null,
             onSecondaryAction = supportUrl?.let { url -> { uriHandler.openUri(url) } },
         ) {
             Row(
@@ -535,12 +411,12 @@ private fun SupportersContributorsBody(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = contributorContributionSummary(contributor),
+                        text = contributionSummary,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = contributor.profileUrl ?: "GitHub profile unavailable",
+                        text = contributor.profileUrl ?: stringResource(Res.string.community_github_profile_unavailable),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -568,7 +444,7 @@ private fun SupportersContributorsBody(
                     modifier = Modifier.size(72.dp),
                 )
                 Text(
-                    text = supporter.message ?: "No message attached.",
+                    text = supporter.message ?: stringResource(Res.string.community_no_message_attached),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -605,7 +481,11 @@ private fun CommunityTabRow(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = if (tab == CommunityTab.Contributors) "Contributors" else "Supporters",
+                        text = if (tab == CommunityTab.Contributors) {
+                            stringResource(Res.string.community_tab_contributors)
+                        } else {
+                            stringResource(Res.string.community_tab_supporters)
+                        },
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
@@ -626,13 +506,13 @@ private fun ContributorsCard(
 ) {
     NuvioSurfaceCard {
         when {
-            isLoading -> LoadingState(label = "Loading contributors...")
+            isLoading -> LoadingState(label = stringResource(Res.string.community_loading_contributors))
             errorMessage != null -> ErrorState(
-                title = "Couldn't load contributors",
+                title = stringResource(Res.string.community_load_contributors_failed),
                 message = errorMessage,
                 onRetry = onRetry,
             )
-            contributors.isEmpty() -> EmptyState(label = "No contributors found.")
+            contributors.isEmpty() -> EmptyState(label = stringResource(Res.string.community_empty_contributors))
             else -> LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -642,7 +522,7 @@ private fun ContributorsCard(
             ) {
                 items(
                     items = contributors,
-                    key = { contributor -> contributor.login.lowercase() },
+                    key = { contributor -> "${contributor.login.lowercase()}-${contributor.profileUrl.orEmpty()}" },
                 ) { contributor ->
                     ContributorRow(
                         contributor = contributor,
@@ -664,13 +544,13 @@ private fun SupportersCard(
 ) {
     NuvioSurfaceCard {
         when {
-            isLoading -> LoadingState(label = "Loading supporters...")
+            isLoading -> LoadingState(label = stringResource(Res.string.community_loading_supporters))
             errorMessage != null -> ErrorState(
-                title = "Couldn't load supporters",
+                title = stringResource(Res.string.community_load_supporters_failed),
                 message = errorMessage,
                 onRetry = onRetry,
             )
-            supporters.isEmpty() -> EmptyState(label = "No supporters found.")
+            supporters.isEmpty() -> EmptyState(label = stringResource(Res.string.community_empty_supporters))
             else -> LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -905,7 +785,7 @@ private fun ErrorState(
             textAlign = TextAlign.Center,
         )
         Button(onClick = onRetry) {
-            Text("Retry")
+            Text(stringResource(Res.string.action_retry))
         }
     }
 }
@@ -969,8 +849,9 @@ private fun CommunityDetailsDialog(
     }
 }
 
+@Composable
 private fun contributorContributionSummary(contributor: CommunityContributor): String =
-    "${contributor.totalContributions} total commits"
+    stringResource(Res.string.community_total_commits, contributor.totalContributions)
 
 private fun contributorSupportLink(login: String): String? = when (login.lowercase()) {
     "skoruppa" -> "https://ko-fi.com/skoruppa"
@@ -978,6 +859,7 @@ private fun contributorSupportLink(login: String): String? = when (login.lowerca
     else -> null
 }
 
+@Composable
 private fun formatDonationDate(rawDate: String): String {
     val datePart = rawDate.substringBefore('T')
     val parts = datePart.split('-')
@@ -985,10 +867,20 @@ private fun formatDonationDate(rawDate: String): String {
     val year = parts[0]
     val month = parts[1].toIntOrNull()?.let { monthIndex ->
         listOf(
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            stringResource(Res.string.community_month_jan),
+            stringResource(Res.string.community_month_feb),
+            stringResource(Res.string.community_month_mar),
+            stringResource(Res.string.community_month_apr),
+            stringResource(Res.string.community_month_may),
+            stringResource(Res.string.community_month_jun),
+            stringResource(Res.string.community_month_jul),
+            stringResource(Res.string.community_month_aug),
+            stringResource(Res.string.community_month_sep),
+            stringResource(Res.string.community_month_oct),
+            stringResource(Res.string.community_month_nov),
+            stringResource(Res.string.community_month_dec),
         ).getOrNull(monthIndex - 1)
     } ?: return rawDate
     val day = parts[2].toIntOrNull()?.toString() ?: return rawDate
-    return "$month $day, $year"
+    return stringResource(Res.string.community_date_format, month, day, year)
 }

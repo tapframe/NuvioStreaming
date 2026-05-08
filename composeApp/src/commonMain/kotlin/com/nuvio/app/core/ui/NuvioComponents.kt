@@ -65,6 +65,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_back
+import nuvio.composeapp.generated.resources.action_ok
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -141,7 +145,7 @@ fun NuvioScreenHeader(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(Res.string.action_back),
                         tint = MaterialTheme.colorScheme.onBackground,
                     )
                 }
@@ -233,7 +237,7 @@ fun NuvioBackButton(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     buttonSize: Dp = 40.dp,
     iconSize: Dp = 22.dp,
-    contentDescription: String = "Back",
+    contentDescription: String = stringResource(Res.string.action_back),
 ) {
     Box(
         modifier = modifier
@@ -375,7 +379,7 @@ fun NuvioStatusModal(
     modifier: Modifier = Modifier,
     isVisible: Boolean,
     isBusy: Boolean = false,
-    confirmText: String = "OK",
+    confirmText: String = stringResource(Res.string.action_ok),
     dismissText: String? = null,
     onConfirm: () -> Unit,
     onDismiss: (() -> Unit)? = null,

@@ -33,6 +33,32 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleUiState
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_reset
+import nuvio.composeapp.generated.resources.settings_poster_card_radius
+import nuvio.composeapp.generated.resources.settings_poster_card_style
+import nuvio.composeapp.generated.resources.settings_poster_card_width
+import nuvio.composeapp.generated.resources.settings_poster_custom
+import nuvio.composeapp.generated.resources.settings_poster_description
+import nuvio.composeapp.generated.resources.settings_poster_hide_labels
+import nuvio.composeapp.generated.resources.settings_poster_landscape_mode
+import nuvio.composeapp.generated.resources.settings_poster_live_preview
+import nuvio.composeapp.generated.resources.settings_poster_option_with_value
+import nuvio.composeapp.generated.resources.settings_poster_preview_corner_radius
+import nuvio.composeapp.generated.resources.settings_poster_preview_height
+import nuvio.composeapp.generated.resources.settings_poster_preview_width
+import nuvio.composeapp.generated.resources.settings_poster_radius_classic
+import nuvio.composeapp.generated.resources.settings_poster_radius_pill
+import nuvio.composeapp.generated.resources.settings_poster_radius_rounded
+import nuvio.composeapp.generated.resources.settings_poster_radius_sharp
+import nuvio.composeapp.generated.resources.settings_poster_radius_subtle
+import nuvio.composeapp.generated.resources.settings_poster_width_balanced
+import nuvio.composeapp.generated.resources.settings_poster_width_comfort
+import nuvio.composeapp.generated.resources.settings_poster_width_compact
+import nuvio.composeapp.generated.resources.settings_poster_width_dense
+import nuvio.composeapp.generated.resources.settings_poster_width_large
+import nuvio.composeapp.generated.resources.settings_poster_width_standard
+import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.posterCustomizationSettingsContent(
     isTablet: Boolean,
@@ -40,11 +66,11 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
 ) {
     item {
         SettingsSection(
-            title = "POSTER CARD STYLE",
+            title = stringResource(Res.string.settings_poster_card_style),
             isTablet = isTablet,
             actions = {
                 NuvioActionLabel(
-                    text = "Reset",
+                    text = stringResource(Res.string.action_reset),
                     onClick = PosterCardStyleRepository::resetToDefaults,
                 )
             },
@@ -80,19 +106,19 @@ private fun PosterCardStyleControls(
     onHideLabelsChange: (Boolean) -> Unit,
 ) {
     val widthOptions = listOf(
-        PresetOption("Compact", 104),
-        PresetOption("Dense", 112),
-        PresetOption("Standard", 120),
-        PresetOption("Balanced", 126),
-        PresetOption("Comfort", 134),
-        PresetOption("Large", 140),
+        PresetOption(stringResource(Res.string.settings_poster_width_compact), 104),
+        PresetOption(stringResource(Res.string.settings_poster_width_dense), 112),
+        PresetOption(stringResource(Res.string.settings_poster_width_standard), 120),
+        PresetOption(stringResource(Res.string.settings_poster_width_balanced), 126),
+        PresetOption(stringResource(Res.string.settings_poster_width_comfort), 134),
+        PresetOption(stringResource(Res.string.settings_poster_width_large), 140),
     )
     val radiusOptions = listOf(
-        PresetOption("Sharp", 0),
-        PresetOption("Subtle", 4),
-        PresetOption("Classic", 8),
-        PresetOption("Rounded", 12),
-        PresetOption("Pill", 16),
+        PresetOption(stringResource(Res.string.settings_poster_radius_sharp), 0),
+        PresetOption(stringResource(Res.string.settings_poster_radius_subtle), 4),
+        PresetOption(stringResource(Res.string.settings_poster_radius_classic), 8),
+        PresetOption(stringResource(Res.string.settings_poster_radius_rounded), 12),
+        PresetOption(stringResource(Res.string.settings_poster_radius_pill), 16),
     )
 
     Column(
@@ -102,7 +128,7 @@ private fun PosterCardStyleControls(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text(
-            text = "Customize card width and corner radius for shared poster cards across the app.",
+            text = stringResource(Res.string.settings_poster_description),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -111,13 +137,13 @@ private fun PosterCardStyleControls(
             cornerRadiusDp = cornerRadiusDp,
         )
         PosterStyleOptionRow(
-            title = "Card Width",
+            title = stringResource(Res.string.settings_poster_card_width),
             selectedValue = widthDp,
             options = widthOptions,
             onSelected = onWidthSelected,
         )
         PosterStyleOptionRow(
-            title = "Card Radius",
+            title = stringResource(Res.string.settings_poster_card_radius),
             selectedValue = cornerRadiusDp,
             options = radiusOptions,
             onSelected = onCornerRadiusSelected,
@@ -127,7 +153,7 @@ private fun PosterCardStyleControls(
             onCheckedChange = onCatalogLandscapeModeChange,
         )
         PosterToggleRow(
-            title = "Hide labels",
+            title = stringResource(Res.string.settings_poster_hide_labels),
             checked = hideLabelsEnabled,
             onCheckedChange = onHideLabelsChange,
         )
@@ -140,7 +166,7 @@ private fun PosterLandscapeModeToggleRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     PosterToggleRow(
-        title = "Landscape mode for shelf posters",
+        title = stringResource(Res.string.settings_poster_landscape_mode),
         checked = checked,
         onCheckedChange = onCheckedChange,
     )
@@ -205,7 +231,7 @@ private fun PosterCardLivePreview(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "Live Preview",
+            text = stringResource(Res.string.settings_poster_live_preview),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
@@ -239,17 +265,17 @@ private fun PosterCardLivePreview(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = "Width: ${widthDp}dp",
+                    text = stringResource(Res.string.settings_poster_preview_width, widthDp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Corner radius: ${cornerRadiusDp}dp",
+                    text = stringResource(Res.string.settings_poster_preview_corner_radius, cornerRadiusDp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Height: ${targetHeightDp}dp",
+                    text = stringResource(Res.string.settings_poster_preview_height, targetHeightDp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -273,13 +299,14 @@ private fun PosterStyleOptionRow(
     options: List<PresetOption>,
     onSelected: (Int) -> Unit,
 ) {
-    val selectedLabel = options.firstOrNull { it.value == selectedValue }?.label ?: "Custom"
+    val selectedLabel = options.firstOrNull { it.value == selectedValue }?.label
+        ?: stringResource(Res.string.settings_poster_custom)
 
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = "$title ($selectedLabel)",
+            text = stringResource(Res.string.settings_poster_option_with_value, title, selectedLabel),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,

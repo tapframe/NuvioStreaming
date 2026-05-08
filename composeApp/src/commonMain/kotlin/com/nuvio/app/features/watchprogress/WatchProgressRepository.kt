@@ -7,6 +7,8 @@ import com.nuvio.app.features.player.PlayerPlaybackSnapshot
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktProgressRepository
+import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.trakt.shouldUseTraktProgress as shouldUseTraktProgressSource
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.sync.ProgressSyncAdapter
 import com.nuvio.app.features.watching.sync.SupabaseProgressSyncAdapter
@@ -37,7 +39,11 @@ object WatchProgressRepository {
     init {
         syncScope.launch {
             TraktAuthRepository.isAuthenticated.collectLatest { authenticated ->
-                if (authenticated) {
+                if (shouldUseTraktProgressSource(
+                        isAuthenticated = authenticated,
+                        source = TraktSettingsRepository.uiState.value.watchProgressSource,
+                    )
+                ) {
                     runCatching { TraktProgressRepository.refreshNow() }
                         .onFailure { error -> log.w { "Failed to refresh Trakt progress after auth: ${error.message}" } }
                 }
@@ -46,8 +52,22 @@ object WatchProgressRepository {
         }
 
         syncScope.launch {
+            TraktSettingsRepository.uiState.collectLatest { settings ->
+                if (shouldUseTraktProgressSource(
+                        isAuthenticated = TraktAuthRepository.isAuthenticated.value,
+                        source = settings.watchProgressSource,
+                    )
+                ) {
+                    runCatching { TraktProgressRepository.refreshNow() }
+                        .onFailure { error -> log.w { "Failed to refresh Trakt progress after source change: ${error.message}" } }
+                }
+                publish()
+            }
+        }
+
+        syncScope.launch {
             TraktProgressRepository.uiState.collectLatest {
-                if (TraktAuthRepository.isAuthenticated.value) {
+                if (shouldUseTraktProgress()) {
                     publish()
                 }
             }
@@ -56,19 +76,21 @@ object WatchProgressRepository {
 
     fun ensureLoaded() {
         TraktAuthRepository.ensureLoaded()
+        TraktSettingsRepository.ensureLoaded()
         TraktProgressRepository.ensureLoaded()
         if (hasLoaded) return
         loadFromDisk(ProfileRepository.activeProfileId)
-        if (TraktAuthRepository.isAuthenticated.value) {
+        if (shouldUseTraktProgress()) {
             TraktProgressRepository.refreshAsync()
         }
     }
 
     fun onProfileChanged(profileId: Int) {
         if (profileId == currentProfileId && hasLoaded) return
+        TraktSettingsRepository.onProfileChanged()
         loadFromDisk(profileId)
         TraktProgressRepository.onProfileChanged()
-        if (TraktAuthRepository.isAuthenticated.value) {
+        if (shouldUseTraktProgress()) {
             TraktProgressRepository.refreshAsync()
         }
     }
@@ -79,6 +101,7 @@ object WatchProgressRepository {
         currentProfileId = 1
         entriesByVideoId.clear()
         TraktProgressRepository.clearLocalState()
+        TraktSettingsRepository.clearLocalState()
         _uiState.value = WatchProgressUiState()
     }
 
@@ -98,9 +121,14 @@ object WatchProgressRepository {
     }
 
     suspend fun pullFromServer(profileId: Int) {
+        TraktAuthRepository.ensureLoaded()
+        TraktSettingsRepository.ensureLoaded()
+        TraktProgressRepository.ensureLoaded()
         currentProfileId = profileId
 
-        if (TraktAuthRepository.isAuthenticated.value) {
+        val useTraktProgress = shouldUseTraktProgress()
+
+        if (useTraktProgress) {
             runCatching { TraktProgressRepository.refreshNow() }
                 .onFailure { e -> log.e(e) { "Failed to pull Trakt progress" } }
             publish()
@@ -138,7 +166,7 @@ object WatchProgressRepository {
                     lastStreamSubtitle = cached?.lastStreamSubtitle,
                     pauseDescription = cached?.pauseDescription,
                     lastSourceUrl = cached?.lastSourceUrl,
-                    isCompleted = entry.duration > 0 && entry.position >= entry.duration,
+                    isCompleted = isWatchProgressComplete(entry.position, entry.duration, false),
                 )
             }
 
@@ -368,7 +396,6 @@ object WatchProgressRepository {
     }
 
     private fun pushScrobbleToServer(entry: WatchProgressEntry) {
-        if (shouldUseTraktProgress()) return
         syncScope.launch {
             runCatching {
                 val profileId = ProfileRepository.activeProfileId
@@ -394,8 +421,9 @@ object WatchProgressRepository {
 
     private fun publish() {
         val entries = currentEntries()
+        val sortedEntries = entries.sortedByDescending { it.lastUpdatedEpochMs }
         _uiState.value = WatchProgressUiState(
-            entries = entries.sortedByDescending { it.lastUpdatedEpochMs },
+            entries = sortedEntries,
         )
     }
 
@@ -406,7 +434,11 @@ object WatchProgressRepository {
         )
     }
 
-    private fun shouldUseTraktProgress(): Boolean = TraktAuthRepository.isAuthenticated.value
+    private fun shouldUseTraktProgress(): Boolean =
+        shouldUseTraktProgressSource(
+            isAuthenticated = TraktAuthRepository.isAuthenticated.value,
+            source = TraktSettingsRepository.uiState.value.watchProgressSource,
+        )
 
     private fun currentEntries(): List<WatchProgressEntry> {
         return if (shouldUseTraktProgress()) {

@@ -137,12 +137,22 @@ struct TrackInfo {
     let selected: Bool
 }
 
+private struct PendingLoadRequest {
+    let urlString: String
+    let audioUrl: String?
+    let requestHeaders: [String: String]
+    let queuedAtUptime: TimeInterval
+}
+
 // MARK: - MPV Player View Controller
 
 final class MPVPlayerViewController: UIViewController {
 
     private let errorStateLock = NSLock()
     private var metalLayer = MetalLayer()
+    private var lastAppliedDrawableSize: CGSize = .zero
+    private var pendingLoadRequest: PendingLoadRequest?
+    private var pendingLoadRetryWorkItem: DispatchWorkItem?
     private var mpv: OpaquePointer?
     private lazy var eventQueue = DispatchQueue(label: "mpv-events", qos: .userInitiated)
     private var recentPlaybackLogs: [String] = []
@@ -188,12 +198,14 @@ final class MPVPlayerViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        view.layer.masksToBounds = true
 
-        metalLayer.frame = view.bounds
-        metalLayer.contentsScale = UIScreen.main.nativeScale
+        metalLayer.contentsGravity = .resize
+        metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
         metalLayer.framebufferOnly = true
         metalLayer.backgroundColor = UIColor.black.cgColor
         view.layer.addSublayer(metalLayer)
+        layoutMetalLayer()
 
         setupMpv()
         setupNotifications()
@@ -207,17 +219,42 @@ final class MPVPlayerViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        metalLayer.frame = view.bounds
+        layoutMetalLayer()
+        attemptStartPendingLoad()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         refreshImmersiveSystemUI()
+        attemptStartPendingLoad()
     }
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
+        layoutMetalLayer()
         refreshImmersiveSystemUI()
+        attemptStartPendingLoad()
+    }
+
+    private func layoutMetalLayer() {
+        let bounds = view.bounds
+        guard bounds.width > 1, bounds.height > 1 else { return }
+
+        let scale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
+        let drawableSize = CGSize(
+            width: (bounds.width * scale).rounded(.toNearestOrAwayFromZero),
+            height: (bounds.height * scale).rounded(.toNearestOrAwayFromZero)
+        )
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        metalLayer.contentsScale = scale
+        metalLayer.frame = CGRect(origin: .zero, size: bounds.size)
+        if drawableSize != lastAppliedDrawableSize {
+            metalLayer.drawableSize = drawableSize
+            lastAppliedDrawableSize = drawableSize
+        }
+        CATransaction.commit()
     }
 
     // MARK: - MPV Setup
@@ -287,19 +324,78 @@ final class MPVPlayerViewController: UIViewController {
     // MARK: - Playback API
 
     func loadFile(_ urlString: String, audioUrl: String? = nil, requestHeaders: [String: String] = [:]) {
+        let request = PendingLoadRequest(
+            urlString: urlString,
+            audioUrl: audioUrl,
+            requestHeaders: requestHeaders,
+            queuedAtUptime: ProcessInfo.processInfo.systemUptime
+        )
+
+        if Thread.isMainThread {
+            queueLoad(request)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.queueLoad(request)
+            }
+        }
+    }
+
+    private func queueLoad(_ request: PendingLoadRequest) {
+        pendingLoadRequest = request
+        attemptStartPendingLoad()
+    }
+
+    private func attemptStartPendingLoad() {
+        guard let request = pendingLoadRequest else { return }
         guard mpv != nil else { return }
+        layoutMetalLayer()
+        guard isViewportReadyForPlayback(queuedAtUptime: request.queuedAtUptime) else {
+            schedulePendingLoadRetry()
+            return
+        }
+
+        pendingLoadRequest = nil
+        pendingLoadRetryWorkItem?.cancel()
+        pendingLoadRetryWorkItem = nil
+        startLoad(request)
+    }
+
+    private func startLoad(_ request: PendingLoadRequest) {
+        guard mpv != nil else { return }
+        layoutMetalLayer()
         clearPlaybackError()
-        let sanitizedHeaders = sanitizeRequestHeaders(requestHeaders)
+        let sanitizedHeaders = sanitizeRequestHeaders(request.requestHeaders)
         activeRequestHeaders = sanitizedHeaders
         applyRequestHeaders(sanitizedHeaders)
         isPlayerLoading = true
         isPlayerEnded = false
-        command("loadfile", args: [urlString, "replace"])
-        if let audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        command("loadfile", args: [request.urlString, "replace"])
+        if let audioUrl = request.audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 self?.command("audio-add", args: [audioUrl, "select"], checkForErrors: false)
             }
         }
+    }
+
+    private func isViewportReadyForPlayback(queuedAtUptime: TimeInterval) -> Bool {
+        guard isViewLoaded, view.window != nil else { return false }
+        let bounds = view.bounds
+        guard bounds.width > 1, bounds.height > 1 else { return false }
+        if bounds.width >= bounds.height { return true }
+
+        let age = ProcessInfo.processInfo.systemUptime - queuedAtUptime
+        return age >= 0.9
+    }
+
+    private func schedulePendingLoadRetry() {
+        guard pendingLoadRetryWorkItem == nil else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.pendingLoadRetryWorkItem = nil
+            self?.attemptStartPendingLoad()
+        }
+        pendingLoadRetryWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: workItem)
     }
 
     func playPlayback() {
@@ -350,8 +446,8 @@ final class MPVPlayerViewController: UIViewController {
             checkError(mpv_set_option_string(mpv, "panscan", "1.0"))
             checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
         case 2: // Zoom
-            checkError(mpv_set_option_string(mpv, "panscan", "0.0"))
-            checkError(mpv_set_option_string(mpv, "video-unscaled", "downscale-big"))
+            checkError(mpv_set_option_string(mpv, "panscan", "1.0"))
+            checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
         default: // Fit
             checkError(mpv_set_option_string(mpv, "panscan", "0.0"))
             checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
@@ -432,6 +528,9 @@ final class MPVPlayerViewController: UIViewController {
 
     func destroyPlayer() {
         NotificationCenter.default.removeObserver(self)
+        pendingLoadRetryWorkItem?.cancel()
+        pendingLoadRetryWorkItem = nil
+        pendingLoadRequest = nil
         clearPlaybackError()
         guard let ctx = mpv else { return }
         mpv = nil  // nil first so event loop stops reading
@@ -480,20 +579,126 @@ final class MPVPlayerViewController: UIViewController {
         for i in 0..<count {
             let type = getString("track-list/\(i)/type") ?? ""
             let id = getInt("track-list/\(i)/id")
-            let title = getString("track-list/\(i)/title") ?? ""
-            let lang = getString("track-list/\(i)/lang") ?? ""
+            let title = getTrackString(i, "title")
+            let lang = getTrackString(i, "lang")
+            let codec = getTrackString(i, "codec")
+            let decoderDescription = getTrackString(i, "decoder-desc")
+            let channels = getTrackString(i, "demux-channels")
+            let channelCount = getInt("track-list/\(i)/demux-channel-count")
             let selected = getFlag("track-list/\(i)/selected")
+            let displayTitle = formatTrackTitle(
+                type: type,
+                index: type == "audio" ? audioIdx : subIdx,
+                title: title,
+                lang: lang,
+                codec: codec,
+                decoderDescription: decoderDescription,
+                channels: channels,
+                channelCount: channelCount
+            )
 
             if type == "audio" {
-                audio.append(TrackInfo(index: audioIdx, id: id, type: type, title: title, lang: lang, selected: selected))
+                audio.append(TrackInfo(index: audioIdx, id: id, type: type, title: displayTitle, lang: lang, selected: selected))
                 audioIdx += 1
             } else if type == "sub" {
-                subs.append(TrackInfo(index: subIdx, id: id, type: type, title: title, lang: lang, selected: selected))
+                subs.append(TrackInfo(index: subIdx, id: id, type: type, title: displayTitle, lang: lang, selected: selected))
                 subIdx += 1
             }
         }
         audioTracks = audio
         subtitleTracks = subs
+    }
+
+    private func getTrackString(_ index: Int, _ field: String) -> String {
+        (getString("track-list/\(index)/\(field)") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func formatTrackTitle(
+        type: String,
+        index: Int,
+        title: String,
+        lang: String,
+        codec: String,
+        decoderDescription: String,
+        channels: String,
+        channelCount: Int
+    ) -> String {
+        let base = ifNotBlank(title)
+            ?? localizedLanguageName(lang)
+            ?? (type == "sub" ? "Subtitle \(index + 1)" : "Track \(index + 1)")
+        let codecName = codecDisplayName(codec) ?? codecDisplayName(decoderDescription)
+        let channelName = type == "audio" ? channelLayoutName(channels: channels, channelCount: channelCount) : nil
+        let details = [channelName, codecName]
+            .compactMap { $0 }
+            .filter { detail in !base.localizedCaseInsensitiveContains(detail) }
+        return details.isEmpty ? base : "\(base) (\(details.joined(separator: ", ")))"
+    }
+
+    private func ifNotBlank(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func localizedLanguageName(_ languageCode: String) -> String? {
+        guard let code = ifNotBlank(languageCode) else { return nil }
+        return Locale.current.localizedString(forLanguageCode: code) ?? code
+    }
+
+    private func channelLayoutName(channels: String, channelCount: Int) -> String? {
+        if let normalized = ifNotBlank(channels), normalized != "unknown" {
+            let lower = normalized.lowercased()
+            if lower == "mono" { return "Mono" }
+            if lower == "stereo" { return "Stereo" }
+            return normalized
+        }
+        switch channelCount {
+        case 1:
+            return "Mono"
+        case 2:
+            return "Stereo"
+        case 6:
+            return "5.1"
+        case 8:
+            return "7.1"
+        case let count where count > 0:
+            return "\(count)ch"
+        default:
+            return nil
+        }
+    }
+
+    private func codecDisplayName(_ value: String) -> String? {
+        guard let raw = ifNotBlank(value) else { return nil }
+        let codec = raw.lowercased()
+        if codec.contains("eac3") || codec.contains("e-ac-3") || codec.contains("e ac-3") {
+            return codec.contains("joc") || codec.contains("atmos") ? "E-AC-3-JOC" : "E-AC-3"
+        }
+        if codec.contains("truehd") || codec.contains("true hd") { return "TrueHD" }
+        if codec.contains("ac3") || codec.contains("ac-3") { return "AC-3" }
+        if codec.contains("dts-hd") || codec.contains("dtshd") || codec.contains("dts hd") { return "DTS-HD" }
+        if codec.contains("dts") || codec == "dca" { return "DTS" }
+        if codec.contains("aac") { return "AAC" }
+        if codec.contains("mp3") || codec.contains("mpeg audio") { return "MP3" }
+        if codec.contains("mp2") { return "MP2" }
+        if codec.contains("opus") { return "Opus" }
+        if codec.contains("vorbis") { return "Vorbis" }
+        if codec.contains("flac") { return "FLAC" }
+        if codec.contains("alac") { return "ALAC" }
+        if codec.contains("pcm") || codec.contains("wav") { return "WAV" }
+        if codec.contains("amr_wb") || codec.contains("amr-wb") { return "AMR-WB" }
+        if codec.contains("amr_nb") || codec.contains("amr-nb") { return "AMR-NB" }
+        if codec.contains("amr") { return "AMR" }
+        if codec.contains("iamf") { return "IAMF" }
+        if codec.contains("mpegh") || codec.contains("mpeg-h") { return "MPEG-H" }
+        if codec.contains("pgs") || codec.contains("hdmv") { return "PGS" }
+        if codec.contains("subrip") || codec == "srt" { return "SRT" }
+        if codec.contains("ass") || codec.contains("ssa") { return "SSA" }
+        if codec.contains("webvtt") || codec == "vtt" { return "VTT" }
+        if codec.contains("ttml") { return "TTML" }
+        if codec.contains("mov_text") || codec.contains("tx3g") { return "TX3G" }
+        if codec.contains("dvb") { return "DVB" }
+        return raw
     }
 
     private func clearPlaybackError() {

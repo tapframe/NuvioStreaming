@@ -9,6 +9,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_player_resize_fill
+import nuvio.composeapp.generated.resources.compose_player_resize_fit
+import nuvio.composeapp.generated.resources.compose_player_resize_zoom
+import org.jetbrains.compose.resources.StringResource
 import kotlin.math.max
 
 internal data class PlayerLayoutMetrics(
@@ -124,11 +129,11 @@ internal fun PlayerResizeMode.next(): PlayerResizeMode =
         PlayerResizeMode.Zoom -> PlayerResizeMode.Fit
     }
 
-internal val PlayerResizeMode.label: String
+internal val PlayerResizeMode.labelRes: StringResource
     get() = when (this) {
-        PlayerResizeMode.Fit -> "Fit"
-        PlayerResizeMode.Fill -> "Fill"
-        PlayerResizeMode.Zoom -> "Zoom"
+        PlayerResizeMode.Fit -> Res.string.compose_player_resize_fit
+        PlayerResizeMode.Fill -> Res.string.compose_player_resize_fill
+        PlayerResizeMode.Zoom -> Res.string.compose_player_resize_zoom
     }
 
 internal fun formatPlaybackTime(positionMs: Long): String {

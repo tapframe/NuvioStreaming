@@ -55,6 +55,8 @@ import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -76,6 +78,7 @@ fun ProfileEditScreen(
 
     var name by rememberSaveable { mutableStateOf(currentProfile?.name ?: "") }
     var selectedAvatarId by rememberSaveable { mutableStateOf(currentProfile?.avatarId) }
+    var avatarUrl by rememberSaveable { mutableStateOf(currentProfile?.avatarUrl.orEmpty()) }
     var usesPrimaryAddons by rememberSaveable { mutableStateOf(currentProfile?.usesPrimaryAddons ?: false) }
     var isSaving by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -88,23 +91,30 @@ fun ProfileEditScreen(
         AvatarRepository.fetchAvatars()
         AvatarRepository.refreshAvatars()
     }
-    LaunchedEffect(isNew, avatars, selectedAvatarId) {
-        if (isNew && selectedAvatarId == null && avatars.isNotEmpty()) {
+    LaunchedEffect(isNew, avatars, selectedAvatarId, avatarUrl) {
+        if (isNew && avatarUrl.isBlank() && selectedAvatarId == null && avatars.isNotEmpty()) {
             selectedAvatarId = avatars.first().id
         }
     }
 
+    val customAvatarUrl = remember(avatarUrl) { normalizedAvatarUrl(avatarUrl) }
+    val avatarUrlIsInvalid = avatarUrl.isNotBlank() && customAvatarUrl == null
     val selectedAvatarItem = remember(selectedAvatarId, avatars) {
         selectedAvatarId?.let { id -> avatars.find { it.id == id } }
     }
-    val previewAccent = remember(selectedAvatarItem, fallbackColorHex) {
-        parseHexColor(selectedAvatarItem?.bgColor ?: fallbackColorHex)
+    val visibleAvatarItem = if (customAvatarUrl == null) selectedAvatarItem else null
+    val previewAccent = remember(visibleAvatarItem, fallbackColorHex) {
+        parseHexColor(visibleAvatarItem?.bgColor ?: fallbackColorHex)
     }
 
     NuvioScreen(modifier = modifier) {
         stickyHeader {
             NuvioScreenHeader(
-                title = if (isNew) "Add Profile" else "Edit Profile",
+                title = if (isNew) {
+                    stringResource(Res.string.profile_edit_add_title)
+                } else {
+                    stringResource(Res.string.profile_edit_edit_title)
+                },
                 onBack = onBack,
             )
         }
@@ -117,7 +127,8 @@ fun ProfileEditScreen(
                 usesPrimaryAddons = usesPrimaryAddons,
                 onNameChange = { name = it },
                 onUsesPrimaryAddonsChange = { usesPrimaryAddons = it },
-                selectedAvatar = selectedAvatarItem,
+                selectedAvatar = visibleAvatarItem,
+                customAvatarUrl = customAvatarUrl,
                 accentColor = previewAccent,
                 hasAvatarChoices = avatars.isNotEmpty(),
             )
@@ -125,15 +136,53 @@ fun ProfileEditScreen(
 
         item {
             NuvioSurfaceCard {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = stringResource(Res.string.profile_custom_avatar_url),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(Res.string.profile_custom_avatar_url_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    NuvioInputField(
+                        value = avatarUrl,
+                        onValueChange = { value ->
+                            avatarUrl = value
+                            if (value.isNotBlank()) {
+                                selectedAvatarId = null
+                            }
+                        },
+                        placeholder = stringResource(Res.string.profile_custom_avatar_url_placeholder),
+                    )
+                    if (avatarUrlIsInvalid) {
+                        Text(
+                            text = stringResource(Res.string.profile_avatar_url_invalid),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            NuvioSurfaceCard {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text(
-                        text = "Choose an avatar",
+                        text = stringResource(Res.string.profile_choose_avatar),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = selectedAvatarItem?.displayName
-                            ?: if (avatars.isEmpty()) "Loading avatars..." else "Select an avatar for this profile.",
+                            ?: if (avatars.isEmpty()) {
+                                stringResource(Res.string.profile_loading_avatars)
+                            } else {
+                                stringResource(Res.string.profile_select_avatar)
+                            },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -155,8 +204,11 @@ fun ProfileEditScreen(
                                     AvatarChoiceItem(
                                         avatar = avatar,
                                         size = avatarSize,
-                                        isSelected = avatar.id == selectedAvatarId,
-                                        onClick = { selectedAvatarId = avatar.id },
+                                        isSelected = customAvatarUrl == null && avatar.id == selectedAvatarId,
+                                        onClick = {
+                                            avatarUrl = ""
+                                            selectedAvatarId = avatar.id
+                                        },
                                     )
                                 }
                             }
@@ -171,27 +223,27 @@ fun ProfileEditScreen(
                 NuvioSurfaceCard {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(
-                            text = "Security",
+                            text = stringResource(Res.string.profile_security),
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
                             text = if (currentProfile?.pinEnabled == true) {
-                                "This profile is protected with a PIN."
+                                stringResource(Res.string.profile_security_pin_enabled)
                             } else {
-                                "Add a PIN if you want this profile locked before switching into it."
+                                stringResource(Res.string.profile_security_pin_disabled)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (currentProfile?.pinEnabled == true) {
                             NuvioPrimaryButton(
-                                text = "Remove PIN Lock",
+                                text = stringResource(Res.string.profile_remove_pin_lock),
                                 onClick = { showPinClear = true },
                             )
                         } else {
                             NuvioPrimaryButton(
-                                text = "Set PIN Lock",
+                                text = stringResource(Res.string.profile_set_pin_lock),
                                 onClick = { showPinSetup = true },
                             )
                         }
@@ -203,17 +255,24 @@ fun ProfileEditScreen(
         item {
             Spacer(modifier = Modifier.height(8.dp))
             NuvioPrimaryButton(
-                text = if (isSaving) "Saving..." else if (isNew) "Create Profile" else "Save Changes",
-                enabled = name.isNotBlank() && !isSaving,
+                text = if (isSaving) {
+                    stringResource(Res.string.profile_saving)
+                } else if (isNew) {
+                    stringResource(Res.string.profile_create_profile)
+                } else {
+                    stringResource(Res.string.collections_editor_save_changes)
+                },
+                enabled = name.isNotBlank() && !avatarUrlIsInvalid && !isSaving,
                 onClick = {
                     isSaving = true
                     scope.launch {
-                        val avatarColorHex = selectedAvatarItem?.bgColor ?: fallbackColorHex
+                        val avatarColorHex = visibleAvatarItem?.bgColor ?: fallbackColorHex
                         if (isNew) {
                             ProfileRepository.createProfile(
                                 name = name,
                                 avatarColorHex = avatarColorHex,
-                                avatarId = selectedAvatarId,
+                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                avatarUrl = customAvatarUrl,
                                 usesPrimaryAddons = usesPrimaryAddons,
                             )
                         } else {
@@ -221,7 +280,8 @@ fun ProfileEditScreen(
                                 profileIndex = currentProfile!!.profileIndex,
                                 name = name,
                                 avatarColorHex = avatarColorHex,
-                                avatarId = selectedAvatarId,
+                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                avatarUrl = customAvatarUrl,
                                 usesPrimaryAddons = usesPrimaryAddons,
                             )
                         }
@@ -247,7 +307,7 @@ fun ProfileEditScreen(
                     ),
                 ) {
                     Text(
-                        text = "Delete Profile",
+                        text = stringResource(Res.string.profile_delete_title),
                         style = MaterialTheme.typography.titleMedium,
                         textAlign = TextAlign.Center,
                     )
@@ -257,11 +317,14 @@ fun ProfileEditScreen(
     }
 
     NuvioStatusModal(
-        title = "Delete Profile?",
-        message = "All data for \"${currentProfile?.name}\" will be permanently deleted.",
+        title = stringResource(Res.string.profile_delete_title),
+        message = stringResource(
+            Res.string.profile_delete_confirm_message,
+            currentProfile?.name.orEmpty(),
+        ),
         isVisible = showDeleteConfirm,
-        confirmText = "Delete",
-        dismissText = "Cancel",
+        confirmText = stringResource(Res.string.action_delete),
+        dismissText = stringResource(Res.string.action_cancel),
         onConfirm = {
             showDeleteConfirm = false
             scope.launch {
@@ -290,7 +353,7 @@ fun ProfileEditScreen(
 
     if (showPinClear && currentProfile != null) {
         PinEntryDialog(
-            profileName = "Remove PIN for ${currentProfile.name}",
+            profileName = stringResource(Res.string.profile_remove_pin_for, currentProfile.name),
             onVerify = { pin -> ProfileRepository.clearPin(currentProfile.profileIndex, pin) },
             onVerified = {
                 showPinClear = false
@@ -311,6 +374,7 @@ private fun ProfileIdentityCard(
     onNameChange: (String) -> Unit,
     onUsesPrimaryAddonsChange: (Boolean) -> Unit,
     selectedAvatar: AvatarCatalogItem?,
+    customAvatarUrl: String?,
     accentColor: Color,
     hasAvatarChoices: Boolean,
 ) {
@@ -326,16 +390,31 @@ private fun ProfileIdentityCard(
                         .size(88.dp)
                         .clip(CircleShape)
                         .background(
-                            if (selectedAvatar != null) accentColor else accentColor.copy(alpha = 0.18f),
+                            if (selectedAvatar != null || customAvatarUrl != null) {
+                                accentColor
+                            } else {
+                                accentColor.copy(alpha = 0.18f)
+                            },
                         )
                         .border(
                             width = 2.dp,
-                            color = if (selectedAvatar == null) accentColor.copy(alpha = 0.35f) else Color.Transparent,
+                            color = if (selectedAvatar == null && customAvatarUrl == null) {
+                                accentColor.copy(alpha = 0.35f)
+                            } else {
+                                Color.Transparent
+                            },
                             shape = CircleShape,
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (selectedAvatar != null) {
+                    if (customAvatarUrl != null) {
+                        AsyncImage(
+                            model = customAvatarUrl,
+                            contentDescription = name,
+                            modifier = Modifier.size(88.dp).clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else if (selectedAvatar != null) {
                         AsyncImage(
                             model = avatarStorageUrl(selectedAvatar.storagePath),
                             contentDescription = selectedAvatar.displayName,
@@ -364,24 +443,40 @@ private fun ProfileIdentityCard(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = name.ifBlank { if (isNew) "New profile" else "Unnamed profile" },
+                        text = name.ifBlank {
+                            if (isNew) stringResource(Res.string.profile_new)
+                            else stringResource(Res.string.profile_unnamed)
+                        },
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
                         text = listOf(
-                            if (isNew) "New profile" else (profileIndex?.let { "Profile $it" } ?: "Profile"),
-                            if (usesPrimaryAddons) "Primary addons on" else "Primary addons off",
+                            if (isNew) {
+                                stringResource(Res.string.profile_new)
+                            } else {
+                                profileIndex?.let { stringResource(Res.string.profile_label_number, it) }
+                                    ?: stringResource(Res.string.profile_unnamed)
+                            },
+                            if (usesPrimaryAddons) {
+                                stringResource(Res.string.profile_primary_addons_on)
+                            } else {
+                                stringResource(Res.string.profile_primary_addons_off)
+                            },
                         ).joinToString("  |  "),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = when {
-                            selectedAvatar != null -> "Avatar: ${selectedAvatar.displayName}"
-                            hasAvatarChoices -> "Choose an avatar below."
-                            else -> "Avatar options will appear here when the catalog loads."
+                            customAvatarUrl != null -> stringResource(Res.string.profile_custom_avatar_selected)
+                            selectedAvatar != null -> stringResource(
+                                Res.string.profile_avatar_selected,
+                                selectedAvatar.displayName,
+                            )
+                            hasAvatarChoices -> stringResource(Res.string.profile_choose_avatar_below)
+                            else -> stringResource(Res.string.profile_avatar_options_pending)
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -392,12 +487,12 @@ private fun ProfileIdentityCard(
             NuvioInputField(
                 value = name,
                 onValueChange = onNameChange,
-                placeholder = "Profile name",
+                placeholder = stringResource(Res.string.profile_name_placeholder),
             )
 
             ProfileOptionRow(
-                title = "Use Primary Addons",
-                description = "Share the main profile's addon setup instead of managing a separate list.",
+                title = stringResource(Res.string.profile_use_primary_addons),
+                description = stringResource(Res.string.profile_use_primary_addons_description),
                 checked = usesPrimaryAddons,
                 onCheckedChange = onUsesPrimaryAddonsChange,
             )
@@ -510,7 +605,7 @@ fun PinSetupDialog(
 
     when (step) {
         "current" -> PinEntryDialog(
-            profileName = "Enter current PIN",
+            profileName = stringResource(Res.string.profile_enter_current_pin),
             onVerify = { pin -> ProfileRepository.verifyPin(profileIndex, pin) },
             onVerified = { pin ->
                 currentPin = pin
@@ -520,7 +615,7 @@ fun PinSetupDialog(
         )
 
         "new" -> PinEntryDialog(
-            profileName = "Enter new PIN",
+            profileName = stringResource(Res.string.profile_enter_new_pin),
             onVerify = { pin ->
                 ProfileRepository.setPin(
                     profileIndex = profileIndex,

@@ -81,6 +81,7 @@ import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
+import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentReview
 import com.nuvio.app.features.trakt.TraktCommentsRepository
@@ -100,6 +101,9 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepositor
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -164,6 +168,7 @@ fun MetaDetailsScreen(
     var pickerMembership by remember(type, id) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     var pickerPending by remember(type, id) { mutableStateOf(false) }
     var pickerError by remember(type, id) { mutableStateOf<String?>(null) }
+    var episodeImdbRatings by remember(type, id) { mutableStateOf<Map<Pair<Int, Int>, Double>>(emptyMap()) }
 
     val shouldShowComments = commentsEnabled &&
         traktAuthUiState.mode == TraktConnectionMode.CONNECTED &&
@@ -186,9 +191,33 @@ fun MetaDetailsScreen(
             commentsCurrentPage = result.currentPage
             commentsPageCount = result.pageCount
         } catch (e: Exception) {
-            commentsError = e.message ?: "Failed to load comments"
+            commentsError = e.message ?: getString(Res.string.details_comments_load_failed)
         }
         isCommentsLoading = false
+    }
+
+    LaunchedEffect(displayedMeta?.id, displayedMeta?.videos) {
+        val metaForRatings = displayedMeta
+        if (metaForRatings == null || !metaForRatings.isSeriesLikeForEpisodeRatings()) {
+            episodeImdbRatings = emptyMap()
+            return@LaunchedEffect
+        }
+
+        val imdbId = extractImdbId(metaForRatings.id) ?: extractImdbId(id)
+        val tmdbId = extractTmdbId(metaForRatings.id)
+            ?: extractTmdbId(id)
+            ?: TmdbService.ensureTmdbId(metaForRatings.id, metaForRatings.type)?.toIntOrNull()
+            ?: TmdbService.ensureTmdbId(id, type)?.toIntOrNull()
+
+        if (imdbId == null && tmdbId == null) {
+            episodeImdbRatings = emptyMap()
+            return@LaunchedEffect
+        }
+
+        episodeImdbRatings = ImdbEpisodeRatingsRepository.getEpisodeRatings(
+            imdbId = imdbId,
+            tmdbId = tmdbId,
+        )
     }
 
     LaunchedEffect(type, id, displayedMeta, uiState.isLoading, autoLoadAttempted) {
@@ -242,14 +271,14 @@ fun MetaDetailsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = "Failed to load",
+                        text = stringResource(Res.string.details_failed_to_load),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                     Text(
                         text = when (networkStatusUiState.condition) {
-                            NetworkCondition.NoInternet -> "Check your Wi-Fi or mobile data connection and try again."
-                            NetworkCondition.ServersUnreachable -> "Your device is online, but Nuvio could not reach required servers."
+                            NetworkCondition.NoInternet -> stringResource(Res.string.details_check_connection)
+                            NetworkCondition.ServersUnreachable -> stringResource(Res.string.details_servers_unreachable)
                             else -> uiState.errorMessage.orEmpty()
                         },
                         style = MaterialTheme.typography.bodyMedium,
@@ -262,7 +291,7 @@ fun MetaDetailsScreen(
                             MetaDetailsRepository.load(type, id)
                         },
                     ) {
-                        Text("Retry")
+                        Text(stringResource(Res.string.action_retry))
                     }
                 }
             }
@@ -273,39 +302,39 @@ fun MetaDetailsScreen(
                 val isSaved = remember(
                     libraryUiState.items,
                     libraryUiState.sections,
-                    traktAuthUiState.mode,
+                    libraryUiState.sourceMode,
                     meta.id,
                     meta.type,
                 ) {
                     LibraryRepository.isSaved(meta.id, meta.type)
                 }
-                val isTraktConnected = traktAuthUiState.mode == TraktConnectionMode.CONNECTED
-                val toggleSaved = remember(meta, isTraktConnected) {
+                val openLibraryListPicker = remember(meta) {
                     {
                         val libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L)
-                        if (!isTraktConnected) {
-                            LibraryRepository.toggleSaved(libraryItem)
-                        } else {
-                            pickerTabs = LibraryRepository.traktListTabs()
-                            pickerMembership = pickerTabs.associate { it.key to false }
-                            pickerPending = true
-                            pickerError = null
-                            showLibraryListPicker = true
-                            detailsScope.launch {
-                                runCatching {
-                                    val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                    val tabs = LibraryRepository.traktListTabs()
-                                    pickerTabs = tabs
-                                    pickerMembership = tabs.associate { tab ->
-                                        tab.key to (snapshot[tab.key] == true)
-                                    }
-                                }.onFailure { error ->
-                                    pickerError = error.message ?: "Failed to load Trakt lists"
+                        pickerTabs = LibraryRepository.libraryListTabs()
+                        pickerMembership = pickerTabs.associate { it.key to false }
+                        pickerPending = true
+                        pickerError = null
+                        showLibraryListPicker = true
+                        detailsScope.launch {
+                            runCatching {
+                                val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
+                                val tabs = LibraryRepository.libraryListTabs()
+                                pickerTabs = tabs
+                                pickerMembership = tabs.associate { tab ->
+                                    tab.key to (snapshot[tab.key] == true)
                                 }
-                                pickerPending = false
+                            }.onFailure { error ->
+                                pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
                             }
-                            Unit
+                            pickerPending = false
                         }
+                        Unit
+                    }
+                }
+                val toggleSaved = remember(meta) {
+                    {
+                        LibraryRepository.toggleSaved(meta.toLibraryItem(savedAtEpochMs = 0L))
                     }
                 }
                 val movieProgress = watchProgressUiState.byVideoId[meta.id]
@@ -394,7 +423,7 @@ fun MetaDetailsScreen(
                                 }
                                 trailerPlaybackSource = resolvedSource
                                 trailerErrorMessage = if (resolvedSource == null) {
-                                    "No playable trailer stream found."
+                                    getString(Res.string.trailer_no_playable_stream)
                                 } else {
                                     null
                                 }
@@ -403,13 +432,15 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
-                val playButtonLabel = remember(movieProgress, seriesAction, meta.type, hasEpisodes) {
+                val playText = stringResource(Res.string.action_play)
+                val resumeText = stringResource(Res.string.action_resume)
+                val playButtonLabel = remember(movieProgress, seriesAction, meta.type, hasEpisodes, playText, resumeText) {
                     when {
                         (meta.type == "series" || hasEpisodes) && seriesAction != null ->
                             seriesAction.label
                         meta.type != "series" && !hasEpisodes && movieProgress != null ->
-                            "Resume"
-                        else -> "Play"
+                            resumeText
+                        else -> playText
                     }
                 }
                 val onPrimaryPlayClick: () -> Unit = {
@@ -634,8 +665,10 @@ fun MetaDetailsScreen(
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                     onSaveClick = toggleSaved,
+                                    onSaveLongClick = openLibraryListPicker,
                                     showManualPlayOption = showManualPlayOption,
                                     preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
+                                    preferredEpisodeNumber = seriesAction?.episodeNumber,
                                     hasProductionSection = hasProductionSection,
                                     hasTrailersSection = hasTrailersSection,
                                     hasEpisodes = hasEpisodes,
@@ -649,6 +682,7 @@ fun MetaDetailsScreen(
                                     commentsCurrentPage = commentsCurrentPage,
                                     commentsPageCount = commentsPageCount,
                                     commentsError = commentsError,
+                                    episodeImdbRatings = episodeImdbRatings,
                                     onRetryComments = {
                                         detailsScope.launch {
                                             isCommentsLoading = true
@@ -659,7 +693,7 @@ fun MetaDetailsScreen(
                                                 commentsCurrentPage = result.currentPage
                                                 commentsPageCount = result.pageCount
                                             } catch (e: Exception) {
-                                                commentsError = e.message ?: "Failed to load comments"
+                                                commentsError = e.message ?: getString(Res.string.details_comments_load_failed)
                                             }
                                             isCommentsLoading = false
                                         }
@@ -683,6 +717,7 @@ fun MetaDetailsScreen(
                                     onTrailerClick = resolveTrailer,
                                     progressByVideoId = watchProgressUiState.byVideoId,
                                     watchedKeys = watchedUiState.watchedKeys,
+                                    blurUnwatchedEpisodes = metaScreenSettingsUiState.blurUnwatchedEpisodes,
                                     onEpisodeClick = onEpisodePlayClick,
                                     onEpisodeLongPress = { video -> selectedEpisodeForActions = video },
                                     onOpenMeta = onOpenMeta,
@@ -779,7 +814,9 @@ fun MetaDetailsScreen(
                             }
                             EpisodeWatchedActionSheet(
                                 episode = selectedEpisode,
-                                seasonLabel = selectedEpisode.season?.let { "Season $it" } ?: "Specials",
+                                seasonLabel = selectedEpisode.season?.let {
+                                    stringResource(Res.string.episodes_season, it)
+                                } ?: stringResource(Res.string.episodes_specials),
                                 isEpisodeWatched = isSelectedEpisodeWatched,
                                 canMarkPreviousEpisodes = previousEpisodes.isNotEmpty(),
                                 arePreviousEpisodesWatched = arePreviousEpisodesWatched,
@@ -864,7 +901,7 @@ fun MetaDetailsScreen(
                                     }.onSuccess {
                                         showLibraryListPicker = false
                                     }.onFailure { error ->
-                                        pickerError = error.message ?: "Failed to update Trakt lists"
+                                        pickerError = error.message ?: getString(Res.string.trakt_lists_update_failed)
                                     }
                                     pickerPending = false
                                 }
@@ -927,6 +964,30 @@ fun MetaDetailsScreen(
     }
 }
 
+private fun MetaDetails.isSeriesLikeForEpisodeRatings(): Boolean {
+    val normalizedType = type.trim().lowercase()
+    val hasNumberedEpisodes = videos.any { it.season != null && it.episode != null }
+    return hasNumberedEpisodes && normalizedType in setOf("series", "show", "tv", "tvshow")
+}
+
+private fun extractImdbId(value: String?): String? =
+    value
+        ?.trim()
+        ?.split(':', '/', '?', '&')
+        ?.firstOrNull { part -> part.startsWith("tt", ignoreCase = true) }
+        ?.takeIf { it.length > 2 }
+
+private fun extractTmdbId(value: String?): Int? {
+    val trimmed = value?.trim().orEmpty()
+    if (trimmed.isBlank()) return null
+    return trimmed
+        .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
+        ?.substringAfter(':')
+        ?.substringBefore(':')
+        ?.substringBefore('/')
+        ?.toIntOrNull()
+}
+
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun ConfiguredMetaSections(
@@ -938,8 +999,10 @@ private fun ConfiguredMetaSections(
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
+    onSaveLongClick: (() -> Unit)?,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
+    preferredEpisodeNumber: Int?,
     hasProductionSection: Boolean,
     hasTrailersSection: Boolean,
     hasEpisodes: Boolean,
@@ -953,12 +1016,14 @@ private fun ConfiguredMetaSections(
     commentsCurrentPage: Int,
     commentsPageCount: Int,
     commentsError: String?,
+    episodeImdbRatings: Map<Pair<Int, Int>, Double>,
     onRetryComments: () -> Unit,
     onLoadMoreComments: () -> Unit,
     onCommentClick: (TraktCommentReview) -> Unit,
     onTrailerClick: (MetaTrailer) -> Unit,
     progressByVideoId: Map<String, WatchProgressEntry>,
     watchedKeys: Set<String>,
+    blurUnwatchedEpisodes: Boolean,
     onEpisodeClick: (MetaVideo) -> Unit,
     onEpisodeLongPress: (MetaVideo) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
@@ -991,12 +1056,17 @@ private fun ConfiguredMetaSections(
             MetaScreenSectionKey.ACTIONS -> {
                 DetailActionButtons(
                     playLabel = playButtonLabel,
-                    saveLabel = if (isSaved) "Saved" else "Save",
+                    saveLabel = if (isSaved) {
+                        stringResource(Res.string.action_saved)
+                    } else {
+                        stringResource(Res.string.action_save)
+                    },
                     isSaved = isSaved,
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
                     onSaveClick = onSaveClick,
+                    onSaveLongClick = onSaveLongClick,
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {
@@ -1042,9 +1112,12 @@ private fun ConfiguredMetaSections(
                         meta = meta,
                         showHeader = showHeader,
                         preferredSeasonNumber = preferredEpisodeSeasonNumber,
+                        preferredEpisodeNumber = preferredEpisodeNumber,
                         episodeCardStyle = settings.episodeCardStyle,
                         progressByVideoId = progressByVideoId,
                         watchedKeys = watchedKeys,
+                        episodeRatings = episodeImdbRatings,
+                        blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                         onEpisodeClick = onEpisodeClick,
                         onEpisodeLongPress = onEpisodeLongPress,
                     )
@@ -1069,7 +1142,7 @@ private fun ConfiguredMetaSections(
             MetaScreenSectionKey.MORE_LIKE_THIS -> {
                 if (hasMoreLikeThisSection) {
                     DetailPosterRailSection(
-                        title = "More Like This",
+                        title = stringResource(Res.string.details_more_like_this),
                         items = meta.moreLikeThis,
                         watchedKeys = watchedKeys,
                         showHeader = showHeader,

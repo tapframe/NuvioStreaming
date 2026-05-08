@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
@@ -38,6 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.features.details.MetaTrailer
+import nuvio.composeapp.generated.resources.*
+import nuvio.composeapp.generated.resources.detail_tab_trailer
+import nuvio.composeapp.generated.resources.detail_trailer_category_count
+import nuvio.composeapp.generated.resources.detail_trailers_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun DetailTrailersSection(
@@ -48,10 +53,11 @@ fun DetailTrailersSection(
 ) {
     if (trailers.isEmpty()) return
 
+    val trailerLabel = stringResource(Res.string.detail_tab_trailer)
     val grouped = remember(trailers) {
         linkedMapOf<String, MutableList<MetaTrailer>>().apply {
             trailers.forEach { trailer ->
-                val category = trailer.type.ifBlank { "Trailer" }
+                val category = trailer.type.ifBlank { trailerLabel }
                 getOrPut(category) { mutableListOf() }.add(trailer)
             }
         }
@@ -60,7 +66,7 @@ fun DetailTrailersSection(
     if (grouped.isEmpty()) return
 
     val initialCategory = remember(grouped) {
-        grouped.keys.firstOrNull { it.equals("Trailer", ignoreCase = true) }
+        grouped.keys.firstOrNull { it.equals(trailerLabel, ignoreCase = true) }
             ?: grouped.keys.first()
     }
     var selectedCategory by remember(grouped) { mutableStateOf(initialCategory) }
@@ -82,7 +88,7 @@ fun DetailTrailersSection(
             ) {
                 if (showHeader) {
                     DetailSectionTitle(
-                        title = "Trailers",
+                        title = stringResource(Res.string.detail_trailers_title),
                         fullWidth = false,
                     )
                 }
@@ -131,7 +137,7 @@ fun DetailTrailersSection(
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        text = "$category ($count)",
+                                        text = stringResource(Res.string.detail_trailer_category_count, category, count),
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                 },
@@ -152,10 +158,10 @@ fun DetailTrailersSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(sizing.cardSpacing),
             ) {
-                items(
+                itemsIndexed(
                     items = selectedTrailers,
-                    key = { trailer -> "${trailer.type}-${trailer.id}-${trailer.seasonNumber ?: 0}" },
-                ) { trailer ->
+                    key = { index, trailer -> "${trailer.type}-${trailer.id}-${trailer.seasonNumber ?: 0}#$index" },
+                ) { _, trailer ->
                     TrailerCard(
                         trailer = trailer,
                         cardWidth = sizing.cardWidth,

@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -60,6 +61,11 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.features.watching.application.WatchingState
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 /**
  * Episode selection panel shown inside the player.
@@ -70,8 +76,13 @@ import com.nuvio.app.features.streams.StreamsUiState
 fun PlayerEpisodesPanel(
     visible: Boolean,
     episodes: List<MetaVideo>,
+    parentMetaType: String,
+    parentMetaId: String,
     currentSeason: Int?,
     currentEpisode: Int?,
+    progressByVideoId: Map<String, WatchProgressEntry>,
+    watchedKeys: Set<String>,
+    blurUnwatchedEpisodes: Boolean,
     // episode stream sub-view state
     episodeStreamsState: EpisodeStreamsPanelState,
     onSeasonSelected: (Int) -> Unit,
@@ -132,8 +143,13 @@ fun PlayerEpisodesPanel(
                     } else {
                         EpisodesListSubView(
                             episodes = episodes,
+                            parentMetaType = parentMetaType,
+                            parentMetaId = parentMetaId,
                             currentSeason = currentSeason,
                             currentEpisode = currentEpisode,
+                            progressByVideoId = progressByVideoId,
+                            watchedKeys = watchedKeys,
+                            blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                             onSeasonSelected = onSeasonSelected,
                             onEpisodeSelected = onEpisodeSelected,
                             onDismiss = onDismiss,
@@ -156,8 +172,13 @@ data class EpisodeStreamsPanelState(
 @Composable
 private fun EpisodesListSubView(
     episodes: List<MetaVideo>,
+    parentMetaType: String,
+    parentMetaId: String,
     currentSeason: Int?,
     currentEpisode: Int?,
+    progressByVideoId: Map<String, WatchProgressEntry>,
+    watchedKeys: Set<String>,
+    blurUnwatchedEpisodes: Boolean,
     onSeasonSelected: (Int) -> Unit,
     onEpisodeSelected: (MetaVideo) -> Unit,
     onDismiss: () -> Unit,
@@ -232,12 +253,12 @@ private fun EpisodesListSubView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Episodes",
+                text = stringResource(Res.string.compose_player_panel_episodes),
                 color = colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            PanelChipButton(label = "Close", onClick = onDismiss)
+            PanelChipButton(label = stringResource(Res.string.action_close), onClick = onDismiss)
         }
 
         // Season tabs
@@ -251,7 +272,11 @@ private fun EpisodesListSubView(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(availableSeasons, key = { season -> season }) { season ->
-                    val label = if (season == 0) "Specials" else "Season $season"
+                    val label = if (season == 0) {
+                        stringResource(Res.string.episodes_specials)
+                    } else {
+                        stringResource(Res.string.episodes_season, season)
+                    }
                     AddonFilterChip(
                         label = label,
                         isSelected = selectedSeason == season,
@@ -273,7 +298,7 @@ private fun EpisodesListSubView(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No episodes available",
+                    text = stringResource(Res.string.compose_player_no_episodes_available),
                     color = colorScheme.onSurfaceVariant,
                     fontSize = 14.sp,
                 )
@@ -285,11 +310,29 @@ private fun EpisodesListSubView(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
             ) {
-                items(seasonEpisodes, key = { "${it.season}:${it.episode}:${it.id}" }) { episode ->
+                itemsIndexed(
+                    items = seasonEpisodes,
+                    key = { index, episode -> "${episode.season}:${episode.episode}:${episode.id}#$index" },
+                ) { _, episode ->
                     val isCurrent = episode.season == currentSeason && episode.episode == currentEpisode
+                    val episodeVideoId = buildPlaybackVideoId(
+                        parentMetaId = parentMetaId,
+                        seasonNumber = episode.season,
+                        episodeNumber = episode.episode,
+                        fallbackVideoId = episode.id,
+                    )
+                    val isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
+                        WatchingState.isEpisodeWatched(
+                            watchedKeys = watchedKeys,
+                            metaType = parentMetaType,
+                            metaId = parentMetaId,
+                            episode = episode,
+                        )
                     EpisodeRow(
                         episode = episode,
                         isCurrent = isCurrent,
+                        isWatched = isWatched,
+                        blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                         onClick = { onEpisodeSelected(episode) },
                     )
                 }
@@ -302,9 +345,12 @@ private fun EpisodesListSubView(
 private fun EpisodeRow(
     episode: MetaVideo,
     isCurrent: Boolean,
+    isWatched: Boolean,
+    blurUnwatchedEpisodes: Boolean,
     onClick: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched && !isCurrent
 
     Row(
         modifier = Modifier
@@ -333,7 +379,8 @@ private fun EpisodeRow(
                 modifier = Modifier
                     .width(80.dp)
                     .height(48.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(8.dp))
+                    .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
             )
         }
@@ -345,9 +392,15 @@ private fun EpisodeRow(
             ) {
                 val episodeLabel = buildString {
                     if (episode.season != null && episode.episode != null) {
-                        append("S${episode.season}E${episode.episode}")
+                        append(
+                            stringResource(
+                                Res.string.compose_player_episode_code_full,
+                                episode.season,
+                                episode.episode,
+                            ),
+                        )
                     } else if (episode.episode != null) {
-                        append("E${episode.episode}")
+                        append(stringResource(Res.string.compose_player_episode_code_episode_only, episode.episode))
                     }
                 }
                 if (episodeLabel.isNotBlank()) {
@@ -366,7 +419,7 @@ private fun EpisodeRow(
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
-                            text = "Playing",
+                            text = stringResource(Res.string.compose_player_playing),
                             color = colorScheme.onPrimaryContainer,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -421,12 +474,12 @@ private fun EpisodeStreamsSubView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Streams",
+                text = stringResource(Res.string.compose_player_panel_streams),
                 color = colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            PanelChipButton(label = "Close", onClick = onDismiss)
+            PanelChipButton(label = stringResource(Res.string.action_close), onClick = onDismiss)
         }
 
         // Back + reload + episode info
@@ -439,19 +492,25 @@ private fun EpisodeStreamsSubView(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             PanelChipButton(
-                label = "Back",
+                label = stringResource(Res.string.action_back),
                 icon = Icons.AutoMirrored.Rounded.ArrowBack,
                 onClick = onBack,
             )
             PanelChipButton(
-                label = "Reload",
+                label = stringResource(Res.string.compose_action_reload),
                 icon = Icons.Rounded.Refresh,
                 onClick = onReload,
             )
             Text(
                 text = buildString {
                     if (episode.season != null && episode.episode != null) {
-                        append("S${episode.season} E${episode.episode}")
+                        append(
+                            stringResource(
+                                Res.string.compose_player_episode_code_full,
+                                episode.season,
+                                episode.episode,
+                            ),
+                        )
                     }
                     if (episode.title.isNotBlank()) {
                         if (isNotEmpty()) append(" • ")
@@ -480,7 +539,7 @@ private fun EpisodeStreamsSubView(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 AddonFilterChip(
-                    label = "All",
+                    label = stringResource(Res.string.collections_tab_all),
                     isSelected = streamsUiState.selectedFilter == null,
                     onClick = { onFilterSelected(null) },
                 )
@@ -522,7 +581,7 @@ private fun EpisodeStreamsSubView(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No streams found",
+                        text = stringResource(Res.string.compose_player_no_streams_found),
                         color = colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                     )

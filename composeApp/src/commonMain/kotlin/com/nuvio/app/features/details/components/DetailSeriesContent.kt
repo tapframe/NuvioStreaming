@@ -15,12 +15,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -57,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
+import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.features.details.MetaDetails
@@ -71,6 +76,13 @@ import com.nuvio.app.features.details.seasonSortKey
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watching.application.WatchingState
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 private val log = Logger.withTag("SeriesContent")
 
@@ -80,9 +92,12 @@ fun DetailSeriesContent(
     modifier: Modifier = Modifier,
     showHeader: Boolean = true,
     preferredSeasonNumber: Int? = null,
+    preferredEpisodeNumber: Int? = null,
     episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
     progressByVideoId: Map<String, WatchProgressEntry> = emptyMap(),
     watchedKeys: Set<String> = emptySet(),
+    episodeRatings: Map<Pair<Int, Int>, Double> = emptyMap(),
+    blurUnwatchedEpisodes: Boolean = false,
     onEpisodeClick: ((MetaVideo) -> Unit)? = null,
     onEpisodeLongPress: ((MetaVideo) -> Unit)? = null,
 ) {
@@ -91,16 +106,16 @@ fun DetailSeriesContent(
 
     if (meta.videos.isEmpty()) {
         DetailSection(
-            title = "Episodes",
+            title = stringResource(Res.string.settings_meta_episodes),
             modifier = modifier,
             showHeader = showHeader,
         ) {
             Text(
                 text = when {
                     meta.status.equals("Not yet aired", ignoreCase = true) || meta.hasScheduledVideos ->
-                        "Episodes have not been published by this addon yet."
+                        stringResource(Res.string.details_series_unpublished)
                     else ->
-                        "This addon did not provide episode metadata for this series."
+                        stringResource(Res.string.details_series_no_metadata)
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -131,12 +146,12 @@ fun DetailSeriesContent(
     if (groupedEpisodes.isEmpty()) {
         if (meta.type == "series") {
             DetailSection(
-                title = "Episodes",
+                title = stringResource(Res.string.settings_meta_episodes),
                 modifier = modifier,
                 showHeader = showHeader,
             ) {
                 Text(
-                    text = "This addon returned videos for the series, but none included season or episode numbers.",
+                    text = stringResource(Res.string.details_series_missing_numbers),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -181,7 +196,7 @@ fun DetailSeriesContent(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Seasons",
+                            text = stringResource(Res.string.details_seasons),
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontSize = sizing.seasonHeaderSize,
                                 fontWeight = FontWeight.SemiBold,
@@ -249,7 +264,7 @@ fun DetailSeriesContent(
                 label = "season_episodes",
             ) { seasonForContent ->
                 val sectionTitle = if (meta.type != "series" && seasons.size == 1 && seasonForContent <= 0) {
-                    "Videos"
+                    stringResource(Res.string.details_videos)
                 } else {
                     seasonForContent.label()
                 }
@@ -269,6 +284,9 @@ fun DetailSeriesContent(
                             watchedKeys = watchedKeys,
                             fallbackImage = meta.background ?: meta.poster,
                             progressByVideoId = progressByVideoId,
+                            episodeRatings = episodeRatings,
+                            blurUnwatchedEpisodes = blurUnwatchedEpisodes,
+                            preferredEpisodeNumber = preferredEpisodeNumber,
                             onEpisodeClick = onEpisodeClick,
                             onEpisodeLongPress = onEpisodeLongPress,
                         )
@@ -287,13 +305,15 @@ fun DetailSeriesContent(
                                     video = episode,
                                     fallbackImage = meta.background ?: meta.poster,
                                     progressEntry = progressByVideoId[episodeVideoId],
-                                    isWatched = progressByVideoId[episodeVideoId]?.isCompleted == true ||
+                                    imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] },
+                                    isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
                                         WatchingState.isEpisodeWatched(
                                             watchedKeys = watchedKeys,
                                             metaType = meta.type,
                                             metaId = meta.id,
                                             episode = episode,
                                         ),
+                                    blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                                     sizing = sizing,
                                     onClick = { onEpisodeClick?.invoke(episode) },
                                     onLongPress = { onEpisodeLongPress?.invoke(episode) },
@@ -334,7 +354,11 @@ private fun SeasonViewModeToggle(
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = if (isPosters) "Posters" else "Text",
+            text = if (isPosters) {
+                stringResource(Res.string.details_season_view_posters)
+            } else {
+                stringResource(Res.string.details_season_view_text)
+            },
             style = MaterialTheme.typography.labelLarge.copy(
                 fontSize = sizing.seasonToggleTextSize,
                 fontWeight = FontWeight.SemiBold,
@@ -541,17 +565,42 @@ private fun EpisodeHorizontalRow(
     watchedKeys: Set<String>,
     fallbackImage: String?,
     progressByVideoId: Map<String, WatchProgressEntry>,
+    episodeRatings: Map<Pair<Int, Int>, Double>,
+    blurUnwatchedEpisodes: Boolean,
+    preferredEpisodeNumber: Int? = null,
     onEpisodeClick: ((MetaVideo) -> Unit)?,
     onEpisodeLongPress: ((MetaVideo) -> Unit)?,
 ) {
     val rowMetrics = rememberEpisodeHorizontalCardMetrics(maxWidthDp)
+    val listState = rememberLazyListState()
+    var hasPositioned by remember(episodes) { mutableStateOf(false) }
+
+    LaunchedEffect(episodes, preferredEpisodeNumber) {
+        val targetIndex = if (preferredEpisodeNumber != null) {
+            episodes.indexOfFirst { it.episode == preferredEpisodeNumber }
+        } else {
+            -1
+        }
+        if (targetIndex >= 0) {
+            if (hasPositioned) {
+                listState.animateScrollToItem(targetIndex)
+            } else {
+                listState.scrollToItem(targetIndex)
+                hasPositioned = true
+            }
+        }
+    }
 
     LazyRow(
+        state = listState,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = rowMetrics.rowHorizontalPadding, vertical = rowMetrics.rowVerticalPadding),
         horizontalArrangement = Arrangement.spacedBy(rowMetrics.itemSpacing),
     ) {
-        items(episodes, key = { it.id }) { episode ->
+        itemsIndexed(
+            items = episodes,
+            key = { index, episode -> "${episode.season}:${episode.episode}:${episode.id}#$index" },
+        ) { _, episode ->
             val episodeVideoId = buildPlaybackVideoId(
                 parentMetaId = parentMetaId,
                 seasonNumber = episode.season,
@@ -562,13 +611,15 @@ private fun EpisodeHorizontalRow(
                 video = episode,
                 fallbackImage = fallbackImage,
                 progressEntry = progressByVideoId[episodeVideoId],
-                isWatched = progressByVideoId[episodeVideoId]?.isCompleted == true ||
+                imdbRating = episode.seasonEpisodeKey()?.let { episodeRatings[it] },
+                isWatched = progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
                     WatchingState.isEpisodeWatched(
                         watchedKeys = watchedKeys,
                         metaType = metaType,
                         metaId = parentMetaId,
                         episode = episode,
                     ),
+                blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                 metrics = rowMetrics,
                 onClick = { onEpisodeClick?.invoke(episode) },
                 onLongPress = { onEpisodeLongPress?.invoke(episode) },
@@ -583,12 +634,17 @@ private fun EpisodeHorizontalCard(
     video: MetaVideo,
     fallbackImage: String?,
     progressEntry: WatchProgressEntry?,
+    imdbRating: Double?,
     isWatched: Boolean,
+    blurUnwatchedEpisodes: Boolean,
     metrics: EpisodeHorizontalCardMetrics,
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
     val cardShape = RoundedCornerShape(metrics.cornerRadius)
+    val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
+    val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
+    val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
     Box(
         modifier = Modifier
             .width(metrics.cardWidth)
@@ -607,11 +663,14 @@ private fun EpisodeHorizontalCard(
             ),
     ) {
         val imageUrl = video.thumbnail ?: fallbackImage
+        val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
         if (imageUrl != null) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = video.title,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                 contentScale = ContentScale.Crop,
             )
         }
@@ -630,30 +689,6 @@ private fun EpisodeHorizontalCard(
                     ),
                 ),
         )
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = metrics.contentPadding, top = metrics.contentPadding)
-                .clip(RoundedCornerShape(metrics.badgeRadius))
-                .background(Color.Black.copy(alpha = 0.75f))
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(metrics.badgeRadius),
-                )
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            Text(
-                text = video.episodeBadge(),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = metrics.badgeTextSize,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 0.5.sp,
-                ),
-                color = Color.White,
-            )
-        }
 
         NuvioAnimatedWatchedBadge(
             isVisible = isWatched,
@@ -674,6 +709,15 @@ private fun EpisodeHorizontalCard(
                 ),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            EpisodeCodeBadge(
+                text = video.episodeBadge(),
+                textSize = metrics.badgeTextSize,
+                radius = metrics.badgeRadius,
+                horizontalPadding = metrics.badgeHorizontalPadding,
+                verticalPadding = metrics.badgeVerticalPadding,
+                backgroundAlpha = 0.42f,
+            )
+
             Text(
                 text = video.title,
                 style = MaterialTheme.typography.titleMedium.copy(
@@ -699,27 +743,39 @@ private fun EpisodeHorizontalCard(
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                video.runtime?.takeIf { it > 0 }?.let { runtimeMinutes ->
-                    Text(
-                        text = formatEpisodeRuntime(runtimeMinutes),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = metrics.metaTextSize),
-                        color = Color.White.copy(alpha = 0.78f),
-                        maxLines = 1,
-                    )
-                }
-                video.released?.let { formatReleaseDateForDisplay(it) }?.let { formattedDate ->
-                    Text(
-                        text = formattedDate,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = metrics.metaTextSize),
-                        color = Color.White.copy(alpha = 0.78f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+            if (runtimeLabel != null || ratingLabel != null || formattedDate != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    runtimeLabel?.let { runtime ->
+                        Text(
+                            text = runtime,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = metrics.metaTextSize),
+                            color = Color.White.copy(alpha = 0.78f),
+                            maxLines = 1,
+                        )
+                    }
+                    ratingLabel?.let { rating ->
+                        ImdbEpisodeRatingBadge(
+                            rating = rating,
+                            logoWidth = metrics.imdbLogoWidth,
+                            logoHeight = metrics.imdbLogoHeight,
+                            textSize = metrics.metaTextSize,
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    formattedDate?.let { date ->
+                        Text(
+                            text = date,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = metrics.metaTextSize),
+                            color = Color.White.copy(alpha = 0.78f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.End,
+                        )
+                    }
                 }
             }
         }
@@ -758,6 +814,10 @@ private data class EpisodeHorizontalCardMetrics(
     val metaTextSize: androidx.compose.ui.unit.TextUnit,
     val badgeTextSize: androidx.compose.ui.unit.TextUnit,
     val badgeRadius: Dp,
+    val badgeHorizontalPadding: Dp,
+    val badgeVerticalPadding: Dp,
+    val imdbLogoWidth: Dp,
+    val imdbLogoHeight: Dp,
 )
 
 @Composable
@@ -780,7 +840,11 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 overviewMaxLines = 3,
                 metaTextSize = 12.sp,
                 badgeTextSize = 11.sp,
-                badgeRadius = 6.dp,
+                badgeRadius = 8.dp,
+                badgeHorizontalPadding = 10.dp,
+                badgeVerticalPadding = 5.dp,
+                imdbLogoWidth = 28.dp,
+                imdbLogoHeight = 14.dp,
             )
 
             maxWidthDp >= 1000f -> EpisodeHorizontalCardMetrics(
@@ -799,7 +863,11 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 overviewMaxLines = 3,
                 metaTextSize = 12.sp,
                 badgeTextSize = 10.sp,
-                badgeRadius = 6.dp,
+                badgeRadius = 7.dp,
+                badgeHorizontalPadding = 9.dp,
+                badgeVerticalPadding = 4.dp,
+                imdbLogoWidth = 26.dp,
+                imdbLogoHeight = 13.dp,
             )
 
             maxWidthDp >= 760f -> EpisodeHorizontalCardMetrics(
@@ -818,7 +886,11 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 overviewMaxLines = 2,
                 metaTextSize = 11.sp,
                 badgeTextSize = 10.sp,
-                badgeRadius = 5.dp,
+                badgeRadius = 6.dp,
+                badgeHorizontalPadding = 8.dp,
+                badgeVerticalPadding = 4.dp,
+                imdbLogoWidth = 24.dp,
+                imdbLogoHeight = 12.dp,
             )
 
             else -> EpisodeHorizontalCardMetrics(
@@ -838,6 +910,10 @@ private fun rememberEpisodeHorizontalCardMetrics(maxWidthDp: Float): EpisodeHori
                 metaTextSize = 10.sp,
                 badgeTextSize = 9.sp,
                 badgeRadius = 5.dp,
+                badgeHorizontalPadding = 7.dp,
+                badgeVerticalPadding = 3.dp,
+                imdbLogoWidth = 22.dp,
+                imdbLogoHeight = 11.dp,
             )
         }
     }
@@ -847,19 +923,83 @@ private fun formatEpisodeRuntime(runtimeMinutes: Int): String {
     return formatRuntimeFromMinutes(runtimeMinutes)
 }
 
+@Composable
+private fun EpisodeCodeBadge(
+    text: String,
+    textSize: androidx.compose.ui.unit.TextUnit,
+    radius: Dp,
+    horizontalPadding: Dp,
+    verticalPadding: Dp,
+    backgroundAlpha: Float,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(radius))
+            .background(Color.Black.copy(alpha = backgroundAlpha))
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontSize = textSize,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.sp,
+            ),
+            color = Color.White.copy(alpha = 0.9f),
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ImdbEpisodeRatingBadge(
+    rating: String,
+    logoWidth: Dp,
+    logoHeight: Dp,
+    textSize: androidx.compose.ui.unit.TextUnit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            painter = painterResource(Res.drawable.rating_imdb),
+            contentDescription = stringResource(Res.string.source_imdb),
+            modifier = Modifier
+                .width(logoWidth)
+                .height(logoHeight),
+            contentScale = ContentScale.Fit,
+        )
+        Text(
+            text = rating,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = textSize,
+                fontWeight = FontWeight.SemiBold,
+            ),
+            color = Color(0xFFF5C518),
+            maxLines = 1,
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EpisodeListCard(
     video: MetaVideo,
     fallbackImage: String?,
     progressEntry: WatchProgressEntry?,
+    imdbRating: Double?,
     isWatched: Boolean,
+    blurUnwatchedEpisodes: Boolean,
     sizing: SeriesContentSizing,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
 ) {
     val cardShape = RoundedCornerShape(sizing.cardRadius)
+    val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
+    val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -888,11 +1028,14 @@ private fun EpisodeListCard(
                     .clip(RoundedCornerShape(topStart = sizing.cardRadius, bottomStart = sizing.cardRadius)),
             ) {
                 val imageUrl = video.thumbnail ?: fallbackImage
+                val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
                 if (imageUrl != null) {
                     AsyncImage(
                         model = imageUrl,
                         contentDescription = video.title,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
                         contentScale = ContentScale.Crop,
                     )
                 } else {
@@ -903,32 +1046,17 @@ private fun EpisodeListCard(
                     )
                 }
 
-                Box(
+                EpisodeCodeBadge(
+                    text = video.episodeBadge(),
+                    textSize = sizing.badgeTextSize,
+                    radius = sizing.badgeRadius,
+                    horizontalPadding = sizing.badgeHorizontalPadding,
+                    verticalPadding = sizing.badgeVerticalPadding,
+                    backgroundAlpha = 0.85f,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(start = 8.dp, top = 8.dp)
-                        .clip(RoundedCornerShape(sizing.badgeRadius))
-                        .background(Color.Black.copy(alpha = 0.85f))
-                        .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(sizing.badgeRadius),
-                        )
-                        .padding(
-                            horizontal = sizing.badgeHorizontalPadding,
-                            vertical = sizing.badgeVerticalPadding,
-                        ),
-                ) {
-                    Text(
-                        text = video.episodeBadge(),
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = sizing.badgeTextSize,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.3.sp,
-                        ),
-                        color = Color.White,
-                    )
-                }
+                        .padding(start = 8.dp, top = 8.dp),
+                )
 
                 NuvioAnimatedWatchedBadge(
                     isVisible = isWatched,
@@ -956,24 +1084,39 @@ private fun EpisodeListCard(
                         fontSize = sizing.titleTextSize,
                         fontWeight = FontWeight.Bold,
                         lineHeight = sizing.titleLineHeight,
-                        letterSpacing = 0.3.sp,
+                        letterSpacing = 0.sp,
                     ),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = sizing.titleMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                video.released?.let { formatReleaseDateForDisplay(it) }?.let { formattedDate ->
-                    Text(
-                        text = formattedDate,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = sizing.metaTextSize,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                if (formattedDate != null || ratingLabel != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        formattedDate?.let { date ->
+                            Text(
+                                text = date,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontSize = sizing.metaTextSize,
+                                    fontWeight = FontWeight.Medium,
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        ratingLabel?.let { rating ->
+                            ImdbEpisodeRatingBadge(
+                                rating = rating,
+                                logoWidth = 24.dp,
+                                logoHeight = 12.dp,
+                                textSize = sizing.metaTextSize,
+                            )
+                        }
+                    }
                 }
 
                 if (!video.overview.isNullOrBlank()) {
@@ -1165,14 +1308,27 @@ private fun seriesContentSizing(maxWidthDp: Float): SeriesContentSizing =
 
 private fun Int.label(): String =
     if (this <= 0) {
-        "Specials"
+        runBlocking { getString(Res.string.episodes_specials) }
     } else {
-        "Season $this"
+        runBlocking { getString(Res.string.episodes_season, this@label) }
     }
 
 private fun MetaVideo.episodeBadge(): String =
     when {
-        episode != null -> "E${episode.toString().padStart(2, '0')}"
-        season != null -> "S${season.toString().padStart(2, '0')}"
-        else -> "FILE"
+        episode != null || season != null ->
+            localizedSeasonEpisodeCode(seasonNumber = season, episodeNumber = episode).orEmpty()
+        else -> runBlocking { getString(Res.string.details_episode_badge_file) }
     }
+
+private fun MetaVideo.seasonEpisodeKey(): Pair<Int, Int>? {
+    val seasonNumber = season ?: return null
+    val episodeNumber = episode ?: return null
+    return seasonNumber to episodeNumber
+}
+
+private fun formatEpisodeRating(rating: Double): String {
+    val roundedTenths = (rating * 10.0).roundToInt()
+    val whole = roundedTenths / 10
+    val tenth = (roundedTenths % 10).absoluteValue
+    return "$whole.$tenth"
+}

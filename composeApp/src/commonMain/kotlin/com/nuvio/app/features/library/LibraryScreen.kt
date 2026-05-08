@@ -32,6 +32,8 @@ import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 fun LibraryScreen(
@@ -49,6 +51,12 @@ fun LibraryScreen(
     var observedOfflineState by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val isTraktSource = uiState.sourceMode == LibrarySourceMode.TRAKT
+    val retryLibraryLoad: () -> Unit = {
+        NetworkStatusRepository.requestRefresh(force = true)
+        coroutineScope.launch {
+            LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
+        }
+    }
 
 
     LaunchedEffect(networkStatusUiState.condition, isTraktSource) {
@@ -86,7 +94,11 @@ fun LibraryScreen(
                     .background(MaterialTheme.colorScheme.background),
             ) {
                 NuvioScreenHeader(
-                    title = if (isTraktSource) "Trakt Library" else "Library",
+                    title = if (isTraktSource) {
+                        stringResource(Res.string.library_trakt_title)
+                    } else {
+                        stringResource(Res.string.library_title)
+                    },
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -106,20 +118,19 @@ fun LibraryScreen(
                         NuvioNetworkOfflineCard(
                             condition = networkStatusUiState.condition,
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            onRetry = {
-                                NetworkStatusRepository.requestRefresh(force = true)
-                                if (isTraktSource) {
-                                    coroutineScope.launch {
-                                        LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
-                                    }
-                                }
-                            },
+                            onRetry = retryLibraryLoad,
                         )
                     } else {
                         HomeEmptyStateCard(
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            title = if (isTraktSource) "Couldn't load Trakt library" else "Couldn't load library",
+                            title = if (isTraktSource) {
+                                stringResource(Res.string.library_trakt_load_failed)
+                            } else {
+                                stringResource(Res.string.library_load_failed)
+                            },
                             message = uiState.errorMessage.orEmpty(),
+                            actionLabel = stringResource(Res.string.action_retry),
+                            onActionClick = retryLibraryLoad,
                         )
                     }
                 }
@@ -131,21 +142,20 @@ fun LibraryScreen(
                         NuvioNetworkOfflineCard(
                             condition = networkStatusUiState.condition,
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            onRetry = {
-                                NetworkStatusRepository.requestRefresh(force = true)
-                                coroutineScope.launch {
-                                    LibraryRepository.pullFromServer(ProfileRepository.activeProfileId)
-                                }
-                            },
+                            onRetry = retryLibraryLoad,
                         )
                     } else {
                         HomeEmptyStateCard(
                             modifier = Modifier.padding(horizontal = 16.dp),
-                            title = if (isTraktSource) "Your Trakt library is empty" else "Your library is empty",
-                            message = if (isTraktSource) {
-                                "Connect Trakt and save titles to your watchlist or personal lists."
+                            title = if (isTraktSource) {
+                                stringResource(Res.string.library_trakt_empty_title)
                             } else {
-                                "Saved titles will appear here after you tap Save on a details screen."
+                                stringResource(Res.string.library_empty_title)
+                            },
+                            message = if (isTraktSource) {
+                                stringResource(Res.string.library_trakt_empty_message)
+                            } else {
+                                stringResource(Res.string.library_empty_message)
                             },
                         )
                     }
@@ -164,6 +174,21 @@ fun LibraryScreen(
             }
         }
     }
+
+    NuvioStatusModal(
+        title = stringResource(Res.string.library_remove_title),
+        message = pendingRemovalItem?.let {
+            stringResource(Res.string.library_remove_message, it.name)
+        }.orEmpty(),
+        isVisible = pendingRemovalItem != null,
+        confirmText = stringResource(Res.string.library_remove_confirm),
+        dismissText = stringResource(Res.string.action_cancel),
+        onConfirm = {
+            pendingRemovalItem?.id?.let(LibraryRepository::remove)
+            pendingRemovalItem = null
+        },
+        onDismiss = { pendingRemovalItem = null },
+    )
 }
 
 private fun LazyListScope.librarySections(
