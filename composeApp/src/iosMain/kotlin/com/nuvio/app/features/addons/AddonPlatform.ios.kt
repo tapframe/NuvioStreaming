@@ -46,10 +46,21 @@ private val addonHttpClient = HttpClient(Darwin) {
     expectSuccess = false
 }
 
+private fun Map<String, String>.hasHeaderIgnoreCase(name: String): Boolean =
+    keys.any { it.equals(name, ignoreCase = true) }
+
+private fun Map<String, String>.withDefaultAcceptLanguage(): Map<String, String> =
+    if (hasHeaderIgnoreCase("Accept-Language")) {
+        this
+    } else {
+        this + ("Accept-Language" to buildAcceptLanguageHeader())
+    }
+
 actual suspend fun httpGetText(url: String): String =
     addonHttpClient
         .get(url) {
             accept(ContentType.Application.Json)
+            header(HttpHeaders.AcceptLanguage, buildAcceptLanguageHeader())
         }
         .let { response ->
             val payload = response.bodyAsText()
@@ -67,6 +78,7 @@ actual suspend fun httpPostJson(url: String, body: String): String =
         .post(url) {
             accept(ContentType.Application.Json)
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            header(HttpHeaders.AcceptLanguage, buildAcceptLanguageHeader())
             setBody(body)
         }
         .let { response ->
@@ -87,7 +99,7 @@ actual suspend fun httpGetTextWithHeaders(
     addonHttpClient
         .get(url) {
             accept(ContentType.Application.Json)
-            headers.forEach { (key, value) ->
+            headers.withDefaultAcceptLanguage().forEach { (key, value) ->
                 header(key, value)
             }
         }
@@ -111,7 +123,7 @@ actual suspend fun httpPostJsonWithHeaders(
         .post(url) {
             accept(ContentType.Application.Json)
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            headers.forEach { (key, value) ->
+            headers.withDefaultAcceptLanguage().forEach { (key, value) ->
                 header(key, value)
             }
             setBody(body)
@@ -138,7 +150,7 @@ actual suspend fun httpRequestRaw(
         .request {
             url(url)
             this.method = HttpMethod.parse(method.uppercase())
-            headers.forEach { (key, value) ->
+            headers.withDefaultAcceptLanguage().forEach { (key, value) ->
                 header(key, value)
             }
             if (this.method == HttpMethod.Post || this.method == HttpMethod.Put || this.method == HttpMethod.Patch) {

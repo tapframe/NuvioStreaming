@@ -71,6 +71,13 @@ private fun Map<String, String>.withoutAcceptEncoding(): Map<String, String> =
 private fun Map<String, String>.getHeaderIgnoreCase(name: String): String? =
     entries.firstOrNull { (key, _) -> key.equals(name, ignoreCase = true) }?.value
 
+private fun Map<String, String>.withDefaultAcceptLanguage(): Map<String, String> =
+    if (getHeaderIgnoreCase("Accept-Language") != null) {
+        this
+    } else {
+        this + ("Accept-Language" to buildAcceptLanguageHeader())
+    }
+
 private data class LimitedReadResult(
     val bytes: ByteArray,
     val truncated: Boolean,
@@ -134,7 +141,7 @@ private suspend fun executeTextRequest(
     body: String = "",
 ): String = withContext(Dispatchers.IO) {
     val normalizedMethod = method.uppercase()
-    val sanitizedHeaders = headers.withoutAcceptEncoding()
+    val sanitizedHeaders = headers.withoutAcceptEncoding().withDefaultAcceptLanguage()
     val builder = Request.Builder().url(url)
     sanitizedHeaders.forEach { (key, value) ->
         builder.header(key, value)
@@ -214,7 +221,7 @@ actual suspend fun httpRequestRaw(
 ): RawHttpResponse =
     withContext(Dispatchers.IO) {
         val normalizedMethod = method.uppercase()
-        val sanitizedHeaders = headers.withoutAcceptEncoding()
+        val sanitizedHeaders = headers.withoutAcceptEncoding().withDefaultAcceptLanguage()
         val builder = Request.Builder().url(url)
         sanitizedHeaders.forEach { (key, value) ->
             builder.header(key, value)
