@@ -1062,7 +1062,7 @@
     <string name="streams_no_direct_link">Nenhum link direto de stream disponível</string>
     <string name="streams_no_metadata">Nenhum metadado disponível</string>
     <string name="streams_refresh">Atualizar streams</string>
-    <string name="streams_resume_from_percent">Continuar de %1$d%%</string>
+    <string name="streams_resume_from_percent">Continuar de %1$d%</string>
     <string name="streams_resume_from_time">Continuar de %1$s</string>
     <string name="streams_size">TAMANHO %1$s</string>
     <string name="streams_torrent_not_supported">Streams via torrent não são suportados</string>
@@ -1073,7 +1073,7 @@
     <string name="updates_asset_line">%1$s • %2$s</string>
     <string name="updates_check_failed">Falha na verificação de atualização</string>
     <string name="updates_download_failed">Falha no download</string>
-    <string name="updates_downloading_progress">Baixando %1$d%%</string>
+    <string name="updates_downloading_progress">Baixando %1$d%</string>
     <string name="updates_install_failed">Não foi possível iniciar a instalação</string>
     <string name="updates_latest_version">Você está usando a versão mais recente.</string>
     <string name="updates_message_allow_installs">Ative a instalação de apps para o Nuvio, depois volte e continue.</string>
