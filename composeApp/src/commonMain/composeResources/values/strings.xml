@@ -391,6 +391,9 @@
     <string name="compose_settings_root_switch_profile_description">Change to a different profile.</string>
     <string name="compose_settings_root_switch_profile_title">Switch Profile</string>
     <string name="compose_settings_root_trakt_description">Open Trakt connection screen</string>
+    <string name="settings_search_empty">No settings found.</string>
+    <string name="settings_search_placeholder">Search settings...</string>
+    <string name="settings_search_results_section">RESULTS</string>
     <string name="compose_trakt_list_picker_loading">Loading your Trakt lists…</string>
     <string name="compose_trakt_list_picker_subtitle">Choose where to save this title on Trakt</string>
     <string name="action_donate">Donate</string>
@@ -1118,6 +1121,7 @@
     <string name="downloads_live_failed">Download failed</string>
     <string name="downloads_live_paused">Paused %1$s</string>
     <string name="library_remove_confirm">Remove</string>
+    <string name="library_remove_from_list_message">Remove %1$s from %2$s?</string>
     <string name="library_remove_message">Remove %1$s from your library?</string>
     <string name="library_remove_title">Remove from Library?</string>
     <string name="media_movie">Movie</string>

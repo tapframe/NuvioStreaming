@@ -4,6 +4,8 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.features.collection.CollectionMobileSettingsRepository
+import com.nuvio.app.features.collection.CollectionMobileSettingsStorage
 import com.nuvio.app.features.details.MetaScreenSettingsStorage
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.mdblist.MdbListMetadataService
@@ -158,6 +160,7 @@ object ProfileSettingsSync {
             TmdbSettingsRepository.uiState.map { "tmdb" },
             MdbListSettingsRepository.uiState.map { "mdblist" },
             MetaScreenSettingsRepository.uiState.map { "meta" },
+            CollectionMobileSettingsRepository.uiState.map { "collection_mobile_settings" },
             ContinueWatchingPreferencesRepository.uiState.map { "continue_watching" },
             TraktSettingsRepository.uiState.map { "trakt_settings" },
             TraktCommentsSettings.enabled.map { "trakt_comments" },
@@ -202,6 +205,7 @@ object ProfileSettingsSync {
                 tmdbSettings = TmdbSettingsStorage.exportToSyncPayload(),
                 mdbListSettings = MdbListSettingsStorage.exportToSyncPayload(),
                 metaScreenSettingsPayload = MetaScreenSettingsStorage.loadPayload().orEmpty().trim(),
+                collectionMobileSettingsPayload = CollectionMobileSettingsStorage.loadPayload().orEmpty().trim(),
                 continueWatchingSettingsPayload = ContinueWatchingPreferencesStorage.loadPayload().orEmpty().trim(),
                 traktSettingsPayload = TraktSettingsStorage.loadPayload().orEmpty().trim(),
                 traktCommentsSettings = TraktCommentsStorage.exportToSyncPayload(),
@@ -232,6 +236,9 @@ object ProfileSettingsSync {
         MetaScreenSettingsStorage.savePayload(blob.features.metaScreenSettingsPayload)
         MetaScreenSettingsRepository.onProfileChanged()
 
+        CollectionMobileSettingsStorage.savePayload(blob.features.collectionMobileSettingsPayload)
+        CollectionMobileSettingsRepository.onProfileChanged()
+
         ContinueWatchingPreferencesStorage.savePayload(blob.features.continueWatchingSettingsPayload)
         ContinueWatchingPreferencesRepository.onProfileChanged()
 
@@ -251,6 +258,7 @@ object ProfileSettingsSync {
         TmdbSettingsRepository.ensureLoaded()
         MdbListSettingsRepository.ensureLoaded()
         MetaScreenSettingsRepository.ensureLoaded()
+        CollectionMobileSettingsRepository.ensureLoaded()
         ContinueWatchingPreferencesRepository.ensureLoaded()
         TraktSettingsRepository.ensureLoaded()
         TraktCommentsSettings.ensureLoaded()
@@ -272,6 +280,7 @@ object ProfileSettingsSync {
         "tmdb=${TmdbSettingsRepository.uiState.value}",
         "mdblist=${MdbListSettingsRepository.uiState.value}",
         "meta=${MetaScreenSettingsRepository.uiState.value}",
+        "collection_mobile_settings=${CollectionMobileSettingsRepository.uiState.value}",
         "continue=${ContinueWatchingPreferencesRepository.uiState.value}",
         "trakt_settings=${TraktSettingsRepository.uiState.value}",
         "trakt_comments=${TraktCommentsSettings.enabled.value}",
@@ -293,6 +302,7 @@ private data class MobileProfileSettingsFeatures(
     @SerialName("tmdb_settings") val tmdbSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("mdblist_settings") val mdbListSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("meta_screen_settings_payload") val metaScreenSettingsPayload: String = "",
+    @SerialName("collection_mobile_settings_payload") val collectionMobileSettingsPayload: String = "",
     @SerialName("continue_watching_settings_payload") val continueWatchingSettingsPayload: String = "",
     @SerialName("trakt_settings_payload") val traktSettingsPayload: String = "",
     @SerialName("trakt_comments_settings") val traktCommentsSettings: JsonObject = JsonObject(emptyMap()),

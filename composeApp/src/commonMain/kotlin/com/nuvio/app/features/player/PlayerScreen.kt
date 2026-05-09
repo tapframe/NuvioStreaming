@@ -1449,13 +1449,17 @@ fun PlayerScreen(
                             totalDy += delta.y
 
                             if (gestureMode == null) {
+                                val holdToSpeedActive = isHoldToSpeedGestureActiveState.value
                                 val horizontalDominant =
                                     playerSettingsUiState.swipeToSeekEnabled &&
-                                        !isHoldToSpeedGestureActiveState.value &&
-                                        abs(totalDx) > viewConfiguration.touchSlop * playerSettingsUiState.swipeToSeekSensitivity.triggerMultiplier &&
+                                        !holdToSpeedActive &&
+                                        abs(totalDx) > viewConfiguration.touchSlop *
+                                            playerSettingsUiState.swipeToSeekSensitivity.triggerMultiplier &&
                                         abs(totalDx) > abs(totalDy)
                                 val verticalDominant =
-                                    abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
+                                    !holdToSpeedActive &&
+                                        abs(totalDy) > viewConfiguration.touchSlop &&
+                                        abs(totalDy) > abs(totalDx)
 
                                 gestureMode = when {
                                     horizontalDominant -> {
