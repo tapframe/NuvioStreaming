@@ -364,6 +364,14 @@ android {
             }
         }
     }
+    splits {
+        abi {
+            isEnable = providers.gradleProperty("nuvio.splitAbi").orNull == "true"
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
+        }
+    }
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
