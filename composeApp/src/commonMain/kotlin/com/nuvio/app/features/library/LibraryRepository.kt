@@ -296,6 +296,14 @@ object LibraryRepository {
         }
     }
 
+    suspend fun removeFromList(item: LibraryItem, listKey: String) {
+        val desiredMembership = libraryMembershipWithRemovedList(
+            currentMembership = getMembershipSnapshot(item),
+            listKey = listKey,
+        )
+        applyMembershipChanges(item, desiredMembership)
+    }
+
     private fun pushToServer() {
         syncScope.launch {
             runCatching {
@@ -415,6 +423,14 @@ internal fun libraryMembershipWithLocal(
 ): Map<String, Boolean> =
     linkedMapOf<String, Boolean>(LOCAL_LIBRARY_LIST_KEY to inLocal).apply {
         putAll(traktMembership)
+    }
+
+internal fun libraryMembershipWithRemovedList(
+    currentMembership: Map<String, Boolean>,
+    listKey: String,
+): Map<String, Boolean> =
+    currentMembership.toMutableMap().apply {
+        this[listKey] = false
     }
 
 private fun LibrarySyncItem.toLibraryItem(): LibraryItem = LibraryItem(

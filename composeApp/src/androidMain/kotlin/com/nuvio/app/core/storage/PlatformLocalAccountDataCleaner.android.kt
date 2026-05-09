@@ -23,6 +23,7 @@ internal actual object PlatformLocalAccountDataCleaner {
         "nuvio_episode_release_notifications",
         "nuvio_episode_release_notifications_platform",
         "nuvio_watch_progress",
+        "nuvio_collection_mobile_settings",
         "nuvio_collections",
         "nuvio_plugins",
     )

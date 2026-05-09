@@ -645,7 +645,7 @@
     <string name="settings_playback_map_dv7_to_hevc_description">Utiliser Dolby Vision Profil 7 vers HEVC comme alternative pour les appareils non compatibles.</string>
     <string name="settings_playback_minutes_before_end">Minutes avant la fin</string>
     <string name="settings_playback_minutes_before_end_description">Afficher la carte de l'épisode suivant ce nombre de minutes avant la fin.</string>
-    <string name="settings_playback_minutes_value">%1$d min</string>
+    <string name="settings_playback_minutes_value">%1$s min</string>
     <string name="settings_playback_no_items_available">Aucun élément disponible</string>
     <string name="settings_playback_not_set">Non défini</string>
     <string name="settings_playback_option_default">Par défaut</string>
@@ -720,9 +720,9 @@
     <string name="settings_playback_threshold_mode_percentage">Pourcentage</string>
     <string name="settings_playback_threshold_percentage">Pourcentage de seuil</string>
     <string name="settings_playback_threshold_percentage_description">Afficher la carte de l'épisode suivant lorsque la lecture atteint ce pourcentage.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$d%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
     <string name="settings_playback_timeout_instant">Instantané</string>
-    <string name="settings_playback_timeout_seconds">%1$ds</string>
+    <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Illimité</string>
     <string name="settings_playback_tunneled_playback">Lecture tunnelisée</string>
     <string name="settings_playback_tunneled_playback_description">Active la lecture tunnelisée pour une latence réduite dans la synchronisation audio/vidéo.</string>

@@ -391,6 +391,9 @@
     <string name="compose_settings_root_switch_profile_description">Change to a different profile.</string>
     <string name="compose_settings_root_switch_profile_title">Switch Profile</string>
     <string name="compose_settings_root_trakt_description">Open Trakt connection screen</string>
+    <string name="settings_search_empty">No settings found.</string>
+    <string name="settings_search_placeholder">Search settings...</string>
+    <string name="settings_search_results_section">RESULTS</string>
     <string name="compose_trakt_list_picker_loading">Loading your Trakt lists…</string>
     <string name="compose_trakt_list_picker_subtitle">Choose where to save this title on Trakt</string>
     <string name="action_donate">Donate</string>
@@ -663,7 +666,7 @@
     <string name="settings_playback_map_dv7_to_hevc_description">Map Dolby Vision Profile 7 to standard HEVC for devices without DV hardware support</string>
     <string name="settings_playback_minutes_before_end">Threshold Minutes</string>
     <string name="settings_playback_minutes_before_end_description">Fallback when no outro timestamp exists.</string>
-    <string name="settings_playback_minutes_value">%1$d min</string>
+    <string name="settings_playback_minutes_value">%1$s min</string>
     <string name="settings_playback_no_items_available">No items available</string>
     <string name="settings_playback_not_set">Not set</string>
     <string name="settings_playback_option_default">Default (media file)</string>
@@ -738,9 +741,9 @@
     <string name="settings_playback_threshold_mode_percentage">Percentage</string>
     <string name="settings_playback_threshold_percentage">Threshold Percentage</string>
     <string name="settings_playback_threshold_percentage_description">Fallback when no outro timestamp exists.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$d%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
     <string name="settings_playback_timeout_instant">Instant</string>
-    <string name="settings_playback_timeout_seconds">%1$ds</string>
+    <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Unlimited</string>
     <string name="settings_playback_tunneled_playback">Tunneled Playback</string>
     <string name="settings_playback_tunneled_playback_description">Hardware-level audio/video sync. May improve playback on some Android TV devices</string>
@@ -1111,6 +1114,7 @@
     <string name="downloads_live_failed">Download failed</string>
     <string name="downloads_live_paused">Paused %1$s</string>
     <string name="library_remove_confirm">Remove</string>
+    <string name="library_remove_from_list_message">Remove %1$s from %2$s?</string>
     <string name="library_remove_message">Remove %1$s from your library?</string>
     <string name="library_remove_title">Remove from Library?</string>
     <string name="media_movie">Movie</string>

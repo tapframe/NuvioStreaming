@@ -195,10 +195,10 @@ object CollectionEditorRepository {
         )
     }
 
-    fun updateFolderFocusGifEnabled(enabled: Boolean) {
+    fun updateFolderMobileFocusGifEnabled(enabled: Boolean) {
         val folder = _uiState.value.editingFolder ?: return
         _uiState.value = _uiState.value.copy(
-            editingFolder = folder.copy(focusGifEnabled = enabled),
+            editingFolder = folder.copy(mobileFocusGifEnabled = enabled),
         )
     }
 
@@ -807,6 +807,8 @@ object CollectionEditorRepository {
             showAllTab = state.showAllTab,
             folders = state.folders,
         )
+
+        CollectionMobileSettingsRepository.replaceCollectionFolderGifSettings(collection.id, collection.folders)
 
         if (state.isNew) {
             CollectionRepository.addCollection(collection)
