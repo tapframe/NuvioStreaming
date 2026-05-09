@@ -60,7 +60,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Configure Android signing if secrets are present
+      - name: Configure Android release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.NUVIO_RELEASE_STORE_PASSWORD }}
@@ -68,18 +68,33 @@ jobs:
           KEY_PASSWORD: ${{ secrets.NUVIO_RELEASE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if [[ -z "${KEYSTORE_BASE64:-}" ]]; then
-            echo "::warning::Android release signing secrets are not set — APKs will be unsigned."
-            exit 0
+          if [[ -n "${KEYSTORE_BASE64:-}" ]]; then
+            keystore_path="$RUNNER_TEMP/nuvio-release.keystore"
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore_path"
+            store_password="$KEYSTORE_PASSWORD"
+            key_alias="$KEY_ALIAS"
+            key_password="$KEY_PASSWORD"
+            echo "Using release keystore from secrets."
+          else
+            echo "::warning::Release signing secrets not set — generating an ephemeral debug-style keystore so the build can complete. APKs will not be installable over signed production builds."
+            keystore_path="$RUNNER_TEMP/nuvio-fallback.keystore"
+            store_password="android"
+            key_alias="androiddebugkey"
+            key_password="android"
+            keytool -genkeypair -v \
+              -keystore "$keystore_path" \
+              -storepass "$store_password" \
+              -keypass "$key_password" \
+              -alias "$key_alias" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
           fi
-          keystore_path="$RUNNER_TEMP/nuvio-release.keystore"
-          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore_path"
           {
             echo ""
             echo "NUVIO_RELEASE_STORE_FILE=$keystore_path"
-            echo "NUVIO_RELEASE_STORE_PASSWORD=$KEYSTORE_PASSWORD"
-            echo "NUVIO_RELEASE_KEY_ALIAS=$KEY_ALIAS"
-            echo "NUVIO_RELEASE_KEY_PASSWORD=$KEY_PASSWORD"
+            echo "NUVIO_RELEASE_STORE_PASSWORD=$store_password"
+            echo "NUVIO_RELEASE_KEY_ALIAS=$key_alias"
+            echo "NUVIO_RELEASE_KEY_PASSWORD=$key_password"
           } >> local.properties
 
       - name: Build per-ABI release APKs (full + playstore)
