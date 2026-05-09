@@ -52,7 +52,8 @@ object CollectionRepository {
         runCatching {
             val parsed = json.parseToJsonElement(payload)
             rawCollectionsJson = parsed
-            _collections.value = json.decodeFromString<List<Collection>>(payload)
+            val decoded = json.decodeFromString<List<Collection>>(payload)
+            _collections.value = CollectionMobileSettingsRepository.applyToCollections(decoded)
         }.onFailure { e ->
             log.e(e) { "Failed to load collections from storage" }
         }
@@ -75,14 +76,15 @@ object CollectionRepository {
 
     fun addCollection(collection: Collection) {
         ensureLoaded()
-        _collections.value = _collections.value + collection
+        _collections.value = _collections.value + CollectionMobileSettingsRepository.applyToCollection(collection)
         persist()
     }
 
     fun updateCollection(collection: Collection) {
         ensureLoaded()
+        val decorated = CollectionMobileSettingsRepository.applyToCollection(collection)
         _collections.value = _collections.value.map {
-            if (it.id == collection.id) collection else it
+            if (it.id == collection.id) decorated else it
         }
         persist()
     }
@@ -95,7 +97,7 @@ object CollectionRepository {
 
     fun setCollections(collections: List<Collection>) {
         ensureLoaded()
-        _collections.value = collections
+        _collections.value = CollectionMobileSettingsRepository.applyToCollections(collections)
         persist()
     }
 
@@ -127,7 +129,7 @@ object CollectionRepository {
         return runCatching {
             rawCollectionsJson = json.parseToJsonElement(jsonString)
             val imported = json.decodeFromString<List<Collection>>(jsonString)
-            _collections.value = imported
+            _collections.value = CollectionMobileSettingsRepository.applyToCollections(imported)
             persist()
             imported
         }
@@ -262,8 +264,13 @@ object CollectionRepository {
 
     internal fun applyFromRemote(collections: List<Collection>, rawJson: JsonElement) {
         rawCollectionsJson = rawJson
-        _collections.value = collections
+        _collections.value = CollectionMobileSettingsRepository.applyToCollections(collections)
         persist(sync = false)
+    }
+
+    internal fun onMobileSettingsChanged() {
+        if (!hasLoaded) return
+        _collections.value = CollectionMobileSettingsRepository.applyToCollections(_collections.value)
     }
 
     private fun ensureLoaded() {

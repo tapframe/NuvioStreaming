@@ -103,8 +103,9 @@ internal object PluginRuntime {
                     val method = args.getOrNull(1)?.toString() ?: "GET"
                     val headersJson = args.getOrNull(2)?.toString() ?: "{}"
                     val body = args.getOrNull(3)?.toString() ?: ""
+                    val followRedirects = args.getOrNull(4) as? Boolean ?: true
                     try {
-                        performNativeFetch(url, method, headersJson, body)
+                        performNativeFetch(url, method, headersJson, body, followRedirects)
                     } catch (t: Throwable) {
                         log.e(t) { "Fetch bridge error for $method $url" }
                         JsonObject(
@@ -315,6 +316,7 @@ internal object PluginRuntime {
         method: String,
         headersJson: String,
         body: String,
+        followRedirects: Boolean,
     ): String {
         return try {
             val headers = parseHeaders(headersJson).toMutableMap()
@@ -328,6 +330,7 @@ internal object PluginRuntime {
                     url = url,
                     headers = headers,
                     body = body,
+                    followRedirects = followRedirects,
                 )
             }
 
@@ -490,7 +493,8 @@ internal object PluginRuntime {
                 var method = (options.method || 'GET').toUpperCase();
                 var headers = options.headers || {};
                 var body = options.body || '';
-                var result = __native_fetch(url, method, JSON.stringify(headers), body);
+                var followRedirects = options.redirect !== 'manual';
+                var result = __native_fetch(url, method, JSON.stringify(headers), body, followRedirects);
                 var parsed = JSON.parse(result);
                 return {
                     ok: parsed.ok,
