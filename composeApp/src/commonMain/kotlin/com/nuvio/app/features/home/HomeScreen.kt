@@ -70,6 +70,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    animateCollectionGifs: Boolean = true,
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
@@ -560,6 +561,7 @@ fun HomeScreen(
                                         collection = collection,
                                         modifier = Modifier.padding(bottom = 12.dp),
                                         sectionPadding = homeSectionPadding,
+                                        animateGifs = animateCollectionGifs,
                                         onFolderClick = onFolderClick,
                                     )
                                 }
