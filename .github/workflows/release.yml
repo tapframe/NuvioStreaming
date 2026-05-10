@@ -165,6 +165,20 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # The Release Kotlin/Native link of the iOS framework regularly needs
+      # 8–10 GB of heap (Compose + Ktor + Supabase). Override at the user
+      # level so we don't have to raise the project default for local devs.
+      - name: Raise Gradle heap for Kotlin/Native release link
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.gradle"
+          cat >> "$HOME/.gradle/gradle.properties" <<'EOF'
+          org.gradle.jvmargs=-Xmx10g -Dfile.encoding=UTF-8 -XX:MaxMetaspaceSize=1g
+          kotlin.daemon.jvmargs=-Xmx4g
+          EOF
+          # Make sure no stale daemon is hanging around with the old args.
+          ./gradlew --stop || true
+
       - name: Archive iOS app (Release, unsigned)
         run: |
           set -euo pipefail
