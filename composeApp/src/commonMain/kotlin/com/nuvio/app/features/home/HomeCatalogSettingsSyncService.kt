@@ -41,6 +41,7 @@ data class SyncCatalogItem(
 
 @Serializable
 data class SyncHomeCatalogPayload(
+    @SerialName("hide_unreleased_content") val hideUnreleasedContent: Boolean = false,
     val items: List<SyncCatalogItem> = emptyList(),
 )
 
@@ -101,7 +102,10 @@ object HomeCatalogSettingsSyncService {
             }
 
             if (remotePayload.items.isEmpty()) {
-                log.i { "pullFromServer — remote has empty items, preserving local" }
+                log.i { "pullFromServer — remote has empty items, preserving local catalog order" }
+                isSyncingFromRemote = true
+                HomeCatalogSettingsRepository.applyFromRemote(remotePayload)
+                isSyncingFromRemote = false
                 val localPayload = HomeCatalogSettingsRepository.exportToSyncPayload()
                 if (localPayload.items.isNotEmpty()) {
                     pushToRemote(profileId)

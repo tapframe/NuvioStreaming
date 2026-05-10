@@ -50,6 +50,18 @@ data class IntroDbSegment(
     @SerialName("updated_at") val updatedAt: String? = null,
 )
 
+@Serializable
+data class SubmitIntroRequest(
+    @SerialName("imdb_id") val imdbId: String,
+    @SerialName("season") val season: Int,
+    @SerialName("episode") val episode: Int,
+    @SerialName("start_sec") val startSec: Double,
+    @SerialName("end_sec") val endSec: Double,
+    @SerialName("start_ms") val startMs: Long,
+    @SerialName("end_ms") val endMs: Long,
+    @SerialName("segment_type") val segmentType: String,
+)
+
 // --- AniSkip API response models ---
 
 @Serializable

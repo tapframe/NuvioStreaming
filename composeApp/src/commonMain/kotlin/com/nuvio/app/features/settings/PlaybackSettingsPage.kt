@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BasicAlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +47,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
@@ -58,9 +62,11 @@ import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.isIos
+import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 internal fun LazyListScope.playbackSettingsContent(
     isTablet: Boolean,
@@ -96,6 +102,47 @@ internal fun LazyListScope.playbackSettingsContent(
             tunnelingEnabled = tunnelingEnabled,
             useLibass = useLibass,
             libassRenderType = libassRenderType,
+        )
+    }
+}
+
+private fun formatStep(value: Float): String {
+    return if (value % 1f == 0f) {
+        value.toInt().toString()
+    } else {
+        value.toString()
+    }
+}
+
+fun snapToStep(value: Float, step: Float): Float {
+    return (value / step).roundToInt() * step
+}
+
+fun calculateSteps(
+    min: Float,
+    max: Float,
+    stepSize: Float
+): Int {
+    val totalSteps = ((max - min) / stepSize).roundToInt()
+    return (totalSteps - 1).coerceAtLeast(0)
+}
+
+@Composable
+fun ValueBox(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
         )
     }
 }
@@ -282,10 +329,9 @@ private fun PlaybackSettingsSection(
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                 Text(
                                     text = stringResource(Res.string.settings_playback_stream_timeout),
                                     style = MaterialTheme.typography.bodyLarge,
@@ -293,26 +339,22 @@ private fun PlaybackSettingsSection(
                                 )
                                 Text(
                                     text = stringResource(Res.string.settings_playback_stream_timeout_description),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Text(
-                                text = timeoutLabel,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                            ValueBox(text = timeoutLabel, modifier = Modifier.wrapContentWidth())
                         }
                         var sliderValue by remember(timeoutSec) { mutableFloatStateOf(timeoutSec.toFloat()) }
-                        var lastHapticStep by remember(timeoutSec) { mutableStateOf(timeoutSec) }
+                        var lastHapticStep by remember(timeoutSec) { mutableStateOf(timeoutSec.toFloat()) }
                         Slider(
                             value = sliderValue,
                             onValueChange = {
-                                sliderValue = it
-                                val steppedValue = it.toInt()
-                                if (steppedValue != lastHapticStep) {
-                                    lastHapticStep = steppedValue
+                                val snapped = snapToStep(it, 1f)
+                                sliderValue = snapped
+
+                                if (snapped != lastHapticStep) {
+                                    lastHapticStep = snapped
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 }
                             },
@@ -320,7 +362,7 @@ private fun PlaybackSettingsSection(
                                 PlayerSettingsRepository.setStreamAutoPlayTimeoutSeconds(sliderValue.toInt())
                             },
                             valueRange = 0f..11f,
-                            steps = 10,
+                            steps = calculateSteps(0f, 11f, 1f),
                             colors = SliderDefaults.colors(
                                 thumbColor = MaterialTheme.colorScheme.primary,
                                 activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -472,6 +514,35 @@ private fun PlaybackSettingsSection(
                         )
                     }
                 }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_intro_submit_enabled),
+                    description = stringResource(Res.string.settings_playback_intro_submit_enabled_description),
+                    checked = autoPlayPlayerSettings.introSubmitEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setIntroSubmitEnabled,
+                )
+                if (autoPlayPlayerSettings.introSubmitEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    var showIntroDbApiKeyDialog by remember { mutableStateOf(false) }
+                    val notSetLabel = stringResource(Res.string.settings_playback_not_set)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_introdb_api_key),
+                        description = autoPlayPlayerSettings.introDbApiKey.ifBlank { notSetLabel },
+                        isTablet = isTablet,
+                        onClick = { showIntroDbApiKeyDialog = true },
+                    )
+                    if (showIntroDbApiKeyDialog) {
+                        IntroDbApiKeyDialog(
+                            initialValue = autoPlayPlayerSettings.introDbApiKey,
+                            onSave = {
+                                PlayerSettingsRepository.setIntroDbApiKey(it)
+                                showIntroDbApiKeyDialog = false
+                            },
+                            onDismiss = { showIntroDbApiKeyDialog = false },
+                        )
+                    }
+                }
             }
         }
 
@@ -524,10 +595,9 @@ private fun PlaybackSettingsSection(
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                     Text(
                                         text = stringResource(Res.string.settings_playback_threshold_percentage),
                                         style = MaterialTheme.typography.bodyLarge,
@@ -535,37 +605,32 @@ private fun PlaybackSettingsSection(
                                     )
                                     Text(
                                         text = stringResource(Res.string.settings_playback_threshold_percentage_description),
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = stringResource(
-                                        Res.string.settings_playback_threshold_percentage_value,
-                                        thresholdPercent.toInt(),
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                ValueBox(text = stringResource(
+                                    Res.string.settings_playback_threshold_percentage_value,
+                                    formatStep(thresholdPercent)), modifier = Modifier.wrapContentWidth())
                             }
-                            var sliderVal by remember(thresholdPercent) { mutableFloatStateOf(thresholdPercent) }
-                            var lastHapticPercent by remember(thresholdPercent) { mutableStateOf(thresholdPercent.toInt()) }
+                            var sliderValue by remember(thresholdPercent) { mutableFloatStateOf(thresholdPercent) }
+                            var lastHapticPercent by remember(thresholdPercent) { mutableStateOf(thresholdPercent) }
                             Slider(
-                                value = sliderVal,
+                                value = sliderValue,
                                 onValueChange = {
-                                    sliderVal = it
-                                    val stepped = it.toInt()
-                                    if (stepped != lastHapticPercent) {
-                                        lastHapticPercent = stepped
+                                    val snapped = snapToStep(it, 0.5f)
+                                    sliderValue = snapped
+
+                                    if (snapped != lastHapticPercent) {
+                                        lastHapticPercent = snapped
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     }
                                 },
                                 onValueChangeFinished = {
-                                    PlayerSettingsRepository.setNextEpisodeThresholdPercent(sliderVal)
+                                    PlayerSettingsRepository.setNextEpisodeThresholdPercent(sliderValue)
                                 },
-                                valueRange = 50f..100f,
-                                steps = 49,
+                                valueRange = 97f..100f,
+                                steps = calculateSteps(97f, 100f, 0.5f),
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -583,10 +648,9 @@ private fun PlaybackSettingsSection(
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                     Text(
                                         text = stringResource(Res.string.settings_playback_minutes_before_end),
                                         style = MaterialTheme.typography.bodyLarge,
@@ -594,37 +658,32 @@ private fun PlaybackSettingsSection(
                                     )
                                     Text(
                                         text = stringResource(Res.string.settings_playback_minutes_before_end_description),
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = stringResource(
+                                ValueBox(text = stringResource(
                                         Res.string.settings_playback_minutes_value,
-                                        thresholdMinutes.toInt(),
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                        formatStep(thresholdMinutes)), modifier = Modifier.wrapContentWidth())
                             }
-                            var sliderVal by remember(thresholdMinutes) { mutableFloatStateOf(thresholdMinutes) }
-                            var lastHapticMin by remember(thresholdMinutes) { mutableStateOf(thresholdMinutes.toInt()) }
+                            var sliderValue by remember(thresholdMinutes) { mutableFloatStateOf(thresholdMinutes) }
+                            var lastHapticMin by remember(thresholdMinutes) { mutableStateOf(thresholdMinutes) }
                             Slider(
-                                value = sliderVal,
+                                value = sliderValue,
                                 onValueChange = {
-                                    sliderVal = it
-                                    val stepped = it.toInt()
-                                    if (stepped != lastHapticMin) {
-                                        lastHapticMin = stepped
+                                    val snapped = snapToStep(it, 0.5f)
+                                    sliderValue = snapped
+
+                                    if (snapped != lastHapticMin) {
+                                        lastHapticMin = snapped
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     }
                                 },
                                 onValueChangeFinished = {
-                                    PlayerSettingsRepository.setNextEpisodeThresholdMinutesBeforeEnd(sliderVal)
+                                    PlayerSettingsRepository.setNextEpisodeThresholdMinutesBeforeEnd(sliderValue)
                                 },
-                                valueRange = 1f..15f,
-                                steps = 13,
+                                valueRange = 0f..3.5f,
+                                steps = calculateSteps(0f, 3.5f, 0.5f),
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -1889,6 +1948,107 @@ private fun AnimeSkipClientIdDialog(
                 ) {
                     TextButton(onClick = onDismiss) { Text(stringResource(Res.string.action_cancel)) }
                     TextButton(onClick = { onSave(value.trim()) }) { Text(stringResource(Res.string.action_save)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun IntroDbApiKeyDialog(
+    initialValue: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var value by remember { mutableStateOf(initialValue) }
+    var isVerifying by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    BasicAlertDialog(onDismissRequest = { if (!isVerifying) onDismiss() }) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_playback_introdb_api_key),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_playback_introdb_api_key_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SettingsSecretTextField(
+                    value = value,
+                    onValueChange = {
+                        value = it
+                        errorMessage = null
+                    },
+                    label = stringResource(Res.string.settings_playback_introdb_api_key),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = errorMessage != null,
+                )
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss, enabled = !isVerifying) { 
+                        Text(stringResource(Res.string.action_cancel)) 
+                    }
+                    TextButton(
+                        onClick = { 
+                            val trimmed = value.trim()
+                            if (trimmed.isEmpty()) {
+                                onSave(trimmed)
+                                return@TextButton
+                            }
+                            
+                            if (trimmed == initialValue) {
+                                onDismiss()
+                                return@TextButton
+                            }
+
+                            isVerifying = true
+                            errorMessage = null
+                            scope.launch {
+                                val isValid = com.nuvio.app.features.player.skip.SkipIntroRepository.verifyIntroDbApiKey(trimmed)
+                                isVerifying = false
+                                if (isValid) {
+                                    onSave(trimmed)
+                                } else {
+                                    errorMessage = "Invalid API Key or connection failed"
+                                }
+                            }
+                        },
+                        enabled = !isVerifying
+                    ) { 
+                        if (isVerifying) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(stringResource(Res.string.action_save)) 
+                        }
+                    }
                 }
             }
         }

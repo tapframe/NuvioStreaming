@@ -19,7 +19,7 @@ data class PlayerAudioLevel(
 expect fun LockPlayerToLandscape()
 
 @Composable
-expect fun EnterImmersivePlayerMode()
+expect fun EnterImmersivePlayerMode(keepScreenAwake: Boolean)
 
 @Composable
 expect fun ManagePlayerPictureInPicture(

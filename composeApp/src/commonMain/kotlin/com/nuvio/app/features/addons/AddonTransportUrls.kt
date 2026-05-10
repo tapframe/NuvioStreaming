@@ -12,11 +12,15 @@ internal fun buildAddonResourceUrl(
 ): String {
     val encodedId = id.encodeAddonPathSegment()
     val baseUrl = addonTransportBaseUrl(manifestUrl)
-    return if (extraPathSegment.isNullOrEmpty()) {
+    val query = manifestUrl.substringAfter("?", "").let { query ->
+        if (query.isBlank()) "" else "?$query"
+    }
+    val resourceUrl = if (extraPathSegment.isNullOrEmpty()) {
         "$baseUrl/$resource/$type/$encodedId.json"
     } else {
         "$baseUrl/$resource/$type/$encodedId/$extraPathSegment.json"
     }
+    return resourceUrl + query
 }
 
 

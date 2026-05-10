@@ -4,7 +4,12 @@ import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.Serializable
 
-internal const val WatchProgressCompletionPercentThreshold = 99.5f
+internal const val WatchProgressCompletionPercentThreshold = 90f
+internal const val WatchProgressTraktPlaybackNextUpSeedPercentThreshold = 95f
+internal const val WatchProgressSourceLocal = "local"
+internal const val WatchProgressSourceTraktPlayback = "trakt_playback"
+internal const val WatchProgressSourceTraktHistory = "trakt_history"
+internal const val WatchProgressSourceTraktShowProgress = "trakt_show_progress"
 
 @Serializable
 enum class ContinueWatchingSectionStyle {
@@ -37,6 +42,7 @@ data class WatchProgressEntry(
     val lastSourceUrl: String? = null,
     val isCompleted: Boolean = false,
     val progressPercent: Float? = null,
+    val source: String = WatchProgressSourceLocal,
 ) {
     val normalizedProgressPercent: Float?
         get() = progressPercent?.coerceIn(0f, 100f)
@@ -150,6 +156,7 @@ data class ContinueWatchingItem(
     val episodeTitle: String? = null,
     val episodeThumbnail: String? = null,
     val pauseDescription: String? = null,
+    val released: String? = null,
     val isNextUp: Boolean = false,
     val nextUpSeedSeasonNumber: Int? = null,
     val nextUpSeedEpisodeNumber: Int? = null,
@@ -163,6 +170,9 @@ data class ContinueWatchingPreferencesUiState(
     val isVisible: Boolean = true,
     val style: ContinueWatchingSectionStyle = ContinueWatchingSectionStyle.Wide,
     val upNextFromFurthestEpisode: Boolean = true,
+    val useEpisodeThumbnails: Boolean = true,
+    val showUnairedNextUp: Boolean = true,
+    val blurNextUp: Boolean = false,
     val dismissedNextUpKeys: Set<String> = emptySet(),
     val showResumePromptOnLaunch: Boolean = true,
 )
@@ -204,6 +214,7 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
         episodeTitle = normalizedEntry.episodeTitle,
         episodeThumbnail = normalizedEntry.episodeThumbnail,
         pauseDescription = normalizedEntry.pauseDescription,
+        released = null,
         isNextUp = false,
         nextUpSeedSeasonNumber = null,
         nextUpSeedEpisodeNumber = null,
@@ -241,6 +252,7 @@ internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
         episodeTitle = nextEpisode.title,
         episodeThumbnail = nextEpisode.thumbnail,
         pauseDescription = nextEpisode.overview,
+        released = nextEpisode.released,
         isNextUp = true,
         nextUpSeedSeasonNumber = seasonNumber,
         nextUpSeedEpisodeNumber = episodeNumber,

@@ -5,11 +5,14 @@ import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.mdblist.MdbListMetadataService
 import com.nuvio.app.features.mdblist.MdbListSettingsRepository
 import com.nuvio.app.features.tmdb.TmdbMetadataService
 import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,14 +51,14 @@ object MetaDetailsRepository {
             cachedEntry.metaScreenMeta
                 ?.takeIf { cachedEntry.metaScreenSettingsFingerprint == metaScreenSettingsFingerprint }
                 ?.let { cachedMeta ->
-                    _uiState.value = MetaDetailsUiState(meta = cachedMeta)
+                    _uiState.value = MetaDetailsUiState(meta = cachedMeta.withUnreleasedFilter())
                     activeRequestKey = requestKey
                     return
                 }
 
             val cachedBaseMeta = cachedEntry.baseMeta
             if (!shouldFetchMdbListOnMetaScreen(cachedBaseMeta, id, mdbListSettings)) {
-                _uiState.value = MetaDetailsUiState(meta = cachedBaseMeta)
+                _uiState.value = MetaDetailsUiState(meta = cachedBaseMeta.withUnreleasedFilter())
                 activeRequestKey = requestKey
                 return
             }
@@ -81,7 +84,7 @@ object MetaDetailsRepository {
                         settingsFingerprint = metaScreenSettingsFingerprint,
                     )
                 }
-                _uiState.value = MetaDetailsUiState(meta = enrichedMeta)
+                _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
                 activeRequestKey = requestKey
             }
             return
@@ -302,7 +305,7 @@ object MetaDetailsRepository {
         cachedMetaByRequestKey[requestKey] = cachedEntry
 
         if (!shouldFetchMdbListOnMetaScreen(meta, fallbackItemId, mdbListSettings)) {
-            _uiState.value = MetaDetailsUiState(meta = meta)
+            _uiState.value = MetaDetailsUiState(meta = meta.withUnreleasedFilter())
             activeRequestKey = requestKey
             return
         }
@@ -324,7 +327,7 @@ object MetaDetailsRepository {
             metaScreenMeta = enrichedMeta,
             metaScreenSettingsFingerprint = metaScreenSettingsFingerprint,
         )
-        _uiState.value = MetaDetailsUiState(meta = enrichedMeta)
+        _uiState.value = MetaDetailsUiState(meta = enrichedMeta.withUnreleasedFilter())
         activeRequestKey = requestKey
     }
 
@@ -372,6 +375,15 @@ object MetaDetailsRepository {
     ): String {
         val providers = settings.enabledProvidersInPriorityOrder().joinToString(",")
         return "${settings.enabled}:${settings.apiKey.trim()}:$providers"
+    }
+
+    private fun MetaDetails.withUnreleasedFilter(): MetaDetails {
+        if (!HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) return this
+        val todayIsoDate = CurrentDateProvider.todayIsoDate()
+        return copy(
+            moreLikeThis = moreLikeThis.filterReleasedItems(todayIsoDate),
+            collectionItems = collectionItems.filterReleasedItems(todayIsoDate),
+        )
     }
 
    

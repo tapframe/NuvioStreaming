@@ -1,8 +1,7 @@
 package com.nuvio.app.features.watching.domain
 
-private const val InProgressStartThresholdFraction = 0.02f
-private const val CompletionThresholdFraction = 0.85
-private const val InProgressStartThresholdMinMs = 30_000L
+private const val CompletionThresholdFraction = 0.90
+private const val ProgressStoreThresholdMs = 1_000L
 private const val UpcomingNextSeasonWindowDays = 7
 
 fun watchedKey(
@@ -14,17 +13,7 @@ fun watchedKey(
 fun shouldStoreProgress(
     positionMs: Long,
     durationMs: Long,
-): Boolean {
-    val thresholdMs = if (durationMs > 0L) {
-        maxOf(
-            InProgressStartThresholdMinMs,
-            (durationMs * InProgressStartThresholdFraction).toLong(),
-        )
-    } else {
-        1L
-    }
-    return positionMs >= thresholdMs
-}
+): Boolean = positionMs >= ProgressStoreThresholdMs
 
 fun isProgressComplete(
     positionMs: Long,

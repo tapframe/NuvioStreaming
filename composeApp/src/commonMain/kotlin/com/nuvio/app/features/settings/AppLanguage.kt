@@ -3,6 +3,7 @@ package com.nuvio.app.features.settings
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.lang_english
 import nuvio.composeapp.generated.resources.lang_french
+import nuvio.composeapp.generated.resources.lang_german
 import nuvio.composeapp.generated.resources.lang_spanish
 import nuvio.composeapp.generated.resources.lang_portuguese_portugal
 import nuvio.composeapp.generated.resources.lang_turkish
@@ -17,6 +18,7 @@ enum class AppLanguage(
 ) {
     ENGLISH("en", Res.string.lang_english),
     FRENCH("fr", Res.string.lang_french),
+    GERMAN("de", Res.string.lang_german),
     SPANISH("es", Res.string.lang_spanish),
     PORTUGUESE("pt", Res.string.lang_portuguese_portugal),
     TURKISH("tr", Res.string.lang_turkish),

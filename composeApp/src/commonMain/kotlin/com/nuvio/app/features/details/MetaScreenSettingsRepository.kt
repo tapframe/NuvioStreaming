@@ -45,6 +45,7 @@ data class MetaScreenSettingsUiState(
     val cinematicBackground: Boolean = false,
     val tabLayout: Boolean = false,
     val episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
+    val blurUnwatchedEpisodes: Boolean = false,
 )
 
 enum class MetaEpisodeCardStyle {
@@ -81,6 +82,8 @@ private data class StoredMetaScreenSettingsPayload(
     @SerialName("tvStyleLayout")
     val tabLayout: Boolean = false,
     val episodeCardStyle: String = "horizontal",
+    @SerialName("blur_unwatched_episodes")
+    val blurUnwatchedEpisodes: Boolean = false,
 )
 
 private data class MetaScreenSectionDefinition(
@@ -156,6 +159,7 @@ object MetaScreenSettingsRepository {
     private var cinematicBackground: Boolean = false
     private var tabLayout: Boolean = false
     private var episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal
+    private var blurUnwatchedEpisodes: Boolean = false
     private fun localizedString(resource: StringResource): String = runBlocking { getString(resource) }
 
     fun ensureLoaded() {
@@ -172,6 +176,7 @@ object MetaScreenSettingsRepository {
                 tabLayout = parsed.tabLayout
                 episodeCardStyle = MetaEpisodeCardStyle.parse(parsed.episodeCardStyle)
                     ?: MetaEpisodeCardStyle.Horizontal
+                blurUnwatchedEpisodes = parsed.blurUnwatchedEpisodes
                 preferences = parsed.items.mapNotNull { item ->
                     val key = runCatching { MetaScreenSectionKey.valueOf(item.key) }.getOrNull() ?: return@mapNotNull null
                     key to item
@@ -190,6 +195,7 @@ object MetaScreenSettingsRepository {
         cinematicBackground = false
         tabLayout = false
         episodeCardStyle = MetaEpisodeCardStyle.Horizontal
+        blurUnwatchedEpisodes = false
         _uiState.value = MetaScreenSettingsUiState()
         ensureLoaded()
     }
@@ -215,6 +221,13 @@ object MetaScreenSettingsRepository {
         persist()
     }
 
+    fun setBlurUnwatchedEpisodes(enabled: Boolean) {
+        ensureLoaded()
+        blurUnwatchedEpisodes = enabled
+        publish()
+        persist()
+    }
+
     fun setTabGroup(key: MetaScreenSectionKey, groupId: Int?) {
         ensureLoaded()
         if (!key.canBeTabbed) return
@@ -233,6 +246,8 @@ object MetaScreenSettingsRepository {
         preferences.clear()
         cinematicBackground = false
         tabLayout = false
+        episodeCardStyle = MetaEpisodeCardStyle.Horizontal
+        blurUnwatchedEpisodes = false
         _uiState.value = MetaScreenSettingsUiState()
     }
 
@@ -241,11 +256,13 @@ object MetaScreenSettingsRepository {
         cinematicBackground: Boolean,
         tabLayout: Boolean,
         episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal,
+        blurUnwatchedEpisodes: Boolean = false,
     ) {
         ensureLoaded()
         this.cinematicBackground = cinematicBackground
         this.tabLayout = tabLayout
         this.episodeCardStyle = episodeCardStyle
+        this.blurUnwatchedEpisodes = blurUnwatchedEpisodes
         preferences = items.associate { item ->
             item.key to StoredMetaScreenSectionPreference(
                 key = item.key.name,
@@ -271,6 +288,7 @@ object MetaScreenSettingsRepository {
         cinematicBackground = false
         tabLayout = false
         episodeCardStyle = MetaEpisodeCardStyle.Horizontal
+        blurUnwatchedEpisodes = false
         normalizePreferences()
         publish()
         persist()
@@ -337,6 +355,7 @@ object MetaScreenSettingsRepository {
             cinematicBackground = cinematicBackground,
             tabLayout = tabLayout,
             episodeCardStyle = episodeCardStyle,
+            blurUnwatchedEpisodes = blurUnwatchedEpisodes,
         )
     }
 
@@ -348,6 +367,7 @@ object MetaScreenSettingsRepository {
                     cinematicBackground = cinematicBackground,
                     tabLayout = tabLayout,
                     episodeCardStyle = MetaEpisodeCardStyle.persist(episodeCardStyle),
+                    blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                 ),
             ),
         )

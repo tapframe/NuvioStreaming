@@ -49,4 +49,26 @@ class HomeCatalogParserTest {
             result.items.map { it.stableKey() },
         )
     }
+
+    @Test
+    fun `parse catalog response keeps raw released date for unreleased filtering`() {
+        val result = HomeCatalogParser.parseCatalogResponse(
+            payload = """
+                {
+                  "metas": [
+                    {
+                      "id": "tt1",
+                      "type": "movie",
+                      "name": "Future Movie",
+                      "releaseInfo": "2027",
+                      "released": "2027-05-12T00:00:00.000Z"
+                    }
+                  ]
+                }
+            """.trimIndent(),
+        )
+
+        assertEquals("2027", result.items.single().releaseInfo)
+        assertEquals("2027-05-12T00:00:00.000Z", result.items.single().rawReleaseDate)
+    }
 }

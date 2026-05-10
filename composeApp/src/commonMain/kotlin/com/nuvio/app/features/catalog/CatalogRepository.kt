@@ -2,6 +2,9 @@ package com.nuvio.app.features.catalog
 
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toMetaPreview
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.home.filterReleasedItems
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -124,7 +127,7 @@ object CatalogRepository {
                     catalogId = request.catalogId,
                     genre = request.genre,
                     skip = requestedSkip.takeIf { it > 0 },
-                )
+                ).withUnreleasedFilter()
             }.fold(
                 onSuccess = { page ->
                     if (activeRequest != request) return@fold
@@ -156,6 +159,12 @@ object CatalogRepository {
             )
         }
     }
+}
+
+private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
+    if (!HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) return this
+    val filteredItems = items.filterReleasedItems(CurrentDateProvider.todayIsoDate())
+    return if (filteredItems.size == items.size) this else copy(items = filteredItems)
 }
 
 private data class CatalogRequest(

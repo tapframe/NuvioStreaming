@@ -36,6 +36,7 @@ private const val LIST_FETCH_CONCURRENCY = 4
 private const val SNAPSHOT_CACHE_TTL_MS = 60_000L
 private const val LIST_TABS_CACHE_TTL_MS = 60_000L
 private const val FORCE_REFRESH_DEDUP_MS = 10_000L
+private const val MAX_VISIBLE_ERROR_MESSAGE_LENGTH = 240
 
 data class TraktLibraryUiState(
     val listTabs: List<TraktListTab> = emptyList(),
@@ -159,21 +160,20 @@ object TraktLibraryRepository {
                         errorMessage = null,
                     )
                 }
-            }.onFailure { error ->
+            }
+            result.exceptionOrNull()?.let { error ->
                 if (error is CancellationException) throw error
-                log.w { "Failed to refresh Trakt library: ${error.message}" }
-            }.getOrNull()
-
-            if (result == null) {
-                _uiState.value = current.copy(
+                log.w(error) { "Failed to refresh Trakt library" }
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     hasLoaded = true,
-                    errorMessage = getString(Res.string.trakt_library_load_failed),
+                    errorMessage = traktLibraryLoadErrorMessage(error),
                 )
                 return
             }
 
-            _uiState.value = result.copy(
+            val snapshot = result.getOrThrow()
+            _uiState.value = snapshot.copy(
                 isLoading = false,
                 hasLoaded = true,
                 errorMessage = null,
@@ -412,6 +412,27 @@ object TraktLibraryRepository {
             entriesByList = state.entriesByList,
         )
         TraktLibraryStorage.savePayload(json.encodeToString(payload))
+    }
+
+    private suspend fun traktLibraryLoadErrorMessage(error: Throwable): String {
+        val fallback = getString(Res.string.trakt_library_load_failed)
+        val detail = error.userVisibleMessage()
+        return when {
+            detail.isBlank() -> fallback
+            detail.equals(fallback, ignoreCase = true) -> fallback
+            else -> detail
+        }
+    }
+
+    private fun Throwable.userVisibleMessage(): String {
+        val raw = message?.trim()?.takeIf { it.isNotBlank() }
+            ?: toString().trim()
+        val firstLine = raw.lines().firstOrNull()?.trim().orEmpty()
+        return if (firstLine.length <= MAX_VISIBLE_ERROR_MESSAGE_LENGTH) {
+            firstLine
+        } else {
+            firstLine.take(MAX_VISIBLE_ERROR_MESSAGE_LENGTH).trimEnd() + "..."
+        }
     }
 
     private suspend fun fetchListTabs(headers: Map<String, String>): List<TraktListTab> {

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.downloads.DownloadItem
 import com.nuvio.app.features.downloads.DownloadsRepository
@@ -55,6 +56,7 @@ import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.trakt.TraktScrobbleRepository
+import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressClock
 import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -139,10 +141,21 @@ fun PlayerScreen(
     initialProgressFraction: Float? = null,
 ) {
     LockPlayerToLandscape()
-    EnterImmersivePlayerMode()
     val playerSettingsUiState by remember {
         PlayerSettingsRepository.ensureLoaded()
         PlayerSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val metaScreenSettingsUiState by remember {
+        MetaScreenSettingsRepository.ensureLoaded()
+        MetaScreenSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val watchProgressUiState by remember {
+        WatchProgressRepository.ensureLoaded()
+        WatchProgressRepository.uiState
     }.collectAsStateWithLifecycle()
 
     BoxWithConstraints(
@@ -195,6 +208,9 @@ fun PlayerScreen(
         var playerController by remember { mutableStateOf<PlayerEngineController?>(null) }
         var playerControllerSourceUrl by remember { mutableStateOf<String?>(null) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        val keepScreenAwake = errorMessage == null &&
+            (playbackSnapshot.isPlaying || (shouldPlay && playbackSnapshot.isLoading))
+        EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
         var scrubbingPositionMs by remember { mutableStateOf<Long?>(null) }
         var pausedOverlayVisible by remember { mutableStateOf(false) }
         var gestureFeedback by remember { mutableStateOf<GestureFeedbackState?>(null) }
@@ -241,6 +257,10 @@ fun PlayerScreen(
         // Sources & Episodes Panel state
         var showSourcesPanel by remember { mutableStateOf(false) }
         var showEpisodesPanel by remember { mutableStateOf(false) }
+        var showSubmitIntroModal by remember { mutableStateOf(false) }
+        var submitIntroSegmentType by rememberSaveable { mutableStateOf("intro") }
+        var submitIntroStartTimeStr by rememberSaveable { mutableStateOf("00:00") }
+        var submitIntroEndTimeStr by rememberSaveable { mutableStateOf("00:00") }
         var episodeStreamsPanelState by remember { mutableStateOf(EpisodeStreamsPanelState()) }
         val sourceStreamsState by PlayerStreamsRepository.sourceState.collectAsStateWithLifecycle()
         val episodeStreamsRepoState by PlayerStreamsRepository.episodeStreamsState.collectAsStateWithLifecycle()
@@ -1429,12 +1449,15 @@ fun PlayerScreen(
                             totalDy += delta.y
 
                             if (gestureMode == null) {
+                                val holdToSpeedActive = isHoldToSpeedGestureActiveState.value
                                 val horizontalDominant =
-                                    !isHoldToSpeedGestureActiveState.value &&
+                                    !holdToSpeedActive &&
                                         abs(totalDx) > viewConfiguration.touchSlop &&
                                         abs(totalDx) > abs(totalDy)
                                 val verticalDominant =
-                                    abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
+                                    !holdToSpeedActive &&
+                                        abs(totalDy) > viewConfiguration.touchSlop &&
+                                        abs(totalDy) > abs(totalDx)
 
                                 gestureMode = when {
                                     horizontalDominant -> {
@@ -1602,8 +1625,9 @@ fun PlayerScreen(
                         refreshTracks()
                         showAudioModal = true
                     },
-                    onSourcesClick = if (activeVideoId != null) {{ openSourcesPanel() }} else null,
-                    onEpisodesClick = if (isSeries) {{ openEpisodesPanel() }} else null,
+                    onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
+                    onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
+                    onSubmitIntroClick = if (isSeries && playerSettingsUiState.introSubmitEnabled && playerSettingsUiState.introDbApiKey.isNotBlank()) { { showSubmitIntroModal = true } } else null,
                     onScrubChange = { positionMs -> scrubbingPositionMs = positionMs },
                     onScrubFinished = { positionMs ->
                         scrubbingPositionMs = null
@@ -1792,8 +1816,13 @@ fun PlayerScreen(
                 PlayerEpisodesPanel(
                     visible = showEpisodesPanel,
                     episodes = allEpisodes,
+                    parentMetaType = parentMetaType,
+                    parentMetaId = parentMetaId,
                     currentSeason = activeSeasonNumber,
                     currentEpisode = activeEpisodeNumber,
+                    progressByVideoId = watchProgressUiState.byVideoId,
+                    watchedKeys = watchedUiState.watchedKeys,
+                    blurUnwatchedEpisodes = metaScreenSettingsUiState.blurUnwatchedEpisodes,
                     episodeStreamsState = episodeStreamsPanelState.copy(
                         streamsUiState = episodeStreamsRepoState,
                     ),
@@ -1847,6 +1876,34 @@ fun PlayerScreen(
                         PlayerStreamsRepository.clearEpisodeStreams()
                         controlsVisible = true
                     },
+                )
+            }
+
+            val season = activeSeasonNumber
+            val episode = activeEpisodeNumber
+            val imdbId = activeVideoId?.split(":")?.firstOrNull()?.takeIf { it.startsWith("tt") }
+                ?: parentMetaId.takeIf { it.startsWith("tt") }
+                ?: metaUiState.meta?.id?.takeIf { it.startsWith("tt") }
+
+            if (showSubmitIntroModal && season != null && episode != null && !imdbId.isNullOrBlank()) {
+                com.nuvio.app.features.player.skip.SubmitIntroDialog(
+                    imdbId = imdbId,
+                    season = season,
+                    episode = episode,
+                    currentTimeSec = (displayedPositionMs / 1000.0),
+                    segmentType = submitIntroSegmentType,
+                    onSegmentTypeChange = { submitIntroSegmentType = it },
+                    startTimeStr = submitIntroStartTimeStr,
+                    onStartTimeChange = { submitIntroStartTimeStr = it },
+                    endTimeStr = submitIntroEndTimeStr,
+                    onEndTimeChange = { submitIntroEndTimeStr = it },
+                    onDismiss = { showSubmitIntroModal = false },
+                    onSuccess = {
+                        submitIntroStartTimeStr = "00:00"
+                        submitIntroEndTimeStr = "00:00"
+                        submitIntroSegmentType = "intro"
+                        showSubmitIntroModal = false
+                    }
                 )
             }
         }
