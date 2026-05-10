@@ -25,6 +25,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -37,11 +39,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.localizedContinueWatchingSubtitle
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.posterCardClickable
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import kotlin.math.roundToInt
@@ -138,12 +142,18 @@ private fun HomeContinueWatchingSectionContent(
     onItemClick: ((ContinueWatchingItem) -> Unit)?,
     onItemLongPress: ((ContinueWatchingItem) -> Unit)?,
 ) {
+    val homeCatalogSettings by remember {
+        HomeCatalogSettingsRepository.snapshot()
+        HomeCatalogSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+
     NuvioShelfSection(
         title = stringResource(Res.string.compose_settings_page_continue_watching),
         entries = items,
         modifier = modifier,
         headerHorizontalPadding = sectionPadding,
         rowContentPadding = PaddingValues(horizontal = sectionPadding),
+        showHeaderAccent = !homeCatalogSettings.hideCatalogUnderline,
         itemSpacing = layout.itemGap,
         key = { item -> item.videoId },
     ) { item ->
