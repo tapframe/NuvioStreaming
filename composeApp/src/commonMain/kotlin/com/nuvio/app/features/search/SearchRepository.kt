@@ -22,6 +22,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -91,26 +94,47 @@ object SearchRepository {
         _uiState.value = SearchUiState(isLoading = true)
 
         activeJob = scope.launch {
-            val results = requests.map { request ->
+            val sections = mutableListOf<HomeCatalogSection>()
+            val failures = mutableListOf<String>()
+            val updates = Channel<Result<HomeCatalogSection>>(Channel.UNLIMITED)
+            val requestSemaphore = Semaphore(permits = 4)
+
+            val workers = requests.map { request ->
                 async {
-                    runCatching { request.toSection() }
+                    requestSemaphore.withPermit {
+                        updates.send(runCatching { request.toSection() })
+                    }
                 }
-            }.awaitAll()
+            }
 
-            val sections = results
-                .mapNotNull { it.getOrNull() }
-            val firstFailure = results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
-            val allFailed = results.isNotEmpty() && results.all { it.isFailure }
+            repeat(requests.size) {
+                val result = updates.receive()
+                result.fold(
+                    onSuccess = { section ->
+                        sections += section
+                        _uiState.value = SearchUiState(
+                            isLoading = true,
+                            sections = sections.sortedBy { it.type.typeSortKey() + ':' + it.title },
+                        )
+                    },
+                    onFailure = { error ->
+                        if (error !is CancellationException) failures += (error.message ?: "Search request failed")
+                    },
+                )
+            }
+            workers.awaitAll()
+            updates.close()
 
+            val allFailed = sections.isEmpty() && failures.isNotEmpty()
             _uiState.value = SearchUiState(
                 isLoading = false,
-                sections = sections,
+                sections = sections.sortedBy { it.type.typeSortKey() + ':' + it.title },
                 emptyStateReason = when {
                     sections.isNotEmpty() -> null
                     allFailed -> SearchEmptyStateReason.RequestFailed
                     else -> SearchEmptyStateReason.NoResults
                 },
-                errorMessage = if (allFailed) firstFailure else null,
+                errorMessage = if (allFailed) failures.firstOrNull() else null,
             )
         }
     }

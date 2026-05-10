@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -132,9 +133,10 @@ fun NuvioPosterCard(
                 .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
             contentAlignment = Alignment.Center,
         ) {
-            if (imageUrl != null) {
+            val optimizedImageUrl = remember(imageUrl, shape) { imageUrl?.withRecommendedImageWidth(shape) }
+            if (optimizedImageUrl != null) {
                 AsyncImage(
-                    model = imageUrl,
+                    model = optimizedImageUrl,
                     contentDescription = title,
                     modifier = Modifier.matchParentSize(),
                     contentScale = ContentScale.Crop,
@@ -350,3 +352,14 @@ internal fun Modifier.posterCardClickable(
     } else {
         this
     }
+
+
+private fun String.withRecommendedImageWidth(shape: NuvioPosterShape): String {
+    val targetWidth = when (shape) {
+        NuvioPosterShape.Poster -> 360
+        NuvioPosterShape.Square -> 320
+        NuvioPosterShape.Landscape -> 640
+    }
+    val separator = if (contains("?")) "&" else "?"
+    return "$this${separator}w=$targetWidth"
+}

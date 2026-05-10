@@ -12,7 +12,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 const val CATALOG_PAGE_SIZE = 100
 
@@ -25,8 +30,22 @@ data class CatalogPage(
 private val inflightMutex = Mutex()
 private val inflightRequestScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 private val inflightRequests = mutableMapOf<String, CompletableDeferred<String>>()
+private val responseCache = mutableMapOf<String, CachedCatalogPayload>()
+private val addonSearchSemaphore = Semaphore(permits = 4)
+private val responseCacheTtl: Duration = 20.seconds
+
+
+private data class CachedCatalogPayload(
+    val payload: String,
+    val expiresAtMillis: Long,
+)
 
 private suspend fun deduplicatedHttpGetText(url: String): String {
+    val now = Clock.System.now().toEpochMilliseconds()
+    inflightMutex.withLock {
+        responseCache[url]?.takeIf { now < it.expiresAtMillis }?.let { return it.payload }
+    }
+
     val deferred = inflightMutex.withLock {
         inflightRequests[url] ?: CompletableDeferred<String>().also { created ->
             inflightRequests[url] = created
@@ -46,7 +65,14 @@ private suspend fun deduplicatedHttpGetText(url: String): String {
         }
     }
 
-    return deferred.await()
+    return deferred.await().also { payload ->
+        inflightMutex.withLock {
+            responseCache[url] = CachedCatalogPayload(
+                payload = payload,
+                expiresAtMillis = Clock.System.now().toEpochMilliseconds() + responseCacheTtl.inWholeMilliseconds,
+            )
+        }
+    }
 }
 
 suspend fun fetchCatalogPage(
@@ -66,7 +92,11 @@ suspend fun fetchCatalogPage(
         search = search,
         skip = skip,
     )
-    val payload = deduplicatedHttpGetText(url)
+    val payload = if (!search.isNullOrBlank()) {
+        addonSearchSemaphore.withPermit { deduplicatedHttpGetText(url) }
+    } else {
+        deduplicatedHttpGetText(url)
+    }
     val parsed = HomeCatalogParser.parseCatalogResponse(
         payload = payload,
         maxItems = maxItems,
