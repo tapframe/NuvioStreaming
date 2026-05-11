@@ -3,8 +3,13 @@ package com.nuvio.app.features.collection
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -177,5 +182,70 @@ class CollectionSourceSerializationTest {
         val merged = CollectionJsonPreserver.merge(json, raw, listOf(collection)).toString()
         assertTrue(merged.contains(""""customField":"keep-me""""))
         assertTrue(merged.contains(""""traktListId":123456"""))
+    }
+
+    @Test
+    fun mobileGifToggleDoesNotEnterCollectionJsonOrOverwriteTvGifToggle() {
+        val raw = json.parseToJsonElement(
+            """
+                [
+                  {
+                    "id": "collection-1",
+                    "title": "Favorites",
+                    "folders": [
+                      {
+                        "id": "folder-1",
+                        "title": "Movies",
+                        "coverImageUrl": "https://example.com/poster.jpg",
+                        "focusGifUrl": "https://example.com/focus.gif",
+                        "focusGifEnabled": true
+                      }
+                    ]
+                  }
+                ]
+            """.trimIndent(),
+        )
+        val collection = json.decodeFromString<List<Collection>>(raw.toString()).single()
+        val mobileDisabled = collection.copy(
+            folders = collection.folders.map { folder ->
+                folder.copy(mobileFocusGifEnabled = false)
+            },
+        )
+
+        val merged = CollectionJsonPreserver.merge(json, raw, listOf(mobileDisabled))
+        val mergedFolder = merged
+            .single()
+            .jsonObject["folders"]!!
+            .jsonArray
+            .single()
+            .jsonObject
+
+        assertTrue(mergedFolder["focusGifEnabled"]!!.jsonPrimitive.boolean)
+        assertTrue(mergedFolder["mobileFocusGifEnabled"] == null)
+    }
+
+    @Test
+    fun mobileGifToggleDefaultsIndependentOfTvGifToggle() {
+        val payload = """
+            [
+              {
+                "id": "collection-1",
+                "title": "Favorites",
+                "folders": [
+                  {
+                    "id": "folder-1",
+                    "title": "Movies",
+                    "focusGifUrl": "https://example.com/focus.gif",
+                    "focusGifEnabled": false
+                  }
+                ]
+              }
+            ]
+        """.trimIndent()
+
+        val folder = json.decodeFromString<List<Collection>>(payload).single().folders.single()
+
+        assertFalse(folder.focusGifEnabled)
+        assertTrue(folder.mobileFocusGifEnabled)
     }
 }

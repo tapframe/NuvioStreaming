@@ -579,20 +579,126 @@ final class MPVPlayerViewController: UIViewController {
         for i in 0..<count {
             let type = getString("track-list/\(i)/type") ?? ""
             let id = getInt("track-list/\(i)/id")
-            let title = getString("track-list/\(i)/title") ?? ""
-            let lang = getString("track-list/\(i)/lang") ?? ""
+            let title = getTrackString(i, "title")
+            let lang = getTrackString(i, "lang")
+            let codec = getTrackString(i, "codec")
+            let decoderDescription = getTrackString(i, "decoder-desc")
+            let channels = getTrackString(i, "demux-channels")
+            let channelCount = getInt("track-list/\(i)/demux-channel-count")
             let selected = getFlag("track-list/\(i)/selected")
+            let displayTitle = formatTrackTitle(
+                type: type,
+                index: type == "audio" ? audioIdx : subIdx,
+                title: title,
+                lang: lang,
+                codec: codec,
+                decoderDescription: decoderDescription,
+                channels: channels,
+                channelCount: channelCount
+            )
 
             if type == "audio" {
-                audio.append(TrackInfo(index: audioIdx, id: id, type: type, title: title, lang: lang, selected: selected))
+                audio.append(TrackInfo(index: audioIdx, id: id, type: type, title: displayTitle, lang: lang, selected: selected))
                 audioIdx += 1
             } else if type == "sub" {
-                subs.append(TrackInfo(index: subIdx, id: id, type: type, title: title, lang: lang, selected: selected))
+                subs.append(TrackInfo(index: subIdx, id: id, type: type, title: displayTitle, lang: lang, selected: selected))
                 subIdx += 1
             }
         }
         audioTracks = audio
         subtitleTracks = subs
+    }
+
+    private func getTrackString(_ index: Int, _ field: String) -> String {
+        (getString("track-list/\(index)/\(field)") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func formatTrackTitle(
+        type: String,
+        index: Int,
+        title: String,
+        lang: String,
+        codec: String,
+        decoderDescription: String,
+        channels: String,
+        channelCount: Int
+    ) -> String {
+        let base = ifNotBlank(title)
+            ?? localizedLanguageName(lang)
+            ?? (type == "sub" ? "Subtitle \(index + 1)" : "Track \(index + 1)")
+        let codecName = codecDisplayName(codec) ?? codecDisplayName(decoderDescription)
+        let channelName = type == "audio" ? channelLayoutName(channels: channels, channelCount: channelCount) : nil
+        let details = [channelName, codecName]
+            .compactMap { $0 }
+            .filter { detail in !base.localizedCaseInsensitiveContains(detail) }
+        return details.isEmpty ? base : "\(base) (\(details.joined(separator: ", ")))"
+    }
+
+    private func ifNotBlank(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func localizedLanguageName(_ languageCode: String) -> String? {
+        guard let code = ifNotBlank(languageCode) else { return nil }
+        return Locale.current.localizedString(forLanguageCode: code) ?? code
+    }
+
+    private func channelLayoutName(channels: String, channelCount: Int) -> String? {
+        if let normalized = ifNotBlank(channels), normalized != "unknown" {
+            let lower = normalized.lowercased()
+            if lower == "mono" { return "Mono" }
+            if lower == "stereo" { return "Stereo" }
+            return normalized
+        }
+        switch channelCount {
+        case 1:
+            return "Mono"
+        case 2:
+            return "Stereo"
+        case 6:
+            return "5.1"
+        case 8:
+            return "7.1"
+        case let count where count > 0:
+            return "\(count)ch"
+        default:
+            return nil
+        }
+    }
+
+    private func codecDisplayName(_ value: String) -> String? {
+        guard let raw = ifNotBlank(value) else { return nil }
+        let codec = raw.lowercased()
+        if codec.contains("eac3") || codec.contains("e-ac-3") || codec.contains("e ac-3") {
+            return codec.contains("joc") || codec.contains("atmos") ? "E-AC-3-JOC" : "E-AC-3"
+        }
+        if codec.contains("truehd") || codec.contains("true hd") { return "TrueHD" }
+        if codec.contains("ac3") || codec.contains("ac-3") { return "AC-3" }
+        if codec.contains("dts-hd") || codec.contains("dtshd") || codec.contains("dts hd") { return "DTS-HD" }
+        if codec.contains("dts") || codec == "dca" { return "DTS" }
+        if codec.contains("aac") { return "AAC" }
+        if codec.contains("mp3") || codec.contains("mpeg audio") { return "MP3" }
+        if codec.contains("mp2") { return "MP2" }
+        if codec.contains("opus") { return "Opus" }
+        if codec.contains("vorbis") { return "Vorbis" }
+        if codec.contains("flac") { return "FLAC" }
+        if codec.contains("alac") { return "ALAC" }
+        if codec.contains("pcm") || codec.contains("wav") { return "WAV" }
+        if codec.contains("amr_wb") || codec.contains("amr-wb") { return "AMR-WB" }
+        if codec.contains("amr_nb") || codec.contains("amr-nb") { return "AMR-NB" }
+        if codec.contains("amr") { return "AMR" }
+        if codec.contains("iamf") { return "IAMF" }
+        if codec.contains("mpegh") || codec.contains("mpeg-h") { return "MPEG-H" }
+        if codec.contains("pgs") || codec.contains("hdmv") { return "PGS" }
+        if codec.contains("subrip") || codec == "srt" { return "SRT" }
+        if codec.contains("ass") || codec.contains("ssa") { return "SSA" }
+        if codec.contains("webvtt") || codec == "vtt" { return "VTT" }
+        if codec.contains("ttml") { return "TTML" }
+        if codec.contains("mov_text") || codec.contains("tx3g") { return "TX3G" }
+        if codec.contains("dvb") { return "DVB" }
+        return raw
     }
 
     private func clearPlaybackError() {

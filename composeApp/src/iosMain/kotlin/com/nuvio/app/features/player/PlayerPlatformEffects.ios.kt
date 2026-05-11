@@ -2,6 +2,7 @@ package com.nuvio.app.features.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.IntSize
 import platform.Foundation.NSNotificationCenter
@@ -32,10 +33,12 @@ actual fun LockPlayerToLandscape() {
 }
 
 @Composable
-actual fun EnterImmersivePlayerMode() {
+actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
+    SideEffect {
+        UIApplication.sharedApplication.setIdleTimerDisabled(keepScreenAwake)
+    }
+
     DisposableEffect(Unit) {
-        // Request idle timer disabled to keep screen awake during playback
-        UIApplication.sharedApplication.setIdleTimerDisabled(true)
         onDispose {
             UIApplication.sharedApplication.setIdleTimerDisabled(false)
         }

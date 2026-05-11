@@ -1052,6 +1052,7 @@ object TmdbMetadataService {
                     posterShape = PosterShape.Poster,
                     description = recommendation.overview?.trim()?.takeIf(String::isNotBlank),
                     releaseInfo = (recommendation.releaseDate ?: recommendation.firstAirDate)?.take(4),
+                    rawReleaseDate = recommendation.releaseDate ?: recommendation.firstAirDate,
                     imdbRating = recommendation.voteAverage?.formatRating(),
                 )
             }
@@ -1087,6 +1088,7 @@ object TmdbMetadataService {
                     posterShape = PosterShape.Landscape,
                     description = part.overview?.trim()?.takeIf(String::isNotBlank),
                     releaseInfo = part.releaseDate?.take(4),
+                    rawReleaseDate = part.releaseDate,
                     imdbRating = part.voteAverage?.formatRating(),
                 )
             }

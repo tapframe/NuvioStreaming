@@ -2,6 +2,7 @@ package com.nuvio.app.features.home
 
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.catalog.fetchCatalogPage
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -145,13 +146,17 @@ object HomeRepository {
     ) {
         val snapshot = HomeCatalogSettingsRepository.snapshot()
         val preferences = snapshot.preferences
+        val todayIsoDate = if (snapshot.hideUnreleasedContent) CurrentDateProvider.todayIsoDate() else null
+        fun HomeCatalogSection.withReleaseFilter(): HomeCatalogSection =
+            if (todayIsoDate == null) this else filterReleasedItems(todayIsoDate)
+
         val sections = currentDefinitions
             .sortedBy { definition -> preferences[definition.key]?.order ?: Int.MAX_VALUE }
             .mapNotNull { definition ->
                 val preference = preferences[definition.key]
                 if (preference?.enabled == false) return@mapNotNull null
 
-                val section = cachedSections[definition.key] ?: return@mapNotNull null
+                val section = cachedSections[definition.key]?.withReleaseFilter() ?: return@mapNotNull null
                 if (section.items.isEmpty()) return@mapNotNull null
                 val customTitle = preference?.customTitle.orEmpty()
                 section.copy(
@@ -164,6 +169,7 @@ object HomeRepository {
             currentDefinitions
                 .filter { definition -> preferences[definition.key]?.heroSourceEnabled != false }
                 .mapNotNull { definition -> cachedSections[definition.key] }
+                .map { section -> section.withReleaseFilter() }
                 .flatMap { section -> section.items }
                 .distinctBy { item -> "${item.type}:${item.id}" }
                 .shuffled(heroRandom)

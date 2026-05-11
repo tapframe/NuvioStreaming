@@ -1,6 +1,7 @@
 package com.nuvio.app.features.details
 
 import com.nuvio.app.features.watched.WatchedItem
+import com.nuvio.app.features.watched.normalizeWatchedMarkedAtEpochMs
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watching.domain.WatchingCompletedEpisode
 import com.nuvio.app.features.watching.domain.WatchingContentRef
@@ -206,7 +207,7 @@ private fun WatchedItem.toDomainWatchedRecord(): WatchingWatchedRecord =
         content = WatchingContentRef(type = type, id = id),
         seasonNumber = season,
         episodeNumber = episode,
-        markedAtEpochMs = markedAtEpochMs,
+        markedAtEpochMs = normalizeWatchedMarkedAtEpochMs(markedAtEpochMs),
     )
 
 private fun WatchingSeriesPrimaryAction.toLegacySeriesPrimaryAction(): SeriesPrimaryAction =

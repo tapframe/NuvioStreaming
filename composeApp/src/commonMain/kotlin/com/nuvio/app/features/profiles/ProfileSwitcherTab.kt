@@ -14,7 +14,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,10 +49,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +70,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.nuvio.app.isIos
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -97,6 +104,52 @@ fun ProfileSwitcherTab(
     // Keep popup composed while exit animation plays
     var popupVisible by remember { mutableStateOf(false) }
     var pinProfile by remember { mutableStateOf<NuvioProfile?>(null) }
+    var dragTargetProfileIndex by remember { mutableStateOf<Int?>(null) }
+    var triggerCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val profileBubbleBounds = remember(profiles.map { it.profileIndex }) {
+        mutableStateMapOf<Int, Rect>()
+    }
+
+    fun performProfileHoldHaptic() {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
+    fun performProfileHoverHaptic() {
+        if (isIos) {
+            ProfileHoverHapticFeedback.perform()
+        } else {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
+
+    fun updateDragTarget(localPosition: Offset) {
+        val trigger = triggerCoordinates ?: return
+        val windowPosition = trigger.localToWindow(localPosition)
+        val nextTargetProfileIndex = profileBubbleBounds.entries
+            .firstOrNull { (_, bounds) -> bounds.contains(windowPosition) }
+            ?.key
+        if (nextTargetProfileIndex != null && nextTargetProfileIndex != dragTargetProfileIndex) {
+            performProfileHoverHaptic()
+        }
+        dragTargetProfileIndex = nextTargetProfileIndex
+    }
+
+    fun chooseProfile(profile: NuvioProfile) {
+        if (profile.pinEnabled) {
+            pinProfile = profile
+        } else {
+            onProfileSelected(profile)
+            showPopup = false
+        }
+    }
+
+    fun chooseDragTarget() {
+        val profile = profiles.firstOrNull { it.profileIndex == dragTargetProfileIndex }
+        dragTargetProfileIndex = null
+        if (profile != null) {
+            chooseProfile(profile)
+        }
+    }
 
     // Popup entrance/exit animation
     val popupAlpha = remember { Animatable(0f) }
@@ -126,6 +179,7 @@ fun ProfileSwitcherTab(
                 )
             }
         } else {
+            ProfileHoverHapticFeedback.release()
             // Animate out
             launch { popupAlpha.animateTo(0f, tween(180, easing = FastOutSlowInEasing)) }
             launch { popupScale.animateTo(0.85f, tween(200, easing = FastOutSlowInEasing)) }
@@ -134,20 +188,40 @@ fun ProfileSwitcherTab(
                 // Remove from composition after animation completes
                 popupVisible = false
                 pinProfile = null
+                dragTargetProfileIndex = null
             }
         }
     }
 
     Box(
         modifier = modifier
+            .onGloballyPositioned { triggerCoordinates = it }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .pointerInput(profiles) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { startOffset ->
                         if (profiles.isNotEmpty()) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            performProfileHoldHaptic()
+                            ProfileHoverHapticFeedback.prepare()
                             showPopup = true
+                            updateDragTarget(startOffset)
                         }
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        updateDragTarget(change.position)
+                    },
+                    onDragEnd = {
+                        ProfileHoverHapticFeedback.release()
+                        chooseDragTarget()
+                    },
+                    onDragCancel = {
+                        ProfileHoverHapticFeedback.release()
+                        dragTargetProfileIndex = null
                     },
                 )
             },
@@ -199,20 +273,20 @@ fun ProfileSwitcherTab(
                                     profile.profileIndex == activeProfile?.profileIndex
                                 val isPinTarget =
                                     pinProfile?.profileIndex == profile.profileIndex
+                                val isDragTarget =
+                                    dragTargetProfileIndex == profile.profileIndex
 
                                 PopupProfileBubble(
                                     profile = profile,
                                     avatars = avatars,
                                     isActive = isActive,
-                                    isSelected = isPinTarget,
+                                    isSelected = isPinTarget || isDragTarget,
                                     delayMs = index * 50,
+                                    onBoundsChanged = { bounds ->
+                                        profileBubbleBounds[profile.profileIndex] = bounds
+                                    },
                                     onClick = {
-                                        if (profile.pinEnabled) {
-                                            pinProfile = profile
-                                        } else {
-                                            onProfileSelected(profile)
-                                            showPopup = false
-                                        }
+                                        chooseProfile(profile)
                                     },
                                 )
                             }
@@ -335,11 +409,15 @@ private fun PopupProfileBubble(
     isActive: Boolean,
     isSelected: Boolean,
     delayMs: Int,
+    onBoundsChanged: (Rect) -> Unit,
     onClick: () -> Unit,
 ) {
     val avatarColor = remember(profile.avatarColorHex) { parseHexColor(profile.avatarColorHex) }
     val avatarItem = remember(profile.avatarId, avatars) {
         profile.avatarId?.let { id -> avatars.find { it.id == id } }
+    }
+    val avatarImageUrl = remember(profile.avatarUrl, avatarItem) {
+        profileAvatarImageUrl(profile, avatarItem)
     }
 
     // Per-item entrance animation
@@ -360,7 +438,7 @@ private fun PopupProfileBubble(
     }
 
     val pressScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.15f else 1f,
+        targetValue = if (isSelected) 1.08f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessLow,
@@ -371,6 +449,9 @@ private fun PopupProfileBubble(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .onGloballyPositioned { coordinates ->
+                onBoundsChanged(coordinates.boundsInWindow())
+            }
             .graphicsLayer {
                 alpha = itemAlpha.value
                 scaleX = itemScale.value * pressScale
@@ -393,8 +474,8 @@ private fun PopupProfileBubble(
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(
-                        if (avatarItem != null) {
-                            avatarItem.bgColor?.let { parseHexColor(it) } ?: avatarColor
+                        if (avatarImageUrl != null) {
+                            avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
                         } else {
                             avatarColor.copy(alpha = 0.15f)
                         },
@@ -411,7 +492,7 @@ private fun PopupProfileBubble(
                                 avatarColor.copy(alpha = 0.6f),
                                 CircleShape,
                             )
-                            avatarItem == null -> Modifier.border(
+                            avatarImageUrl == null -> Modifier.border(
                                 1.5.dp,
                                 avatarColor.copy(alpha = 0.3f),
                                 CircleShape,
@@ -421,9 +502,9 @@ private fun PopupProfileBubble(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (avatarItem != null) {
+                if (avatarImageUrl != null) {
                     AsyncImage(
-                        model = avatarStorageUrl(avatarItem.storagePath),
+                        model = avatarImageUrl,
                         contentDescription = profile.name,
                         modifier = Modifier.size(48.dp).clip(CircleShape),
                         contentScale = ContentScale.Crop,
@@ -700,6 +781,9 @@ fun ActiveProfileMiniAvatar(
     val avatarItem = remember(profile.avatarId, avatars) {
         profile.avatarId?.let { id -> avatars.find { it.id == id } }
     }
+    val avatarImageUrl = remember(profile.avatarUrl, avatarItem) {
+        profileAvatarImageUrl(profile, avatarItem)
+    }
 
     val borderColor = if (selected) {
         MaterialTheme.colorScheme.primary
@@ -712,8 +796,8 @@ fun ActiveProfileMiniAvatar(
             .size(size.dp)
             .clip(CircleShape)
             .background(
-                if (avatarItem != null) {
-                    avatarItem.bgColor?.let { parseHexColor(it) } ?: avatarColor
+                if (avatarImageUrl != null) {
+                    avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
                 } else {
                     avatarColor.copy(alpha = 0.15f)
                 },
@@ -721,9 +805,9 @@ fun ActiveProfileMiniAvatar(
             .border(1.5.dp, borderColor, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        if (avatarItem != null) {
+        if (avatarImageUrl != null) {
             AsyncImage(
-                model = avatarStorageUrl(avatarItem.storagePath),
+                model = avatarImageUrl,
                 contentDescription = profile.name,
                 modifier = Modifier.size(size.dp).clip(CircleShape),
                 contentScale = ContentScale.Crop,

@@ -2,6 +2,7 @@ package com.nuvio.app.features.home
 
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -60,6 +61,91 @@ class HomeScreenTest {
         assertEquals("S1E5 • The Wolf and the Lion", result.single().subtitle)
     }
 
+    @Test
+    fun `build home continue watching items suppresses next up when series has in progress resume`() {
+        val inProgress = progressEntry(
+            videoId = "show:1:4",
+            title = "Show",
+            episodeNumber = 4,
+            episodeTitle = "Current",
+            lastUpdatedEpochMs = 200L,
+        )
+        val nextUp = continueWatchingItem(
+            videoId = "show:1:5",
+            subtitle = "Up Next • S1E5 • Next",
+        )
+
+        val result = buildHomeContinueWatchingItems(
+            visibleEntries = listOf(inProgress),
+            nextUpItemsBySeries = mapOf("show" to (500L to nextUp)),
+        )
+
+        assertEquals(listOf("show:1:4"), result.map(ContinueWatchingItem::videoId))
+        assertEquals("S1E4 • Current", result.single().subtitle)
+    }
+
+    @Test
+    fun `Trakt continue watching window filters old progress only when Trakt source is active`() {
+        val oldEntry = progressEntry(
+            videoId = "old",
+            title = "Old",
+            lastUpdatedEpochMs = 1_000L,
+            seasonNumber = null,
+            episodeNumber = null,
+        )
+        val recentEntry = progressEntry(
+            videoId = "recent",
+            title = "Recent",
+            lastUpdatedEpochMs = 30L * MILLIS_PER_DAY,
+            seasonNumber = null,
+            episodeNumber = null,
+        )
+        val entries = listOf(oldEntry, recentEntry)
+
+        val filtered = filterEntriesForTraktContinueWatchingWindow(
+            entries = entries,
+            isTraktProgressActive = true,
+            daysCap = 60,
+            nowEpochMs = 90L * MILLIS_PER_DAY,
+        )
+        val nuvioSource = filterEntriesForTraktContinueWatchingWindow(
+            entries = entries,
+            isTraktProgressActive = false,
+            daysCap = 60,
+            nowEpochMs = 90L * MILLIS_PER_DAY,
+        )
+
+        assertEquals(listOf("recent"), filtered.map(WatchProgressEntry::videoId))
+        assertEquals(listOf("old", "recent"), nuvioSource.map(WatchProgressEntry::videoId))
+    }
+
+    @Test
+    fun `Trakt all history window keeps old progress`() {
+        val oldEntry = progressEntry(
+            videoId = "old",
+            title = "Old",
+            lastUpdatedEpochMs = 1_000L,
+            seasonNumber = null,
+            episodeNumber = null,
+        )
+        val recentEntry = progressEntry(
+            videoId = "recent",
+            title = "Recent",
+            lastUpdatedEpochMs = 30L * MILLIS_PER_DAY,
+            seasonNumber = null,
+            episodeNumber = null,
+        )
+
+        val result = filterEntriesForTraktContinueWatchingWindow(
+            entries = listOf(oldEntry, recentEntry),
+            isTraktProgressActive = true,
+            daysCap = TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL,
+            nowEpochMs = 90L * MILLIS_PER_DAY,
+        )
+
+        assertEquals(listOf("old", "recent"), result.map(WatchProgressEntry::videoId))
+    }
+
     private fun progressEntry(
         videoId: String,
         title: String,
@@ -100,4 +186,8 @@ class HomeScreenTest {
             durationMs = 0L,
             progressFraction = 0f,
         )
+
+    private companion object {
+        const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
+    }
 }

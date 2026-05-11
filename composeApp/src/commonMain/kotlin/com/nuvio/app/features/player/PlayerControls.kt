@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
@@ -79,6 +80,7 @@ internal fun PlayerControlsShell(
     onAudioClick: () -> Unit,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
+    onSubmitIntroClick: (() -> Unit)? = null,
     onScrubChange: (Long) -> Unit,
     onScrubFinished: (Long) -> Unit,
     horizontalSafePadding: androidx.compose.ui.unit.Dp,
@@ -129,6 +131,7 @@ internal fun PlayerControlsShell(
                 episodeTitle = episodeTitle,
                 metrics = metrics,
                 isLocked = isLocked,
+                onSubmitIntroClick = onSubmitIntroClick,
                 onLockToggle = onLockToggle,
                 onBack = onBack,
                 modifier = Modifier
@@ -186,6 +189,7 @@ private fun PlayerHeader(
     episodeTitle: String?,
     metrics: PlayerLayoutMetrics,
     isLocked: Boolean,
+    onSubmitIntroClick: (() -> Unit)?,
     onLockToggle: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -261,6 +265,15 @@ private fun PlayerHeader(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (onSubmitIntroClick != null) {
+                    PlayerHeaderIconButton(
+                        icon = Icons.Rounded.Flag,
+                        contentDescription = "Submit Intro",
+                        buttonSize = metrics.headerIconSize + 16.dp,
+                        iconSize = metrics.headerIconSize,
+                        onClick = onSubmitIntroClick,
+                    )
+                }
                 PlayerHeaderIconButton(
                     icon = if (isLocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
                     contentDescription = if (isLocked) {
@@ -665,6 +678,9 @@ private fun PlayerActionPillButton(
             text = label,
             style = MaterialTheme.nuvioTypeScale.labelSm,
             color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
         )
     }
 }

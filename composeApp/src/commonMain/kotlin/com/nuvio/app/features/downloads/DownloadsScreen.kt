@@ -56,7 +56,7 @@ fun DownloadsScreen(
     val completedEpisodes = remember(uiState.items) {
         uiState.completedItems
             .filter { it.isEpisode }
-            .sortedByDescending { it.updatedAtEpochMs }
+            .sortedForSeriesDownloads()
     }
 
     val selectedShowTitle = remember(selectedShowId, completedEpisodes) {
@@ -229,6 +229,7 @@ private fun LazyListScope.downloadsShowContent(
 ) {
     val showEpisodes = episodes
         .filter { it.parentMetaId == showId }
+        .sortedForSeriesDownloads()
 
     val seasons = showEpisodes
         .groupBy { it.seasonNumber ?: 0 }
@@ -268,10 +269,7 @@ private fun LazyListScope.downloadsShowContent(
             )
         }
 
-        val sortedEpisodes = entries.sortedWith(
-            compareBy<DownloadItem> { it.episodeNumber ?: Int.MAX_VALUE }
-                .thenByDescending { it.updatedAtEpochMs },
-        )
+        val sortedEpisodes = entries.sortedForSeriesDownloads()
 
         items(
             items = sortedEpisodes,
@@ -298,6 +296,12 @@ private fun DownloadRow(
     onRetry: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val displayTitle = item.displayTitle()
+    val displaySubtitle = downloadDisplaySubtitle(
+        item = item,
+        displayTitle = displayTitle,
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -322,7 +326,7 @@ private fun DownloadRow(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
-                        text = item.title,
+                        text = displayTitle,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
@@ -330,7 +334,7 @@ private fun DownloadRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = item.displaySubtitle,
+                        text = displaySubtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -401,6 +405,36 @@ private fun DownloadRow(
             }
         }
     }
+}
+
+private fun DownloadItem.displayTitle(): String =
+    if (isEpisode) {
+        episodeTitle?.trim()?.takeIf { it.isNotBlank() } ?: title
+    } else {
+        title
+    }
+
+@Composable
+private fun downloadDisplaySubtitle(
+    item: DownloadItem,
+    displayTitle: String,
+): String {
+    val seasonNumber = item.seasonNumber
+    val episodeNumber = item.episodeNumber
+    if (seasonNumber == null || episodeNumber == null) {
+        return item.displaySubtitle
+    }
+
+    val episodeCode = stringResource(
+        Res.string.compose_player_episode_code_full,
+        seasonNumber,
+        episodeNumber,
+    )
+    return listOf(
+        episodeCode,
+        item.episodeTitle?.trim().orEmpty().takeIf { it.isNotBlank() && it != displayTitle },
+        item.title.trim().takeIf { it.isNotBlank() && it != displayTitle },
+    ).filterNotNull().joinToString(" • ")
 }
 
 @Composable

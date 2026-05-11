@@ -20,7 +20,8 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
     override suspend fun pull(profileId: Int): List<ProgressSyncRecord> {
         val params = buildJsonObject { put("p_profile_id", profileId) }
         val result = SupabaseProvider.client.postgrest.rpc("sync_pull_watch_progress", params)
-        return result.decodeList<WatchProgressSyncEntry>().map { entry ->
+        val serverEntries = result.decodeList<WatchProgressSyncEntry>()
+        val records = serverEntries.map { entry ->
             ProgressSyncRecord(
                 contentId = entry.contentId,
                 contentType = entry.contentType,
@@ -32,6 +33,7 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
                 lastWatched = entry.lastWatched,
             )
         }
+        return records
     }
 
     override suspend fun push(

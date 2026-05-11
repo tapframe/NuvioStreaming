@@ -33,6 +33,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +47,7 @@ import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
@@ -88,6 +90,7 @@ fun SearchScreen(
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val uiState by SearchRepository.uiState.collectAsStateWithLifecycle()
     val discoverUiState by SearchRepository.discoverUiState.collectAsStateWithLifecycle()
+    val homeCatalogSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
     val recentSearches by SearchHistoryRepository.uiState.collectAsStateWithLifecycle()
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
@@ -123,11 +126,11 @@ fun SearchScreen(
         }
     }
 
-    LaunchedEffect(addonRefreshKey) {
+    LaunchedEffect(addonRefreshKey, homeCatalogSettingsUiState.hideUnreleasedContent) {
         SearchRepository.refreshDiscover(addonsUiState.addons)
     }
 
-    LaunchedEffect(query, addonRefreshKey) {
+    LaunchedEffect(query, addonRefreshKey, homeCatalogSettingsUiState.hideUnreleasedContent) {
         val normalizedQuery = query.trim()
         if (normalizedQuery.isBlank()) {
             lastRequestedQuery = null
@@ -218,7 +221,14 @@ fun SearchScreen(
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background),
+                    .background(MaterialTheme.colorScheme.background)
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent()
+                            }
+                        }
+                    },
             ) {
                 NuvioScreenHeader(
                     title = headerTitle,
@@ -275,52 +285,60 @@ fun SearchScreen(
                     onPosterLongClick = onPosterLongClick,
                 )
             } else {
-            when {
-                uiState.isLoading && uiState.sections.isEmpty() -> {
-                    items(2) {
-                        HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                val normalizedQuery = query.trim()
+                val isWaitingForSearch = normalizedQuery.isNotBlank() && lastRequestedQuery != normalizedQuery
+                when {
+                    isWaitingForSearch -> {
+                        items(2) {
+                            HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                        }
                     }
-                }
 
-                uiState.sections.isEmpty() -> {
-                    item {
-                        SearchEmptyStateCard(
-                            reason = uiState.emptyStateReason,
-                            errorMessage = uiState.errorMessage,
-                            networkCondition = networkStatusUiState.condition,
-                            onRetry = {
-                                val normalizedQuery = query.trim()
-                                if (normalizedQuery.isNotBlank()) {
-                                    NetworkStatusRepository.requestRefresh(force = true)
-                                    SearchRepository.search(
-                                        query = normalizedQuery,
-                                        addons = addonsUiState.addons,
-                                    )
-                                }
-                            },
-                        )
+                    uiState.isLoading && uiState.sections.isEmpty() -> {
+                        items(2) {
+                            HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                        }
                     }
-                }
 
-                else -> {
-                    items(
-                        items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
-                        key = { section -> section.lazyKey },
-                    ) { keyedSection ->
-                        val section = keyedSection.value
-                        HomeCatalogRowSection(
-                            section = section,
-                            modifier = Modifier.padding(bottom = 12.dp),
-                            watchedKeys = watchedUiState.watchedKeys,
-                            onPosterClick = onPosterClick,
-                            onPosterLongClick = onPosterLongClick,
-                        )
+                    uiState.sections.isEmpty() -> {
+                        item {
+                            SearchEmptyStateCard(
+                                reason = uiState.emptyStateReason,
+                                errorMessage = uiState.errorMessage,
+                                networkCondition = networkStatusUiState.condition,
+                                onRetry = {
+                                    if (normalizedQuery.isNotBlank()) {
+                                        NetworkStatusRepository.requestRefresh(force = true)
+                                        SearchRepository.search(
+                                            query = normalizedQuery,
+                                            addons = addonsUiState.addons,
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.padding(horizontal = homeSectionPadding),
+                            )
+                        }
+                    }
+
+                    else -> {
+                        items(
+                            items = uiState.sections.withDuplicateSafeLazyKeys { section -> section.key },
+                            key = { section -> section.lazyKey },
+                        ) { keyedSection ->
+                            val section = keyedSection.value
+                            HomeCatalogRowSection(
+                                section = section,
+                                modifier = Modifier.padding(bottom = 12.dp),
+                                watchedKeys = watchedUiState.watchedKeys,
+                                onPosterClick = onPosterClick,
+                                onPosterLongClick = onPosterLongClick,
+                            )
+                        }
                     }
                 }
             }
         }
     }
-}
 }
 
 private fun discoverColumnCountForWidth(screenWidth: Dp): Int =

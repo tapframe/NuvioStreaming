@@ -19,6 +19,8 @@ data class CachedNextUpItem(
     val episodeTitle: String? = null,
     val episodeThumbnail: String? = null,
     val pauseDescription: String? = null,
+    val released: String? = null,
+    val hasAired: Boolean = true,
     val lastWatched: Long,
     val sortTimestamp: Long,
     val seedSeason: Int? = null,

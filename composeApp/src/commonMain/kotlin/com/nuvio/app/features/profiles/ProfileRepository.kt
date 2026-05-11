@@ -6,6 +6,7 @@ import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.auth.isAnonymous
 import com.nuvio.app.core.network.SupabaseProvider
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.collection.CollectionMobileSettingsRepository
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.downloads.DownloadsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
@@ -20,6 +21,7 @@ import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.search.SearchHistoryRepository
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
+import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
@@ -135,6 +137,7 @@ object ProfileRepository {
         )
         persist()
         WatchedRepository.onProfileChanged(profileIndex)
+        TraktSettingsRepository.onProfileChanged()
         LibraryRepository.onProfileChanged(profileIndex)
         WatchProgressRepository.onProfileChanged(profileIndex)
         AddonRepository.onProfileChanged(profileIndex)
@@ -154,6 +157,7 @@ object ProfileRepository {
         TraktAuthRepository.onProfileChanged()
         SearchHistoryRepository.onProfileChanged()
         CollectionRepository.onProfileChanged()
+        CollectionMobileSettingsRepository.onProfileChanged()
         DownloadsRepository.onProfileChanged()
     }
 
@@ -177,6 +181,7 @@ object ProfileRepository {
         name: String,
         avatarColorHex: String,
         avatarId: String? = null,
+        avatarUrl: String? = null,
         usesPrimaryAddons: Boolean = false,
     ) {
         val existing = _state.value.profiles
@@ -190,6 +195,7 @@ object ProfileRepository {
                 usesPrimaryAddons = profile.usesPrimaryAddons,
                 usesPrimaryPlugins = profile.usesPrimaryPlugins,
                 avatarId = profile.avatarId,
+                avatarUrl = profile.avatarUrl,
             )
         } + ProfilePushPayload(
             profileIndex = nextIndex,
@@ -197,6 +203,7 @@ object ProfileRepository {
             avatarColorHex = avatarColorHex,
             usesPrimaryAddons = usesPrimaryAddons,
             avatarId = avatarId,
+            avatarUrl = avatarUrl,
         )
 
         pushProfiles(allPayloads)
@@ -207,6 +214,7 @@ object ProfileRepository {
         name: String,
         avatarColorHex: String,
         avatarId: String? = null,
+        avatarUrl: String? = null,
         usesPrimaryAddons: Boolean = false,
     ) {
         val allPayloads = _state.value.profiles.map { profile ->
@@ -216,7 +224,8 @@ object ProfileRepository {
                     name = name,
                     avatarColorHex = avatarColorHex,
                     usesPrimaryAddons = usesPrimaryAddons,
-                    avatarId = avatarId ?: profile.avatarId,
+                    avatarId = avatarId,
+                    avatarUrl = avatarUrl,
                 )
             } else {
                 ProfilePushPayload(
@@ -226,6 +235,7 @@ object ProfileRepository {
                     usesPrimaryAddons = profile.usesPrimaryAddons,
                     usesPrimaryPlugins = profile.usesPrimaryPlugins,
                     avatarId = profile.avatarId,
+                    avatarUrl = profile.avatarUrl,
                 )
             }
         }
@@ -355,6 +365,7 @@ object ProfileRepository {
                 name = p.name,
                 avatarColorHex = p.avatarColorHex,
                 avatarId = p.avatarId,
+                avatarUrl = p.avatarUrl,
                 usesPrimaryAddons = p.usesPrimaryAddons,
                 usesPrimaryPlugins = p.usesPrimaryPlugins,
             )

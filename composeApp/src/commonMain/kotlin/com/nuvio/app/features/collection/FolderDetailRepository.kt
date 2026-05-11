@@ -3,14 +3,18 @@ package com.nuvio.app.features.collection
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.catalog.CATALOG_PAGE_SIZE
+import com.nuvio.app.features.catalog.CatalogPage
 import com.nuvio.app.features.catalog.fetchCatalogPage
 import com.nuvio.app.features.catalog.mergeCatalogItems
 import com.nuvio.app.features.catalog.supportsPagination
 import com.nuvio.app.core.i18n.localizedMediaTypeLabel
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.filterReleasedItems
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -320,7 +324,7 @@ object FolderDetailRepository {
                         genre = currentTab.genre,
                         skip = requestedSkip.takeIf { it > 0 },
                     )
-                }
+                }.withUnreleasedFilter()
             }.onSuccess { page ->
                 updateTab(index) { tab ->
                     val mergedItems = if (reset) {
@@ -417,6 +421,12 @@ object FolderDetailRepository {
 }
 
 private fun Boolean?.orFalse(): Boolean = this == true
+
+private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
+    if (!HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) return this
+    val filteredItems = items.filterReleasedItems(CurrentDateProvider.todayIsoDate())
+    return if (filteredItems.size == items.size) this else copy(items = filteredItems)
+}
 
 private fun tmdbCatalogId(source: CollectionSource): String =
     buildString {

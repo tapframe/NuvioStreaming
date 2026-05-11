@@ -78,6 +78,7 @@ fun ProfileEditScreen(
 
     var name by rememberSaveable { mutableStateOf(currentProfile?.name ?: "") }
     var selectedAvatarId by rememberSaveable { mutableStateOf(currentProfile?.avatarId) }
+    var avatarUrl by rememberSaveable { mutableStateOf(currentProfile?.avatarUrl.orEmpty()) }
     var usesPrimaryAddons by rememberSaveable { mutableStateOf(currentProfile?.usesPrimaryAddons ?: false) }
     var isSaving by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -90,17 +91,20 @@ fun ProfileEditScreen(
         AvatarRepository.fetchAvatars()
         AvatarRepository.refreshAvatars()
     }
-    LaunchedEffect(isNew, avatars, selectedAvatarId) {
-        if (isNew && selectedAvatarId == null && avatars.isNotEmpty()) {
+    LaunchedEffect(isNew, avatars, selectedAvatarId, avatarUrl) {
+        if (isNew && avatarUrl.isBlank() && selectedAvatarId == null && avatars.isNotEmpty()) {
             selectedAvatarId = avatars.first().id
         }
     }
 
+    val customAvatarUrl = remember(avatarUrl) { normalizedAvatarUrl(avatarUrl) }
+    val avatarUrlIsInvalid = avatarUrl.isNotBlank() && customAvatarUrl == null
     val selectedAvatarItem = remember(selectedAvatarId, avatars) {
         selectedAvatarId?.let { id -> avatars.find { it.id == id } }
     }
-    val previewAccent = remember(selectedAvatarItem, fallbackColorHex) {
-        parseHexColor(selectedAvatarItem?.bgColor ?: fallbackColorHex)
+    val visibleAvatarItem = if (customAvatarUrl == null) selectedAvatarItem else null
+    val previewAccent = remember(visibleAvatarItem, fallbackColorHex) {
+        parseHexColor(visibleAvatarItem?.bgColor ?: fallbackColorHex)
     }
 
     NuvioScreen(modifier = modifier) {
@@ -123,10 +127,45 @@ fun ProfileEditScreen(
                 usesPrimaryAddons = usesPrimaryAddons,
                 onNameChange = { name = it },
                 onUsesPrimaryAddonsChange = { usesPrimaryAddons = it },
-                selectedAvatar = selectedAvatarItem,
+                selectedAvatar = visibleAvatarItem,
+                customAvatarUrl = customAvatarUrl,
                 accentColor = previewAccent,
                 hasAvatarChoices = avatars.isNotEmpty(),
             )
+        }
+
+        item {
+            NuvioSurfaceCard {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = stringResource(Res.string.profile_custom_avatar_url),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(Res.string.profile_custom_avatar_url_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    NuvioInputField(
+                        value = avatarUrl,
+                        onValueChange = { value ->
+                            avatarUrl = value
+                            if (value.isNotBlank()) {
+                                selectedAvatarId = null
+                            }
+                        },
+                        placeholder = stringResource(Res.string.profile_custom_avatar_url_placeholder),
+                    )
+                    if (avatarUrlIsInvalid) {
+                        Text(
+                            text = stringResource(Res.string.profile_avatar_url_invalid),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
         }
 
         item {
@@ -165,8 +204,11 @@ fun ProfileEditScreen(
                                     AvatarChoiceItem(
                                         avatar = avatar,
                                         size = avatarSize,
-                                        isSelected = avatar.id == selectedAvatarId,
-                                        onClick = { selectedAvatarId = avatar.id },
+                                        isSelected = customAvatarUrl == null && avatar.id == selectedAvatarId,
+                                        onClick = {
+                                            avatarUrl = ""
+                                            selectedAvatarId = avatar.id
+                                        },
                                     )
                                 }
                             }
@@ -220,16 +262,17 @@ fun ProfileEditScreen(
                 } else {
                     stringResource(Res.string.collections_editor_save_changes)
                 },
-                enabled = name.isNotBlank() && !isSaving,
+                enabled = name.isNotBlank() && !avatarUrlIsInvalid && !isSaving,
                 onClick = {
                     isSaving = true
                     scope.launch {
-                        val avatarColorHex = selectedAvatarItem?.bgColor ?: fallbackColorHex
+                        val avatarColorHex = visibleAvatarItem?.bgColor ?: fallbackColorHex
                         if (isNew) {
                             ProfileRepository.createProfile(
                                 name = name,
                                 avatarColorHex = avatarColorHex,
-                                avatarId = selectedAvatarId,
+                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                avatarUrl = customAvatarUrl,
                                 usesPrimaryAddons = usesPrimaryAddons,
                             )
                         } else {
@@ -237,7 +280,8 @@ fun ProfileEditScreen(
                                 profileIndex = currentProfile!!.profileIndex,
                                 name = name,
                                 avatarColorHex = avatarColorHex,
-                                avatarId = selectedAvatarId,
+                                avatarId = if (customAvatarUrl == null) selectedAvatarId else null,
+                                avatarUrl = customAvatarUrl,
                                 usesPrimaryAddons = usesPrimaryAddons,
                             )
                         }
@@ -330,6 +374,7 @@ private fun ProfileIdentityCard(
     onNameChange: (String) -> Unit,
     onUsesPrimaryAddonsChange: (Boolean) -> Unit,
     selectedAvatar: AvatarCatalogItem?,
+    customAvatarUrl: String?,
     accentColor: Color,
     hasAvatarChoices: Boolean,
 ) {
@@ -345,16 +390,31 @@ private fun ProfileIdentityCard(
                         .size(88.dp)
                         .clip(CircleShape)
                         .background(
-                            if (selectedAvatar != null) accentColor else accentColor.copy(alpha = 0.18f),
+                            if (selectedAvatar != null || customAvatarUrl != null) {
+                                accentColor
+                            } else {
+                                accentColor.copy(alpha = 0.18f)
+                            },
                         )
                         .border(
                             width = 2.dp,
-                            color = if (selectedAvatar == null) accentColor.copy(alpha = 0.35f) else Color.Transparent,
+                            color = if (selectedAvatar == null && customAvatarUrl == null) {
+                                accentColor.copy(alpha = 0.35f)
+                            } else {
+                                Color.Transparent
+                            },
                             shape = CircleShape,
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (selectedAvatar != null) {
+                    if (customAvatarUrl != null) {
+                        AsyncImage(
+                            model = customAvatarUrl,
+                            contentDescription = name,
+                            modifier = Modifier.size(88.dp).clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else if (selectedAvatar != null) {
                         AsyncImage(
                             model = avatarStorageUrl(selectedAvatar.storagePath),
                             contentDescription = selectedAvatar.displayName,
@@ -410,6 +470,7 @@ private fun ProfileIdentityCard(
                     )
                     Text(
                         text = when {
+                            customAvatarUrl != null -> stringResource(Res.string.profile_custom_avatar_selected)
                             selectedAvatar != null -> stringResource(
                                 Res.string.profile_avatar_selected,
                                 selectedAvatar.displayName,

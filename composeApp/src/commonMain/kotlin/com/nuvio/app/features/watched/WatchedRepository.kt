@@ -4,6 +4,9 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
+import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.trakt.shouldUseTraktProgress
 import com.nuvio.app.features.watching.sync.SupabaseWatchedSyncAdapter
 import com.nuvio.app.features.watching.sync.TraktWatchedSyncAdapter
 import com.nuvio.app.features.watching.sync.WatchedSyncAdapter
@@ -42,8 +45,8 @@ object WatchedRepository {
     private var itemsByKey: MutableMap<String, WatchedItem> = mutableMapOf()
     internal var syncAdapter: WatchedSyncAdapter = SupabaseWatchedSyncAdapter
 
-    private fun activeSyncAdapter(): WatchedSyncAdapter =
-        if (TraktAuthRepository.isAuthenticated.value) TraktWatchedSyncAdapter else syncAdapter
+    private fun activePullSyncAdapter(): WatchedSyncAdapter =
+        if (shouldUseTraktWatchedSync()) TraktWatchedSyncAdapter else syncAdapter
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -72,21 +75,27 @@ object WatchedRepository {
             val items = runCatching {
                 json.decodeFromString<StoredWatchedPayload>(payload).items
             }.getOrDefault(emptyList())
-            itemsByKey = items.associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }.toMutableMap()
+            itemsByKey = items
+                .map(WatchedItem::normalizedMarkedAt)
+                .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
+                .toMutableMap()
         }
 
         publish()
     }
 
     suspend fun pullFromServer(profileId: Int) {
+        TraktAuthRepository.ensureLoaded()
+        TraktSettingsRepository.ensureLoaded()
         currentProfileId = profileId
         runCatching {
-            val serverItems = activeSyncAdapter().pull(
+            val serverItems = activePullSyncAdapter().pull(
                 profileId = profileId,
                 pageSize = watchedItemsPageSize,
             )
 
             itemsByKey = serverItems
+                .map(WatchedItem::normalizedMarkedAt)
                 .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
                 .toMutableMap()
             hasLoaded = true
@@ -203,7 +212,7 @@ object WatchedRepository {
             runCatching {
                 if (items.isEmpty()) return@runCatching
                 val profileId = ProfileRepository.activeProfileId
-                activeSyncAdapter().push(profileId = profileId, items = items)
+                pushToActiveTargets(profileId = profileId, items = items)
             }.onFailure { e ->
                 log.e(e) { "Failed to push watched items" }
             }
@@ -215,7 +224,7 @@ object WatchedRepository {
             runCatching {
                 if (items.isEmpty()) return@runCatching
                 val profileId = ProfileRepository.activeProfileId
-                activeSyncAdapter().delete(profileId = profileId, items = items)
+                deleteFromActiveTargets(profileId = profileId, items = items)
             }.onFailure { e ->
                 log.e(e) { "Failed to push watched item delete" }
             }
@@ -223,7 +232,9 @@ object WatchedRepository {
     }
 
     private fun publish() {
-        val items = itemsByKey.values.sortedByDescending { it.markedAtEpochMs }
+        val items = itemsByKey.values
+            .map(WatchedItem::normalizedMarkedAt)
+            .sortedByDescending { it.markedAtEpochMs }
         _uiState.value = WatchedUiState(
             items = items,
             watchedKeys = items.mapTo(linkedSetOf()) {
@@ -238,9 +249,55 @@ object WatchedRepository {
             currentProfileId,
             json.encodeToString(
                 StoredWatchedPayload(
-                    items = itemsByKey.values.sortedByDescending { it.markedAtEpochMs },
+                    items = itemsByKey.values
+                        .map(WatchedItem::normalizedMarkedAt)
+                        .sortedByDescending { it.markedAtEpochMs },
                 ),
             ),
         )
     }
+
+    private fun shouldUseTraktWatchedSync(): Boolean =
+        shouldUseTraktWatchedSync(
+            isAuthenticated = TraktAuthRepository.isAuthenticated.value,
+            source = TraktSettingsRepository.uiState.value.watchProgressSource,
+        )
+
+    private suspend fun pushToActiveTargets(
+        profileId: Int,
+        items: Collection<WatchedItem>,
+    ) {
+        if (shouldUseTraktWatchedSync()) {
+            TraktWatchedSyncAdapter.push(profileId = profileId, items = items)
+            return
+        }
+
+        syncAdapter.push(profileId = profileId, items = items)
+        if (TraktAuthRepository.isAuthenticated.value) {
+            TraktWatchedSyncAdapter.push(profileId = profileId, items = items)
+        }
+    }
+
+    private suspend fun deleteFromActiveTargets(
+        profileId: Int,
+        items: Collection<WatchedItem>,
+    ) {
+        if (shouldUseTraktWatchedSync()) {
+            TraktWatchedSyncAdapter.delete(profileId = profileId, items = items)
+            return
+        }
+
+        syncAdapter.delete(profileId = profileId, items = items)
+        if (TraktAuthRepository.isAuthenticated.value) {
+            TraktWatchedSyncAdapter.delete(profileId = profileId, items = items)
+        }
+    }
 }
+
+internal fun shouldUseTraktWatchedSync(
+    isAuthenticated: Boolean,
+    source: WatchProgressSource,
+): Boolean = shouldUseTraktProgress(
+    isAuthenticated = isAuthenticated,
+    source = source,
+)

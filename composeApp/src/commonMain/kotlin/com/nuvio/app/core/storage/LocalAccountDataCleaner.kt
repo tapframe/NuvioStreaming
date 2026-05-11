@@ -3,6 +3,7 @@ package com.nuvio.app.core.storage
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.catalog.CatalogRepository
+import com.nuvio.app.features.collection.CollectionMobileSettingsRepository
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
@@ -21,6 +22,7 @@ import com.nuvio.app.features.streams.StreamContextStore
 import com.nuvio.app.features.streams.StreamLaunchStore
 import com.nuvio.app.features.streams.StreamsRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
+import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -43,10 +45,12 @@ internal object LocalAccountDataCleaner {
         WatchedRepository.clearLocalState()
         ContinueWatchingPreferencesRepository.clearLocalState()
         EpisodeReleaseNotificationsRepository.clearLocalState()
+        CollectionMobileSettingsRepository.clearLocalState()
         CollectionRepository.clearLocalState()
         ThemeSettingsRepository.clearLocalState()
         PosterCardStyleRepository.clearLocalState()
         TraktAuthRepository.clearLocalState()
+        TraktSettingsRepository.clearLocalState()
         PlayerSettingsRepository.clearLocalState()
         CatalogRepository.clear()
         StreamsRepository.clear()
