@@ -3,7 +3,6 @@ name: Build check
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch:        # TODO: remove before opening upstream PR
 
 # Cancel superseded runs on the same PR.
 concurrency:
