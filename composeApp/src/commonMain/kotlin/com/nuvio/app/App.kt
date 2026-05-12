@@ -1338,7 +1338,13 @@ private fun MainAppContent(
                         reuseHandled = true
                         if (launch.manualSelection) return@LaunchedEffect
                         if (!playerSettings.streamReuseLastLinkEnabled) return@LaunchedEffect
-                        val cacheKey = StreamLinkCacheRepository.contentKey(launch.type, effectiveVideoId)
+                        val cacheKey = StreamLinkCacheRepository.contentKey(
+                            type = launch.type,
+                            videoId = effectiveVideoId,
+                            parentMetaId = launch.parentMetaId,
+                            season = launch.seasonNumber,
+                            episode = launch.episodeNumber,
+                        )
                         val maxAgeMs = playerSettings.streamReuseLastLinkCacheHours * 60L * 60L * 1000L
                         val cached = StreamLinkCacheRepository.getValid(cacheKey, maxAgeMs)
                         if (cached != null) {
@@ -1378,17 +1384,37 @@ private fun MainAppContent(
                     }
 
                     val streamsUiState by StreamsRepository.uiState.collectAsStateWithLifecycle()
+                    val expectedStreamsRequestToken = StreamsRepository.requestToken(
+                        type = launch.type,
+                        videoId = effectiveVideoId,
+                        season = launch.seasonNumber,
+                        episode = launch.episodeNumber,
+                        manualSelection = launch.manualSelection,
+                    )
                     var autoPlayHandled by rememberSaveable(launch.videoId, effectiveVideoId) { mutableStateOf(false) }
-                    LaunchedEffect(streamsUiState.autoPlayStream, reuseHandled, launch.manualSelection) {
+                    LaunchedEffect(
+                        streamsUiState.autoPlayStream,
+                        streamsUiState.requestToken,
+                        expectedStreamsRequestToken,
+                        reuseHandled,
+                        launch.manualSelection,
+                    ) {
                         if (!reuseHandled) return@LaunchedEffect
                         if (launch.manualSelection) return@LaunchedEffect
                         if (reuseNavigated) return@LaunchedEffect
                         if (autoPlayHandled) return@LaunchedEffect
+                        if (streamsUiState.requestToken != expectedStreamsRequestToken) return@LaunchedEffect
                         val stream = streamsUiState.autoPlayStream ?: return@LaunchedEffect
                         val sourceUrl = stream.directPlaybackUrl ?: return@LaunchedEffect
                         autoPlayHandled = true
                         if (playerSettings.streamReuseLastLinkEnabled) {
-                            val cacheKey = StreamLinkCacheRepository.contentKey(launch.type, effectiveVideoId)
+                            val cacheKey = StreamLinkCacheRepository.contentKey(
+                                type = launch.type,
+                                videoId = effectiveVideoId,
+                                parentMetaId = launch.parentMetaId,
+                                season = launch.seasonNumber,
+                                episode = launch.episodeNumber,
+                            )
                             StreamLinkCacheRepository.save(
                                 contentKey = cacheKey,
                                 url = sourceUrl,
@@ -1468,7 +1494,13 @@ private fun MainAppContent(
                             if (sourceUrl != null) {
                                 // Persist for Reuse Last Link
                                 if (playerSettings.streamReuseLastLinkEnabled) {
-                                    val cacheKey = StreamLinkCacheRepository.contentKey(launch.type, effectiveVideoId)
+                                    val cacheKey = StreamLinkCacheRepository.contentKey(
+                                        type = launch.type,
+                                        videoId = effectiveVideoId,
+                                        parentMetaId = launch.parentMetaId,
+                                        season = launch.seasonNumber,
+                                        episode = launch.episodeNumber,
+                                    )
                                     StreamLinkCacheRepository.save(
                                         contentKey = cacheKey,
                                         url = sourceUrl,

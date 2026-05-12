@@ -237,6 +237,7 @@ fun SettingsScreen(
                 traktSettingsUiState = traktSettingsUiState,
                 homescreenHeroEnabled = homescreenSettingsUiState.heroEnabled,
                 homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
+                homescreenHideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
                 homescreenItems = homescreenSettingsUiState.items,
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
@@ -283,6 +284,7 @@ fun SettingsScreen(
                 traktSettingsUiState = traktSettingsUiState,
                 homescreenHeroEnabled = homescreenSettingsUiState.heroEnabled,
                 homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
+                homescreenHideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
                 homescreenItems = homescreenSettingsUiState.items,
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
@@ -339,6 +341,7 @@ private fun MobileSettingsScreen(
     traktSettingsUiState: TraktSettingsUiState,
     homescreenHeroEnabled: Boolean,
     homescreenHideUnreleasedContent: Boolean,
+    homescreenHideCatalogUnderline: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
@@ -530,6 +533,7 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     heroEnabled = homescreenHeroEnabled,
                     hideUnreleasedContent = homescreenHideUnreleasedContent,
+                    hideCatalogUnderline = homescreenHideCatalogUnderline,
                     items = homescreenItems,
                 )
                 SettingsPage.MetaScreen -> metaScreenSettingsContent(
@@ -638,6 +642,7 @@ private fun TabletSettingsScreen(
     traktSettingsUiState: TraktSettingsUiState,
     homescreenHeroEnabled: Boolean,
     homescreenHideUnreleasedContent: Boolean,
+    homescreenHideCatalogUnderline: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
@@ -888,6 +893,7 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         heroEnabled = homescreenHeroEnabled,
                         hideUnreleasedContent = homescreenHideUnreleasedContent,
+                        hideCatalogUnderline = homescreenHideCatalogUnderline,
                         items = homescreenItems,
                     )
                     SettingsPage.MetaScreen -> metaScreenSettingsContent(

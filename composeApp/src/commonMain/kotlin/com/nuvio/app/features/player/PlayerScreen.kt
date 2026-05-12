@@ -791,8 +791,11 @@ fun PlayerScreen(
             flushWatchProgress()
             if (playerSettingsUiState.streamReuseLastLinkEnabled && activeVideoId != null) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    activeVideoId!!,
+                    type = contentType ?: parentMetaType,
+                    videoId = activeVideoId!!,
+                    parentMetaId = parentMetaId,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -851,8 +854,11 @@ fun PlayerScreen(
             val epResumePositionMs = epEntry?.lastPositionMs?.takeIf { it > 0L } ?: 0L
             if (playerSettingsUiState.streamReuseLastLinkEnabled) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    epVideoId,
+                    type = contentType ?: parentMetaType,
+                    videoId = epVideoId,
+                    parentMetaId = parentMetaId,
+                    season = episode.season,
+                    episode = episode.episode,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -1563,8 +1569,11 @@ fun PlayerScreen(
                         val currentVideoId = activeVideoId
                         if (currentVideoId != null) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
-                                contentType ?: parentMetaType,
-                                currentVideoId,
+                                type = contentType ?: parentMetaType,
+                                videoId = currentVideoId,
+                                parentMetaId = parentMetaId,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
                             )
                             StreamLinkCacheRepository.remove(cacheKey)
                         }
