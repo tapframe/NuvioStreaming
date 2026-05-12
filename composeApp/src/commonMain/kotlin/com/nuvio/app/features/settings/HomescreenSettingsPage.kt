@@ -42,6 +42,8 @@ import nuvio.composeapp.generated.resources.layout_hide_unreleased
 import nuvio.composeapp.generated.resources.layout_hide_unreleased_sub
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_message
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_title
+import nuvio.composeapp.generated.resources.settings_homescreen_hide_catalog_underline
+import nuvio.composeapp.generated.resources.settings_homescreen_hide_catalog_underline_description
 import nuvio.composeapp.generated.resources.settings_homescreen_keep_home_focused
 import nuvio.composeapp.generated.resources.settings_homescreen_limit_reached
 import nuvio.composeapp.generated.resources.settings_homescreen_no_sources_selected
@@ -65,6 +67,7 @@ internal fun LazyListScope.homescreenSettingsContent(
     isTablet: Boolean,
     heroEnabled: Boolean,
     hideUnreleasedContent: Boolean,
+    hideCatalogUnderline: Boolean,
     items: List<HomeCatalogSettingsItem>,
 ) {
     val selectedHeroSourceCount = items.count { it.heroSourceEnabled }
@@ -97,6 +100,14 @@ internal fun LazyListScope.homescreenSettingsContent(
                     checked = hideUnreleasedContent,
                     isTablet = isTablet,
                     onCheckedChange = HomeCatalogSettingsRepository::setHideUnreleasedContent,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_homescreen_hide_catalog_underline),
+                    description = stringResource(Res.string.settings_homescreen_hide_catalog_underline_description),
+                    checked = hideCatalogUnderline,
+                    isTablet = isTablet,
+                    onCheckedChange = HomeCatalogSettingsRepository::setHideCatalogUnderline,
                 )
             }
         }

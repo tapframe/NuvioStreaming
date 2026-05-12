@@ -357,9 +357,10 @@ fun PlayerScreen(
                 .coerceIn(0f, 100f)
         }
 
-        fun currentTraktScrobbleItem() = TraktScrobbleRepository.buildItem(
+        suspend fun currentTraktScrobbleItem() = TraktScrobbleRepository.buildItem(
             contentType = contentType ?: parentMetaType,
             parentMetaId = parentMetaId,
+            videoId = activeVideoId,
             title = title,
             seasonNumber = activeSeasonNumber,
             episodeNumber = activeEpisodeNumber,
@@ -367,11 +368,15 @@ fun PlayerScreen(
         )
 
         fun emitTraktScrobbleStart() {
-            val item = currentTraktScrobbleItem() ?: return
             if (hasRequestedScrobbleStartForCurrentItem) return
             hasRequestedScrobbleStartForCurrentItem = true
 
             scope.launch {
+                val item = currentTraktScrobbleItem()
+                if (item == null) {
+                    hasRequestedScrobbleStartForCurrentItem = false
+                    return@launch
+                }
                 TraktScrobbleRepository.scrobbleStart(
                     item = item,
                     progressPercent = currentPlaybackProgressPercent(),
@@ -380,12 +385,12 @@ fun PlayerScreen(
         }
 
         fun emitTraktScrobbleStop(progressPercent: Float? = null) {
-            val item = currentTraktScrobbleItem() ?: return
             val provided = progressPercent
             if (!hasRequestedScrobbleStartForCurrentItem && (provided ?: 0f) < 80f) return
 
             val percent = provided ?: currentPlaybackProgressPercent()
             scope.launch {
+                val item = currentTraktScrobbleItem() ?: return@launch
                 TraktScrobbleRepository.scrobbleStop(
                     item = item,
                     progressPercent = percent,
@@ -786,8 +791,11 @@ fun PlayerScreen(
             flushWatchProgress()
             if (playerSettingsUiState.streamReuseLastLinkEnabled && activeVideoId != null) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    activeVideoId!!,
+                    type = contentType ?: parentMetaType,
+                    videoId = activeVideoId!!,
+                    parentMetaId = parentMetaId,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -846,8 +854,11 @@ fun PlayerScreen(
             val epResumePositionMs = epEntry?.lastPositionMs?.takeIf { it > 0L } ?: 0L
             if (playerSettingsUiState.streamReuseLastLinkEnabled) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    epVideoId,
+                    type = contentType ?: parentMetaType,
+                    videoId = epVideoId,
+                    parentMetaId = parentMetaId,
+                    season = episode.season,
+                    episode = episode.episode,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -1558,8 +1569,11 @@ fun PlayerScreen(
                         val currentVideoId = activeVideoId
                         if (currentVideoId != null) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
-                                contentType ?: parentMetaType,
-                                currentVideoId,
+                                type = contentType ?: parentMetaType,
+                                videoId = currentVideoId,
+                                parentMetaId = parentMetaId,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
                             )
                             StreamLinkCacheRepository.remove(cacheKey)
                         }

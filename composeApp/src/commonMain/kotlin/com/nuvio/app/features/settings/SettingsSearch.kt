@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
@@ -94,6 +95,7 @@ internal fun settingsSearchEntries(
     val integrationsPage = stringResource(Res.string.compose_settings_page_integrations)
     val notificationsPage = stringResource(Res.string.compose_settings_page_notifications)
     val supportersPage = stringResource(Res.string.compose_settings_page_supporters_contributors)
+    val licensesPage = stringResource(Res.string.compose_settings_page_licenses_attributions)
     val homeLayoutPage = stringResource(Res.string.compose_settings_page_homescreen)
     val detailPage = stringResource(Res.string.compose_settings_page_meta_screen)
     val continueWatchingPage = stringResource(Res.string.compose_settings_page_continue_watching)
@@ -248,6 +250,46 @@ internal fun settingsSearchEntries(
         category = aboutCategory,
         icon = Icons.Rounded.Favorite,
     )
+    addPage(
+        page = SettingsPage.LicensesAttributions,
+        key = "licenses-attributions",
+        title = licensesPage,
+        description = stringResource(Res.string.about_licenses_attributions_subtitle),
+        category = aboutCategory,
+        icon = Icons.Rounded.Info,
+    )
+    listOf(
+        PlaybackSearchRow("nuvio-license", stringResource(Res.string.settings_licenses_attributions_nuvio_title), stringResource(Res.string.settings_licenses_attributions_nuvio_license)),
+        PlaybackSearchRow("tmdb-attribution", stringResource(Res.string.settings_licenses_attributions_tmdb_title), stringResource(Res.string.settings_licenses_attributions_tmdb_body)),
+        PlaybackSearchRow("trakt-attribution", stringResource(Res.string.settings_licenses_attributions_trakt_title), stringResource(Res.string.settings_licenses_attributions_trakt_body)),
+        PlaybackSearchRow("mdblist-attribution", stringResource(Res.string.settings_licenses_attributions_mdblist_title), stringResource(Res.string.settings_licenses_attributions_mdblist_body)),
+        PlaybackSearchRow("introdb-attribution", stringResource(Res.string.settings_licenses_attributions_introdb_title), stringResource(Res.string.settings_licenses_attributions_introdb_body)),
+        PlaybackSearchRow("imdb-datasets", stringResource(Res.string.settings_licenses_attributions_imdb_title), stringResource(Res.string.settings_licenses_attributions_imdb_body)),
+        PlaybackSearchRow(
+            if (isIos) "mpvkit-license" else "exoplayer-license",
+            if (isIos) {
+                stringResource(Res.string.settings_licenses_attributions_mpvkit_title)
+            } else {
+                stringResource(Res.string.settings_licenses_attributions_exoplayer_title)
+            },
+            if (isIos) {
+                stringResource(Res.string.settings_licenses_attributions_mpvkit_license)
+            } else {
+                stringResource(Res.string.settings_licenses_attributions_exoplayer_license)
+            },
+        ),
+    ).forEach { row ->
+        addRow(
+            page = SettingsPage.LicensesAttributions,
+            key = row.key,
+            title = row.title,
+            description = row.description,
+            pageLabel = licensesPage,
+            section = stringResource(Res.string.compose_settings_root_about_section),
+            category = aboutCategory,
+            icon = Icons.Rounded.Info,
+        )
+    }
     if (checkForUpdatesAvailable) {
         add(
             key = "check-updates",
@@ -546,6 +588,7 @@ internal fun settingsSearchEntries(
     listOf(
         PlaybackSearchRow("home-hero", stringResource(Res.string.settings_homescreen_show_hero), stringResource(Res.string.settings_homescreen_show_hero_description)),
         PlaybackSearchRow("home-hide-unreleased", stringResource(Res.string.layout_hide_unreleased), stringResource(Res.string.layout_hide_unreleased_sub)),
+        PlaybackSearchRow("home-hide-catalog-underline", stringResource(Res.string.settings_homescreen_hide_catalog_underline), stringResource(Res.string.settings_homescreen_hide_catalog_underline_description)),
         PlaybackSearchRow("home-hero-sources", stringResource(Res.string.settings_homescreen_section_hero_sources)),
         PlaybackSearchRow("home-catalogs", stringResource(Res.string.settings_homescreen_section_catalogs)),
     ).forEach { row ->

@@ -51,6 +51,7 @@ object TraktEpisodeMappingService {
         videoId: String?,
         season: Int?,
         episode: Int?,
+        episodeTitle: String? = null,
     ): EpisodeMappingEntry? {
         val key = cacheKey(contentId, contentType, videoId, season, episode) ?: return null
         cacheMutex.withLock {
@@ -77,7 +78,7 @@ object TraktEpisodeMappingService {
             requestedSeason = requestedSeason,
             requestedEpisode = requestedEpisode,
             requestedVideoId = videoId,
-            requestedTitle = null,
+            requestedTitle = episodeTitle,
             addonEpisodes = addonEpisodes,
             traktEpisodes = traktEpisodes,
         ) ?: return null
@@ -176,18 +177,18 @@ object TraktEpisodeMappingService {
 
     // ── Season structure comparison ───────────────────────────────────────
 
-    private fun hasSameSeasonStructure(
+    internal fun hasSameSeasonStructure(
         addonEpisodes: List<EpisodeMappingEntry>,
         traktEpisodes: List<EpisodeMappingEntry>,
     ): Boolean {
-        val addonSeasons = addonEpisodes.mapTo(mutableSetOf()) { it.season }
-        val traktSeasons = traktEpisodes.mapTo(mutableSetOf()) { it.season }
-        return addonSeasons == traktSeasons
+        val addonPerSeason = addonEpisodes.groupBy { it.season }.mapValues { it.value.size }
+        val traktPerSeason = traktEpisodes.groupBy { it.season }.mapValues { it.value.size }
+        return addonPerSeason == traktPerSeason
     }
 
     // ── Forward mapping: addon → Trakt ──────────────────────────────────
 
-    private fun remapEpisodeByTitleOrIndex(
+    internal fun remapEpisodeByTitleOrIndex(
         requestedSeason: Int,
         requestedEpisode: Int,
         requestedVideoId: String?,
@@ -195,63 +196,72 @@ object TraktEpisodeMappingService {
         addonEpisodes: List<EpisodeMappingEntry>,
         traktEpisodes: List<EpisodeMappingEntry>,
     ): EpisodeMappingEntry? {
-        // Find the addon episode entry
-        val addonEntry = addonEpisodes.firstOrNull {
-            it.season == requestedSeason && it.episode == requestedEpisode
-        } ?: addonEpisodes.firstOrNull {
-            !requestedVideoId.isNullOrBlank() && it.videoId == requestedVideoId
-        } ?: return null
-
-        // Try title match first
-        val titleToMatch = addonEntry.title?.takeIf { it.isNotBlank() } ?: requestedTitle
-        if (!titleToMatch.isNullOrBlank()) {
-            val titleMatch = traktEpisodes.firstOrNull { target ->
-                !target.title.isNullOrBlank() &&
-                    normalizeTitle(target.title) == normalizeTitle(titleToMatch)
-            }
-            if (titleMatch != null) {
-                return titleMatch
-            }
-        }
-
-        // Fallback: global index mapping
-        val addonIndex = addonEpisodes.indexOf(addonEntry)
-        if (addonIndex < 0 || addonIndex >= traktEpisodes.size) return null
-
-        return traktEpisodes[addonIndex]
+        return remapEpisodeBetweenLists(
+            requestedSeason = requestedSeason,
+            requestedEpisode = requestedEpisode,
+            requestedVideoId = requestedVideoId,
+            requestedTitle = requestedTitle,
+            sourceEpisodes = addonEpisodes,
+            targetEpisodes = traktEpisodes,
+        )
     }
 
     // ── Reverse mapping: Trakt → addon ──────────────────────────────────
 
-    private fun reverseRemapEpisodeByTitleOrIndex(
+    internal fun reverseRemapEpisodeByTitleOrIndex(
         requestedSeason: Int,
         requestedEpisode: Int,
         requestedTitle: String?,
         addonEpisodes: List<EpisodeMappingEntry>,
         traktEpisodes: List<EpisodeMappingEntry>,
     ): EpisodeMappingEntry? {
-        // Find the Trakt episode entry
-        val traktEntry = traktEpisodes.firstOrNull {
-            it.season == requestedSeason && it.episode == requestedEpisode
-        } ?: return null
+        return remapEpisodeBetweenLists(
+            requestedSeason = requestedSeason,
+            requestedEpisode = requestedEpisode,
+            requestedVideoId = null,
+            requestedTitle = requestedTitle,
+            sourceEpisodes = traktEpisodes,
+            targetEpisodes = addonEpisodes,
+        )
+    }
 
-        // Try title match first
-        val titleToMatch = traktEntry.title?.takeIf { it.isNotBlank() } ?: requestedTitle
-        if (!titleToMatch.isNullOrBlank()) {
-            val titleMatch = addonEpisodes.firstOrNull { target ->
-                !target.title.isNullOrBlank() &&
-                    normalizeTitle(target.title) == normalizeTitle(titleToMatch)
+    private fun remapEpisodeBetweenLists(
+        requestedSeason: Int,
+        requestedEpisode: Int,
+        requestedVideoId: String?,
+        requestedTitle: String?,
+        sourceEpisodes: List<EpisodeMappingEntry>,
+        targetEpisodes: List<EpisodeMappingEntry>,
+    ): EpisodeMappingEntry? {
+        if (sourceEpisodes.isEmpty() || targetEpisodes.isEmpty()) return null
+
+        val orderedSourceEpisodes = sourceEpisodes
+            .sortedWith(compareBy(EpisodeMappingEntry::season, EpisodeMappingEntry::episode))
+        val orderedTargetEpisodes = targetEpisodes
+            .sortedWith(compareBy(EpisodeMappingEntry::season, EpisodeMappingEntry::episode))
+
+        val currentSourceEpisode = requestedVideoId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { videoId -> orderedSourceEpisodes.firstOrNull { it.videoId == videoId } }
+            ?: orderedSourceEpisodes.firstOrNull {
+                it.season == requestedSeason && it.episode == requestedEpisode
             }
-            if (titleMatch != null) {
-                return titleMatch
+            ?: return null
+
+        val normalizedTitle = normalizeEpisodeTitle(requestedTitle ?: currentSourceEpisode.title)
+        if (isUsefulEpisodeTitle(normalizedTitle)) {
+            val titleMatches = orderedTargetEpisodes.filter {
+                normalizeEpisodeTitle(it.title) == normalizedTitle
+            }
+            if (titleMatches.size == 1) {
+                return titleMatches.first()
             }
         }
 
-        // Fallback: global index mapping
-        val traktIndex = traktEpisodes.indexOf(traktEntry)
-        if (traktIndex < 0 || traktIndex >= addonEpisodes.size) return null
+        val sourceIndex = orderedSourceEpisodes.indexOf(currentSourceEpisode)
+        if (sourceIndex !in orderedTargetEpisodes.indices) return null
 
-        return addonEpisodes[traktIndex]
+        return orderedTargetEpisodes[sourceIndex]
     }
 
     // ── Addon episodes fetching (with dedup) ───────────────────────────
@@ -396,7 +406,7 @@ object TraktEpisodeMappingService {
             return when {
                 !contentIds.imdb.isNullOrBlank() -> contentIds.imdb
                 contentIds.trakt != null -> contentIds.trakt.toString()
-                contentIds.tmdb != null -> contentIds.tmdb.toString()
+                !contentIds.slug.isNullOrBlank() -> contentIds.slug
                 else -> null
             }
         }
@@ -405,13 +415,13 @@ object TraktEpisodeMappingService {
         return when {
             !videoIds.imdb.isNullOrBlank() -> videoIds.imdb
             videoIds.trakt != null -> videoIds.trakt.toString()
-            videoIds.tmdb != null -> videoIds.tmdb.toString()
+            !videoIds.slug.isNullOrBlank() -> videoIds.slug
             else -> null
         }
     }
 
     private fun TraktExternalIds.hasAnyId(): Boolean =
-        !imdb.isNullOrBlank() || trakt != null || tmdb != null
+        !imdb.isNullOrBlank() || trakt != null || !slug.isNullOrBlank()
 
     private fun cacheKey(
         contentId: String?,
@@ -461,9 +471,22 @@ object TraktEpisodeMappingService {
             .toList()
     }
 
-    private fun normalizeTitle(title: String?): String =
-        title.orEmpty().trim().lowercase()
-            .replace(Regex("[^a-z0-9]"), "")
+    private fun normalizeEpisodeTitle(title: String?): String {
+        return title
+            .orEmpty()
+            .lowercase()
+            .replace(Regex("[^a-z0-9]+"), " ")
+            .trim()
+            .replace(Regex("\\s+"), " ")
+    }
+
+    private fun isUsefulEpisodeTitle(normalizedTitle: String): Boolean {
+        if (normalizedTitle.isBlank()) return false
+        if (normalizedTitle.matches(Regex("episode \\d+"))) return false
+        if (normalizedTitle.matches(Regex("ep \\d+"))) return false
+        if (normalizedTitle.matches(Regex("e \\d+"))) return false
+        return true
+    }
 }
 
 // ── Data classes ────────────────────────────────────────────────────────
