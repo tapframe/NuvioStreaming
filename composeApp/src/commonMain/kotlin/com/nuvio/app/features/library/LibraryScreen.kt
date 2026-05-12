@@ -53,7 +53,10 @@ fun LibraryScreen(
         LibraryRepository.uiState
     }.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
-    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsStateWithLifecycle()
     var actionTarget by remember { mutableStateOf<LibraryActionTarget?>(null) }
     var observedOfflineState by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -159,6 +162,7 @@ fun LibraryScreen(
             else -> {
                 librarySections(
                     sections = uiState.sections,
+                    watchedKeys = watchedUiState.watchedKeys,
                     onPosterClick = onPosterClick,
                     onSectionViewAllClick = onSectionViewAllClick,
                     onPosterLongClick = { item, section ->
@@ -213,6 +217,7 @@ fun LibraryScreen(
 
 private fun LazyListScope.librarySections(
     sections: List<LibrarySection>,
+    watchedKeys: Set<String>,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onSectionViewAllClick: ((LibrarySection) -> Unit)?,
     onPosterLongClick: (LibraryItem, LibrarySection) -> Unit,
@@ -235,8 +240,13 @@ private fun LazyListScope.librarySections(
             viewAllPillSize = NuvioViewAllPillSize.Compact,
             key = { item -> "${item.type}:${item.id}" },
         ) { item ->
+            val preview = item.toMetaPreview()
             HomePosterCard(
-                item = item.toMetaPreview(),
+                item = preview,
+                isWatched = WatchingState.isPosterWatched(
+                    watchedKeys = watchedKeys,
+                    item = preview,
+                ),
                 onClick = onPosterClick?.let { { it(item) } },
                 onLongClick = { onPosterLongClick(item, section) },
             )
