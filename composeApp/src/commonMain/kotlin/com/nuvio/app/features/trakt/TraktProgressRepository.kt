@@ -475,27 +475,27 @@ object TraktProgressRepository {
             var resolvedEpisode = entry.episodeNumber
 
             val episode = if (resolvedSeason != null && resolvedEpisode != null) {
-                // Try direct match first
                 val directMatch = meta.videos.firstOrNull { video ->
                     video.season == resolvedSeason && video.episode == resolvedEpisode
                 }
                 if (directMatch != null) {
                     directMatch
                 } else {
-                    // Fallback: reverse-remap from Trakt numbering to addon numbering
-                    val addonSeasons = meta.videos.mapTo(mutableSetOf()) { it.season }
-                    if (resolvedSeason == 1 && addonSeasons.size > 1 && resolvedEpisode!! > 0) {
-                        val sorted = meta.videos
-                            .filter { it.season != null && it.episode != null }
-                            .sortedWith(compareBy({ it.season }, { it.episode }))
-                        val globalIndex = resolvedEpisode!! - 1
-                        if (globalIndex in sorted.indices) {
-                            val remapped = sorted[globalIndex]
-                            resolvedSeason = remapped.season
-                            resolvedEpisode = remapped.episode
-                            remapped
-                        } else null
-                    } else null
+                    val remapped = resolveAddonEpisodeProgress(
+                        contentId = entry.parentMetaId,
+                        season = resolvedSeason,
+                        episode = resolvedEpisode,
+                        episodeTitle = entry.episodeTitle,
+                    )
+                    if (remapped != null) {
+                        resolvedSeason = remapped.season
+                        resolvedEpisode = remapped.episode
+                        meta.videos.firstOrNull { video ->
+                            video.season == remapped.season && video.episode == remapped.episode
+                        }
+                    } else {
+                        null
+                    }
                 }
             } else {
                 null
@@ -540,7 +540,7 @@ object TraktProgressRepository {
         ).normalizedCompletion()
     }
 
-    private fun mapPlaybackEpisode(item: TraktPlaybackItem, fallbackIndex: Int): WatchProgressEntry? {
+    private suspend fun mapPlaybackEpisode(item: TraktPlaybackItem, fallbackIndex: Int): WatchProgressEntry? {
         val show = item.show ?: return null
         val episode = item.episode ?: return null
         val season = episode.season ?: return null
@@ -551,6 +551,14 @@ object TraktProgressRepository {
 
         val progressPercent = normalizeTraktProgressPercent(item.progress) ?: return null
         if (progressPercent <= 0f) return null
+        val resolvedEpisode = resolveAddonEpisodeProgress(
+            contentId = parentMetaId,
+            season = season,
+            episode = number,
+            episodeTitle = episode.title,
+        )
+        val resolvedSeason = resolvedEpisode?.season ?: season
+        val resolvedNumber = resolvedEpisode?.episode ?: number
 
         return WatchProgressEntry(
             contentType = "series",
@@ -558,14 +566,14 @@ object TraktProgressRepository {
             parentMetaType = "series",
             videoId = buildPlaybackVideoId(
                 parentMetaId = parentMetaId,
-                seasonNumber = season,
-                episodeNumber = number,
+                seasonNumber = resolvedSeason,
+                episodeNumber = resolvedNumber,
                 fallbackVideoId = episode.ids?.trakt?.let { "trakt:$it" },
             ),
             title = show.title ?: parentMetaId,
-            seasonNumber = season,
-            episodeNumber = number,
-            episodeTitle = episode.title,
+            seasonNumber = resolvedSeason,
+            episodeNumber = resolvedNumber,
+            episodeTitle = resolvedEpisode?.title ?: episode.title,
             lastPositionMs = 0L,
             durationMs = 0L,
             lastUpdatedEpochMs = rankedTimestamp(item.pausedAt, fallbackIndex),
@@ -575,7 +583,7 @@ object TraktProgressRepository {
         ).normalizedCompletion()
     }
 
-    private fun mapHistoryEpisode(item: TraktHistoryEpisodeItem, fallbackIndex: Int): WatchProgressEntry? {
+    private suspend fun mapHistoryEpisode(item: TraktHistoryEpisodeItem, fallbackIndex: Int): WatchProgressEntry? {
         val show = item.show ?: return null
         val episode = item.episode ?: return null
         val season = episode.season ?: return null
@@ -583,6 +591,14 @@ object TraktProgressRepository {
 
         val parentMetaId = normalizeTraktContentId(show.ids, fallback = show.title)
         if (parentMetaId.isBlank()) return null
+        val resolvedEpisode = resolveAddonEpisodeProgress(
+            contentId = parentMetaId,
+            season = season,
+            episode = number,
+            episodeTitle = episode.title,
+        )
+        val resolvedSeason = resolvedEpisode?.season ?: season
+        val resolvedNumber = resolvedEpisode?.episode ?: number
 
         return WatchProgressEntry(
             contentType = "series",
@@ -590,14 +606,14 @@ object TraktProgressRepository {
             parentMetaType = "series",
             videoId = buildPlaybackVideoId(
                 parentMetaId = parentMetaId,
-                seasonNumber = season,
-                episodeNumber = number,
+                seasonNumber = resolvedSeason,
+                episodeNumber = resolvedNumber,
                 fallbackVideoId = episode.ids?.trakt?.let { "trakt:$it" },
             ),
             title = show.title ?: parentMetaId,
-            seasonNumber = season,
-            episodeNumber = number,
-            episodeTitle = episode.title,
+            seasonNumber = resolvedSeason,
+            episodeNumber = resolvedNumber,
+            episodeTitle = resolvedEpisode?.title ?: episode.title,
             lastPositionMs = 1L,
             durationMs = 1L,
             lastUpdatedEpochMs = rankedTimestamp(item.watchedAt, fallbackIndex),
@@ -627,7 +643,7 @@ object TraktProgressRepository {
         )
     }
 
-    private fun mapWatchedShowSeed(
+    private suspend fun mapWatchedShowSeed(
         item: TraktWatchedShowItem,
         useFurthestEpisode: Boolean,
     ): WatchProgressEntry? {
@@ -670,6 +686,14 @@ object TraktProgressRepository {
                     )
                 },
             ) ?: return null
+        val resolvedEpisode = resolveAddonEpisodeProgress(
+            contentId = parentMetaId,
+            season = completedEpisode.season,
+            episode = completedEpisode.episode,
+            episodeTitle = null,
+        )
+        val resolvedSeason = resolvedEpisode?.season ?: completedEpisode.season
+        val resolvedNumber = resolvedEpisode?.episode ?: completedEpisode.episode
 
         return WatchProgressEntry(
             contentType = "series",
@@ -677,13 +701,14 @@ object TraktProgressRepository {
             parentMetaType = "series",
             videoId = buildPlaybackVideoId(
                 parentMetaId = parentMetaId,
-                seasonNumber = completedEpisode.season,
-                episodeNumber = completedEpisode.episode,
+                seasonNumber = resolvedSeason,
+                episodeNumber = resolvedNumber,
                 fallbackVideoId = null,
             ),
             title = show.title ?: parentMetaId,
-            seasonNumber = completedEpisode.season,
-            episodeNumber = completedEpisode.episode,
+            seasonNumber = resolvedSeason,
+            episodeNumber = resolvedNumber,
+            episodeTitle = resolvedEpisode?.title,
             lastPositionMs = 1L,
             durationMs = 1L,
             lastUpdatedEpochMs = completedEpisode.watchedAt,
@@ -709,6 +734,26 @@ object TraktProgressRepository {
             ?.let(TraktPlatformClock::parseIsoDateTimeToEpochMs)
             ?.let { return it }
         return TraktPlatformClock.nowEpochMs() - (fallbackIndex * 1_000L)
+    }
+
+    private suspend fun resolveAddonEpisodeProgress(
+        contentId: String,
+        season: Int,
+        episode: Int,
+        episodeTitle: String?,
+    ): EpisodeMappingEntry? {
+        return runCatching {
+            TraktEpisodeMappingService.resolveAddonEpisodeMapping(
+                contentId = contentId,
+                contentType = "series",
+                season = season,
+                episode = episode,
+                episodeTitle = episodeTitle,
+            )
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            log.w { "resolveAddonEpisodeProgress failed for $contentId s=$season e=$episode: ${error.message}" }
+        }.getOrNull()
     }
 }
 

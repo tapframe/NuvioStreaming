@@ -42,6 +42,7 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
+import com.nuvio.app.features.watchprogress.ContinueWatchingSortMode
 import com.nuvio.app.features.watchprogress.isSeriesTypeForContinueWatching
 import com.nuvio.app.features.watchprogress.nextUpDismissKey
 import com.nuvio.app.features.watchprogress.WatchProgressClock
@@ -70,6 +71,7 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    animateCollectionGifs: Boolean = true,
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
@@ -246,11 +248,14 @@ fun HomeScreen(
         visibleContinueWatchingEntries,
         cachedInProgressItems,
         effectivNextUpItems,
+        continueWatchingPreferences.sortMode,
     ) {
         buildHomeContinueWatchingItems(
             visibleEntries = visibleContinueWatchingEntries,
             cachedInProgressByVideoId = cachedInProgressItems,
             nextUpItemsBySeries = effectivNextUpItems,
+            sortMode = continueWatchingPreferences.sortMode,
+            todayIsoDate = CurrentDateProvider.todayIsoDate(),
         )
     }
     val availableManifests = remember(addonsUiState.addons) {
@@ -403,6 +408,11 @@ fun HomeScreen(
     val enabledHomeItems = remember(homeSettingsUiState.items) {
         homeSettingsUiState.items.filter { it.enabled }
     }
+    val hasRenderableCollectionRows = remember(enabledHomeItems, collectionsMap) {
+        enabledHomeItems.any { item ->
+            item.isCollection && collectionsMap[item.key] != null
+        }
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val homeSectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value)
@@ -465,7 +475,7 @@ fun HomeScreen(
             }
 
             when {
-                addonsUiState.addons.none { it.manifest != null } -> {
+                addonsUiState.addons.none { it.manifest != null } && !hasRenderableCollectionRows -> {
                     if (continueWatchingPreferences.isVisible && continueWatchingItems.isNotEmpty()) {
                         item {
                             HomeContinueWatchingSection(
@@ -490,7 +500,7 @@ fun HomeScreen(
                     }
                 }
 
-                homeUiState.isLoading && homeUiState.sections.isEmpty() -> {
+                homeUiState.isLoading && homeUiState.sections.isEmpty() && !hasRenderableCollectionRows -> {
                     if (continueWatchingPreferences.isVisible && continueWatchingItems.isNotEmpty()) {
                         item {
                             HomeContinueWatchingSection(
@@ -512,7 +522,8 @@ fun HomeScreen(
                 }
 
                 homeUiState.sections.isEmpty() && homeUiState.heroItems.isEmpty() &&
-                    (!continueWatchingPreferences.isVisible || continueWatchingItems.isEmpty()) -> {
+                    (!continueWatchingPreferences.isVisible || continueWatchingItems.isEmpty()) &&
+                    !hasRenderableCollectionRows -> {
                     item {
                         if (networkStatusUiState.isOfflineLike) {
                             NuvioNetworkOfflineCard(
@@ -560,6 +571,7 @@ fun HomeScreen(
                                         collection = collection,
                                         modifier = Modifier.padding(bottom = 12.dp),
                                         sectionPadding = homeSectionPadding,
+                                        animateGifs = animateCollectionGifs,
                                         onFolderClick = onFolderClick,
                                     )
                                 }
@@ -631,6 +643,8 @@ internal fun buildHomeContinueWatchingItems(
     visibleEntries: List<WatchProgressEntry>,
     cachedInProgressByVideoId: Map<String, ContinueWatchingItem> = emptyMap(),
     nextUpItemsBySeries: Map<String, Pair<Long, ContinueWatchingItem>>,
+    sortMode: ContinueWatchingSortMode = ContinueWatchingSortMode.DEFAULT,
+    todayIsoDate: String = "",
 ): List<ContinueWatchingItem> {
     val inProgressSeriesIds = visibleEntries
         .asSequence()
@@ -639,7 +653,7 @@ internal fun buildHomeContinueWatchingItems(
         .filter(String::isNotBlank)
         .toSet()
 
-    return buildList {
+    val candidates = buildList {
         addAll(
             visibleEntries.map { entry ->
                 val liveItem = entry.toContinueWatchingItem()
@@ -661,13 +675,62 @@ internal fun buildHomeContinueWatchingItems(
             },
         )
     }
+
+    // Deduplicate by series/content id first (order-stable)
+    val seen = mutableSetOf<String>()
+    val deduplicated = candidates
         .sortedWith(
             compareByDescending<HomeContinueWatchingCandidate> { it.lastUpdatedEpochMs }
                 .thenByDescending { it.isProgressEntry },
         )
         .filter { candidate -> candidate.item.shouldDisplayInContinueWatching() }
-        .distinctBy { candidate -> candidate.item.parentMetaId.ifBlank { candidate.item.videoId } }
+        .filter { candidate ->
+            val key = candidate.item.parentMetaId.ifBlank { candidate.item.videoId }
+            seen.add(key)
+        }
+
+    return when (sortMode) {
+        ContinueWatchingSortMode.DEFAULT -> deduplicated.map(HomeContinueWatchingCandidate::item)
+        ContinueWatchingSortMode.STREAMING_STYLE -> applyStreamingStyleSort(deduplicated, todayIsoDate)
+    }
+}
+
+private fun applyStreamingStyleSort(
+    candidates: List<HomeContinueWatchingCandidate>,
+    todayIsoDate: String,
+): List<ContinueWatchingItem> {
+    val (released, unreleased) = candidates.partition { candidate ->
+        val item = candidate.item
+        if (!item.isNextUp) {
+            true // in-progress items are always "released"
+        } else {
+            val itemReleased = item.released
+            if (itemReleased.isNullOrBlank() || todayIsoDate.isBlank()) {
+                true // no date info → treat as released
+            } else {
+                isReleasedBy(todayIsoDate = todayIsoDate, releasedDate = itemReleased)
+            }
+        }
+    }
+
+    // Released: most recently watched first (already sorted by dedup pass)
+    val sortedReleased = released.map(HomeContinueWatchingCandidate::item)
+
+    // Unaired: soonest air date first; unknown dates go to the end
+    val sortedUnreleased = unreleased
+        .sortedWith { a, b ->
+            val dateA = a.item.released?.takeIf { it.isNotBlank() }
+            val dateB = b.item.released?.takeIf { it.isNotBlank() }
+            when {
+                dateA == null && dateB == null -> 0
+                dateA == null -> 1
+                dateB == null -> -1
+                else -> dateA.compareTo(dateB)
+            }
+        }
         .map(HomeContinueWatchingCandidate::item)
+
+    return sortedReleased + sortedUnreleased
 }
 
 private data class CompletedSeriesCandidate(
