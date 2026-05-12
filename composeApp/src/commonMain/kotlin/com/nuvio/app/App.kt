@@ -123,7 +123,6 @@ import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
-import com.nuvio.app.features.library.toMetaPreview
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
@@ -385,8 +384,8 @@ fun App() {
             val cachedProfiles = profileState.profiles
             val allowOfflineProfileAccess =
                 cachedProfiles.isNotEmpty() &&
-                        authState !is AuthState.Authenticated &&
-                        networkStatusUiState.condition != NetworkCondition.Online
+                    authState !is AuthState.Authenticated &&
+                    networkStatusUiState.condition != NetworkCondition.Online
 
             when (authState) {
                 is AuthState.Loading -> {
@@ -660,7 +659,7 @@ private fun MainAppContent(
 
             NetworkCondition.Unknown,
             NetworkCondition.Checking,
-                -> Unit
+            -> Unit
         }
 
         lastNetworkToastCondition = condition.name
@@ -677,7 +676,7 @@ private fun MainAppContent(
         when (networkStatusUiState.condition) {
             NetworkCondition.Unknown,
             NetworkCondition.Checking,
-                -> return@LaunchedEffect
+            -> return@LaunchedEffect
 
             NetworkCondition.Online -> {
                 offlineLaunchRouteHandled = true
@@ -685,7 +684,7 @@ private fun MainAppContent(
 
             NetworkCondition.NoInternet,
             NetworkCondition.ServersUnreachable,
-                -> {
+            -> {
                 offlineLaunchRouteHandled = true
                 val hasPlayableDownload = downloadsUiState.completedItems.any {
                     DownloadsRepository.playableLocalFileUri(it) != null
@@ -729,24 +728,29 @@ private fun MainAppContent(
         }
     }
 
-    LaunchedEffect(navController) {
-        AppDeepLinkRepository.pendingDeepLink.collectLatest { deepLink ->
-            when (deepLink) {
-                is AppDeepLink.Meta -> {
-                    selectedTab = AppScreenTab.Home
-                    navController.navigate(DetailRoute(type = deepLink.type, id = deepLink.id)) {
-                        launchSingleTop = true
+        LaunchedEffect(navController) {
+            AppDeepLinkRepository.pendingDeepLink.collectLatest { deepLink ->
+                when (deepLink) {
+                    is AppDeepLink.Meta -> {
+                        selectedTab = AppScreenTab.Home
+                        navController.navigate(DetailRoute(type = deepLink.type, id = deepLink.id)) {
+                            launchSingleTop = true
+                        }
+                        AppDeepLinkRepository.markConsumed(deepLink)
                     }
-                    AppDeepLinkRepository.markConsumed(deepLink)
-                }
 
-                AppDeepLink.Downloads -> {
-                    selectedTab = AppScreenTab.Settings
-                    navController.navigate(DownloadsSettingsRoute) {
-                        launchSingleTop = true
+                    AppDeepLink.Downloads -> {
+                        selectedTab = AppScreenTab.Settings
+                        navController.navigate(DownloadsSettingsRoute) {
+                            launchSingleTop = true
+                        }
+                        AppDeepLinkRepository.markConsumed(deepLink)
                     }
-                    AppDeepLinkRepository.markConsumed(deepLink)
+
+                    null -> Unit
                 }
+            }
+        }
 
         fun launchPlaybackWithDownloadPreference(
             type: String,
@@ -809,69 +813,90 @@ private fun MainAppContent(
                     return
                 }
             }
-        }
-    }
 
-    fun launchPlaybackWithDownloadPreference(
-        type: String,
-        videoId: String,
-        parentMetaId: String,
-        parentMetaType: String,
-        title: String,
-        logo: String?,
-        poster: String?,
-        background: String?,
-        seasonNumber: Int?,
-        episodeNumber: Int?,
-        episodeTitle: String?,
-        episodeThumbnail: String?,
-        pauseDescription: String?,
-        resumePositionMs: Long?,
-        resumeProgressFraction: Float?,
-        manualSelection: Boolean,
-        startFromBeginning: Boolean,
-    ) {
-        val targetResumePositionMs = if (startFromBeginning) 0L else (resumePositionMs ?: 0L)
-        val targetResumeProgressFraction = if (startFromBeginning) null else resumeProgressFraction
-
-        if (!manualSelection) {
-            val downloadedItem = DownloadsRepository.findPlayableDownload(
-                parentMetaId = parentMetaId,
-                seasonNumber = seasonNumber,
-                episodeNumber = episodeNumber,
-                videoId = videoId,
+            val streamLaunchId = StreamLaunchStore.put(
+                StreamLaunch(
+                    type = type,
+                    videoId = videoId,
+                    parentMetaId = parentMetaId,
+                    parentMetaType = parentMetaType,
+                    title = title,
+                    logo = logo,
+                    poster = poster,
+                    background = background,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                    episodeTitle = episodeTitle,
+                    episodeThumbnail = episodeThumbnail,
+                    pauseDescription = pauseDescription,
+                    resumePositionMs = if (startFromBeginning) 0L else resumePositionMs,
+                    resumeProgressFraction = targetResumeProgressFraction,
+                    manualSelection = manualSelection,
+                    startFromBeginning = startFromBeginning,
+                ),
             )
-            val localSourceUrl = downloadedItem?.localFileUri
-            if (!localSourceUrl.isNullOrBlank()) {
-                val launchId = PlayerLaunchStore.put(
-                    PlayerLaunch(
-                        title = title,
-                        sourceUrl = localSourceUrl,
-                        sourceHeaders = emptyMap(),
-                        sourceResponseHeaders = emptyMap(),
-                        logo = logo,
-                        poster = poster,
-                        background = background,
-                        seasonNumber = seasonNumber,
-                        episodeNumber = episodeNumber,
-                        episodeTitle = episodeTitle,
-                        episodeThumbnail = episodeThumbnail,
-                        streamTitle = downloadedItem.streamTitle.ifBlank { title },
-                        streamSubtitle = downloadedItem.streamSubtitle,
-                        pauseDescription = pauseDescription,
-                        providerName = downloadedItem.providerName.ifBlank { downloadedProviderLabel },
-                        providerAddonId = downloadedItem.providerAddonId,
-                        contentType = type,
-                        videoId = videoId,
-                        parentMetaId = parentMetaId,
-                        parentMetaType = parentMetaType,
-                        initialPositionMs = targetResumePositionMs,
-                        initialProgressFraction = targetResumeProgressFraction,
-                    ),
+            navController.navigate(
+                StreamRoute(launchId = streamLaunchId),
+            )
+        }
+
+        val onPlay: (String, String, String, String, String, String?, String?, String?, Int?, Int?, String?, String?, String?, Long?) -> Unit =
+            { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail, pauseDescription, resumePositionMs ->
+                launchPlaybackWithDownloadPreference(
+                    type = type,
+                    videoId = videoId,
+                    parentMetaId = parentMetaId,
+                    parentMetaType = parentMetaType,
+                    title = title,
+                    logo = logo,
+                    poster = poster,
+                    background = background,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                    episodeTitle = episodeTitle,
+                    episodeThumbnail = episodeThumbnail,
+                    pauseDescription = pauseDescription,
+                    resumePositionMs = resumePositionMs,
+                    resumeProgressFraction = null,
+                    manualSelection = false,
+                    startFromBeginning = false,
                 )
-                navController.navigate(PlayerRoute(launchId = launchId))
-                return
             }
+
+        val onPlayManually: (String, String, String, String, String, String?, String?, String?, Int?, Int?, String?, String?, String?, Long?) -> Unit =
+            { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail, pauseDescription, resumePositionMs ->
+                launchPlaybackWithDownloadPreference(
+                    type = type,
+                    videoId = videoId,
+                    parentMetaId = parentMetaId,
+                    parentMetaType = parentMetaType,
+                    title = title,
+                    logo = logo,
+                    poster = poster,
+                    background = background,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                    episodeTitle = episodeTitle,
+                    episodeThumbnail = episodeThumbnail,
+                    pauseDescription = pauseDescription,
+                    resumePositionMs = resumePositionMs,
+                    resumeProgressFraction = null,
+                    manualSelection = true,
+                    startFromBeginning = false,
+                )
+            }
+
+        val onCatalogClick: (HomeCatalogSection) -> Unit = { section ->
+            navController.navigate(
+                CatalogRoute(
+                    title = section.title,
+                    subtitle = section.subtitle,
+                    manifestUrl = section.manifestUrl,
+                    type = section.type,
+                    catalogId = section.catalogId,
+                    supportsPagination = section.supportsPagination,
+                ),
+            )
         }
 
         val librarySectionSubtitle = if (libraryUiState.sourceMode == LibrarySourceMode.TRAKT) {
@@ -893,111 +918,56 @@ private fun MainAppContent(
             )
         }
 
-    val onPlayManually: (String, String, String, String, String, String?, String?, String?, Int?, Int?, String?, String?, String?, Long?) -> Unit =
-        { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail, pauseDescription, resumePositionMs ->
+        val openContinueWatching: (ContinueWatchingItem, Boolean, Boolean) -> Unit = { item, manualSelection, startFromBeginning ->
             launchPlaybackWithDownloadPreference(
-                type = type,
-                videoId = videoId,
-                parentMetaId = parentMetaId,
-                parentMetaType = parentMetaType,
-                title = title,
-                logo = logo,
-                poster = poster,
-                background = background,
-                seasonNumber = seasonNumber,
-                episodeNumber = episodeNumber,
-                episodeTitle = episodeTitle,
-                episodeThumbnail = episodeThumbnail,
-                pauseDescription = pauseDescription,
-                resumePositionMs = resumePositionMs,
-                resumeProgressFraction = null,
-                manualSelection = true,
-                startFromBeginning = false,
+                type = item.parentMetaType,
+                videoId = item.videoId,
+                parentMetaId = item.parentMetaId,
+                parentMetaType = item.parentMetaType,
+                title = item.title,
+                logo = item.logo,
+                poster = item.poster,
+                background = item.background,
+                seasonNumber = item.seasonNumber,
+                episodeNumber = item.episodeNumber,
+                episodeTitle = item.episodeTitle,
+                episodeThumbnail = item.episodeThumbnail,
+                pauseDescription = item.pauseDescription,
+                resumePositionMs = item.resumePositionMs,
+                resumeProgressFraction = item.resumeProgressFraction,
+                manualSelection = manualSelection,
+                startFromBeginning = startFromBeginning,
             )
         }
 
-    val onCatalogClick: (HomeCatalogSection) -> Unit = { section ->
-        navController.navigate(
-            CatalogRoute(
-                title = section.title,
-                subtitle = section.subtitle,
-                manifestUrl = section.manifestUrl,
-                type = section.type,
-                catalogId = section.catalogId,
-                supportsPagination = section.supportsPagination,
-            ),
-        )
-    }
+        val onContinueWatchingClick: (ContinueWatchingItem) -> Unit = { item ->
+            openContinueWatching(item, false, false)
+        }
 
-    val librarySectionSubtitle = if (libraryUiState.sourceMode == LibrarySourceMode.TRAKT) {
-        stringResource(Res.string.compose_catalog_subtitle_trakt_library)
-    } else {
-        stringResource(Res.string.compose_catalog_subtitle_library)
-    }
+        val onContinueWatchingStartFromBeginning: (ContinueWatchingItem) -> Unit = { item ->
+            openContinueWatching(item, false, true)
+        }
 
-    val onLibrarySectionViewAllClick: (LibrarySection) -> Unit = { section ->
-        navController.navigate(
-            CatalogRoute(
-                title = section.displayTitle,
-                subtitle = librarySectionSubtitle,
-                manifestUrl = INTERNAL_LIBRARY_MANIFEST_URL,
-                type = section.items.firstOrNull()?.type ?: "movie",
-                catalogId = section.type,
-                supportsPagination = false,
-            ),
-        )
-    }
+        val onContinueWatchingPlayManually: (ContinueWatchingItem) -> Unit = { item ->
+            openContinueWatching(item, true, false)
+        }
 
-    val openContinueWatching: (ContinueWatchingItem, Boolean, Boolean) -> Unit = { item, manualSelection, startFromBeginning ->
-        launchPlaybackWithDownloadPreference(
-            type = item.parentMetaType,
-            videoId = item.videoId,
-            parentMetaId = item.parentMetaId,
-            parentMetaType = item.parentMetaType,
-            title = item.title,
-            logo = item.logo,
-            poster = item.poster,
-            background = item.background,
-            seasonNumber = item.seasonNumber,
-            episodeNumber = item.episodeNumber,
-            episodeTitle = item.episodeTitle,
-            episodeThumbnail = item.episodeThumbnail,
-            pauseDescription = item.pauseDescription,
-            resumePositionMs = item.resumePositionMs,
-            resumeProgressFraction = item.resumeProgressFraction,
-            manualSelection = manualSelection,
-            startFromBeginning = startFromBeginning,
-        )
-    }
+        val onContinueWatchingLongPress: (ContinueWatchingItem) -> Unit = { item ->
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            selectedContinueWatchingForActions = item
+        }
 
-    val onContinueWatchingClick: (ContinueWatchingItem) -> Unit = { item ->
-        openContinueWatching(item, false, false)
-    }
-
-    val onContinueWatchingStartFromBeginning: (ContinueWatchingItem) -> Unit = { item ->
-        openContinueWatching(item, false, true)
-    }
-
-    val onContinueWatchingPlayManually: (ContinueWatchingItem) -> Unit = { item ->
-        openContinueWatching(item, true, false)
-    }
-
-    val onContinueWatchingLongPress: (ContinueWatchingItem) -> Unit = { item ->
-        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-        selectedContinueWatchingForActions = item
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-    ) {
-        SharedTransitionLayout {
-            NavHost(
-                navController = navController,
-                startDestination = TabsRoute,
-                modifier = Modifier.fillMaxSize(),
-            ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            SharedTransitionLayout {
+                NavHost(
+                    navController = navController,
+                    startDestination = TabsRoute,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
                 composable<TabsRoute> {
                     PlatformBackHandler(
                         enabled = true,
@@ -1303,8 +1273,8 @@ private fun MainAppContent(
                     }
                     val shouldResolveEpisodeVideoId =
                         launch.parentMetaId != null &&
-                                launch.seasonNumber != null &&
-                                launch.episodeNumber != null
+                            launch.seasonNumber != null &&
+                            launch.episodeNumber != null
                     var effectiveVideoId by rememberSaveable(
                         launch.videoId,
                         launch.parentMetaId,
@@ -1345,7 +1315,7 @@ private fun MainAppContent(
                             ?.videos
                             ?.firstOrNull { video ->
                                 video.season == launch.seasonNumber &&
-                                        video.episode == launch.episodeNumber
+                                    video.episode == launch.episodeNumber
                             }
                             ?.id
                             ?.takeIf { it.isNotBlank() }
@@ -1818,8 +1788,8 @@ private fun MainAppContent(
                         },
                     )
                 }
+                }
             }
-        }
 
             NuvioPosterActionSheet(
                 item = selectedPosterForActions,
@@ -1857,94 +1827,73 @@ private fun MainAppContent(
                                 }.onFailure { error ->
                                     pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
                                 }
-                            }.onFailure { error ->
-                                pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
+                                pickerPending = false
                             }
-                            pickerPending = false
                         }
                     }
-                }
-            },
-            onToggleWatched = {
-                selectedPosterForActions?.let { preview ->
-                    coroutineScope.launch {
-                        WatchingActions.togglePosterWatched(preview)
+                },
+                onToggleWatched = {
+                    selectedPosterForActions?.let { preview ->
+                        coroutineScope.launch {
+                            WatchingActions.togglePosterWatched(preview)
+                        }
                     }
-                }
-            },
-        )
+                },
+            )
 
-        NuvioContinueWatchingActionSheet(
-            item = selectedContinueWatchingForActions,
-            showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState),
-            onDismiss = { selectedContinueWatchingForActions = null },
-            onOpenDetails = {
-                selectedContinueWatchingForActions?.let { item ->
-                    navController.navigate(
-                        DetailRoute(
-                            type = item.parentMetaType,
-                            id = item.parentMetaId,
-                        ),
-                    )
-                }
-            },
-            onStartFromBeginning = selectedContinueWatchingForActions
-                ?.takeIf { !it.isNextUp }
-                ?.let { item -> { onContinueWatchingStartFromBeginning(item) } },
-            onPlayManually = selectedContinueWatchingForActions
-                ?.let { item -> { onContinueWatchingPlayManually(item) } },
-            onRemove = {
-                selectedContinueWatchingForActions?.let { item ->
-                    if (item.isNextUp) {
-                        ContinueWatchingPreferencesRepository.addDismissedNextUpKey(
-                            nextUpDismissKey(
-                                item.parentMetaId,
-                                item.nextUpSeedSeasonNumber,
-                                item.nextUpSeedEpisodeNumber,
+            NuvioContinueWatchingActionSheet(
+                item = selectedContinueWatchingForActions,
+                showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState),
+                onDismiss = { selectedContinueWatchingForActions = null },
+                onOpenDetails = {
+                    selectedContinueWatchingForActions?.let { item ->
+                        navController.navigate(
+                            DetailRoute(
+                                type = item.parentMetaType,
+                                id = item.parentMetaId,
                             ),
                         )
-                    } else {
-                        WatchProgressRepository.removeProgress(contentId = item.parentMetaId)
                     }
-                }
-            },
-        )
+                },
+                onStartFromBeginning = selectedContinueWatchingForActions
+                    ?.takeIf { !it.isNextUp }
+                    ?.let { item -> { onContinueWatchingStartFromBeginning(item) } },
+                onPlayManually = selectedContinueWatchingForActions
+                    ?.let { item -> { onContinueWatchingPlayManually(item) } },
+                onRemove = {
+                    selectedContinueWatchingForActions?.let { item ->
+                        if (item.isNextUp) {
+                            ContinueWatchingPreferencesRepository.addDismissedNextUpKey(
+                                nextUpDismissKey(
+                                    item.parentMetaId,
+                                    item.nextUpSeedSeasonNumber,
+                                    item.nextUpSeedEpisodeNumber,
+                                ),
+                            )
+                        } else {
+                            WatchProgressRepository.removeProgress(contentId = item.parentMetaId)
+                        }
+                    }
+                },
+            )
 
-        TraktListPickerDialog(
-            visible = showLibraryListPicker,
-            title = pickerTitle,
-            tabs = pickerTabs,
-            membership = pickerMembership,
-            isPending = pickerPending,
-            errorMessage = pickerError,
-            onToggle = { listKey ->
-                pickerMembership = pickerMembership.toMutableMap().apply {
-                    this[listKey] = !(this[listKey] == true)
-                }
-            },
-            onDismiss = {
-                if (!pickerPending) {
-                    showLibraryListPicker = false
-                    pickerItem = null
-                    pickerError = null
-                }
-            },
-            onSave = {
-                val item = pickerItem ?: return@TraktListPickerDialog
-                coroutineScope.launch {
-                    pickerPending = true
-                    pickerError = null
-                    runCatching {
-                        LibraryRepository.applyMembershipChanges(
-                            item = item,
-                            desiredMembership = pickerMembership,
-                        )
-                    }.onSuccess {
+            TraktListPickerDialog(
+                visible = showLibraryListPicker,
+                title = pickerTitle,
+                tabs = pickerTabs,
+                membership = pickerMembership,
+                isPending = pickerPending,
+                errorMessage = pickerError,
+                onToggle = { listKey ->
+                    pickerMembership = pickerMembership.toMutableMap().apply {
+                        this[listKey] = !(this[listKey] == true)
+                    }
+                },
+                onDismiss = {
+                    if (!pickerPending) {
                         showLibraryListPicker = false
                         pickerItem = null
                         pickerError = null
-                    }.onFailure { error ->
-                        pickerError = error.message ?: getString(Res.string.trakt_lists_update_failed)
                     }
                 },
                 onSave = {
@@ -1984,22 +1933,22 @@ private fun MainAppContent(
                 },
             )
 
-        androidx.compose.animation.AnimatedVisibility(
-            visible = !initialHomeReady || profileSwitchLoading,
-            enter = fadeIn(),
-            exit = fadeOut(androidx.compose.animation.core.tween(400)),
-        ) {
-            AppLaunchOverlay(modifier = Modifier.fillMaxSize())
-        }
-
-        // Auto-dismiss profile switch overlay
-        if (profileSwitchLoading) {
-            LaunchedEffect(Unit) {
-                // Brief loading screen while home refreshes for the new profile
-                kotlinx.coroutines.delay(1200)
-                profileSwitchLoading = false
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !initialHomeReady || profileSwitchLoading,
+                enter = fadeIn(),
+                exit = fadeOut(androidx.compose.animation.core.tween(400)),
+            ) {
+                AppLaunchOverlay(modifier = Modifier.fillMaxSize())
             }
-        }
+
+            // Auto-dismiss profile switch overlay
+            if (profileSwitchLoading) {
+                LaunchedEffect(Unit) {
+                    // Brief loading screen while home refreshes for the new profile
+                    kotlinx.coroutines.delay(1200)
+                    profileSwitchLoading = false
+                }
+            }
 
             NuvioFloatingPrompt(
                 visible = resumePromptItem != null,
@@ -2019,19 +1968,19 @@ private fun MainAppContent(
                     .zIndex(15f),
             )
 
-        NuvioToastHost(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .zIndex(20f),
-        )
+            NuvioToastHost(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(20f),
+            )
 
-        AppUpdaterHost(
-            controller = appUpdaterController,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .zIndex(25f),
-        )
-    }
+            AppUpdaterHost(
+                controller = appUpdaterController,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .zIndex(25f),
+            )
+        }
 }
 
 @Composable
@@ -2063,7 +2012,6 @@ private fun AppTabHost(
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onLibraryPosterClick: ((LibraryItem) -> Unit)? = null,
-    onLibraryPosterLongClick: ((LibraryItem) -> Unit)? = null,
     onLibrarySectionViewAllClick: ((LibrarySection) -> Unit)? = null,
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
@@ -2113,7 +2061,6 @@ private fun AppTabHost(
                     LibraryScreen(
                         modifier = Modifier.fillMaxSize(),
                         onPosterClick = onLibraryPosterClick,
-                        onPosterLongClick = onLibraryPosterLongClick,
                         onSectionViewAllClick = onLibrarySectionViewAllClick,
                     )
                 }
