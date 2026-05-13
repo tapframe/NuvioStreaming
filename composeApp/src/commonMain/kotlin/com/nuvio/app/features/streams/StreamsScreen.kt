@@ -1160,7 +1160,7 @@ private fun StreamNameWithInstantService(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stream.streamLabel,
+            text = stream.streamLabel.ifBlank { stringResource(Res.string.stream_default_name) },
             modifier = Modifier.weight(1f, fill = false),
             style = nameStyle,
             color = MaterialTheme.colorScheme.onSurface,
@@ -1223,7 +1223,7 @@ private fun StreamActionsSheet(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = stream.streamLabel,
+                    text = stream.streamLabel.ifBlank { stringResource(Res.string.stream_default_name) },
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,

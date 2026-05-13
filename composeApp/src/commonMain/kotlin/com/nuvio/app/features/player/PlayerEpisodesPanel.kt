@@ -638,7 +638,7 @@ private fun EpisodeSourceStreamRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stream.streamLabel,
+                text = stream.streamLabel.ifBlank { stringResource(Res.string.stream_default_name) },
                 color = tokens.colors.textPrimary,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,

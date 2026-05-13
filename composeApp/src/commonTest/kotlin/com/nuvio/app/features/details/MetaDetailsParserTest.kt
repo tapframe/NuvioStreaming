@@ -8,11 +8,10 @@ import kotlin.test.assertFailsWith
 class MetaDetailsParserTest {
 
     @Test
-    fun `parse rejects null meta object without json object cast crash`() = runBlocking {
+    fun `parse rejects null meta object without json object cast crash`() {
         assertFailsWith<IllegalStateException> {
             runBlocking { MetaDetailsParser.parse("""{"meta":null}""") }
         }
-        Unit
     }
 
     @Test

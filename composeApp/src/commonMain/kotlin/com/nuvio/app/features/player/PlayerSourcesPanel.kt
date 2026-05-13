@@ -298,7 +298,7 @@ private fun SourceStreamRow(
                 horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
             ) {
                 Text(
-                    text = stream.streamLabel,
+                    text = stream.streamLabel.ifBlank { stringResource(Res.string.stream_default_name) },
                     color = tokens.colors.textPrimary,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontWeight = FontWeight.Bold,

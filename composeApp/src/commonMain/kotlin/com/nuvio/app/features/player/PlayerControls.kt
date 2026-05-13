@@ -273,7 +273,7 @@ private fun PlayerHeader(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = streamTitle,
+                            text = streamTitle.ifBlank { stringResource(Res.string.stream_default_name) },
                             style = typeScale.labelSm.copy(
                                 fontSize = metrics.metadataSize,
                                 lineHeight = metrics.metadataSize * 1.25f,

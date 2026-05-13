@@ -22,7 +22,7 @@ data class StreamItem(
     val badges: List<StreamBadge> = emptyList(),
 ) {
     val streamLabel: String
-        get() = name ?: "Stream"
+        get() = name.orEmpty()
 
     val streamSubtitle: String?
         get() = description
