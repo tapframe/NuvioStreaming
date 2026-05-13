@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -44,7 +43,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import nuvio.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 
 @Serializable
@@ -58,7 +56,6 @@ object ProfileRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("ProfileRepository")
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-    private fun localizedString(resource: StringResource): String = runBlocking { getString(resource) }
 
     private val _state = MutableStateFlow(ProfileState())
     val state: StateFlow<ProfileState> = _state.asStateFlow()
@@ -414,7 +411,7 @@ object ProfileRepository {
         ProfilePinCacheStorage.savePayload(profileIndex, json.encodeToString(payload))
     }
 
-    private fun verifyPinLocally(profileIndex: Int, pin: String): PinVerifyResult {
+    private suspend fun verifyPinLocally(profileIndex: Int, pin: String): PinVerifyResult {
         val profile = _state.value.profiles.find { it.profileIndex == profileIndex }
         if (profile?.pinEnabled != true) {
             return PinVerifyResult(unlocked = true)
@@ -424,7 +421,7 @@ object ProfileRepository {
         if (payload.isEmpty()) {
             return PinVerifyResult(
                 unlocked = false,
-                message = localizedString(Res.string.profile_pin_offline_verification_requires_online),
+                message = getString(Res.string.profile_pin_offline_verification_requires_online),
             )
         }
 
@@ -432,7 +429,7 @@ object ProfileRepository {
             json.decodeFromString<CachedProfilePinPayload>(payload)
         }.getOrNull() ?: return PinVerifyResult(
             unlocked = false,
-            message = localizedString(Res.string.profile_pin_offline_verification_requires_online),
+            message = getString(Res.string.profile_pin_offline_verification_requires_online),
         )
 
         if (
@@ -443,7 +440,7 @@ object ProfileRepository {
             ProfilePinCacheStorage.removePayload(profileIndex)
             return PinVerifyResult(
                 unlocked = false,
-                message = localizedString(Res.string.profile_pin_changed_requires_refresh),
+                message = getString(Res.string.profile_pin_changed_requires_refresh),
             )
         }
 
@@ -451,7 +448,7 @@ object ProfileRepository {
         return if (digest == cached.digest) {
             PinVerifyResult(unlocked = true)
         } else {
-            PinVerifyResult(unlocked = false, message = localizedString(Res.string.pin_incorrect))
+            PinVerifyResult(unlocked = false, message = getString(Res.string.pin_incorrect))
         }
     }
 

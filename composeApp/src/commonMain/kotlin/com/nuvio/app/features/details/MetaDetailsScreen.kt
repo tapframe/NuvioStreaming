@@ -98,6 +98,7 @@ import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
+import com.nuvio.app.features.settings.titleRes
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.launch
@@ -1176,7 +1177,7 @@ private fun ConfiguredMetaSections(
                     RenderSection(groupMembers.first().key)
                 } else {
                     TabbedSectionGroup(
-                        tabs = groupMembers.map { it.key to it.title },
+                        tabs = groupMembers.map { it.key to stringResource(it.key.titleRes) },
                     ) { activeKey ->
                         RenderSection(activeKey, showHeader = false)
                     }

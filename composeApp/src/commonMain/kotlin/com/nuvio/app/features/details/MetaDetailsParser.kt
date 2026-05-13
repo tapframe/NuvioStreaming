@@ -3,7 +3,6 @@ package com.nuvio.app.features.details
 import com.nuvio.app.features.streams.StreamBehaviorHints
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamProxyHeaders
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -20,7 +19,7 @@ import org.jetbrains.compose.resources.getString
 internal object MetaDetailsParser {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun parse(payload: String): MetaDetails {
+    suspend fun parse(payload: String): MetaDetails {
         val root = json.parseToJsonElement(payload).asJsonObjectOrNull()
             ?: error("Expected top-level JSON object in response")
         val meta = root.extractMetaObject()
@@ -217,59 +216,71 @@ internal object MetaDetailsParser {
         return merged.values.toList()
     }
 
-    private fun JsonObject.videos(): List<MetaVideo> =
-        array("videos").mapNotNull { element ->
-            val video = element as? JsonObject ?: return@mapNotNull null
-            val id = video.string("id") ?: return@mapNotNull null
-            val title = video.string("title") ?: video.string("name") ?: return@mapNotNull null
-            MetaVideo(
-                id = id,
-                title = title,
-                released = video.string("released"),
-                thumbnail = video.string("thumbnail"),
-                seasonPoster = video.string("seasonPoster") ?: video.string("season_poster_path"),
-                season = video.int("season"),
-                episode = video.int("episode"),
-                overview = video.string("overview") ?: video.string("description"),
-                runtime = video.int("runtime"),
-                streams = video.embeddedStreams(),
+    private suspend fun JsonObject.videos(): List<MetaVideo> {
+        val result = mutableListOf<MetaVideo>()
+        for (element in array("videos")) {
+            val video = element as? JsonObject ?: continue
+            val id = video.string("id") ?: continue
+            val title = video.string("title") ?: video.string("name") ?: continue
+            result.add(
+                MetaVideo(
+                    id = id,
+                    title = title,
+                    released = video.string("released"),
+                    thumbnail = video.string("thumbnail"),
+                    seasonPoster = video.string("seasonPoster") ?: video.string("season_poster_path"),
+                    season = video.int("season"),
+                    episode = video.int("episode"),
+                    overview = video.string("overview") ?: video.string("description"),
+                    runtime = video.int("runtime"),
+                    streams = video.embeddedStreams(),
+                ),
             )
         }
+        return result
+    }
 
-    private fun JsonObject.trailers(): List<MetaTrailer> =
-        array("trailers").mapNotNull { element ->
-            val trailer = element as? JsonObject ?: return@mapNotNull null
+    private suspend fun JsonObject.trailers(): List<MetaTrailer> {
+        val result = mutableListOf<MetaTrailer>()
+        for (element in array("trailers")) {
+            val trailer = element as? JsonObject ?: continue
             val key = trailer.string("key")
                 ?: trailer.string("source")
                 ?: trailer.string("ytId")
                 ?: trailer.string("ytid")
-                ?: return@mapNotNull null
+                ?: continue
 
             val normalizedKey = key.trim()
-            if (normalizedKey.isEmpty()) return@mapNotNull null
+            if (normalizedKey.isEmpty()) continue
 
-            MetaTrailer(
-                id = trailer.string("id")?.takeIf(String::isNotBlank) ?: normalizedKey,
-                key = normalizedKey,
-                name = trailer.string("name")?.takeIf(String::isNotBlank) ?: runBlocking { getString(Res.string.generic_trailer) },
-                site = trailer.string("site")?.takeIf(String::isNotBlank) ?: "YouTube",
-                size = trailer.int("size"),
-                type = trailer.string("type")?.takeIf(String::isNotBlank) ?: runBlocking { getString(Res.string.generic_trailer) },
-                official = trailer.boolean("official") == true,
-                publishedAt = trailer.string("published_at") ?: trailer.string("publishedAt"),
-                seasonNumber = trailer.int("seasonNumber") ?: trailer.int("season_number"),
-                displayName = trailer.string("displayName")?.takeIf(String::isNotBlank),
+            result.add(
+                MetaTrailer(
+                    id = trailer.string("id")?.takeIf(String::isNotBlank) ?: normalizedKey,
+                    key = normalizedKey,
+                    name = trailer.string("name")?.takeIf(String::isNotBlank)
+                        ?: getString(Res.string.generic_trailer),
+                    site = trailer.string("site")?.takeIf(String::isNotBlank) ?: "YouTube",
+                    size = trailer.int("size"),
+                    type = trailer.string("type")?.takeIf(String::isNotBlank) ?: "",
+                    official = trailer.boolean("official") == true,
+                    publishedAt = trailer.string("published_at") ?: trailer.string("publishedAt"),
+                    seasonNumber = trailer.int("seasonNumber") ?: trailer.int("season_number"),
+                    displayName = trailer.string("displayName")?.takeIf(String::isNotBlank),
+                ),
             )
         }
+        return result
+    }
 
-    private fun JsonObject.embeddedStreams(): List<StreamItem> {
+    private suspend fun JsonObject.embeddedStreams(): List<StreamItem> {
         val arr = this["streams"] as? JsonArray ?: return emptyList()
-        return arr.mapNotNull { element ->
-            val obj = element as? JsonObject ?: return@mapNotNull null
+        val result = mutableListOf<StreamItem>()
+        for (element in arr) {
+            val obj = element as? JsonObject ?: continue
             val url = obj.string("url")
             val infoHash = obj.string("infoHash")
             val externalUrl = obj.string("externalUrl")
-            if (url == null && infoHash == null && externalUrl == null) return@mapNotNull null
+            if (url == null && infoHash == null && externalUrl == null) continue
 
             val hintsObj = obj["behaviorHints"] as? JsonObject
             val proxyHeaders = hintsObj
@@ -278,25 +289,28 @@ internal object MetaDetailsParser {
             val streamData = obj["streamData"] as? JsonObject
             val addonName = streamData?.string("addon")
                 ?: obj.string("name")
-                ?: runBlocking { getString(Res.string.source_embedded) }
-            StreamItem(
-                name = obj.string("name"),
-                description = obj.string("description") ?: obj.string("title"),
-                url = url,
-                infoHash = infoHash,
-                fileIdx = obj.int("fileIdx"),
-                externalUrl = externalUrl,
-                addonName = addonName,
-                addonId = "embedded",
-                behaviorHints = StreamBehaviorHints(
-                    bingeGroup = hintsObj?.string("bingeGroup"),
-                    notWebReady = (hintsObj?.boolean("notWebReady") ?: false) || proxyHeaders != null,
-                    videoSize = hintsObj?.long("videoSize"),
-                    filename = hintsObj?.string("filename"),
-                    proxyHeaders = proxyHeaders,
+                ?: getString(Res.string.source_embedded)
+            result.add(
+                StreamItem(
+                    name = obj.string("name"),
+                    description = obj.string("description") ?: obj.string("title"),
+                    url = url,
+                    infoHash = infoHash,
+                    fileIdx = obj.int("fileIdx"),
+                    externalUrl = externalUrl,
+                    addonName = addonName,
+                    addonId = "embedded",
+                    behaviorHints = StreamBehaviorHints(
+                        bingeGroup = hintsObj?.string("bingeGroup"),
+                        notWebReady = (hintsObj?.boolean("notWebReady") ?: false) || proxyHeaders != null,
+                        videoSize = hintsObj?.long("videoSize"),
+                        filename = hintsObj?.string("filename"),
+                        proxyHeaders = proxyHeaders,
+                    ),
                 ),
             )
         }
+        return result
     }
 
     private fun JsonObject.objectValue(name: String): JsonObject? =

@@ -487,7 +487,7 @@ private val MetaEpisodeCardStyle.descriptionRes: StringResource
         MetaEpisodeCardStyle.List -> Res.string.settings_meta_episode_style_list_description
     }
 
-private val MetaScreenSectionKey.titleRes: StringResource
+internal val MetaScreenSectionKey.titleRes: StringResource
     get() = when (this) {
         MetaScreenSectionKey.ACTIONS -> Res.string.settings_meta_actions
         MetaScreenSectionKey.OVERVIEW -> Res.string.settings_meta_overview

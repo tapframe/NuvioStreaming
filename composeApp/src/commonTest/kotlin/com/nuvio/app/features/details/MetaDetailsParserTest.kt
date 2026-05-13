@@ -1,5 +1,6 @@
 package com.nuvio.app.features.details
 
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -7,14 +8,15 @@ import kotlin.test.assertFailsWith
 class MetaDetailsParserTest {
 
     @Test
-    fun `parse rejects null meta object without json object cast crash`() {
+    fun `parse rejects null meta object without json object cast crash`() = runBlocking {
         assertFailsWith<IllegalStateException> {
-            MetaDetailsParser.parse("""{"meta":null}""")
+            runBlocking { MetaDetailsParser.parse("""{"meta":null}""") }
         }
+        Unit
     }
 
     @Test
-    fun `parse accepts bare meta object response`() {
+    fun `parse accepts bare meta object response`() = runBlocking {
         val result = MetaDetailsParser.parse(
             """
             {
