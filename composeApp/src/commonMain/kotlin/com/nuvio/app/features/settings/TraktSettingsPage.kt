@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
@@ -50,6 +51,7 @@ import com.nuvio.app.features.trakt.WatchProgressSource
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
 import com.nuvio.app.features.trakt.normalizeTraktContinueWatchingDaysCap
 import com.nuvio.app.features.trakt.traktBrandPainter
+import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.settings_playback_dialog_close
@@ -669,6 +671,7 @@ private fun TraktConnectionCard(
     uiState: TraktAuthUiState,
 ) {
     val uriHandler = LocalUriHandler.current
+    val coroutineScope = rememberCoroutineScope()
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
     val verticalPadding = if (isTablet) 18.dp else 16.dp
     val failedOpenBrowserMessage = stringResource(Res.string.settings_trakt_failed_open_browser)
@@ -729,15 +732,17 @@ private fun TraktConnectionCard(
                 )
                 Button(
                     onClick = {
-                        val authUrl = TraktAuthRepository.pendingAuthorizationUrl()
-                            ?: TraktAuthRepository.onConnectRequested()
-                        if (authUrl == null) return@Button
-                        runCatching { uriHandler.openUri(authUrl) }
-                            .onFailure {
-                                TraktAuthRepository.onAuthLaunchFailed(
-                                    it.message ?: failedOpenBrowserMessage,
-                                )
-                            }
+                        coroutineScope.launch {
+                            val authUrl = TraktAuthRepository.pendingAuthorizationUrl()
+                                ?: TraktAuthRepository.onConnectRequested()
+                            if (authUrl == null) return@launch
+                            runCatching { uriHandler.openUri(authUrl) }
+                                .onFailure {
+                                    TraktAuthRepository.onAuthLaunchFailed(
+                                        it.message ?: failedOpenBrowserMessage,
+                                    )
+                                }
+                        }
                     },
                     enabled = !uiState.isLoading,
                 ) {
@@ -763,13 +768,15 @@ private fun TraktConnectionCard(
                 )
                 Button(
                     onClick = {
-                        val authUrl = TraktAuthRepository.onConnectRequested() ?: return@Button
-                        runCatching { uriHandler.openUri(authUrl) }
-                            .onFailure {
-                                TraktAuthRepository.onAuthLaunchFailed(
-                                    it.message ?: failedOpenBrowserMessage,
-                                )
-                            }
+                        coroutineScope.launch {
+                            val authUrl = TraktAuthRepository.onConnectRequested() ?: return@launch
+                            runCatching { uriHandler.openUri(authUrl) }
+                                .onFailure {
+                                    TraktAuthRepository.onAuthLaunchFailed(
+                                        it.message ?: failedOpenBrowserMessage,
+                                    )
+                                }
+                        }
                     },
                     enabled = uiState.credentialsConfigured && !uiState.isLoading,
                 ) {

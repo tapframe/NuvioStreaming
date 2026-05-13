@@ -4,7 +4,6 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.details.MetaDetails
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -102,7 +101,8 @@ object TraktCommentsRepository {
         val itemCount = response.headers["X-Pagination-Item-Count"]?.toIntOrNull()
             ?: response.headers["x-pagination-item-count"]?.toIntOrNull()
             ?: dtos.size
-        val selected = filterDisplayableComments(dtos).map(::toReviewModel)
+        val userFallback = getString(Res.string.trakt_user_fallback)
+        val selected = filterDisplayableComments(dtos).map { dto -> toReviewModel(dto, userFallback) }
 
         cacheMutex.withLock {
             val cached = cache[cacheKey]
@@ -224,11 +224,11 @@ private fun stripInlineSpoilerMarkup(comment: String?): String {
         .trim()
 }
 
-private fun toReviewModel(dto: TraktCommentDto): TraktCommentReview {
+private fun toReviewModel(dto: TraktCommentDto, userFallback: String): TraktCommentReview {
     val authorDisplayName = dto.user?.name
         ?.takeIf { it.isNotBlank() }
         ?: dto.user?.username?.takeIf { it.isNotBlank() }
-        ?: runBlocking { getString(Res.string.trakt_user_fallback) }
+        ?: userFallback
 
     return TraktCommentReview(
         id = dto.id,

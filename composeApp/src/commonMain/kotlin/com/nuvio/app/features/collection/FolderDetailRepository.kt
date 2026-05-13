@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.collections_folder_addon_not_found
 import nuvio.composeapp.generated.resources.collections_folder_trakt_movie_list
@@ -95,7 +94,7 @@ object FolderDetailRepository {
     private var activeCollectionId: String? = null
     private var activeFolderId: String? = null
 
-    fun initialize(collectionId: String, folderId: String) {
+    suspend fun initialize(collectionId: String, folderId: String) {
         val current = _uiState.value
         if (
             activeCollectionId == collectionId &&
@@ -130,7 +129,7 @@ object FolderDetailRepository {
             if (showAll) {
                 add(
                     FolderTab(
-                        label = runBlocking { getString(Res.string.collections_tab_all) },
+                        label = getString(Res.string.collections_tab_all),
                         isAllTab = true,
                         isLoading = true,
                     ),
@@ -158,15 +157,13 @@ object FolderDetailRepository {
                 } else if (source.isTrakt) {
                     val mediaType = TmdbCollectionMediaType.fromString(source.mediaType)
                     val type = if (mediaType == TmdbCollectionMediaType.TV) "series" else "movie"
-                    val typeLabel = runBlocking {
-                        getString(
-                            if (mediaType == TmdbCollectionMediaType.TV) {
-                                Res.string.collections_folder_trakt_series_list
-                            } else {
-                                Res.string.collections_folder_trakt_movie_list
-                            },
-                        )
-                    }
+                    val typeLabel = getString(
+                        if (mediaType == TmdbCollectionMediaType.TV) {
+                            Res.string.collections_folder_trakt_series_list
+                        } else {
+                            Res.string.collections_folder_trakt_movie_list
+                        },
+                    )
                     add(
                         FolderTab(
                             label = source.title?.takeIf { it.isNotBlank() } ?: "Trakt",
@@ -219,12 +216,14 @@ object FolderDetailRepository {
             val catalogSource = source.addonCatalogSource()
             val resolvedCatalog = catalogSource?.let { addons.findCollectionCatalog(it) }
             if (!source.isTmdb && !source.isTrakt && resolvedCatalog == null) {
+                val errorMessage = getString(
+                    Res.string.collections_folder_addon_not_found,
+                    catalogSource?.addonId.orEmpty(),
+                )
                 updateTab(tabIndex) {
                     it.copy(
                         isLoading = false,
-                        error = runBlocking {
-                            getString(Res.string.collections_folder_addon_not_found, catalogSource?.addonId.orEmpty())
-                        },
+                        error = errorMessage,
                     )
                 }
                 return@forEachIndexed

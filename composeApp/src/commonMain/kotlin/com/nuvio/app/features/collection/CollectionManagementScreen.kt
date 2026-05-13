@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,7 @@ import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -69,6 +71,7 @@ fun CollectionManagementScreen(
 ) {
     val collections by CollectionRepository.collections.collectAsState()
     val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
     var showImportDialog by remember { mutableStateOf(false) }
     var importText by remember { mutableStateOf("") }
     var importError by remember { mutableStateOf<String?>(null) }
@@ -171,14 +174,16 @@ fun CollectionManagementScreen(
                 importError = null
             },
             onConfirm = {
-                val result = CollectionRepository.validateJson(importText)
-                if (result.valid) {
-                    CollectionRepository.importFromJson(importText)
-                    showImportDialog = false
-                    importText = ""
-                    importError = null
-                } else {
-                    importError = result.error
+                coroutineScope.launch {
+                    val result = CollectionRepository.validateJson(importText)
+                    if (result.valid) {
+                        CollectionRepository.importFromJson(importText)
+                        showImportDialog = false
+                        importText = ""
+                        importError = null
+                    } else {
+                        importError = result.error
+                    }
                 }
             },
             onDismiss = {

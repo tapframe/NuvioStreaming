@@ -60,10 +60,8 @@ import nuvio.composeapp.generated.resources.rating_rotten_tomatoes
 import nuvio.composeapp.generated.resources.rating_tmdb
 import nuvio.composeapp.generated.resources.rating_trakt
 import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import kotlinx.coroutines.runBlocking
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
@@ -209,6 +207,8 @@ private fun DetailRatingsRow(
 
     if (orderedRatings.isEmpty()) return
 
+    val audienceScoreLabel = stringResource(Res.string.rating_audience_score)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -232,7 +232,7 @@ private fun DetailRatingsRow(
                 } else {
                     Image(
                         painter = painterResource(visuals.logo),
-                        contentDescription = visuals.displayName,
+                        contentDescription = if (visuals.source == PROVIDER_AUDIENCE) audienceScoreLabel else visuals.displayName,
                         modifier = Modifier.size(width = visuals.logoWidth, height = 16.dp),
                     )
                 }
@@ -385,7 +385,7 @@ private val ratingVisuals = listOf(
     ),
     RatingVisuals(
         source = PROVIDER_AUDIENCE,
-        displayName = runBlocking { getString(Res.string.rating_audience_score) },
+        displayName = "",
         logo = Res.drawable.rating_audience_score,
         logoWidth = 16.dp,
         valueColor = Color(0xFFFA320A),
