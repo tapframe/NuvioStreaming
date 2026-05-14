@@ -12,11 +12,17 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +71,8 @@ fun PluginsSettingsPageContent(
     var testingScraperId by remember { mutableStateOf<String?>(null) }
     val testResults = remember { mutableStateMapOf<String, List<PluginRuntimeResult>>() }
 
+    var configuringRepo by remember { mutableStateOf<PluginRepositoryItem?>(null) }
+
     val sortedRepos = remember(uiState.repositories) {
         uiState.repositories.sortedBy { it.name.lowercase() }
     }
@@ -76,6 +86,17 @@ fun PluginsSettingsPageContent(
                 { repositoryNameByUrl[it.repositoryUrl]?.lowercase() ?: it.repositoryUrl.lowercase() },
                 { it.name.lowercase() },
             ),
+        )
+    }
+
+    configuringRepo?.let { repo ->
+        PluginConfigDialog(
+            repo = repo,
+            onDismiss = { configuringRepo = null },
+            onSave = { values ->
+                PluginStorage.saveConfig(repo.manifestUrl, values)
+                configuringRepo = null
+            },
         )
     }
 
@@ -257,6 +278,14 @@ fun PluginsSettingsPageContent(
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (repo.settings.isNotEmpty()) {
+                                NuvioIconActionButton(
+                                    icon = Icons.Rounded.Settings,
+                                    contentDescription = "Configure plugin repository",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    onClick = { configuringRepo = repo },
+                                )
+                            }
                             NuvioIconActionButton(
                                 icon = Icons.Rounded.Refresh,
                                 contentDescription = "Refresh plugin repository",
@@ -277,6 +306,9 @@ fun PluginsSettingsPageContent(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         NuvioInfoBadge(text = "${repo.scraperCount} providers")
+                        if (repo.settings.isNotEmpty()) {
+                            NuvioInfoBadge(text = "Configurable")
+                        }
                         if (repo.isRefreshing) {
                             NuvioInfoBadge(text = "Refreshing")
                         }
@@ -439,6 +471,101 @@ fun PluginsSettingsPageContent(
             }
         }
     }
+}
+
+@Composable
+private fun PluginConfigDialog(
+    repo: PluginRepositoryItem,
+    onDismiss: () -> Unit,
+    onSave: (Map<String, String>) -> Unit,
+) {
+    val savedValues = remember(repo.manifestUrl) {
+        PluginStorage.loadConfig(repo.manifestUrl)
+    }
+    val fieldValues = remember(repo.manifestUrl) {
+        mutableStateMapOf<String, String>().apply {
+            repo.settings.forEach { field ->
+                put(field.key, savedValues[field.key] ?: field.default.orEmpty())
+            }
+        }
+    }
+    val passwordVisibility = remember(repo.manifestUrl) {
+        mutableStateMapOf<String, Boolean>().apply {
+            repo.settings.forEach { field -> put(field.key, false) }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "${repo.name} — Settings",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                repo.settings.forEach { field ->
+                    val isPassword = field.type == "password"
+                    val isVisible = passwordVisibility[field.key] == true
+                    Column {
+                        Text(
+                            text = field.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        field.description?.let { desc ->
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = desc,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        NuvioInputField(
+                            value = fieldValues[field.key].orEmpty(),
+                            onValueChange = { fieldValues[field.key] = it },
+                            placeholder = field.label,
+                            trailingContent = if (isPassword) {
+                                {
+                                    IconButton(onClick = {
+                                        passwordVisibility[field.key] = !isVisible
+                                    }) {
+                                        Icon(
+                                            imageVector = if (isVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                            contentDescription = if (isVisible) "Hide" else "Show",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            } else null,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(fieldValues.toMap()) }) {
+                Text(
+                    text = "Save",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Cancel",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+    )
 }
 
 private fun String.fallbackRepositoryLabel(): String {

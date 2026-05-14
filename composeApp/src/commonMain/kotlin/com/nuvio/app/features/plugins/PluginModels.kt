@@ -4,11 +4,22 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class PluginConfigField(
+    val key: String,
+    val label: String,
+    val description: String? = null,
+    val type: String = "text",
+    val required: Boolean = false,
+    val default: String? = null,
+)
+
+@Serializable
 data class PluginManifest(
     val name: String,
     val version: String,
     val description: String? = null,
     val author: String? = null,
+    val settings: List<PluginConfigField> = emptyList(),
     val scrapers: List<PluginManifestScraper> = emptyList(),
 )
 
@@ -40,6 +51,7 @@ data class PluginRepositoryItem(
     val lastUpdated: Long = 0L,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
+    val settings: List<PluginConfigField> = emptyList(),
 )
 
 data class PluginScraper(
@@ -106,6 +118,7 @@ internal data class StoredPluginRepository(
     val version: String? = null,
     val scraperCount: Int = 0,
     val lastUpdated: Long = 0L,
+    val settings: List<PluginConfigField> = emptyList(),
 )
 
 @Serializable
