@@ -605,8 +605,8 @@
     <string name="settings_meta_blur_unwatched_episodes">Buramkan Episode Belum Ditonton</string>
     <string name="settings_meta_blur_unwatched_episodes_description">Buramkan thumbnail episode sampai ditonton untuk menghindari spoiler.</string>
     <string name="settings_meta_group_label">Grup %1$d</string>
-    <string name="settings_meta_more_like_this">Lebih seperti ini</string>
-    <string name="settings_meta_more_like_this_description">Latar rekomendasi TMDB di halaman detail</string>
+    <string name="settings_meta_more_like_this">Yang Serupa</string>
+    <string name="settings_meta_more_like_this_description">Gambar latar rekomendasi TMDB di halaman detail</string>
     <string name="settings_meta_none">Tidak Ada</string>
     <string name="settings_meta_overview">Ikhtisar</string>
     <string name="settings_meta_overview_description">Sinopsis, rating, genre, dan kredit utama.</string>
@@ -802,8 +802,8 @@
     <string name="settings_tmdb_module_details_description">Durasi, status, negara, dan bahasa dari TMDB</string>
     <string name="settings_tmdb_module_episodes">Episode</string>
     <string name="settings_tmdb_module_episodes_description">Judul episode, ikhtisar, thumbnail, dan durasi dari TMDB</string>
-    <string name="settings_tmdb_module_more_like_this">Yang Seperti Ini</string>
-    <string name="settings_tmdb_module_more_like_this_description">Latar rekomendasi TMDB di halaman detail</string>
+    <string name="settings_tmdb_module_more_like_this">Yang Serupa</string>
+    <string name="settings_tmdb_module_more_like_this_description">Gambar latar rekomendasi TMDB di halaman detail</string>
     <string name="settings_tmdb_module_networks">Jaringan</string>
     <string name="settings_tmdb_module_networks_description">Jaringan dengan logo dari TMDB</string>
     <string name="settings_tmdb_module_production_companies">Produksi</string>
@@ -975,7 +975,7 @@
     <string name="details_check_connection">Periksa koneksi Wi-Fi atau data seluler Anda dan coba lagi.</string>
     <string name="details_director">Sutradara</string>
     <string name="details_failed_to_load">Gagal memuat</string>
-    <string name="details_more_like_this">Lebih Seperti Ini</string>
+    <string name="details_more_like_this">Yang Serupa</string>
     <string name="details_seasons">Musim</string>
     <string name="details_series_missing_numbers">Addon ini mengembalikan video untuk serial, tetapi tidak ada yang menyertakan nomor musim atau episode.</string>
     <string name="details_series_no_metadata">Addon ini tidak menyediakan metadata episode untuk serial ini.</string>
@@ -1020,7 +1020,7 @@
     <string name="meta_section_details_title">Detail</string>
     <string name="meta_section_episodes_description">Musim dan daftar episode untuk serial.</string>
     <string name="meta_section_more_like_this_description">Baris rekomendasi.</string>
-    <string name="meta_section_more_like_this_title">Lebih Seperti Ini</string>
+    <string name="meta_section_more_like_this_title">Yang Serupa</string>
     <string name="meta_section_overview_description">Sinopsis, rating, genre, dan kredit utama.</string>
     <string name="meta_section_overview_title">Ikhtisar</string>
     <string name="meta_section_production_description">Studio dan jaringan.</string>
