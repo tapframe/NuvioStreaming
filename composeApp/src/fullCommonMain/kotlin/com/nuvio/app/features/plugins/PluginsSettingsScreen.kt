@@ -15,11 +15,16 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,8 +45,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import com.nuvio.app.core.ui.NuvioIconActionButton
 import com.nuvio.app.core.ui.NuvioInfoBadge
 import com.nuvio.app.core.ui.NuvioInputField
@@ -509,8 +512,9 @@ private fun PluginConfigDialog(
         text = {
             val scrollState = rememberScrollState()
             Column(
-                modifier = Modifier.verticalScroll(scrollState),    
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                modifier = Modifier.verticalScroll(scrollState),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 repo.settings.forEach { field ->
                     val isPassword = field.type == "password"
                     val isVisible = passwordVisibility[field.key] == true
@@ -529,12 +533,25 @@ private fun PluginConfigDialog(
                             )
                         }
                         Spacer(modifier = Modifier.height(6.dp))
-                        NuvioInputField(
-                            value = fieldValues[field.key].orEmpty(),
-                            onValueChange = { fieldValues[field.key] = it },
-                            placeholder = field.label,
-                            trailingContent = if (isPassword) {
-                                {
+                        if (isPassword) {
+                            OutlinedTextField(
+                                value = fieldValues[field.key].orEmpty(),
+                                onValueChange = { fieldValues[field.key] = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                placeholder = {
+                                    Text(
+                                        text = field.label,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                },
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                ),
+                                visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = {
                                     IconButton(onClick = {
                                         passwordVisibility[field.key] = !isVisible
                                     }) {
@@ -544,9 +561,22 @@ private fun PluginConfigDialog(
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
-                                }
-                            } else null,
-                        )
+                                },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.outline,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        } else {
+                            NuvioInputField(
+                                value = fieldValues[field.key].orEmpty(),
+                                onValueChange = { fieldValues[field.key] = it },
+                                placeholder = field.label,
+                            )
+                        }
                     }
                 }
             }
