@@ -16,6 +16,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_content_discov
 import nuvio.composeapp.generated.resources.compose_settings_page_continue_watching
 import nuvio.composeapp.generated.resources.compose_settings_page_homescreen
 import nuvio.composeapp.generated.resources.compose_settings_page_integrations
+import nuvio.composeapp.generated.resources.compose_settings_page_licenses_attributions
 import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
 import nuvio.composeapp.generated.resources.compose_settings_page_meta_screen
 import nuvio.composeapp.generated.resources.compose_settings_page_notifications
@@ -55,6 +56,11 @@ internal enum class SettingsPage(
     ),
     SupportersContributors(
         titleRes = Res.string.compose_settings_page_supporters_contributors,
+        category = SettingsCategory.About,
+        parentPage = Root,
+    ),
+    LicensesAttributions(
+        titleRes = Res.string.compose_settings_page_licenses_attributions,
         category = SettingsCategory.About,
         parentPage = Root,
     ),

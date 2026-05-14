@@ -15,8 +15,7 @@ private const val COMMENTS_SORT = "likes"
 private const val COMMENTS_LIMIT = 100
 private const val COMMENTS_CACHE_TTL_MS = 10 * 60_000L
 private val INLINE_SPOILER_REGEX = Regex(
-    "\\[spoiler\\].*?\\[/spoiler\\]",
-    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+    "(?is)\\[spoiler\\].*?\\[/spoiler\\]"
 )
 private val INLINE_SPOILER_TAG_REGEX = Regex("\\[/?spoiler\\]", RegexOption.IGNORE_CASE)
 

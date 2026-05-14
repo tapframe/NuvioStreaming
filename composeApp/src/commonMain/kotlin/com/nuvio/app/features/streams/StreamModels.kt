@@ -66,6 +66,7 @@ enum class StreamsEmptyStateReason {
 }
 
 data class StreamsUiState(
+    val requestToken: String? = null,
     val groups: List<AddonStreamGroup> = emptyList(),
     val activeAddonIds: Set<String> = emptySet(),
     val selectedFilter: String? = null,

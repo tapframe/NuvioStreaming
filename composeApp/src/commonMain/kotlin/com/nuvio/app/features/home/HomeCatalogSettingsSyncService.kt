@@ -42,6 +42,7 @@ data class SyncCatalogItem(
 @Serializable
 data class SyncHomeCatalogPayload(
     @SerialName("hide_unreleased_content") val hideUnreleasedContent: Boolean = false,
+    @SerialName("hide_catalog_underline") val hideCatalogUnderline: Boolean = false,
     val items: List<SyncCatalogItem> = emptyList(),
 )
 

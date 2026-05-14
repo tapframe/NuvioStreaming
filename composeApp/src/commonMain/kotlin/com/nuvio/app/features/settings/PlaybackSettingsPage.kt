@@ -53,6 +53,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.player.AudioLanguageOption
 import com.nuvio.app.features.player.AvailableLanguageOptions
+import com.nuvio.app.features.player.ExternalPlayerApp
+import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.formatPlaybackSpeedLabel
@@ -169,6 +171,7 @@ private fun PlaybackSettingsSection(
     var showSecondaryAudioDialog by remember { mutableStateOf(false) }
     var showPreferredSubtitleDialog by remember { mutableStateOf(false) }
     var showSecondarySubtitleDialog by remember { mutableStateOf(false) }
+    var showExternalPlayerDialog by remember { mutableStateOf(false) }
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showDecoderPriorityDialog by remember { mutableStateOf(false) }
     var showHoldToSpeedValueDialog by remember { mutableStateOf(false) }
@@ -180,6 +183,10 @@ private fun PlaybackSettingsSection(
     var showAutoPlayRegexDialog by remember { mutableStateOf(false) }
     val pluginsEnabled = AppFeaturePolicy.pluginsEnabled
     val autoPlayPlayerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val availableExternalPlayers = ExternalPlayerPlatform.availablePlayers()
+    val selectedExternalPlayer = availableExternalPlayers.firstOrNull {
+        it.id == autoPlayPlayerSettings.externalPlayerId
+    }
     val addonUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val pluginUiState = if (pluginsEnabled) {
         val state by PluginRepository.uiState.collectAsStateWithLifecycle()
@@ -205,6 +212,39 @@ private fun PlaybackSettingsSection(
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setShowLoadingOverlay,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_external_player),
+                    description = stringResource(
+                        if (isIos) {
+                            Res.string.settings_playback_external_player_description_ios
+                        } else {
+                            Res.string.settings_playback_external_player_description_android
+                        },
+                    ),
+                    checked = autoPlayPlayerSettings.externalPlayerEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        PlayerSettingsRepository.setExternalPlayerEnabled(enabled)
+                        if (enabled && isIos) {
+                            showExternalPlayerDialog = true
+                        }
+                    },
+                )
+                if (isIos && autoPlayPlayerSettings.externalPlayerEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_external_player_app),
+                        description = selectedExternalPlayer?.name
+                            ?: if (availableExternalPlayers.isEmpty()) {
+                                stringResource(Res.string.settings_playback_external_player_none_available)
+                            } else {
+                                stringResource(Res.string.settings_playback_not_set)
+                            },
+                        isTablet = isTablet,
+                        onClick = { showExternalPlayerDialog = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_playback_hold_to_speed),
@@ -780,6 +820,18 @@ private fun PlaybackSettingsSection(
         )
     }
 
+    if (showExternalPlayerDialog) {
+        ExternalPlayerSelectionDialog(
+            players = availableExternalPlayers,
+            selectedPlayerId = autoPlayPlayerSettings.externalPlayerId,
+            onPlayerSelected = { playerId ->
+                PlayerSettingsRepository.setExternalPlayerId(playerId)
+                showExternalPlayerDialog = false
+            },
+            onDismiss = { showExternalPlayerDialog = false },
+        )
+    }
+
     if (showDecoderPriorityDialog) {
         DecoderPriorityDialog(
             selectedPriority = decoderPriority,
@@ -903,6 +955,100 @@ private data class LanguageSelectionOption(
     val value: String?,
     val label: String,
 )
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ExternalPlayerSelectionDialog(
+    players: List<ExternalPlayerApp>,
+    selectedPlayerId: String?,
+    onPlayerSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_playback_external_player_app),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                if (players.isEmpty()) {
+                    Text(
+                        text = stringResource(Res.string.settings_playback_external_player_none_available),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        players.forEach { player ->
+                            val isSelected = player.id == selectedPlayerId
+                            val containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onPlayerSelected(player.id) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = containerColor,
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = player.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Box(
+                                        modifier = Modifier.size(24.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(Res.string.settings_playback_dialog_close),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
