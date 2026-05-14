@@ -21,6 +21,8 @@ actual object PlayerSettingsStorage {
     private const val resizeModeKey = "resize_mode"
     private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
     private const val holdToSpeedValueKey = "hold_to_speed_value"
+    private const val externalPlayerEnabledKey = "external_player_enabled"
+    private const val externalPlayerIdKey = "external_player_id"
     private const val preferredAudioLanguageKey = "preferred_audio_language"
     private const val secondaryPreferredAudioLanguageKey = "secondary_preferred_audio_language"
     private const val preferredSubtitleLanguageKey = "preferred_subtitle_language"
@@ -57,6 +59,8 @@ actual object PlayerSettingsStorage {
         resizeModeKey,
         holdToSpeedEnabledKey,
         holdToSpeedValueKey,
+        externalPlayerEnabledKey,
+        externalPlayerIdKey,
         preferredAudioLanguageKey,
         secondaryPreferredAudioLanguageKey,
         preferredSubtitleLanguageKey,
@@ -138,6 +142,36 @@ actual object PlayerSettingsStorage {
 
     actual fun saveHoldToSpeedValue(speed: Float) {
         NSUserDefaults.standardUserDefaults.setFloat(speed, forKey = ProfileScopedKey.of(holdToSpeedValueKey))
+    }
+
+    actual fun loadExternalPlayerEnabled(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(externalPlayerEnabledKey)
+        return if (defaults.objectForKey(key) != null) {
+            defaults.boolForKey(key)
+        } else {
+            null
+        }
+    }
+
+    actual fun saveExternalPlayerEnabled(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(externalPlayerEnabledKey))
+    }
+
+    actual fun loadExternalPlayerId(): String? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(externalPlayerIdKey)
+        return defaults.stringForKey(key)
+    }
+
+    actual fun saveExternalPlayerId(playerId: String?) {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(externalPlayerIdKey)
+        if (playerId.isNullOrBlank()) {
+            defaults.removeObjectForKey(key)
+        } else {
+            defaults.setObject(playerId, forKey = key)
+        }
     }
 
     actual fun loadPreferredAudioLanguage(): String? {
@@ -523,6 +557,8 @@ actual object PlayerSettingsStorage {
         loadResizeMode()?.let { put(resizeModeKey, encodeSyncString(it)) }
         loadHoldToSpeedEnabled()?.let { put(holdToSpeedEnabledKey, encodeSyncBoolean(it)) }
         loadHoldToSpeedValue()?.let { put(holdToSpeedValueKey, encodeSyncFloat(it)) }
+        loadExternalPlayerEnabled()?.let { put(externalPlayerEnabledKey, encodeSyncBoolean(it)) }
+        loadExternalPlayerId()?.let { put(externalPlayerIdKey, encodeSyncString(it)) }
         loadPreferredAudioLanguage()?.let { put(preferredAudioLanguageKey, encodeSyncString(it)) }
         loadSecondaryPreferredAudioLanguage()?.let { put(secondaryPreferredAudioLanguageKey, encodeSyncString(it)) }
         loadPreferredSubtitleLanguage()?.let { put(preferredSubtitleLanguageKey, encodeSyncString(it)) }
@@ -563,6 +599,8 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncString(resizeModeKey)?.let(::saveResizeMode)
         payload.decodeSyncBoolean(holdToSpeedEnabledKey)?.let(::saveHoldToSpeedEnabled)
         payload.decodeSyncFloat(holdToSpeedValueKey)?.let(::saveHoldToSpeedValue)
+        payload.decodeSyncBoolean(externalPlayerEnabledKey)?.let(::saveExternalPlayerEnabled)
+        payload.decodeSyncString(externalPlayerIdKey)?.let(::saveExternalPlayerId)
         payload.decodeSyncString(preferredAudioLanguageKey)?.let(::savePreferredAudioLanguage)
         payload.decodeSyncString(secondaryPreferredAudioLanguageKey)?.let(::saveSecondaryPreferredAudioLanguage)
         payload.decodeSyncString(preferredSubtitleLanguageKey)?.let(::savePreferredSubtitleLanguage)

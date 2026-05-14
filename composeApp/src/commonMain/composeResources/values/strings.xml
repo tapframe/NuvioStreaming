@@ -689,6 +689,11 @@
     <string name="settings_playback_duration_hours">%1$d hours</string>
     <string name="settings_playback_enable_libass">Use libass for ASS/SSA subtitles</string>
     <string name="settings_playback_enable_libass_description">Experimental: advanced ASS/SSA rendering (styles, positioning, animations)</string>
+    <string name="settings_playback_external_player">External Player</string>
+    <string name="settings_playback_external_player_app">External Player App</string>
+    <string name="settings_playback_external_player_description_android">Open new playback with Android&apos;s default video app or system chooser.</string>
+    <string name="settings_playback_external_player_description_ios">Open new playback with the selected installed player.</string>
+    <string name="settings_playback_external_player_none_available">No supported external players installed</string>
     <string name="settings_playback_hold_speed">Hold Speed</string>
     <string name="settings_playback_hold_to_speed">Hold To Speed</string>
     <string name="settings_playback_hold_to_speed_description">Long-press anywhere on the player surface to temporarily boost playback speed.</string>
@@ -1081,6 +1086,8 @@
     <string name="streams_checking_more_addons">Checking more addons…</string>
     <string name="streams_copy_link">Copy stream link</string>
     <string name="streams_download_file">Download file</string>
+    <string name="streams_open_external_player">Open in external player</string>
+    <string name="streams_open_internal_player">Open in internal player</string>
     <string name="streams_empty_load_failed_message">The installed stream addons failed to return a valid stream response.</string>
     <string name="streams_empty_load_failed_title">Could not load streams</string>
     <string name="streams_empty_no_addons_message">Install an addon first to load streams for this title.</string>
@@ -1101,6 +1108,9 @@
     <string name="streams_resume_from_time">Resume from %1$s</string>
     <string name="streams_size">SIZE %1$s</string>
     <string name="streams_torrent_not_supported">Torrent streams are not supported</string>
+    <string name="external_player_failed">Couldn&apos;t open external player</string>
+    <string name="external_player_not_configured">Choose an external player in settings first</string>
+    <string name="external_player_unavailable">No external player is available</string>
     <string name="trailer_close">Close trailer</string>
     <string name="trailer_unable_to_play">Unable to play trailer</string>
     <string name="trakt_lists_load_failed">Failed to load Trakt lists</string>

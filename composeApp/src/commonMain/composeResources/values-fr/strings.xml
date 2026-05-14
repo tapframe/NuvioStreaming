@@ -720,7 +720,7 @@
     <string name="settings_playback_threshold_mode_percentage">Pourcentage</string>
     <string name="settings_playback_threshold_percentage">Pourcentage de seuil</string>
     <string name="settings_playback_threshold_percentage_description">Afficher la carte de l'épisode suivant lorsque la lecture atteint ce pourcentage.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s %</string>
     <string name="settings_playback_timeout_instant">Instantané</string>
     <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Illimité</string>
@@ -1017,7 +1017,7 @@
     <string name="streams_no_direct_link">Aucun lien direct du stream disponible</string>
     <string name="streams_no_metadata">Aucune métadonnée disponible</string>
     <string name="streams_refresh">Actualiser les streams</string>
-    <string name="streams_resume_from_percent">Reprendre depuis %1$d%</string>
+    <string name="streams_resume_from_percent">Reprendre depuis %1$d %</string>
     <string name="streams_resume_from_time">Reprendre depuis %1$s</string>
     <string name="streams_size">TAILLE %1$s</string>
     <string name="trailer_close">Fermer la bande-annonce</string>
@@ -1027,7 +1027,7 @@
     <string name="updates_asset_line">%1$s • %2$s</string>
     <string name="updates_check_failed">Échec de la vérification des mises à jour</string>
     <string name="updates_download_failed">Échec du téléchargement</string>
-    <string name="updates_downloading_progress">Téléchargement %1$d%%</string>
+    <string name="updates_downloading_progress">Téléchargement %1$d %</string>
     <string name="updates_install_failed">Impossible de démarrer l'installation</string>
     <string name="updates_latest_version">Vous utilisez la version la plus récente.</string>
     <string name="updates_message_allow_installs">Activez l'installation d'applications pour Nuvio puis revenez pour continuer.</string>
