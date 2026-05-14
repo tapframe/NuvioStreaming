@@ -689,6 +689,11 @@
     <string name="settings_playback_duration_hours">%1$d jam</string>
     <string name="settings_playback_enable_libass">Gunakan libass untuk subtitle ASS/SSA</string>
     <string name="settings_playback_enable_libass_description">Eksperimental: rendering ASS/SSA lanjutan (gaya, posisi, animasi)</string>
+    <string name="settings_playback_external_player">Player Eksternal</string>
+    <string name="settings_playback_external_player_app">Applikasi Pemutar Video Eksternal</string>
+    <string name="settings_playback_external_player_description_android">Buka pemutaran baru dengan aplikasi video bawaan Android atau pemilih sistem.</string>
+    <string name="settings_playback_external_player_description_ios">Buka pemutaran baru dengan pemutar video yang dipilih.</string>
+    <string name="settings_playback_external_player_none_available">Tidak ada pemutar eksternal yang didukung</string>
     <string name="settings_playback_hold_speed">Kecepatan Putar saat Ditahan</string>
     <string name="settings_playback_hold_to_speed">Tahan untuk Mempercepat</string>
     <string name="settings_playback_hold_to_speed_description">Tekan lama di mana saja pada permukaan pemutar untuk sementara meningkatkan kecepatan putar.</string>
@@ -1081,6 +1086,8 @@
     <string name="streams_checking_more_addons">Memeriksa addon lainnya…</string>
     <string name="streams_copy_link">Salin tautan stream</string>
     <string name="streams_download_file">Unduh file</string>
+    <string name="streams_open_external_player">Buka menggunakan player eksternal</string>
+    <string name="streams_open_internal_player">Buka menggunakan player internal</string>
     <string name="streams_empty_load_failed_message">Addon stream yang terpasang gagal mengembalikan respons stream yang valid.</string>
     <string name="streams_empty_load_failed_title">Tidak dapat memuat stream</string>
     <string name="streams_empty_no_addons_message">Pasang addon terlebih dahulu untuk memuat stream untuk judul ini.</string>
@@ -1101,6 +1108,9 @@
     <string name="streams_resume_from_time">Lanjutkan dari %1$s</string>
     <string name="streams_size">UKURAN %1$s</string>
     <string name="streams_torrent_not_supported">Stream torrent tidak didukung</string>
+    <string name="external_player_failed">Tidak dapat membuka player eksternal</string>
+    <string name="external_player_not_configured">Pilih player eksternal terlebih dahulu di pengaturan</string>
+    <string name="external_player_unavailable">Tidak ada player eksternal yang tersedia</string>
     <string name="trailer_close">Tutup trailer</string>
     <string name="trailer_unable_to_play">Tidak dapat memutar trailer</string>
     <string name="trakt_lists_load_failed">Gagal memuat daftar Trakt</string>
