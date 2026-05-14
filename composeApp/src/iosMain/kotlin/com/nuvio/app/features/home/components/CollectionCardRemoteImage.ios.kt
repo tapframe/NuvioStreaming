@@ -2,6 +2,7 @@ package com.nuvio.app.features.home.components
 
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +52,16 @@ private data class ExpandedGifFrames(
     val tickCentiseconds: Int,
 )
 
+private class GifImageViewHolder {
+    var imageView: UIImageView? = null
+
+    fun clear() {
+        imageView?.stopAnimating()
+        imageView?.image = null
+        imageView = null
+    }
+}
+
 @OptIn(ExperimentalForeignApi::class)
 @Composable
 internal actual fun CollectionCardRemoteImage(
@@ -76,6 +87,13 @@ internal actual fun CollectionCardRemoteImage(
         gifImage = loadGifImage(imageUrl)
     }
 
+    val imageViewHolder = remember(imageUrl) { GifImageViewHolder() }
+    DisposableEffect(imageUrl) {
+        onDispose {
+            imageViewHolder.clear()
+        }
+    }
+
     UIKitView(
         modifier = modifier,
         factory = {
@@ -83,17 +101,29 @@ internal actual fun CollectionCardRemoteImage(
                 contentMode = UIViewContentMode.UIViewContentModeScaleAspectFill
                 clipsToBounds = true
                 userInteractionEnabled = false
-                image = gifImage
                 tag = imageUrl.hashCode().toLong()
+                imageViewHolder.imageView = this
+                updateGifImage(gifImage)
             }
         },
         update = { imageView ->
+            imageViewHolder.imageView = imageView
             if (imageView.tag != imageUrl.hashCode().toLong()) {
                 imageView.tag = imageUrl.hashCode().toLong()
             }
-            imageView.image = gifImage
+            imageView.updateGifImage(gifImage)
         },
     )
+}
+
+private fun UIImageView.updateGifImage(image: UIImage?) {
+    if (this.image != image) {
+        stopAnimating()
+        this.image = image
+    }
+    if (image != null) {
+        startAnimating()
+    }
 }
 
 private fun cachedGifImage(imageUrl: String): UIImage? {

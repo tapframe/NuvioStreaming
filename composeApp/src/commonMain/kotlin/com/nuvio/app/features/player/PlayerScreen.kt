@@ -1516,12 +1516,15 @@ fun PlayerScreen(
                             totalDy += delta.y
 
                             if (gestureMode == null) {
+                                val holdToSpeedActive = isHoldToSpeedGestureActiveState.value
                                 val horizontalDominant =
-                                    !isHoldToSpeedGestureActiveState.value &&
+                                    !holdToSpeedActive &&
                                         abs(totalDx) > viewConfiguration.touchSlop &&
                                         abs(totalDx) > abs(totalDy)
                                 val verticalDominant =
-                                    abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
+                                    !holdToSpeedActive &&
+                                        abs(totalDy) > viewConfiguration.touchSlop &&
+                                        abs(totalDy) > abs(totalDx)
 
                                 gestureMode = when {
                                     horizontalDominant -> {
