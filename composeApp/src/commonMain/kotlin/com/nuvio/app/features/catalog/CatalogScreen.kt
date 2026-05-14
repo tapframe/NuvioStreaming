@@ -33,7 +33,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,17 +43,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
-import coil3.compose.AsyncImage
-import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioBackButton
-import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
-import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.home.MetaPreview
-import com.nuvio.app.features.home.HomeCatalogSettingsRepository
-import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.stableKey
+import com.nuvio.app.features.home.components.HomePosterCard
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -72,17 +68,20 @@ fun CatalogScreen(
     genre: String? = null,
     onBack: () -> Unit,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by CatalogRepository.uiState.collectAsStateWithLifecycle()
-    val homeCatalogSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
-    val posterCardStyle = rememberPosterCardStyleUiState()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var observedOfflineState by remember { mutableStateOf(false) }
 
-    LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination, homeCatalogSettingsUiState.hideUnreleasedContent) {
+    LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination) {
         CatalogRepository.load(
             manifestUrl = manifestUrl,
             type = type,
@@ -110,7 +109,7 @@ fun CatalogScreen(
         when (networkStatusUiState.condition) {
             NetworkCondition.NoInternet,
             NetworkCondition.ServersUnreachable,
-            -> {
+                -> {
                 observedOfflineState = true
             }
 
@@ -129,7 +128,7 @@ fun CatalogScreen(
 
             NetworkCondition.Unknown,
             NetworkCondition.Checking,
-            -> Unit
+                -> Unit
         }
     }
 
@@ -156,7 +155,7 @@ fun CatalogScreen(
             ) {
                 if (uiState.items.isEmpty() && uiState.isLoading) {
                     items(columns * 3) {
-                        CatalogSkeletonTile(cornerRadiusDp = posterCardStyle.cornerRadiusDp)
+                        CatalogSkeletonTile()
                     }
                 } else if (uiState.items.isEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
@@ -182,11 +181,14 @@ fun CatalogScreen(
                         key = { item -> item.lazyKey },
                     ) { keyedItem ->
                         val item = keyedItem.value
-                        CatalogPosterTile(
+                        HomePosterCard(
                             item = item,
-                            cornerRadiusDp = posterCardStyle.cornerRadiusDp,
-                            hideLabels = posterCardStyle.hideLabelsEnabled,
+                            isWatched = WatchingState.isPosterWatched(
+                                watchedKeys = watchedUiState.watchedKeys,
+                                item = item,
+                            ),
                             onClick = onPosterClick?.let { { it(item) } },
+                            onLongClick = onPosterLongClick?.let { { it(item) } },
                         )
                     }
                     if (uiState.isLoading) {
@@ -252,63 +254,12 @@ private fun CatalogHeader(
 }
 
 @Composable
-private fun CatalogPosterTile(
-    item: MetaPreview,
-    cornerRadiusDp: Int,
-    hideLabels: Boolean,
-    onClick: (() -> Unit)? = null,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(item.posterShape.catalogAspectRatio())
-                .clip(RoundedCornerShape(cornerRadiusDp.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .posterCardClickable(onClick = onClick, onLongClick = null),
-        ) {
-            if (item.poster != null) {
-                AsyncImage(
-                    model = item.poster,
-                    contentDescription = item.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                )
-            }
-        }
-        if (!hideLabels) {
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val detail = item.releaseInfo?.let { formatReleaseDateForDisplay(it) }
-            if (detail != null) {
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun CatalogSkeletonTile(cornerRadiusDp: Int) {
+private fun CatalogSkeletonTile() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(0.68f)
-            .clip(RoundedCornerShape(cornerRadiusDp.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surface),
     )
 }
@@ -362,13 +313,6 @@ private fun CatalogLoadingFooter() {
         )
     }
 }
-
-private fun PosterShape.catalogAspectRatio(): Float =
-    when (this) {
-        PosterShape.Poster -> 0.68f
-        PosterShape.Square -> 1f
-        PosterShape.Landscape -> 1.2f
-    }
 
 private fun catalogGridColumnsForWidth(screenWidth: Dp): Int =
     when {
