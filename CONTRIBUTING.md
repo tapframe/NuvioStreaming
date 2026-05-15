@@ -2,33 +2,84 @@
 
 Thanks for helping improve Nuvio.
 
-## Strict rules — read before opening anything
+## Strict rules - read before opening anything
 
 These rules are enforced strictly. Issues and PRs that do not follow them will be closed without review.
 
 ---
 
-## PR policy
+## What PRs are for
 
-Pull requests are currently intended for:
+Pull requests are accepted only when they fit one of these categories:
 
-- Reproducible bug fixes
-- Small stability improvements
-- Minor maintenance work
+- Reproducible bug fixes for documented issues
+- UI glitch fixes for visible bugs or regressions, with before/after proof
+- Behavior bug fixes that restore expected behavior without changing product direction
+- Small maintenance work that does not change UI, UX, behavior, dependencies, architecture, or public contracts
 - Small documentation fixes that improve accuracy
-- Translation updates
+- Translation/localization updates
 
-Pull requests are generally **not** accepted for:
+Pull requests are not accepted for:
 
 - New major features
 - Product direction changes
-- Large UX / UI redesigns
-- Cosmetic-only changes
-- Refactors without a clear user-facing or maintenance benefit
+- UX/UI redesigns
+- Cosmetic-only UI changes
+- "Minor polish" changes to colors, spacing, typography, icons, copy, layout, animations, or visual style
+- Behavior changes that are not tied to a reproducible bug or approved feature request
+- Refactors without a clear maintenance need
+- Dependency additions or architecture changes without prior approval
 
 Translation PRs are allowed, as long as they stay focused on translation/localization work and do not bundle unrelated feature or UI changes.
 
-### Large PRs and large changes
+---
+
+## UI changes
+
+Do not open a pull request for a UI change just because it looks better, cleaner, more modern, or more consistent to you.
+
+UI PRs are accepted only when they fix a specific, documented glitch or bug, such as:
+
+- Broken layout
+- Overlapping or clipped text
+- Unreadable content
+- Incorrect visual state
+- Navigation, gesture, or focus glitches
+- A visible regression from a previous version
+- A crash, blank screen, or unusable screen caused by UI code
+
+Every UI PR must include:
+
+- A linked bug issue
+- A short explanation of the exact glitch being fixed
+- Before and after screenshots or a short video
+- The smallest possible change that fixes the glitch
+
+Cosmetic-only UI PRs will be closed, even if the change is small.
+
+---
+
+## Behavior changes
+
+Behavior includes, but is not limited to, playback, stream/source selection, resume state, watched state, search, sync, settings defaults, navigation, gestures, error handling, caching, networking, storage, downloads, offline behavior, and account-related flows.
+
+Do not open a PR that changes behavior unless one of these is true:
+
+- It fixes a linked, reproducible bug or regression and restores the intended behavior.
+- It links an approved feature request where a maintainer explicitly approved implementation.
+
+Behavior PRs must explain:
+
+- The old behavior
+- The broken or unwanted behavior
+- The new behavior
+- How the behavior was tested
+
+Minor behavior tweaks are still behavior changes. They need the same issue link or approval.
+
+---
+
+## Large PRs and large changes
 
 **Any large PR or change that is not a simple bug fix must be discussed and approved via a feature request issue first.**
 
@@ -38,7 +89,9 @@ Translation PRs are allowed, as long as they stay focused on translation/localiz
 
 PRs that introduce large changes without a linked, approved feature request **will not be reviewed at all** and will be closed immediately. No exceptions.
 
-This applies to — but is not limited to — UI changes, new features, architecture changes, dependency additions, and large refactors.
+This applies to UI changes, behavior changes, new features, architecture changes, dependency additions, large refactors, migrations, and changes that affect product direction.
+
+Approval means a maintainer has clearly said the implementation is approved. A feature request being open, popular, or labeled `enhancement` is not approval.
 
 ---
 
@@ -100,14 +153,26 @@ Opening a feature request does **not** mean a pull request will be accepted for 
 
 Please make sure your PR is all of the following:
 
-- Small in scope
-- Focused on one problem
+- Allowed by this policy
+- Small in scope and focused on one problem
 - Clearly aligned with the current direction of the project
-- Not cosmetic-only, unless it is a translation PR
-- Not a new major feature unless it was discussed and approved first
-- **If large or non-trivial: linked to an approved feature request issue**
+- Not cosmetic-only
+- Not changing behavior unless it fixes a linked bug or has explicit approval
+- Not changing UI unless it fixes a linked glitch/bug and includes visual proof
+- Not bundling refactors, cleanups, or drive-by changes with a bug fix
+- Tested manually and/or automatically in a way that matches the risk
+- Linked to an approved feature request issue if large, directional, or non-trivial
 
-PRs that do not fit this policy will be closed without merge so review time can stay focused on bugs, regressions, and small improvements.
+PRs will be closed without review if they:
+
+- Are cosmetic-only UI changes
+- Change behavior without a linked bug or approved feature request
+- Change UI without screenshots/video
+- Bundle unrelated changes
+- Leave the PR template incomplete
+- Add dependencies, architecture changes, or broad refactors without approval
+
+Review time is reserved for bugs, regressions, stability, translations, documentation accuracy, and approved work.
 
 ---
 

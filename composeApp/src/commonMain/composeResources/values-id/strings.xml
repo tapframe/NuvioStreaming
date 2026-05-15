@@ -1111,6 +1111,7 @@
     <string name="external_player_failed">Tidak dapat membuka player eksternal</string>
     <string name="external_player_not_configured">Pilih player eksternal terlebih dahulu di pengaturan</string>
     <string name="external_player_unavailable">Tidak ada player eksternal yang tersedia</string>
+    <string name="streams_torrent_not_supported">Jenis stream ini tidak didukung</string>
     <string name="trailer_close">Tutup trailer</string>
     <string name="trailer_unable_to_play">Tidak dapat memutar trailer</string>
     <string name="trakt_lists_load_failed">Gagal memuat daftar Trakt</string>

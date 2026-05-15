@@ -145,16 +145,49 @@ class StreamAutoPlaySelectorTest {
         assertNull(selected)
     }
 
+    @Test
+    fun `first stream mode can select direct debrid candidate without resolved URL`() {
+        val directDebrid = stream(
+            addonName = "Torbox Instant",
+            url = null,
+            name = "TB Instant",
+            directDebrid = true,
+        )
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(directDebrid),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = emptySet(),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+
+        assertEquals(directDebrid, selected)
+    }
+
     private fun stream(
         addonName: String,
         url: String? = null,
         name: String? = null,
         bingeGroup: String? = null,
+        directDebrid: Boolean = false,
     ): StreamItem = StreamItem(
         name = name,
         url = url,
         addonName = addonName,
         addonId = addonName,
+        clientResolve = if (directDebrid) {
+            StreamClientResolve(
+                type = "debrid",
+                service = "torbox",
+                isCached = true,
+                infoHash = "hash",
+            )
+        } else {
+            null
+        },
         behaviorHints = StreamBehaviorHints(
             bingeGroup = bingeGroup,
         ),

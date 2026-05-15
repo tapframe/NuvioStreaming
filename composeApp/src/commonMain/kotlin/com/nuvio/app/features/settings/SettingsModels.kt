@@ -13,6 +13,7 @@ import nuvio.composeapp.generated.resources.compose_settings_page_account
 import nuvio.composeapp.generated.resources.compose_settings_page_addons
 import nuvio.composeapp.generated.resources.compose_settings_page_appearance
 import nuvio.composeapp.generated.resources.compose_settings_page_content_discovery
+import nuvio.composeapp.generated.resources.compose_settings_page_debrid
 import nuvio.composeapp.generated.resources.compose_settings_page_continue_watching
 import nuvio.composeapp.generated.resources.compose_settings_page_homescreen
 import nuvio.composeapp.generated.resources.compose_settings_page_integrations
@@ -126,6 +127,11 @@ internal enum class SettingsPage(
     ),
     MdbListRatings(
         titleRes = Res.string.compose_settings_page_mdblist_ratings,
+        category = SettingsCategory.General,
+        parentPage = Integrations,
+    ),
+    Debrid(
+        titleRes = Res.string.compose_settings_page_debrid,
         category = SettingsCategory.General,
         parentPage = Integrations,
     ),

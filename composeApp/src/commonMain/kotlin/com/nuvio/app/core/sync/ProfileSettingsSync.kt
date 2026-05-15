@@ -6,6 +6,8 @@ import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.SupabaseProvider
 import com.nuvio.app.features.collection.CollectionMobileSettingsRepository
 import com.nuvio.app.features.collection.CollectionMobileSettingsStorage
+import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.debrid.DebridSettingsStorage
 import com.nuvio.app.features.details.MetaScreenSettingsStorage
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.mdblist.MdbListMetadataService
@@ -157,6 +159,7 @@ object ProfileSettingsSync {
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.map { "liquid_glass_tab_bar" },
             PosterCardStyleRepository.uiState.map { "poster_card_style" },
             PlayerSettingsRepository.uiState.map { "player" },
+            DebridSettingsRepository.uiState.map { "debrid" },
             TmdbSettingsRepository.uiState.map { "tmdb" },
             MdbListSettingsRepository.uiState.map { "mdblist" },
             MetaScreenSettingsRepository.uiState.map { "meta" },
@@ -202,6 +205,7 @@ object ProfileSettingsSync {
                 themeSettings = ThemeSettingsStorage.exportToSyncPayload(),
                 posterCardStyleSettingsPayload = PosterCardStyleStorage.loadPayload().orEmpty().trim(),
                 playerSettings = PlayerSettingsStorage.exportToSyncPayload(),
+                debridSettings = DebridSettingsStorage.exportToSyncPayload(),
                 tmdbSettings = TmdbSettingsStorage.exportToSyncPayload(),
                 mdbListSettings = MdbListSettingsStorage.exportToSyncPayload(),
                 metaScreenSettingsPayload = MetaScreenSettingsStorage.loadPayload().orEmpty().trim(),
@@ -225,6 +229,9 @@ object ProfileSettingsSync {
 
         PlayerSettingsStorage.replaceFromSyncPayload(blob.features.playerSettings)
         PlayerSettingsRepository.onProfileChanged()
+
+        DebridSettingsStorage.replaceFromSyncPayload(blob.features.debridSettings)
+        DebridSettingsRepository.onProfileChanged()
 
         TmdbSettingsStorage.replaceFromSyncPayload(blob.features.tmdbSettings)
         TmdbSettingsRepository.onProfileChanged()
@@ -255,6 +262,7 @@ object ProfileSettingsSync {
         ThemeSettingsRepository.ensureLoaded()
         PosterCardStyleRepository.ensureLoaded()
         PlayerSettingsRepository.ensureLoaded()
+        DebridSettingsRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
         MdbListSettingsRepository.ensureLoaded()
         MetaScreenSettingsRepository.ensureLoaded()
@@ -277,6 +285,7 @@ object ProfileSettingsSync {
         "liquid_glass_tab_bar=${ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.value}",
         "poster_card_style=${PosterCardStyleRepository.uiState.value}",
         "player=${PlayerSettingsRepository.uiState.value}",
+        "debrid=${DebridSettingsRepository.uiState.value}",
         "tmdb=${TmdbSettingsRepository.uiState.value}",
         "mdblist=${MdbListSettingsRepository.uiState.value}",
         "meta=${MetaScreenSettingsRepository.uiState.value}",
@@ -299,6 +308,7 @@ private data class MobileProfileSettingsFeatures(
     @SerialName("theme_settings") val themeSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("poster_card_style_settings_payload") val posterCardStyleSettingsPayload: String = "",
     @SerialName("player_settings") val playerSettings: JsonObject = JsonObject(emptyMap()),
+    @SerialName("debrid_settings") val debridSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("tmdb_settings") val tmdbSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("mdblist_settings") val mdbListSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("meta_screen_settings_payload") val metaScreenSettingsPayload: String = "",
