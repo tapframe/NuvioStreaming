@@ -13,6 +13,7 @@ import com.nuvio.app.core.auth.AuthStorage
 import com.nuvio.app.core.deeplink.handleAppUrl
 import com.nuvio.app.core.storage.PlatformLocalAccountDataCleaner
 import com.nuvio.app.features.addons.AddonStorage
+import com.nuvio.app.features.collection.CollectionMobileSettingsStorage
 import com.nuvio.app.features.collection.CollectionStorage
 import com.nuvio.app.features.downloads.DownloadsLiveStatusPlatform
 import com.nuvio.app.features.downloads.DownloadsPlatformDownloader
@@ -24,6 +25,7 @@ import com.nuvio.app.features.mdblist.MdbListSettingsStorage
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationPlatform
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsStorage
 import com.nuvio.app.features.player.PlayerSettingsStorage
+import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerPictureInPictureManager
 import com.nuvio.app.features.plugins.PluginStorage
 import com.nuvio.app.features.profiles.AvatarStorage
@@ -35,6 +37,7 @@ import com.nuvio.app.features.settings.ThemeSettingsStorage
 import com.nuvio.app.features.trakt.TraktAuthStorage
 import com.nuvio.app.features.trakt.TraktCommentsStorage
 import com.nuvio.app.features.trakt.TraktLibraryStorage
+import com.nuvio.app.features.trakt.TraktSettingsStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsStorage
 import com.nuvio.app.features.updater.AndroidAppUpdaterPlatform
 import com.nuvio.app.core.ui.PosterCardStyleStorage
@@ -63,6 +66,7 @@ class MainActivity : AppCompatActivity() {
         MetaScreenSettingsStorage.initialize(applicationContext)
         HomeCatalogSettingsStorage.initialize(applicationContext)
         PlayerSettingsStorage.initialize(applicationContext)
+        ExternalPlayerPlatform.initialize(applicationContext)
         ProfileStorage.initialize(applicationContext)
         AvatarStorage.initialize(applicationContext)
         ProfilePinCacheStorage.initialize(applicationContext)
@@ -74,6 +78,7 @@ class MainActivity : AppCompatActivity() {
         TraktAuthStorage.initialize(applicationContext)
         TraktCommentsStorage.initialize(applicationContext)
         TraktLibraryStorage.initialize(applicationContext)
+        TraktSettingsStorage.initialize(applicationContext)
         ContinueWatchingPreferencesStorage.initialize(applicationContext)
         ResumePromptStorage.initialize(applicationContext)
         ContinueWatchingEnrichmentStorage.initialize(applicationContext)
@@ -81,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         WatchProgressStorage.initialize(applicationContext)
         StreamLinkCacheStorage.initialize(applicationContext)
         PluginStorage.initialize(applicationContext)
+        CollectionMobileSettingsStorage.initialize(applicationContext)
         CollectionStorage.initialize(applicationContext)
         DownloadsStorage.initialize(applicationContext)
         DownloadsPlatformDownloader.initialize(applicationContext)

@@ -78,6 +78,8 @@ import nuvio.composeapp.generated.resources.settings_meta_episode_style_list
 import nuvio.composeapp.generated.resources.settings_meta_episode_style_list_description
 import nuvio.composeapp.generated.resources.settings_meta_episodes
 import nuvio.composeapp.generated.resources.settings_meta_episodes_description
+import nuvio.composeapp.generated.resources.settings_meta_blur_unwatched_episodes
+import nuvio.composeapp.generated.resources.settings_meta_blur_unwatched_episodes_description
 import nuvio.composeapp.generated.resources.settings_meta_group_label
 import nuvio.composeapp.generated.resources.settings_meta_more_like_this
 import nuvio.composeapp.generated.resources.settings_meta_more_like_this_description
@@ -129,6 +131,14 @@ internal fun LazyListScope.metaScreenSettingsContent(
                     isTablet = isTablet,
                     selectedStyle = uiState.episodeCardStyle,
                     onStyleSelected = MetaScreenSettingsRepository::setEpisodeCardStyle,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_meta_blur_unwatched_episodes),
+                    description = stringResource(Res.string.settings_meta_blur_unwatched_episodes_description),
+                    checked = uiState.blurUnwatchedEpisodes,
+                    isTablet = isTablet,
+                    onCheckedChange = { MetaScreenSettingsRepository.setBlurUnwatchedEpisodes(it) },
                 )
             }
         }

@@ -5,22 +5,26 @@ import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.features.addons.AddonCatalog
 import com.nuvio.app.features.addons.AddonExtraProperty
 import com.nuvio.app.features.addons.ManagedAddon
+import com.nuvio.app.features.catalog.CatalogPage
 import com.nuvio.app.features.catalog.buildCatalogUrl
 import com.nuvio.app.features.catalog.fetchCatalogPage
 import com.nuvio.app.features.catalog.mergeCatalogItems
 import com.nuvio.app.features.catalog.supportsPagination
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.home.filterReleasedItems
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -37,6 +41,7 @@ object SearchRepository {
     private var activeDiscoverJob: Job? = null
     private var lastRequestKey: String? = null
     private var discoverSources: List<DiscoverCatalogOption> = emptyList()
+    private var lastDiscoverHideUnreleasedContent: Boolean? = null
 
     fun search(query: String, addons: List<ManagedAddon>) {
         val normalizedQuery = query.trim()
@@ -71,6 +76,8 @@ object SearchRepository {
         val requestKey = buildString {
             append(normalizedQuery.lowercase())
             append('|')
+            append(HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent)
+            append('|')
             append(
                 requests.joinToString(separator = "|") { request ->
                     "${request.addon.manifestUrl}:${request.type}:${request.catalogId}"
@@ -84,16 +91,57 @@ object SearchRepository {
         _uiState.value = SearchUiState(isLoading = true)
 
         activeJob = scope.launch {
-            val results = requests.map { request ->
-                async {
+            val resultChannel = Channel<IndexedSearchResult>(Channel.UNLIMITED)
+            val jobs = requests.mapIndexed { index, request ->
+                launch {
                     runCatching { request.toSection() }
+                        .fold(
+                            onSuccess = { section ->
+                                resultChannel.send(
+                                    IndexedSearchResult(
+                                        index = index,
+                                        section = section,
+                                    ),
+                                )
+                            },
+                            onFailure = { error ->
+                                if (error is CancellationException) throw error
+                                resultChannel.send(
+                                    IndexedSearchResult(
+                                        index = index,
+                                        error = error,
+                                    ),
+                                )
+                            },
+                        )
                 }
-            }.awaitAll()
+            }
+            val closeChannelJob = launch {
+                jobs.joinAll()
+                resultChannel.close()
+            }
+            val results = arrayOfNulls<IndexedSearchResult>(requests.size)
 
-            val sections = results
-                .mapNotNull { it.getOrNull() }
-            val firstFailure = results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
-            val allFailed = results.isNotEmpty() && results.all { it.isFailure }
+            try {
+                for (result in resultChannel) {
+                    results[result.index] = result
+                    val sections = results.orderedSections()
+                    if (sections.isNotEmpty()) {
+                        _uiState.value = SearchUiState(
+                            isLoading = true,
+                            sections = sections,
+                        )
+                    }
+                }
+            } finally {
+                closeChannelJob.cancel()
+                resultChannel.close()
+            }
+
+            val completedResults = results.filterNotNull()
+            val sections = results.orderedSections()
+            val firstFailure = completedResults.firstNotNullOfOrNull { it.error?.message }
+            val allFailed = completedResults.isNotEmpty() && completedResults.all { it.error != null }
 
             _uiState.value = SearchUiState(
                 isLoading = false,
@@ -119,6 +167,7 @@ object SearchRepository {
         activeDiscoverJob?.cancel()
         lastRequestKey = null
         discoverSources = emptyList()
+        lastDiscoverHideUnreleasedContent = null
         _uiState.value = SearchUiState()
         _discoverUiState.value = DiscoverUiState()
     }
@@ -128,6 +177,7 @@ object SearchRepository {
         if (activeAddons.isEmpty()) {
             activeDiscoverJob?.cancel()
             discoverSources = emptyList()
+            lastDiscoverHideUnreleasedContent = null
             log.d { "Discover refresh aborted: no active addons" }
             _discoverUiState.value = DiscoverUiState(
                 emptyStateReason = DiscoverEmptyStateReason.NoActiveAddons,
@@ -137,7 +187,12 @@ object SearchRepository {
 
         val sources = buildDiscoverSources(activeAddons)
         val current = _discoverUiState.value
-        if (sources == discoverSources && current.canReuseDiscoverState(sources)) {
+        val hideUnreleasedContent = HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent
+        if (
+            sources == discoverSources &&
+            lastDiscoverHideUnreleasedContent == hideUnreleasedContent &&
+            current.canReuseDiscoverState(sources)
+        ) {
             log.d {
                 "Reusing discover state type=${current.selectedType} catalog=${current.selectedCatalogKey} " +
                     "genre=${current.selectedGenre ?: "<all>"} items=${current.items.size} nextSkip=${current.nextSkip}"
@@ -146,6 +201,7 @@ object SearchRepository {
         }
 
         discoverSources = sources
+        lastDiscoverHideUnreleasedContent = hideUnreleasedContent
         if (sources.isEmpty()) {
             activeDiscoverJob?.cancel()
             log.d { "Discover refresh found no compatible discover catalogs" }
@@ -310,7 +366,7 @@ object SearchRepository {
             type = type,
             catalogId = catalogId,
             search = query,
-        )
+        ).withUnreleasedFilter()
         val items = page.items
         require(items.isNotEmpty()) { "No search results returned for $catalogName." }
 
@@ -364,7 +420,7 @@ object SearchRepository {
                     catalogId = selectedCatalog.catalogId,
                     genre = current.selectedGenre,
                     skip = requestedSkip.takeIf { it > 0 },
-                )
+                ).withUnreleasedFilter()
             }.fold(
                 onSuccess = { page ->
                     val latest = _discoverUiState.value
@@ -419,6 +475,21 @@ object SearchRepository {
             )
         }
     }
+}
+
+private data class IndexedSearchResult(
+    val index: Int,
+    val section: HomeCatalogSection? = null,
+    val error: Throwable? = null,
+)
+
+private fun Array<IndexedSearchResult?>.orderedSections(): List<HomeCatalogSection> =
+    mapNotNull { result -> result?.section }
+
+private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
+    if (!HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) return this
+    val filteredItems = items.filterReleasedItems(CurrentDateProvider.todayIsoDate())
+    return if (filteredItems.size == items.size) this else copy(items = filteredItems)
 }
 
 private data class SearchCatalogRequest(

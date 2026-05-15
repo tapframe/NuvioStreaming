@@ -304,6 +304,9 @@ private fun ProfileAvatarCard(
     val avatarItem = remember(profile.avatarId, avatars) {
         profile.avatarId?.let { id -> avatars.find { it.id == id } }
     }
+    val avatarImageUrl = remember(profile.avatarUrl, avatarItem) {
+        profileAvatarImageUrl(profile, avatarItem)
+    }
 
     val animAlpha = remember { Animatable(0f) }
     val animScale = remember { Animatable(0.85f) }
@@ -342,8 +345,8 @@ private fun ProfileAvatarCard(
             modifier = Modifier.size(110.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (avatarItem != null) {
-                val bgColor = avatarItem.bgColor?.let { parseHexColor(it) } ?: avatarColor
+            if (avatarImageUrl != null) {
+                val bgColor = avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
                 Box(
                     modifier = Modifier
                         .size(110.dp)
@@ -364,15 +367,15 @@ private fun ProfileAvatarCard(
                         },
                     )
                     .then(
-                        if (avatarItem == null) Modifier.border(2.dp, avatarColor.copy(alpha = 0.4f), CircleShape)
+                        if (avatarImageUrl == null) Modifier.border(2.dp, avatarColor.copy(alpha = 0.4f), CircleShape)
                         else Modifier,
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (avatarItem != null) {
+                if (avatarImageUrl != null) {
                     AsyncImage(
-                        model = avatarStorageUrl(avatarItem.storagePath),
-                        contentDescription = avatarItem.displayName,
+                        model = avatarImageUrl,
+                        contentDescription = avatarItem?.displayName ?: profile.name,
                         modifier = Modifier.size(100.dp).clip(CircleShape),
                         contentScale = ContentScale.Crop,
                     )

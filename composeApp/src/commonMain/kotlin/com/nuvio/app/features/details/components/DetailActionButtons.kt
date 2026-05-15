@@ -13,11 +13,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +41,7 @@ fun DetailActionButtons(
     onPlayClick: () -> Unit = {},
     onPlayLongClick: (() -> Unit)? = null,
     onSaveClick: () -> Unit = {},
+    onSaveLongClick: (() -> Unit)? = null,
 ) {
     val playPainter = appIconPainter(AppIconResource.PlayerPlay)
     val libraryAddPainter = appIconPainter(AppIconResource.LibraryAddPlus)
@@ -96,35 +94,49 @@ fun DetailActionButtons(
             }
         }
 
-        OutlinedButton(
-            onClick = onSaveClick,
+        Surface(
             modifier = rowButtonModifier.height(50.dp),
             shape = RoundedCornerShape(40.dp),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ) {
-            if (isSaved) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            } else {
-                Icon(
-                    painter = libraryAddPainter,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurface,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = onSaveClick,
+                        onLongClick = onSaveLongClick,
+                        role = Role.Button,
+                    )
+                    .height(50.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (isSaved) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                } else {
+                    Icon(
+                        painter = libraryAddPainter,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = saveLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = saveLabel,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

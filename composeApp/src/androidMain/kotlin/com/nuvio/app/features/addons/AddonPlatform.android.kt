@@ -210,6 +210,7 @@ actual suspend fun httpRequestRaw(
     url: String,
     headers: Map<String, String>,
     body: String,
+    followRedirects: Boolean,
 ): RawHttpResponse =
     withContext(Dispatchers.IO) {
         val normalizedMethod = method.uppercase()
@@ -228,7 +229,16 @@ actual suspend fun httpRequestRaw(
             builder.method(normalizedMethod, null)
         }.build()
 
-        addonHttpClient.newCall(request).execute().use { response ->
+        val client = if (followRedirects) {
+            addonHttpClient
+        } else {
+            addonHttpClient.newBuilder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .build()
+        }
+
+        client.newCall(request).execute().use { response ->
             RawHttpResponse(
                 status = response.code,
                 statusText = response.message,

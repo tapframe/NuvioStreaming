@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
@@ -46,11 +47,14 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.player.AudioLanguageOption
 import com.nuvio.app.features.player.AvailableLanguageOptions
+import com.nuvio.app.features.player.ExternalPlayerApp
+import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.formatPlaybackSpeedLabel
@@ -64,6 +68,7 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 internal fun LazyListScope.playbackSettingsContent(
     isTablet: Boolean,
@@ -103,6 +108,47 @@ internal fun LazyListScope.playbackSettingsContent(
     }
 }
 
+private fun formatStep(value: Float): String {
+    return if (value % 1f == 0f) {
+        value.toInt().toString()
+    } else {
+        value.toString()
+    }
+}
+
+fun snapToStep(value: Float, step: Float): Float {
+    return (value / step).roundToInt() * step
+}
+
+fun calculateSteps(
+    min: Float,
+    max: Float,
+    stepSize: Float
+): Int {
+    val totalSteps = ((max - min) / stepSize).roundToInt()
+    return (totalSteps - 1).coerceAtLeast(0)
+}
+
+@Composable
+fun ValueBox(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        Text(
+            text = text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
 @Composable
 private fun PlaybackSettingsSection(
     isTablet: Boolean,
@@ -125,6 +171,7 @@ private fun PlaybackSettingsSection(
     var showSecondaryAudioDialog by remember { mutableStateOf(false) }
     var showPreferredSubtitleDialog by remember { mutableStateOf(false) }
     var showSecondarySubtitleDialog by remember { mutableStateOf(false) }
+    var showExternalPlayerDialog by remember { mutableStateOf(false) }
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showDecoderPriorityDialog by remember { mutableStateOf(false) }
     var showHoldToSpeedValueDialog by remember { mutableStateOf(false) }
@@ -136,6 +183,10 @@ private fun PlaybackSettingsSection(
     var showAutoPlayRegexDialog by remember { mutableStateOf(false) }
     val pluginsEnabled = AppFeaturePolicy.pluginsEnabled
     val autoPlayPlayerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val availableExternalPlayers = ExternalPlayerPlatform.availablePlayers()
+    val selectedExternalPlayer = availableExternalPlayers.firstOrNull {
+        it.id == autoPlayPlayerSettings.externalPlayerId
+    }
     val addonUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val pluginUiState = if (pluginsEnabled) {
         val state by PluginRepository.uiState.collectAsStateWithLifecycle()
@@ -161,6 +212,39 @@ private fun PlaybackSettingsSection(
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setShowLoadingOverlay,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_external_player),
+                    description = stringResource(
+                        if (isIos) {
+                            Res.string.settings_playback_external_player_description_ios
+                        } else {
+                            Res.string.settings_playback_external_player_description_android
+                        },
+                    ),
+                    checked = autoPlayPlayerSettings.externalPlayerEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        PlayerSettingsRepository.setExternalPlayerEnabled(enabled)
+                        if (enabled && isIos) {
+                            showExternalPlayerDialog = true
+                        }
+                    },
+                )
+                if (isIos && autoPlayPlayerSettings.externalPlayerEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_external_player_app),
+                        description = selectedExternalPlayer?.name
+                            ?: if (availableExternalPlayers.isEmpty()) {
+                                stringResource(Res.string.settings_playback_external_player_none_available)
+                            } else {
+                                stringResource(Res.string.settings_playback_not_set)
+                            },
+                        isTablet = isTablet,
+                        onClick = { showExternalPlayerDialog = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_playback_hold_to_speed),
@@ -285,10 +369,9 @@ private fun PlaybackSettingsSection(
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                 Text(
                                     text = stringResource(Res.string.settings_playback_stream_timeout),
                                     style = MaterialTheme.typography.bodyLarge,
@@ -296,26 +379,22 @@ private fun PlaybackSettingsSection(
                                 )
                                 Text(
                                     text = stringResource(Res.string.settings_playback_stream_timeout_description),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Text(
-                                text = timeoutLabel,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                            ValueBox(text = timeoutLabel, modifier = Modifier.wrapContentWidth())
                         }
                         var sliderValue by remember(timeoutSec) { mutableFloatStateOf(timeoutSec.toFloat()) }
-                        var lastHapticStep by remember(timeoutSec) { mutableStateOf(timeoutSec) }
+                        var lastHapticStep by remember(timeoutSec) { mutableStateOf(timeoutSec.toFloat()) }
                         Slider(
                             value = sliderValue,
                             onValueChange = {
-                                sliderValue = it
-                                val steppedValue = it.toInt()
-                                if (steppedValue != lastHapticStep) {
-                                    lastHapticStep = steppedValue
+                                val snapped = snapToStep(it, 1f)
+                                sliderValue = snapped
+
+                                if (snapped != lastHapticStep) {
+                                    lastHapticStep = snapped
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 }
                             },
@@ -323,7 +402,7 @@ private fun PlaybackSettingsSection(
                                 PlayerSettingsRepository.setStreamAutoPlayTimeoutSeconds(sliderValue.toInt())
                             },
                             valueRange = 0f..11f,
-                            steps = 10,
+                            steps = calculateSteps(0f, 11f, 1f),
                             colors = SliderDefaults.colors(
                                 thumbColor = MaterialTheme.colorScheme.primary,
                                 activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -556,10 +635,9 @@ private fun PlaybackSettingsSection(
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                     Text(
                                         text = stringResource(Res.string.settings_playback_threshold_percentage),
                                         style = MaterialTheme.typography.bodyLarge,
@@ -567,37 +645,32 @@ private fun PlaybackSettingsSection(
                                     )
                                     Text(
                                         text = stringResource(Res.string.settings_playback_threshold_percentage_description),
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = stringResource(
-                                        Res.string.settings_playback_threshold_percentage_value,
-                                        thresholdPercent.toInt(),
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                ValueBox(text = stringResource(
+                                    Res.string.settings_playback_threshold_percentage_value,
+                                    formatStep(thresholdPercent)), modifier = Modifier.wrapContentWidth())
                             }
-                            var sliderVal by remember(thresholdPercent) { mutableFloatStateOf(thresholdPercent) }
-                            var lastHapticPercent by remember(thresholdPercent) { mutableStateOf(thresholdPercent.toInt()) }
+                            var sliderValue by remember(thresholdPercent) { mutableFloatStateOf(thresholdPercent) }
+                            var lastHapticPercent by remember(thresholdPercent) { mutableStateOf(thresholdPercent) }
                             Slider(
-                                value = sliderVal,
+                                value = sliderValue,
                                 onValueChange = {
-                                    sliderVal = it
-                                    val stepped = it.toInt()
-                                    if (stepped != lastHapticPercent) {
-                                        lastHapticPercent = stepped
+                                    val snapped = snapToStep(it, 0.5f)
+                                    sliderValue = snapped
+
+                                    if (snapped != lastHapticPercent) {
+                                        lastHapticPercent = snapped
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     }
                                 },
                                 onValueChangeFinished = {
-                                    PlayerSettingsRepository.setNextEpisodeThresholdPercent(sliderVal)
+                                    PlayerSettingsRepository.setNextEpisodeThresholdPercent(sliderValue)
                                 },
-                                valueRange = 50f..100f,
-                                steps = 49,
+                                valueRange = 97f..100f,
+                                steps = calculateSteps(97f, 100f, 0.5f),
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -615,10 +688,9 @@ private fun PlaybackSettingsSection(
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                                     Text(
                                         text = stringResource(Res.string.settings_playback_minutes_before_end),
                                         style = MaterialTheme.typography.bodyLarge,
@@ -626,37 +698,32 @@ private fun PlaybackSettingsSection(
                                     )
                                     Text(
                                         text = stringResource(Res.string.settings_playback_minutes_before_end_description),
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Text(
-                                    text = stringResource(
+                                ValueBox(text = stringResource(
                                         Res.string.settings_playback_minutes_value,
-                                        thresholdMinutes.toInt(),
-                                    ),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
+                                        formatStep(thresholdMinutes)), modifier = Modifier.wrapContentWidth())
                             }
-                            var sliderVal by remember(thresholdMinutes) { mutableFloatStateOf(thresholdMinutes) }
-                            var lastHapticMin by remember(thresholdMinutes) { mutableStateOf(thresholdMinutes.toInt()) }
+                            var sliderValue by remember(thresholdMinutes) { mutableFloatStateOf(thresholdMinutes) }
+                            var lastHapticMin by remember(thresholdMinutes) { mutableStateOf(thresholdMinutes) }
                             Slider(
-                                value = sliderVal,
+                                value = sliderValue,
                                 onValueChange = {
-                                    sliderVal = it
-                                    val stepped = it.toInt()
-                                    if (stepped != lastHapticMin) {
-                                        lastHapticMin = stepped
+                                    val snapped = snapToStep(it, 0.5f)
+                                    sliderValue = snapped
+
+                                    if (snapped != lastHapticMin) {
+                                        lastHapticMin = snapped
                                         hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     }
                                 },
                                 onValueChangeFinished = {
-                                    PlayerSettingsRepository.setNextEpisodeThresholdMinutesBeforeEnd(sliderVal)
+                                    PlayerSettingsRepository.setNextEpisodeThresholdMinutesBeforeEnd(sliderValue)
                                 },
-                                valueRange = 1f..15f,
-                                steps = 13,
+                                valueRange = 0f..3.5f,
+                                steps = calculateSteps(0f, 3.5f, 0.5f),
                                 colors = SliderDefaults.colors(
                                     thumbColor = MaterialTheme.colorScheme.primary,
                                     activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -750,6 +817,18 @@ private fun PlaybackSettingsSection(
                 showReuseCacheDurationDialog = false
             },
             onDismiss = { showReuseCacheDurationDialog = false },
+        )
+    }
+
+    if (showExternalPlayerDialog) {
+        ExternalPlayerSelectionDialog(
+            players = availableExternalPlayers,
+            selectedPlayerId = autoPlayPlayerSettings.externalPlayerId,
+            onPlayerSelected = { playerId ->
+                PlayerSettingsRepository.setExternalPlayerId(playerId)
+                showExternalPlayerDialog = false
+            },
+            onDismiss = { showExternalPlayerDialog = false },
         )
     }
 
@@ -876,6 +955,100 @@ private data class LanguageSelectionOption(
     val value: String?,
     val label: String,
 )
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ExternalPlayerSelectionDialog(
+    players: List<ExternalPlayerApp>,
+    selectedPlayerId: String?,
+    onPlayerSelected: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_playback_external_player_app),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                if (players.isEmpty()) {
+                    Text(
+                        text = stringResource(Res.string.settings_playback_external_player_none_available),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        players.forEach { player ->
+                            val isSelected = player.id == selectedPlayerId
+                            val containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onPlayerSelected(player.id) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = containerColor,
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = player.name,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Box(
+                                        modifier = Modifier.size(24.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (isSelected) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(Res.string.settings_playback_dialog_close),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1960,27 +2133,16 @@ private fun IntroDbApiKeyDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (errorMessage != null) 1f else 0.3f)),
-                ) {
-                    BasicTextField(
-                        value = value,
-                        onValueChange = { 
-                            value = it 
-                            errorMessage = null
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        singleLine = true,
-                    )
-                }
+                SettingsSecretTextField(
+                    value = value,
+                    onValueChange = {
+                        value = it
+                        errorMessage = null
+                    },
+                    label = stringResource(Res.string.settings_playback_introdb_api_key),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = errorMessage != null,
+                )
                 if (errorMessage != null) {
                     Text(
                         text = errorMessage!!,
@@ -2162,4 +2324,3 @@ private fun libassRenderTypeRes(renderType: String): StringResource = when (rend
 
 @Composable
 private fun libassRenderTypeLabel(renderType: String): String = stringResource(libassRenderTypeRes(renderType))
-

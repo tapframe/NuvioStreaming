@@ -38,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Refresh
@@ -84,6 +85,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.launch
 import kotlin.math.round
@@ -114,10 +116,20 @@ fun StreamsScreen(
     manualSelection: Boolean = false,
     startFromBeginning: Boolean = false,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit = { _, _, _ -> },
+    onStreamActionOpen: (
+        stream: StreamItem,
+        openExternally: Boolean,
+        resumePositionMs: Long?,
+        resumeProgressFraction: Float?,
+    ) -> Unit = { _, _, _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by StreamsRepository.uiState.collectAsStateWithLifecycle()
+    val playerSettings by remember {
+        PlayerSettingsRepository.ensureLoaded()
+        PlayerSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
     val watchProgressUiState by remember {
         WatchProgressRepository.ensureLoaded()
         WatchProgressRepository.uiState
@@ -129,6 +141,7 @@ fun StreamsScreen(
     val clipboardManager = LocalClipboardManager.current
     val streamLinkCopiedText = stringResource(Res.string.streams_link_copied)
     val noDirectStreamLinkText = stringResource(Res.string.streams_no_direct_link)
+    val torrentUnsupportedText = stringResource(Res.string.streams_torrent_not_supported)
     var streamActionsTarget by remember(videoId) { mutableStateOf<StreamItem?>(null) }
     var preferredFilterApplied by remember(videoId) { mutableStateOf(false) }
     val storedProgress = if (startFromBeginning) {
@@ -159,7 +172,7 @@ fun StreamsScreen(
         }
     }
 
-    LaunchedEffect(type, videoId, manualSelection) {
+    LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection) {
         StreamsRepository.load(
             type = type,
             videoId = videoId,
@@ -205,7 +218,13 @@ fun StreamsScreen(
                 uiState = uiState,
                 resumePositionMs = effectiveResumePositionMs,
                 resumeProgressFraction = effectiveResumeProgressFraction,
-                onStreamSelected = onStreamSelected,
+                onStreamSelected = { stream, positionMs, progressFraction ->
+                    if (stream.isTorrentStream) {
+                        NuvioToastController.show(torrentUnsupportedText)
+                    } else {
+                        onStreamSelected(stream, positionMs, progressFraction)
+                    }
+                },
                 onStreamLongPress = { stream -> streamActionsTarget = stream },
             )
         } else {
@@ -220,7 +239,13 @@ fun StreamsScreen(
                 uiState = uiState,
                 resumePositionMs = effectiveResumePositionMs,
                 resumeProgressFraction = effectiveResumeProgressFraction,
-                onStreamSelected = onStreamSelected,
+                onStreamSelected = { stream, positionMs, progressFraction ->
+                    if (stream.isTorrentStream) {
+                        NuvioToastController.show(torrentUnsupportedText)
+                    } else {
+                        onStreamSelected(stream, positionMs, progressFraction)
+                    }
+                },
                 onStreamLongPress = { stream -> streamActionsTarget = stream },
             )
         }
@@ -310,6 +335,7 @@ fun StreamsScreen(
 
         StreamActionsSheet(
             stream = streamActionsTarget,
+            externalPlayerEnabled = playerSettings.externalPlayerEnabled,
             onDismiss = { streamActionsTarget = null },
             onCopyLink = { stream ->
                 val directUrl = stream.directPlaybackUrl
@@ -337,6 +363,14 @@ fun StreamsScreen(
                     stream = stream,
                 )
                 NuvioToastController.show(result.toastMessage())
+            },
+            onOpen = { stream, openExternally ->
+                onStreamActionOpen(
+                    stream,
+                    openExternally,
+                    effectiveResumePositionMs,
+                    effectiveResumeProgressFraction,
+                )
             },
         )
     }
@@ -830,7 +864,7 @@ private fun LazyListScope.streamSection(
             StreamCard(
                 stream = stream,
                 onClick = {
-                    if (stream.directPlaybackUrl != null) {
+                    if (stream.directPlaybackUrl != null || stream.isTorrentStream) {
                         onStreamSelected(stream, resumePositionMs, resumeProgressFraction)
                     }
                 },
@@ -936,7 +970,7 @@ private fun StreamCard(
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val isEnabled = stream.directPlaybackUrl != null
+    val isEnabled = stream.directPlaybackUrl != null || stream.isTorrentStream
     val cardShape = RoundedCornerShape(12.dp)
     Row(
         modifier = modifier
@@ -995,9 +1029,11 @@ private fun StreamCard(
 @Composable
 private fun StreamActionsSheet(
     stream: StreamItem?,
+    externalPlayerEnabled: Boolean,
     onDismiss: () -> Unit,
     onCopyLink: (StreamItem) -> Unit,
     onDownload: (StreamItem) -> Unit,
+    onOpen: (StreamItem, openExternally: Boolean) -> Unit,
 ) {
     if (stream == null) return
 
@@ -1050,6 +1086,23 @@ private fun StreamActionsSheet(
                 title = stringResource(Res.string.streams_copy_link),
                 onClick = {
                     onCopyLink(stream)
+                    coroutineScope.launch {
+                        dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                    }
+                },
+            )
+            NuvioBottomSheetDivider()
+            NuvioBottomSheetActionRow(
+                icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                title = stringResource(
+                    if (externalPlayerEnabled) {
+                        Res.string.streams_open_internal_player
+                    } else {
+                        Res.string.streams_open_external_player
+                    },
+                ),
+                onClick = {
+                    onOpen(stream, !externalPlayerEnabled)
                     coroutineScope.launch {
                         dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
                     }

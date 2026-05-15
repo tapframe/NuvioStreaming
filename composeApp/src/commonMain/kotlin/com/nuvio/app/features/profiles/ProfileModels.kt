@@ -12,6 +12,7 @@ data class NuvioProfile(
     val name: String = "",
     @SerialName("avatar_color_hex") val avatarColorHex: String = "#1E88E5",
     @SerialName("avatar_id") val avatarId: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
     @SerialName("uses_primary_addons") val usesPrimaryAddons: Boolean = false,
     @SerialName("uses_primary_plugins") val usesPrimaryPlugins: Boolean = false,
     @SerialName("pin_enabled") val pinEnabled: Boolean = false,
@@ -28,6 +29,7 @@ data class ProfilePushPayload(
     @SerialName("uses_primary_addons") val usesPrimaryAddons: Boolean = false,
     @SerialName("uses_primary_plugins") val usesPrimaryPlugins: Boolean = false,
     @SerialName("avatar_id") val avatarId: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
 )
 
 @Serializable
@@ -74,3 +76,20 @@ val PROFILE_COLORS = listOf(
 
 fun avatarStorageUrl(storagePath: String): String =
     "${com.nuvio.app.core.network.SupabaseConfig.URL}/storage/v1/object/public/avatars/$storagePath"
+
+fun normalizedAvatarUrl(url: String?): String? =
+    url?.trim()?.takeIf { it.isValidAvatarUrl() }
+
+fun String.isValidAvatarUrl(): Boolean {
+    val value = trim()
+    return value.length <= 2048 &&
+        !value.any { it.isWhitespace() } &&
+        (value.startsWith("https://") || value.startsWith("http://"))
+}
+
+fun profileAvatarImageUrl(profile: NuvioProfile, avatar: AvatarCatalogItem?): String? =
+    normalizedAvatarUrl(profile.avatarUrl)
+        ?: avatar
+            ?.storagePath
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::avatarStorageUrl)

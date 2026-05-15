@@ -702,8 +702,8 @@ private fun FolderEditorPage(
                             FolderEditorToggleRow(
                                 title = stringResource(Res.string.collections_editor_show_gif_when_configured),
                                 subtitle = stringResource(Res.string.collections_editor_show_gif_when_configured_desc),
-                                checked = folder.focusGifEnabled,
-                                onCheckedChange = { CollectionEditorRepository.updateFolderFocusGifEnabled(it) },
+                                checked = folder.mobileFocusGifEnabled,
+                                onCheckedChange = { CollectionEditorRepository.updateFolderMobileFocusGifEnabled(it) },
                             )
 
                             FolderEditorToggleRow(

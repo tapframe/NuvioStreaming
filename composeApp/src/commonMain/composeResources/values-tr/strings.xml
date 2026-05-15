@@ -494,7 +494,7 @@
     <string name="settings_playback_map_dv7_to_hevc_description">Desteklenmeyen cihazlar için Dolby Vision Profile 7\'den HEVC\'ye geri dönüş.</string>
     <string name="settings_playback_minutes_before_end">Bitmeden kaç dakika önce</string>
     <string name="settings_playback_minutes_before_end_description">Sonraki bölüm kartını bitişten kaç dakika önce göstereceğini seç.</string>
-    <string name="settings_playback_minutes_value">%1$d dk</string>
+    <string name="settings_playback_minutes_value">%1$s dk</string>
     <string name="settings_playback_no_items_available">Kullanılabilir öğe yok</string>
     <string name="settings_playback_not_set">Ayarlanmadı</string>
     <string name="settings_playback_option_default">Varsayılan</string>
@@ -569,9 +569,9 @@
     <string name="settings_playback_threshold_mode_percentage">Yüzde</string>
     <string name="settings_playback_threshold_percentage">Eşik yüzdesi</string>
     <string name="settings_playback_threshold_percentage_description">Oynatma bu yüzdeye ulaşınca sonraki bölüm kartını göster.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$d%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
     <string name="settings_playback_timeout_instant">Hemen</string>
-    <string name="settings_playback_timeout_seconds">%1$dsn</string>
+    <string name="settings_playback_timeout_seconds">%1$ssn</string>
     <string name="settings_playback_timeout_unlimited">Sınırsız</string>
     <string name="settings_playback_tunneled_playback">Tunneled oynatma</string>
     <string name="settings_playback_tunneled_playback_description">Daha düşük gecikmeli ses/video senkronu için tunneled oynatmayı aç.</string>

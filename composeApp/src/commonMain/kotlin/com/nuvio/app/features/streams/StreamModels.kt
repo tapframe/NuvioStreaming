@@ -25,9 +25,17 @@ data class StreamItem(
     val directPlaybackUrl: String?
         get() = url ?: externalUrl
 
+    val isTorrentStream: Boolean
+        get() = !infoHash.isNullOrBlank() ||
+            url.isMagnetLink() ||
+            externalUrl.isMagnetLink()
+
     val hasPlayableSource: Boolean
         get() = url != null || infoHash != null || externalUrl != null
 }
+
+private fun String?.isMagnetLink(): Boolean =
+    this?.trimStart()?.startsWith("magnet:", ignoreCase = true) == true
 
 data class StreamBehaviorHints(
     val bingeGroup: String? = null,
@@ -58,6 +66,7 @@ enum class StreamsEmptyStateReason {
 }
 
 data class StreamsUiState(
+    val requestToken: String? = null,
     val groups: List<AddonStreamGroup> = emptyList(),
     val activeAddonIds: Set<String> = emptySet(),
     val selectedFilter: String? = null,

@@ -32,11 +32,17 @@ data class HomeCatalogSettingsItem(
 
 data class HomeCatalogSettingsUiState(
     val heroEnabled: Boolean = true,
+    val hideUnreleasedContent: Boolean = false,
+    val hideCatalogUnderline: Boolean = false,
     val items: List<HomeCatalogSettingsItem> = emptyList(),
 ) {
     val signature: String
         get() = buildString {
             append(heroEnabled)
+            append('|')
+            append(hideUnreleasedContent)
+            append('|')
+            append(hideCatalogUnderline)
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
@@ -55,6 +61,8 @@ internal data class HomeCatalogPreference(
 
 internal data class HomeCatalogSettingsSnapshot(
     val heroEnabled: Boolean,
+    val hideUnreleasedContent: Boolean,
+    val hideCatalogUnderline: Boolean,
     val preferences: Map<String, HomeCatalogPreference>,
 )
 
@@ -70,6 +78,8 @@ private data class StoredHomeCatalogPreference(
 @Serializable
 private data class StoredHomeCatalogSettingsPayload(
     val heroEnabled: Boolean = true,
+    val hideUnreleasedContent: Boolean = false,
+    val hideCatalogUnderline: Boolean = false,
     val items: List<StoredHomeCatalogPreference> = emptyList(),
 )
 
@@ -89,11 +99,15 @@ object HomeCatalogSettingsRepository {
     private var collectionDefinitions: List<CollectionCatalogDefinition> = emptyList()
     private var preferences: MutableMap<String, StoredHomeCatalogPreference> = mutableMapOf()
     private var heroEnabled = true
+    private var hideUnreleasedContent = false
+    private var hideCatalogUnderline = false
 
     fun onProfileChanged() {
         hasLoaded = false
         preferences.clear()
         heroEnabled = true
+        hideUnreleasedContent = false
+        hideCatalogUnderline = false
         definitions = emptyList()
         collectionDefinitions = emptyList()
         _uiState.value = HomeCatalogSettingsUiState()
@@ -105,6 +119,8 @@ object HomeCatalogSettingsRepository {
         collectionDefinitions = emptyList()
         preferences.clear()
         heroEnabled = true
+        hideUnreleasedContent = false
+        hideCatalogUnderline = false
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -135,6 +151,8 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         return HomeCatalogSettingsSnapshot(
             heroEnabled = heroEnabled,
+            hideUnreleasedContent = hideUnreleasedContent,
+            hideCatalogUnderline = hideCatalogUnderline,
             preferences = preferences.mapValues { (_, value) ->
                 HomeCatalogPreference(
                     customTitle = value.customTitle,
@@ -152,6 +170,23 @@ object HomeCatalogSettingsRepository {
         publish()
         persist()
         HomeRepository.applyCurrentSettings()
+    }
+
+    fun setHideUnreleasedContent(enabled: Boolean) {
+        ensureLoaded()
+        if (hideUnreleasedContent == enabled) return
+        hideUnreleasedContent = enabled
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+    }
+
+    fun setHideCatalogUnderline(enabled: Boolean) {
+        ensureLoaded()
+        if (hideCatalogUnderline == enabled) return
+        hideCatalogUnderline = enabled
+        publish()
+        persist()
     }
 
     fun setHeroSourceEnabled(key: String, enabled: Boolean) {
@@ -181,6 +216,8 @@ object HomeCatalogSettingsRepository {
     fun resetToDefaults() {
         ensureLoaded()
         heroEnabled = true
+        hideUnreleasedContent = false
+        hideCatalogUnderline = false
         preferences.clear()
         normalizePreferences()
         publish()
@@ -226,7 +263,10 @@ object HomeCatalogSettingsRepository {
 
         if (parsedPayload != null) {
             heroEnabled = parsedPayload.heroEnabled
+            hideUnreleasedContent = parsedPayload.hideUnreleasedContent
+            hideCatalogUnderline = parsedPayload.hideCatalogUnderline
             preferences = parsedPayload.items.associateBy { it.key }.toMutableMap()
+            publish()
             return
         }
 
@@ -235,6 +275,7 @@ object HomeCatalogSettingsRepository {
         }.getOrDefault(emptyList())
 
         preferences = legacyItems.associateBy { it.key }.toMutableMap()
+        publish()
     }
 
     private fun normalizePreferences() {
@@ -322,6 +363,8 @@ object HomeCatalogSettingsRepository {
 
         _uiState.value = HomeCatalogSettingsUiState(
             heroEnabled = heroEnabled,
+            hideUnreleasedContent = hideUnreleasedContent,
+            hideCatalogUnderline = hideCatalogUnderline,
             items = items,
         )
     }
@@ -331,6 +374,8 @@ object HomeCatalogSettingsRepository {
             json.encodeToString(
                 StoredHomeCatalogSettingsPayload(
                     heroEnabled = heroEnabled,
+                    hideUnreleasedContent = hideUnreleasedContent,
+                    hideCatalogUnderline = hideCatalogUnderline,
                     items = preferences.values.sortedBy { it.order },
                 ),
             ),
@@ -411,26 +456,34 @@ object HomeCatalogSettingsRepository {
                 )
             }
         }
-        return SyncHomeCatalogPayload(items = items)
+        return SyncHomeCatalogPayload(
+            hideUnreleasedContent = hideUnreleasedContent,
+            hideCatalogUnderline = hideCatalogUnderline,
+            items = items,
+        )
     }
 
     fun applyFromRemote(payload: SyncHomeCatalogPayload) {
         ensureLoaded()
-        val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
-        preferences = payload.items.associate { item ->
-            val key = if (item.isCollection) {
-                "collection_${item.collectionId}"
-            } else {
-                "${item.addonId}:${item.type}:${item.catalogId}"
-            }
-            key to StoredHomeCatalogPreference(
-                key = key,
-                customTitle = item.customTitle,
-                enabled = item.enabled,
-                heroSourceEnabled = existingHeroState[key] ?: true,
-                order = item.order,
-            )
-        }.toMutableMap()
+        hideUnreleasedContent = payload.hideUnreleasedContent
+        hideCatalogUnderline = payload.hideCatalogUnderline
+        if (payload.items.isNotEmpty()) {
+            val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
+            preferences = payload.items.associate { item ->
+                val key = if (item.isCollection) {
+                    "collection_${item.collectionId}"
+                } else {
+                    "${item.addonId}:${item.type}:${item.catalogId}"
+                }
+                key to StoredHomeCatalogPreference(
+                    key = key,
+                    customTitle = item.customTitle,
+                    enabled = item.enabled,
+                    heroSourceEnabled = existingHeroState[key] ?: true,
+                    order = item.order,
+                )
+            }.toMutableMap()
+        }
         hasLoaded = true
         publish()
         persist()

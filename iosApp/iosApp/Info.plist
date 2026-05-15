@@ -22,6 +22,13 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>infuse</string>
+		<string>vlc-x-callback</string>
+		<string>outplayer</string>
+		<string>open-vidhub</string>
+	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 </dict>

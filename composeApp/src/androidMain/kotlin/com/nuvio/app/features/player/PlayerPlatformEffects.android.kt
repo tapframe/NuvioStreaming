@@ -35,7 +35,7 @@ actual fun LockPlayerToLandscape() {
 }
 
 @Composable
-actual fun EnterImmersivePlayerMode() {
+actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
     val activity = LocalContext.current.findActivity() ?: return
 
     DisposableEffect(activity) {

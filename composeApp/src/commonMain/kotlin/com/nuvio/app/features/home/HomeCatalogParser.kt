@@ -52,6 +52,7 @@ internal object HomeCatalogParser {
                     posterShape = meta.string("posterShape").toPosterShape(),
                     description = meta.string("description"),
                     releaseInfo = meta.string("releaseInfo"),
+                    rawReleaseDate = meta.string("released"),
                     imdbRating = meta.string("imdbRating"),
                     genres = meta.array("genres").mapNotNull { genre ->
                         genre.jsonPrimitive.contentOrNull?.takeIf { it.isNotBlank() }
