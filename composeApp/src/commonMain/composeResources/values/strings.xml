@@ -1197,6 +1197,11 @@
     <string name="library_remove_from_list_message">Remove %1$s from %2$s?</string>
     <string name="library_remove_message">Remove %1$s from your library?</string>
     <string name="library_remove_title">Remove from Library?</string>
+    <string name="library_filter_all">All</string>
+    <string name="library_filter_count">%1$d items</string>
+    <string name="library_filter_empty_message">Try another Library filter.</string>
+    <string name="library_filter_empty_title">No matching titles</string>
+    <string name="library_filter_unwatched">Unwatched</string>
     <string name="media_movie">Movie</string>
     <string name="notifications_channel_episode_releases_description">Alerts when a saved show's new episode is released.</string>
     <string name="notifications_test_preview_body">Preview episode release alert.</string>
