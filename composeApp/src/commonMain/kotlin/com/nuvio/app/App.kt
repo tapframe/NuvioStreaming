@@ -614,27 +614,32 @@ private fun MainAppContent(
             .sorted()
     }
 
-    fun handleRootTabClick(tab: AppScreenTab) {
-        if (selectedTab != tab) {
-            selectedTab = tab
-            return
+    fun selectRootTab(tab: AppScreenTab) {
+        val isReselection = selectedTab == tab
+        val shouldReturnToTabs = navController.currentDestination?.hasRoute<TabsRoute>() != true || isReselection
+        selectedTab = tab
+
+        if (isReselection) {
+            when (tab) {
+                AppScreenTab.Home -> homeScrollToTopRequests.tryEmit(Unit)
+                AppScreenTab.Search -> {
+                    searchFocusRequestCount++
+                    searchScrollToTopRequests.tryEmit(Unit)
+                }
+                AppScreenTab.Library -> libraryScrollToTopRequests.tryEmit(Unit)
+                AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
+            }
         }
 
-        when (tab) {
-            AppScreenTab.Home -> homeScrollToTopRequests.tryEmit(Unit)
-            AppScreenTab.Search -> {
-                searchFocusRequestCount++
-                searchScrollToTopRequests.tryEmit(Unit)
-            }
-            AppScreenTab.Library -> libraryScrollToTopRequests.tryEmit(Unit)
-            AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
+        if (shouldReturnToTabs) {
+            navController.popBackStack<TabsRoute>(inclusive = false)
         }
     }
 
     LaunchedEffect(liquidGlassNativeTabBarSupported, liquidGlassNativeTabBarEnabled) {
         NativeTabBridge.requestedTabs.collectLatest { requestedTab ->
             if (liquidGlassNativeTabBarSupported && liquidGlassNativeTabBarEnabled) {
-                handleRootTabClick(requestedTab.toAppScreenTab())
+                selectRootTab(requestedTab.toAppScreenTab())
             }
         }
     }
@@ -1090,29 +1095,31 @@ private fun MainAppContent(
                                     NuvioNavigationBar {
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Home,
-                                            onClick = { handleRootTabClick(AppScreenTab.Home) },
+                                            onClick = { selectRootTab(AppScreenTab.Home) },
                                             icon = Icons.Filled.Home,
                                             contentDescription = stringResource(Res.string.compose_nav_home),
                                         )
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Search,
-                                            onClick = { handleRootTabClick(AppScreenTab.Search) },
+                                            onClick = {
+                                                selectRootTab(AppScreenTab.Search)
+                                            },
                                             icon = Res.drawable.sidebar_search,
                                             contentDescription = stringResource(Res.string.compose_nav_search),
                                         )
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Library,
-                                            onClick = { handleRootTabClick(AppScreenTab.Library) },
+                                            onClick = { selectRootTab(AppScreenTab.Library) },
                                             icon = Res.drawable.sidebar_library,
                                             contentDescription = stringResource(Res.string.compose_nav_library),
                                         )
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Settings,
-                                            onClick = { handleRootTabClick(AppScreenTab.Settings) },
+                                            onClick = { selectRootTab(AppScreenTab.Settings) },
                                         ) {
                                             ProfileSwitcherTab(
                                                 selected = selectedTab == AppScreenTab.Settings,
-                                                onClick = { handleRootTabClick(AppScreenTab.Settings) },
+                                                onClick = { selectRootTab(AppScreenTab.Settings) },
                                                 onProfileSelected = onProfileSelected,
                                                 onAddProfileRequested = onSwitchProfile,
                                             )
@@ -1198,7 +1205,9 @@ private fun MainAppContent(
                                 if (isTabletLayout && !useNativeBottomTabs) {
                                     TabletFloatingTopBar(
                                         selectedTab = selectedTab,
-                                        onTabSelected = ::handleRootTabClick,
+                                        onTabSelected = { tab ->
+                                            selectRootTab(tab)
+                                        },
                                         onProfileSelected = onProfileSelected,
                                         onAddProfileRequested = onSwitchProfile,
                                     )

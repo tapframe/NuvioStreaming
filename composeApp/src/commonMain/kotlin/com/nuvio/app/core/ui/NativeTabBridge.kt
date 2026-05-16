@@ -17,6 +17,11 @@ internal enum class NativeNavigationTab {
     }
 }
 
+internal data class NativeTabSelectionRequest(
+    val tab: NativeNavigationTab,
+    val sequence: Long,
+)
+
 internal object NativeTabBridge {
     private val _requestedTabs = MutableSharedFlow<NativeNavigationTab>(extraBufferCapacity = 1)
     val requestedTabs: SharedFlow<NativeNavigationTab> = _requestedTabs.asSharedFlow()
