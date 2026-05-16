@@ -7,6 +7,7 @@ import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Tune
+import com.nuvio.app.features.search.SearchHistoryRecentSearchLimit
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_page_addons
 import nuvio.composeapp.generated.resources.compose_settings_page_homescreen
@@ -19,11 +20,16 @@ import nuvio.composeapp.generated.resources.settings_content_discovery_homescree
 import nuvio.composeapp.generated.resources.settings_content_discovery_meta_screen_description
 import nuvio.composeapp.generated.resources.settings_content_discovery_plugins_description
 import nuvio.composeapp.generated.resources.settings_content_discovery_section_home
+import nuvio.composeapp.generated.resources.settings_content_discovery_section_search
 import nuvio.composeapp.generated.resources.settings_content_discovery_section_sources
+import nuvio.composeapp.generated.resources.settings_search_history_limit_description
+import nuvio.composeapp.generated.resources.settings_search_history_limit_title
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.contentDiscoveryContent(
     isTablet: Boolean,
+    searchHistoryLimitOverride: Int?,
+    onSearchHistoryLimitSelected: (Int?) -> Unit,
     showPluginsEntry: Boolean,
     onAddonsClick: () -> Unit,
     onPluginsClick: () -> Unit,
@@ -53,6 +59,26 @@ internal fun LazyListScope.contentDiscoveryContent(
                         onClick = onPluginsClick,
                     )
                 }
+            }
+        }
+    }
+    item {
+        SettingsSection(
+            title = stringResource(Res.string.settings_content_discovery_section_search),
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_search_history_limit_title),
+                    description = stringResource(Res.string.settings_search_history_limit_description),
+                    checked = searchHistoryLimitOverride == SearchHistoryRecentSearchLimit,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        onSearchHistoryLimitSelected(
+                            if (enabled) SearchHistoryRecentSearchLimit else null,
+                        )
+                    },
+                )
             }
         }
     }
