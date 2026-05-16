@@ -371,6 +371,7 @@
     <string name="compose_search_empty_no_search_catalogs_title">No searchable catalogs</string>
     <string name="compose_search_placeholder">Search movies, shows...</string>
     <string name="compose_search_recent_searches">Recent Searches</string>
+    <string name="compose_search_clear_recent_searches">Clear recent searches</string>
     <string name="compose_search_remove_recent_search">Remove recent search</string>
     <string name="compose_settings_category_about">About</string>
     <string name="compose_settings_category_general">General</string>
@@ -579,12 +580,15 @@
     <string name="settings_continue_watching_use_episode_thumbnails_description">Prefer episode thumbnails when available.</string>
     <string name="settings_continue_watching_use_episode_thumbnails_title">Prefer Episode Thumbnails in Continue Watching</string>
     <string name="settings_content_discovery_section_home">HOME</string>
+    <string name="settings_content_discovery_section_search">SEARCH</string>
     <string name="settings_content_discovery_section_sources">SOURCES</string>
     <string name="settings_content_discovery_addons_description">Install, remove, refresh, and sort your content sources.</string>
     <string name="settings_content_discovery_plugins_description">Install JavaScript scraper repositories and test providers internally.</string>
     <string name="settings_content_discovery_homescreen_description">Adjust home layout, content visibility, and poster behavior</string>
     <string name="settings_content_discovery_meta_screen_description">Settings for the detail and episode screens.</string>
     <string name="settings_content_discovery_collections_description">Create custom catalog groupings with folders shown on Home.</string>
+    <string name="settings_search_history_limit_description">Only keep and show the 5 most recent searches.</string>
+    <string name="settings_search_history_limit_title">Show only last 5 searches</string>
     <string name="settings_integrations_section_title">Integrations</string>
     <string name="settings_integrations_tmdb_description">Metadata enrichment controls</string>
     <string name="settings_integrations_mdblist_description">External ratings providers</string>
