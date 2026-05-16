@@ -27,6 +27,9 @@ private val downloadHttpClient = OkHttpClient.Builder()
     .followSslRedirects(true)
     .build()
 
+private const val PROGRESS_MIN_INTERVAL_SECONDS = 0.5
+private const val PROGRESS_MIN_BYTE_DELTA = 512L * 1024L
+
 internal actual object DownloadsPlatformDownloader {
     private var appContext: Context? = null
 
@@ -54,6 +57,23 @@ internal actual object DownloadsPlatformDownloader {
             val downloadsDir = File(context.filesDir, "downloads").apply { mkdirs() }
             val destination = File(downloadsDir, request.destinationFileName)
             val tempFile = File(downloadsDir, "${request.destinationFileName}.part")
+
+            var lastProgressBytes = -1L
+            var lastProgressTimestampMs = 0L
+
+            fun reportProgress(downloadedBytes: Long, totalBytes: Long?) {
+                val now = System.currentTimeMillis()
+                if (lastProgressBytes >= 0L) {
+                    val byteDelta = downloadedBytes - lastProgressBytes
+                    val timeDelta = (now - lastProgressTimestampMs) / 1000.0
+                    val reachedEnd = totalBytes != null && downloadedBytes >= totalBytes
+                        return
+                    }
+                }
+                lastProgressBytes = downloadedBytes
+                lastProgressTimestampMs = now
+                onProgress(downloadedBytes, totalBytes)
+            }
 
             try {
                 var resumeFromBytes = tempFile.takeIf { it.exists() }?.length()?.coerceAtLeast(0L) ?: 0L
@@ -115,7 +135,7 @@ internal actual object DownloadsPlatformDownloader {
                         contentLength = body.contentLength().takeIf { it > 0L },
                     )
                     var downloadedBytes = startingBytes
-                    onProgress(downloadedBytes, totalBytes)
+                    reportProgress(downloadedBytes, totalBytes)
 
                     body.byteStream().use { input ->
                         FileOutputStream(tempFile, appendToTemp).use { output ->
@@ -126,7 +146,7 @@ internal actual object DownloadsPlatformDownloader {
                                 if (read <= 0) break
                                 output.write(buffer, 0, read)
                                 downloadedBytes += read.toLong()
-                                onProgress(downloadedBytes, totalBytes)
+                                reportProgress(downloadedBytes, totalBytes)
                             }
                             output.flush()
                         }
