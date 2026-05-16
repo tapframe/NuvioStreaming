@@ -1,0 +1,89 @@
+name: Write runtime config to local.properties
+description: >
+  Append runtime config keys (Supabase, Trakt, IntroDB, IMDB, Community URLs)
+  consumed by composeApp/build.gradle.kts to local.properties. Each input is
+  optional — when omitted the corresponding generated config field is an empty
+  string at runtime (matches the behavior of a local dev without a configured
+  local.properties).
+
+inputs:
+  supabase-url:
+    description: Supabase project URL
+    required: false
+    default: ''
+  supabase-anon-key:
+    description: Supabase anon API key
+    required: false
+    default: ''
+  trakt-client-id:
+    description: Trakt OAuth client id
+    required: false
+    default: ''
+  trakt-client-secret:
+    description: Trakt OAuth client secret
+    required: false
+    default: ''
+  trakt-redirect-uri:
+    description: Trakt OAuth redirect URI (defaults to nuvio://auth/trakt)
+    required: false
+    default: ''
+  introdb-api-url:
+    description: IntroDB API base URL
+    required: false
+    default: ''
+  imdb-ratings-api-base-url:
+    description: IMDB episode ratings API base URL
+    required: false
+    default: ''
+  imdb-tapframe-api-base-url:
+    description: IMDB tapframe API base URL
+    required: false
+    default: ''
+  contributions-url:
+    description: Community contributions URL (settings screen)
+    required: false
+    default: ''
+  donations-base-url:
+    description: Donations base URL (settings screen)
+    required: false
+    default: ''
+  donations-donate-url:
+    description: Donations donate URL (settings screen)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Append runtime config to local.properties
+      shell: bash
+      env:
+        SUPABASE_URL: ${{ inputs.supabase-url }}
+        SUPABASE_ANON_KEY: ${{ inputs.supabase-anon-key }}
+        TRAKT_CLIENT_ID: ${{ inputs.trakt-client-id }}
+        TRAKT_CLIENT_SECRET: ${{ inputs.trakt-client-secret }}
+        TRAKT_REDIRECT_URI: ${{ inputs.trakt-redirect-uri }}
+        INTRODB_API_URL: ${{ inputs.introdb-api-url }}
+        IMDB_RATINGS_API_BASE_URL: ${{ inputs.imdb-ratings-api-base-url }}
+        IMDB_TAPFRAME_API_BASE_URL: ${{ inputs.imdb-tapframe-api-base-url }}
+        CONTRIBUTIONS_URL: ${{ inputs.contributions-url }}
+        DONATIONS_BASE_URL: ${{ inputs.donations-base-url }}
+        DONATIONS_DONATE_URL: ${{ inputs.donations-donate-url }}
+      run: |
+        set -euo pipefail
+        {
+          echo ""
+          printf 'SUPABASE_URL=%s\n' "${SUPABASE_URL}"
+          printf 'SUPABASE_ANON_KEY=%s\n' "${SUPABASE_ANON_KEY}"
+          printf 'TRAKT_CLIENT_ID=%s\n' "${TRAKT_CLIENT_ID}"
+          printf 'TRAKT_CLIENT_SECRET=%s\n' "${TRAKT_CLIENT_SECRET}"
+          # Empty input falls back to the same default the build script uses
+          # when the property is missing.
+          printf 'TRAKT_REDIRECT_URI=%s\n' "${TRAKT_REDIRECT_URI:-nuvio://auth/trakt}"
+          printf 'INTRODB_API_URL=%s\n' "${INTRODB_API_URL}"
+          printf 'IMDB_RATINGS_API_BASE_URL=%s\n' "${IMDB_RATINGS_API_BASE_URL}"
+          printf 'IMDB_TAPFRAME_API_BASE_URL=%s\n' "${IMDB_TAPFRAME_API_BASE_URL}"
+          printf 'CONTRIBUTIONS_URL=%s\n' "${CONTRIBUTIONS_URL}"
+          printf 'DONATIONS_BASE_URL=%s\n' "${DONATIONS_BASE_URL}"
+          printf 'DONATIONS_DONATE_URL=%s\n' "${DONATIONS_DONATE_URL}"
+        } >> local.properties

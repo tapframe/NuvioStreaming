@@ -60,6 +60,21 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Write runtime config to local.properties
+        uses: ./.github/actions/write-runtime-config
+        with:
+          supabase-url: ${{ secrets.SUPABASE_URL }}
+          supabase-anon-key: ${{ secrets.SUPABASE_ANON_KEY }}
+          trakt-client-id: ${{ secrets.TRAKT_CLIENT_ID }}
+          trakt-client-secret: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          trakt-redirect-uri: ${{ secrets.TRAKT_REDIRECT_URI }}
+          introdb-api-url: ${{ secrets.INTRODB_API_URL }}
+          imdb-ratings-api-base-url: ${{ secrets.IMDB_RATINGS_API_BASE_URL }}
+          imdb-tapframe-api-base-url: ${{ secrets.IMDB_TAPFRAME_API_BASE_URL }}
+          contributions-url: ${{ secrets.CONTRIBUTIONS_URL }}
+          donations-base-url: ${{ secrets.DONATIONS_BASE_URL }}
+          donations-donate-url: ${{ secrets.DONATIONS_DONATE_URL }}
+
       - name: Configure Android release signing
         env:
           KEYSTORE_BASE64: ${{ secrets.NUVIO_RELEASE_KEYSTORE_BASE64 }}
@@ -164,6 +179,21 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
+
+      - name: Write runtime config to local.properties
+        uses: ./.github/actions/write-runtime-config
+        with:
+          supabase-url: ${{ secrets.SUPABASE_URL }}
+          supabase-anon-key: ${{ secrets.SUPABASE_ANON_KEY }}
+          trakt-client-id: ${{ secrets.TRAKT_CLIENT_ID }}
+          trakt-client-secret: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          trakt-redirect-uri: ${{ secrets.TRAKT_REDIRECT_URI }}
+          introdb-api-url: ${{ secrets.INTRODB_API_URL }}
+          imdb-ratings-api-base-url: ${{ secrets.IMDB_RATINGS_API_BASE_URL }}
+          imdb-tapframe-api-base-url: ${{ secrets.IMDB_TAPFRAME_API_BASE_URL }}
+          contributions-url: ${{ secrets.CONTRIBUTIONS_URL }}
+          donations-base-url: ${{ secrets.DONATIONS_BASE_URL }}
+          donations-donate-url: ${{ secrets.DONATIONS_DONATE_URL }}
 
       # The Release Kotlin/Native link of the iOS framework regularly needs
       # 8–10 GB of heap (Compose + Ktor + Supabase). Override at the user
