@@ -1068,7 +1068,7 @@
     <string name="streams_resume_from_percent">Pokračovat od %1$d%%</string>
     <string name="streams_resume_from_time">Pokračovat od %1$s</string>
     <string name="streams_size">VELIKOST %1$s</string>
-    <string name="streams_torrent_not_supported">Torrent streamy nejsou podporovány</string>
+    <string name="streams_torrent_not_supported">Tento typ streamu není podporován</string>
     <string name="trailer_close">Zavřít trailer</string>
     <string name="trailer_unable_to_play">Trailer nelze přehrát</string>
     <string name="trakt_lists_load_failed">Nepodařilo se načíst seznamy Trakt</string>

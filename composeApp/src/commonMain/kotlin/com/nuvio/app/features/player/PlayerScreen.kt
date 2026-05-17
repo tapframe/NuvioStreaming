@@ -38,7 +38,13 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.features.debrid.DirectDebridPlayableResult
+import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
+import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.AddonResource
+import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
@@ -439,8 +445,24 @@ fun PlayerScreen(
         var preferredSubtitleSelectionApplied by rememberSaveable(sourceUrl) { mutableStateOf(false) }
         var activeSubtitleTab by remember { mutableStateOf(SubtitleTab.BuiltIn) }
         val subtitleStyle = playerSettingsUiState.subtitleStyle
+        val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
         val addonSubtitles by SubtitleRepository.addonSubtitles.collectAsStateWithLifecycle()
         val isLoadingAddonSubtitles by SubtitleRepository.isLoading.collectAsStateWithLifecycle()
+        val activeAddonSubtitleType = contentType ?: parentMetaType
+        val addonSubtitleFetchKey = remember(
+            addonsUiState.addons,
+            activeAddonSubtitleType,
+            activeVideoId,
+        ) {
+            buildAddonSubtitleFetchKey(
+                addons = addonsUiState.addons,
+                type = activeAddonSubtitleType,
+                videoId = activeVideoId,
+            )
+        }
+        var autoFetchedAddonSubtitlesForKey by rememberSaveable(activeSourceUrl, activeVideoId) {
+            mutableStateOf<String?>(null)
+        }
 
         fun refreshTracks() {
             val ctrl = playerController ?: return
@@ -784,7 +806,55 @@ fun PlayerScreen(
             playerController?.seekTo(targetPositionMs)
         }
 
+        fun resolveDebridForPlayer(
+            stream: StreamItem,
+            season: Int?,
+            episode: Int?,
+            onResolved: (StreamItem) -> Unit,
+            onStale: () -> Unit,
+        ): Boolean {
+            if (!stream.isDirectDebridStream || stream.directPlaybackUrl != null) return false
+            scope.launch {
+                val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
+                    stream = stream,
+                    season = season,
+                    episode = episode,
+                )
+                when (resolved) {
+                    is DirectDebridPlayableResult.Success -> onResolved(resolved.stream)
+                    else -> {
+                        resolved.toastMessage()?.let { NuvioToastController.show(it) }
+                        if (resolved == DirectDebridPlayableResult.Stale) {
+                            onStale()
+                        }
+                    }
+                }
+            }
+            return true
+        }
+
         fun switchToSource(stream: StreamItem) {
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
+                    onResolved = ::switchToSource,
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        val vid = activeVideoId
+                        if (vid != null) {
+                            PlayerStreamsRepository.loadSources(
+                                type = type,
+                                videoId = vid,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
+                                forceRefresh = true,
+                            )
+                        }
+                    },
+                )
+            ) return
             val url = stream.directPlaybackUrl ?: return
             if (url == activeSourceUrl) return
             val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
@@ -826,6 +896,26 @@ fun PlayerScreen(
         }
 
         fun switchToEpisodeStream(stream: StreamItem, episode: MetaVideo) {
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = episode.season,
+                    episode = episode.episode,
+                    onResolved = { resolvedStream ->
+                        switchToEpisodeStream(resolvedStream, episode)
+                    },
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        PlayerStreamsRepository.loadEpisodeStreams(
+                            type = type,
+                            videoId = episode.id,
+                            season = episode.season,
+                            episode = episode.episode,
+                            forceRefresh = true,
+                        )
+                    },
+                )
+            ) return
             val url = stream.directPlaybackUrl ?: return
             showNextEpisodeCard = false
             showSourcesPanel = false
@@ -1092,8 +1182,8 @@ fun PlayerScreen(
         }
 
         fun fetchAddonSubtitlesForActiveItem() {
-            val type = contentType ?: return
-            val videoId = activeVideoId ?: return
+            val type = activeAddonSubtitleType.takeIf { it.isNotBlank() } ?: return
+            val videoId = activeVideoId?.takeIf { it.isNotBlank() } ?: return
             SubtitleRepository.fetchAddonSubtitles(type, videoId)
         }
 
@@ -1127,11 +1217,11 @@ fun PlayerScreen(
             playerController?.applySubtitleStyle(subtitleStyle)
         }
 
-        LaunchedEffect(showSubtitleModal, activeSubtitleTab, contentType, activeVideoId) {
-            if (!showSubtitleModal || activeSubtitleTab != SubtitleTab.Addons) return@LaunchedEffect
-            if (!isLoadingAddonSubtitles && addonSubtitles.isEmpty()) {
-                fetchAddonSubtitlesForActiveItem()
-            }
+        LaunchedEffect(activeSourceUrl, addonSubtitleFetchKey) {
+            val fetchKey = addonSubtitleFetchKey ?: return@LaunchedEffect
+            if (autoFetchedAddonSubtitlesForKey == fetchKey) return@LaunchedEffect
+            autoFetchedAddonSubtitlesForKey = fetchKey
+            fetchAddonSubtitlesForActiveItem()
         }
 
         LaunchedEffect(playbackSnapshot.isLoading, playerController) {
@@ -1922,6 +2012,47 @@ fun PlayerScreen(
             }
         }
     }
+}
+
+private fun buildAddonSubtitleFetchKey(
+    addons: List<ManagedAddon>,
+    type: String?,
+    videoId: String?,
+): String? {
+    val normalizedType = type?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedVideoId = videoId?.takeIf { it.isNotBlank() } ?: return null
+    val compatibleSubtitleAddons = addons.mapNotNull { addon ->
+        val manifest = addon.manifest ?: return@mapNotNull null
+        val supportsSubtitles = manifest.resources.any { resource ->
+            resource.isCompatibleSubtitleResource(
+                type = normalizedType,
+                videoId = normalizedVideoId,
+            )
+        }
+        if (!supportsSubtitles) return@mapNotNull null
+        "${manifest.id}:${manifest.transportUrl}"
+    }
+
+    if (compatibleSubtitleAddons.isEmpty()) return null
+    return buildString {
+        append(normalizedType)
+        append('|')
+        append(normalizedVideoId)
+        append('|')
+        append(compatibleSubtitleAddons.sorted().joinToString("|"))
+    }
+}
+
+private fun AddonResource.isCompatibleSubtitleResource(type: String, videoId: String): Boolean {
+    val isSubtitleResource = name.equals("subtitles", ignoreCase = true) ||
+        name.equals("subtitle", ignoreCase = true)
+    if (!isSubtitleResource) return false
+
+    val requestType = if (type.equals("tv", ignoreCase = true)) "series" else type
+    val typeMatches = types.isEmpty() || types.any { it.equals(requestType, ignoreCase = true) }
+    if (!typeMatches) return false
+
+    return idPrefixes.isEmpty() || idPrefixes.any { prefix -> videoId.startsWith(prefix) }
 }
 
 private fun <T> findPreferredTrackIndex(

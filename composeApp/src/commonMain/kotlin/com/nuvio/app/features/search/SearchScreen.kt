@@ -33,6 +33,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
@@ -80,7 +82,16 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
+    searchFocusRequestCount: Int = 0,
 ) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(searchFocusRequestCount) {
+        if (searchFocusRequestCount > 0) {
+            focusRequester.requestFocus()
+        }
+    }
+
     LaunchedEffect(Unit) {
         AddonRepository.initialize()
         WatchedRepository.ensureLoaded()
@@ -240,6 +251,7 @@ fun SearchScreen(
                         value = query,
                         onValueChange = { query = it },
                         placeholder = stringResource(Res.string.compose_search_placeholder),
+                        modifier = Modifier.focusRequester(focusRequester),
                         trailingContent = if (query.isNotBlank()) {
                             {
                                 IconButton(onClick = { query = "" }) {

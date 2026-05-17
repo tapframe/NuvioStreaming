@@ -11,6 +11,10 @@ internal expect object PlayerSettingsStorage {
     fun saveHoldToSpeedEnabled(enabled: Boolean)
     fun loadHoldToSpeedValue(): Float?
     fun saveHoldToSpeedValue(speed: Float)
+    fun loadExternalPlayerEnabled(): Boolean?
+    fun saveExternalPlayerEnabled(enabled: Boolean)
+    fun loadExternalPlayerId(): String?
+    fun saveExternalPlayerId(playerId: String?)
     fun loadPreferredAudioLanguage(): String?
     fun savePreferredAudioLanguage(language: String)
     fun loadSecondaryPreferredAudioLanguage(): String?

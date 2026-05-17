@@ -5,6 +5,8 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
+import com.nuvio.app.features.debrid.DirectDebridStreamSource
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
@@ -14,6 +16,7 @@ import com.nuvio.app.features.plugins.PluginRepositoryItem
 import com.nuvio.app.features.plugins.PluginRuntimeResult
 import com.nuvio.app.features.plugins.PluginScraper
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -131,6 +134,7 @@ object StreamsRepository {
         }
 
         val installedAddons = AddonRepository.uiState.value.addons
+        val debridTargets = DirectDebridStreamSource.configuredTargets()
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.getEnabledScrapersForType(type)
         } else {
@@ -141,7 +145,7 @@ object StreamsRepository {
             groupByRepository = pluginUiState.groupStreamsByRepository,
         )
 
-        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+        if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty() && debridTargets.isEmpty()) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -170,7 +174,7 @@ object StreamsRepository {
 
         log.d { "Found ${streamAddons.size} addons for stream type=$type id=$videoId" }
 
-        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty() && debridTargets.isEmpty()) {
             _uiState.value = StreamsUiState(
                 requestToken = requestToken,
                 isAnyLoading = false,
@@ -194,6 +198,13 @@ object StreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
+        } + debridTargets.map { target ->
+            AddonStreamGroup(
+                addonName = target.addonName,
+                addonId = target.addonId,
+                streams = emptyList(),
+                isLoading = true,
+            )
         }
         _uiState.value = StreamsUiState(
             requestToken = requestToken,
@@ -211,13 +222,21 @@ object StreamsRepository {
                 .associate { it.addonId to it.scrapers.size }
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
-            val totalTasks = streamAddons.size + pluginRemainingByAddonId.values.sum()
+            val totalTasks = streamAddons.size +
+                pluginProviderGroups.sumOf { it.scrapers.size } +
+                debridTargets.size
 
             val installedAddonNames = installedAddons
                 .map { it.displayTitle }
                 .toSet()
             var autoSelectTriggered = false
             var timeoutElapsed = false
+            var debridPreparationLaunched = false
+            fun publishCompletion(completion: StreamLoadCompletion) {
+                if (completions.trySend(completion).isFailure) {
+                    log.d { "Ignoring late stream load completion after channel close" }
+                }
+            }
 
             val timeoutJob = if (isAutoPlayEnabled) {
                 val timeoutMs = playerSettings.streamAutoPlayTimeoutSeconds * 1_000L
@@ -271,7 +290,7 @@ object StreamsRepository {
                     log.d { "Fetching streams from: $url" }
 
                     val displayName = addon.addonName
-                    val group = runCatching {
+                    val group = runCatchingUnlessCancelled {
                         val payload = httpGetText(url)
                         StreamParser.parse(
                             payload = payload,
@@ -299,7 +318,7 @@ object StreamsRepository {
                             )
                         },
                     )
-                    completions.send(StreamLoadCompletion.Addon(group))
+                    publishCompletion(StreamLoadCompletion.Addon(group))
                 }
             }
 
@@ -340,8 +359,22 @@ object StreamsRepository {
                                 )
                             },
                         )
-                        completions.send(completion)
+                        publishCompletion(completion)
                     }
+                }
+            }
+
+            debridTargets.forEach { target ->
+                launch {
+                    publishCompletion(
+                        StreamLoadCompletion.Debrid(
+                            DirectDebridStreamSource.fetchProviderStreams(
+                                type = type,
+                                videoId = videoId,
+                                target = target,
+                            ),
+                        ),
+                    )
                 }
             }
 
@@ -400,10 +433,45 @@ object StreamsRepository {
                             )
                         }
                     }
+
+                    is StreamLoadCompletion.Debrid -> {
+                        val result = completion.group
+                        _uiState.update { current ->
+                            val updated = current.groups.map { group ->
+                                if (group.addonId == result.addonId) result else group
+                            }
+                            val anyLoading = updated.any { it.isLoading }
+                            current.copy(
+                                groups = updated,
+                                isAnyLoading = anyLoading,
+                                emptyStateReason = updated.toEmptyStateReason(anyLoading),
+                            )
+                        }
+                        if (!debridPreparationLaunched && result.streams.any { it.isDirectDebridStream }) {
+                            debridPreparationLaunched = true
+                            launch {
+                                DirectDebridStreamPreparer.prepare(
+                                    streams = _uiState.value.groups.flatMap { it.streams },
+                                    season = season,
+                                    episode = episode,
+                                    playerSettings = playerSettings,
+                                    installedAddonNames = installedAddonNames,
+                                ) { original, prepared ->
+                                    _uiState.update { current ->
+                                        current.copy(
+                                            groups = DirectDebridStreamPreparer.replacePreparedStream(
+                                                groups = current.groups,
+                                                original = original,
+                                                prepared = prepared,
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-
-            completions.close()
 
             if (isAutoPlayEnabled && !autoSelectTriggered) {
                 autoSelectTriggered = true
@@ -493,6 +561,7 @@ private data class PluginProviderGroup(
 
 private sealed interface StreamLoadCompletion {
     data class Addon(val group: AddonStreamGroup) : StreamLoadCompletion
+    data class Debrid(val group: AddonStreamGroup) : StreamLoadCompletion
     data class PluginScraper(
         val addonId: String,
         val streams: List<StreamItem>,
@@ -537,6 +606,15 @@ private fun List<AddonStreamGroup>.toEmptyStateReason(anyLoading: Boolean): Stre
         StreamsEmptyStateReason.NoStreamsFound
     }
 }
+
+private suspend fun <T> runCatchingUnlessCancelled(block: suspend () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        Result.failure(error)
+    }
 
 private fun PluginRuntimeResult.toStreamItem(
     scraper: PluginScraper,

@@ -119,4 +119,56 @@ class StreamParserTest {
         assertEquals("video/mp4", responseHeaders["content-type"])
         assertEquals("ok", responseHeaders["x-test"])
     }
+
+    @Test
+    fun `parse keeps client resolve metadata without direct URL`() {
+        val streams = StreamParser.parse(
+            payload =
+                """
+                {
+                  "streams": [
+                    {
+                      "name": "Instant",
+                      "clientResolve": {
+                        "type": "debrid",
+                        "infoHash": "abc123",
+                        "fileIdx": 4,
+                        "sources": ["udp://tracker.example"],
+                        "torrentName": "Movie Pack",
+                        "filename": "Movie.2024.2160p.mkv",
+                        "service": "torbox",
+                        "isCached": true,
+                        "stream": {
+                          "raw": {
+                            "size": 1610612736,
+                            "indexer": "Indexer",
+                            "parsed": {
+                              "parsed_title": "Movie",
+                              "year": 2024,
+                              "resolution": "2160p",
+                              "hdr": ["DV"],
+                              "audio": ["Atmos"],
+                              "episodes": [1, 2],
+                              "bit_depth": "10bit"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            addonName = "Direct Debrid",
+            addonId = "debrid:torbox",
+        )
+
+        val stream = streams.single()
+        assertTrue(stream.isDirectDebridStream)
+        assertFalse(stream.isTorrentStream)
+        assertEquals("abc123", stream.clientResolve?.infoHash)
+        assertEquals(4, stream.clientResolve?.fileIdx)
+        assertEquals("udp://tracker.example", stream.clientResolve?.sources?.single())
+        assertEquals("2160p", stream.clientResolve?.stream?.raw?.parsed?.resolution)
+        assertEquals(listOf(1, 2), stream.clientResolve?.stream?.raw?.parsed?.episodes)
+    }
 }
