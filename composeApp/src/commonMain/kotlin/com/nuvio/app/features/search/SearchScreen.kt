@@ -334,6 +334,11 @@ fun SearchScreen(
                                 onPosterLongClick = onPosterLongClick,
                             )
                         }
+                        if (uiState.isLoading) {
+                            item(key = "search_loading_more") {
+                                HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                            }
+                        }
                     }
                 }
             }

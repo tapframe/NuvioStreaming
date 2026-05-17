@@ -98,6 +98,30 @@ class SeriesContinuityTest {
     }
 
     @Test
+    fun nextReleasedEpisodeAfter_global_index_fallback_ignores_specials() {
+        val episodesWithSpecials = listOf(
+            WatchingReleasedEpisode(videoId = "sp1", seasonNumber = 0, episodeNumber = 1, title = "Special 1", releasedDate = "2026-01-01"),
+            WatchingReleasedEpisode(videoId = "s1e1", seasonNumber = 1, episodeNumber = 1, title = "Episode 1", releasedDate = "2026-01-08"),
+            WatchingReleasedEpisode(videoId = "s1e2", seasonNumber = 1, episodeNumber = 2, title = "Episode 2", releasedDate = "2026-01-15"),
+            WatchingReleasedEpisode(videoId = "s2e1", seasonNumber = 2, episodeNumber = 1, title = "Episode 3", releasedDate = "2026-01-22"),
+            WatchingReleasedEpisode(videoId = "s2e2", seasonNumber = 2, episodeNumber = 2, title = "Episode 4", releasedDate = "2026-01-29"),
+        )
+
+        val nextEpisode = nextReleasedEpisodeAfter(
+            content = show,
+            episodes = episodesWithSpecials,
+            seasonNumber = 1,
+            episodeNumber = 3,
+            todayIsoDate = "2026-02-01",
+        )
+
+        assertNotNull(nextEpisode)
+        assertEquals(2, nextEpisode.seasonNumber)
+        assertEquals(2, nextEpisode.episodeNumber)
+        assertEquals("s2e2", nextEpisode.videoId)
+    }
+
+    @Test
     fun decideSeriesPrimaryAction_falls_back_to_specials_when_no_main_season() {
         val specialsOnly = listOf(
             WatchingReleasedEpisode(videoId = "sp1", seasonNumber = 0, episodeNumber = 1, title = "Special 1", releasedDate = "2026-01-01"),

@@ -53,11 +53,14 @@ fun nextReleasedEpisodeAfter(
     // Fallback: if the seed wasn't found by season+episode (anime with absolute
     // numbering on Trakt vs multi-season on addon), try global index matching.
     if (watchedIndex < 0 && seasonNumber != null && episodeNumber != null) {
-        val addonSeasons = sortedEpisodes.mapTo(mutableSetOf()) { it.seasonNumber }
+        val mainEpisodes = sortedEpisodes.filter { episode -> normalizeSeasonNumber(episode.seasonNumber) > 0 }
+        val addonSeasons = mainEpisodes.mapTo(mutableSetOf()) { episode ->
+            normalizeSeasonNumber(episode.seasonNumber)
+        }
         if (seasonNumber == 1 && addonSeasons.size > 1 && episodeNumber > 0) {
             val globalIndex = episodeNumber - 1
-            if (globalIndex in sortedEpisodes.indices) {
-                watchedIndex = globalIndex
+            if (globalIndex in mainEpisodes.indices) {
+                watchedIndex = sortedEpisodes.indexOf(mainEpisodes[globalIndex])
             }
         }
     }
