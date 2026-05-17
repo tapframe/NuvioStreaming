@@ -245,6 +245,7 @@ fun SettingsScreen(
                 tunnelingEnabled = playerSettingsUiState.tunnelingEnabled,
                 useLibass = playerSettingsUiState.useLibass,
                 libassRenderType = playerSettingsUiState.libassRenderType,
+                swipeGesturesEnabled = playerSettingsUiState.swipeGesturesEnabled,
                 selectedTheme = selectedTheme,
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
@@ -294,6 +295,7 @@ fun SettingsScreen(
                 tunnelingEnabled = playerSettingsUiState.tunnelingEnabled,
                 useLibass = playerSettingsUiState.useLibass,
                 libassRenderType = playerSettingsUiState.libassRenderType,
+                swipeGesturesEnabled = playerSettingsUiState.swipeGesturesEnabled,
                 selectedTheme = selectedTheme,
                 onThemeSelected = ThemeSettingsRepository::setTheme,
                 amoledEnabled = amoledEnabled,
@@ -353,6 +355,7 @@ private fun MobileSettingsScreen(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeGesturesEnabled: Boolean,
     selectedTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
@@ -520,6 +523,7 @@ private fun MobileSettingsScreen(
                     tunnelingEnabled = tunnelingEnabled,
                     useLibass = useLibass,
                     libassRenderType = libassRenderType,
+                    swipeGesturesEnabled = swipeGesturesEnabled,
                 )
                 SettingsPage.Appearance -> appearanceSettingsContent(
                     isTablet = false,
@@ -667,6 +671,7 @@ private fun TabletSettingsScreen(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeGesturesEnabled: Boolean,
     selectedTheme: AppTheme,
     onThemeSelected: (AppTheme) -> Unit,
     amoledEnabled: Boolean,
@@ -892,6 +897,7 @@ private fun TabletSettingsScreen(
                         tunnelingEnabled = tunnelingEnabled,
                         useLibass = useLibass,
                         libassRenderType = libassRenderType,
+                        swipeGesturesEnabled = swipeGesturesEnabled,
                     )
                     SettingsPage.Appearance -> appearanceSettingsContent(
                         isTablet = true,

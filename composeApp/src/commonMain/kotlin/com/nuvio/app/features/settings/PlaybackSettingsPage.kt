@@ -86,6 +86,7 @@ internal fun LazyListScope.playbackSettingsContent(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeGesturesEnabled: Boolean,
 ) {
     item {
         PlaybackSettingsSection(
@@ -104,6 +105,7 @@ internal fun LazyListScope.playbackSettingsContent(
             tunnelingEnabled = tunnelingEnabled,
             useLibass = useLibass,
             libassRenderType = libassRenderType,
+            swipeGesturesEnabled = swipeGesturesEnabled,
         )
     }
 }
@@ -166,6 +168,7 @@ private fun PlaybackSettingsSection(
     tunnelingEnabled: Boolean,
     useLibass: Boolean,
     libassRenderType: String,
+    swipeGesturesEnabled: Boolean,
 ) {
     var showPreferredAudioDialog by remember { mutableStateOf(false) }
     var showSecondaryAudioDialog by remember { mutableStateOf(false) }
@@ -262,6 +265,14 @@ private fun PlaybackSettingsSection(
                         onClick = { showHoldToSpeedValueDialog = true },
                     )
                 }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_enable_swipe_gestures),
+                    description = stringResource(Res.string.settings_playback_enable_swipe_gestures_description),
+                    checked = swipeGesturesEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setSwipeGesturesEnabled,
+                )
             }
         }
 

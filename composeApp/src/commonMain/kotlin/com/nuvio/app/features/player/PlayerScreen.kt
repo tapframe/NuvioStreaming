@@ -1631,10 +1631,10 @@ fun PlayerScreen(
                                         abs(totalDx) > viewConfiguration.touchSlop &&
                                         abs(totalDx) > abs(totalDy)
                                 val verticalDominant =
-                                    !holdToSpeedActive &&
+                                    playerSettingsUiState.swipeGesturesEnabled &&
+                                        !holdToSpeedActive &&
                                         abs(totalDy) > viewConfiguration.touchSlop &&
                                         abs(totalDy) > abs(totalDx)
-
                                 gestureMode = when {
                                     horizontalDominant -> {
                                         deactivateHoldToSpeedState.value()
