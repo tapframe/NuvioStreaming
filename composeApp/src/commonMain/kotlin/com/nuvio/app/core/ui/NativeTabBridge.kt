@@ -1,8 +1,8 @@
 package com.nuvio.app.core.ui
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 internal enum class NativeNavigationTab {
     Home,
@@ -18,11 +18,11 @@ internal enum class NativeNavigationTab {
 }
 
 internal object NativeTabBridge {
-    private val _requestedTab = MutableStateFlow(NativeNavigationTab.Home)
-    val requestedTab: StateFlow<NativeNavigationTab> = _requestedTab.asStateFlow()
+    private val _requestedTabs = MutableSharedFlow<NativeNavigationTab>(extraBufferCapacity = 1)
+    val requestedTabs: SharedFlow<NativeNavigationTab> = _requestedTabs.asSharedFlow()
 
     fun requestTab(tabName: String) {
-        _requestedTab.value = NativeNavigationTab.fromName(tabName)
+        _requestedTabs.tryEmit(NativeNavigationTab.fromName(tabName))
     }
 
     fun publishSelectedTab(tab: NativeNavigationTab) {

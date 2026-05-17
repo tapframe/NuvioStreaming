@@ -61,6 +61,7 @@ import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktScrobbleRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressClock
@@ -181,6 +182,16 @@ fun PlayerScreen(
         val downloadedLabel = stringResource(Res.string.compose_player_downloaded)
         val airsPrefix = stringResource(Res.string.compose_player_airs_prefix)
         val tbaLabel = stringResource(Res.string.compose_player_tba)
+        val parentalGuideLabels = ParentalGuideLabels(
+            nudity = stringResource(Res.string.parental_nudity),
+            violence = stringResource(Res.string.parental_violence),
+            profanity = stringResource(Res.string.parental_profanity),
+            alcohol = stringResource(Res.string.parental_alcohol),
+            frightening = stringResource(Res.string.parental_frightening),
+            severe = stringResource(Res.string.parental_severity_severe),
+            moderate = stringResource(Res.string.parental_severity_moderate),
+            mild = stringResource(Res.string.parental_severity_mild),
+        )
         val gestureController = rememberPlayerGestureController()
         var controlsVisible by rememberSaveable { mutableStateOf(true) }
         var playerControlsLocked by rememberSaveable { mutableStateOf(false) }
@@ -217,6 +228,7 @@ fun PlayerScreen(
         val keepScreenAwake = errorMessage == null &&
             (playbackSnapshot.isPlaying || (shouldPlay && playbackSnapshot.isLoading))
         EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
+        var isScrubbingTimeline by remember { mutableStateOf(false) }
         var scrubbingPositionMs by remember { mutableStateOf<Long?>(null) }
         var pausedOverlayVisible by remember { mutableStateOf(false) }
         var gestureFeedback by remember { mutableStateOf<GestureFeedbackState?>(null) }
@@ -281,6 +293,12 @@ fun PlayerScreen(
         var skipIntervals by remember { mutableStateOf<List<SkipInterval>>(emptyList()) }
         var activeSkipInterval by remember { mutableStateOf<SkipInterval?>(null) }
         var skipIntervalDismissed by remember { mutableStateOf(false) }
+
+        // Parental guide overlay state
+        var parentalWarnings by remember { mutableStateOf<List<ParentalWarning>>(emptyList()) }
+        var showParentalGuide by remember { mutableStateOf(false) }
+        var parentalGuideHasShown by remember { mutableStateOf(false) }
+        var playbackStartedForParentalGuide by remember { mutableStateOf(false) }
 
         // Next episode state
         var nextEpisodeInfo by remember { mutableStateOf<NextEpisodeInfo?>(null) }
@@ -416,6 +434,25 @@ fun PlayerScreen(
                 hasSentCompletionScrobbleForCurrentItem = true
                 emitTraktScrobbleStop(progressPercent)
             }
+        }
+
+        fun tryShowParentalGuide() {
+            if (!parentalGuideHasShown && parentalWarnings.isNotEmpty() && !playbackStartedForParentalGuide) {
+                playbackStartedForParentalGuide = true
+                controlsVisible = true
+                showParentalGuide = true
+                parentalGuideHasShown = true
+            }
+        }
+
+        suspend fun resolveParentalGuideImdbId(): String? {
+            val candidates = listOf(parentMetaId, activeVideoId)
+            candidates.firstNotNullOfOrNull(::extractParentalGuideImdbId)?.let { return it }
+            val tmdbId = candidates.firstNotNullOfOrNull(::extractParentalGuideTmdbId) ?: return null
+            return TmdbService.tmdbToImdb(
+                tmdbId = tmdbId,
+                mediaType = contentType ?: parentMetaType,
+            )
         }
 
         fun flushWatchProgress() {
@@ -564,6 +601,7 @@ fun PlayerScreen(
             controlsVisible = false
             lockedOverlayVisible = false
             pausedOverlayVisible = false
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             gestureMessageJob?.cancel()
             gestureFeedback = null
@@ -1192,6 +1230,7 @@ fun PlayerScreen(
             playerController = null
             playerControllerSourceUrl = null
             playbackSnapshot = PlayerPlaybackSnapshot()
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             liveGestureFeedback = null
             renderedGestureFeedback = null
@@ -1289,8 +1328,22 @@ fun PlayerScreen(
             initialSeekApplied = true
         }
 
-        LaunchedEffect(controlsVisible, playbackSnapshot.isPlaying, playbackSnapshot.isLoading, errorMessage) {
-            if (!controlsVisible || !playbackSnapshot.isPlaying || playbackSnapshot.isLoading || errorMessage != null) {
+        LaunchedEffect(
+            controlsVisible,
+            isScrubbingTimeline,
+            playbackSnapshot.isPlaying,
+            playbackSnapshot.isLoading,
+            showParentalGuide,
+            errorMessage,
+        ) {
+            if (
+                !controlsVisible ||
+                isScrubbingTimeline ||
+                !playbackSnapshot.isPlaying ||
+                playbackSnapshot.isLoading ||
+                showParentalGuide ||
+                errorMessage != null
+            ) {
                 return@LaunchedEffect
             }
             delay(3500)
@@ -1352,6 +1405,28 @@ fun PlayerScreen(
                 session = playbackSession,
                 snapshot = playbackSnapshot,
             )
+        }
+
+        // Fetch parental guide when the playable item changes.
+        LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber, parentMetaId, parentMetaType) {
+            parentalWarnings = emptyList()
+            showParentalGuide = false
+            parentalGuideHasShown = false
+            playbackStartedForParentalGuide = false
+
+            val imdbId = resolveParentalGuideImdbId() ?: return@LaunchedEffect
+            val guide = ParentalGuideRepository.getParentalGuide(imdbId) ?: return@LaunchedEffect
+            parentalWarnings = buildParentalWarnings(guide, parentalGuideLabels)
+
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
+        }
+
+        LaunchedEffect(playbackSnapshot.isPlaying, parentalWarnings) {
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
         }
 
         // Fetch skip intervals when episode changes
@@ -1692,7 +1767,7 @@ fun PlayerScreen(
             }
 
             AnimatedVisibility(
-                visible = controlsVisible && !playerControlsLocked,
+                visible = (controlsVisible || showParentalGuide) && !playerControlsLocked,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -1708,6 +1783,7 @@ fun PlayerScreen(
                     metrics = metrics,
                     resizeMode = resizeMode,
                     isLocked = playerControlsLocked,
+                    showPlaybackControls = controlsVisible,
                     onLockToggle = {
                         if (playerControlsLocked) {
                             unlockPlayerControls()
@@ -1732,8 +1808,15 @@ fun PlayerScreen(
                     onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
                     onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
                     onSubmitIntroClick = if (isSeries && playerSettingsUiState.introSubmitEnabled && playerSettingsUiState.introDbApiKey.isNotBlank()) { { showSubmitIntroModal = true } } else null,
-                    onScrubChange = { positionMs -> scrubbingPositionMs = positionMs },
+                    parentalWarnings = parentalWarnings,
+                    showParentalGuide = showParentalGuide,
+                    onParentalGuideAnimationComplete = { showParentalGuide = false },
+                    onScrubChange = { positionMs ->
+                        isScrubbingTimeline = true
+                        scrubbingPositionMs = positionMs
+                    },
                     onScrubFinished = { positionMs ->
+                        isScrubbingTimeline = false
                         scrubbingPositionMs = null
                         playerController?.seekTo(positionMs)
                     },

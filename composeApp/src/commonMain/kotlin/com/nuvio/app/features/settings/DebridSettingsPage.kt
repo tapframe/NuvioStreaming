@@ -47,6 +47,7 @@ import nuvio.composeapp.generated.resources.settings_debrid_description_template
 import nuvio.composeapp.generated.resources.settings_debrid_description_template_description
 import nuvio.composeapp.generated.resources.settings_debrid_enable
 import nuvio.composeapp.generated.resources.settings_debrid_enable_description
+import nuvio.composeapp.generated.resources.settings_debrid_experimental_notice
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_count_many
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_count_one
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_instant_playback
@@ -73,6 +74,11 @@ internal fun LazyListScope.debridSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                DebridInfoRow(
+                    isTablet = isTablet,
+                    text = stringResource(Res.string.settings_debrid_experimental_notice),
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_debrid_enable),
                     description = stringResource(Res.string.settings_debrid_enable_description),
