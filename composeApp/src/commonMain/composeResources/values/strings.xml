@@ -1188,8 +1188,6 @@
     <string name="download_failed">Download failed</string>
     <string name="downloads_channel_description">Shows live download progress and controls.</string>
     <string name="downloads_channel_name">Downloads</string>
-    <string name="downloads_foreground_channel_description">Keeps downloads running while the app is in the background.</string>
-    <string name="downloads_foreground_channel_name">Active downloads</string>
     <string name="downloads_foreground_title">Downloads in progress</string>
     <string name="downloads_foreground_subtitle">Keeping downloads running in the background</string>
     <string name="downloads_live_completed">Download completed</string>
