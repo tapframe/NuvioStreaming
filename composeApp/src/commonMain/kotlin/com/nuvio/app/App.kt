@@ -124,6 +124,7 @@ import com.nuvio.app.features.library.LibraryItem
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySourceMode
+import com.nuvio.app.features.library.LibraryCalendarScreen
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
@@ -221,6 +222,9 @@ data class EntityBrowseRoute(
     val entityName: String,
     val sourceType: String = "tv",
 )
+
+@Serializable
+object LibraryCalendarRoute
 
 @Serializable
 object HomescreenSettingsRoute
@@ -1119,6 +1123,7 @@ private fun MainAppContent(
                                             navController.navigate(DetailRoute(type = item.type, id = item.id))
                                         },
                                         onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
+                                        onLibraryCalendarClick = { navController.navigate(LibraryCalendarRoute) },
                                         onContinueWatchingClick = onContinueWatchingClick,
                                         onContinueWatchingLongPress = onContinueWatchingLongPress,
                                         onSwitchProfile = onSwitchProfile,
@@ -1246,6 +1251,15 @@ private fun MainAppContent(
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = this,
                         modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                composable<LibraryCalendarRoute> {
+                    LibraryCalendarScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        onBack = { navController.popBackStack() },
+                        onEpisodeClick = { episode ->
+                            navController.navigate(DetailRoute(type = episode.showType, id = episode.showId))
+                        },
                     )
                 }
                 composable<PersonDetailRoute> { backStackEntry ->
@@ -2202,6 +2216,7 @@ private fun AppTabHost(
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onLibraryPosterClick: ((LibraryItem) -> Unit)? = null,
     onLibrarySectionViewAllClick: ((LibrarySection) -> Unit)? = null,
+    onLibraryCalendarClick: () -> Unit = {},
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     onSwitchProfile: (() -> Unit)? = null,
@@ -2252,6 +2267,7 @@ private fun AppTabHost(
                         modifier = Modifier.fillMaxSize(),
                         onPosterClick = onLibraryPosterClick,
                         onSectionViewAllClick = onLibrarySectionViewAllClick,
+                        onCalendarClick = onLibraryCalendarClick,
                     )
                 }
 
