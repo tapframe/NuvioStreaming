@@ -590,6 +590,7 @@
     <string name="settings_integrations_mdblist_description">Penyedia rating eksternal</string>
     <string name="settings_integrations_debrid_description">Sumber akun cloud</string>
     <string name="settings_debrid_section_title">Debrid</string>
+    <string name="settings_debrid_experimental_notice">Dukungan Debrid masih bersifat eksperimental dan dapat dipertahankan, diubah, atau dihapus sewaktu-waktu.</string>
     <string name="settings_debrid_enable">Aktifkan sumber</string>
     <string name="settings_debrid_enable_description">Tampilkan hasil dari akun yang terhubung.</string>
     <string name="settings_debrid_add_key_first">Tambahkan kunci API terlebih dahulu.</string>
@@ -1312,6 +1313,14 @@
     <string name="notifications_episode_release_body_generic">Episode baru sudah tersedia</string>
     <string name="notifications_episode_release_body_title">%1$s sudah tersedia</string>
     <string name="notifications_channel_episode_releases_name">Rilis Episode</string>
+    <string name="parental_alcohol">Alkohol/Obat Terlarang</string>
+    <string name="parental_frightening">Menyeramkan</string>
+    <string name="parental_nudity">Telanjang</string>
+    <string name="parental_profanity">Umpatan</string>
+    <string name="parental_severity_mild">Ringan</string>
+    <string name="parental_severity_moderate">Sedang</string>
+    <string name="parental_severity_severe">Beart</string>
+    <string name="parental_violence">Kekerasan</string>
     <string name="person_role_creator">Kreator</string>
     <string name="person_role_director">Sutradara</string>
     <string name="person_role_writer">Penulis</string>
