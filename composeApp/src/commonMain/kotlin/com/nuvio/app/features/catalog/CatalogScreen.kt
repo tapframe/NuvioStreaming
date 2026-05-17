@@ -72,6 +72,7 @@ fun CatalogScreen(
     genre: String? = null,
     onBack: () -> Unit,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
+    onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val uiState by CatalogRepository.uiState.collectAsStateWithLifecycle()
@@ -187,6 +188,7 @@ fun CatalogScreen(
                             cornerRadiusDp = posterCardStyle.cornerRadiusDp,
                             hideLabels = posterCardStyle.hideLabelsEnabled,
                             onClick = onPosterClick?.let { { it(item) } },
+                            onLongClick = onPosterLongClick?.let { { it(item) } },
                         )
                     }
                     if (uiState.isLoading) {
@@ -257,6 +259,7 @@ private fun CatalogPosterTile(
     cornerRadiusDp: Int,
     hideLabels: Boolean,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -267,7 +270,7 @@ private fun CatalogPosterTile(
                 .aspectRatio(item.posterShape.catalogAspectRatio())
                 .clip(RoundedCornerShape(cornerRadiusDp.dp))
                 .background(MaterialTheme.colorScheme.surface)
-                .posterCardClickable(onClick = onClick, onLongClick = null),
+                .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
         ) {
             if (item.poster != null) {
                 AsyncImage(

@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,6 +46,7 @@ import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.nuvioBlockPointerPassthrough
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
@@ -57,7 +57,9 @@ import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWid
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.watched.WatchedRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import nuvio.composeapp.generated.resources.Res
@@ -83,6 +85,7 @@ fun SearchScreen(
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     searchFocusRequestCount: Int = 0,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -112,6 +115,12 @@ fun SearchScreen(
     val discoverInFocus by remember(query, listState) {
         derivedStateOf {
             query.isBlank() && listState.firstVisibleItemIndex > 0
+        }
+    }
+
+    LaunchedEffect(scrollToTopRequests) {
+        scrollToTopRequests.collect {
+            listState.animateScrollToItem(0)
         }
     }
 
@@ -232,14 +241,8 @@ fun SearchScreen(
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent()
-                            }
-                        }
-                    },
+                    .nuvioBlockPointerPassthrough()
+                    .background(MaterialTheme.colorScheme.background),
             ) {
                 NuvioScreenHeader(
                     title = headerTitle,

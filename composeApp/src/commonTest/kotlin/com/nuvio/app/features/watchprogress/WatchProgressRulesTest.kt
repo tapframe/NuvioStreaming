@@ -174,6 +174,34 @@ class WatchProgressRulesTest {
     }
 
     @Test
+    fun `completed progress does not cascade to watched history while Trakt progress is active`() {
+        val completed = entry(
+            videoId = "movie-complete",
+            isCompleted = true,
+        )
+        val inProgress = completed.copy(isCompleted = false)
+
+        assertFalse(
+            shouldCascadeCompletedProgressToWatchedHistory(
+                entry = completed,
+                isUsingTraktProgress = true,
+            ),
+        )
+        assertTrue(
+            shouldCascadeCompletedProgressToWatchedHistory(
+                entry = completed,
+                isUsingTraktProgress = false,
+            ),
+        )
+        assertFalse(
+            shouldCascadeCompletedProgressToWatchedHistory(
+                entry = inProgress,
+                isUsingTraktProgress = false,
+            ),
+        )
+    }
+
+    @Test
     fun `codec normalizes completed entries inferred from percent`() {
         val payload = WatchProgressCodec.encodeEntries(
             listOf(

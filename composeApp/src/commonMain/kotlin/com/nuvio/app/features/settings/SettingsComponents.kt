@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioSectionLabel
+import com.nuvio.app.core.ui.nuvioBlockPointerPassthrough
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_homescreen_collection_with_addon
@@ -113,7 +114,9 @@ internal fun TabletPageHeader(
     onBack: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .nuvioBlockPointerPassthrough(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

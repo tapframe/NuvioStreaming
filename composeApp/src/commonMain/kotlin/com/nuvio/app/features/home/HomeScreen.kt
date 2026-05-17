@@ -60,6 +60,8 @@ import com.nuvio.app.features.home.components.HomeCollectionRowSection
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import com.nuvio.app.features.home.components.ContinueWatchingLayout
@@ -72,6 +74,7 @@ import org.jetbrains.compose.resources.stringResource
 fun HomeScreen(
     modifier: Modifier = Modifier,
     animateCollectionGifs: Boolean = true,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
@@ -106,6 +109,12 @@ fun HomeScreen(
         TraktAuthRepository.isAuthenticated
     }.collectAsStateWithLifecycle()
     var observedOfflineState by remember { mutableStateOf(false) }
+
+    LaunchedEffect(scrollToTopRequests) {
+        scrollToTopRequests.collect {
+            homeListState.animateScrollToItem(0)
+        }
+    }
 
     LaunchedEffect(networkStatusUiState.condition) {
         when (networkStatusUiState.condition) {

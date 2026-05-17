@@ -382,8 +382,10 @@ object WatchProgressRepository {
             ContinueWatchingPreferencesRepository.removeDismissedNextUpKeysForContent(entry.parentMetaId)
         }
 
+        val useTraktProgress = shouldUseTraktProgress()
+
         entriesByVideoId[session.videoId] = entry
-        if (shouldUseTraktProgress()) {
+        if (useTraktProgress) {
             TraktProgressRepository.applyOptimisticProgress(entry)
         }
         publish()
@@ -392,7 +394,9 @@ object WatchProgressRepository {
             resolveRemoteMetadata()
         }
         pushScrobbleToServer(entry)
-        WatchingActions.onProgressEntryUpdated(entry)
+        if (shouldCascadeCompletedProgressToWatchedHistory(entry, useTraktProgress)) {
+            WatchingActions.onProgressEntryUpdated(entry)
+        }
     }
 
     private fun pushScrobbleToServer(entry: WatchProgressEntry) {

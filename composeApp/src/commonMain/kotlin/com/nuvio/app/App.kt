@@ -126,6 +126,7 @@ import com.nuvio.app.features.library.LibrarySection
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
+import com.nuvio.app.features.library.toMetaPreview
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
@@ -181,6 +182,8 @@ import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.nextUpDismissKey
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.application.WatchingState
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -272,6 +275,12 @@ data class CatalogRoute(
     val catalogId: String,
     val supportsPagination: Boolean = false,
     val genre: String? = null,
+)
+
+private data class PosterActionTarget(
+    val preview: MetaPreview,
+    val libraryItem: LibraryItem? = null,
+    val libraryListKey: String? = null,
 )
 
 enum class AppScreenTab {
@@ -544,14 +553,17 @@ private fun MainAppContent(
         val coroutineScope = rememberCoroutineScope()
         var selectedTab by rememberSaveable { mutableStateOf(AppScreenTab.Home) }
         var searchFocusRequestCount by remember { mutableStateOf(0) }
+        val homeScrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+        val searchScrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+        val libraryScrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+        val settingsRootActionRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
         val currentBackStackEntry by navController.currentBackStackEntryAsState()
-        val nativeRequestedTab by remember { NativeTabBridge.requestedTab }.collectAsStateWithLifecycle()
         val liquidGlassNativeTabBarEnabled by remember {
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled
         }.collectAsStateWithLifecycle()
         val liquidGlassNativeTabBarSupported = remember { isLiquidGlassNativeTabBarSupported() }
         var showExitConfirmation by rememberSaveable { mutableStateOf(false) }
-        var selectedPosterForActions by remember { mutableStateOf<MetaPreview?>(null) }
+        var selectedPosterActionTarget by remember { mutableStateOf<PosterActionTarget?>(null) }
         var selectedContinueWatchingForActions by remember { mutableStateOf<ContinueWatchingItem?>(null) }
         var showLibraryListPicker by remember { mutableStateOf(false) }
         var pickerItem by remember { mutableStateOf<LibraryItem?>(null) }
@@ -602,9 +614,28 @@ private fun MainAppContent(
             .sorted()
     }
 
-    LaunchedEffect(nativeRequestedTab) {
-        if (liquidGlassNativeTabBarSupported && liquidGlassNativeTabBarEnabled) {
-            selectedTab = nativeRequestedTab.toAppScreenTab()
+    fun handleRootTabClick(tab: AppScreenTab) {
+        if (selectedTab != tab) {
+            selectedTab = tab
+            return
+        }
+
+        when (tab) {
+            AppScreenTab.Home -> homeScrollToTopRequests.tryEmit(Unit)
+            AppScreenTab.Search -> {
+                searchFocusRequestCount++
+                searchScrollToTopRequests.tryEmit(Unit)
+            }
+            AppScreenTab.Library -> libraryScrollToTopRequests.tryEmit(Unit)
+            AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
+        }
+    }
+
+    LaunchedEffect(liquidGlassNativeTabBarSupported, liquidGlassNativeTabBarEnabled) {
+        NativeTabBridge.requestedTabs.collectLatest { requestedTab ->
+            if (liquidGlassNativeTabBarSupported && liquidGlassNativeTabBarEnabled) {
+                handleRootTabClick(requestedTab.toAppScreenTab())
+            }
         }
     }
 
@@ -1059,35 +1090,29 @@ private fun MainAppContent(
                                     NuvioNavigationBar {
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Home,
-                                            onClick = { selectedTab = AppScreenTab.Home },
+                                            onClick = { handleRootTabClick(AppScreenTab.Home) },
                                             icon = Icons.Filled.Home,
                                             contentDescription = stringResource(Res.string.compose_nav_home),
                                         )
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Search,
-                                            onClick = {
-                                                if (selectedTab == AppScreenTab.Search) {
-                                                    searchFocusRequestCount++
-                                                } else {
-                                                    selectedTab = AppScreenTab.Search
-                                                }
-                                            },
+                                            onClick = { handleRootTabClick(AppScreenTab.Search) },
                                             icon = Res.drawable.sidebar_search,
                                             contentDescription = stringResource(Res.string.compose_nav_search),
                                         )
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Library,
-                                            onClick = { selectedTab = AppScreenTab.Library },
+                                            onClick = { handleRootTabClick(AppScreenTab.Library) },
                                             icon = Res.drawable.sidebar_library,
                                             contentDescription = stringResource(Res.string.compose_nav_library),
                                         )
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Settings,
-                                            onClick = { selectedTab = AppScreenTab.Settings },
+                                            onClick = { handleRootTabClick(AppScreenTab.Settings) },
                                         ) {
                                             ProfileSwitcherTab(
                                                 selected = selectedTab == AppScreenTab.Settings,
-                                                onClick = { selectedTab = AppScreenTab.Settings },
+                                                onClick = { handleRootTabClick(AppScreenTab.Settings) },
                                                 onProfileSelected = onProfileSelected,
                                                 onAddProfileRequested = onSwitchProfile,
                                             )
@@ -1106,6 +1131,11 @@ private fun MainAppContent(
                                             .padding(innerPadding),
                                         selectedTab = selectedTab,
                                         searchFocusRequestCount = searchFocusRequestCount,
+                                        rootActionsEnabled = tabsRouteActive,
+                                        homeScrollToTopRequests = homeScrollToTopRequests,
+                                        searchScrollToTopRequests = searchScrollToTopRequests,
+                                        libraryScrollToTopRequests = libraryScrollToTopRequests,
+                                        settingsRootActionRequests = settingsRootActionRequests,
                                         animateHomeCollectionGifs = tabsRouteActive,
                                         onCatalogClick = onCatalogClick,
                                         onPosterClick = { meta ->
@@ -1113,10 +1143,18 @@ private fun MainAppContent(
                                         },
                                         onPosterLongClick = { meta ->
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            selectedPosterForActions = meta
+                                            selectedPosterActionTarget = PosterActionTarget(preview = meta)
                                         },
                                         onLibraryPosterClick = { item ->
                                             navController.navigate(DetailRoute(type = item.type, id = item.id))
+                                        },
+                                        onLibraryPosterLongClick = { item, section ->
+                                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            selectedPosterActionTarget = PosterActionTarget(
+                                                preview = item.toMetaPreview(),
+                                                libraryItem = item,
+                                                libraryListKey = section.type,
+                                            )
                                         },
                                         onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
                                         onContinueWatchingClick = onContinueWatchingClick,
@@ -1160,13 +1198,7 @@ private fun MainAppContent(
                                 if (isTabletLayout && !useNativeBottomTabs) {
                                     TabletFloatingTopBar(
                                         selectedTab = selectedTab,
-                                        onTabSelected = { tab ->
-                                            if (tab == AppScreenTab.Search && selectedTab == AppScreenTab.Search) {
-                                                searchFocusRequestCount++
-                                            } else {
-                                                selectedTab = tab
-                                            }
-                                        },
+                                        onTabSelected = ::handleRootTabClick,
                                         onProfileSelected = onProfileSelected,
                                         onAddProfileRequested = onSwitchProfile,
                                     )
@@ -1815,6 +1847,18 @@ private fun MainAppContent(
                         onPosterClick = { meta ->
                             navController.navigate(DetailRoute(type = meta.type, id = meta.id))
                         },
+                        onPosterLongClick = { meta ->
+                            hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectedPosterActionTarget = if (route.manifestUrl == INTERNAL_LIBRARY_MANIFEST_URL) {
+                                PosterActionTarget(
+                                    preview = meta,
+                                    libraryItem = meta.toLibraryItem(savedAtEpochMs = 0L),
+                                    libraryListKey = route.catalogId,
+                                )
+                            } else {
+                                PosterActionTarget(preview = meta)
+                            }
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -1980,48 +2024,74 @@ private fun MainAppContent(
             }
 
             NuvioPosterActionSheet(
-                item = selectedPosterForActions,
-                isSaved = selectedPosterForActions?.let { preview ->
+                item = selectedPosterActionTarget?.preview,
+                isSaved = selectedPosterActionTarget?.preview?.let { preview ->
                     LibraryRepository.isSaved(preview.id, preview.type)
                 } == true,
-                isWatched = selectedPosterForActions?.let { preview ->
+                isWatched = selectedPosterActionTarget?.preview?.let { preview ->
                     WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,
                         item = preview,
                     )
                 } == true,
-                onDismiss = { selectedPosterForActions = null },
+                onDismiss = { selectedPosterActionTarget = null },
                 onToggleLibrary = {
-                    selectedPosterForActions?.let { preview ->
-                        val libraryItem = preview.toLibraryItem(savedAtEpochMs = 0L)
-                        if (!isTraktLibrarySource) {
-                            LibraryRepository.toggleSaved(libraryItem)
-                        } else {
-                            pickerItem = libraryItem
-                            pickerTitle = preview.name
-                            pickerTabs = LibraryRepository.libraryListTabs()
-                            pickerMembership = pickerTabs.associate { it.key to false }
-                            pickerPending = true
-                            pickerError = null
-                            showLibraryListPicker = true
-                            coroutineScope.launch {
-                                runCatching {
-                                    val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                    val tabs = LibraryRepository.libraryListTabs()
-                                    pickerTabs = tabs
-                                    pickerMembership = tabs.associate { tab ->
-                                        tab.key to (snapshot[tab.key] == true)
+                    selectedPosterActionTarget?.let { target ->
+                        val preview = target.preview
+                        val libraryItem = target.libraryItem ?: preview.toLibraryItem(savedAtEpochMs = 0L)
+                        if (target.libraryItem != null) {
+                            if (isTraktLibrarySource) {
+                                coroutineScope.launch {
+                                    runCatching {
+                                        val listKey = target.libraryListKey
+                                        if (listKey.isNullOrBlank()) {
+                                            val currentMembership = LibraryRepository.getMembershipSnapshot(libraryItem)
+                                            LibraryRepository.applyMembershipChanges(
+                                                item = libraryItem,
+                                                desiredMembership = currentMembership.mapValues { false },
+                                            )
+                                        } else {
+                                            LibraryRepository.removeFromList(libraryItem, listKey)
+                                        }
+                                    }.onFailure { error ->
+                                        NuvioToastController.show(
+                                            error.message ?: getString(Res.string.trakt_lists_update_failed),
+                                        )
                                     }
-                                }.onFailure { error ->
-                                    pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
                                 }
-                                pickerPending = false
+                            } else {
+                                LibraryRepository.remove(libraryItem.id)
+                            }
+                        } else {
+                            if (!isTraktLibrarySource) {
+                                LibraryRepository.toggleSaved(libraryItem)
+                            } else {
+                                pickerItem = libraryItem
+                                pickerTitle = preview.name
+                                pickerTabs = LibraryRepository.libraryListTabs()
+                                pickerMembership = pickerTabs.associate { it.key to false }
+                                pickerPending = true
+                                pickerError = null
+                                showLibraryListPicker = true
+                                coroutineScope.launch {
+                                    runCatching {
+                                        val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
+                                        val tabs = LibraryRepository.libraryListTabs()
+                                        pickerTabs = tabs
+                                        pickerMembership = tabs.associate { tab ->
+                                            tab.key to (snapshot[tab.key] == true)
+                                        }
+                                    }.onFailure { error ->
+                                        pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
+                                    }
+                                    pickerPending = false
+                                }
                             }
                         }
                     }
                 },
                 onToggleWatched = {
-                    selectedPosterForActions?.let { preview ->
+                    selectedPosterActionTarget?.preview?.let { preview ->
                         coroutineScope.launch {
                             WatchingActions.togglePosterWatched(preview)
                         }
@@ -2196,11 +2266,17 @@ private fun AppTabHost(
     selectedTab: AppScreenTab,
     modifier: Modifier = Modifier,
     searchFocusRequestCount: Int = 0,
+    rootActionsEnabled: Boolean = true,
+    homeScrollToTopRequests: Flow<Unit>,
+    searchScrollToTopRequests: Flow<Unit>,
+    libraryScrollToTopRequests: Flow<Unit>,
+    settingsRootActionRequests: Flow<Unit>,
     animateHomeCollectionGifs: Boolean = true,
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
     onLibraryPosterClick: ((LibraryItem) -> Unit)? = null,
+    onLibraryPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)? = null,
     onLibrarySectionViewAllClick: ((LibrarySection) -> Unit)? = null,
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
@@ -2228,6 +2304,7 @@ private fun AppTabHost(
                     HomeScreen(
                         modifier = Modifier.fillMaxSize(),
                         animateCollectionGifs = animateHomeCollectionGifs,
+                        scrollToTopRequests = homeScrollToTopRequests,
                         onCatalogClick = onCatalogClick,
                         onPosterClick = onPosterClick,
                         onPosterLongClick = onPosterLongClick,
@@ -2244,13 +2321,16 @@ private fun AppTabHost(
                         onPosterClick = onPosterClick,
                         onPosterLongClick = onPosterLongClick,
                         searchFocusRequestCount = searchFocusRequestCount,
+                        scrollToTopRequests = searchScrollToTopRequests,
                     )
                 }
 
                 AppScreenTab.Library -> {
                     LibraryScreen(
                         modifier = Modifier.fillMaxSize(),
+                        scrollToTopRequests = libraryScrollToTopRequests,
                         onPosterClick = onLibraryPosterClick,
+                        onPosterLongClick = onLibraryPosterLongClick,
                         onSectionViewAllClick = onLibrarySectionViewAllClick,
                     )
                 }
@@ -2258,6 +2338,8 @@ private fun AppTabHost(
                 AppScreenTab.Settings -> {
                     SettingsScreen(
                         modifier = Modifier.fillMaxSize(),
+                        rootActionRequests = settingsRootActionRequests,
+                        rootActionsEnabled = rootActionsEnabled,
                         onSwitchProfile = onSwitchProfile,
                         onHomescreenClick = onHomescreenSettingsClick,
                         onMetaScreenClick = onMetaScreenSettingsClick,

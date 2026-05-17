@@ -588,8 +588,9 @@
     <string name="settings_integrations_section_title">Integrations</string>
     <string name="settings_integrations_tmdb_description">Metadata enrichment controls</string>
     <string name="settings_integrations_mdblist_description">External ratings providers</string>
-    <string name="settings_integrations_debrid_description">Cloud account sources</string>
+    <string name="settings_integrations_debrid_description">Experimental cloud account sources</string>
     <string name="settings_debrid_section_title">Debrid</string>
+    <string name="settings_debrid_experimental_notice">Debrid support is experimental and may be kept, changed, or removed later.</string>
     <string name="settings_debrid_enable">Enable sources</string>
     <string name="settings_debrid_enable_description">Show playable results from connected accounts.</string>
     <string name="settings_debrid_add_key_first">Add an API key first.</string>
@@ -1312,6 +1313,14 @@
     <string name="notifications_episode_release_body_generic">A new episode is out now</string>
     <string name="notifications_episode_release_body_title">%1$s is out now</string>
     <string name="notifications_channel_episode_releases_name">Episode Releases</string>
+    <string name="parental_alcohol">Alcohol/Drugs</string>
+    <string name="parental_frightening">Frightening</string>
+    <string name="parental_nudity">Nudity</string>
+    <string name="parental_profanity">Profanity</string>
+    <string name="parental_severity_mild">Mild</string>
+    <string name="parental_severity_moderate">Moderate</string>
+    <string name="parental_severity_severe">Severe</string>
+    <string name="parental_violence">Violence</string>
     <string name="person_role_creator">Creator</string>
     <string name="person_role_director">Director</string>
     <string name="person_role_writer">Writer</string>
