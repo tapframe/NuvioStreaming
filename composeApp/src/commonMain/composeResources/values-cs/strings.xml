@@ -54,7 +54,7 @@
     <string name="cd_selected">Vybráno</string>
     <string name="collections_copy_json">Kopírovat JSON</string>
     <string name="collections_count_summary">%1$d kolekce, %2$d složka(y)</string>
-    <string name="collections_delete_message">Smazat "%1$s"? Tuto akci nelze vrátit zpět.</string>
+    <string name="collections_delete_message">Smazat \"%1$s\"? Tuto akci nelze vrátit zpět.</string>
     <string name="collections_delete_title">Smazat kolekci</string>
     <string name="collections_editor_add_catalog">Přidat katalog</string>
     <string name="collections_editor_add_folder">Přidat složku</string>
@@ -813,7 +813,7 @@
     <string name="settings_playback_threshold_mode_percentage">Procenta</string>
     <string name="settings_playback_threshold_percentage">Prahová procenta</string>
     <string name="settings_playback_threshold_percentage_description">Záložní řešení, pokud neexistuje časová značka pro outro.</string>
-    <string name="settings_playback_threshold_percentage_value">%1$s%</string>
+    <string name="settings_playback_threshold_percentage_value">%1$s%%</string>
     <string name="settings_playback_timeout_instant">Okamžitě</string>
     <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Neomezeně</string>
@@ -1234,11 +1234,11 @@
     <string name="action_resume_episode">Pokračovat %1$s</string>
     <string name="collections_import_error_empty_json">JSON je prázdný.</string>
     <string name="collections_import_error_collection_blank_id">Kolekce %1$d má prázdné ID.</string>
-    <string name="collections_import_error_collection_blank_title">Kolekce '%1$s' má prázdný název.</string>
-    <string name="collections_import_error_folder_blank_id">Složka %1$d v '%2$s' má prázdné ID.</string>
-    <string name="collections_import_error_folder_blank_title">Složka '%1$s' v '%2$s' má prázdný název.</string>
-    <string name="collections_import_error_source_blank_fields">Zdroj %1$d ve složce '%2$s' má prázdná pole.</string>
-    <string name="collections_import_error_trakt_list_id">Zdroj %1$d ve složce '%2$s' nemá ID seznamu Trakt.</string>
+    <string name="collections_import_error_collection_blank_title">Kolekce \'%1$s\' má prázdný název.</string>
+    <string name="collections_import_error_folder_blank_id">Složka %1$d v \'%2$s\' má prázdné ID.</string>
+    <string name="collections_import_error_folder_blank_title">Složka \'%1$s\' v \'%2$s\' má prázdný název.</string>
+    <string name="collections_import_error_source_blank_fields">Zdroj %1$d ve složce \'%2$s\' má prázdná pole.</string>
+    <string name="collections_import_error_trakt_list_id">Zdroj %1$d ve složce \'%2$s\' nemá ID seznamu Trakt.</string>
     <string name="collections_import_error_invalid_json">Neplatný JSON: %1$s</string>
     <string name="collections_folder_addon_not_found">Doplněk nenalezen: %1$s</string>
     <string name="date_month_january">Leden</string>
