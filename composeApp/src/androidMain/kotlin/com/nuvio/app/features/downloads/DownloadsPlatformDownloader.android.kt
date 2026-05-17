@@ -43,6 +43,12 @@ internal actual object DownloadsPlatformDownloader {
         val job = SupervisorJob()
         val scope = CoroutineScope(job + Dispatchers.IO)
         var call: Call? = null
+        val keepAliveContext = appContext
+        var foregroundRetained = false
+        if (keepAliveContext != null) {
+            DownloadsForegroundService.retain(keepAliveContext)
+            foregroundRetained = true
+        }
 
         scope.launch {
             val context = appContext
@@ -150,6 +156,9 @@ internal actual object DownloadsPlatformDownloader {
 
         job.invokeOnCompletion {
             call?.cancel()
+            if (foregroundRetained && keepAliveContext != null) {
+                DownloadsForegroundService.release(keepAliveContext)
+            }
         }
 
         return AndroidDownloadsTaskHandle(job)
