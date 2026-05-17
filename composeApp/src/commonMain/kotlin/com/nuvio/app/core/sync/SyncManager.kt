@@ -11,6 +11,7 @@ import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktPlatformClock
+import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +58,10 @@ object SyncManager {
             launch {
                 runCatching { WatchProgressRepository.pullFromServer(profileId) }
                     .onFailure { log.e(it) { "WatchProgress pull failed" } }
+            }
+            launch {
+                runCatching { StreamLinkCacheRepository.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "StreamLinkCache pull failed" } }
             }
             launch {
                 runCatching { WatchedRepository.pullFromServer(profileId) }
@@ -109,6 +114,10 @@ object SyncManager {
                     .onFailure { log.e(it) { "Foreground library pull failed" } }
             }
 
+            launch {
+                runCatching { StreamLinkCacheRepository.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground StreamLinkCache pull failed" } }
+            }
             launch {
                 runCatching { WatchProgressRepository.pullFromServer(profileId) }
                     .onFailure { log.e(it) { "Foreground watch progress pull failed" } }
