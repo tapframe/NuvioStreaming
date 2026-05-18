@@ -268,7 +268,7 @@ fun HomeScreen(
         )
     }
     val availableManifests = remember(addonsUiState.addons) {
-        addonsUiState.addons.mapNotNull { addon -> addon.manifest }
+        addonsUiState.addons.filter { it.isActive }.mapNotNull { addon -> addon.manifest }
     }
 
     val metaProviderKey = remember(availableManifests) {
@@ -391,7 +391,7 @@ fun HomeScreen(
         )
     }
 
-    val hasActiveAddons = addonsUiState.addons.any { it.manifest != null }
+    val hasActiveAddons = addonsUiState.addons.any { it.isActive }
     val showHeroSlot = homeSettingsUiState.heroEnabled
     val isResolvingHeroSources = addonsUiState.addons.any { it.isRefreshing } || homeUiState.isLoading
     val showHeroSkeleton = showHeroSlot &&
@@ -484,7 +484,7 @@ fun HomeScreen(
             }
 
             when {
-                addonsUiState.addons.none { it.manifest != null } && !hasRenderableCollectionRows -> {
+                addonsUiState.addons.none { it.isActive } && !hasRenderableCollectionRows -> {
                     if (continueWatchingPreferences.isVisible && continueWatchingItems.isNotEmpty()) {
                         item {
                             HomeContinueWatchingSection(

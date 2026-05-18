@@ -20,6 +20,7 @@ data class HomeCatalogDefinition(
 
 fun buildHomeCatalogDefinitions(addons: List<ManagedAddon>): List<HomeCatalogDefinition> =
     addons.mapNotNull { addon ->
+        if (!addon.isActive) return@mapNotNull null
         val manifest = addon.manifest ?: return@mapNotNull null
         addon to manifest
     }.flatMap { (addon, manifest) ->

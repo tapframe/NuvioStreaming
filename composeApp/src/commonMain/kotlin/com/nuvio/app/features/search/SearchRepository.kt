@@ -50,7 +50,7 @@ object SearchRepository {
             return
         }
 
-        val activeAddons = addons.filter { it.manifest != null }
+        val activeAddons = addons.filter { it.isActive }
         if (activeAddons.isEmpty()) {
             activeJob?.cancel()
             lastRequestKey = null
@@ -173,7 +173,7 @@ object SearchRepository {
     }
 
     fun refreshDiscover(addons: List<ManagedAddon>) {
-        val activeAddons = addons.filter { it.manifest != null }
+        val activeAddons = addons.filter { it.isActive }
         if (activeAddons.isEmpty()) {
             activeDiscoverJob?.cancel()
             discoverSources = emptyList()

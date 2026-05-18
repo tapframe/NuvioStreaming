@@ -19,6 +19,7 @@ import platform.Foundation.NSUserDefaults
 
 actual object AddonStorage {
     private const val addonUrlsKey = "installed_manifest_urls"
+    private const val addonEnabledStatesKey = "installed_manifest_enabled_states"
 
     actual fun loadInstalledAddonUrls(profileId: Int): List<String> =
         NSUserDefaults.standardUserDefaults
@@ -33,6 +34,25 @@ actual object AddonStorage {
         NSUserDefaults.standardUserDefaults.setObject(
             urls.joinToString(separator = "\n"),
             forKey = "${addonUrlsKey}_$profileId",
+        )
+    }
+
+    actual fun loadAddonEnabledStates(profileId: Int): Map<String, Boolean> =
+        NSUserDefaults.standardUserDefaults
+            .stringForKey("${addonEnabledStatesKey}_$profileId")
+            .orEmpty()
+            .lineSequence()
+            .mapNotNull { line ->
+                val url = line.substringBefore('\t').trim()
+                val enabled = line.substringAfter('\t', missingDelimiterValue = "true").toBooleanStrictOrNull()
+                if (url.isBlank() || enabled == null) null else url to enabled
+            }
+            .toMap()
+
+    actual fun saveAddonEnabledStates(profileId: Int, states: Map<String, Boolean>) {
+        NSUserDefaults.standardUserDefaults.setObject(
+            states.entries.joinToString(separator = "\n") { (url, enabled) -> "$url\t$enabled" },
+            forKey = "${addonEnabledStatesKey}_$profileId",
         )
     }
 }

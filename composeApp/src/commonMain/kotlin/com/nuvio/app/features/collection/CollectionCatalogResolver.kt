@@ -11,13 +11,14 @@ internal data class ResolvedCollectionCatalog(
 internal fun List<ManagedAddon>.findCollectionCatalog(
     source: CollectionCatalogSource,
 ): ResolvedCollectionCatalog? {
-    val declaredAddon = firstOrNull { it.manifest?.id == source.addonId }
+    val declaredAddon = firstOrNull { it.isActive && it.manifest?.id == source.addonId }
     val declaredCatalog = declaredAddon?.manifest?.catalogs?.findSourceCatalog(source)
     if (declaredAddon != null && declaredCatalog != null) {
         return ResolvedCollectionCatalog(addon = declaredAddon, catalog = declaredCatalog)
     }
 
     return firstNotNullOfOrNull { addon ->
+        if (!addon.isActive) return@firstNotNullOfOrNull null
         val catalog = addon.manifest?.catalogs?.find {
             it.id == source.catalogId && it.type == source.type
         } ?: return@firstNotNullOfOrNull null
