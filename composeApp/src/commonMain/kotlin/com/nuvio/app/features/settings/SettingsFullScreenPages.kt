@@ -35,6 +35,7 @@ fun HomescreenSettingsScreen(
             addonsUiState.addons.none { it.isRefreshing }
         if (!allManifestsSettled) return@remember emptyList<String>()
         addonsUiState.addons.mapNotNull { addon ->
+            if (!addon.isActive) return@mapNotNull null
             val manifest = addon.manifest ?: return@mapNotNull null
             buildString {
                 append(manifest.transportUrl)

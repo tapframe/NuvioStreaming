@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit
 actual object AddonStorage {
     private const val preferencesName = "nuvio_addons"
     private const val addonUrlsKey = "installed_manifest_urls"
+    private const val addonEnabledStatesKey = "installed_manifest_enabled_states"
 
     private var preferences: SharedPreferences? = null
 
@@ -39,6 +40,28 @@ actual object AddonStorage {
         preferences
             ?.edit()
             ?.putString("${addonUrlsKey}_$profileId", urls.joinToString(separator = "\n"))
+            ?.apply()
+    }
+
+    actual fun loadAddonEnabledStates(profileId: Int): Map<String, Boolean> =
+        preferences
+            ?.getString("${addonEnabledStatesKey}_$profileId", null)
+            .orEmpty()
+            .lineSequence()
+            .mapNotNull { line ->
+                val url = line.substringBefore('\t').trim()
+                val enabled = line.substringAfter('\t', missingDelimiterValue = "true").toBooleanStrictOrNull()
+                if (url.isBlank() || enabled == null) null else url to enabled
+            }
+            .toMap()
+
+    actual fun saveAddonEnabledStates(profileId: Int, states: Map<String, Boolean>) {
+        preferences
+            ?.edit()
+            ?.putString(
+                "${addonEnabledStatesKey}_$profileId",
+                states.entries.joinToString(separator = "\n") { (url, enabled) -> "$url\t$enabled" },
+            )
             ?.apply()
     }
 }

@@ -23,6 +23,7 @@
     <string name="addon_installing">Installing</string>
     <string name="addon_title">Addons</string>
     <string name="addons_badge_active">Active</string>
+    <string name="addons_badge_disabled">Disabled</string>
     <string name="addons_badge_catalogs">%1$d catalogs</string>
     <string name="addons_badge_configurable">Configurable</string>
     <string name="addons_badge_refreshing">Refreshing</string>

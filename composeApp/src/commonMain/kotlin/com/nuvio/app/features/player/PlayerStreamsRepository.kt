@@ -153,7 +153,7 @@ object PlayerStreamsRepository {
             return
         }
 
-        val installedAddons = AddonRepository.uiState.value.addons
+        val installedAddons = AddonRepository.uiState.value.addons.filter { it.isActive }
         val installedAddonNames = installedAddons.map { it.displayTitle }.toSet()
         PlayerSettingsRepository.ensureLoaded()
         val playerSettings = PlayerSettingsRepository.uiState.value

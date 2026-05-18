@@ -128,6 +128,7 @@ fun SearchScreen(
 
     val addonRefreshKey = remember(addonsUiState.addons) {
         addonsUiState.addons.mapNotNull { addon ->
+            if (!addon.isActive) return@mapNotNull null
             val manifest = addon.manifest ?: return@mapNotNull null
             buildString {
                 append(manifest.transportUrl)

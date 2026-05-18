@@ -242,6 +242,7 @@ object CollectionRepository {
     fun getAvailableCatalogs(): List<AvailableCatalog> {
         val addons = AddonRepository.uiState.value.addons
         return addons.mapNotNull { addon ->
+            if (!addon.isActive) return@mapNotNull null
             val manifest = addon.manifest ?: return@mapNotNull null
             addon to manifest
         }.flatMap { (addon, manifest) ->

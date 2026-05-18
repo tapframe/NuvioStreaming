@@ -49,7 +49,7 @@ object SubtitleRepository {
             _error.value = null
             _addonSubtitles.value = emptyList()
 
-            val addons = AddonRepository.uiState.value.addons
+            val addons = AddonRepository.uiState.value.addons.filter { it.isActive }
             val allSubs = mutableListOf<AddonSubtitle>()
 
             for (addon in addons) {

@@ -62,13 +62,17 @@ object AddonRepository {
         log.d { "initialize() — loading local addons for profile $currentProfileId" }
 
         val storedUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
+        val enabledByUrl = AddonStorage.loadAddonEnabledStates(currentProfileId)
         log.d { "initialize() — local addon count: ${storedUrls.size}" }
         if (storedUrls.isEmpty()) return
 
         val existingByUrl = _uiState.value.addons.associateBy(ManagedAddon::manifestUrl)
         _uiState.value = AddonsUiState(
             addons = storedUrls.map { manifestUrl ->
-                existingByUrl[manifestUrl].toPendingAddon(manifestUrl)
+                existingByUrl[manifestUrl].toPendingAddon(
+                    manifestUrl = manifestUrl,
+                    isEnabled = enabledByUrl[manifestUrl] ?: true,
+                )
             },
         )
 
@@ -111,10 +115,13 @@ object AddonRepository {
                 .decodeList<AddonRow>()
 
             val namesByUrl = mutableMapOf<String, String>()
+            val enabledByUrl = mutableMapOf<String, Boolean>()
             rows.forEach { row ->
+                val manifestUrl = ensureManifestSuffix(row.url)
                 if (!row.name.isNullOrBlank()) {
-                    namesByUrl[ensureManifestSuffix(row.url)] = row.name
+                    namesByUrl[manifestUrl] = row.name
                 }
+                enabledByUrl[manifestUrl] = row.enabled
             }
 
             val urls = dedupeManifestUrls(rows.map { it.url })
@@ -123,6 +130,7 @@ object AddonRepository {
 
             if (urls.isEmpty() && !pulledFromServer) {
                 val localUrls = AddonStorage.loadInstalledAddonUrls(currentProfileId)
+                val localEnabledByUrl = AddonStorage.loadAddonEnabledStates(currentProfileId)
                 log.i { "pullFromServer() — server empty, local has ${localUrls.size} addons" }
                 if (localUrls.isNotEmpty()) {
                     log.i { "pullFromServer() — migrating local addons to server for profile $currentProfileId" }
@@ -133,7 +141,7 @@ object AddonRepository {
                             url = addonUrl,
                             name = _uiState.value.addons
                                 .find { it.manifestUrl == addonUrl }?.manifest?.name ?: "",
-                            enabled = true,
+                            enabled = localEnabledByUrl[addonUrl] ?: true,
                             sortOrder = index,
                         )
                     }
@@ -149,12 +157,16 @@ object AddonRepository {
 
             if (urls.isEmpty()) {
                 val localUrls = dedupeManifestUrls(AddonStorage.loadInstalledAddonUrls(currentProfileId))
+                val localEnabledByUrl = AddonStorage.loadAddonEnabledStates(currentProfileId)
                 if (localUrls.isNotEmpty()) {
                     log.w { "pullFromServer() — remote empty while local has ${localUrls.size} addons; preserving local addons" }
                     val existingByUrl = _uiState.value.addons.associateBy(ManagedAddon::manifestUrl)
                     _uiState.value = AddonsUiState(
                         addons = localUrls.map { url ->
-                            existingByUrl[url].toPendingAddon(url)
+                            existingByUrl[url].toPendingAddon(
+                                manifestUrl = url,
+                                isEnabled = localEnabledByUrl[url] ?: true,
+                            )
                         },
                     )
                     persist()
@@ -173,7 +185,11 @@ object AddonRepository {
             val existingByUrl = _uiState.value.addons.associateBy(ManagedAddon::manifestUrl)
             _uiState.value = AddonsUiState(
                 addons = urls.map { url ->
-                    existingByUrl[url].toPendingAddon(url, namesByUrl[url])
+                    existingByUrl[url].toPendingAddon(
+                        manifestUrl = url,
+                        userSetName = namesByUrl[url],
+                        isEnabled = enabledByUrl[url] ?: true,
+                    )
                 },
             )
             persist()
@@ -230,6 +246,7 @@ object AddonRepository {
                 addons = current.addons + ManagedAddon(
                     manifestUrl = manifestUrl,
                     manifest = manifest,
+                    isEnabled = true,
                     isRefreshing = false,
                     errorMessage = null,
                 ),
@@ -250,6 +267,29 @@ object AddonRepository {
         }
         persist()
         pushToServer()
+    }
+
+    fun setAddonEnabled(manifestUrl: String, enabled: Boolean) {
+        if (isUsingPrimaryAddonsFromSecondaryProfile()) return
+        log.i { "setAddonEnabled() - $manifestUrl enabled=$enabled" }
+        var shouldRefresh = false
+        _uiState.update { current ->
+            current.copy(
+                addons = current.addons.map { addon ->
+                    if (addon.manifestUrl != manifestUrl) {
+                        addon
+                    } else {
+                        shouldRefresh = enabled && addon.manifest == null && !addon.isRefreshing
+                        addon.copy(isEnabled = enabled)
+                    }
+                },
+            )
+        }
+        persist()
+        pushToServer()
+        if (shouldRefresh) {
+            refreshAddon(manifestUrl)
+        }
     }
 
     fun moveAddon(fromIndex: Int, toIndex: Int) {
@@ -342,7 +382,7 @@ object AddonRepository {
                     AddonPushItem(
                         url = addon.manifestUrl,
                         name = addon.userSetName?.takeIf { it.isNotBlank() } ?: addon.manifest?.name ?: "",
-                        enabled = true,
+                        enabled = addon.isEnabled,
                         sortOrder = index,
                     )
                 }
@@ -381,6 +421,12 @@ object AddonRepository {
             currentProfileId,
             dedupeManifestUrls(_uiState.value.addons.map { it.manifestUrl }),
         )
+        AddonStorage.saveAddonEnabledStates(
+            currentProfileId,
+            _uiState.value.addons
+                .distinctBy { it.manifestUrl }
+                .associate { it.manifestUrl to it.isEnabled },
+        )
     }
 
     private fun cancelActiveRefreshes() {
@@ -399,27 +445,35 @@ object AddonRepository {
     }
 }
 
-private fun ManagedAddon?.toPendingAddon(manifestUrl: String, userSetName: String? = null): ManagedAddon =
+private fun ManagedAddon?.toPendingAddon(
+    manifestUrl: String,
+    userSetName: String? = null,
+    isEnabled: Boolean = this?.isEnabled ?: true,
+): ManagedAddon =
     when {
         this == null -> ManagedAddon(
             manifestUrl = manifestUrl,
             isRefreshing = true,
             userSetName = userSetName,
+            isEnabled = isEnabled,
         )
         manifest != null -> copy(
             manifestUrl = manifestUrl,
             isRefreshing = false,
             userSetName = userSetName ?: this.userSetName,
+            isEnabled = isEnabled,
         )
         isRefreshing -> copy(
             manifestUrl = manifestUrl,
             userSetName = userSetName ?: this.userSetName,
+            isEnabled = isEnabled,
         )
         else -> copy(
             manifestUrl = manifestUrl,
             isRefreshing = true,
             errorMessage = null,
             userSetName = userSetName ?: this.userSetName,
+            isEnabled = isEnabled,
         )
     }
 
