@@ -38,7 +38,13 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.features.debrid.DirectDebridPlayableResult
+import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
+import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.AddonResource
+import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
@@ -55,6 +61,7 @@ import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktScrobbleRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressClock
@@ -175,6 +182,16 @@ fun PlayerScreen(
         val downloadedLabel = stringResource(Res.string.compose_player_downloaded)
         val airsPrefix = stringResource(Res.string.compose_player_airs_prefix)
         val tbaLabel = stringResource(Res.string.compose_player_tba)
+        val parentalGuideLabels = ParentalGuideLabels(
+            nudity = stringResource(Res.string.parental_nudity),
+            violence = stringResource(Res.string.parental_violence),
+            profanity = stringResource(Res.string.parental_profanity),
+            alcohol = stringResource(Res.string.parental_alcohol),
+            frightening = stringResource(Res.string.parental_frightening),
+            severe = stringResource(Res.string.parental_severity_severe),
+            moderate = stringResource(Res.string.parental_severity_moderate),
+            mild = stringResource(Res.string.parental_severity_mild),
+        )
         val gestureController = rememberPlayerGestureController()
         var controlsVisible by rememberSaveable { mutableStateOf(true) }
         var playerControlsLocked by rememberSaveable { mutableStateOf(false) }
@@ -211,6 +228,7 @@ fun PlayerScreen(
         val keepScreenAwake = errorMessage == null &&
             (playbackSnapshot.isPlaying || (shouldPlay && playbackSnapshot.isLoading))
         EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
+        var isScrubbingTimeline by remember { mutableStateOf(false) }
         var scrubbingPositionMs by remember { mutableStateOf<Long?>(null) }
         var pausedOverlayVisible by remember { mutableStateOf(false) }
         var gestureFeedback by remember { mutableStateOf<GestureFeedbackState?>(null) }
@@ -275,6 +293,12 @@ fun PlayerScreen(
         var skipIntervals by remember { mutableStateOf<List<SkipInterval>>(emptyList()) }
         var activeSkipInterval by remember { mutableStateOf<SkipInterval?>(null) }
         var skipIntervalDismissed by remember { mutableStateOf(false) }
+
+        // Parental guide overlay state
+        var parentalWarnings by remember { mutableStateOf<List<ParentalWarning>>(emptyList()) }
+        var showParentalGuide by remember { mutableStateOf(false) }
+        var parentalGuideHasShown by remember { mutableStateOf(false) }
+        var playbackStartedForParentalGuide by remember { mutableStateOf(false) }
 
         // Next episode state
         var nextEpisodeInfo by remember { mutableStateOf<NextEpisodeInfo?>(null) }
@@ -357,9 +381,10 @@ fun PlayerScreen(
                 .coerceIn(0f, 100f)
         }
 
-        fun currentTraktScrobbleItem() = TraktScrobbleRepository.buildItem(
+        suspend fun currentTraktScrobbleItem() = TraktScrobbleRepository.buildItem(
             contentType = contentType ?: parentMetaType,
             parentMetaId = parentMetaId,
+            videoId = activeVideoId,
             title = title,
             seasonNumber = activeSeasonNumber,
             episodeNumber = activeEpisodeNumber,
@@ -367,11 +392,15 @@ fun PlayerScreen(
         )
 
         fun emitTraktScrobbleStart() {
-            val item = currentTraktScrobbleItem() ?: return
             if (hasRequestedScrobbleStartForCurrentItem) return
             hasRequestedScrobbleStartForCurrentItem = true
 
             scope.launch {
+                val item = currentTraktScrobbleItem()
+                if (item == null) {
+                    hasRequestedScrobbleStartForCurrentItem = false
+                    return@launch
+                }
                 TraktScrobbleRepository.scrobbleStart(
                     item = item,
                     progressPercent = currentPlaybackProgressPercent(),
@@ -380,12 +409,12 @@ fun PlayerScreen(
         }
 
         fun emitTraktScrobbleStop(progressPercent: Float? = null) {
-            val item = currentTraktScrobbleItem() ?: return
             val provided = progressPercent
             if (!hasRequestedScrobbleStartForCurrentItem && (provided ?: 0f) < 80f) return
 
             val percent = provided ?: currentPlaybackProgressPercent()
             scope.launch {
+                val item = currentTraktScrobbleItem() ?: return@launch
                 TraktScrobbleRepository.scrobbleStop(
                     item = item,
                     progressPercent = percent,
@@ -405,6 +434,25 @@ fun PlayerScreen(
                 hasSentCompletionScrobbleForCurrentItem = true
                 emitTraktScrobbleStop(progressPercent)
             }
+        }
+
+        fun tryShowParentalGuide() {
+            if (!parentalGuideHasShown && parentalWarnings.isNotEmpty() && !playbackStartedForParentalGuide) {
+                playbackStartedForParentalGuide = true
+                controlsVisible = true
+                showParentalGuide = true
+                parentalGuideHasShown = true
+            }
+        }
+
+        suspend fun resolveParentalGuideImdbId(): String? {
+            val candidates = listOf(parentMetaId, activeVideoId)
+            candidates.firstNotNullOfOrNull(::extractParentalGuideImdbId)?.let { return it }
+            val tmdbId = candidates.firstNotNullOfOrNull(::extractParentalGuideTmdbId) ?: return null
+            return TmdbService.tmdbToImdb(
+                tmdbId = tmdbId,
+                mediaType = contentType ?: parentMetaType,
+            )
         }
 
         fun flushWatchProgress() {
@@ -434,8 +482,24 @@ fun PlayerScreen(
         var preferredSubtitleSelectionApplied by rememberSaveable(sourceUrl) { mutableStateOf(false) }
         var activeSubtitleTab by remember { mutableStateOf(SubtitleTab.BuiltIn) }
         val subtitleStyle = playerSettingsUiState.subtitleStyle
+        val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
         val addonSubtitles by SubtitleRepository.addonSubtitles.collectAsStateWithLifecycle()
         val isLoadingAddonSubtitles by SubtitleRepository.isLoading.collectAsStateWithLifecycle()
+        val activeAddonSubtitleType = contentType ?: parentMetaType
+        val addonSubtitleFetchKey = remember(
+            addonsUiState.addons,
+            activeAddonSubtitleType,
+            activeVideoId,
+        ) {
+            buildAddonSubtitleFetchKey(
+                addons = addonsUiState.addons,
+                type = activeAddonSubtitleType,
+                videoId = activeVideoId,
+            )
+        }
+        var autoFetchedAddonSubtitlesForKey by rememberSaveable(activeSourceUrl, activeVideoId) {
+            mutableStateOf<String?>(null)
+        }
 
         fun refreshTracks() {
             val ctrl = playerController ?: return
@@ -537,6 +601,7 @@ fun PlayerScreen(
             controlsVisible = false
             lockedOverlayVisible = false
             pausedOverlayVisible = false
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             gestureMessageJob?.cancel()
             gestureFeedback = null
@@ -779,15 +844,66 @@ fun PlayerScreen(
             playerController?.seekTo(targetPositionMs)
         }
 
+        fun resolveDebridForPlayer(
+            stream: StreamItem,
+            season: Int?,
+            episode: Int?,
+            onResolved: (StreamItem) -> Unit,
+            onStale: () -> Unit,
+        ): Boolean {
+            if (!stream.isDirectDebridStream || stream.directPlaybackUrl != null) return false
+            scope.launch {
+                val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
+                    stream = stream,
+                    season = season,
+                    episode = episode,
+                )
+                when (resolved) {
+                    is DirectDebridPlayableResult.Success -> onResolved(resolved.stream)
+                    else -> {
+                        resolved.toastMessage()?.let { NuvioToastController.show(it) }
+                        if (resolved == DirectDebridPlayableResult.Stale) {
+                            onStale()
+                        }
+                    }
+                }
+            }
+            return true
+        }
+
         fun switchToSource(stream: StreamItem) {
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
+                    onResolved = ::switchToSource,
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        val vid = activeVideoId
+                        if (vid != null) {
+                            PlayerStreamsRepository.loadSources(
+                                type = type,
+                                videoId = vid,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
+                                forceRefresh = true,
+                            )
+                        }
+                    },
+                )
+            ) return
             val url = stream.directPlaybackUrl ?: return
             if (url == activeSourceUrl) return
             val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
             flushWatchProgress()
             if (playerSettingsUiState.streamReuseLastLinkEnabled && activeVideoId != null) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    activeVideoId!!,
+                    type = contentType ?: parentMetaType,
+                    videoId = activeVideoId!!,
+                    parentMetaId = parentMetaId,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -818,6 +934,26 @@ fun PlayerScreen(
         }
 
         fun switchToEpisodeStream(stream: StreamItem, episode: MetaVideo) {
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = episode.season,
+                    episode = episode.episode,
+                    onResolved = { resolvedStream ->
+                        switchToEpisodeStream(resolvedStream, episode)
+                    },
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        PlayerStreamsRepository.loadEpisodeStreams(
+                            type = type,
+                            videoId = episode.id,
+                            season = episode.season,
+                            episode = episode.episode,
+                            forceRefresh = true,
+                        )
+                    },
+                )
+            ) return
             val url = stream.directPlaybackUrl ?: return
             showNextEpisodeCard = false
             showSourcesPanel = false
@@ -846,8 +982,11 @@ fun PlayerScreen(
             val epResumePositionMs = epEntry?.lastPositionMs?.takeIf { it > 0L } ?: 0L
             if (playerSettingsUiState.streamReuseLastLinkEnabled) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    epVideoId,
+                    type = contentType ?: parentMetaType,
+                    videoId = epVideoId,
+                    parentMetaId = parentMetaId,
+                    season = episode.season,
+                    episode = episode.episode,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -1081,8 +1220,8 @@ fun PlayerScreen(
         }
 
         fun fetchAddonSubtitlesForActiveItem() {
-            val type = contentType ?: return
-            val videoId = activeVideoId ?: return
+            val type = activeAddonSubtitleType.takeIf { it.isNotBlank() } ?: return
+            val videoId = activeVideoId?.takeIf { it.isNotBlank() } ?: return
             SubtitleRepository.fetchAddonSubtitles(type, videoId)
         }
 
@@ -1091,6 +1230,7 @@ fun PlayerScreen(
             playerController = null
             playerControllerSourceUrl = null
             playbackSnapshot = PlayerPlaybackSnapshot()
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             liveGestureFeedback = null
             renderedGestureFeedback = null
@@ -1116,11 +1256,11 @@ fun PlayerScreen(
             playerController?.applySubtitleStyle(subtitleStyle)
         }
 
-        LaunchedEffect(showSubtitleModal, activeSubtitleTab, contentType, activeVideoId) {
-            if (!showSubtitleModal || activeSubtitleTab != SubtitleTab.Addons) return@LaunchedEffect
-            if (!isLoadingAddonSubtitles && addonSubtitles.isEmpty()) {
-                fetchAddonSubtitlesForActiveItem()
-            }
+        LaunchedEffect(activeSourceUrl, addonSubtitleFetchKey) {
+            val fetchKey = addonSubtitleFetchKey ?: return@LaunchedEffect
+            if (autoFetchedAddonSubtitlesForKey == fetchKey) return@LaunchedEffect
+            autoFetchedAddonSubtitlesForKey = fetchKey
+            fetchAddonSubtitlesForActiveItem()
         }
 
         LaunchedEffect(playbackSnapshot.isLoading, playerController) {
@@ -1188,8 +1328,22 @@ fun PlayerScreen(
             initialSeekApplied = true
         }
 
-        LaunchedEffect(controlsVisible, playbackSnapshot.isPlaying, playbackSnapshot.isLoading, errorMessage) {
-            if (!controlsVisible || !playbackSnapshot.isPlaying || playbackSnapshot.isLoading || errorMessage != null) {
+        LaunchedEffect(
+            controlsVisible,
+            isScrubbingTimeline,
+            playbackSnapshot.isPlaying,
+            playbackSnapshot.isLoading,
+            showParentalGuide,
+            errorMessage,
+        ) {
+            if (
+                !controlsVisible ||
+                isScrubbingTimeline ||
+                !playbackSnapshot.isPlaying ||
+                playbackSnapshot.isLoading ||
+                showParentalGuide ||
+                errorMessage != null
+            ) {
                 return@LaunchedEffect
             }
             delay(3500)
@@ -1251,6 +1405,28 @@ fun PlayerScreen(
                 session = playbackSession,
                 snapshot = playbackSnapshot,
             )
+        }
+
+        // Fetch parental guide when the playable item changes.
+        LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber, parentMetaId, parentMetaType) {
+            parentalWarnings = emptyList()
+            showParentalGuide = false
+            parentalGuideHasShown = false
+            playbackStartedForParentalGuide = false
+
+            val imdbId = resolveParentalGuideImdbId() ?: return@LaunchedEffect
+            val guide = ParentalGuideRepository.getParentalGuide(imdbId) ?: return@LaunchedEffect
+            parentalWarnings = buildParentalWarnings(guide, parentalGuideLabels)
+
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
+        }
+
+        LaunchedEffect(playbackSnapshot.isPlaying, parentalWarnings) {
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
         }
 
         // Fetch skip intervals when episode changes
@@ -1558,8 +1734,11 @@ fun PlayerScreen(
                         val currentVideoId = activeVideoId
                         if (currentVideoId != null) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
-                                contentType ?: parentMetaType,
-                                currentVideoId,
+                                type = contentType ?: parentMetaType,
+                                videoId = currentVideoId,
+                                parentMetaId = parentMetaId,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
                             )
                             StreamLinkCacheRepository.remove(cacheKey)
                         }
@@ -1588,7 +1767,7 @@ fun PlayerScreen(
             }
 
             AnimatedVisibility(
-                visible = controlsVisible && !playerControlsLocked,
+                visible = (controlsVisible || showParentalGuide) && !playerControlsLocked,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -1604,6 +1783,7 @@ fun PlayerScreen(
                     metrics = metrics,
                     resizeMode = resizeMode,
                     isLocked = playerControlsLocked,
+                    showPlaybackControls = controlsVisible,
                     onLockToggle = {
                         if (playerControlsLocked) {
                             unlockPlayerControls()
@@ -1628,8 +1808,15 @@ fun PlayerScreen(
                     onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
                     onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
                     onSubmitIntroClick = if (isSeries && playerSettingsUiState.introSubmitEnabled && playerSettingsUiState.introDbApiKey.isNotBlank()) { { showSubmitIntroModal = true } } else null,
-                    onScrubChange = { positionMs -> scrubbingPositionMs = positionMs },
+                    parentalWarnings = parentalWarnings,
+                    showParentalGuide = showParentalGuide,
+                    onParentalGuideAnimationComplete = { showParentalGuide = false },
+                    onScrubChange = { positionMs ->
+                        isScrubbingTimeline = true
+                        scrubbingPositionMs = positionMs
+                    },
                     onScrubFinished = { positionMs ->
+                        isScrubbingTimeline = false
                         scrubbingPositionMs = null
                         playerController?.seekTo(positionMs)
                     },
@@ -1908,6 +2095,47 @@ fun PlayerScreen(
             }
         }
     }
+}
+
+private fun buildAddonSubtitleFetchKey(
+    addons: List<ManagedAddon>,
+    type: String?,
+    videoId: String?,
+): String? {
+    val normalizedType = type?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedVideoId = videoId?.takeIf { it.isNotBlank() } ?: return null
+    val compatibleSubtitleAddons = addons.mapNotNull { addon ->
+        val manifest = addon.manifest ?: return@mapNotNull null
+        val supportsSubtitles = manifest.resources.any { resource ->
+            resource.isCompatibleSubtitleResource(
+                type = normalizedType,
+                videoId = normalizedVideoId,
+            )
+        }
+        if (!supportsSubtitles) return@mapNotNull null
+        "${manifest.id}:${manifest.transportUrl}"
+    }
+
+    if (compatibleSubtitleAddons.isEmpty()) return null
+    return buildString {
+        append(normalizedType)
+        append('|')
+        append(normalizedVideoId)
+        append('|')
+        append(compatibleSubtitleAddons.sorted().joinToString("|"))
+    }
+}
+
+private fun AddonResource.isCompatibleSubtitleResource(type: String, videoId: String): Boolean {
+    val isSubtitleResource = name.equals("subtitles", ignoreCase = true) ||
+        name.equals("subtitle", ignoreCase = true)
+    if (!isSubtitleResource) return false
+
+    val requestType = if (type.equals("tv", ignoreCase = true)) "series" else type
+    val typeMatches = types.isEmpty() || types.any { it.equals(requestType, ignoreCase = true) }
+    if (!typeMatches) return false
+
+    return idPrefixes.isEmpty() || idPrefixes.any { prefix -> videoId.startsWith(prefix) }
 }
 
 private fun <T> findPreferredTrackIndex(

@@ -22,8 +22,20 @@ internal expect fun epochMs(): Long
 object StreamLinkCacheRepository {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun contentKey(type: String, videoId: String): String =
-        "${type.lowercase()}|$videoId"
+    fun contentKey(
+        type: String,
+        videoId: String,
+        parentMetaId: String? = null,
+        season: Int? = null,
+        episode: Int? = null,
+    ): String {
+        val normalizedType = type.lowercase()
+        return if (!parentMetaId.isNullOrBlank() && season != null && episode != null) {
+            "$normalizedType|${parentMetaId.trim()}|s$season|e$episode|$videoId"
+        } else {
+            "$normalizedType|$videoId"
+        }
+    }
 
     fun save(
         contentKey: String,

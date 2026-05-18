@@ -22,6 +22,8 @@ private data class StoredContinueWatchingPreferences(
     val blurNextUp: Boolean = false,
     val dismissedNextUpKeys: Set<String> = emptySet(),
     val showResumePromptOnLaunch: Boolean = true,
+    @SerialName("sort_mode")
+    val sortMode: ContinueWatchingSortMode = ContinueWatchingSortMode.DEFAULT,
 )
 
 object ContinueWatchingPreferencesRepository {
@@ -97,6 +99,7 @@ object ContinueWatchingPreferencesRepository {
                 blurNextUp = stored.blurNextUp,
                 dismissedNextUpKeys = stored.dismissedNextUpKeys,
                 showResumePromptOnLaunch = stored.showResumePromptOnLaunch,
+                sortMode = stored.sortMode,
             )
         } else {
             ContinueWatchingPreferencesUiState()
@@ -155,6 +158,13 @@ object ContinueWatchingPreferencesRepository {
         persist()
     }
 
+    fun setSortMode(mode: ContinueWatchingSortMode) {
+        ensureLoaded()
+        if (_uiState.value.sortMode == mode) return
+        _uiState.value = _uiState.value.copy(sortMode = mode)
+        persist()
+    }
+
     fun removeDismissedNextUpKeysForContent(contentId: String) {
         ensureLoaded()
         val normalizedContentId = contentId.trim()
@@ -178,6 +188,7 @@ object ContinueWatchingPreferencesRepository {
                     blurNextUp = _uiState.value.blurNextUp,
                     dismissedNextUpKeys = _uiState.value.dismissedNextUpKeys,
                     showResumePromptOnLaunch = _uiState.value.showResumePromptOnLaunch,
+                    sortMode = _uiState.value.sortMode,
                 ),
             ),
         )

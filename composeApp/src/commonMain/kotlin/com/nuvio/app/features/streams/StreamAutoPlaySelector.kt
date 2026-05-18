@@ -34,14 +34,14 @@ object StreamAutoPlaySelector {
         val targetBingeGroup = preferredBingeGroup?.trim().orEmpty()
         if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
             val bingeGroupMatch = candidateStreams.firstOrNull { stream ->
-                stream.behaviorHints.bingeGroup == targetBingeGroup && stream.directPlaybackUrl != null
+                stream.behaviorHints.bingeGroup == targetBingeGroup && stream.isAutoPlayable()
             }
             if (bingeGroupMatch != null) return bingeGroupMatch
         }
 
         return when (mode) {
             StreamAutoPlayMode.MANUAL -> null
-            StreamAutoPlayMode.FIRST_STREAM -> candidateStreams.firstOrNull { it.directPlaybackUrl != null }
+            StreamAutoPlayMode.FIRST_STREAM -> candidateStreams.firstOrNull { it.isAutoPlayable() }
             StreamAutoPlayMode.REGEX_MATCH -> {
                 val pattern = regexPattern.trim()
 
@@ -61,7 +61,8 @@ object StreamAutoPlaySelector {
                 } else null
 
                 val matchingStreams = candidateStreams.filter { stream ->
-                    val url = stream.directPlaybackUrl ?: return@filter false
+                    if (!stream.isAutoPlayable()) return@filter false
+                    val url = stream.directPlaybackUrl.orEmpty()
 
                     val searchableText = buildString {
                         append(stream.addonName).append(' ')
@@ -81,8 +82,11 @@ object StreamAutoPlaySelector {
                 }
 
                 if (matchingStreams.isEmpty()) return null
-                matchingStreams.firstOrNull { it.directPlaybackUrl != null }
+                matchingStreams.firstOrNull { it.isAutoPlayable() }
             }
         }
     }
+
+    private fun StreamItem.isAutoPlayable(): Boolean =
+        directPlaybackUrl != null || isDirectDebridStream
 }

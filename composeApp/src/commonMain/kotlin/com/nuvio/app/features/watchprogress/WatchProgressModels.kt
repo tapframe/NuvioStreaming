@@ -18,6 +18,12 @@ enum class ContinueWatchingSectionStyle {
 }
 
 @Serializable
+enum class ContinueWatchingSortMode {
+    DEFAULT,
+    STREAMING_STYLE,
+}
+
+@Serializable
 data class WatchProgressEntry(
     val contentType: String,
     val parentMetaId: String,
@@ -175,6 +181,7 @@ data class ContinueWatchingPreferencesUiState(
     val blurNextUp: Boolean = false,
     val dismissedNextUpKeys: Set<String> = emptySet(),
     val showResumePromptOnLaunch: Boolean = true,
+    val sortMode: ContinueWatchingSortMode = ContinueWatchingSortMode.DEFAULT,
 )
 
 internal fun nextUpDismissKey(

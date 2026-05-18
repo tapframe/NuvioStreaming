@@ -80,10 +80,12 @@ fun DetailMetaInfo(
         val runtimeText = formatRuntimeForDisplay(meta.runtime)
         val ageBadge = meta.ageRating?.trim()?.takeIf { it.isNotBlank() }
         val hasMdbImdbRating = meta.externalRatings.any { it.source == PROVIDER_IMDB }
+        val validImdbRating = meta.imdbRating
+            ?.takeIf { raw -> raw.toDoubleOrNull()?.let { it > 0.0 } == true }
         val hasMetaRow = releaseLine != null ||
             runtimeText != null ||
             ageBadge != null ||
-            (meta.imdbRating != null && !hasMdbImdbRating)
+            (validImdbRating != null && !hasMdbImdbRating)
         if (hasMetaRow) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -108,7 +110,7 @@ fun DetailMetaInfo(
                 ageBadge?.let { badge ->
                     DetailHeroMetaBadge(text = badge)
                 }
-                if (meta.imdbRating != null && !hasMdbImdbRating) {
+                if (validImdbRating != null && !hasMdbImdbRating) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -129,7 +131,7 @@ fun DetailMetaInfo(
                         }
                         Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = meta.imdbRating,
+                            text = validImdbRating,
                             style = MaterialTheme.typography.titleMedium,
                             color = ImdbYellow,
                             fontWeight = FontWeight.Bold,

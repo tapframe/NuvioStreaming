@@ -63,9 +63,10 @@ internal object TraktScrobbleRepository {
         sendScrobble(action = "stop", item = item, progressPercent = progressPercent)
     }
 
-    fun buildItem(
+    suspend fun buildItem(
         contentType: String,
         parentMetaId: String,
+        videoId: String?,
         title: String?,
         seasonNumber: Int?,
         episodeNumber: Int?,
@@ -81,12 +82,20 @@ internal object TraktScrobbleRepository {
             seasonNumber != null &&
             episodeNumber != null
         ) {
+            val mappedEpisode = TraktEpisodeMappingService.resolveEpisodeMapping(
+                contentId = parentMetaId,
+                contentType = contentType,
+                videoId = videoId,
+                season = seasonNumber,
+                episode = episodeNumber,
+                episodeTitle = episodeTitle,
+            )
             TraktScrobbleItem.Episode(
                 showTitle = title,
                 showYear = parsedYear,
                 showIds = ids,
-                season = seasonNumber,
-                number = episodeNumber,
+                season = mappedEpisode?.season ?: seasonNumber,
+                number = mappedEpisode?.episode ?: episodeNumber,
                 episodeTitle = episodeTitle,
             )
         } else {
@@ -247,6 +256,9 @@ internal object TraktScrobbleRepository {
         val isSameAction = last.action == action
         val isSameItem = last.itemKey == itemKey
         val isNearProgress = abs(last.progress - progress) <= progressWindow
+        if (action == "stop" && last.action == "start" && isSameItem) {
+            return false
+        }
         return isSameWindow && isSameAction && isSameItem && isNearProgress
     }
 

@@ -78,6 +78,7 @@ fun HomescreenSettingsScreen(
             isTablet = false,
             heroEnabled = homescreenSettingsUiState.heroEnabled,
             hideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
+            hideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
             items = homescreenSettingsUiState.items,
         )
     }
@@ -135,6 +136,7 @@ fun ContinueWatchingSettingsScreen(
             showUnairedNextUp = continueWatchingPreferencesUiState.showUnairedNextUp,
             blurNextUp = continueWatchingPreferencesUiState.blurNextUp,
             showResumePromptOnLaunch = continueWatchingPreferencesUiState.showResumePromptOnLaunch,
+            sortMode = continueWatchingPreferencesUiState.sortMode,
         )
     }
 }
