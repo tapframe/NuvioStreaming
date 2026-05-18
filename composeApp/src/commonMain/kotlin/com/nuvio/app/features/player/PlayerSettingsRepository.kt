@@ -8,6 +8,24 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class SwipeToSeekSensitivity {
+    LOW, MEDIUM, HIGH;
+
+    val triggerMultiplier: Float
+        get() = when (this) {
+            LOW -> 4.0f
+            MEDIUM -> 1.0f
+            HIGH -> 0.5f
+        }
+
+    val speedMultiplier: Float
+        get() = when (this) {
+            LOW -> 0.5f
+            MEDIUM -> 1.0f
+            HIGH -> 2.0f
+        }
+}
+
 data class PlayerSettingsUiState(
     val showLoadingOverlay: Boolean = true,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
@@ -31,6 +49,8 @@ data class PlayerSettingsUiState(
     val streamAutoPlaySelectedPlugins: Set<String> = emptySet(),
     val streamAutoPlayRegex: String = "",
     val streamAutoPlayTimeoutSeconds: Int = 3,
+    val swipeToSeekEnabled: Boolean = true,
+    val swipeToSeekSensitivity: SwipeToSeekSensitivity = SwipeToSeekSensitivity.MEDIUM,
     val skipIntroEnabled: Boolean = true,
     val animeSkipEnabled: Boolean = false,
     val animeSkipClientId: String = "",
@@ -84,6 +104,8 @@ object PlayerSettingsRepository {
     private var nextEpisodeThresholdMinutesBeforeEnd = 2f
     private var useLibass = false
     private var libassRenderType = "CUES"
+    private var swipeToSeekEnabled = true
+    private var swipeToSeekSensitivity = SwipeToSeekSensitivity.MEDIUM
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -204,6 +226,12 @@ object PlayerSettingsRepository {
         nextEpisodeThresholdMinutesBeforeEnd = PlayerSettingsStorage.loadNextEpisodeThresholdMinutesBeforeEnd() ?: 2f
         useLibass = PlayerSettingsStorage.loadUseLibass() ?: false
         libassRenderType = PlayerSettingsStorage.loadLibassRenderType() ?: "CUES"
+        swipeToSeekEnabled = PlayerSettingsStorage.loadSwipeToSeekEnabled() ?: true
+        swipeToSeekSensitivity = try {
+            SwipeToSeekSensitivity.valueOf(PlayerSettingsStorage.loadSwipeToSeekSensitivity() ?: "MEDIUM")
+        } catch (e: Exception) {
+            SwipeToSeekSensitivity.MEDIUM
+        }
         publish()
     }
 
@@ -498,6 +526,22 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveLibassRenderType(renderType)
     }
 
+    fun setSwipeToSeekEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (swipeToSeekEnabled == enabled) return
+        swipeToSeekEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveSwipeToSeekEnabled(enabled)
+    }
+
+    fun setSwipeToSeekSensitivity(sensitivity: SwipeToSeekSensitivity) {
+        ensureLoaded()
+        if (swipeToSeekSensitivity == sensitivity) return
+        swipeToSeekSensitivity = sensitivity
+        publish()
+        PlayerSettingsStorage.saveSwipeToSeekSensitivity(sensitivity.name)
+    }
+
     private fun publish() {
         _uiState.value = PlayerSettingsUiState(
             showLoadingOverlay = showLoadingOverlay,
@@ -534,6 +578,8 @@ object PlayerSettingsRepository {
             nextEpisodeThresholdMinutesBeforeEnd = nextEpisodeThresholdMinutesBeforeEnd,
             useLibass = useLibass,
             libassRenderType = libassRenderType,
+            swipeToSeekEnabled = swipeToSeekEnabled,
+            swipeToSeekSensitivity = swipeToSeekSensitivity,
         )
     }
 

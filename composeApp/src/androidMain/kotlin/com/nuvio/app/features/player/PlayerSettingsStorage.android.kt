@@ -56,6 +56,8 @@ actual object PlayerSettingsStorage {
     private const val nextEpisodeThresholdMinutesBeforeEndKey = "next_episode_threshold_minutes_before_end_v2"
     private const val useLibassKey = "use_libass"
     private const val libassRenderTypeKey = "libass_render_type"
+    private const val swipeToSeekEnabledKey = "swipe_to_seek_enabled"
+    private const val swipeToSeekSensitivityKey = "swipe_to_seek_sensitivity"
     private val syncKeys = listOf(
         showLoadingOverlayKey,
         resizeModeKey,
@@ -92,6 +94,8 @@ actual object PlayerSettingsStorage {
         nextEpisodeThresholdMinutesBeforeEndKey,
         useLibassKey,
         libassRenderTypeKey,
+        swipeToSeekEnabledKey,
+        swipeToSeekSensitivityKey,
     )
 
     private var preferences: SharedPreferences? = null
@@ -688,6 +692,8 @@ actual object PlayerSettingsStorage {
         loadNextEpisodeThresholdMinutesBeforeEnd()?.let { put(nextEpisodeThresholdMinutesBeforeEndKey, encodeSyncFloat(it)) }
         loadUseLibass()?.let { put(useLibassKey, encodeSyncBoolean(it)) }
         loadLibassRenderType()?.let { put(libassRenderTypeKey, encodeSyncString(it)) }
+        loadSwipeToSeekEnabled()?.let { put(swipeToSeekEnabledKey, encodeSyncBoolean(it)) }
+        loadSwipeToSeekSensitivity()?.let { put(swipeToSeekSensitivityKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -732,5 +738,34 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncFloat(nextEpisodeThresholdMinutesBeforeEndKey)?.let(::saveNextEpisodeThresholdMinutesBeforeEnd)
         payload.decodeSyncBoolean(useLibassKey)?.let(::saveUseLibass)
         payload.decodeSyncString(libassRenderTypeKey)?.let(::saveLibassRenderType)
+        payload.decodeSyncBoolean(swipeToSeekEnabledKey)?.let(::saveSwipeToSeekEnabled)
+        payload.decodeSyncString(swipeToSeekSensitivityKey)?.let(::saveSwipeToSeekSensitivity)
+    }
+
+    actual fun loadSwipeToSeekEnabled(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(swipeToSeekEnabledKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, true)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveSwipeToSeekEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(swipeToSeekEnabledKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadSwipeToSeekSensitivity(): String? =
+        preferences?.getString(ProfileScopedKey.of(swipeToSeekSensitivityKey), null)
+
+    actual fun saveSwipeToSeekSensitivity(sensitivity: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(swipeToSeekSensitivityKey), sensitivity)
+            ?.apply()
     }
 }

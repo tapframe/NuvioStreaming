@@ -754,6 +754,13 @@
     <string name="settings_playback_regex_matches_against">Matches against stream name/title/description/addon/url. Example: 4K|2160p|Remux</string>
     <string name="settings_playback_regex_pattern">Regex Pattern</string>
     <string name="settings_playback_regex_placeholder">No pattern set. Example: 4K|2160p|Remux</string>
+    <string name="settings_playback_swipe_to_seek">Swipe to Seek</string>
+    <string name="settings_playback_swipe_to_seek_description">Swipe horizontally on the player surface to seek forward or backward.</string>
+    <string name="settings_playback_swipe_to_seek_sensitivity">Swipe to Seek Sensitivity</string>
+    <string name="settings_playback_swipe_to_seek_sensitivity_description">Adjust the drag distance required to trigger a seek.</string>
+    <string name="settings_playback_swipe_to_seek_sensitivity_low">Low</string>
+    <string name="settings_playback_swipe_to_seek_sensitivity_medium">Medium</string>
+    <string name="settings_playback_swipe_to_seek_sensitivity_high">High</string>
     <string name="settings_playback_regex_preset_any_1080p">Any 1080p+</string>
     <string name="settings_playback_regex_preset_avc_x264">AVC / x264</string>
     <string name="settings_playback_regex_preset_bluray_quality">BluRay Quality</string>

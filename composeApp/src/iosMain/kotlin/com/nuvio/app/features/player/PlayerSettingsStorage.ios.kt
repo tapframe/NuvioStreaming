@@ -54,6 +54,8 @@ actual object PlayerSettingsStorage {
     private const val nextEpisodeThresholdMinutesBeforeEndKey = "next_episode_threshold_minutes_before_end_v2"
     private const val useLibassKey = "use_libass"
     private const val libassRenderTypeKey = "libass_render_type"
+    private const val swipeToSeekEnabledKey = "swipe_to_seek_enabled"
+    private const val swipeToSeekSensitivityKey = "swipe_to_seek_sensitivity"
     private val syncKeys = listOf(
         showLoadingOverlayKey,
         resizeModeKey,
@@ -90,6 +92,8 @@ actual object PlayerSettingsStorage {
         nextEpisodeThresholdMinutesBeforeEndKey,
         useLibassKey,
         libassRenderTypeKey,
+        swipeToSeekEnabledKey,
+        swipeToSeekSensitivityKey,
     )
 
     actual fun loadShowLoadingOverlay(): Boolean? {
@@ -588,6 +592,8 @@ actual object PlayerSettingsStorage {
         loadNextEpisodeThresholdMinutesBeforeEnd()?.let { put(nextEpisodeThresholdMinutesBeforeEndKey, encodeSyncFloat(it)) }
         loadUseLibass()?.let { put(useLibassKey, encodeSyncBoolean(it)) }
         loadLibassRenderType()?.let { put(libassRenderTypeKey, encodeSyncString(it)) }
+        loadSwipeToSeekEnabled()?.let { put(swipeToSeekEnabledKey, encodeSyncBoolean(it)) }
+        loadSwipeToSeekSensitivity()?.let { put(swipeToSeekSensitivityKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -631,5 +637,29 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncFloat(nextEpisodeThresholdMinutesBeforeEndKey)?.let(::saveNextEpisodeThresholdMinutesBeforeEnd)
         payload.decodeSyncBoolean(useLibassKey)?.let(::saveUseLibass)
         payload.decodeSyncString(libassRenderTypeKey)?.let(::saveLibassRenderType)
+        payload.decodeSyncBoolean(swipeToSeekEnabledKey)?.let(::saveSwipeToSeekEnabled)
+        payload.decodeSyncString(swipeToSeekSensitivityKey)?.let(::saveSwipeToSeekSensitivity)
+    }
+
+    actual fun loadSwipeToSeekEnabled(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(swipeToSeekEnabledKey)
+        return if (defaults.objectForKey(key) != null) {
+            defaults.boolForKey(key)
+        } else {
+            null
+        }
+    }
+
+    actual fun saveSwipeToSeekEnabled(enabled: Boolean) {
+        val defaults = NSUserDefaults.standardUserDefaults
+        defaults.setBool(enabled, ProfileScopedKey.of(swipeToSeekEnabledKey))
+    }
+
+    actual fun loadSwipeToSeekSensitivity(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(swipeToSeekSensitivityKey))
+
+    actual fun saveSwipeToSeekSensitivity(sensitivity: String) {
+        NSUserDefaults.standardUserDefaults.setObject(sensitivity, ProfileScopedKey.of(swipeToSeekSensitivityKey))
     }
 }

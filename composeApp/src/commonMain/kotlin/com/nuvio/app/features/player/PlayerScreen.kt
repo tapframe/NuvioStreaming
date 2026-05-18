@@ -1627,8 +1627,10 @@ fun PlayerScreen(
                             if (gestureMode == null) {
                                 val holdToSpeedActive = isHoldToSpeedGestureActiveState.value
                                 val horizontalDominant =
-                                    !holdToSpeedActive &&
-                                        abs(totalDx) > viewConfiguration.touchSlop &&
+                                    playerSettingsUiState.swipeToSeekEnabled &&
+                                        !holdToSpeedActive &&
+                                        abs(totalDx) > viewConfiguration.touchSlop *
+                                            playerSettingsUiState.swipeToSeekSensitivity.triggerMultiplier &&
                                         abs(totalDx) > abs(totalDy)
                                 val verticalDominant =
                                     !holdToSpeedActive &&
@@ -1665,7 +1667,7 @@ fun PlayerScreen(
                                         else -> 60f
                                     }
                                     val previewOffsetMs =
-                                        ((totalDx / width) * sensitivitySeconds * 1000f).roundToLong()
+                                        ((totalDx / width) * sensitivitySeconds * playerSettingsUiState.swipeToSeekSensitivity.speedMultiplier * 1000f).roundToLong()
                                     val unclampedPreviewMs = horizontalSeekBaselineMs + previewOffsetMs
                                     horizontalSeekPreviewMs = currentDurationMsState.value
                                         .takeIf { it > 0L }
