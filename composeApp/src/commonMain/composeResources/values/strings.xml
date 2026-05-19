@@ -800,6 +800,8 @@
     <string name="settings_playback_selected_count">%1$d selected</string>
     <string name="settings_playback_show_loading_overlay">Loading Overlay</string>
     <string name="settings_playback_show_loading_overlay_description">Show loading screen until first video frame appears.</string>
+    <string name="settings_playback_swipe_gestures">Swipe Gestures</string>
+    <string name="settings_playback_swipe_gestures_description">Use swipe gestures on the player surface for seeking, volume, and brightness.</string>
     <string name="settings_playback_skip_intro_outro_recap">Skip Intro</string>
     <string name="settings_playback_skip_intro_outro_recap_description">Use introdb.app to detect intros and recaps.</string>
     <string name="settings_playback_source_scope">Auto-play Source Scope</string>

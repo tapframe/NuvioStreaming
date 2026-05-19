@@ -1578,7 +1578,7 @@ fun PlayerScreen(
                         },
                     )
                 }
-                .pointerInput(gestureController, layoutSize) {
+                .pointerInput(gestureController, layoutSize, playerSettingsUiState.swipeGesturesEnabled) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         if (playerControlsLockedState.value) {
@@ -1588,6 +1588,9 @@ fun PlayerScreen(
                                 if (!change.pressed) break
                                 change.consume()
                             }
+                            return@awaitEachGesture
+                        }
+                        if (!playerSettingsUiState.swipeGesturesEnabled) {
                             return@awaitEachGesture
                         }
                         val controller = gestureController
