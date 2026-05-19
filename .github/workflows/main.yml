@@ -1,0 +1,36 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch: # Umožní spustit sestavení ručně jedním kliknutím
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout kód z repozitáře
+        uses: actions/checkout@v4
+
+      - name: Nastavení Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Nastavení práv pro Gradle Wrapper
+        run: chmod +x gradlew
+
+      - name: Sestavení Debug APK
+        run: ./gradlew :composeApp:assembleDebug
+
+      - name: Nahrání hotového APK do GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: composeApp/build/outputs/apk/debug/composeApp-debug.apk
+          tag_name: v${{ github.run_number }}-debug
+          name: Build #${{ github.run_number }} (Debug APK)
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
