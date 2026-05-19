@@ -28,6 +28,37 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func seekTo(positionMs: Int64) { playerVC?.seekToMs(positionMs) }
     func seekBy(offsetMs: Int64) { playerVC?.seekByMs(offsetMs) }
     func retry() { playerVC?.retryPlayback() }
+    func configureVideoOutput(
+        hardwareDecoder: String,
+        targetColorspaceHint: Bool,
+        toneMapping: String,
+        hdrComputePeak: Bool,
+        targetPrimaries: String,
+        targetTransfer: String,
+        extendedDynamicRange: Bool,
+        deband: Bool,
+        interpolation: Bool,
+        brightness: Int32,
+        contrast: Int32,
+        saturation: Int32,
+        gamma: Int32
+    ) {
+        playerVC?.configureVideoOutput(
+            hardwareDecoder: hardwareDecoder,
+            targetColorspaceHint: targetColorspaceHint,
+            toneMapping: toneMapping,
+            hdrComputePeak: hdrComputePeak,
+            targetPrimaries: targetPrimaries,
+            targetTransfer: targetTransfer,
+            extendedDynamicRange: extendedDynamicRange,
+            deband: deband,
+            interpolation: interpolation,
+            brightness: Int(brightness),
+            contrast: Int(contrast),
+            saturation: Int(saturation),
+            gamma: Int(gamma)
+        )
+    }
     func setPlaybackSpeed(speed: Float) { playerVC?.setSpeed(speed) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
 
@@ -204,6 +235,7 @@ final class MPVPlayerViewController: UIViewController {
         metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
         metalLayer.framebufferOnly = true
         metalLayer.backgroundColor = UIColor.black.cgColor
+        metalLayer.wantsExtendedDynamicRangeContent = true
         view.layer.addSublayer(metalLayer)
         layoutMetalLayer()
 
@@ -286,7 +318,7 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "keep-open", "yes"))
         checkError(mpv_set_option_string(mpv, "target-colorspace-hint", "yes"))
         checkError(mpv_set_option_string(mpv, "tone-mapping", "auto"))
-        checkError(mpv_set_option_string(mpv, "hdr-compute-peak", "no"))
+        checkError(mpv_set_option_string(mpv, "hdr-compute-peak", "yes"))
 
         checkError(mpv_initialize(mpv))
 
@@ -433,6 +465,38 @@ final class MPVPlayerViewController: UIViewController {
                 self?.command("seek", args: [String(format: "%.3f", pos), "absolute"])
             }
         }
+    }
+
+    func configureVideoOutput(
+        hardwareDecoder: String,
+        targetColorspaceHint: Bool,
+        toneMapping: String,
+        hdrComputePeak: Bool,
+        targetPrimaries: String,
+        targetTransfer: String,
+        extendedDynamicRange: Bool,
+        deband: Bool,
+        interpolation: Bool,
+        brightness: Int,
+        contrast: Int,
+        saturation: Int,
+        gamma: Int
+    ) {
+        metalLayer.wantsExtendedDynamicRangeContent = extendedDynamicRange
+        guard mpv != nil else { return }
+
+        setStringProperty("hwdec", hardwareDecoder)
+        setStringProperty("target-colorspace-hint", targetColorspaceHint ? "yes" : "no")
+        setStringProperty("tone-mapping", toneMapping)
+        setStringProperty("hdr-compute-peak", hdrComputePeak ? "yes" : "no")
+        setStringProperty("target-prim", targetPrimaries)
+        setStringProperty("target-trc", targetTransfer)
+        setStringProperty("deband", deband ? "yes" : "no")
+        setStringProperty("interpolation", interpolation ? "yes" : "no")
+        setVideoEqualizer("brightness", brightness)
+        setVideoEqualizer("contrast", contrast)
+        setVideoEqualizer("saturation", saturation)
+        setVideoEqualizer("gamma", gamma)
     }
 
     func setSpeed(_ speed: Float) {
@@ -829,6 +893,12 @@ final class MPVPlayerViewController: UIViewController {
     private func setStringProperty(_ name: String, _ value: String) {
         guard mpv != nil else { return }
         checkError(mpv_set_property_string(mpv, name, value))
+    }
+
+    private func setVideoEqualizer(_ name: String, _ value: Int) {
+        guard mpv != nil else { return }
+        var clamped = Int64(max(-100, min(100, value)))
+        checkError(mpv_set_property(mpv, name, MPV_FORMAT_INT64, &clamped))
     }
 
     private func getInt(_ name: String) -> Int {

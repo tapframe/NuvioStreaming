@@ -184,7 +184,8 @@ object StreamsRepository {
         }
 
         // Initialise loading placeholders
-        val initialGroups = streamAddons.map { addon ->
+        val installedAddonOrder = streamAddons.map { it.addonName }
+        val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
             AddonStreamGroup(
                 addonName = addon.addonName,
                 addonId = addon.addonId,
@@ -205,7 +206,7 @@ object StreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        }
+        }, installedAddonOrder)
         _uiState.value = StreamsUiState(
             requestToken = requestToken,
             groups = initialGroups,
@@ -226,9 +227,7 @@ object StreamsRepository {
                 pluginProviderGroups.sumOf { it.scrapers.size } +
                 debridTargets.size
 
-            val installedAddonNames = installedAddons
-                .map { it.displayTitle }
-                .toSet()
+            val installedAddonNames = installedAddonOrder.toSet()
             var autoSelectTriggered = false
             var timeoutElapsed = false
             var debridPreparationLaunched = false
@@ -383,9 +382,12 @@ object StreamsRepository {
                     is StreamLoadCompletion.Addon -> {
                         val result = completion.group
                         _uiState.update { current ->
-                            val updated = current.groups.map { group ->
-                                if (group.addonId == result.addonId) result else group
-                            }
+                            val updated = StreamAutoPlaySelector.orderAddonStreams(
+                                groups = current.groups.map { group ->
+                                    if (group.addonId == result.addonId) result else group
+                                },
+                                installedOrder = installedAddonOrder,
+                            )
                             val anyLoading = updated.any { it.isLoading }
                             current.copy(
                                 groups = updated,
@@ -403,28 +405,31 @@ object StreamsRepository {
                         }
 
                         _uiState.update { current ->
-                            val updated = current.groups.map { group ->
-                                if (group.addonId != completion.addonId) {
-                                    group
-                                } else {
-                                    val mergedStreams = if (completion.streams.isEmpty()) {
-                                        group.streams
+                            val updated = StreamAutoPlaySelector.orderAddonStreams(
+                                groups = current.groups.map { group ->
+                                    if (group.addonId != completion.addonId) {
+                                        group
                                     } else {
-                                        (group.streams + completion.streams).sortedForGroupedDisplay()
+                                        val mergedStreams = if (completion.streams.isEmpty()) {
+                                            group.streams
+                                        } else {
+                                            (group.streams + completion.streams).sortedForGroupedDisplay()
+                                        }
+                                        val stillLoading = remaining > 0
+                                        val finalError = if (mergedStreams.isEmpty() && !stillLoading) {
+                                            pluginFirstErrorByAddonId[completion.addonId]
+                                        } else {
+                                            null
+                                        }
+                                        group.copy(
+                                            streams = mergedStreams,
+                                            isLoading = stillLoading,
+                                            error = finalError,
+                                        )
                                     }
-                                    val stillLoading = remaining > 0
-                                    val finalError = if (mergedStreams.isEmpty() && !stillLoading) {
-                                        pluginFirstErrorByAddonId[completion.addonId]
-                                    } else {
-                                        null
-                                    }
-                                    group.copy(
-                                        streams = mergedStreams,
-                                        isLoading = stillLoading,
-                                        error = finalError,
-                                    )
-                                }
-                            }
+                                },
+                                installedOrder = installedAddonOrder,
+                            )
                             val anyLoading = updated.any { it.isLoading }
                             current.copy(
                                 groups = updated,
@@ -437,9 +442,12 @@ object StreamsRepository {
                     is StreamLoadCompletion.Debrid -> {
                         val result = completion.group
                         _uiState.update { current ->
-                            val updated = current.groups.map { group ->
-                                if (group.addonId == result.addonId) result else group
-                            }
+                            val updated = StreamAutoPlaySelector.orderAddonStreams(
+                                groups = current.groups.map { group ->
+                                    if (group.addonId == result.addonId) result else group
+                                },
+                                installedOrder = installedAddonOrder,
+                            )
                             val anyLoading = updated.any { it.isLoading }
                             current.copy(
                                 groups = updated,

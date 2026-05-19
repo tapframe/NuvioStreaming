@@ -44,6 +44,20 @@ data class PlayerSettingsUiState(
     val nextEpisodeThresholdMinutesBeforeEnd: Float = 2f,
     val useLibass: Boolean = false,
     val libassRenderType: String = "CUES",
+    val iosVideoOutputPreset: IosVideoOutputPreset = IosVideoOutputPreset.NativeEdr,
+    val iosToneMappingMode: IosToneMappingMode = IosToneMappingMode.Auto,
+    val iosTargetPrimaries: IosTargetPrimaries = IosTargetPrimaries.Auto,
+    val iosTargetTransfer: IosTargetTransfer = IosTargetTransfer.Auto,
+    val iosHardwareDecoderMode: IosHardwareDecoderMode = IosHardwareDecoderMode.Auto,
+    val iosExtendedDynamicRangeEnabled: Boolean = true,
+    val iosTargetColorspaceHintEnabled: Boolean = true,
+    val iosHdrComputePeakEnabled: Boolean = true,
+    val iosDebandEnabled: Boolean = false,
+    val iosInterpolationEnabled: Boolean = false,
+    val iosBrightness: Int = 0,
+    val iosContrast: Int = 0,
+    val iosSaturation: Int = 0,
+    val iosGamma: Int = 0,
 )
 
 object PlayerSettingsRepository {
@@ -86,6 +100,20 @@ object PlayerSettingsRepository {
     private var nextEpisodeThresholdMinutesBeforeEnd = 2f
     private var useLibass = false
     private var libassRenderType = "CUES"
+    private var iosVideoOutputPreset = IosVideoOutputPreset.NativeEdr
+    private var iosToneMappingMode = IosToneMappingMode.Auto
+    private var iosTargetPrimaries = IosTargetPrimaries.Auto
+    private var iosTargetTransfer = IosTargetTransfer.Auto
+    private var iosHardwareDecoderMode = IosHardwareDecoderMode.Auto
+    private var iosExtendedDynamicRangeEnabled = true
+    private var iosTargetColorspaceHintEnabled = true
+    private var iosHdrComputePeakEnabled = true
+    private var iosDebandEnabled = false
+    private var iosInterpolationEnabled = false
+    private var iosBrightness = 0
+    private var iosContrast = 0
+    private var iosSaturation = 0
+    private var iosGamma = 0
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -133,6 +161,20 @@ object PlayerSettingsRepository {
         nextEpisodeThresholdMinutesBeforeEnd = 2f
         useLibass = false
         libassRenderType = "CUES"
+        iosVideoOutputPreset = IosVideoOutputPreset.NativeEdr
+        iosToneMappingMode = IosToneMappingMode.Auto
+        iosTargetPrimaries = IosTargetPrimaries.Auto
+        iosTargetTransfer = IosTargetTransfer.Auto
+        iosHardwareDecoderMode = IosHardwareDecoderMode.Auto
+        iosExtendedDynamicRangeEnabled = true
+        iosTargetColorspaceHintEnabled = true
+        iosHdrComputePeakEnabled = true
+        iosDebandEnabled = false
+        iosInterpolationEnabled = false
+        iosBrightness = 0
+        iosContrast = 0
+        iosSaturation = 0
+        iosGamma = 0
         publish()
     }
 
@@ -208,6 +250,30 @@ object PlayerSettingsRepository {
         nextEpisodeThresholdMinutesBeforeEnd = PlayerSettingsStorage.loadNextEpisodeThresholdMinutesBeforeEnd() ?: 2f
         useLibass = PlayerSettingsStorage.loadUseLibass() ?: false
         libassRenderType = PlayerSettingsStorage.loadLibassRenderType() ?: "CUES"
+        iosVideoOutputPreset = PlayerSettingsStorage.loadIosVideoOutputPreset()
+            ?.let { runCatching { IosVideoOutputPreset.valueOf(it) }.getOrNull() }
+            ?: IosVideoOutputPreset.NativeEdr
+        iosToneMappingMode = PlayerSettingsStorage.loadIosToneMappingMode()
+            ?.let { runCatching { IosToneMappingMode.valueOf(it) }.getOrNull() }
+            ?: IosToneMappingMode.Auto
+        iosTargetPrimaries = PlayerSettingsStorage.loadIosTargetPrimaries()
+            ?.let { runCatching { IosTargetPrimaries.valueOf(it) }.getOrNull() }
+            ?: IosTargetPrimaries.Auto
+        iosTargetTransfer = PlayerSettingsStorage.loadIosTargetTransfer()
+            ?.let { runCatching { IosTargetTransfer.valueOf(it) }.getOrNull() }
+            ?: IosTargetTransfer.Auto
+        iosHardwareDecoderMode = PlayerSettingsStorage.loadIosHardwareDecoderMode()
+            ?.let { runCatching { IosHardwareDecoderMode.valueOf(it) }.getOrNull() }
+            ?: IosHardwareDecoderMode.Auto
+        iosExtendedDynamicRangeEnabled = PlayerSettingsStorage.loadIosExtendedDynamicRangeEnabled() ?: true
+        iosTargetColorspaceHintEnabled = PlayerSettingsStorage.loadIosTargetColorspaceHintEnabled() ?: true
+        iosHdrComputePeakEnabled = PlayerSettingsStorage.loadIosHdrComputePeakEnabled() ?: true
+        iosDebandEnabled = PlayerSettingsStorage.loadIosDebandEnabled() ?: false
+        iosInterpolationEnabled = PlayerSettingsStorage.loadIosInterpolationEnabled() ?: false
+        iosBrightness = PlayerSettingsStorage.loadIosBrightness() ?: 0
+        iosContrast = PlayerSettingsStorage.loadIosContrast() ?: 0
+        iosSaturation = PlayerSettingsStorage.loadIosSaturation() ?: 0
+        iosGamma = PlayerSettingsStorage.loadIosGamma() ?: 0
         publish()
     }
 
@@ -510,6 +576,164 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveLibassRenderType(renderType)
     }
 
+    fun setIosVideoOutputPreset(preset: IosVideoOutputPreset) {
+        ensureLoaded()
+        iosVideoOutputPreset = preset
+        when (preset) {
+            IosVideoOutputPreset.NativeEdr -> {
+                iosExtendedDynamicRangeEnabled = true
+                iosTargetColorspaceHintEnabled = true
+                iosHdrComputePeakEnabled = true
+                iosToneMappingMode = IosToneMappingMode.Auto
+                iosTargetPrimaries = IosTargetPrimaries.Auto
+                iosTargetTransfer = IosTargetTransfer.Auto
+            }
+            IosVideoOutputPreset.SdrToneMapped -> {
+                iosExtendedDynamicRangeEnabled = false
+                iosTargetColorspaceHintEnabled = false
+                iosHdrComputePeakEnabled = true
+                iosToneMappingMode = IosToneMappingMode.Bt2390
+                iosTargetPrimaries = IosTargetPrimaries.Bt709
+                iosTargetTransfer = IosTargetTransfer.Srgb
+            }
+            IosVideoOutputPreset.Compatibility -> {
+                iosExtendedDynamicRangeEnabled = false
+                iosTargetColorspaceHintEnabled = true
+                iosHdrComputePeakEnabled = false
+                iosToneMappingMode = IosToneMappingMode.Auto
+                iosTargetPrimaries = IosTargetPrimaries.Auto
+                iosTargetTransfer = IosTargetTransfer.Auto
+            }
+            IosVideoOutputPreset.Custom -> Unit
+        }
+        publish()
+        saveIosVideoOutputSettings()
+    }
+
+    fun setIosToneMappingMode(mode: IosToneMappingMode) {
+        ensureLoaded()
+        iosVideoOutputPreset = IosVideoOutputPreset.Custom
+        iosToneMappingMode = mode
+        publish()
+        saveIosVideoOutputSettings()
+    }
+
+    fun setIosTargetPrimaries(primaries: IosTargetPrimaries) {
+        ensureLoaded()
+        iosVideoOutputPreset = IosVideoOutputPreset.Custom
+        iosTargetPrimaries = primaries
+        publish()
+        saveIosVideoOutputSettings()
+    }
+
+    fun setIosTargetTransfer(transfer: IosTargetTransfer) {
+        ensureLoaded()
+        iosVideoOutputPreset = IosVideoOutputPreset.Custom
+        iosTargetTransfer = transfer
+        publish()
+        saveIosVideoOutputSettings()
+    }
+
+    fun setIosHardwareDecoderMode(mode: IosHardwareDecoderMode) {
+        ensureLoaded()
+        iosHardwareDecoderMode = mode
+        publish()
+        PlayerSettingsStorage.saveIosHardwareDecoderMode(mode.name)
+    }
+
+    fun setIosExtendedDynamicRangeEnabled(enabled: Boolean) {
+        ensureLoaded()
+        iosVideoOutputPreset = IosVideoOutputPreset.Custom
+        iosExtendedDynamicRangeEnabled = enabled
+        publish()
+        saveIosVideoOutputSettings()
+    }
+
+    fun setIosTargetColorspaceHintEnabled(enabled: Boolean) {
+        ensureLoaded()
+        iosVideoOutputPreset = IosVideoOutputPreset.Custom
+        iosTargetColorspaceHintEnabled = enabled
+        publish()
+        saveIosVideoOutputSettings()
+    }
+
+    fun setIosHdrComputePeakEnabled(enabled: Boolean) {
+        ensureLoaded()
+        iosVideoOutputPreset = IosVideoOutputPreset.Custom
+        iosHdrComputePeakEnabled = enabled
+        publish()
+        saveIosVideoOutputSettings()
+    }
+
+    fun setIosDebandEnabled(enabled: Boolean) {
+        ensureLoaded()
+        iosDebandEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveIosDebandEnabled(enabled)
+    }
+
+    fun setIosInterpolationEnabled(enabled: Boolean) {
+        ensureLoaded()
+        iosInterpolationEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveIosInterpolationEnabled(enabled)
+    }
+
+    fun setIosBrightness(value: Int) {
+        ensureLoaded()
+        iosBrightness = value.coerceIn(-50, 50)
+        publish()
+        PlayerSettingsStorage.saveIosBrightness(iosBrightness)
+    }
+
+    fun setIosContrast(value: Int) {
+        ensureLoaded()
+        iosContrast = value.coerceIn(-50, 50)
+        publish()
+        PlayerSettingsStorage.saveIosContrast(iosContrast)
+    }
+
+    fun setIosSaturation(value: Int) {
+        ensureLoaded()
+        iosSaturation = value.coerceIn(-50, 50)
+        publish()
+        PlayerSettingsStorage.saveIosSaturation(iosSaturation)
+    }
+
+    fun setIosGamma(value: Int) {
+        ensureLoaded()
+        iosGamma = value.coerceIn(-50, 50)
+        publish()
+        PlayerSettingsStorage.saveIosGamma(iosGamma)
+    }
+
+    fun resetIosVideoOutputTuning() {
+        ensureLoaded()
+        iosBrightness = 0
+        iosContrast = 0
+        iosSaturation = 0
+        iosGamma = 0
+        iosDebandEnabled = false
+        iosInterpolationEnabled = false
+        publish()
+        PlayerSettingsStorage.saveIosBrightness(0)
+        PlayerSettingsStorage.saveIosContrast(0)
+        PlayerSettingsStorage.saveIosSaturation(0)
+        PlayerSettingsStorage.saveIosGamma(0)
+        PlayerSettingsStorage.saveIosDebandEnabled(false)
+        PlayerSettingsStorage.saveIosInterpolationEnabled(false)
+    }
+
+    private fun saveIosVideoOutputSettings() {
+        PlayerSettingsStorage.saveIosVideoOutputPreset(iosVideoOutputPreset.name)
+        PlayerSettingsStorage.saveIosToneMappingMode(iosToneMappingMode.name)
+        PlayerSettingsStorage.saveIosTargetPrimaries(iosTargetPrimaries.name)
+        PlayerSettingsStorage.saveIosTargetTransfer(iosTargetTransfer.name)
+        PlayerSettingsStorage.saveIosExtendedDynamicRangeEnabled(iosExtendedDynamicRangeEnabled)
+        PlayerSettingsStorage.saveIosTargetColorspaceHintEnabled(iosTargetColorspaceHintEnabled)
+        PlayerSettingsStorage.saveIosHdrComputePeakEnabled(iosHdrComputePeakEnabled)
+    }
+
     private fun publish() {
         _uiState.value = PlayerSettingsUiState(
             showLoadingOverlay = showLoadingOverlay,
@@ -547,6 +771,20 @@ object PlayerSettingsRepository {
             nextEpisodeThresholdMinutesBeforeEnd = nextEpisodeThresholdMinutesBeforeEnd,
             useLibass = useLibass,
             libassRenderType = libassRenderType,
+            iosVideoOutputPreset = iosVideoOutputPreset,
+            iosToneMappingMode = iosToneMappingMode,
+            iosTargetPrimaries = iosTargetPrimaries,
+            iosTargetTransfer = iosTargetTransfer,
+            iosHardwareDecoderMode = iosHardwareDecoderMode,
+            iosExtendedDynamicRangeEnabled = iosExtendedDynamicRangeEnabled,
+            iosTargetColorspaceHintEnabled = iosTargetColorspaceHintEnabled,
+            iosHdrComputePeakEnabled = iosHdrComputePeakEnabled,
+            iosDebandEnabled = iosDebandEnabled,
+            iosInterpolationEnabled = iosInterpolationEnabled,
+            iosBrightness = iosBrightness,
+            iosContrast = iosContrast,
+            iosSaturation = iosSaturation,
+            iosGamma = iosGamma,
         )
     }
 

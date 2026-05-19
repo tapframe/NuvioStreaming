@@ -47,6 +47,7 @@ import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioBackButton
+import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
@@ -55,6 +56,8 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.stableKey
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -79,6 +82,10 @@ fun CatalogScreen(
     val homeCatalogSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
     val posterCardStyle = rememberPosterCardStyleUiState()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var observedOfflineState by remember { mutableStateOf(false) }
@@ -187,6 +194,10 @@ fun CatalogScreen(
                             item = item,
                             cornerRadiusDp = posterCardStyle.cornerRadiusDp,
                             hideLabels = posterCardStyle.hideLabelsEnabled,
+                            isWatched = WatchingState.isPosterWatched(
+                                watchedKeys = watchedUiState.watchedKeys,
+                                item = item,
+                            ),
                             onClick = onPosterClick?.let { { it(item) } },
                             onLongClick = onPosterLongClick?.let { { it(item) } },
                         )
@@ -258,6 +269,7 @@ private fun CatalogPosterTile(
     item: MetaPreview,
     cornerRadiusDp: Int,
     hideLabels: Boolean,
+    isWatched: Boolean,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
 ) {
@@ -280,6 +292,7 @@ private fun CatalogPosterTile(
                     contentScale = ContentScale.Crop,
                 )
             }
+            NuvioPosterWatchedOverlay(isWatched = isWatched)
         }
         if (!hideLabels) {
             Text(

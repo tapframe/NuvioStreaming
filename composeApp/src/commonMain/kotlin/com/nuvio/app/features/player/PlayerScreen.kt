@@ -68,6 +68,7 @@ import com.nuvio.app.features.watchprogress.WatchProgressClock
 import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.isIos
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -472,6 +473,7 @@ fun PlayerScreen(
 
         var showAudioModal by remember { mutableStateOf(false) }
         var showSubtitleModal by remember { mutableStateOf(false) }
+        var showVideoSettingsModal by remember { mutableStateOf(false) }
         var audioTracks by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
         var subtitleTracks by remember { mutableStateOf<List<SubtitleTrack>>(emptyList()) }
         var selectedAudioIndex by remember { mutableStateOf(-1) }
@@ -609,6 +611,7 @@ fun PlayerScreen(
             renderedGestureFeedback = null
             showAudioModal = false
             showSubtitleModal = false
+            showVideoSettingsModal = false
             showSourcesPanel = false
             showEpisodesPanel = false
             episodeStreamsPanelState = EpisodeStreamsPanelState()
@@ -1809,6 +1812,14 @@ fun PlayerScreen(
                         refreshTracks()
                         showAudioModal = true
                     },
+                    onVideoSettingsClick = if (isIos) {
+                        {
+                            showVideoSettingsModal = true
+                            controlsVisible = true
+                        }
+                    } else {
+                        null
+                    },
                     onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
                     onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
                     onSubmitIntroClick = if (isSeries && playerSettingsUiState.introSubmitEnabled && playerSettingsUiState.introDbApiKey.isNotBlank()) { { showSubmitIntroModal = true } } else null,
@@ -1975,6 +1986,15 @@ fun PlayerScreen(
                 onFetchAddonSubtitles = ::fetchAddonSubtitlesForActiveItem,
                 onStyleChanged = PlayerSettingsRepository::setSubtitleStyle,
                 onDismiss = { showSubtitleModal = false },
+            )
+
+            IosVideoSettingsModal(
+                visible = showVideoSettingsModal,
+                settings = playerSettingsUiState,
+                onSettingsChanged = {
+                    playerController?.configureIosVideoOutput(PlayerSettingsRepository.uiState.value)
+                },
+                onDismiss = { showVideoSettingsModal = false },
             )
 
             // Sources Panel

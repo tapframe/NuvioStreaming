@@ -12,6 +12,7 @@ import nuvio.composeapp.generated.resources.lang_polish
 import nuvio.composeapp.generated.resources.lang_portuguese_portugal
 import nuvio.composeapp.generated.resources.lang_spanish
 import nuvio.composeapp.generated.resources.lang_turkish
+import nuvio.composeapp.generated.resources.lang_norwegian
 import org.jetbrains.compose.resources.StringResource
 
 enum class AppLanguage(
@@ -29,6 +30,7 @@ enum class AppLanguage(
     PORTUGUESE("pt", Res.string.lang_portuguese_portugal),
     SPANISH("es", Res.string.lang_spanish),
     TURKISH("tr", Res.string.lang_turkish),
+    NORWEGIAN("no", Res.string.lang_norwegian),
     ;
 
     companion object {

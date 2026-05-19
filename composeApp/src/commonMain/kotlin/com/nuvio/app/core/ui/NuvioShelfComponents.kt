@@ -179,12 +179,7 @@ fun NuvioPosterCard(
                 }
             }
 
-            NuvioAnimatedWatchedBadge(
-                isVisible = isWatched,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp),
-            )
+            NuvioPosterWatchedOverlay(isWatched = isWatched)
         }
         if (shouldShowTitleBelow) {
             Text(

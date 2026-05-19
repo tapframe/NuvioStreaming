@@ -45,6 +45,7 @@ import com.nuvio.app.features.debrid.DebridCredentialValidator
 import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.debrid.DebridSettings
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.debrid.DebridStreamFormatterDefaults
 import com.nuvio.app.features.debrid.DebridStreamAudioChannel
 import com.nuvio.app.features.debrid.DebridStreamAudioTag
 import com.nuvio.app.features.debrid.DebridStreamEncode
@@ -70,6 +71,8 @@ import nuvio.composeapp.generated.resources.settings_debrid_dialog_title
 import nuvio.composeapp.generated.resources.settings_debrid_enable
 import nuvio.composeapp.generated.resources.settings_debrid_enable_description
 import nuvio.composeapp.generated.resources.settings_debrid_experimental_notice
+import nuvio.composeapp.generated.resources.settings_debrid_description_template
+import nuvio.composeapp.generated.resources.settings_debrid_description_template_description
 import nuvio.composeapp.generated.resources.settings_debrid_formatter_reset_subtitle
 import nuvio.composeapp.generated.resources.settings_debrid_formatter_reset_title
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_count_many
@@ -77,7 +80,10 @@ import nuvio.composeapp.generated.resources.settings_debrid_prepare_count_one
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_instant_playback
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_instant_playback_description
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_stream_count
+import nuvio.composeapp.generated.resources.settings_debrid_prepare_stream_count_warning
 import nuvio.composeapp.generated.resources.settings_debrid_key_invalid
+import nuvio.composeapp.generated.resources.settings_debrid_name_template
+import nuvio.composeapp.generated.resources.settings_debrid_name_template_description
 import nuvio.composeapp.generated.resources.settings_debrid_not_set
 import nuvio.composeapp.generated.resources.settings_debrid_provider_torbox_description
 import nuvio.composeapp.generated.resources.settings_debrid_section_instant_playback
@@ -277,11 +283,31 @@ internal fun LazyListScope.debridSettingsContent(
     }
 
     item {
+        var activeTemplateField by rememberSaveable { mutableStateOf<DebridTemplateField?>(null) }
+
         SettingsSection(
             title = stringResource(Res.string.settings_debrid_section_formatting),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = stringResource(Res.string.settings_debrid_name_template),
+                    description = stringResource(Res.string.settings_debrid_name_template_description),
+                    value = templatePreview(settings.streamNameTemplate),
+                    enabled = settings.enabled,
+                    onClick = { activeTemplateField = DebridTemplateField.NAME },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = stringResource(Res.string.settings_debrid_description_template),
+                    description = stringResource(Res.string.settings_debrid_description_template_description),
+                    value = templatePreview(settings.streamDescriptionTemplate),
+                    enabled = settings.enabled,
+                    onClick = { activeTemplateField = DebridTemplateField.DESCRIPTION },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 DebridPreferenceRow(
                     isTablet = isTablet,
                     title = stringResource(Res.string.settings_debrid_formatter_reset_title),
@@ -292,7 +318,41 @@ internal fun LazyListScope.debridSettingsContent(
                 )
             }
         }
+
+        when (activeTemplateField) {
+            DebridTemplateField.NAME -> DebridTemplateDialog(
+                title = stringResource(Res.string.settings_debrid_name_template),
+                description = stringResource(Res.string.settings_debrid_name_template_description),
+                currentValue = settings.streamNameTemplate,
+                defaultValue = DebridStreamFormatterDefaults.NAME_TEMPLATE,
+                onSave = DebridSettingsRepository::setStreamNameTemplate,
+                onDismiss = { activeTemplateField = null },
+            )
+            DebridTemplateField.DESCRIPTION -> DebridTemplateDialog(
+                title = stringResource(Res.string.settings_debrid_description_template),
+                description = stringResource(Res.string.settings_debrid_description_template_description),
+                currentValue = settings.streamDescriptionTemplate,
+                defaultValue = DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE,
+                onSave = DebridSettingsRepository::setStreamDescriptionTemplate,
+                onDismiss = { activeTemplateField = null },
+            )
+            null -> Unit
+        }
     }
+}
+
+private enum class DebridTemplateField {
+    NAME,
+    DESCRIPTION,
+}
+
+private fun templatePreview(value: String): String {
+    val firstLine = value
+        .lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.isNotBlank() }
+        ?: return ""
+    return if (firstLine.length <= 28) firstLine else "${firstLine.take(28)}..."
 }
 
 @Composable
@@ -373,6 +433,84 @@ private fun DebridPrepareCountDialog(
                                 }
                             }
                         }
+                    }
+                }
+
+                Text(
+                    text = stringResource(Res.string.settings_debrid_prepare_stream_count_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun DebridTemplateDialog(
+    title: String,
+    description: String,
+    currentValue: String,
+    defaultValue: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var draft by rememberSaveable(currentValue) { mutableStateOf(currentValue) }
+
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        DebridDialogSurface(title = title) {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp, max = 280.dp),
+                minLines = 5,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    disabledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TextButton(onClick = { draft = defaultValue }) {
+                    Text(
+                        text = stringResource(Res.string.action_reset),
+                        maxLines = 1,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            text = stringResource(Res.string.action_cancel),
+                            maxLines = 1,
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            onSave(draft)
+                            onDismiss()
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.action_save),
+                            maxLines = 1,
+                        )
                     }
                 }
             }

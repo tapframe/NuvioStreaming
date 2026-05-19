@@ -3,11 +3,13 @@ package com.nuvio.app.features.player
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitViewController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.delay
@@ -37,6 +39,9 @@ actual fun PlatformPlayerSurface(
     val latestOnControllerReady = rememberUpdatedState(onControllerReady)
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
+    PlayerSettingsRepository.ensureLoaded()
+    val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val latestPlayerSettings = rememberUpdatedState(playerSettings)
 
     val bridge = remember {
         NuvioPlayerBridgeFactory.create()
@@ -69,6 +74,10 @@ actual fun PlatformPlayerSurface(
 
             override fun retry() {
                 bridge.retry()
+            }
+
+            override fun configureIosVideoOutput(settings: PlayerSettingsUiState) {
+                bridge.applyIosVideoOutputSettings(settings)
             }
 
             override fun setPlaybackSpeed(speed: Float) {
@@ -214,6 +223,7 @@ actual fun PlatformPlayerSurface(
 
     // Load file and set initial state
     LaunchedEffect(bridge, sourceUrl, sourceAudioUrl, sourceHeaders) {
+        bridge.applyIosVideoOutputSettings(latestPlayerSettings.value)
         bridge.loadFileWithAudio(
             sourceUrl,
             sourceAudioUrl,
@@ -240,6 +250,10 @@ actual fun PlatformPlayerSurface(
                 PlayerResizeMode.Zoom -> 2
             }
         )
+    }
+
+    LaunchedEffect(bridge, playerSettings) {
+        bridge.applyIosVideoOutputSettings(playerSettings)
     }
 
     // Polling for snapshots
@@ -277,6 +291,24 @@ actual fun PlatformPlayerSurface(
         factory = { bridge.createPlayerViewController() },
         modifier = modifier,
         interactive = false,
+    )
+}
+
+private fun NuvioPlayerBridge.applyIosVideoOutputSettings(settings: PlayerSettingsUiState) {
+    configureVideoOutput(
+        hardwareDecoder = settings.iosHardwareDecoderMode.mpvValue,
+        targetColorspaceHint = settings.iosTargetColorspaceHintEnabled,
+        toneMapping = settings.iosToneMappingMode.mpvValue,
+        hdrComputePeak = settings.iosHdrComputePeakEnabled,
+        targetPrimaries = settings.iosTargetPrimaries.mpvValue,
+        targetTransfer = settings.iosTargetTransfer.mpvValue,
+        extendedDynamicRange = settings.iosExtendedDynamicRangeEnabled,
+        deband = settings.iosDebandEnabled,
+        interpolation = settings.iosInterpolationEnabled,
+        brightness = settings.iosBrightness,
+        contrast = settings.iosContrast,
+        saturation = settings.iosSaturation,
+        gamma = settings.iosGamma,
     )
 }
 

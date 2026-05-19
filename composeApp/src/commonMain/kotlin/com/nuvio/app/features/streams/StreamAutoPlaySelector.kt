@@ -2,6 +2,34 @@ package com.nuvio.app.features.streams
 
 object StreamAutoPlaySelector {
 
+    fun orderAddonStreams(
+        groups: List<AddonStreamGroup>,
+        installedOrder: List<String>,
+    ): List<AddonStreamGroup> {
+        if (groups.isEmpty()) return groups
+
+        val addonRankByName = HashMap<String, Int>(installedOrder.size)
+        installedOrder.forEachIndexed { index, addonName ->
+            if (addonName !in addonRankByName) {
+                addonRankByName[addonName] = index
+            }
+        }
+
+        val (directDebridEntries, remainingEntries) = groups.partition { group ->
+            group.addonId.startsWith("debrid:") ||
+                group.streams.any { stream -> stream.isDirectDebridStream }
+        }
+        if (installedOrder.isEmpty()) return directDebridEntries + remainingEntries
+
+        val (addonEntries, pluginEntries) = remainingEntries.partition { group ->
+            group.addonName in addonRankByName
+        }
+        val orderedAddons = addonEntries.sortedBy { group ->
+            addonRankByName.getValue(group.addonName)
+        }
+        return directDebridEntries + orderedAddons + pluginEntries
+    }
+
     fun selectAutoPlayStream(
         streams: List<StreamItem>,
         mode: StreamAutoPlayMode,
