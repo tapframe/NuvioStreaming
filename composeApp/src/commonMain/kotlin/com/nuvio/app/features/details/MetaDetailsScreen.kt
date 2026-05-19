@@ -62,6 +62,7 @@ import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.TraktListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.features.debrid.DirectDebridStreamSource
 import com.nuvio.app.features.details.components.DetailActionButtons
 import com.nuvio.app.features.details.components.CommentDetailSheet
 import com.nuvio.app.features.details.components.DetailAdditionalInfoSection
@@ -372,6 +373,16 @@ fun MetaDetailsScreen(
                     seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
                 }
                 val hasEpisodes = meta.videos.any { it.season != null || it.episode != null }
+                val debridPreloadVideoId = remember(meta.id, meta.type, hasEpisodes, seriesStreamVideoId, seriesAction?.videoId) {
+                    if (meta.isSeriesLikeForDebridPreload(hasEpisodes)) {
+                        seriesStreamVideoId ?: seriesAction?.videoId ?: meta.id
+                    } else {
+                        meta.id
+                    }
+                }
+                LaunchedEffect(meta.type, debridPreloadVideoId) {
+                    DirectDebridStreamSource.preloadStreams(meta.type, debridPreloadVideoId)
+                }
                 val hasProductionSection = remember(meta) {
                     meta.productionCompanies.isNotEmpty() || meta.networks.isNotEmpty()
                 }
@@ -1259,3 +1270,8 @@ private fun detailTabletContentMaxWidth(maxWidth: Dp, isTablet: Boolean): Dp =
     } else {
         (maxWidth * 0.6f).coerceIn(520.dp, 680.dp)
     }
+
+private fun MetaDetails.isSeriesLikeForDebridPreload(hasEpisodes: Boolean): Boolean =
+    hasEpisodes || type.equals("series", ignoreCase = true) ||
+        type.equals("show", ignoreCase = true) ||
+        type.equals("tv", ignoreCase = true)

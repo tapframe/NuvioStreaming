@@ -186,9 +186,18 @@ val AvailableLanguageOptions: List<LanguagePreferenceOption> = listOf(
     LanguagePreferenceOption("zu", Res.string.lang_zulu),
 )
 
-private val Iso639Aliases = mapOf(
+private val LanguageCodeAliases = mapOf(
+    "pt-pt" to "pt",
+    "pt_br" to "pt-BR",
+    "pt-br" to "pt-BR",
+    "br" to "pt-BR",
+    "pob" to "pt-BR",
     "eng" to "en",
     "spa" to "es",
+    "es-419" to "es-419",
+    "es_419" to "es-419",
+    "es-la" to "es-419",
+    "es-lat" to "es-419",
     "fra" to "fr",
     "fre" to "fr",
     "deu" to "de",
@@ -200,14 +209,170 @@ private val Iso639Aliases = mapOf(
     "kor" to "ko",
     "zho" to "zh",
     "chi" to "zh",
+    "zht" to "zh-TW",
+    "zhs" to "zh-CN",
+    "chi-tw" to "zh-TW",
+    "chi-cn" to "zh-CN",
+    "zh-tw" to "zh-TW",
+    "zh_tw" to "zh-TW",
+    "zh-cn" to "zh-CN",
+    "zh_cn" to "zh-CN",
     "ara" to "ar",
     "hin" to "hi",
     "nld" to "nl",
     "dut" to "nl",
     "pol" to "pl",
     "swe" to "sv",
+    "nor" to "no",
+    "dan" to "da",
+    "fin" to "fi",
     "tur" to "tr",
+    "ell" to "el",
+    "gre" to "el",
     "heb" to "he",
+    "tha" to "th",
+    "vie" to "vi",
+    "ind" to "id",
+    "msa" to "ms",
+    "may" to "ms",
+    "ces" to "cs",
+    "cze" to "cs",
+    "hun" to "hu",
+    "ron" to "ro",
+    "rum" to "ro",
+    "ukr" to "uk",
+    "bul" to "bg",
+    "hrv" to "hr",
+    "srp" to "sr",
+    "slk" to "sk",
+    "slo" to "sk",
+    "slv" to "sl",
+    "cat" to "ca",
+    "alb" to "sq",
+    "sqi" to "sq",
+    "bos" to "bs",
+    "mac" to "mk",
+    "mkd" to "mk",
+    "lav" to "lv",
+    "lit" to "lt",
+    "est" to "et",
+    "isl" to "is",
+    "ice" to "is",
+    "glg" to "gl",
+    "baq" to "eu",
+    "eus" to "eu",
+    "wel" to "cy",
+    "cym" to "cy",
+    "gle" to "ga",
+    "ben" to "bn",
+    "tam" to "ta",
+    "tel" to "te",
+    "mal" to "ml",
+    "kan" to "kn",
+    "mar" to "mr",
+    "pan" to "pa",
+    "guj" to "gu",
+    "urd" to "ur",
+    "fas" to "fa",
+    "per" to "fa",
+    "amh" to "am",
+    "swa" to "sw",
+    "zul" to "zu",
+    "afr" to "af",
+    "mlt" to "mt",
+    "bel" to "be",
+    "geo" to "ka",
+    "kat" to "ka",
+    "arm" to "hy",
+    "hye" to "hy",
+    "aze" to "az",
+    "kaz" to "kk",
+    "uzb" to "uz",
+    "mon" to "mn",
+    "khm" to "km",
+    "lao" to "lo",
+    "mya" to "my",
+    "bur" to "my",
+    "sin" to "si",
+    "nep" to "ne",
+    "tgl" to "tl",
+    "fil" to "tl",
+)
+
+private val LanguageNameAliases = mapOf(
+    "afrikaans" to "af",
+    "albanian" to "sq",
+    "amharic" to "am",
+    "arabic" to "ar",
+    "armenian" to "hy",
+    "azerbaijani" to "az",
+    "basque" to "eu",
+    "belarusian" to "be",
+    "bengali" to "bn",
+    "bosnian" to "bs",
+    "bulgarian" to "bg",
+    "burmese" to "my",
+    "catalan" to "ca",
+    "chinese" to "zh",
+    "mandarin" to "zh",
+    "croatian" to "hr",
+    "czech" to "cs",
+    "danish" to "da",
+    "dutch" to "nl",
+    "english" to "en",
+    "estonian" to "et",
+    "filipino" to "tl",
+    "finnish" to "fi",
+    "french" to "fr",
+    "galician" to "gl",
+    "georgian" to "ka",
+    "german" to "de",
+    "greek" to "el",
+    "gujarati" to "gu",
+    "hebrew" to "he",
+    "hindi" to "hi",
+    "hungarian" to "hu",
+    "icelandic" to "is",
+    "indonesian" to "id",
+    "irish" to "ga",
+    "italian" to "it",
+    "japanese" to "ja",
+    "kannada" to "kn",
+    "kazakh" to "kk",
+    "khmer" to "km",
+    "korean" to "ko",
+    "lao" to "lo",
+    "latvian" to "lv",
+    "lithuanian" to "lt",
+    "macedonian" to "mk",
+    "malay" to "ms",
+    "malayalam" to "ml",
+    "maltese" to "mt",
+    "marathi" to "mr",
+    "mongolian" to "mn",
+    "nepali" to "ne",
+    "norwegian" to "no",
+    "persian" to "fa",
+    "polish" to "pl",
+    "punjabi" to "pa",
+    "romanian" to "ro",
+    "russian" to "ru",
+    "serbian" to "sr",
+    "sinhala" to "si",
+    "slovak" to "sk",
+    "slovenian" to "sl",
+    "swahili" to "sw",
+    "swedish" to "sv",
+    "tamil" to "ta",
+    "telugu" to "te",
+    "thai" to "th",
+    "turkish" to "tr",
+    "ukrainian" to "uk",
+    "urdu" to "ur",
+    "uzbek" to "uz",
+    "vietnamese" to "vi",
+    "welsh" to "cy",
+    "zulu" to "zu",
 )
 
 fun normalizeLanguageCode(language: String?): String? {
@@ -218,13 +383,55 @@ fun normalizeLanguageCode(language: String?): String? {
         ?.takeIf { it.isNotBlank() }
         ?: return null
 
+    val tokenized = raw
+        .replace('-', ' ')
+        .replace('.', ' ')
+        .replace('/', ' ')
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
+    fun containsAny(vararg values: String): Boolean =
+        values.any { value -> tokenized.contains(value) }
+
+    if (containsAny("portuguese", "portugues")) {
+        return when {
+            containsAny("brazil", "brasil", "brazilian", "brasileiro", "pt br", "ptbr", "pob", "(br)") ->
+                "pt-br"
+            containsAny("portugal", "european", "europeu", "iberian", "pt pt", "ptpt") ->
+                "pt"
+            else -> "pt"
+        }
+    }
+
+    if (containsAny("spanish", "espanol", "castellano")) {
+        return if (containsAny("latin", "latino", "latinoamerica", "latinoamericano", "lat am", "latam", "es 419", "es419", "(419)")) {
+            "es-419"
+        } else {
+            "es"
+        }
+    }
+
+    LanguageCodeAliases[raw]?.let { return it.replace('_', '-').lowercase() }
+    LanguageNameAliases[tokenized]?.let { return it }
+    LanguageNameAliases.entries
+        .sortedByDescending { it.key.length }
+        .firstOrNull { (name, _) ->
+            tokenized == name ||
+                tokenized.startsWith("$name ") ||
+                tokenized.endsWith(" $name") ||
+                tokenized.contains(" $name ")
+        }
+        ?.let { return it.value }
+
     val primary = raw.substringBefore('-')
-    val canonicalPrimary = Iso639Aliases[primary] ?: primary
+    val primaryAlias = LanguageCodeAliases[primary]?.replace('_', '-')?.lowercase()
     val suffix = raw.substringAfter('-', "")
     return if (suffix.isBlank()) {
-        canonicalPrimary
+        primaryAlias ?: primary
+    } else if (primaryAlias != null && !primaryAlias.contains('-')) {
+        "$primaryAlias-$suffix"
     } else {
-        "$canonicalPrimary-$suffix"
+        primaryAlias ?: "$primary-$suffix"
     }
 }
 

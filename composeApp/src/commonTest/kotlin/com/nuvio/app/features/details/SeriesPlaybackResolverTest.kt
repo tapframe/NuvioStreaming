@@ -88,4 +88,31 @@ class SeriesPlaybackResolverTest {
         assertEquals("Up Next • S1E3", action.label)
         assertEquals("show:1:3", action.videoId)
     }
+
+    @Test
+    fun nextReleasedEpisodeAfter_global_index_fallback_ignores_specials() {
+        val meta = MetaDetails(
+            id = "show",
+            type = "series",
+            name = "Show",
+            videos = listOf(
+                MetaVideo(id = "sp1", title = "Special 1", season = 0, episode = 1, released = "2026-01-01"),
+                MetaVideo(id = "s1e1", title = "Episode 1", season = 1, episode = 1, released = "2026-01-08"),
+                MetaVideo(id = "s1e2", title = "Episode 2", season = 1, episode = 2, released = "2026-01-15"),
+                MetaVideo(id = "s2e1", title = "Episode 3", season = 2, episode = 1, released = "2026-01-22"),
+                MetaVideo(id = "s2e2", title = "Episode 4", season = 2, episode = 2, released = "2026-01-29"),
+            ),
+        )
+
+        val nextEpisode = meta.nextReleasedEpisodeAfter(
+            seasonNumber = 1,
+            episodeNumber = 3,
+            todayIsoDate = "2026-02-01",
+        )
+
+        assertNotNull(nextEpisode)
+        assertEquals(2, nextEpisode.season)
+        assertEquals(2, nextEpisode.episode)
+        assertEquals("s2e2", nextEpisode.id)
+    }
 }

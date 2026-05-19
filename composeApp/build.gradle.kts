@@ -90,6 +90,19 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
             )
         }
 
+        outDir.resolve("com/nuvio/app/features/debrid").apply {
+            mkdirs()
+            resolve("DebridConfig.kt").writeText(
+                """
+                |package com.nuvio.app.features.debrid
+                |
+                |object DebridConfig {
+                |    const val DIRECT_DEBRID_API_BASE_URL = "${props.getProperty("DIRECT_DEBRID_API_BASE_URL", "")}"
+                |}
+                """.trimMargin()
+            )
+        }
+
         outDir.resolve("com/nuvio/app/core/build").apply {
             mkdirs()
             resolve("AppVersionConfig.kt").writeText(
@@ -260,6 +273,7 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor3)
+            implementation(libs.coil.svg)
             implementation("dev.chrisbanes.haze:haze:1.7.2")
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)

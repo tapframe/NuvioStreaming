@@ -20,11 +20,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -91,16 +91,57 @@ object SearchRepository {
         _uiState.value = SearchUiState(isLoading = true)
 
         activeJob = scope.launch {
-            val results = requests.map { request ->
-                async {
+            val resultChannel = Channel<IndexedSearchResult>(Channel.UNLIMITED)
+            val jobs = requests.mapIndexed { index, request ->
+                launch {
                     runCatching { request.toSection() }
+                        .fold(
+                            onSuccess = { section ->
+                                resultChannel.send(
+                                    IndexedSearchResult(
+                                        index = index,
+                                        section = section,
+                                    ),
+                                )
+                            },
+                            onFailure = { error ->
+                                if (error is CancellationException) throw error
+                                resultChannel.send(
+                                    IndexedSearchResult(
+                                        index = index,
+                                        error = error,
+                                    ),
+                                )
+                            },
+                        )
                 }
-            }.awaitAll()
+            }
+            val closeChannelJob = launch {
+                jobs.joinAll()
+                resultChannel.close()
+            }
+            val results = arrayOfNulls<IndexedSearchResult>(requests.size)
 
-            val sections = results
-                .mapNotNull { it.getOrNull() }
-            val firstFailure = results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
-            val allFailed = results.isNotEmpty() && results.all { it.isFailure }
+            try {
+                for (result in resultChannel) {
+                    results[result.index] = result
+                    val sections = results.orderedSections()
+                    if (sections.isNotEmpty()) {
+                        _uiState.value = SearchUiState(
+                            isLoading = true,
+                            sections = sections,
+                        )
+                    }
+                }
+            } finally {
+                closeChannelJob.cancel()
+                resultChannel.close()
+            }
+
+            val completedResults = results.filterNotNull()
+            val sections = results.orderedSections()
+            val firstFailure = completedResults.firstNotNullOfOrNull { it.error?.message }
+            val allFailed = completedResults.isNotEmpty() && completedResults.all { it.error != null }
 
             _uiState.value = SearchUiState(
                 isLoading = false,
@@ -435,6 +476,15 @@ object SearchRepository {
         }
     }
 }
+
+private data class IndexedSearchResult(
+    val index: Int,
+    val section: HomeCatalogSection? = null,
+    val error: Throwable? = null,
+)
+
+private fun Array<IndexedSearchResult?>.orderedSections(): List<HomeCatalogSection> =
+    mapNotNull { result -> result?.section }
 
 private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
     if (!HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) return this
