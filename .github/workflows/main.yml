@@ -3,6 +3,10 @@ name: Build Android APK
 on:
   workflow_dispatch: # Umožní spustit sestavení ručně jedním kliknutím
 
+# Tento blok opravuje chybu 403 - dává skriptu právo zapisovat a vytvářet Releases
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,7 +34,8 @@ jobs:
       - name: Nahrání hotového APK do GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          files: composeApp/build/outputs/apk/debug/composeApp-debug.apk
+          # Použití hvězdičky zajistí, že to vezme APK bez ohledu na přesný název
+          files: composeApp/build/outputs/apk/debug/*.apk
           tag_name: v${{ github.run_number }}-debug
           name: Build #${{ github.run_number }} (Debug APK)
           draft: false
