@@ -21,17 +21,12 @@ jobs:
       - name: Nastavení práv pro Gradle Wrapper
         run: chmod +x gradlew
 
-      - name: Sestavení Debug APK
-        run: ./gradlew :composeApp:assembleDebug
-        
-       - name: Nastavení práv pro Gradle Wrapper
-        run: chmod +x gradlew
-
       - name: Vytvoření chybějícího local.properties
         run: touch local.properties
 
       - name: Sestavení Debug APK
         run: ./gradlew :composeApp:assembleDebug
+
       - name: Nahrání hotového APK do GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
