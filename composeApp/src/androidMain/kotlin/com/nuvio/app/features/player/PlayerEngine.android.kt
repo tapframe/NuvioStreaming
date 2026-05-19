@@ -98,10 +98,28 @@ actual fun PlatformPlayerSurface(
     val libassRenderType = runCatching {
         LibassRenderType.valueOf(playerSettings.libassRenderType)
     }.getOrDefault(LibassRenderType.CUES)
+    val playerSourceKey = listOf(
+        sourceUrl,
+        sourceAudioUrl.orEmpty(),
+        sanitizedSourceHeaders,
+        sanitizedSourceResponseHeaders,
+        useYoutubeChunkedPlayback,
+    )
+    var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
+    var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
+    val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
 
-    val exoPlayer = remember(sourceUrl, sourceAudioUrl, sanitizedSourceHeaders, sanitizedSourceResponseHeaders) {
+    val exoPlayer = remember(
+        sourceUrl,
+        sourceAudioUrl,
+        sanitizedSourceHeaders,
+        sanitizedSourceResponseHeaders,
+        useYoutubeChunkedPlayback,
+        effectiveDecoderPriority,
+    ) {
         val renderersFactory = DefaultRenderersFactory(context)
-            .setExtensionRendererMode(playerSettings.decoderPriority)
+            .setExtensionRendererMode(effectiveDecoderPriority)
+            .setEnableDecoderFallback(true)
             .setMapDV7ToHevc(playerSettings.mapDV7ToHevc)
 
         val trackSelector = DefaultTrackSelector(context).apply {
@@ -169,6 +187,7 @@ actual fun PlatformPlayerSurface(
                 } else {
                     setMediaItem(MediaItem.fromUri(sourceUrl))
                 }
+                fallbackStartPositionMs?.let { seekTo(it.coerceAtLeast(0L)) }
                 prepare()
                 this.playWhenReady = playWhenReady
             }
@@ -191,6 +210,21 @@ actual fun PlatformPlayerSurface(
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 syncPlayerViewKeepScreenOn()
+                if (
+                    playerSettings.decoderPriority == DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON &&
+                    effectiveDecoderPriority != DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER &&
+                    error.isDecoderFailure()
+                ) {
+                    Log.w(
+                        TAG,
+                        "Decoder failure (${error.errorCodeName}); retrying with app decoders",
+                        error,
+                    )
+                    fallbackStartPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                    decoderPriorityOverride = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                    latestOnError.value(null)
+                    return
+                }
                 latestOnError.value(error.localizedMessage ?: runBlocking { getString(Res.string.player_unable_to_play_stream) })
             }
 
@@ -204,6 +238,7 @@ actual fun PlatformPlayerSurface(
                 }
                 Log.d(TAG, "onPlaybackStateChanged: $stateName")
                 if (playbackState == Player.STATE_READY) {
+                    fallbackStartPositionMs = null
                     latestOnError.value(null)
                     exoPlayer.logCurrentTracks("STATE_READY")
                 }
@@ -483,6 +518,16 @@ private fun ExoPlayer.shouldKeepPlayerScreenOn(): Boolean =
     playerError == null &&
         playWhenReady &&
         playbackState in setOf(Player.STATE_BUFFERING, Player.STATE_READY)
+
+private fun PlaybackException.isDecoderFailure(): Boolean =
+    errorCode in setOf(
+        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+        PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FAILED,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+        PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+        PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED,
+    )
 
 private fun PlayerResizeMode.toExoResizeMode(): Int =
     when (this) {

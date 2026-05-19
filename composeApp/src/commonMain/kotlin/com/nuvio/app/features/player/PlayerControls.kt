@@ -1,11 +1,14 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -37,6 +40,7 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,6 +73,7 @@ internal fun PlayerControlsShell(
     metrics: PlayerLayoutMetrics,
     resizeMode: PlayerResizeMode,
     isLocked: Boolean,
+    showPlaybackControls: Boolean = true,
     onLockToggle: () -> Unit,
     onBack: () -> Unit,
     onTogglePlayback: () -> Unit,
@@ -81,6 +86,9 @@ internal fun PlayerControlsShell(
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
     onSubmitIntroClick: (() -> Unit)? = null,
+    parentalWarnings: List<ParentalWarning> = emptyList(),
+    showParentalGuide: Boolean = false,
+    onParentalGuideAnimationComplete: () -> Unit = {},
     onScrubChange: (Long) -> Unit,
     onScrubFinished: (Long) -> Unit,
     horizontalSafePadding: androidx.compose.ui.unit.Dp,
@@ -131,7 +139,11 @@ internal fun PlayerControlsShell(
                 episodeTitle = episodeTitle,
                 metrics = metrics,
                 isLocked = isLocked,
+                showActions = showPlaybackControls,
                 onSubmitIntroClick = onSubmitIntroClick,
+                parentalWarnings = parentalWarnings,
+                showParentalGuide = showParentalGuide,
+                onParentalGuideAnimationComplete = onParentalGuideAnimationComplete,
                 onLockToggle = onLockToggle,
                 onBack = onBack,
                 modifier = Modifier
@@ -145,36 +157,40 @@ internal fun PlayerControlsShell(
                     ),
             )
 
-            CenterControls(
-                snapshot = playbackSnapshot,
-                metrics = metrics,
-                onSeekBack = onSeekBack,
-                onSeekForward = onSeekForward,
-                onTogglePlayback = onTogglePlayback,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(bottom = metrics.centerLift),
-            )
+            if (showPlaybackControls) {
+                CenterControls(
+                    snapshot = playbackSnapshot,
+                    metrics = metrics,
+                    onSeekBack = onSeekBack,
+                    onSeekForward = onSeekForward,
+                    onTogglePlayback = onTogglePlayback,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(bottom = metrics.centerLift),
+                )
+            }
 
-            ProgressControls(
-                playbackSnapshot = playbackSnapshot,
-                displayedPositionMs = displayedPositionMs,
-                metrics = metrics,
-                resizeMode = resizeMode,
-                onScrubChange = onScrubChange,
-                onScrubFinished = onScrubFinished,
-                onResizeModeClick = onResizeModeClick,
-                onSpeedClick = onSpeedClick,
-                onSubtitleClick = onSubtitleClick,
-                onAudioClick = onAudioClick,
-                onSourcesClick = onSourcesClick,
-                onEpisodesClick = onEpisodesClick,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = metrics.horizontalPadding)
-                    .padding(bottom = metrics.sliderBottomOffset),
-            )
+            if (showPlaybackControls) {
+                ProgressControls(
+                    playbackSnapshot = playbackSnapshot,
+                    displayedPositionMs = displayedPositionMs,
+                    metrics = metrics,
+                    resizeMode = resizeMode,
+                    onScrubChange = onScrubChange,
+                    onScrubFinished = onScrubFinished,
+                    onResizeModeClick = onResizeModeClick,
+                    onSpeedClick = onSpeedClick,
+                    onSubtitleClick = onSubtitleClick,
+                    onAudioClick = onAudioClick,
+                    onSourcesClick = onSourcesClick,
+                    onEpisodesClick = onEpisodesClick,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = metrics.horizontalPadding)
+                        .padding(bottom = metrics.sliderBottomOffset),
+                )
+            }
         }
     }
 }
@@ -189,110 +205,131 @@ private fun PlayerHeader(
     episodeTitle: String?,
     metrics: PlayerLayoutMetrics,
     isLocked: Boolean,
+    showActions: Boolean,
     onSubmitIntroClick: (() -> Unit)?,
+    parentalWarnings: List<ParentalWarning>,
+    showParentalGuide: Boolean,
+    onParentalGuideAnimationComplete: () -> Unit,
     onLockToggle: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val typeScale = MaterialTheme.nuvioTypeScale
+    val metadataAlpha by animateFloatAsState(
+        targetValue = if (!showParentalGuide && showActions) 1f else 0f,
+        animationSpec = tween(durationMillis = if (!showParentalGuide && showActions) 260 else 160),
+        label = "playerHeaderMetadataAlpha",
+    )
     Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
-            Column(
+            Box(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = title,
-                    style = typeScale.titleLg.copy(
-                        fontSize = metrics.titleSize,
-                        lineHeight = metrics.titleSize * 1.16f,
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (seasonNumber != null && episodeNumber != null && !episodeTitle.isNullOrBlank()) {
-                    Text(
-                        text = stringResource(
-                            Res.string.compose_player_episode_title_format,
-                            seasonNumber,
-                            episodeNumber,
-                            episodeTitle,
-                        ),
-                        style = typeScale.bodyMd.copy(
-                            fontSize = metrics.episodeInfoSize,
-                            lineHeight = metrics.episodeInfoSize * 1.3f,
-                        ),
-                        color = Color.White.copy(alpha = 0.9f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier = Modifier.graphicsLayer { alpha = metadataAlpha },
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = streamTitle,
-                        style = typeScale.labelSm.copy(
-                            fontSize = metrics.metadataSize,
-                            lineHeight = metrics.metadataSize * 1.25f,
+                        text = title,
+                        style = typeScale.titleLg.copy(
+                            fontSize = metrics.titleSize,
+                            lineHeight = metrics.titleSize * 1.16f,
+                            fontWeight = FontWeight.Bold,
                         ),
-                        color = Color.White.copy(alpha = 0.7f),
-                        maxLines = 1,
+                        color = Color.White,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = providerName,
-                        style = typeScale.labelSm.copy(
-                            fontSize = metrics.metadataSize,
-                            lineHeight = metrics.metadataSize * 1.25f,
-                            fontStyle = FontStyle.Italic,
-                        ),
-                        color = Color.White.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    if (seasonNumber != null && episodeNumber != null && !episodeTitle.isNullOrBlank()) {
+                        Text(
+                            text = stringResource(
+                                Res.string.compose_player_episode_title_format,
+                                seasonNumber,
+                                episodeNumber,
+                                episodeTitle,
+                            ),
+                            style = typeScale.bodyMd.copy(
+                                fontSize = metrics.episodeInfoSize,
+                                lineHeight = metrics.episodeInfoSize * 1.3f,
+                            ),
+                            color = Color.White.copy(alpha = 0.9f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = streamTitle,
+                            style = typeScale.labelSm.copy(
+                                fontSize = metrics.metadataSize,
+                                lineHeight = metrics.metadataSize * 1.25f,
+                            ),
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = providerName,
+                            style = typeScale.labelSm.copy(
+                                fontSize = metrics.metadataSize,
+                                lineHeight = metrics.metadataSize * 1.25f,
+                                fontStyle = FontStyle.Italic,
+                            ),
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
+                ParentalGuideOverlay(
+                    warnings = parentalWarnings,
+                    isVisible = showParentalGuide,
+                    onAnimationComplete = onParentalGuideAnimationComplete,
+                    contentPadding = PaddingValues(0.dp),
+                )
             }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (onSubmitIntroClick != null) {
+            if (showActions) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (onSubmitIntroClick != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.Rounded.Flag,
+                            contentDescription = "Submit Intro",
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onSubmitIntroClick,
+                        )
+                    }
                     PlayerHeaderIconButton(
-                        icon = Icons.Rounded.Flag,
-                        contentDescription = "Submit Intro",
+                        icon = if (isLocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
+                        contentDescription = if (isLocked) {
+                            stringResource(Res.string.compose_player_unlock_controls)
+                        } else {
+                            stringResource(Res.string.compose_player_lock_controls)
+                        },
                         buttonSize = metrics.headerIconSize + 16.dp,
                         iconSize = metrics.headerIconSize,
-                        onClick = onSubmitIntroClick,
+                        onClick = onLockToggle,
+                    )
+                    NuvioBackButton(
+                        onClick = onBack,
+                        containerColor = Color.Black.copy(alpha = 0.35f),
+                        contentColor = Color.White,
+                        buttonSize = metrics.headerIconSize + 16.dp,
+                        iconSize = metrics.headerIconSize,
+                        contentDescription = stringResource(Res.string.compose_player_close),
                     )
                 }
-                PlayerHeaderIconButton(
-                    icon = if (isLocked) Icons.Rounded.LockOpen else Icons.Rounded.Lock,
-                    contentDescription = if (isLocked) {
-                        stringResource(Res.string.compose_player_unlock_controls)
-                    } else {
-                        stringResource(Res.string.compose_player_lock_controls)
-                    },
-                    buttonSize = metrics.headerIconSize + 16.dp,
-                    iconSize = metrics.headerIconSize,
-                    onClick = onLockToggle,
-                )
-                NuvioBackButton(
-                    onClick = onBack,
-                    containerColor = Color.Black.copy(alpha = 0.35f),
-                    contentColor = Color.White,
-                    buttonSize = metrics.headerIconSize + 16.dp,
-                    iconSize = metrics.headerIconSize,
-                    contentDescription = stringResource(Res.string.compose_player_close),
-                )
             }
         }
     }

@@ -273,6 +273,8 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "gpu-api", "vulkan"))
         checkError(mpv_set_option_string(mpv, "gpu-context", "moltenvk"))
         checkError(mpv_set_option_string(mpv, "hwdec", "auto"))
+        checkError(mpv_set_option_string(mpv, "audio-channels", "stereo"))
+        checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
         checkError(mpv_set_option_string(mpv, "vulkan-swap-mode", "fifo"))
         checkError(mpv_set_option_string(mpv, "vulkan-queue-count", "1"))
         checkError(mpv_set_option_string(mpv, "vulkan-async-compute", "no"))
@@ -312,12 +314,12 @@ final class MPVPlayerViewController: UIViewController {
     @objc private func enterBackground() {
         guard mpv != nil else { return }
         pausePlayback()
-        checkError(mpv_set_option_string(mpv, "vid", "no"))
+        setStringProperty("vid", "no")
     }
 
     @objc private func enterForeground() {
         guard mpv != nil else { return }
-        checkError(mpv_set_option_string(mpv, "vid", "auto"))
+        setStringProperty("vid", "auto")
         playPlayback()
     }
 
@@ -443,14 +445,14 @@ final class MPVPlayerViewController: UIViewController {
         guard mpv != nil else { return }
         switch mode {
         case 1: // Fill
-            checkError(mpv_set_option_string(mpv, "panscan", "1.0"))
-            checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
+            setStringProperty("panscan", "1.0")
+            setStringProperty("video-unscaled", "no")
         case 2: // Zoom
-            checkError(mpv_set_option_string(mpv, "panscan", "1.0"))
-            checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
+            setStringProperty("panscan", "1.0")
+            setStringProperty("video-unscaled", "no")
         default: // Fit
-            checkError(mpv_set_option_string(mpv, "panscan", "0.0"))
-            checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
+            setStringProperty("panscan", "0.0")
+            setStringProperty("video-unscaled", "no")
         }
     }
 
@@ -465,7 +467,7 @@ final class MPVPlayerViewController: UIViewController {
     func selectSubtitle(_ trackId: Int) {
         guard mpv != nil else { return }
         if trackId < 0 {
-            checkError(mpv_set_option_string(mpv, "sid", "no"))
+            setStringProperty("sid", "no")
         } else {
             var id = Int64(trackId)
             mpv_set_property(mpv, "sid", MPV_FORMAT_INT64, &id)
@@ -488,7 +490,7 @@ final class MPVPlayerViewController: UIViewController {
                 command("sub-remove", args: ["\(id)"], checkForErrors: false)
             }
         }
-        checkError(mpv_set_option_string(mpv, "sid", "no"))
+        setStringProperty("sid", "no")
     }
 
     func removeExternalSubtitlesAndSelect(_ trackId: Int) {
@@ -505,7 +507,7 @@ final class MPVPlayerViewController: UIViewController {
         if trackId >= 0 {
             selectSubtitle(trackId)
         } else {
-            checkError(mpv_set_option_string(mpv, "sid", "no"))
+            setStringProperty("sid", "no")
         }
     }
 
@@ -822,6 +824,11 @@ final class MPVPlayerViewController: UIViewController {
         guard mpv != nil else { return }
         var data: Int = flag ? 1 : 0
         mpv_set_property(mpv, name, MPV_FORMAT_FLAG, &data)
+    }
+
+    private func setStringProperty(_ name: String, _ value: String) {
+        guard mpv != nil else { return }
+        checkError(mpv_set_property_string(mpv, name, value))
     }
 
     private func getInt(_ name: String) -> Int {

@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -159,36 +160,59 @@ private fun HomeContinueWatchingSectionContent(
         HomeCatalogSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
 
-    NuvioShelfSection(
-        title = stringResource(Res.string.compose_settings_page_continue_watching),
-        entries = items,
-        modifier = modifier,
-        headerHorizontalPadding = sectionPadding,
-        rowContentPadding = PaddingValues(horizontal = sectionPadding),
-        itemSpacing = layout.itemGap,
-        showHeaderAccent = !homeCatalogSettings.hideCatalogUnderline,
-        key = { item -> item.videoId },
-    ) { item ->
-        when (style) {
-            ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
-                item = item,
-                layout = layout,
-                useEpisodeThumbnails = useEpisodeThumbnails,
-                blurNextUp = blurNextUp,
-                onClick = onItemClick?.let { { it(item) } },
-                onLongClick = onItemLongPress?.let { { it(item) } },
-            )
-            ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
-                item = item,
-                layout = layout,
-                useEpisodeThumbnails = useEpisodeThumbnails,
-                blurNextUp = blurNextUp,
-                onClick = onItemClick?.let { { it(item) } },
-                onLongClick = onItemLongPress?.let { { it(item) } },
-            )
+    val itemOrderKey = remember(items) {
+        items.joinToString(separator = "|") { item -> item.continueWatchingRowOrderKey() }
+    }
+
+    key(itemOrderKey) {
+        NuvioShelfSection(
+            title = stringResource(Res.string.compose_settings_page_continue_watching),
+            entries = items,
+            modifier = modifier,
+            headerHorizontalPadding = sectionPadding,
+            rowContentPadding = PaddingValues(horizontal = sectionPadding),
+            itemSpacing = layout.itemGap,
+            showHeaderAccent = !homeCatalogSettings.hideCatalogUnderline,
+            key = { item -> item.videoId },
+        ) { item ->
+            when (style) {
+                ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
+                    item = item,
+                    layout = layout,
+                    useEpisodeThumbnails = useEpisodeThumbnails,
+                    blurNextUp = blurNextUp,
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongPress?.let { { it(item) } },
+                )
+                ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
+                    item = item,
+                    layout = layout,
+                    useEpisodeThumbnails = useEpisodeThumbnails,
+                    blurNextUp = blurNextUp,
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongPress?.let { { it(item) } },
+                )
+            }
         }
     }
 }
+
+private fun ContinueWatchingItem.continueWatchingRowOrderKey(): String =
+    buildString {
+        append(if (isNextUp) "next" else "progress")
+        append(':')
+        append(parentMetaId)
+        append(':')
+        append(videoId)
+        append(':')
+        append(seasonNumber)
+        append('x')
+        append(episodeNumber)
+        append(":seed=")
+        append(nextUpSeedSeasonNumber)
+        append('x')
+        append(nextUpSeedEpisodeNumber)
+    }
 
 @Composable
 fun ContinueWatchingStylePreview(

@@ -1,6 +1,8 @@
 package com.nuvio.app.features.watchprogress
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.auth.AuthRepository
+import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.player.PlayerPlaybackSnapshot
@@ -12,16 +14,20 @@ import com.nuvio.app.features.trakt.shouldUseTraktProgress as shouldUseTraktProg
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.sync.ProgressSyncAdapter
 import com.nuvio.app.features.watching.sync.SupabaseProgressSyncAdapter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+
+private const val NUVIO_SYNC_PERIODIC_INTERVAL_MS = 5L * 60L * 1000L
 
 object WatchProgressRepository {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -34,6 +40,8 @@ object WatchProgressRepository {
     private var currentProfileId: Int = 1
     private var entriesByVideoId: MutableMap<String, WatchProgressEntry> = mutableMapOf()
     private var metadataResolutionJob: Job? = null
+    private var isPullingNuvioSyncFromServer = false
+    private var hasCompletedInitialNuvioSyncPull = false
     internal var syncAdapter: ProgressSyncAdapter = SupabaseProgressSyncAdapter
 
     init {
@@ -45,7 +53,10 @@ object WatchProgressRepository {
                     )
                 ) {
                     runCatching { TraktProgressRepository.refreshNow() }
-                        .onFailure { error -> log.w { "Failed to refresh Trakt progress after auth: ${error.message}" } }
+                        .onFailure { error ->
+                            if (error is CancellationException) throw error
+                            log.w { "Failed to refresh Trakt progress after auth: ${error.message}" }
+                        }
                 }
                 publish()
             }
@@ -59,7 +70,10 @@ object WatchProgressRepository {
                     )
                 ) {
                     runCatching { TraktProgressRepository.refreshNow() }
-                        .onFailure { error -> log.w { "Failed to refresh Trakt progress after source change: ${error.message}" } }
+                        .onFailure { error ->
+                            if (error is CancellationException) throw error
+                            log.w { "Failed to refresh Trakt progress after source change: ${error.message}" }
+                        }
                 }
                 publish()
             }
@@ -70,6 +84,25 @@ object WatchProgressRepository {
                 if (shouldUseTraktProgress()) {
                     publish()
                 }
+            }
+        }
+
+        syncScope.launch {
+            while (true) {
+                delay(NUVIO_SYNC_PERIODIC_INTERVAL_MS)
+                TraktAuthRepository.ensureLoaded()
+                TraktSettingsRepository.ensureLoaded()
+                if (shouldUseTraktProgress()) continue
+
+                val authState = AuthRepository.state.value
+                if (authState !is AuthState.Authenticated || authState.isAnonymous) continue
+                if (!hasCompletedInitialNuvioSyncPull || isPullingNuvioSyncFromServer) continue
+
+                runCatching { pullFromServer(ProfileRepository.activeProfileId) }
+                    .onFailure { error ->
+                        if (error is CancellationException) throw error
+                        log.w { "Periodic NuvioSync pull failed: ${error.message}" }
+                    }
             }
         }
     }
@@ -128,56 +161,74 @@ object WatchProgressRepository {
 
         val useTraktProgress = shouldUseTraktProgress()
 
-        if (useTraktProgress) {
-            runCatching { TraktProgressRepository.refreshNow() }
-                .onFailure { e -> log.e(e) { "Failed to pull Trakt progress" } }
-            publish()
+        if (!useTraktProgress && isPullingNuvioSyncFromServer) {
             return
         }
+        if (!useTraktProgress) {
+            isPullingNuvioSyncFromServer = true
+        }
 
-        runCatching {
-            val serverEntries = syncAdapter.pull(profileId = profileId)
-
-            val oldLocal = entriesByVideoId.toMap()
-            val newMap = mutableMapOf<String, WatchProgressEntry>()
-
-            serverEntries.forEach { entry ->
-                val videoId = entry.videoId
-                val cached = oldLocal[videoId]
-                newMap[videoId] = WatchProgressEntry(
-                    contentType = entry.contentType,
-                    parentMetaId = entry.contentId,
-                    parentMetaType = cached?.parentMetaType ?: entry.contentType,
-                    videoId = videoId,
-                    title = cached?.title?.takeIf { it.isNotBlank() } ?: entry.contentId,
-                    logo = cached?.logo,
-                    poster = cached?.poster,
-                    background = cached?.background,
-                    seasonNumber = entry.season,
-                    episodeNumber = entry.episode,
-                    episodeTitle = cached?.episodeTitle,
-                    episodeThumbnail = cached?.episodeThumbnail,
-                    lastPositionMs = entry.position,
-                    durationMs = entry.duration,
-                    lastUpdatedEpochMs = entry.lastWatched,
-                    providerName = cached?.providerName,
-                    providerAddonId = cached?.providerAddonId,
-                    lastStreamTitle = cached?.lastStreamTitle,
-                    lastStreamSubtitle = cached?.lastStreamSubtitle,
-                    pauseDescription = cached?.pauseDescription,
-                    lastSourceUrl = cached?.lastSourceUrl,
-                    isCompleted = isWatchProgressComplete(entry.position, entry.duration, false),
-                )
+        try {
+            if (useTraktProgress) {
+                runCatching { TraktProgressRepository.refreshNow() }
+                    .onFailure { e ->
+                        if (e is CancellationException) throw e
+                        log.e(e) { "Failed to pull Trakt progress" }
+                    }
+                publish()
+                return
             }
 
-            entriesByVideoId = newMap
-            hasLoaded = true
-            publish()
-            persist()
+            runCatching {
+                val serverEntries = syncAdapter.pull(profileId = profileId)
 
-            resolveRemoteMetadata()
-        }.onFailure { e ->
-            log.e(e) { "Failed to pull watch progress from server" }
+                val oldLocal = entriesByVideoId.toMap()
+                val newMap = mutableMapOf<String, WatchProgressEntry>()
+
+                serverEntries.forEach { entry ->
+                    val videoId = entry.videoId
+                    val cached = oldLocal[videoId]
+                    newMap[videoId] = WatchProgressEntry(
+                        contentType = entry.contentType,
+                        parentMetaId = entry.contentId,
+                        parentMetaType = cached?.parentMetaType ?: entry.contentType,
+                        videoId = videoId,
+                        title = cached?.title?.takeIf { it.isNotBlank() } ?: entry.contentId,
+                        logo = cached?.logo,
+                        poster = cached?.poster,
+                        background = cached?.background,
+                        seasonNumber = entry.season,
+                        episodeNumber = entry.episode,
+                        episodeTitle = cached?.episodeTitle,
+                        episodeThumbnail = cached?.episodeThumbnail,
+                        lastPositionMs = entry.position,
+                        durationMs = entry.duration,
+                        lastUpdatedEpochMs = entry.lastWatched,
+                        providerName = cached?.providerName,
+                        providerAddonId = cached?.providerAddonId,
+                        lastStreamTitle = cached?.lastStreamTitle,
+                        lastStreamSubtitle = cached?.lastStreamSubtitle,
+                        pauseDescription = cached?.pauseDescription,
+                        lastSourceUrl = cached?.lastSourceUrl,
+                        isCompleted = isWatchProgressComplete(entry.position, entry.duration, false),
+                    )
+                }
+
+                entriesByVideoId = newMap
+                hasLoaded = true
+                hasCompletedInitialNuvioSyncPull = true
+                publish()
+                persist()
+
+                resolveRemoteMetadata()
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                log.e(e) { "Failed to pull watch progress from server" }
+            }
+        } finally {
+            if (!useTraktProgress) {
+                isPullingNuvioSyncFromServer = false
+            }
         }
     }
 
@@ -186,7 +237,9 @@ object WatchProgressRepository {
             .filter { it.poster.isNullOrBlank() || it.background.isNullOrBlank() }
             .groupBy { it.parentMetaId to it.contentType }
 
-        if (needsResolution.isEmpty()) return
+        if (needsResolution.isEmpty()) {
+            return
+        }
 
         metadataResolutionJob?.cancel()
         metadataResolutionJob = syncScope.launch {
@@ -201,7 +254,10 @@ object WatchProgressRepository {
                 val (metaId, metaType) = key
                 val meta = runCatching {
                     MetaDetailsRepository.fetch(metaType, metaId)
-                }.getOrNull() ?: continue
+                }.getOrNull()
+                if (meta == null) {
+                    continue
+                }
 
                 for (entry in entries) {
                     val episodeVideo = if (entry.seasonNumber != null && entry.episodeNumber != null) {
@@ -382,8 +438,10 @@ object WatchProgressRepository {
             ContinueWatchingPreferencesRepository.removeDismissedNextUpKeysForContent(entry.parentMetaId)
         }
 
+        val useTraktProgress = shouldUseTraktProgress()
+
         entriesByVideoId[session.videoId] = entry
-        if (shouldUseTraktProgress()) {
+        if (useTraktProgress) {
             TraktProgressRepository.applyOptimisticProgress(entry)
         }
         publish()
@@ -392,7 +450,9 @@ object WatchProgressRepository {
             resolveRemoteMetadata()
         }
         pushScrobbleToServer(entry)
-        WatchingActions.onProgressEntryUpdated(entry)
+        if (shouldCascadeCompletedProgressToWatchedHistory(entry, useTraktProgress)) {
+            WatchingActions.onProgressEntryUpdated(entry)
+        }
     }
 
     private fun pushScrobbleToServer(entry: WatchProgressEntry) {
@@ -424,6 +484,11 @@ object WatchProgressRepository {
         val sortedEntries = entries.sortedByDescending { it.lastUpdatedEpochMs }
         _uiState.value = WatchProgressUiState(
             entries = sortedEntries,
+            hasLoadedRemoteProgress = if (shouldUseTraktProgress()) {
+                TraktProgressRepository.uiState.value.hasLoadedRemoteProgress
+            } else {
+                hasLoaded
+            },
         )
     }
 
