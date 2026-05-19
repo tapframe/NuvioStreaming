@@ -297,6 +297,8 @@ object PlayerStreamsRepository {
                         type = type,
                         videoId = videoId,
                         target = target,
+                        season = season,
+                        episode = episode,
                     )
                 }
             }

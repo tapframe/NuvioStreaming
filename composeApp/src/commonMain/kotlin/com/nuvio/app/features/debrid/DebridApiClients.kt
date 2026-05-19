@@ -26,6 +26,7 @@ internal object DebridApiJson {
 
 internal object TorboxApiClient {
     private const val BASE_URL = "https://api.torbox.app"
+    private const val SEARCH_BASE_URL = "https://search-api.torbox.app"
 
     suspend fun validateApiKey(apiKey: String): Boolean =
         getUser(apiKey.trim()).status in 200..299
@@ -82,6 +83,48 @@ internal object TorboxApiClient {
                     "zip_link" to "false",
                     "redirect" to "false",
                     "append_name" to "false",
+                )
+            }",
+            apiKey = apiKey,
+        )
+
+    suspend fun searchTorrents(
+        apiKey: String,
+        imdbId: String,
+        season: Int?,
+        episode: Int?,
+        searchUserEngines: Boolean,
+    ): DebridApiResponse<TorboxSearchResponseDto> =
+        request(
+            method = "GET",
+            url = "$SEARCH_BASE_URL/torrents/imdb:${encodePathSegment(imdbId)}?${
+                queryString(
+                    "metadata" to "true",
+                    "check_cache" to "true",
+                    "search_user_engines" to searchUserEngines.toString(),
+                    "season" to season?.toString(),
+                    "episode" to episode?.toString(),
+                )
+            }",
+            apiKey = apiKey,
+        )
+
+    suspend fun searchTorrentsByQuery(
+        apiKey: String,
+        query: String,
+        season: Int?,
+        episode: Int?,
+        searchUserEngines: Boolean,
+    ): DebridApiResponse<TorboxSearchResponseDto> =
+        request(
+            method = "GET",
+            url = "$SEARCH_BASE_URL/torrents/search/${encodePathSegment(query)}?${
+                queryString(
+                    "metadata" to "true",
+                    "check_cache" to "true",
+                    "search_user_engines" to searchUserEngines.toString(),
+                    "season" to season?.toString(),
+                    "episode" to episode?.toString(),
                 )
             }",
             apiKey = apiKey,

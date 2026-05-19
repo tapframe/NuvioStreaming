@@ -18,6 +18,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.URI
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 private val downloadHttpClient = OkHttpClient.Builder()
     .connectTimeout(60, TimeUnit.SECONDS)
@@ -29,6 +30,7 @@ private val downloadHttpClient = OkHttpClient.Builder()
 
 internal actual object DownloadsPlatformDownloader {
     private var appContext: Context? = null
+    private val activeDownloadCount = AtomicInteger(0)
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
@@ -50,6 +52,7 @@ internal actual object DownloadsPlatformDownloader {
                 onFailure(runBlocking { getString(Res.string.downloads_error_not_initialized) })
                 return@launch
             }
+            startForegroundDownloadService(context)
 
             val downloadsDir = File(context.filesDir, "downloads").apply { mkdirs() }
             val destination = File(downloadsDir, request.destinationFileName)
@@ -145,6 +148,8 @@ internal actual object DownloadsPlatformDownloader {
                 }
             } catch (error: Throwable) {
                 onFailure(error.message ?: runBlocking { getString(Res.string.download_failed) })
+            } finally {
+                stopForegroundDownloadServiceIfIdle(context)
             }
         }
 
@@ -185,6 +190,20 @@ internal actual object DownloadsPlatformDownloader {
         val downloadsDir = File(context.filesDir, "downloads")
         val localFile = File(downloadsDir, fileName)
         return localFile.takeIf { it.exists() }?.toURI()?.toString()
+    }
+
+    private fun startForegroundDownloadService(context: Context) {
+        if (activeDownloadCount.getAndIncrement() == 0) {
+            runCatching { DownloadsForegroundService.start(context) }
+        }
+    }
+
+    private fun stopForegroundDownloadServiceIfIdle(context: Context) {
+        val remaining = activeDownloadCount.decrementAndGet().coerceAtLeast(0)
+        if (remaining == 0) {
+            activeDownloadCount.set(0)
+            runCatching { DownloadsForegroundService.stop(context) }
+        }
     }
 }
 

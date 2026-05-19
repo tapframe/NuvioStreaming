@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -15,6 +17,7 @@ import com.nuvio.app.core.deeplink.buildDownloadsDeepLinkUrl
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
+import java.net.URL
 import kotlin.math.abs
 
 internal actual object DownloadsLiveStatusPlatform {
@@ -24,6 +27,7 @@ internal actual object DownloadsLiveStatusPlatform {
 
     private var appContext: Context? = null
     private val lastRenderStateById = mutableMapOf<String, RenderState>()
+    private val bitmapCache = mutableMapOf<String, Bitmap?>()
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
@@ -40,10 +44,15 @@ internal actual object DownloadsLiveStatusPlatform {
             .orEmpty()
             .toMutableSet()
 
+        val completedItemsById = items
+            .filter { item -> item.status == DownloadStatus.Completed }
+            .associateBy { item -> item.id }
+
         val activeItems = items.filter { item ->
             item.status == DownloadStatus.Downloading ||
                 item.status == DownloadStatus.Paused ||
-                item.status == DownloadStatus.Failed
+                item.status == DownloadStatus.Failed ||
+                (item.status == DownloadStatus.Completed && item.id in trackedBefore)
         }
 
         val trackedNow = mutableSetOf<String>()
@@ -67,15 +76,19 @@ internal actual object DownloadsLiveStatusPlatform {
             trackedNow += item.id
         }
 
-        val staleIds = trackedBefore - trackedNow
+        val staleIds = trackedBefore - trackedNow - completedItemsById.keys
         staleIds.forEach { downloadId ->
             manager.cancel(notificationId(downloadId))
             lastRenderStateById.remove(downloadId)
         }
 
+        completedItemsById.keys.forEach { downloadId ->
+            lastRenderStateById.remove(downloadId)
+        }
+
         preferences(context)
             .edit()
-            .putStringSet(trackedDownloadIdsKey, trackedNow)
+            .putStringSet(trackedDownloadIdsKey, trackedNow - completedItemsById.keys)
             .apply()
     }
 
@@ -104,6 +117,10 @@ internal actual object DownloadsLiveStatusPlatform {
             .setContentIntent(launchPendingIntent)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
 
+        loadArtworkBitmap(item)?.let { bitmap ->
+            notificationBuilder.setLargeIcon(bitmap)
+        }
+
         when (item.status) {
             DownloadStatus.Downloading -> {
                 notificationBuilder
@@ -129,7 +146,6 @@ internal actual object DownloadsLiveStatusPlatform {
 
             DownloadStatus.Paused,
             DownloadStatus.Failed,
-            DownloadStatus.Completed,
             -> {
                 notificationBuilder
                     .setOngoing(false)
@@ -151,6 +167,15 @@ internal actual object DownloadsLiveStatusPlatform {
                             downloadId = item.id,
                         ),
                     )
+            }
+
+            DownloadStatus.Completed -> {
+                notificationBuilder
+                    .setOngoing(false)
+                    .setAutoCancel(true)
+                    .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                    .setCategory(NotificationCompat.CATEGORY_STATUS)
+                    .setProgress(0, 0, false)
             }
         }
 
@@ -174,6 +199,31 @@ internal actual object DownloadsLiveStatusPlatform {
             DownloadStatus.Failed -> item.errorMessage?.takeIf { it.isNotBlank() } ?: runBlocking { getString(Res.string.downloads_live_failed) }
             DownloadStatus.Completed -> runBlocking { getString(Res.string.downloads_live_completed) }
         }
+    }
+
+    private fun loadArtworkBitmap(item: DownloadItem): Bitmap? {
+        val imageUrl = listOfNotNull(
+            item.episodeThumbnail,
+            item.poster,
+            item.background,
+            item.logo,
+        ).firstOrNull { it.isNotBlank() } ?: return null
+
+        bitmapCache[imageUrl]?.let { return it }
+        if (imageUrl in bitmapCache) return null
+
+        val bitmap = runCatching {
+            val connection = URL(imageUrl).openConnection().apply {
+                connectTimeout = 8_000
+                readTimeout = 8_000
+            }
+            connection.getInputStream().use { input ->
+                BitmapFactory.decodeStream(input)
+            }
+        }.getOrNull()
+
+        bitmapCache[imageUrl] = bitmap
+        return bitmap
     }
 
     private fun formatBytes(bytes: Long): String {

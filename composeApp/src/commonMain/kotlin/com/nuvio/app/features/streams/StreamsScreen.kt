@@ -85,6 +85,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.features.notifications.EpisodeReleaseNotificationPlatform
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.launch
@@ -115,6 +116,7 @@ fun StreamsScreen(
     resumeProgressFraction: Float? = null,
     manualSelection: Boolean = false,
     startFromBeginning: Boolean = false,
+    downloadMode: Boolean = false,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit = { _, _, _ -> },
     onStreamActionOpen: (
         stream: StreamItem,
@@ -139,6 +141,7 @@ fun StreamsScreen(
     }
     val isEpisode = seasonNumber != null && episodeNumber != null
     val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
     val streamLinkCopiedText = stringResource(Res.string.streams_link_copied)
     val noDirectStreamLinkText = stringResource(Res.string.streams_no_direct_link)
     val torrentUnsupportedText = stringResource(Res.string.streams_torrent_not_supported)
@@ -178,6 +181,7 @@ fun StreamsScreen(
             videoId = videoId,
             season = seasonNumber,
             episode = episodeNumber,
+            searchQuery = title,
             manualSelection = manualSelection,
         )
     }
@@ -195,6 +199,27 @@ fun StreamsScreen(
         episodeThumbnail ?: background ?: poster
     } else {
         background ?: poster
+    }
+    fun enqueueDownload(stream: StreamItem) {
+        coroutineScope.launch {
+            runCatching { EpisodeReleaseNotificationPlatform.requestAuthorization() }
+            val result = DownloadsRepository.enqueueFromStream(
+                contentType = type,
+                videoId = videoId,
+                parentMetaId = parentMetaId,
+                parentMetaType = parentMetaType,
+                title = title,
+                logo = logo,
+                poster = poster,
+                background = background,
+                seasonNumber = seasonNumber,
+                episodeNumber = episodeNumber,
+                episodeTitle = episodeTitle,
+                episodeThumbnail = episodeThumbnail,
+                stream = stream,
+            )
+            NuvioToastController.show(result.toastMessage())
+        }
     }
 
     BoxWithConstraints(
@@ -221,6 +246,8 @@ fun StreamsScreen(
                 onStreamSelected = { stream, positionMs, progressFraction ->
                     if (stream.isTorrentStream) {
                         NuvioToastController.show(torrentUnsupportedText)
+                    } else if (downloadMode) {
+                        enqueueDownload(stream)
                     } else {
                         onStreamSelected(stream, positionMs, progressFraction)
                     }
@@ -242,6 +269,8 @@ fun StreamsScreen(
                 onStreamSelected = { stream, positionMs, progressFraction ->
                     if (stream.isTorrentStream) {
                         NuvioToastController.show(torrentUnsupportedText)
+                    } else if (downloadMode) {
+                        enqueueDownload(stream)
                     } else {
                         onStreamSelected(stream, positionMs, progressFraction)
                     }
@@ -279,6 +308,7 @@ fun StreamsScreen(
                                 videoId = videoId,
                                 season = seasonNumber,
                                 episode = episodeNumber,
+                                searchQuery = title,
                                 manualSelection = manualSelection,
                             )
                         },

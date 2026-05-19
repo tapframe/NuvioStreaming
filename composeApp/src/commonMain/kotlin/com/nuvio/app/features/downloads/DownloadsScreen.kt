@@ -1,5 +1,6 @@
 package com.nuvio.app.features.downloads
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,10 +32,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
@@ -175,8 +179,12 @@ private fun LazyListScope.downloadsRootContent(
                         .fillMaxWidth()
                         .padding(horizontal = 14.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    DownloadArtwork(
+                        item = item,
+                        modifier = Modifier.size(width = 52.dp, height = 52.dp),
+                    )
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -318,9 +326,13 @@ private fun DownloadRow(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top,
             ) {
+                DownloadArtwork(
+                    item = item,
+                    modifier = Modifier.size(width = 64.dp, height = 44.dp),
+                )
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -407,12 +419,43 @@ private fun DownloadRow(
     }
 }
 
+@Composable
+private fun DownloadArtwork(
+    item: DownloadItem,
+    modifier: Modifier = Modifier,
+) {
+    val imageUrl = item.downloadArtworkUrl()
+    Box(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (imageUrl != null) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = item.title,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+    }
+}
+
 private fun DownloadItem.displayTitle(): String =
     if (isEpisode) {
         episodeTitle?.trim()?.takeIf { it.isNotBlank() } ?: title
     } else {
         title
     }
+
+private fun DownloadItem.downloadArtworkUrl(): String? =
+    listOfNotNull(
+        episodeThumbnail,
+        poster,
+        background,
+        logo,
+    ).firstOrNull { it.isNotBlank() }
 
 @Composable
 private fun downloadDisplaySubtitle(

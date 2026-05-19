@@ -1199,7 +1199,6 @@
     <string name="library_remove_message">Fjern %1$s fra biblioteket ditt?</string>
     <string name="library_remove_title">Fjern fra bibliotek?</string>
     <string name="media_movie">Film</string>
-    <string name="media_series">Serie</string>
     <string name="notifications_channel_episode_releases_description">Varsler når en ny episode for en lagret serie er ute.</string>
     <string name="notifications_test_preview_body">Forhåndsvisning av episodeutgivelsesvarsel.</string>
     <string name="notifications_test_send_failed">Kunne ikke sende testvarsel.</string>

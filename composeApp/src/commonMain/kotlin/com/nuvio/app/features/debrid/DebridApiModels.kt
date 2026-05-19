@@ -2,6 +2,7 @@ package com.nuvio.app.features.debrid
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 internal data class TorboxEnvelopeDto<T>(
@@ -43,6 +44,51 @@ internal data class TorboxTorrentFileDto(
             .firstOrNull { it.isNotBlank() }
             .orEmpty()
 }
+
+@Serializable
+internal data class TorboxSearchResponseDto(
+    val success: Boolean? = null,
+    val data: TorboxSearchDataDto? = null,
+    val error: String? = null,
+    val detail: String? = null,
+)
+
+@Serializable
+internal data class TorboxSearchDataDto(
+    val torrents: List<TorboxSearchTorrentDto> = emptyList(),
+    @SerialName("cached") val cached: Boolean? = null,
+)
+
+@Serializable
+internal data class TorboxSearchTorrentDto(
+    val hash: String? = null,
+    val magnet: String? = null,
+    val title: String? = null,
+    @SerialName("raw_title") val rawTitle: String? = null,
+    val size: Long? = null,
+    val tracker: String? = null,
+    val cached: Boolean? = null,
+    @SerialName("title_parsed_data") val parsed: TorboxSearchParsedDto? = null,
+)
+
+@Serializable
+internal data class TorboxSearchParsedDto(
+    val title: String? = null,
+    val year: Int? = null,
+    val resolution: String? = null,
+    val quality: String? = null,
+    val codec: String? = null,
+    val audio: JsonElement? = null,
+    val channels: JsonElement? = null,
+    val languages: JsonElement? = null,
+    val hdr: JsonElement? = null,
+    val season: Int? = null,
+    val seasons: List<Int> = emptyList(),
+    val episode: Int? = null,
+    val episodes: List<Int> = emptyList(),
+    val group: String? = null,
+    @SerialName("bitDepth") val bitDepth: Int? = null,
+)
 
 @Serializable
 internal data class RealDebridAddTorrentDto(
