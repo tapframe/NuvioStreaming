@@ -2,11 +2,14 @@ package com.nuvio.app.features.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudQueue
+import androidx.compose.material.icons.rounded.LiveTv
 import androidx.compose.foundation.lazy.LazyListScope
 import nuvio.composeapp.generated.resources.compose_settings_page_debrid
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_settings_page_live_tv
 import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
 import nuvio.composeapp.generated.resources.compose_settings_page_tmdb_enrichment
+import nuvio.composeapp.generated.resources.settings_integrations_live_tv_description
 import nuvio.composeapp.generated.resources.settings_integrations_mdblist_description
 import nuvio.composeapp.generated.resources.settings_integrations_debrid_description
 import nuvio.composeapp.generated.resources.settings_integrations_section_title
@@ -18,6 +21,7 @@ internal fun LazyListScope.integrationsContent(
     onTmdbClick: () -> Unit,
     onMdbListClick: () -> Unit,
     onDebridClick: () -> Unit,
+    onLiveTvClick: () -> Unit,
 ) {
     item {
         SettingsSection(
@@ -47,6 +51,14 @@ internal fun LazyListScope.integrationsContent(
                     icon = Icons.Rounded.CloudQueue,
                     isTablet = isTablet,
                     onClick = onDebridClick,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.compose_settings_page_live_tv),
+                    description = stringResource(Res.string.settings_integrations_live_tv_description),
+                    icon = Icons.Rounded.LiveTv,
+                    isTablet = isTablet,
+                    onClick = onLiveTvClick,
                 )
             }
         }

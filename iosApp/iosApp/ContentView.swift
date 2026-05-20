@@ -31,6 +31,15 @@ private enum NuvioNativeTabIcon {
         ]
     )
 
+    static let liveTv = vectorIcon(
+        viewport: CGSize(width: 24, height: 24),
+        paths: [
+            "M21,17V7C21,5.9 20.1,5 19,5H5C3.9,5 3,5.9 3,7V17C3,18.1 3.9,19 5,19H19C20.1,19 21,18.1 21,17ZM5,7H19V17H5V7Z",
+            "M10,15V9L15,12L10,15Z",
+            "M8,3L12,5L16,3",
+        ]
+    )
+
     static let profileFallback = vectorIcon(
         viewport: CGSize(width: 24, height: 24),
         paths: [
@@ -258,6 +267,7 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
         case home = "Home"
         case search = "Search"
         case library = "Library"
+        case liveTv = "LiveTv"
         case settings = "Settings"
 
         var tag: Int {
@@ -265,7 +275,8 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
             case .home: return 0
             case .search: return 1
             case .library: return 2
-            case .settings: return 3
+            case .liveTv: return 3
+            case .settings: return 4
             }
         }
 
@@ -274,6 +285,7 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
             case .home: return "Home"
             case .search: return "Search"
             case .library: return "Library"
+            case .liveTv: return "Live TV"
             case .settings: return "Profile"
             }
         }
@@ -283,6 +295,7 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
             case .home: return NuvioNativeTabIcon.home
             case .search: return NuvioNativeTabIcon.search
             case .library: return NuvioNativeTabIcon.library
+            case .liveTv: return NuvioNativeTabIcon.liveTv
             case .settings: return NuvioNativeTabIcon.profileFallback
             }
         }

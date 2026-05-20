@@ -141,6 +141,7 @@
     <string name="compose_catalog_subtitle_trakt_library">Trakt kitaplığı</string>
     <string name="compose_nav_home">Ana sayfa</string>
     <string name="compose_nav_library">Kitaplık</string>
+    <string name="compose_nav_live_tv">Canlı TV</string>
     <string name="compose_nav_profile">Profil</string>
     <string name="compose_nav_search">Ara</string>
     <string name="compose_player_audio_tracks">Ses parçaları</string>
@@ -179,6 +180,7 @@
     <string name="compose_player_seek_feedback_backward">-%1$dsn</string>
     <string name="compose_player_seek_feedback_forward">+%1$dsn</string>
     <string name="compose_player_seek_forward_10">10 saniye ileri sar</string>
+    <string name="compose_player_channels">Kanallar</string>
     <string name="compose_player_sources">Kaynaklar</string>
     <string name="compose_player_style">Stil</string>
     <string name="compose_player_subs">Altyazı</string>
@@ -216,6 +218,7 @@
     <string name="compose_settings_page_continue_watching">İzlemeye devam</string>
     <string name="compose_settings_page_homescreen">Ana ekran</string>
     <string name="compose_settings_page_integrations">Entegrasyonlar</string>
+    <string name="compose_settings_page_live_tv">Canlı TV</string>
     <string name="compose_settings_page_mdblist_ratings">MDBList puanları</string>
     <string name="compose_settings_page_meta_screen">Detay ekranı</string>
     <string name="compose_settings_page_notifications">Bildirimler</string>
@@ -270,6 +273,18 @@
     <string name="downloads_status_downloading">İndiriliyor • %1$s</string>
     <string name="downloads_status_failed">Olmadı</string>
     <string name="downloads_status_paused">Duraklatıldı • %1$s</string>
+    <string name="settings_integrations_live_tv_description">Canlı kanallar için M3U listesi ekle.</string>
+    <string name="live_tv_title">Canlı TV</string>
+    <string name="live_tv_channel_group_default">Kanal</string>
+    <string name="live_tv_empty_title">Kanal bulunamadı</string>
+    <string name="live_tv_empty_message">Liste URL'sini kontrol et veya yenilemeyi dene.</string>
+    <string name="live_tv_load_failed">Liste yüklenemedi</string>
+    <string name="live_tv_no_playlist_title">Liste ayarlanmamış</string>
+    <string name="live_tv_no_playlist_message">Kanalları burada görmek için Ayarlar > Entegrasyonlar > Canlı TV bölümüne M3U listesi ekle.</string>
+    <string name="live_tv_settings_section_playlist">LİSTE</string>
+    <string name="live_tv_settings_playlist_label">M3U liste URL'si</string>
+    <string name="live_tv_settings_playlist_placeholder">https://example.com/playlist.m3u8</string>
+    <string name="live_tv_settings_description">Bu listedeki kanallar Canlı TV sekmesinde görünür.</string>
     <string name="episodes_cd_watched">İzlendi</string>
     <string name="episodes_season">%1$d. sezon</string>
     <string name="episodes_specials">Özel bölümler</string>

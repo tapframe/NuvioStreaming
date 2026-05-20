@@ -50,6 +50,8 @@ import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.downloads.DownloadItem
 import com.nuvio.app.features.downloads.DownloadsRepository
+import com.nuvio.app.features.livetv.LiveTvChannel
+import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.player.skip.NextEpisodeCard
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.PlayerNextEpisodeRules
@@ -165,6 +167,10 @@ fun PlayerScreen(
         WatchProgressRepository.ensureLoaded()
         WatchProgressRepository.uiState
     }.collectAsStateWithLifecycle()
+    val liveTvUiState by remember {
+        LiveTvRepository.ensureLoaded()
+        LiveTvRepository.uiState
+    }.collectAsStateWithLifecycle()
 
     BoxWithConstraints(
         modifier = modifier
@@ -175,6 +181,7 @@ fun PlayerScreen(
         val metrics = remember(maxWidth) { PlayerLayoutMetrics.fromWidth(maxWidth) }
         val sliderEdgePadding = horizontalSafePadding + metrics.horizontalPadding
         val overlayBottomPadding = sliderOverlayBottomPadding(metrics)
+        val isLiveTvPlayback = contentType == "live"
         val scope = rememberCoroutineScope()
         val hapticFeedback = LocalHapticFeedback.current
         val resizeModeFitLabel = stringResource(Res.string.compose_player_resize_fit)
@@ -275,6 +282,7 @@ fun PlayerScreen(
 
         // Sources & Episodes Panel state
         var showSourcesPanel by remember { mutableStateOf(false) }
+        var showLiveChannelsPanel by remember { mutableStateOf(false) }
         var showEpisodesPanel by remember { mutableStateOf(false) }
         var showSubmitIntroModal by remember { mutableStateOf(false) }
         var submitIntroSegmentType by rememberSaveable { mutableStateOf("intro") }
@@ -933,6 +941,33 @@ fun PlayerScreen(
             activeInitialPositionMs = currentPositionMs
             activeInitialProgressFraction = null
             showSourcesPanel = false
+            controlsVisible = true
+        }
+
+        fun switchToLiveChannel(channel: LiveTvChannel) {
+            if (channel.streamUrl == activeSourceUrl) {
+                showLiveChannelsPanel = false
+                controlsVisible = true
+                return
+            }
+            flushWatchProgress()
+            activeSourceUrl = channel.streamUrl
+            activeSourceAudioUrl = null
+            activeSourceHeaders = emptyMap()
+            activeSourceResponseHeaders = emptyMap()
+            activeStreamTitle = channel.name
+            activeStreamSubtitle = channel.group
+            activeProviderName = "Live TV"
+            activeProviderAddonId = null
+            currentStreamBingeGroup = null
+            activeSeasonNumber = null
+            activeEpisodeNumber = null
+            activeEpisodeTitle = null
+            activeEpisodeThumbnail = null
+            activeVideoId = channel.id
+            activeInitialPositionMs = 0L
+            activeInitialProgressFraction = null
+            showLiveChannelsPanel = false
             controlsVisible = true
         }
 
@@ -1820,8 +1855,9 @@ fun PlayerScreen(
                     } else {
                         null
                     },
-                    onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
-                    onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
+                    onSourcesClick = if (!isLiveTvPlayback && activeVideoId != null) { { openSourcesPanel() } } else null,
+                    onEpisodesClick = if (!isLiveTvPlayback && isSeries) { { openEpisodesPanel() } } else null,
+                    onLiveChannelsClick = if (isLiveTvPlayback) { { showLiveChannelsPanel = true } } else null,
                     onSubmitIntroClick = if (isSeries && playerSettingsUiState.introSubmitEnabled && playerSettingsUiState.introDbApiKey.isNotBlank()) { { showSubmitIntroModal = true } } else null,
                     parentalWarnings = parentalWarnings,
                     showParentalGuide = showParentalGuide,
@@ -2018,6 +2054,17 @@ fun PlayerScreen(
                 },
                 onDismiss = {
                     showSourcesPanel = false
+                    controlsVisible = true
+                },
+            )
+
+            PlayerLiveChannelsPanel(
+                visible = showLiveChannelsPanel,
+                channels = liveTvUiState.channels,
+                currentStreamUrl = activeSourceUrl,
+                onChannelSelected = ::switchToLiveChannel,
+                onDismiss = {
+                    showLiveChannelsPanel = false
                     controlsVisible = true
                 },
             )
