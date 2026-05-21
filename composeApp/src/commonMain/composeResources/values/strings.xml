@@ -1306,6 +1306,9 @@
     <string name="home_catalog_default_title">%1$s - %2$s</string>
     <string name="library_empty_message">Saved titles will appear here after you tap Save on a details screen.</string>
     <string name="library_empty_title">Your library is empty</string>
+    <string name="library_calendar_empty_message">Add series to your library to see their upcoming episodes here</string>
+    <string name="library_calendar_empty_title">No upcoming episodes found</string>
+    <string name="library_calendar_title">Calendar</string>
     <string name="library_load_failed">Couldn't load library</string>
     <string name="library_other">Other</string>
     <string name="library_title">Library</string>
