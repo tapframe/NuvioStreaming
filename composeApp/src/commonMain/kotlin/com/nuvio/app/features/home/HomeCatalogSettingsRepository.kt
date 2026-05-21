@@ -145,6 +145,7 @@ object HomeCatalogSettingsRepository {
         enforcePinnedCollectionsAtTop()
         publish()
         persist()
+        HomeRepository.applyCurrentSettings()
     }
 
     internal fun snapshot(): HomeCatalogSettingsSnapshot {

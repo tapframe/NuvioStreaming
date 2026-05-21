@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -63,6 +64,7 @@ import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.details.components.DetailPosterRailSection
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.tmdb.TmdbMetadataService
+import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -89,6 +91,10 @@ fun PersonDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     var uiState by remember(personId) { mutableStateOf<PersonDetailUiState>(PersonDetailUiState.Loading) }
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsStateWithLifecycle()
     val resolvedAvatarTransitionKey = avatarTransitionKey ?: castAvatarSharedTransitionKey(personId)
 
     LaunchedEffect(personId) {
@@ -127,6 +133,7 @@ fun PersonDetailScreen(
             )
             is PersonDetailUiState.Success -> PersonDetailContent(
                 person = state.personDetail,
+                watchedKeys = watchedUiState.watchedKeys,
                 onOpenMeta = onOpenMeta,
                 initialProfilePhoto = initialProfilePhoto,
                 avatarTransitionKey = resolvedAvatarTransitionKey,
@@ -156,6 +163,7 @@ fun PersonDetailScreen(
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun PersonDetailContent(
     person: PersonDetail,
+    watchedKeys: Set<String>,
     onOpenMeta: (MetaPreview) -> Unit,
     initialProfilePhoto: String? = null,
     avatarTransitionKey: String,
@@ -274,7 +282,7 @@ private fun PersonDetailContent(
                     DetailPosterRailSection(
                         title = stringResource(Res.string.person_popular),
                         items = popularCredits,
-                        watchedKeys = emptySet(),
+                        watchedKeys = watchedKeys,
                         headerHorizontalPadding = 20.dp,
                         onPosterClick = onOpenMeta,
                     )
@@ -285,7 +293,7 @@ private fun PersonDetailContent(
                     DetailPosterRailSection(
                         title = stringResource(Res.string.person_latest),
                         items = latestCredits,
-                        watchedKeys = emptySet(),
+                        watchedKeys = watchedKeys,
                         headerHorizontalPadding = 20.dp,
                         onPosterClick = onOpenMeta,
                     )
@@ -296,7 +304,7 @@ private fun PersonDetailContent(
                     DetailPosterRailSection(
                         title = stringResource(Res.string.person_upcoming),
                         items = upcomingCredits,
-                        watchedKeys = emptySet(),
+                        watchedKeys = watchedKeys,
                         headerHorizontalPadding = 20.dp,
                         onPosterClick = onOpenMeta,
                     )

@@ -605,6 +605,7 @@
     <string name="settings_debrid_prepare_instant_playback">Prepare links</string>
     <string name="settings_debrid_prepare_instant_playback_description">Resolve the first sources before playback starts.</string>
     <string name="settings_debrid_prepare_stream_count">Sources to prepare</string>
+    <string name="settings_debrid_prepare_stream_count_warning">Use a lower count when possible. Debrid services may rate-limit how many links can be resolved in a time period. Opening a movie or episode can count toward those limits even if you do not press Watch, because the links are prepared ahead of time.</string>
     <string name="settings_debrid_prepare_count_one">1 source</string>
     <string name="settings_debrid_prepare_count_many">%1$d sources</string>
     <string name="settings_debrid_section_formatting">Formatting</string>
@@ -755,6 +756,8 @@
     <string name="settings_playback_option_none">None</string>
     <string name="settings_playback_prefer_binge_group">Prefer Binge Group (Next Episode)</string>
     <string name="settings_playback_prefer_binge_group_description">Try the same source profile first (same addon/quality group) before normal auto-play rules.</string>
+    <string name="settings_playback_reuse_binge_group">Reuse Binge Group</string>
+    <string name="settings_playback_reuse_binge_group_description">Remember and reuse the last binge group across sessions (Continue Watching, Details, etc.).</string>
     <string name="settings_playback_preferred_audio_language">Preferred Audio Language</string>
     <string name="settings_playback_preferred_subtitle_language">Preferred Language</string>
     <string name="settings_playback_presets">Presets</string>

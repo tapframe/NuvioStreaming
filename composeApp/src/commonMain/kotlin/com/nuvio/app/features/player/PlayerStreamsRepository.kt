@@ -13,6 +13,7 @@ import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginRuntimeResult
 import com.nuvio.app.features.plugins.PluginScraper
 import com.nuvio.app.features.streams.AddonStreamGroup
+import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamParser
 import com.nuvio.app.features.streams.StreamsUiState
@@ -21,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -199,7 +201,8 @@ object PlayerStreamsRepository {
             return
         }
 
-        val initialGroups = streamAddons.map { addon ->
+        val installedAddonOrder = streamAddons.map { it.addonName }
+        val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
             AddonStreamGroup(
                 addonName = addon.addonName,
                 addonId = addon.addonId,
@@ -220,7 +223,7 @@ object PlayerStreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        }
+        }, installedAddonOrder)
         stateFlow.value = StreamsUiState(
             groups = initialGroups,
             activeAddonIds = initialGroups.map { it.addonId }.toSet(),
@@ -299,11 +302,20 @@ object PlayerStreamsRepository {
             }
 
             val jobs = addonJobs + pluginJobs + debridJobs
-            var debridPreparationLaunched = false
+            val completions = Channel<AddonStreamGroup>(capacity = Channel.BUFFERED)
             jobs.forEach { deferred ->
-                val result = deferred.await()
+                launch {
+                    completions.send(deferred.await())
+                }
+            }
+            var debridPreparationLaunched = false
+            repeat(jobs.size) {
+                val result = completions.receive()
                 stateFlow.update { current ->
-                    val updated = current.groups.map { g -> if (g.addonId == result.addonId) result else g }
+                    val updated = StreamAutoPlaySelector.orderAddonStreams(
+                        groups = current.groups.map { g -> if (g.addonId == result.addonId) result else g },
+                        installedOrder = installedAddonOrder,
+                    )
                     val anyLoading = updated.any { it.isLoading }
                     current.copy(
                         groups = updated,
@@ -340,6 +352,7 @@ object PlayerStreamsRepository {
                     }
                 }
             }
+            completions.close()
         }
         setJob(job)
     }

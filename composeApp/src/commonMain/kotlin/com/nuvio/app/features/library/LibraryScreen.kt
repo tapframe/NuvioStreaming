@@ -32,6 +32,8 @@ import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomePosterCard
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
@@ -49,6 +51,10 @@ fun LibraryScreen(
     val uiState by remember {
         LibraryRepository.ensureLoaded()
         LibraryRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
     var observedOfflineState by remember { mutableStateOf(false) }
@@ -176,6 +182,7 @@ fun LibraryScreen(
             else -> {
                 librarySections(
                     sections = uiState.sections,
+                    watchedKeys = watchedUiState.watchedKeys,
                     onPosterClick = onPosterClick,
                     onSectionViewAllClick = onSectionViewAllClick,
                     onPosterLongClick = onPosterLongClick,
@@ -187,6 +194,7 @@ fun LibraryScreen(
 
 private fun LazyListScope.librarySections(
     sections: List<LibrarySection>,
+    watchedKeys: Set<String>,
     onPosterClick: ((LibraryItem) -> Unit)?,
     onSectionViewAllClick: ((LibrarySection) -> Unit)?,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
@@ -209,8 +217,13 @@ private fun LazyListScope.librarySections(
             viewAllPillSize = NuvioViewAllPillSize.Compact,
             key = { item -> "${item.type}:${item.id}" },
         ) { item ->
+            val posterItem = item.toMetaPreview()
             HomePosterCard(
-                item = item.toMetaPreview(),
+                item = posterItem,
+                isWatched = WatchingState.isPosterWatched(
+                    watchedKeys = watchedKeys,
+                    item = posterItem,
+                ),
                 onClick = onPosterClick?.let { { it(item) } },
                 onLongClick = onPosterLongClick?.let { { it(item, section) } },
             )

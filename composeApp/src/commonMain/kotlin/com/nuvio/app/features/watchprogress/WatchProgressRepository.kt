@@ -12,6 +12,7 @@ import com.nuvio.app.features.trakt.TraktProgressRepository
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.trakt.shouldUseTraktProgress as shouldUseTraktProgressSource
 import com.nuvio.app.features.watching.application.WatchingActions
+import com.nuvio.app.features.watching.sync.ProgressSyncRecord
 import com.nuvio.app.features.watching.sync.ProgressSyncAdapter
 import com.nuvio.app.features.watching.sync.SupabaseProgressSyncAdapter
 import kotlinx.coroutines.CancellationException
@@ -180,38 +181,23 @@ object WatchProgressRepository {
             }
 
             runCatching {
-                val serverEntries = syncAdapter.pull(profileId = profileId)
-
+                val sinceLastWatched = entriesByVideoId.values
+                    .maxOfOrNull { entry -> entry.lastUpdatedEpochMs }
+                    ?.takeIf { hasCompletedInitialNuvioSyncPull }
+                val serverEntries = syncAdapter.pull(
+                    profileId = profileId,
+                    sinceLastWatched = sinceLastWatched,
+                )
+                val isIncrementalPull = sinceLastWatched != null
                 val oldLocal = entriesByVideoId.toMap()
-                val newMap = mutableMapOf<String, WatchProgressEntry>()
+                val newMap = if (isIncrementalPull) {
+                    entriesByVideoId.toMutableMap()
+                } else {
+                    mutableMapOf()
+                }
 
                 serverEntries.forEach { entry ->
-                    val videoId = entry.videoId
-                    val cached = oldLocal[videoId]
-                    newMap[videoId] = WatchProgressEntry(
-                        contentType = entry.contentType,
-                        parentMetaId = entry.contentId,
-                        parentMetaType = cached?.parentMetaType ?: entry.contentType,
-                        videoId = videoId,
-                        title = cached?.title?.takeIf { it.isNotBlank() } ?: entry.contentId,
-                        logo = cached?.logo,
-                        poster = cached?.poster,
-                        background = cached?.background,
-                        seasonNumber = entry.season,
-                        episodeNumber = entry.episode,
-                        episodeTitle = cached?.episodeTitle,
-                        episodeThumbnail = cached?.episodeThumbnail,
-                        lastPositionMs = entry.position,
-                        durationMs = entry.duration,
-                        lastUpdatedEpochMs = entry.lastWatched,
-                        providerName = cached?.providerName,
-                        providerAddonId = cached?.providerAddonId,
-                        lastStreamTitle = cached?.lastStreamTitle,
-                        lastStreamSubtitle = cached?.lastStreamSubtitle,
-                        pauseDescription = cached?.pauseDescription,
-                        lastSourceUrl = cached?.lastSourceUrl,
-                        isCompleted = isWatchProgressComplete(entry.position, entry.duration, false),
-                    )
+                    newMap[entry.videoId] = entry.toWatchProgressEntry(cached = oldLocal[entry.videoId])
                 }
 
                 entriesByVideoId = newMap
@@ -231,6 +217,32 @@ object WatchProgressRepository {
             }
         }
     }
+
+    private fun ProgressSyncRecord.toWatchProgressEntry(cached: WatchProgressEntry?): WatchProgressEntry =
+        WatchProgressEntry(
+            contentType = contentType,
+            parentMetaId = contentId,
+            parentMetaType = cached?.parentMetaType ?: contentType,
+            videoId = videoId,
+            title = cached?.title?.takeIf { it.isNotBlank() } ?: contentId,
+            logo = cached?.logo,
+            poster = cached?.poster,
+            background = cached?.background,
+            seasonNumber = season,
+            episodeNumber = episode,
+            episodeTitle = cached?.episodeTitle,
+            episodeThumbnail = cached?.episodeThumbnail,
+            lastPositionMs = position,
+            durationMs = duration,
+            lastUpdatedEpochMs = lastWatched,
+            providerName = cached?.providerName,
+            providerAddonId = cached?.providerAddonId,
+            lastStreamTitle = cached?.lastStreamTitle,
+            lastStreamSubtitle = cached?.lastStreamSubtitle,
+            pauseDescription = cached?.pauseDescription,
+            lastSourceUrl = cached?.lastSourceUrl,
+            isCompleted = isWatchProgressComplete(position, duration, false),
+        )
 
     private fun resolveRemoteMetadata() {
         val needsResolution = entriesByVideoId.values

@@ -176,6 +176,7 @@ fun StreamsScreen(
         StreamsRepository.load(
             type = type,
             videoId = videoId,
+            parentMetaId = parentMetaId,
             season = seasonNumber,
             episode = episodeNumber,
             manualSelection = manualSelection,
@@ -277,6 +278,7 @@ fun StreamsScreen(
                             StreamsRepository.reload(
                                 type = type,
                                 videoId = videoId,
+                                parentMetaId = parentMetaId,
                                 season = seasonNumber,
                                 episode = episodeNumber,
                                 manualSelection = manualSelection,

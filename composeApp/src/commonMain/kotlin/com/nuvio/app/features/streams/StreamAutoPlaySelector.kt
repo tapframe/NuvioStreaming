@@ -2,6 +2,34 @@ package com.nuvio.app.features.streams
 
 object StreamAutoPlaySelector {
 
+    fun orderAddonStreams(
+        groups: List<AddonStreamGroup>,
+        installedOrder: List<String>,
+    ): List<AddonStreamGroup> {
+        if (groups.isEmpty()) return groups
+
+        val addonRankByName = HashMap<String, Int>(installedOrder.size)
+        installedOrder.forEachIndexed { index, addonName ->
+            if (addonName !in addonRankByName) {
+                addonRankByName[addonName] = index
+            }
+        }
+
+        val (directDebridEntries, remainingEntries) = groups.partition { group ->
+            group.addonId.startsWith("debrid:") ||
+                group.streams.any { stream -> stream.isDirectDebridStream }
+        }
+        if (installedOrder.isEmpty()) return directDebridEntries + remainingEntries
+
+        val (addonEntries, pluginEntries) = remainingEntries.partition { group ->
+            group.addonName in addonRankByName
+        }
+        val orderedAddons = addonEntries.sortedBy { group ->
+            addonRankByName.getValue(group.addonName)
+        }
+        return directDebridEntries + orderedAddons + pluginEntries
+    }
+
     fun selectAutoPlayStream(
         streams: List<StreamItem>,
         mode: StreamAutoPlayMode,
@@ -12,6 +40,7 @@ object StreamAutoPlaySelector {
         selectedPlugins: Set<String>,
         preferredBingeGroup: String? = null,
         preferBingeGroupInSelection: Boolean = false,
+        bingeGroupOnly: Boolean = false,
     ): StreamItem? {
         if (streams.isEmpty()) return null
 
@@ -29,7 +58,7 @@ object StreamAutoPlaySelector {
             }
         }
         if (candidateStreams.isEmpty()) return null
-        if (mode == StreamAutoPlayMode.MANUAL) return null
+        if (mode == StreamAutoPlayMode.MANUAL && !bingeGroupOnly) return null
 
         val targetBingeGroup = preferredBingeGroup?.trim().orEmpty()
         if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
@@ -37,6 +66,12 @@ object StreamAutoPlaySelector {
                 stream.behaviorHints.bingeGroup == targetBingeGroup && stream.isAutoPlayable()
             }
             if (bingeGroupMatch != null) return bingeGroupMatch
+            // When bingeGroupOnly = true, do NOT fall through to mode-based selection
+            if (bingeGroupOnly) return null
+        } else if (bingeGroupOnly) {
+            // bingeGroupOnly requested but no preferredBingeGroup or preferBingeGroupInSelection is false
+            // Fall through to mode-based selection (bingeGroupOnly has no effect without a binge group to match)
+            if (mode == StreamAutoPlayMode.MANUAL) return null
         }
 
         return when (mode) {
