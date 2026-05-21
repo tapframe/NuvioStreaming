@@ -24,4 +24,3 @@ class DirectDebridConfigEncoderTest {
         assertEquals(expected, encoded)
     }
 }
-

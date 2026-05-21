@@ -35,4 +35,3 @@ private fun percentEncode(value: String, spaceAsPlus: Boolean): String = buildSt
         }
     }
 }
-

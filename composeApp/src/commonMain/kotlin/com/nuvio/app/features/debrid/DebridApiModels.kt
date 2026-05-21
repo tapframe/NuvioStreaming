@@ -91,4 +91,3 @@ internal data class RealDebridUnrestrictLinkDto(
     val streamable: Int? = null,
     val type: String? = null,
 )
-

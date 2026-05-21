@@ -97,7 +97,7 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |package com.nuvio.app.features.debrid
                 |
                 |object DebridConfig {
-                |    const val DIRECT_DEBRID_API_BASE_URL = "${props.getProperty("DIRECT_DEBRID_API_BASE_URL", "")}" 
+                |    const val DIRECT_DEBRID_API_BASE_URL = "${props.getProperty("DIRECT_DEBRID_API_BASE_URL", "")}"
                 |}
                 """.trimMargin()
             )

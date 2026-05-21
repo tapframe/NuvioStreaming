@@ -1,0 +1,120 @@
+--- composeApp/src/commonMain/kotlin/com/nuvio/app/features/catalog/CatalogScreen.kt
++++ composeApp/src/commonMain/kotlin/com/nuvio/app/features/catalog/CatalogScreen.kt
+@@ -10,6 +10,7 @@
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.lazy.grid.GridCells
+@@ -19,6 +20,8 @@
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material3.CircularProgressIndicator
+ import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.FilterChip
++import androidx.compose.material3.FilterChipDefaults
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+@@ -83,6 +86,16 @@
+     var headerHeightPx by remember { mutableIntStateOf(0) }
+     var observedOfflineState by remember { mutableStateOf(false) }
+
++    val isTraktLibrary = manifestUrl == INTERNAL_LIBRARY_MANIFEST_URL &&
++        subtitle == stringResource(Res.string.compose_catalog_subtitle_trakt_library)
++    var selectedFilter by remember { mutableIntStateOf(0) }
++
++    val filteredItems = remember(uiState.items, selectedFilter) {
++        if (selectedFilter == 1) uiState.items.filter { it.type.lowercase() in listOf("movie", "film") }
++        else if (selectedFilter == 2) uiState.items.filter { it.type.lowercase() in listOf("series", "tv", "show") }
++        else uiState.items
++    }
++
+     LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination) {
+         CatalogRepository.load(
+             manifestUrl = manifestUrl,
+@@ -149,11 +162,11 @@
+                 horizontalArrangement = Arrangement.spacedBy(12.dp),
+                 verticalArrangement = Arrangement.spacedBy(18.dp),
+             ) {
+-                if (uiState.items.isEmpty() && uiState.isLoading) {
++                if (filteredItems.isEmpty() && uiState.isLoading) {
+                     items(columns * 3) {
+                         CatalogSkeletonTile(cornerRadiusDp = posterCardStyle.cornerRadiusDp)
+                     }
+-                } else if (uiState.items.isEmpty()) {
++                } else if (filteredItems.isEmpty()) {
+                     item(span = { GridItemSpan(maxLineSpan) }) {
+                         CatalogEmptyState(
+                             errorMessage = uiState.errorMessage,
+@@ -172,7 +185,7 @@
+                     }
+                 } else {
+                     items(
+-                        items = uiState.items.withDuplicateSafeLazyKeys { item -> item.stableKey() },
++                        items = filteredItems.withDuplicateSafeLazyKeys { item -> item.stableKey() },
+                         key = { item -> item.lazyKey },
+                     ) { keyedItem ->
+                         val item = keyedItem.value
+@@ -194,6 +207,9 @@
+             CatalogHeader(
+                 title = title,
+                 subtitle = subtitle,
++                showFilters = isTraktLibrary,
++                selectedFilter = selectedFilter,
++                onFilterSelected = { selectedFilter = it },
+                 modifier = Modifier.onSizeChanged { headerHeightPx = it.height },
+                 onBack = onBack,
+             )
+@@ -206,6 +222,9 @@
+ private fun CatalogHeader(
+     title: String,
+     subtitle: String,
++    showFilters: Boolean = false,
++    selectedFilter: Int = 0,
++    onFilterSelected: (Int) -> Unit = {},
+     onBack: () -> Unit,
+     modifier: Modifier = Modifier,
+ ) {
+@@ -237,6 +256,41 @@
+                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+             )
+         }
++        if (showFilters) {
++            Spacer(modifier = Modifier.height(12.dp))
++            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                FilterChip(
++                    selected = selectedFilter == 0,
++                    onClick = { onFilterSelected(0) },
++                    label = { Text(stringResource(Res.string.collections_tab_all)) },
++                    colors = FilterChipDefaults.filterChipColors(
++                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
++                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
++                    ),
++                    shape = RoundedCornerShape(16.dp),
++                )
++                FilterChip(
++                    selected = selectedFilter == 1,
++                    onClick = { onFilterSelected(1) },
++                    label = { Text(stringResource(Res.string.media_movies)) },
++                    colors = FilterChipDefaults.filterChipColors(
++                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
++                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
++                    ),
++                    shape = RoundedCornerShape(16.dp),
++                )
++                FilterChip(
++                    selected = selectedFilter == 2,
++                    onClick = { onFilterSelected(2) },
++                    label = { Text(stringResource(Res.string.media_series)) },
++                    colors = FilterChipDefaults.filterChipColors(
++                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
++                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
++                    ),
++                    shape = RoundedCornerShape(16.dp),
++                )
++            }
++        }
+     }
+ }

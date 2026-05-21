@@ -1,0 +1,12 @@
+--- composeApp/src/commonMain/kotlin/com/nuvio/app/features/catalog/CatalogScreen.kt
++++ composeApp/src/commonMain/kotlin/com/nuvio/app/features/catalog/CatalogScreen.kt
+@@ -86,8 +86,7 @@
+     var headerHeightPx by remember { mutableIntStateOf(0) }
+     var observedOfflineState by remember { mutableStateOf(false) }
+
+-    val isTraktLibrary = manifestUrl == INTERNAL_LIBRARY_MANIFEST_URL &&
+-        subtitle == stringResource(Res.string.compose_catalog_subtitle_trakt_library)
++    val isTraktLibrary = manifestUrl == INTERNAL_LIBRARY_MANIFEST_URL && subtitle.contains("Trakt", ignoreCase = true)
+     var selectedFilter by remember { mutableIntStateOf(0) }
+
+     val filteredItems = remember(uiState.items, selectedFilter) {
