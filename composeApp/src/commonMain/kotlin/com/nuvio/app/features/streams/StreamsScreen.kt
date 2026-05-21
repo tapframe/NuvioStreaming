@@ -38,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Refresh
@@ -84,6 +85,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.launch
 import kotlin.math.round
@@ -114,10 +116,20 @@ fun StreamsScreen(
     manualSelection: Boolean = false,
     startFromBeginning: Boolean = false,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit = { _, _, _ -> },
+    onStreamActionOpen: (
+        stream: StreamItem,
+        openExternally: Boolean,
+        resumePositionMs: Long?,
+        resumeProgressFraction: Float?,
+    ) -> Unit = { _, _, _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by StreamsRepository.uiState.collectAsStateWithLifecycle()
+    val playerSettings by remember {
+        PlayerSettingsRepository.ensureLoaded()
+        PlayerSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
     val watchProgressUiState by remember {
         WatchProgressRepository.ensureLoaded()
         WatchProgressRepository.uiState
@@ -160,10 +172,11 @@ fun StreamsScreen(
         }
     }
 
-    LaunchedEffect(type, videoId, manualSelection) {
+    LaunchedEffect(type, videoId, seasonNumber, episodeNumber, manualSelection) {
         StreamsRepository.load(
             type = type,
             videoId = videoId,
+            parentMetaId = parentMetaId,
             season = seasonNumber,
             episode = episodeNumber,
             manualSelection = manualSelection,
@@ -265,6 +278,7 @@ fun StreamsScreen(
                             StreamsRepository.reload(
                                 type = type,
                                 videoId = videoId,
+                                parentMetaId = parentMetaId,
                                 season = seasonNumber,
                                 episode = episodeNumber,
                                 manualSelection = manualSelection,
@@ -323,6 +337,7 @@ fun StreamsScreen(
 
         StreamActionsSheet(
             stream = streamActionsTarget,
+            externalPlayerEnabled = playerSettings.externalPlayerEnabled,
             onDismiss = { streamActionsTarget = null },
             onCopyLink = { stream ->
                 val directUrl = stream.directPlaybackUrl
@@ -350,6 +365,14 @@ fun StreamsScreen(
                     stream = stream,
                 )
                 NuvioToastController.show(result.toastMessage())
+            },
+            onOpen = { stream, openExternally ->
+                onStreamActionOpen(
+                    stream,
+                    openExternally,
+                    effectiveResumePositionMs,
+                    effectiveResumeProgressFraction,
+                )
             },
         )
     }
@@ -843,7 +866,7 @@ private fun LazyListScope.streamSection(
             StreamCard(
                 stream = stream,
                 onClick = {
-                    if (stream.directPlaybackUrl != null || stream.isTorrentStream) {
+                    if (stream.directPlaybackUrl != null || stream.isTorrentStream || stream.isDirectDebridStream) {
                         onStreamSelected(stream, resumePositionMs, resumeProgressFraction)
                     }
                 },
@@ -875,7 +898,7 @@ internal fun streamCardRenderKey(
     append(':')
     append(itemIndex)
     append(':')
-    append(stream.url ?: stream.infoHash ?: stream.streamLabel)
+    append(stream.url ?: stream.infoHash ?: stream.clientResolve?.infoHash ?: stream.streamLabel)
 }
 
 // ---------------------------------------------------------------------------
@@ -949,7 +972,7 @@ private fun StreamCard(
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val isEnabled = stream.directPlaybackUrl != null || stream.isTorrentStream
+    val isEnabled = stream.directPlaybackUrl != null || stream.isTorrentStream || stream.isDirectDebridStream
     val cardShape = RoundedCornerShape(12.dp)
     Row(
         modifier = modifier
@@ -1008,9 +1031,11 @@ private fun StreamCard(
 @Composable
 private fun StreamActionsSheet(
     stream: StreamItem?,
+    externalPlayerEnabled: Boolean,
     onDismiss: () -> Unit,
     onCopyLink: (StreamItem) -> Unit,
     onDownload: (StreamItem) -> Unit,
+    onOpen: (StreamItem, openExternally: Boolean) -> Unit,
 ) {
     if (stream == null) return
 
@@ -1063,6 +1088,23 @@ private fun StreamActionsSheet(
                 title = stringResource(Res.string.streams_copy_link),
                 onClick = {
                     onCopyLink(stream)
+                    coroutineScope.launch {
+                        dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                    }
+                },
+            )
+            NuvioBottomSheetDivider()
+            NuvioBottomSheetActionRow(
+                icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                title = stringResource(
+                    if (externalPlayerEnabled) {
+                        Res.string.streams_open_internal_player
+                    } else {
+                        Res.string.streams_open_external_player
+                    },
+                ),
+                onClick = {
+                    onOpen(stream, !externalPlayerEnabled)
                     coroutineScope.launch {
                         dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
                     }

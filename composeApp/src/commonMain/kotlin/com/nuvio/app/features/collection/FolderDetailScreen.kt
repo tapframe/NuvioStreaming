@@ -83,6 +83,10 @@ fun FolderDetailScreen(
     onPosterClick: (MetaPreview) -> Unit,
 ) {
     val uiState by FolderDetailRepository.uiState.collectAsState()
+    val watchedUiState by remember {
+        WatchedRepository.ensureLoaded()
+        WatchedRepository.uiState
+    }.collectAsState()
     val folder = uiState.folder
     val coverImageUrl = folder?.coverImageUrl?.takeIf { it.isNotBlank() }
     val density = LocalDensity.current
@@ -164,18 +168,21 @@ fun FolderDetailScreen(
         when (uiState.viewMode) {
             FolderViewMode.TABBED_GRID -> TabbedGridContent(
                 uiState = uiState,
+                watchedKeys = watchedUiState.watchedKeys,
                 modifier = Modifier.weight(1f).then(contentModifier),
                 onTabSelected = { FolderDetailRepository.selectTab(it) },
                 onPosterClick = onPosterClick,
             )
             FolderViewMode.ROWS -> RowsContent(
                 uiState = uiState,
+                watchedKeys = watchedUiState.watchedKeys,
                 modifier = Modifier.weight(1f).then(contentModifier),
                 onCatalogClick = onCatalogClick,
                 onPosterClick = onPosterClick,
             )
             FolderViewMode.FOLLOW_LAYOUT -> RowsContent(
                 uiState = uiState,
+                watchedKeys = watchedUiState.watchedKeys,
                 modifier = Modifier.weight(1f).then(contentModifier),
                 onCatalogClick = onCatalogClick,
                 onPosterClick = onPosterClick,
@@ -203,16 +210,12 @@ private fun FolderCoverImage(
 @Composable
 private fun TabbedGridContent(
     uiState: FolderDetailUiState,
+    watchedKeys: Set<String>,
     modifier: Modifier = Modifier,
     onTabSelected: (Int) -> Unit,
     onPosterClick: (MetaPreview) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
-    val libraryUiState by remember {
-        LibraryRepository.ensureLoaded()
-        LibraryRepository.uiState
-    }.collectAsStateWithLifecycle()
-    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(gridState, uiState.selectedTabIndex, uiState.selectedTabCanLoadMore, uiState.selectedTabIsLoadingMore) {
         snapshotFlow { gridState.layoutInfo }
@@ -304,7 +307,7 @@ private fun TabbedGridContent(
                                 shape = NuvioPosterShape.Poster,
                                 detailLine = item.releaseInfo,
                                 isWatched = WatchingState.isPosterWatched(
-                                    watchedKeys = watchedUiState.watchedKeys,
+                                    watchedKeys = watchedKeys,
                                     item = item,
                                 ),
                                 isSaved = isSaved,
@@ -327,12 +330,12 @@ private fun TabbedGridContent(
 @Composable
 private fun RowsContent(
     uiState: FolderDetailUiState,
+    watchedKeys: Set<String>,
     modifier: Modifier = Modifier,
     onCatalogClick: (HomeCatalogSection) -> Unit,
     onPosterClick: (MetaPreview) -> Unit,
 ) {
     val sections = FolderDetailRepository.getCatalogSectionsForRows()
-    val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
 
     if (uiState.isLoading && sections.isEmpty()) {
         LoadingIndicator()
@@ -359,12 +362,12 @@ private fun RowsContent(
             HomeCatalogRowSection(
                 section = section,
                 entries = section.items.take(18),
-                watchedKeys = watchedUiState.watchedKeys,
                 onViewAllClick = if (section.canOpenCatalog(18)) {
                     { onCatalogClick(section) }
                 } else {
                     null
                 },
+                watchedKeys = watchedKeys,
                 onPosterClick = { onPosterClick(it) },
             )
         }

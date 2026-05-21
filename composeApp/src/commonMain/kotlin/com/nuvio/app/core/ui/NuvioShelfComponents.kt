@@ -180,13 +180,7 @@ fun NuvioPosterCard(
                 }
             }
 
-            NuvioAnimatedWatchedBadge(
-                isVisible = isWatched,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(6.dp),
-            )
-
+            NuvioPosterWatchedOverlay(isWatched = isWatched)
             NuvioAnimatedBookmarkedBadge(
                 isVisible = isSaved,
                 modifier = Modifier

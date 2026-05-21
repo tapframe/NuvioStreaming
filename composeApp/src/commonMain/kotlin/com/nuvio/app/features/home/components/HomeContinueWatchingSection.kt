@@ -25,6 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -37,11 +40,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.nuvio.app.core.ui.localizedContinueWatchingSubtitle
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.posterCardClickable
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import kotlin.math.roundToInt
@@ -50,6 +54,19 @@ import org.jetbrains.compose.resources.stringResource
 
 private fun continueWatchingProgressPercent(progressFraction: Float): Int =
     (progressFraction * 100f).roundToInt().coerceIn(1, 99)
+
+@Composable
+private fun localizedContinueWatchingMetaLine(item: ContinueWatchingItem): String =
+    when {
+        item.seasonNumber != null && item.episodeNumber != null && item.isNextUp ->
+            stringResource(Res.string.continue_watching_up_next_episode, item.seasonNumber, item.episodeNumber)
+        item.seasonNumber != null && item.episodeNumber != null ->
+            stringResource(Res.string.compose_player_episode_code_full, item.seasonNumber, item.episodeNumber)
+        item.isNextUp ->
+            stringResource(Res.string.continue_watching_up_next)
+        else ->
+            stringResource(Res.string.media_movie)
+    }
 
 private fun ContinueWatchingItem.continueWatchingArtworkUrl(
     useEpisodeThumbnails: Boolean,
@@ -138,35 +155,64 @@ private fun HomeContinueWatchingSectionContent(
     onItemClick: ((ContinueWatchingItem) -> Unit)?,
     onItemLongPress: ((ContinueWatchingItem) -> Unit)?,
 ) {
-    NuvioShelfSection(
-        title = stringResource(Res.string.compose_settings_page_continue_watching),
-        entries = items,
-        modifier = modifier,
-        headerHorizontalPadding = sectionPadding,
-        rowContentPadding = PaddingValues(horizontal = sectionPadding),
-        itemSpacing = layout.itemGap,
-        key = { item -> item.videoId },
-    ) { item ->
-        when (style) {
-            ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
-                item = item,
-                layout = layout,
-                useEpisodeThumbnails = useEpisodeThumbnails,
-                blurNextUp = blurNextUp,
-                onClick = onItemClick?.let { { it(item) } },
-                onLongClick = onItemLongPress?.let { { it(item) } },
-            )
-            ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
-                item = item,
-                layout = layout,
-                useEpisodeThumbnails = useEpisodeThumbnails,
-                blurNextUp = blurNextUp,
-                onClick = onItemClick?.let { { it(item) } },
-                onLongClick = onItemLongPress?.let { { it(item) } },
-            )
+    val homeCatalogSettings by remember {
+        HomeCatalogSettingsRepository.snapshot()
+        HomeCatalogSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+
+    val itemOrderKey = remember(items) {
+        items.joinToString(separator = "|") { item -> item.continueWatchingRowOrderKey() }
+    }
+
+    key(itemOrderKey) {
+        NuvioShelfSection(
+            title = stringResource(Res.string.compose_settings_page_continue_watching),
+            entries = items,
+            modifier = modifier,
+            headerHorizontalPadding = sectionPadding,
+            rowContentPadding = PaddingValues(horizontal = sectionPadding),
+            itemSpacing = layout.itemGap,
+            showHeaderAccent = !homeCatalogSettings.hideCatalogUnderline,
+            key = { item -> item.videoId },
+        ) { item ->
+            when (style) {
+                ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
+                    item = item,
+                    layout = layout,
+                    useEpisodeThumbnails = useEpisodeThumbnails,
+                    blurNextUp = blurNextUp,
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongPress?.let { { it(item) } },
+                )
+                ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
+                    item = item,
+                    layout = layout,
+                    useEpisodeThumbnails = useEpisodeThumbnails,
+                    blurNextUp = blurNextUp,
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongPress?.let { { it(item) } },
+                )
+            }
         }
     }
 }
+
+private fun ContinueWatchingItem.continueWatchingRowOrderKey(): String =
+    buildString {
+        append(if (isNextUp) "next" else "progress")
+        append(':')
+        append(parentMetaId)
+        append(':')
+        append(videoId)
+        append(':')
+        append(seasonNumber)
+        append('x')
+        append(episodeNumber)
+        append(":seed=")
+        append(nextUpSeedSeasonNumber)
+        append('x')
+        append(nextUpSeedEpisodeNumber)
+    }
 
 @Composable
 fun ContinueWatchingStylePreview(
@@ -355,9 +401,8 @@ private fun ContinueWatchingWideCard(
                 .padding(layout.wideContentPadding),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            val isEpisodeCard = item.seasonNumber != null && item.episodeNumber != null
-            val hasEpisodeTitle = !item.episodeTitle.isNullOrBlank()
-            val wideMetaLine = localizedContinueWatchingSubtitle(item)
+            val wideMetaLine = localizedContinueWatchingMetaLine(item)
+            val episodeTitle = item.episodeTitle?.trim()?.takeIf { it.isNotBlank() }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -389,9 +434,9 @@ private fun ContinueWatchingWideCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (hasEpisodeTitle) {
+                if (episodeTitle != null) {
                     Text(
-                        text = item.episodeTitle.orEmpty(),
+                        text = episodeTitle,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = layout.wideMetaSize,
                             fontWeight = FontWeight.Medium,

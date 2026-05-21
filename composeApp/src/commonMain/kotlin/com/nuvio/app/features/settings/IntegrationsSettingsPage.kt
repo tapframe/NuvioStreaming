@@ -1,10 +1,14 @@
 package com.nuvio.app.features.settings
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CloudQueue
 import androidx.compose.foundation.lazy.LazyListScope
+import nuvio.composeapp.generated.resources.compose_settings_page_debrid
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_page_mdblist_ratings
 import nuvio.composeapp.generated.resources.compose_settings_page_tmdb_enrichment
 import nuvio.composeapp.generated.resources.settings_integrations_mdblist_description
+import nuvio.composeapp.generated.resources.settings_integrations_debrid_description
 import nuvio.composeapp.generated.resources.settings_integrations_section_title
 import nuvio.composeapp.generated.resources.settings_integrations_tmdb_description
 import org.jetbrains.compose.resources.stringResource
@@ -13,6 +17,7 @@ internal fun LazyListScope.integrationsContent(
     isTablet: Boolean,
     onTmdbClick: () -> Unit,
     onMdbListClick: () -> Unit,
+    onDebridClick: () -> Unit,
 ) {
     item {
         SettingsSection(
@@ -34,6 +39,14 @@ internal fun LazyListScope.integrationsContent(
                     iconPainter = integrationLogoPainter(IntegrationLogo.MdbList),
                     isTablet = isTablet,
                     onClick = onMdbListClick,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.compose_settings_page_debrid),
+                    description = stringResource(Res.string.settings_integrations_debrid_description),
+                    icon = Icons.Rounded.CloudQueue,
+                    isTablet = isTablet,
+                    onClick = onDebridClick,
                 )
             }
         }

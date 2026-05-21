@@ -5,12 +5,15 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
+import com.nuvio.app.features.debrid.DirectDebridStreamSource
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginRuntimeResult
 import com.nuvio.app.features.plugins.PluginScraper
 import com.nuvio.app.features.streams.AddonStreamGroup
+import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamParser
 import com.nuvio.app.features.streams.StreamsUiState
@@ -19,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -152,6 +156,10 @@ object PlayerStreamsRepository {
         }
 
         val installedAddons = AddonRepository.uiState.value.addons
+        val installedAddonNames = installedAddons.map { it.displayTitle }.toSet()
+        PlayerSettingsRepository.ensureLoaded()
+        val playerSettings = PlayerSettingsRepository.uiState.value
+        val debridTargets = DirectDebridStreamSource.configuredTargets()
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
             PluginRepository.getEnabledScrapersForType(type)
@@ -159,7 +167,7 @@ object PlayerStreamsRepository {
             emptyList()
         }
 
-        if (installedAddons.isEmpty() && pluginScrapers.isEmpty()) {
+        if (installedAddons.isEmpty() && pluginScrapers.isEmpty() && debridTargets.isEmpty()) {
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoAddonsInstalled,
@@ -185,7 +193,7 @@ object PlayerStreamsRepository {
                 )
             }
 
-        if (streamAddons.isEmpty() && pluginScrapers.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginScrapers.isEmpty() && debridTargets.isEmpty()) {
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoCompatibleAddons,
@@ -193,7 +201,8 @@ object PlayerStreamsRepository {
             return
         }
 
-        val initialGroups = streamAddons.map { addon ->
+        val installedAddonOrder = streamAddons.map { it.addonName }
+        val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
             AddonStreamGroup(
                 addonName = addon.addonName,
                 addonId = addon.addonId,
@@ -207,7 +216,14 @@ object PlayerStreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        }
+        } + debridTargets.map { target ->
+            AddonStreamGroup(
+                addonName = target.addonName,
+                addonId = target.addonId,
+                streams = emptyList(),
+                isLoading = true,
+            )
+        }, installedAddonOrder)
         stateFlow.value = StreamsUiState(
             groups = initialGroups,
             activeAddonIds = initialGroups.map { it.addonId }.toSet(),
@@ -275,11 +291,31 @@ object PlayerStreamsRepository {
                 }
             }
 
-            val jobs = addonJobs + pluginJobs
+            val debridJobs = debridTargets.map { target ->
+                async {
+                    DirectDebridStreamSource.fetchProviderStreams(
+                        type = type,
+                        videoId = videoId,
+                        target = target,
+                    )
+                }
+            }
+
+            val jobs = addonJobs + pluginJobs + debridJobs
+            val completions = Channel<AddonStreamGroup>(capacity = Channel.BUFFERED)
             jobs.forEach { deferred ->
-                val result = deferred.await()
+                launch {
+                    completions.send(deferred.await())
+                }
+            }
+            var debridPreparationLaunched = false
+            repeat(jobs.size) {
+                val result = completions.receive()
                 stateFlow.update { current ->
-                    val updated = current.groups.map { g -> if (g.addonId == result.addonId) result else g }
+                    val updated = StreamAutoPlaySelector.orderAddonStreams(
+                        groups = current.groups.map { g -> if (g.addonId == result.addonId) result else g },
+                        installedOrder = installedAddonOrder,
+                    )
                     val anyLoading = updated.any { it.isLoading }
                     current.copy(
                         groups = updated,
@@ -293,7 +329,30 @@ object PlayerStreamsRepository {
                         } else null,
                     )
                 }
+                if (!debridPreparationLaunched && result.streams.any { it.isDirectDebridStream }) {
+                    debridPreparationLaunched = true
+                    launch {
+                        DirectDebridStreamPreparer.prepare(
+                            streams = stateFlow.value.groups.flatMap { it.streams },
+                            season = season,
+                            episode = episode,
+                            playerSettings = playerSettings,
+                            installedAddonNames = installedAddonNames,
+                        ) { original, prepared ->
+                            stateFlow.update { current ->
+                                current.copy(
+                                    groups = DirectDebridStreamPreparer.replacePreparedStream(
+                                        groups = current.groups,
+                                        original = original,
+                                        prepared = prepared,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
             }
+            completions.close()
         }
         setJob(job)
     }

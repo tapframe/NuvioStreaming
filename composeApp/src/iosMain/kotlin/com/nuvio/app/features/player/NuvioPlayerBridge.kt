@@ -15,6 +15,21 @@ interface NuvioPlayerBridge {
     fun seekTo(positionMs: Long)
     fun seekBy(offsetMs: Long)
     fun retry()
+    fun configureVideoOutput(
+        hardwareDecoder: String,
+        targetColorspaceHint: Boolean,
+        toneMapping: String,
+        hdrComputePeak: Boolean,
+        targetPrimaries: String,
+        targetTransfer: String,
+        extendedDynamicRange: Boolean,
+        deband: Boolean,
+        interpolation: Boolean,
+        brightness: Int,
+        contrast: Int,
+        saturation: Int,
+        gamma: Int,
+    )
     fun setPlaybackSpeed(speed: Float)
     fun setResizeMode(mode: Int) // 0=Fit, 1=Fill, 2=Zoom
     fun getAudioTrackCount(): Int
