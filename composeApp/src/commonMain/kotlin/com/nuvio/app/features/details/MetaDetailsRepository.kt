@@ -261,6 +261,7 @@ object MetaDetailsRepository {
 
     private fun findMetaManifests(type: String, id: String): List<AddonManifest> =
         AddonRepository.uiState.value.addons
+            .filter { it.isActive }
             .mapNotNull { it.manifest }
             .filter { manifest ->
                 manifest.resources.any { resource ->

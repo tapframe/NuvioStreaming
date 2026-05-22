@@ -50,11 +50,12 @@ data class ManagedAddon(
     val manifestUrl: String,
     val manifest: AddonManifest? = null,
     val userSetName: String? = null,
+    val isEnabled: Boolean = true,
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val isActive: Boolean
-        get() = manifest != null
+        get() = isEnabled && manifest != null
 
     val displayTitle: String
         get() = userSetName?.takeIf { it.isNotBlank() && it != manifest?.name }

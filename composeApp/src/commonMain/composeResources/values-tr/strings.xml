@@ -20,6 +20,7 @@
     <string name="addon_installing">Kuruluyor</string>
     <string name="addon_title">Eklentiler</string>
     <string name="addons_badge_active">Aktif</string>
+    <string name="addons_badge_disabled">Kapalı</string>
     <string name="addons_badge_catalogs">%1$d katalog</string>
     <string name="addons_badge_configurable">Ayarlanabilir</string>
     <string name="addons_badge_refreshing">Yenileniyor</string>

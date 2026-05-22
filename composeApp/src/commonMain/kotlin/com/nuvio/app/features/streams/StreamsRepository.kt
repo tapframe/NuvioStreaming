@@ -149,7 +149,7 @@ object StreamsRepository {
             return
         }
 
-        val installedAddons = AddonRepository.uiState.value.addons
+        val installedAddons = AddonRepository.uiState.value.addons.filter { it.isActive }
         val debridTargets = DirectDebridStreamSource.configuredTargets()
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.getEnabledScrapersForType(type)

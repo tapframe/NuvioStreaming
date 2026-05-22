@@ -1164,6 +1164,7 @@ fun PlayerScreen(
                 )
 
                 val installedAddonNames = AddonRepository.uiState.value.addons
+                    .filter { it.isActive }
                     .map { it.displayTitle }
                     .toSet()
 
@@ -2264,6 +2265,7 @@ private fun buildAddonSubtitleFetchKey(
     val normalizedType = type?.takeIf { it.isNotBlank() } ?: return null
     val normalizedVideoId = videoId?.takeIf { it.isNotBlank() } ?: return null
     val compatibleSubtitleAddons = addons.mapNotNull { addon ->
+        if (!addon.isActive) return@mapNotNull null
         val manifest = addon.manifest ?: return@mapNotNull null
         val supportsSubtitles = manifest.resources.any { resource ->
             resource.isCompatibleSubtitleResource(
