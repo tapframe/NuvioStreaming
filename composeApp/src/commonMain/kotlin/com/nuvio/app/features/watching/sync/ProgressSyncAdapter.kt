@@ -14,7 +14,11 @@ data class ProgressSyncRecord(
 )
 
 interface ProgressSyncAdapter {
-    suspend fun pull(profileId: Int): List<ProgressSyncRecord>
+    suspend fun pull(
+        profileId: Int,
+        sinceLastWatched: Long? = null,
+        limit: Int? = null,
+    ): List<ProgressSyncRecord>
 
     suspend fun push(
         profileId: Int,

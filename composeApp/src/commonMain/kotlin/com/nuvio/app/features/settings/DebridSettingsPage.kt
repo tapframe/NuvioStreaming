@@ -4,16 +4,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -37,26 +45,46 @@ import com.nuvio.app.features.debrid.DebridCredentialValidator
 import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.debrid.DebridSettings
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.debrid.DebridStreamFormatterDefaults
+import com.nuvio.app.features.debrid.DebridStreamAudioChannel
+import com.nuvio.app.features.debrid.DebridStreamAudioTag
+import com.nuvio.app.features.debrid.DebridStreamEncode
+import com.nuvio.app.features.debrid.DebridStreamLanguage
+import com.nuvio.app.features.debrid.DebridStreamPreferences
+import com.nuvio.app.features.debrid.DebridStreamQuality
+import com.nuvio.app.features.debrid.DebridStreamResolution
+import com.nuvio.app.features.debrid.DebridStreamSortCriterion
+import com.nuvio.app.features.debrid.DebridStreamSortDirection
+import com.nuvio.app.features.debrid.DebridStreamSortKey
+import com.nuvio.app.features.debrid.DebridStreamVisualTag
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_cancel
+import nuvio.composeapp.generated.resources.action_clear
 import nuvio.composeapp.generated.resources.action_reset
 import nuvio.composeapp.generated.resources.action_save
-import nuvio.composeapp.generated.resources.action_validate
+import nuvio.composeapp.generated.resources.action_saving
 import nuvio.composeapp.generated.resources.settings_debrid_add_key_first
-import nuvio.composeapp.generated.resources.settings_debrid_description_template
-import nuvio.composeapp.generated.resources.settings_debrid_description_template_description
+import nuvio.composeapp.generated.resources.settings_debrid_dialog_placeholder
+import nuvio.composeapp.generated.resources.settings_debrid_dialog_subtitle
+import nuvio.composeapp.generated.resources.settings_debrid_dialog_title
 import nuvio.composeapp.generated.resources.settings_debrid_enable
 import nuvio.composeapp.generated.resources.settings_debrid_enable_description
 import nuvio.composeapp.generated.resources.settings_debrid_experimental_notice
+import nuvio.composeapp.generated.resources.settings_debrid_description_template
+import nuvio.composeapp.generated.resources.settings_debrid_description_template_description
+import nuvio.composeapp.generated.resources.settings_debrid_formatter_reset_subtitle
+import nuvio.composeapp.generated.resources.settings_debrid_formatter_reset_title
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_count_many
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_count_one
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_instant_playback
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_instant_playback_description
 import nuvio.composeapp.generated.resources.settings_debrid_prepare_stream_count
-import nuvio.composeapp.generated.resources.settings_debrid_key_valid
+import nuvio.composeapp.generated.resources.settings_debrid_prepare_stream_count_warning
 import nuvio.composeapp.generated.resources.settings_debrid_key_invalid
 import nuvio.composeapp.generated.resources.settings_debrid_name_template
 import nuvio.composeapp.generated.resources.settings_debrid_name_template_description
+import nuvio.composeapp.generated.resources.settings_debrid_not_set
 import nuvio.composeapp.generated.resources.settings_debrid_provider_torbox_description
 import nuvio.composeapp.generated.resources.settings_debrid_section_instant_playback
 import nuvio.composeapp.generated.resources.settings_debrid_section_formatting
@@ -82,7 +110,7 @@ internal fun LazyListScope.debridSettingsContent(
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_debrid_enable),
                     description = stringResource(Res.string.settings_debrid_enable_description),
-                    checked = settings.enabled,
+                    checked = settings.enabled && settings.hasAnyApiKey,
                     enabled = settings.hasAnyApiKey,
                     isTablet = isTablet,
                     onCheckedChange = DebridSettingsRepository::setEnabled,
@@ -99,20 +127,34 @@ internal fun LazyListScope.debridSettingsContent(
     }
 
     item {
+        var showApiKeyDialog by rememberSaveable { mutableStateOf(false) }
+
         SettingsSection(
             title = stringResource(Res.string.settings_debrid_section_providers),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                DebridApiKeyRow(
+                DebridPreferenceRow(
                     isTablet = isTablet,
-                    providerId = DebridProviders.TORBOX_ID,
                     title = DebridProviders.Torbox.displayName,
                     description = stringResource(Res.string.settings_debrid_provider_torbox_description),
-                    value = settings.torboxApiKey,
-                    onApiKeyCommitted = DebridSettingsRepository::setTorboxApiKey,
+                    value = maskDebridApiKey(settings.torboxApiKey, stringResource(Res.string.settings_debrid_not_set)),
+                    enabled = true,
+                    onClick = { showApiKeyDialog = true },
                 )
             }
+        }
+
+        if (showApiKeyDialog) {
+            DebridApiKeyDialog(
+                providerId = DebridProviders.TORBOX_ID,
+                title = stringResource(Res.string.settings_debrid_dialog_title),
+                subtitle = stringResource(Res.string.settings_debrid_dialog_subtitle),
+                placeholder = stringResource(Res.string.settings_debrid_dialog_placeholder),
+                currentValue = settings.torboxApiKey,
+                onSave = DebridSettingsRepository::setTorboxApiKey,
+                onDismiss = { showApiKeyDialog = false },
+            )
         }
     }
 
@@ -163,41 +205,154 @@ internal fun LazyListScope.debridSettingsContent(
     }
 
     item {
+        var activeStreamPicker by rememberSaveable { mutableStateOf<DebridStreamPicker?>(null) }
+        val preferences = settings.streamPreferences
+        val rows = debridRuleRows(preferences)
+
+        SettingsSection(
+            title = "Filters & Sorting",
+            isTablet = isTablet,
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = "Max results",
+                    description = "Limit how many Direct Debrid sources appear.",
+                    value = streamMaxResultsLabel(preferences.maxResults),
+                    enabled = settings.enabled,
+                    onClick = { activeStreamPicker = DebridStreamPicker.MAX_RESULTS },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = "Sort streams",
+                    description = "Choose how Direct Debrid sources are ordered.",
+                    value = sortProfileLabel(preferences.sortCriteria),
+                    enabled = settings.enabled,
+                    onClick = { activeStreamPicker = DebridStreamPicker.SORT_MODE },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = "Per resolution limit",
+                    description = "Cap repeated 2160p, 1080p, 720p results after sorting.",
+                    value = streamMaxResultsLabel(preferences.maxPerResolution),
+                    enabled = settings.enabled,
+                    onClick = { activeStreamPicker = DebridStreamPicker.MAX_PER_RESOLUTION },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = "Per quality limit",
+                    description = "Cap repeated BluRay, WEB-DL, REMUX results after sorting.",
+                    value = streamMaxResultsLabel(preferences.maxPerQuality),
+                    enabled = settings.enabled,
+                    onClick = { activeStreamPicker = DebridStreamPicker.MAX_PER_QUALITY },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = "Size range",
+                    description = "Filter streams by file size.",
+                    value = sizeRangeLabel(preferences),
+                    enabled = settings.enabled,
+                    onClick = { activeStreamPicker = DebridStreamPicker.SIZE_RANGE },
+                )
+                rows.forEach { row ->
+                    SettingsGroupDivider(isTablet = isTablet)
+                    DebridPreferenceRow(
+                        isTablet = isTablet,
+                        title = row.title,
+                        description = row.description,
+                        value = row.value,
+                        enabled = settings.enabled,
+                        onClick = { activeStreamPicker = row.picker },
+                    )
+                }
+            }
+        }
+
+        activeStreamPicker?.let { picker ->
+            DebridStreamPreferenceDialog(
+                picker = picker,
+                preferences = preferences,
+                onPreferencesChanged = DebridSettingsRepository::setStreamPreferences,
+                onDismiss = { activeStreamPicker = null },
+            )
+        }
+    }
+
+    item {
+        var activeTemplateField by rememberSaveable { mutableStateOf<DebridTemplateField?>(null) }
+
         SettingsSection(
             title = stringResource(Res.string.settings_debrid_section_formatting),
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
-                DebridTemplateRow(
+                DebridPreferenceRow(
                     isTablet = isTablet,
                     title = stringResource(Res.string.settings_debrid_name_template),
                     description = stringResource(Res.string.settings_debrid_name_template_description),
-                    value = settings.streamNameTemplate,
-                    singleLine = true,
-                    onTemplateCommitted = DebridSettingsRepository::setStreamNameTemplate,
+                    value = templatePreview(settings.streamNameTemplate),
+                    enabled = settings.enabled,
+                    onClick = { activeTemplateField = DebridTemplateField.NAME },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
-                DebridTemplateRow(
+                DebridPreferenceRow(
                     isTablet = isTablet,
                     title = stringResource(Res.string.settings_debrid_description_template),
                     description = stringResource(Res.string.settings_debrid_description_template_description),
-                    value = settings.streamDescriptionTemplate,
-                    singleLine = false,
-                    onTemplateCommitted = DebridSettingsRepository::setStreamDescriptionTemplate,
+                    value = templatePreview(settings.streamDescriptionTemplate),
+                    enabled = settings.enabled,
+                    onClick = { activeTemplateField = DebridTemplateField.DESCRIPTION },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = 12.dp),
-                ) {
-                    TextButton(onClick = DebridSettingsRepository::resetStreamTemplates) {
-                        Text(stringResource(Res.string.action_reset))
-                    }
-                }
+                DebridPreferenceRow(
+                    isTablet = isTablet,
+                    title = stringResource(Res.string.settings_debrid_formatter_reset_title),
+                    description = stringResource(Res.string.settings_debrid_formatter_reset_subtitle),
+                    value = stringResource(Res.string.action_reset),
+                    enabled = settings.enabled,
+                    onClick = DebridSettingsRepository::resetStreamTemplates,
+                )
             }
         }
+
+        when (activeTemplateField) {
+            DebridTemplateField.NAME -> DebridTemplateDialog(
+                title = stringResource(Res.string.settings_debrid_name_template),
+                description = stringResource(Res.string.settings_debrid_name_template_description),
+                currentValue = settings.streamNameTemplate,
+                defaultValue = DebridStreamFormatterDefaults.NAME_TEMPLATE,
+                onSave = DebridSettingsRepository::setStreamNameTemplate,
+                onDismiss = { activeTemplateField = null },
+            )
+            DebridTemplateField.DESCRIPTION -> DebridTemplateDialog(
+                title = stringResource(Res.string.settings_debrid_description_template),
+                description = stringResource(Res.string.settings_debrid_description_template_description),
+                currentValue = settings.streamDescriptionTemplate,
+                defaultValue = DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE,
+                onSave = DebridSettingsRepository::setStreamDescriptionTemplate,
+                onDismiss = { activeTemplateField = null },
+            )
+            null -> Unit
+        }
     }
+}
+
+private enum class DebridTemplateField {
+    NAME,
+    DESCRIPTION,
+}
+
+private fun templatePreview(value: String): String {
+    val firstLine = value
+        .lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.isNotBlank() }
+        ?: return ""
+    return if (firstLine.length <= 28) firstLine else "${firstLine.take(28)}..."
 }
 
 @Composable
@@ -280,157 +435,848 @@ private fun DebridPrepareCountDialog(
                         }
                     }
                 }
+
+                Text(
+                    text = stringResource(Res.string.settings_debrid_prepare_stream_count_warning),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun DebridApiKeyRow(
+@OptIn(ExperimentalMaterial3Api::class)
+private fun DebridTemplateDialog(
+    title: String,
+    description: String,
+    currentValue: String,
+    defaultValue: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var draft by rememberSaveable(currentValue) { mutableStateOf(currentValue) }
+
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        DebridDialogSurface(title = title) {
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp, max = 280.dp),
+                minLines = 5,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    disabledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TextButton(onClick = { draft = defaultValue }) {
+                    Text(
+                        text = stringResource(Res.string.action_reset),
+                        maxLines = 1,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(
+                            text = stringResource(Res.string.action_cancel),
+                            maxLines = 1,
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            onSave(draft)
+                            onDismiss()
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.action_save),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DebridPreferenceRow(
     isTablet: Boolean,
+    title: String,
+    description: String,
+    value: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val horizontalPadding = if (isTablet) 20.dp else 16.dp
+    val verticalPadding = if (isTablet) 16.dp else 14.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun DebridStreamPreferenceDialog(
+    picker: DebridStreamPicker,
+    preferences: DebridStreamPreferences,
+    onPreferencesChanged: (DebridStreamPreferences) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    when (picker) {
+        DebridStreamPicker.MAX_RESULTS -> DebridIntChoiceDialog(
+            title = "Max results",
+            selectedValue = preferences.maxResults,
+            options = listOf(0, 5, 10, 20, 50),
+            label = { streamMaxResultsLabel(it) },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(maxResults = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.MAX_PER_RESOLUTION -> DebridIntChoiceDialog(
+            title = "Max results",
+            selectedValue = preferences.maxPerResolution,
+            options = listOf(0, 1, 2, 3, 5),
+            label = { streamMaxResultsLabel(it) },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(maxPerResolution = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.MAX_PER_QUALITY -> DebridIntChoiceDialog(
+            title = "Max results",
+            selectedValue = preferences.maxPerQuality,
+            options = listOf(0, 1, 2, 3, 5),
+            label = { streamMaxResultsLabel(it) },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(maxPerQuality = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.SORT_MODE -> DebridSingleChoiceDialog(
+            title = "Sort streams",
+            selectedValue = sortProfileFor(preferences.sortCriteria),
+            options = listOf(
+                DebridSortProfile.DEFAULT,
+                DebridSortProfile.LARGEST,
+                DebridSortProfile.SMALLEST,
+                DebridSortProfile.AUDIO,
+                DebridSortProfile.LANGUAGE,
+            ),
+            label = { sortProfileLabel(it) },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(sortCriteria = sortCriteriaForProfile(value))) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.SIZE_RANGE -> DebridSingleChoiceDialog(
+            title = "Size range",
+            selectedValue = preferences.sizeMinGb to preferences.sizeMaxGb,
+            options = listOf(0 to 0, 0 to 5, 0 to 10, 5 to 20, 10 to 50, 20 to 100),
+            label = { sizeRangeLabel(it.first, it.second) },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(sizeMinGb = value.first, sizeMaxGb = value.second)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.PREFERRED_RESOLUTIONS -> DebridMultiChoiceDialog(
+            title = "Preferred resolutions",
+            selectedValues = preferences.preferredResolutions,
+            values = DebridStreamResolution.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(preferredResolutions = value.ifEmpty { DebridStreamResolution.defaultOrder })) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_RESOLUTIONS -> DebridMultiChoiceDialog(
+            title = "Required resolutions",
+            selectedValues = preferences.requiredResolutions,
+            values = DebridStreamResolution.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredResolutions = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_RESOLUTIONS -> DebridMultiChoiceDialog(
+            title = "Excluded resolutions",
+            selectedValues = preferences.excludedResolutions,
+            values = DebridStreamResolution.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedResolutions = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.PREFERRED_QUALITIES -> DebridMultiChoiceDialog(
+            title = "Preferred qualities",
+            selectedValues = preferences.preferredQualities,
+            values = DebridStreamQuality.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(preferredQualities = value.ifEmpty { DebridStreamQuality.defaultOrder })) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_QUALITIES -> DebridMultiChoiceDialog(
+            title = "Required qualities",
+            selectedValues = preferences.requiredQualities,
+            values = DebridStreamQuality.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredQualities = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_QUALITIES -> DebridMultiChoiceDialog(
+            title = "Excluded qualities",
+            selectedValues = preferences.excludedQualities,
+            values = DebridStreamQuality.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedQualities = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.PREFERRED_VISUAL_TAGS -> DebridMultiChoiceDialog(
+            title = "Preferred visual tags",
+            selectedValues = preferences.preferredVisualTags,
+            values = DebridStreamVisualTag.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(preferredVisualTags = value.ifEmpty { DebridStreamVisualTag.defaultOrder })) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_VISUAL_TAGS -> DebridMultiChoiceDialog(
+            title = "Required visual tags",
+            selectedValues = preferences.requiredVisualTags,
+            values = DebridStreamVisualTag.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredVisualTags = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_VISUAL_TAGS -> DebridMultiChoiceDialog(
+            title = "Excluded visual tags",
+            selectedValues = preferences.excludedVisualTags,
+            values = DebridStreamVisualTag.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedVisualTags = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.PREFERRED_AUDIO_TAGS -> DebridMultiChoiceDialog(
+            title = "Preferred audio tags",
+            selectedValues = preferences.preferredAudioTags,
+            values = DebridStreamAudioTag.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(preferredAudioTags = value.ifEmpty { DebridStreamAudioTag.defaultOrder })) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_AUDIO_TAGS -> DebridMultiChoiceDialog(
+            title = "Required audio tags",
+            selectedValues = preferences.requiredAudioTags,
+            values = DebridStreamAudioTag.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredAudioTags = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_AUDIO_TAGS -> DebridMultiChoiceDialog(
+            title = "Excluded audio tags",
+            selectedValues = preferences.excludedAudioTags,
+            values = DebridStreamAudioTag.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedAudioTags = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.PREFERRED_AUDIO_CHANNELS -> DebridMultiChoiceDialog(
+            title = "Preferred channels",
+            selectedValues = preferences.preferredAudioChannels,
+            values = DebridStreamAudioChannel.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(preferredAudioChannels = value.ifEmpty { DebridStreamAudioChannel.defaultOrder })) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_AUDIO_CHANNELS -> DebridMultiChoiceDialog(
+            title = "Required channels",
+            selectedValues = preferences.requiredAudioChannels,
+            values = DebridStreamAudioChannel.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredAudioChannels = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_AUDIO_CHANNELS -> DebridMultiChoiceDialog(
+            title = "Excluded channels",
+            selectedValues = preferences.excludedAudioChannels,
+            values = DebridStreamAudioChannel.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedAudioChannels = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.PREFERRED_ENCODES -> DebridMultiChoiceDialog(
+            title = "Preferred encodes",
+            selectedValues = preferences.preferredEncodes,
+            values = DebridStreamEncode.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(preferredEncodes = value.ifEmpty { DebridStreamEncode.defaultOrder })) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_ENCODES -> DebridMultiChoiceDialog(
+            title = "Required encodes",
+            selectedValues = preferences.requiredEncodes,
+            values = DebridStreamEncode.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredEncodes = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_ENCODES -> DebridMultiChoiceDialog(
+            title = "Excluded encodes",
+            selectedValues = preferences.excludedEncodes,
+            values = DebridStreamEncode.defaultOrder,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedEncodes = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.PREFERRED_LANGUAGES -> DebridMultiChoiceDialog(
+            title = "Preferred languages",
+            selectedValues = preferences.preferredLanguages,
+            values = DebridStreamLanguage.entries,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(preferredLanguages = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_LANGUAGES -> DebridMultiChoiceDialog(
+            title = "Required languages",
+            selectedValues = preferences.requiredLanguages,
+            values = DebridStreamLanguage.entries,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredLanguages = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_LANGUAGES -> DebridMultiChoiceDialog(
+            title = "Excluded languages",
+            selectedValues = preferences.excludedLanguages,
+            values = DebridStreamLanguage.entries,
+            label = { it.label },
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedLanguages = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.REQUIRED_RELEASE_GROUPS -> DebridTextListDialog(
+            title = "Required release groups",
+            selectedValues = preferences.requiredReleaseGroups,
+            onSelected = { value -> onPreferencesChanged(preferences.copy(requiredReleaseGroups = value)) },
+            onDismiss = onDismiss,
+        )
+        DebridStreamPicker.EXCLUDED_RELEASE_GROUPS -> DebridTextListDialog(
+            title = "Excluded release groups",
+            selectedValues = preferences.excludedReleaseGroups,
+            onSelected = { value -> onPreferencesChanged(preferences.copy(excludedReleaseGroups = value)) },
+            onDismiss = onDismiss,
+        )
+    }
+}
+
+@Composable
+private fun DebridIntChoiceDialog(
+    title: String,
+    selectedValue: Int,
+    options: List<Int>,
+    label: @Composable (Int) -> String,
+    onSelected: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DebridSingleChoiceDialog(
+        title = title,
+        selectedValue = selectedValue,
+        options = options,
+        label = label,
+        onSelected = onSelected,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun <T> DebridSingleChoiceDialog(
+    title: String,
+    selectedValue: T,
+    options: List<T>,
+    label: @Composable (T) -> String,
+    onSelected: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        DebridDialogSurface(title = title) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(options) { option ->
+                    DebridDialogOptionRow(
+                        text = label(option),
+                        selected = option == selectedValue,
+                        onClick = {
+                            onSelected(option)
+                            onDismiss()
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun <T> DebridMultiChoiceDialog(
+    title: String,
+    selectedValues: List<T>,
+    values: List<T>,
+    label: @Composable (T) -> String,
+    onSelected: (List<T>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var draft by remember(selectedValues) { mutableStateOf(selectedValues) }
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        DebridDialogSurface(title = title) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(values) { option ->
+                    val selected = option in draft
+                    DebridDialogOptionRow(
+                        text = label(option),
+                        selected = selected,
+                        showCheckbox = true,
+                        onClick = {
+                            draft = if (selected) {
+                                draft - option
+                            } else {
+                                draft + option
+                            }
+                        },
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                TextButton(onClick = { draft = emptyList() }) {
+                    Text(stringResource(Res.string.action_clear))
+                }
+                Button(
+                    onClick = {
+                        onSelected(draft)
+                        onDismiss()
+                    },
+                ) {
+                    Text(stringResource(Res.string.action_save))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun DebridTextListDialog(
+    title: String,
+    selectedValues: List<String>,
+    onSelected: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var value by remember(selectedValues) { mutableStateOf(selectedValues.joinToString("\n")) }
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        DebridDialogSurface(title = title) {
+            Text(
+                text = "Enter one group per line.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp),
+                minLines = 4,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    disabledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                TextButton(onClick = { value = "" }) {
+                    Text(stringResource(Res.string.action_clear))
+                }
+                Button(
+                    onClick = {
+                        onSelected(value.split('\n', ',').map { it.trim() }.filter { it.isNotBlank() }.distinct())
+                        onDismiss()
+                    },
+                ) {
+                    Text(stringResource(Res.string.action_save))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DebridDialogSurface(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            content()
+            Spacer(modifier = Modifier.height(2.dp))
+        }
+    }
+}
+
+@Composable
+private fun DebridDialogOptionRow(
+    text: String,
+    selected: Boolean,
+    showCheckbox: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = containerColor,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            if (showCheckbox) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onClick() },
+                )
+            } else {
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun streamMaxResultsLabel(value: Int): String =
+    if (value <= 0) "All streams" else "$value streams"
+
+private fun sortProfileLabel(value: DebridSortProfile): String =
+    when (value) {
+        DebridSortProfile.DEFAULT -> "Default"
+        DebridSortProfile.LARGEST -> "Largest first"
+        DebridSortProfile.SMALLEST -> "Smallest first"
+        DebridSortProfile.AUDIO -> "Best audio first"
+        DebridSortProfile.LANGUAGE -> "Language first"
+    }
+
+private fun debridRuleRows(preferences: DebridStreamPreferences): List<DebridRuleRow> =
+    listOf(
+        DebridRuleRow(DebridStreamPicker.PREFERRED_RESOLUTIONS, "Preferred resolutions", "Sort selected resolutions first, in default order.", selectionCountLabel(preferences.preferredResolutions)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_RESOLUTIONS, "Required resolutions", "Only show selected resolutions.", selectionCountLabel(preferences.requiredResolutions)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_RESOLUTIONS, "Excluded resolutions", "Hide selected resolutions.", selectionCountLabel(preferences.excludedResolutions)),
+        DebridRuleRow(DebridStreamPicker.PREFERRED_QUALITIES, "Preferred qualities", "Sort selected qualities first, in default order.", selectionCountLabel(preferences.preferredQualities)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_QUALITIES, "Required qualities", "Only show selected source qualities.", selectionCountLabel(preferences.requiredQualities)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_QUALITIES, "Excluded qualities", "Hide selected source qualities.", selectionCountLabel(preferences.excludedQualities)),
+        DebridRuleRow(DebridStreamPicker.PREFERRED_VISUAL_TAGS, "Preferred visual tags", "Sort DV, HDR, 10bit, IMAX and similar tags.", selectionCountLabel(preferences.preferredVisualTags)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_VISUAL_TAGS, "Required visual tags", "Require DV, HDR, 10bit, IMAX, SDR and similar tags.", selectionCountLabel(preferences.requiredVisualTags)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_VISUAL_TAGS, "Excluded visual tags", "Hide DV, HDR, 10bit, 3D and similar tags.", selectionCountLabel(preferences.excludedVisualTags)),
+        DebridRuleRow(DebridStreamPicker.PREFERRED_AUDIO_TAGS, "Preferred audio tags", "Sort Atmos, TrueHD, DTS, AAC and similar tags.", selectionCountLabel(preferences.preferredAudioTags)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_AUDIO_TAGS, "Required audio tags", "Require Atmos, TrueHD, DTS, AAC and similar tags.", selectionCountLabel(preferences.requiredAudioTags)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_AUDIO_TAGS, "Excluded audio tags", "Hide selected audio tags.", selectionCountLabel(preferences.excludedAudioTags)),
+        DebridRuleRow(DebridStreamPicker.PREFERRED_AUDIO_CHANNELS, "Preferred channels", "Sort preferred channel layouts first.", selectionCountLabel(preferences.preferredAudioChannels)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_AUDIO_CHANNELS, "Required channels", "Only show selected channel layouts.", selectionCountLabel(preferences.requiredAudioChannels)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_AUDIO_CHANNELS, "Excluded channels", "Hide selected channel layouts.", selectionCountLabel(preferences.excludedAudioChannels)),
+        DebridRuleRow(DebridStreamPicker.PREFERRED_ENCODES, "Preferred encodes", "Sort AV1, HEVC, AVC and similar encodes.", selectionCountLabel(preferences.preferredEncodes)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_ENCODES, "Required encodes", "Require AV1, HEVC, AVC and similar encodes.", selectionCountLabel(preferences.requiredEncodes)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_ENCODES, "Excluded encodes", "Hide selected encodes.", selectionCountLabel(preferences.excludedEncodes)),
+        DebridRuleRow(DebridStreamPicker.PREFERRED_LANGUAGES, "Preferred languages", "Sort preferred audio languages first.", selectionCountLabel(preferences.preferredLanguages)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_LANGUAGES, "Required languages", "Only show streams with selected languages.", selectionCountLabel(preferences.requiredLanguages)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_LANGUAGES, "Excluded languages", "Hide streams where every language is excluded.", selectionCountLabel(preferences.excludedLanguages)),
+        DebridRuleRow(DebridStreamPicker.REQUIRED_RELEASE_GROUPS, "Required release groups", "Only show selected release groups.", selectionCountLabel(preferences.requiredReleaseGroups)),
+        DebridRuleRow(DebridStreamPicker.EXCLUDED_RELEASE_GROUPS, "Excluded release groups", "Hide selected release groups.", selectionCountLabel(preferences.excludedReleaseGroups)),
+    )
+
+private fun selectionCountLabel(values: List<*>): String =
+    if (values.isEmpty()) "Any" else "${values.size} selected"
+
+private fun sizeRangeLabel(preferences: DebridStreamPreferences): String =
+    sizeRangeLabel(preferences.sizeMinGb, preferences.sizeMaxGb)
+
+private fun sizeRangeLabel(minGb: Int, maxGb: Int): String =
+    when {
+        minGb <= 0 && maxGb <= 0 -> "Any"
+        minGb <= 0 -> "Up to ${maxGb}GB"
+        maxGb <= 0 -> "${minGb}GB+"
+        else -> "${minGb}-${maxGb}GB"
+    }
+
+private fun sortProfileFor(criteria: List<DebridStreamSortCriterion>): DebridSortProfile {
+    val normalized = criteria.map { it.key to it.direction }
+    return when {
+        normalized == listOf(DebridStreamSortKey.SIZE to DebridStreamSortDirection.DESC) -> DebridSortProfile.LARGEST
+        normalized == listOf(DebridStreamSortKey.SIZE to DebridStreamSortDirection.ASC) -> DebridSortProfile.SMALLEST
+        normalized.take(2) == listOf(
+            DebridStreamSortKey.AUDIO_TAG to DebridStreamSortDirection.DESC,
+            DebridStreamSortKey.AUDIO_CHANNEL to DebridStreamSortDirection.DESC,
+        ) -> DebridSortProfile.AUDIO
+        normalized.firstOrNull() == DebridStreamSortKey.LANGUAGE to DebridStreamSortDirection.DESC -> DebridSortProfile.LANGUAGE
+        else -> DebridSortProfile.DEFAULT
+    }
+}
+
+private fun sortProfileLabel(criteria: List<DebridStreamSortCriterion>): String =
+    sortProfileLabel(sortProfileFor(criteria))
+
+private fun sortCriteriaForProfile(profile: DebridSortProfile): List<DebridStreamSortCriterion> =
+    when (profile) {
+        DebridSortProfile.DEFAULT -> DebridStreamSortCriterion.defaultOrder
+        DebridSortProfile.LARGEST -> listOf(DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.DESC))
+        DebridSortProfile.SMALLEST -> listOf(DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.ASC))
+        DebridSortProfile.AUDIO -> listOf(
+            DebridStreamSortCriterion(DebridStreamSortKey.AUDIO_TAG, DebridStreamSortDirection.DESC),
+            DebridStreamSortCriterion(DebridStreamSortKey.AUDIO_CHANNEL, DebridStreamSortDirection.DESC),
+            DebridStreamSortCriterion(DebridStreamSortKey.RESOLUTION, DebridStreamSortDirection.DESC),
+            DebridStreamSortCriterion(DebridStreamSortKey.QUALITY, DebridStreamSortDirection.DESC),
+            DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.DESC),
+        )
+        DebridSortProfile.LANGUAGE -> listOf(
+            DebridStreamSortCriterion(DebridStreamSortKey.LANGUAGE, DebridStreamSortDirection.DESC),
+            DebridStreamSortCriterion(DebridStreamSortKey.RESOLUTION, DebridStreamSortDirection.DESC),
+            DebridStreamSortCriterion(DebridStreamSortKey.QUALITY, DebridStreamSortDirection.DESC),
+            DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.DESC),
+        )
+    }
+
+private data class DebridRuleRow(
+    val picker: DebridStreamPicker,
+    val title: String,
+    val description: String,
+    val value: String,
+)
+
+private enum class DebridSortProfile {
+    DEFAULT,
+    LARGEST,
+    SMALLEST,
+    AUDIO,
+    LANGUAGE,
+}
+
+private enum class DebridStreamPicker {
+    MAX_RESULTS,
+    MAX_PER_RESOLUTION,
+    MAX_PER_QUALITY,
+    SORT_MODE,
+    SIZE_RANGE,
+    PREFERRED_RESOLUTIONS,
+    REQUIRED_RESOLUTIONS,
+    EXCLUDED_RESOLUTIONS,
+    PREFERRED_QUALITIES,
+    REQUIRED_QUALITIES,
+    EXCLUDED_QUALITIES,
+    PREFERRED_VISUAL_TAGS,
+    REQUIRED_VISUAL_TAGS,
+    EXCLUDED_VISUAL_TAGS,
+    PREFERRED_AUDIO_TAGS,
+    REQUIRED_AUDIO_TAGS,
+    EXCLUDED_AUDIO_TAGS,
+    PREFERRED_AUDIO_CHANNELS,
+    REQUIRED_AUDIO_CHANNELS,
+    EXCLUDED_AUDIO_CHANNELS,
+    PREFERRED_ENCODES,
+    REQUIRED_ENCODES,
+    EXCLUDED_ENCODES,
+    PREFERRED_LANGUAGES,
+    REQUIRED_LANGUAGES,
+    EXCLUDED_LANGUAGES,
+    REQUIRED_RELEASE_GROUPS,
+    EXCLUDED_RELEASE_GROUPS,
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun DebridApiKeyDialog(
     providerId: String,
     title: String,
-    description: String,
-    value: String,
-    onApiKeyCommitted: (String) -> Unit,
+    subtitle: String,
+    placeholder: String,
+    currentValue: String,
+    onSave: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 16.dp else 14.dp
     val scope = rememberCoroutineScope()
-    var draft by rememberSaveable(value) { mutableStateOf(value) }
+    var draft by rememberSaveable(currentValue) { mutableStateOf(currentValue) }
     var isValidating by rememberSaveable(providerId) { mutableStateOf(false) }
-    var validationMessage by rememberSaveable(providerId, value) { mutableStateOf<String?>(null) }
+    var validationMessage by rememberSaveable(providerId, currentValue) { mutableStateOf<String?>(null) }
     val normalizedDraft = draft.trim()
-    val validMessage = stringResource(Res.string.settings_debrid_key_valid)
     val invalidMessage = stringResource(Res.string.settings_debrid_key_invalid)
+    val saveAndDismiss: () -> Unit = {
+        scope.launch {
+            isValidating = true
+            validationMessage = null
+            val valid = normalizedDraft.isNotBlank() && runCatching {
+                DebridCredentialValidator.validateProvider(providerId, normalizedDraft)
+            }.getOrDefault(false)
+            if (valid) {
+                onSave(normalizedDraft)
+                isValidating = false
+                onDismiss()
+            } else {
+                validationMessage = invalidMessage
+                isValidating = false
+            }
+        }
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        DebridDialogSurface(title = title) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = description,
+                text = subtitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-
-        SettingsSecretTextField(
-            value = draft,
-            onValueChange = {
-                draft = it
-                validationMessage = null
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = "$title API key",
-        )
-
-        validationMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            OutlinedTextField(
+                value = draft,
+                onValueChange = {
+                    draft = it
+                    validationMessage = null
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text(placeholder) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    disabledContainerColor = MaterialTheme.colorScheme.surface,
+                ),
             )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(
-                onClick = {
-                    draft = normalizedDraft
-                    onApiKeyCommitted(normalizedDraft)
-                },
-                enabled = normalizedDraft != value && !isValidating,
-            ) {
-                Text(stringResource(Res.string.action_save))
+            validationMessage?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
-            TextButton(
-                onClick = {
-                    scope.launch {
-                        isValidating = true
-                        val valid = runCatching {
-                            DebridCredentialValidator.validateProvider(providerId, normalizedDraft)
-                        }.getOrDefault(false)
-                        validationMessage = if (valid) validMessage else invalidMessage
-                        isValidating = false
-                    }
-                },
-                enabled = normalizedDraft.isNotBlank() && !isValidating,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
-                Text(stringResource(Res.string.action_validate))
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(Res.string.action_cancel))
+                }
+                TextButton(
+                    onClick = {
+                        onSave("")
+                        onDismiss()
+                    },
+                    enabled = !isValidating,
+                ) {
+                    Text(stringResource(Res.string.action_clear))
+                }
+                Button(
+                    onClick = saveAndDismiss,
+                    enabled = normalizedDraft.isNotBlank() && !isValidating,
+                ) {
+                    Text(
+                        if (isValidating) {
+                            stringResource(Res.string.action_saving)
+                        } else {
+                            stringResource(Res.string.action_save)
+                        },
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-private fun DebridTemplateRow(
-    isTablet: Boolean,
-    title: String,
-    description: String,
-    value: String,
-    singleLine: Boolean,
-    onTemplateCommitted: (String) -> Unit,
-) {
-    val horizontalPadding = if (isTablet) 20.dp else 16.dp
-    val verticalPadding = if (isTablet) 16.dp else 14.dp
-    var draft by rememberSaveable(value) { mutableStateOf(value) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        OutlinedTextField(
-            value = draft,
-            onValueChange = { draft = it },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = singleLine,
-            minLines = if (singleLine) 1 else 4,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                disabledContainerColor = MaterialTheme.colorScheme.surface,
-            ),
-        )
-
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = { onTemplateCommitted(draft) },
-                enabled = draft != value,
-            ) {
-                Text(stringResource(Res.string.action_save))
-            }
-        }
-    }
+private fun maskDebridApiKey(key: String, notSetLabel: String): String {
+    val trimmed = key.trim()
+    if (trimmed.isBlank()) return notSetLabel
+    return if (trimmed.length <= 4) "****" else "******${trimmed.takeLast(4)}"
 }
 
 @Composable

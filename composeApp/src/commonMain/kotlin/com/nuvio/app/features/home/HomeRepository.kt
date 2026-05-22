@@ -1,7 +1,14 @@
 package com.nuvio.app.features.home
 
 import com.nuvio.app.features.addons.ManagedAddon
+import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.catalog.fetchCatalogPage
+import com.nuvio.app.features.collection.Collection
+import com.nuvio.app.features.collection.CollectionRepository
+import com.nuvio.app.features.collection.CollectionSource
+import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
+import com.nuvio.app.features.collection.findCollectionCatalog
+import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +34,10 @@ object HomeRepository {
     private var lastRequestKey: String? = null
     private var currentDefinitions: List<HomeCatalogDefinition> = emptyList()
     private var cachedSections: Map<String, HomeCatalogSection> = emptyMap()
+    private var cachedCollectionHeroItems: List<MetaPreview> = emptyList()
+    private var collectionHeroJob: Job? = null
+    private var collectionHeroRequestKey: String? = null
+    private var lastPublishedCatalogHeroEmpty: Boolean = true
     private var lastErrorMessage: String? = null
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
@@ -55,10 +66,14 @@ object HomeRepository {
             activeRequestKey = null
             cachedSections = emptyMap()
             lastErrorMessage = null
-            _uiState.value = HomeUiState(
+            publishCurrentState(
                 isLoading = false,
-                sections = emptyList(),
-                errorMessage = null,
+                requestKey = requestKey,
+            )
+            ensureCollectionHeroFallback(
+                addons = addons,
+                force = force,
+                requestKey = requestKey,
             )
             return
         }
@@ -119,12 +134,22 @@ object HomeRepository {
                 isLoading = false,
                 requestKey = requestKey,
             )
+            ensureCollectionHeroFallback(
+                addons = addons,
+                force = force,
+                requestKey = requestKey,
+            )
         }
     }
 
     fun applyCurrentSettings() {
         publishCurrentState(
             isLoading = _uiState.value.isLoading,
+            requestKey = activeRequestKey ?: lastRequestKey,
+        )
+        ensureCollectionHeroFallback(
+            addons = AddonRepository.uiState.value.addons,
+            force = false,
             requestKey = activeRequestKey ?: lastRequestKey,
         )
     }
@@ -136,6 +161,11 @@ object HomeRepository {
         lastRequestKey = null
         currentDefinitions = emptyList()
         cachedSections = emptyMap()
+        cachedCollectionHeroItems = emptyList()
+        collectionHeroJob?.cancel()
+        collectionHeroJob = null
+        collectionHeroRequestKey = null
+        lastPublishedCatalogHeroEmpty = true
         lastErrorMessage = null
         _uiState.value = HomeUiState()
     }
@@ -164,7 +194,7 @@ object HomeRepository {
                 )
             }
 
-        val heroItems = if (snapshot.heroEnabled) {
+        val catalogHeroItems = if (snapshot.heroEnabled) {
             val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
             currentDefinitions
                 .filter { definition -> preferences[definition.key]?.heroSourceEnabled != false }
@@ -174,6 +204,12 @@ object HomeRepository {
                 .distinctBy { item -> "${item.type}:${item.id}" }
                 .shuffled(heroRandom)
                 .take(HOME_HERO_ITEM_LIMIT)
+        } else {
+            emptyList()
+        }
+        lastPublishedCatalogHeroEmpty = snapshot.heroEnabled && catalogHeroItems.isEmpty()
+        val heroItems = if (snapshot.heroEnabled) {
+            catalogHeroItems.ifEmpty { cachedCollectionHeroItems }
         } else {
             emptyList()
         }
@@ -222,9 +258,175 @@ object HomeRepository {
             supportsPagination = supportsPagination,
         )
     }
+
+    private fun ensureCollectionHeroFallback(
+        addons: List<ManagedAddon>,
+        force: Boolean,
+        requestKey: String?,
+    ) {
+        if (!lastPublishedCatalogHeroEmpty) return
+        val snapshot = HomeCatalogSettingsRepository.snapshot()
+        if (!snapshot.heroEnabled) return
+        val collections = enabledCollectionsForHero(snapshot)
+        if (collections.isEmpty()) {
+            cachedCollectionHeroItems = emptyList()
+            collectionHeroRequestKey = null
+            return
+        }
+
+        val nextRequestKey = collectionHeroRequestKey(
+            collections = collections,
+            addons = addons,
+            snapshot = snapshot,
+            requestKey = requestKey,
+        )
+        if (!force && collectionHeroRequestKey == nextRequestKey) return
+
+        collectionHeroJob?.cancel()
+        collectionHeroRequestKey = nextRequestKey
+        cachedCollectionHeroItems = emptyList()
+        publishCurrentState(
+            isLoading = _uiState.value.isLoading,
+            requestKey = requestKey,
+        )
+
+        collectionHeroJob = scope.launch {
+            val sources = collectionHeroSources(collections)
+            val sourceResults = sources.map { source ->
+                async {
+                    runCatching {
+                        source.resolveCollectionHeroItems(addons)
+                    }.getOrDefault(emptyList())
+                }
+            }.awaitAll()
+            val random = Random((nextRequestKey.hashCode()).absoluteValue + 7)
+            cachedCollectionHeroItems = roundRobinCollectionHeroItems(sourceResults)
+                .distinctBy { item -> item.stableKey() }
+                .shuffled(random)
+                .take(HOME_HERO_ITEM_LIMIT)
+            publishCurrentState(
+                isLoading = _uiState.value.isLoading,
+                requestKey = requestKey,
+            )
+        }
+    }
+
+    private fun enabledCollectionsForHero(snapshot: HomeCatalogSettingsSnapshot): List<Collection> {
+        val preferences = snapshot.preferences
+        return CollectionRepository.collections.value
+            .filter { collection ->
+                collection.folders.isNotEmpty() &&
+                    preferences["collection_${collection.id}"]?.enabled != false
+            }
+            .sortedBy { collection ->
+                preferences["collection_${collection.id}"]?.order ?: Int.MAX_VALUE
+            }
+    }
+
+    private fun collectionHeroSources(collections: List<Collection>): List<CollectionSource> =
+        collections
+            .flatMap { collection -> collection.folders }
+            .flatMap { folder -> folder.resolvedSources }
+            .take(HOME_COLLECTION_HERO_SOURCE_LIMIT)
+
+    private suspend fun CollectionSource.resolveCollectionHeroItems(addons: List<ManagedAddon>): List<MetaPreview> {
+        val page = when {
+            isTmdb -> TmdbCollectionSourceResolver.resolve(source = this, page = 1)
+            isTrakt -> TraktPublicListSourceResolver.resolve(source = this, page = 1)
+            else -> {
+                val catalogSource = addonCatalogSource() ?: return emptyList()
+                val resolvedCatalog = addons.findCollectionCatalog(catalogSource) ?: return emptyList()
+                fetchCatalogPage(
+                    manifestUrl = resolvedCatalog.addon.manifestUrl,
+                    type = catalogSource.type,
+                    catalogId = catalogSource.catalogId,
+                    genre = catalogSource.genre,
+                    maxItems = HOME_COLLECTION_HERO_SOURCE_ITEM_LIMIT,
+                )
+            }
+        }
+        val items = page.items
+        return if (HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) {
+            items.filterReleasedItems(CurrentDateProvider.todayIsoDate())
+        } else {
+            items
+        }
+    }
+
+    private fun roundRobinCollectionHeroItems(sourceResults: List<List<MetaPreview>>): List<MetaPreview> {
+        val iterators = sourceResults.filter { it.isNotEmpty() }.map { it.iterator() }
+        if (iterators.isEmpty()) return emptyList()
+        val merged = mutableListOf<MetaPreview>()
+        var hasMore = true
+        while (hasMore && merged.size < HOME_COLLECTION_HERO_SOURCE_LIMIT * HOME_COLLECTION_HERO_SOURCE_ITEM_LIMIT) {
+            hasMore = false
+            iterators.forEach { iterator ->
+                if (iterator.hasNext()) {
+                    merged.add(iterator.next())
+                    hasMore = true
+                }
+            }
+        }
+        return merged
+    }
+
+    private fun collectionHeroRequestKey(
+        collections: List<Collection>,
+        addons: List<ManagedAddon>,
+        snapshot: HomeCatalogSettingsSnapshot,
+        requestKey: String?,
+    ): String = buildString {
+        append(requestKey.orEmpty())
+        append("|hideUnreleased=")
+        append(snapshot.hideUnreleasedContent)
+        append("|collections=")
+        collections.forEach { collection ->
+            val preference = snapshot.preferences["collection_${collection.id}"]
+            append(collection.id)
+            append(":")
+            append(preference?.order ?: Int.MAX_VALUE)
+            append(":")
+            collection.folders.forEach { folder ->
+                append(folder.id)
+                append("[")
+                folder.resolvedSources.forEach { source ->
+                    append(collectionSourceKey(source))
+                    append(",")
+                }
+                append("]")
+            }
+            append(";")
+        }
+        append("|addons=")
+        addons.forEach { addon ->
+            append(addon.manifest?.id.orEmpty())
+            append(":")
+            append(addon.manifestUrl)
+            append(":")
+            append(addon.manifest?.catalogs?.size ?: 0)
+            append(";")
+        }
+    }
+
+    private fun collectionSourceKey(source: CollectionSource): String =
+        listOf(
+            source.provider,
+            source.addonId,
+            source.type,
+            source.catalogId,
+            source.genre,
+            source.tmdbSourceType,
+            source.tmdbId?.toString(),
+            source.traktListId?.toString(),
+            source.mediaType,
+            source.sortBy,
+            source.sortHow,
+        ).joinToString(":") { it.orEmpty() }
 }
 
 private const val HOME_HERO_ITEM_LIMIT = 8
+private const val HOME_COLLECTION_HERO_SOURCE_LIMIT = 6
+private const val HOME_COLLECTION_HERO_SOURCE_ITEM_LIMIT = 8
 private const val HOME_CATALOG_FETCH_BATCH_SIZE = 4
 private const val HOME_CATALOG_PREVIEW_FETCH_LIMIT = 18
 private const val HOME_CATALOG_PUBLISH_INTERVAL = 2

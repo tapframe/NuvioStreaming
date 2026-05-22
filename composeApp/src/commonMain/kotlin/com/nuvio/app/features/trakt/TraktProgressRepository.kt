@@ -13,6 +13,7 @@ import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watchprogress.shouldTreatAsInProgressForContinueWatching
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -22,7 +23,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -44,6 +47,7 @@ data class TraktProgressUiState(
     val entries: List<WatchProgressEntry> = emptyList(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+    val hasLoadedRemoteProgress: Boolean = false,
 )
 
 object TraktProgressRepository {
@@ -56,6 +60,8 @@ object TraktProgressRepository {
 
     private var hasLoaded = false
     private var refreshRequestId: Long = 0L
+    private val refreshJobMutex = Mutex()
+    private var inFlightRefresh: Deferred<Unit>? = null
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -83,6 +89,25 @@ object TraktProgressRepository {
 
     suspend fun refreshNow() {
         ensureLoaded()
+        val refresh = refreshJobMutex.withLock {
+            inFlightRefresh?.takeIf { it.isActive } ?: scope.async {
+                refreshNowInternal()
+            }.also { inFlightRefresh = it }
+        }
+
+        try {
+            refresh.await()
+        } finally {
+            refreshJobMutex.withLock {
+                if (inFlightRefresh == refresh && refresh.isCompleted) {
+                    inFlightRefresh = null
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshNowInternal() {
+        ensureLoaded()
         val requestId = nextRefreshRequestId()
         val headers = TraktAuthRepository.authorizedHeaders()
         if (headers == null) {
@@ -109,34 +134,47 @@ object TraktProgressRepository {
 
         _uiState.value = TraktProgressUiState(
             entries = playbackEntries,
-            isLoading = false,
+            isLoading = true,
             errorMessage = null,
+            hasLoadedRemoteProgress = false,
         )
 
         if (playbackEntries.isNotEmpty()) {
             launchHydration(requestId = requestId, entries = playbackEntries)
         }
 
-        scope.launch {
-            val completedEntries = runCatching {
-                fetchHistoryEntries(headers) + fetchWatchedShowSeedEntries(headers)
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                log.w { "Failed to fetch Trakt history snapshot: ${error.message}" }
-            }.getOrNull() ?: return@launch
+        val completedEntries = runCatching {
+            coroutineScope {
+                val history = async { fetchHistoryEntries(headers) }
+                val watchedShowSeeds = async { fetchWatchedShowSeedEntries(headers) }
+                history.await() + watchedShowSeeds.await()
+            }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            log.w { "Failed to fetch Trakt history snapshot: ${error.message}" }
+        }.getOrNull()
 
-            if (!isLatestRefreshRequest(requestId)) return@launch
-
-            val merged = mergeNewestByVideoId(playbackEntries + completedEntries)
+        if (completedEntries == null) {
             _uiState.value = _uiState.value.copy(
-                entries = merged.sortedByDescending { it.lastUpdatedEpochMs },
                 isLoading = false,
                 errorMessage = null,
+                hasLoadedRemoteProgress = false,
             )
+            return
+        }
 
-            if (merged.isNotEmpty()) {
-                launchHydration(requestId = requestId, entries = merged)
-            }
+        if (!isLatestRefreshRequest(requestId)) return
+
+        val merged = mergeNewestByVideoId(playbackEntries + completedEntries)
+        _uiState.value = _uiState.value.copy(
+            entries = merged.sortedByDescending { it.lastUpdatedEpochMs },
+            isLoading = false,
+            errorMessage = null,
+            hasLoadedRemoteProgress = true,
+        )
+
+        if (merged.isNotEmpty()) {
+            launchHydration(requestId = requestId, entries = merged)
         }
     }
 
@@ -314,7 +352,8 @@ object TraktProgressRepository {
             mapPlaybackEpisode(item = item, fallbackIndex = index)
         }
 
-        mergeNewestByVideoId(inProgressMovies + inProgressEpisodes)
+        val merged = mergeNewestByVideoId(inProgressMovies + inProgressEpisodes)
+        merged
     }
 
     private suspend fun fetchHistoryEntries(headers: Map<String, String>): List<WatchProgressEntry> = withContext(Dispatchers.Default) {
@@ -347,7 +386,8 @@ object TraktProgressRepository {
             .mapIndexedNotNull { index, item -> mapHistoryMovie(item = item, fallbackIndex = index) }
             .distinctBy { entry -> entry.videoId }
 
-        mergeNewestByVideoId(completedEpisodes + completedMovies)
+        val merged = mergeNewestByVideoId(completedEpisodes + completedMovies)
+        merged
     }
 
     private suspend fun fetchWatchedShowSeedEntries(
@@ -360,7 +400,7 @@ object TraktProgressRepository {
             headers = headers,
         )
         val watchedShows = json.decodeFromString<List<TraktWatchedShowItem>>(payload)
-        watchedShows
+        val mapped = watchedShows
             .mapNotNull { item ->
                 mapWatchedShowSeed(
                     item = item,
@@ -368,6 +408,7 @@ object TraktProgressRepository {
                 )
             }
             .sortedByDescending { entry -> entry.lastUpdatedEpochMs }
+        mapped
     }
 
     private fun mergeNewestByVideoId(entries: List<WatchProgressEntry>): List<WatchProgressEntry> {
@@ -436,6 +477,8 @@ object TraktProgressRepository {
 
     private fun invalidateInFlightRefreshes() {
         refreshRequestId += 1L
+        inFlightRefresh?.cancel()
+        inFlightRefresh = null
     }
 
     private fun isLatestRefreshRequest(requestId: Long): Boolean = refreshRequestId == requestId

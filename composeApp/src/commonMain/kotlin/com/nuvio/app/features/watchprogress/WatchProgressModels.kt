@@ -118,6 +118,7 @@ data class WatchProgressEntry(
 
 data class WatchProgressUiState(
     val entries: List<WatchProgressEntry> = emptyList(),
+    val hasLoadedRemoteProgress: Boolean = false,
 ) {
     val byVideoId: Map<String, WatchProgressEntry>
         get() = entries.associateBy { it.videoId }

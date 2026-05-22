@@ -55,7 +55,11 @@ import com.nuvio.app.features.player.AudioLanguageOption
 import com.nuvio.app.features.player.AvailableLanguageOptions
 import com.nuvio.app.features.player.ExternalPlayerApp
 import com.nuvio.app.features.player.ExternalPlayerPlatform
+import com.nuvio.app.features.player.IosHardwareDecoderMode
+import com.nuvio.app.features.player.IosTargetPrimaries
+import com.nuvio.app.features.player.IosTargetTransfer
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.STREAM_AUTO_PLAY_TIMEOUT_VALUES
 import com.nuvio.app.features.player.SubtitleLanguageOption
 import com.nuvio.app.features.player.formatPlaybackSpeedLabel
 import com.nuvio.app.features.player.languageLabelForCode
@@ -175,6 +179,9 @@ private fun PlaybackSettingsSection(
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showDecoderPriorityDialog by remember { mutableStateOf(false) }
     var showHoldToSpeedValueDialog by remember { mutableStateOf(false) }
+    var showIosHardwareDecoderDialog by remember { mutableStateOf(false) }
+    var showIosTargetPrimariesDialog by remember { mutableStateOf(false) }
+    var showIosTargetTransferDialog by remember { mutableStateOf(false) }
     var showLibassRenderTypeDialog by remember { mutableStateOf(false) }
     var showAutoPlayModeDialog by remember { mutableStateOf(false) }
     var showAutoPlaySourceDialog by remember { mutableStateOf(false) }
@@ -359,7 +366,7 @@ private fun PlaybackSettingsSection(
                     val timeoutSec = autoPlayPlayerSettings.streamAutoPlayTimeoutSeconds
                     val timeoutLabel = when (timeoutSec) {
                         0 -> stringResource(Res.string.settings_playback_timeout_instant)
-                        11 -> stringResource(Res.string.settings_playback_timeout_unlimited)
+                        Int.MAX_VALUE -> stringResource(Res.string.settings_playback_timeout_unlimited)
                         else -> stringResource(Res.string.settings_playback_timeout_seconds, timeoutSec)
                     }
                     Column(
@@ -385,8 +392,11 @@ private fun PlaybackSettingsSection(
                             }
                             ValueBox(text = timeoutLabel, modifier = Modifier.wrapContentWidth())
                         }
-                        var sliderValue by remember(timeoutSec) { mutableFloatStateOf(timeoutSec.toFloat()) }
-                        var lastHapticStep by remember(timeoutSec) { mutableStateOf(timeoutSec.toFloat()) }
+                        val timeoutIndex = STREAM_AUTO_PLAY_TIMEOUT_VALUES.indexOf(timeoutSec)
+                            .coerceAtLeast(0)
+                        val maxIndex = (STREAM_AUTO_PLAY_TIMEOUT_VALUES.size - 1).toFloat()
+                        var sliderValue by remember(timeoutIndex) { mutableFloatStateOf(timeoutIndex.toFloat()) }
+                        var lastHapticStep by remember(timeoutIndex) { mutableStateOf(timeoutIndex.toFloat()) }
                         Slider(
                             value = sliderValue,
                             onValueChange = {
@@ -399,10 +409,11 @@ private fun PlaybackSettingsSection(
                                 }
                             },
                             onValueChangeFinished = {
-                                PlayerSettingsRepository.setStreamAutoPlayTimeoutSeconds(sliderValue.toInt())
+                                val index = sliderValue.toInt().coerceIn(0, STREAM_AUTO_PLAY_TIMEOUT_VALUES.size - 1)
+                                PlayerSettingsRepository.setStreamAutoPlayTimeoutSeconds(STREAM_AUTO_PLAY_TIMEOUT_VALUES[index])
                             },
-                            valueRange = 0f..11f,
-                            steps = calculateSteps(0f, 11f, 1f),
+                            valueRange = 0f..maxIndex,
+                            steps = calculateSteps(0f, maxIndex, 1f),
                             colors = SliderDefaults.colors(
                                 thumbColor = MaterialTheme.colorScheme.primary,
                                 activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -482,6 +493,52 @@ private fun PlaybackSettingsSection(
                         checked = tunnelingEnabled,
                         isTablet = isTablet,
                         onCheckedChange = PlayerSettingsRepository::setTunnelingEnabled,
+                    )
+                }
+            }
+        }
+
+        if (isIos) {
+            SettingsSection(
+                title = "iOS video output",
+                isTablet = isTablet,
+            ) {
+                SettingsGroup(isTablet = isTablet) {
+                    SettingsNavigationRow(
+                        title = "Hardware decoder",
+                        description = autoPlayPlayerSettings.iosHardwareDecoderMode.label,
+                        isTablet = isTablet,
+                        onClick = { showIosHardwareDecoderDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = "Extended dynamic range",
+                        description = "Default Metal output mode for new playback sessions.",
+                        checked = autoPlayPlayerSettings.iosExtendedDynamicRangeEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setIosExtendedDynamicRangeEnabled,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = "Display color hint",
+                        description = "Let mpv target the active display color space by default.",
+                        checked = autoPlayPlayerSettings.iosTargetColorspaceHintEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setIosTargetColorspaceHintEnabled,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Target primaries",
+                        description = autoPlayPlayerSettings.iosTargetPrimaries.label,
+                        isTablet = isTablet,
+                        onClick = { showIosTargetPrimariesDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = "Target transfer",
+                        description = autoPlayPlayerSettings.iosTargetTransfer.label,
+                        isTablet = isTablet,
+                        onClick = { showIosTargetTransferDialog = true },
                     )
                 }
             }
@@ -606,6 +663,16 @@ private fun PlaybackSettingsSection(
                     isTablet = isTablet,
                     onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayPreferBingeGroup,
                 )
+                if (autoPlayPlayerSettings.streamAutoPlayPreferBingeGroup) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_reuse_binge_group),
+                        description = stringResource(Res.string.settings_playback_reuse_binge_group_description),
+                        checked = autoPlayPlayerSettings.streamAutoPlayReuseBingeGroup,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setStreamAutoPlayReuseBingeGroup,
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 var showThresholdModeDialog by remember { mutableStateOf(false) }
                 SettingsNavigationRow(
@@ -851,6 +918,48 @@ private fun PlaybackSettingsSection(
                 showHoldToSpeedValueDialog = false
             },
             onDismiss = { showHoldToSpeedValueDialog = false },
+        )
+    }
+
+    if (showIosHardwareDecoderDialog) {
+        IosEnumSelectionDialog(
+            title = "Hardware decoder",
+            options = IosHardwareDecoderMode.entries,
+            selected = autoPlayPlayerSettings.iosHardwareDecoderMode,
+            label = { it.label },
+            onSelect = {
+                PlayerSettingsRepository.setIosHardwareDecoderMode(it)
+                showIosHardwareDecoderDialog = false
+            },
+            onDismiss = { showIosHardwareDecoderDialog = false },
+        )
+    }
+
+    if (showIosTargetPrimariesDialog) {
+        IosEnumSelectionDialog(
+            title = "Target primaries",
+            options = IosTargetPrimaries.entries,
+            selected = autoPlayPlayerSettings.iosTargetPrimaries,
+            label = { it.label },
+            onSelect = {
+                PlayerSettingsRepository.setIosTargetPrimaries(it)
+                showIosTargetPrimariesDialog = false
+            },
+            onDismiss = { showIosTargetPrimariesDialog = false },
+        )
+    }
+
+    if (showIosTargetTransferDialog) {
+        IosEnumSelectionDialog(
+            title = "Target transfer",
+            options = IosTargetTransfer.entries,
+            selected = autoPlayPlayerSettings.iosTargetTransfer,
+            label = { it.label },
+            onSelect = {
+                PlayerSettingsRepository.setIosTargetTransfer(it)
+                showIosTargetTransferDialog = false
+            },
+            onDismiss = { showIosTargetTransferDialog = false },
         )
     }
 
@@ -1286,6 +1395,94 @@ private fun DecoderPriorityDialog(
                             ) {
                                 Text(
                                     text = stringResource(labelRes),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Box(
+                                    modifier = Modifier.size(24.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(Res.string.settings_playback_dialog_close),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun <T> IosEnumSelectionDialog(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BasicAlertDialog(
+        onDismissRequest = onDismiss,
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    options.forEach { option ->
+                        val isSelected = option == selected
+                        val containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(option) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = containerColor,
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = label(option),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f),
