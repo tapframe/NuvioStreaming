@@ -147,7 +147,13 @@ object TraktProgressRepository {
             coroutineScope {
                 val history = async { fetchHistoryEntries(headers) }
                 val watchedShowSeeds = async { fetchWatchedShowSeedEntries(headers) }
-                history.await() + watchedShowSeeds.await()
+                val hiddenShows = async { fetchHiddenProgressShowIds(headers) }
+                val hiddenIds = hiddenShows.await()
+                (history.await() + watchedShowSeeds.await())
+                    .filterNot { entry ->
+                        entry.parentMetaType == "series" &&
+                                hiddenIds.contains(entry.parentMetaId)
+                    }
             }
         }.onFailure { error ->
             if (error is CancellationException) throw error
@@ -388,6 +394,35 @@ object TraktProgressRepository {
 
         val merged = mergeNewestByVideoId(completedEpisodes + completedMovies)
         merged
+    }
+
+    private suspend fun fetchHiddenProgressShowIds(
+        headers: Map<String, String>,
+    ): Set<String> = withContext(Dispatchers.Default) {
+        val allIds = mutableSetOf<String>()
+        var page = 1
+        val limit = 1000
+        while (true) {
+            val payload = httpGetTextWithHeaders(
+                url = "$BASE_URL/users/hidden/dropped?type=show&page=$page&limit=$limit",
+                headers = headers,
+            )
+            val items = json.decodeFromString<List<TraktHiddenItem>>(payload)
+            if (items.isEmpty()) break
+            items.forEach { item ->
+                val ids = item.show?.ids ?: return@forEach
+                ids.imdb
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(allIds::add)
+                ids.tmdb
+                    ?.let { allIds.add("tmdb:$it") }
+                ids.trakt
+                    ?.let { allIds.add("trakt:$it") }
+            }
+            if (items.size < limit) break
+            page++
+        }
+        allIds
     }
 
     private suspend fun fetchWatchedShowSeedEntries(
@@ -847,6 +882,13 @@ private data class TraktWatchedShowEpisodeSeed(
     val season: Int,
     val episode: Int,
     val watchedAt: Long,
+)
+
+@Serializable
+private data class TraktHiddenItem(
+    @SerialName("hidden_at") val hiddenAt: String? = null,
+    @SerialName("type") val type: String? = null,
+    @SerialName("show") val show: TraktMedia? = null,
 )
 
 @Serializable
