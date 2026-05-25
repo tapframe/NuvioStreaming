@@ -56,8 +56,8 @@ class DirectDebridStreamPreparerTest {
         StreamItem(
             name = name,
             url = url,
-            addonName = "Torbox Instant",
-            addonId = "debrid:torbox",
+            addonName = "Addon",
+            addonId = "addon:test",
             clientResolve = StreamClientResolve(
                 type = "debrid",
                 service = DebridProviders.TORBOX_ID,

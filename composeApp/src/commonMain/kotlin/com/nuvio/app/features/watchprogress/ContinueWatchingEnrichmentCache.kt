@@ -70,7 +70,9 @@ internal object ContinueWatchingEnrichmentCache {
 
     fun getSnapshots(): Pair<List<CachedNextUpItem>, List<CachedInProgressItem>> {
         val payload = loadPayload()
-        return (payload?.nextUp ?: emptyList()) to (payload?.inProgress ?: emptyList())
+        val nextUp = payload?.nextUp ?: emptyList()
+        val inProgress = payload?.inProgress ?: emptyList()
+        return nextUp to inProgress
     }
 
     fun saveSnapshots(
@@ -80,7 +82,9 @@ internal object ContinueWatchingEnrichmentCache {
     ) {
         val payload = CachedEnrichmentPayload(nextUp = nextUp, inProgress = inProgress)
         val payloadHash = payload.hashCode()
-        if (!force && lastPayloadHash == payloadHash) return
+        if (!force && lastPayloadHash == payloadHash) {
+            return
+        }
 
         val encoded = runCatching {
             json.encodeToString(payload)

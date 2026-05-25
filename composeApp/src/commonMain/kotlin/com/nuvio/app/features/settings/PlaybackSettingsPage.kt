@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.player.AudioLanguageOption
 import com.nuvio.app.features.player.AvailableLanguageOptions
 import com.nuvio.app.features.player.ExternalPlayerApp
@@ -999,6 +1000,7 @@ private fun PlaybackSettingsSection(
 
     if (showAutoPlayAddonSelectionDialog) {
         val addonNames = addonUiState.addons
+            .enabledAddons()
             .mapNotNull { it.manifest }
             .filter { manifest -> manifest.resources.any { resource -> resource.name == "stream" } }
             .map { it.name }

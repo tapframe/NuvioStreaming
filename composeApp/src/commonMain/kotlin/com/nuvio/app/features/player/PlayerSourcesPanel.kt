@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,9 +48,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.i18n.localizedByteUnit
+import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.streams.isSelectableForPlayback
 import kotlin.math.round
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -67,6 +71,10 @@ fun PlayerSourcesPanel(
     modifier: Modifier = Modifier,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val debridSettings by remember {
+        DebridSettingsRepository.ensureLoaded()
+        DebridSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
 
     AnimatedVisibility(
         visible = visible,
@@ -213,6 +221,7 @@ fun PlayerSourcesPanel(
                                         SourceStreamRow(
                                             stream = stream,
                                             isCurrent = isCurrent,
+                                            enabled = stream.isSelectableForPlayback(debridSettings.canResolvePlayableLinks),
                                             onClick = { onStreamSelected(stream) },
                                         )
                                     }
@@ -230,6 +239,7 @@ fun PlayerSourcesPanel(
 private fun SourceStreamRow(
     stream: StreamItem,
     isCurrent: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -256,7 +266,7 @@ private fun SourceStreamRow(
                     Modifier
                 },
             )
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -452,9 +462,9 @@ private fun isCurrentStream(
     currentUrl: String?,
     currentName: String?,
 ): Boolean {
-    if (currentUrl != null && stream.directPlaybackUrl == currentUrl) return true
+    if (currentUrl != null && stream.playableDirectUrl == currentUrl) return true
     if (currentName != null && stream.streamLabel.equals(currentName, ignoreCase = true) &&
-        stream.directPlaybackUrl == currentUrl
+        stream.playableDirectUrl == currentUrl
     ) return true
     return false
 }

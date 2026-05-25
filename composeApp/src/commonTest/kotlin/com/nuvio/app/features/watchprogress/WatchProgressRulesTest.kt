@@ -1,5 +1,6 @@
 package com.nuvio.app.features.watchprogress
 
+import com.nuvio.app.features.cloud.TorboxCloudLibraryPosterUrl
 import com.nuvio.app.features.details.MetaVideo
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -93,6 +94,23 @@ class WatchProgressRulesTest {
         val result = listOf(m1, m2).continueWatchingEntries()
 
         assertEquals(2, result.size)
+    }
+
+    @Test
+    fun `cloud continue watching uses provider poster fallback`() {
+        val item = WatchProgressEntry(
+            contentType = "cloud",
+            parentMetaId = "torbox:Torrent:29773238",
+            parentMetaType = "cloud",
+            videoId = "torbox:Torrent:29773238:8",
+            title = "Cloud file",
+            lastPositionMs = 120_000L,
+            durationMs = 1_000_000L,
+            lastUpdatedEpochMs = 1L,
+        ).toContinueWatchingItem()
+
+        assertEquals(TorboxCloudLibraryPosterUrl, item.poster)
+        assertEquals(TorboxCloudLibraryPosterUrl, item.imageUrl)
     }
 
     @Test

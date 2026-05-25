@@ -49,6 +49,7 @@ import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.nuvioBlockPointerPassthrough
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
@@ -104,7 +105,10 @@ fun SearchScreen(
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val uiState by SearchRepository.uiState.collectAsStateWithLifecycle()
     val discoverUiState by SearchRepository.discoverUiState.collectAsStateWithLifecycle()
-    val homeCatalogSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val homeCatalogSettingsUiState by remember {
+        HomeCatalogSettingsRepository.snapshot()
+        HomeCatalogSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
     val recentSearches by SearchHistoryRepository.uiState.collectAsStateWithLifecycle()
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
@@ -125,7 +129,7 @@ fun SearchScreen(
     }
 
     val addonRefreshKey = remember(addonsUiState.addons) {
-        addonsUiState.addons.mapNotNull { addon ->
+        addonsUiState.addons.enabledAddons().mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             buildString {
                 append(manifest.transportUrl)
@@ -305,13 +309,19 @@ fun SearchScreen(
                 when {
                     isWaitingForSearch -> {
                         items(2) {
-                            HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                            HomeSkeletonRow(
+                                modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
+                            )
                         }
                     }
 
                     uiState.isLoading && uiState.sections.isEmpty() -> {
                         items(2) {
-                            HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                            HomeSkeletonRow(
+                                modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
+                            )
                         }
                     }
 
@@ -351,7 +361,10 @@ fun SearchScreen(
                         }
                         if (uiState.isLoading) {
                             item(key = "search_loading_more") {
-                                HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                                HomeSkeletonRow(
+                                    modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                    showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
+                                )
                             }
                         }
                     }

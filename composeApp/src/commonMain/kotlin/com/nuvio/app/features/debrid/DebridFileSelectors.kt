@@ -107,6 +107,57 @@ internal class RealDebridFileSelector {
         displayName().lowercase().hasVideoExtension()
 }
 
+internal class PremiumizeDirectDownloadFileSelector {
+    fun selectFile(
+        files: List<PremiumizeDirectDownloadFileDto>,
+        resolve: StreamClientResolve,
+        season: Int?,
+        episode: Int?,
+    ): PremiumizeDirectDownloadFileDto? {
+        val playable = files.filter { it.isPlayableVideo() }
+        if (playable.isEmpty()) return null
+
+        val episodePatterns = buildEpisodePatterns(
+            season = season ?: resolve.season,
+            episode = episode ?: resolve.episode,
+        )
+        val names = resolve.specificFileNames(episodePatterns)
+        if (names.isNotEmpty()) {
+            playable.firstNameMatch(names) { it.displayName() }?.let {
+                return it
+            }
+        }
+
+        if (episodePatterns.isNotEmpty()) {
+            playable.firstOrNull { file ->
+                val fileName = file.displayName().lowercase()
+                episodePatterns.any { pattern -> fileName.contains(pattern) }
+            }?.let {
+                return it
+            }
+        }
+
+        resolve.fileIdx?.let { fileIdx ->
+            files.getOrNull(fileIdx)?.takeIf { it.isPlayableVideo() }?.let {
+                return it
+            }
+            if (fileIdx > 0) {
+                files.getOrNull(fileIdx - 1)?.takeIf { it.isPlayableVideo() }?.let {
+                    return it
+                }
+            }
+        }
+
+        return playable.maxByOrNull { it.size ?: 0L }
+    }
+
+    private fun PremiumizeDirectDownloadFileDto.isPlayableVideo(): Boolean =
+        !link.isNullOrBlank() && displayName().lowercase().hasVideoExtension()
+}
+
+internal fun PremiumizeDirectDownloadFileDto.displayName(): String =
+    path.orEmpty().substringAfterLast('/').substringAfterLast('\\').ifBlank { path.orEmpty() }
+
 private fun String.normalizedName(): String =
     substringAfterLast('/')
         .substringBeforeLast('.')

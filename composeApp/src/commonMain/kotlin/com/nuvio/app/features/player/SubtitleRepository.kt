@@ -3,6 +3,7 @@ package com.nuvio.app.features.player
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.AddonResource
 import com.nuvio.app.features.addons.buildAddonResourceUrl
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.httpGetText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -49,7 +50,7 @@ object SubtitleRepository {
             _error.value = null
             _addonSubtitles.value = emptyList()
 
-            val addons = AddonRepository.uiState.value.addons
+            val addons = AddonRepository.uiState.value.addons.enabledAddons()
             val allSubs = mutableListOf<AddonSubtitle>()
 
             for (addon in addons) {

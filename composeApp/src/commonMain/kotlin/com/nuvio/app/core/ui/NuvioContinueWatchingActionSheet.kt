@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.nuvio.app.features.cloud.CloudLibraryContentType
+import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -42,6 +44,7 @@ import org.jetbrains.compose.resources.stringResource
 fun NuvioContinueWatchingActionSheet(
     item: ContinueWatchingItem?,
     showManualPlayOption: Boolean,
+    showDetailsOption: Boolean = true,
     onDismiss: () -> Unit,
     onOpenDetails: () -> Unit,
     onStartFromBeginning: (() -> Unit)? = null,
@@ -73,12 +76,14 @@ fun NuvioContinueWatchingActionSheet(
                 .padding(bottom = nuvioSafeBottomPadding(16.dp)),
         ) {
             ContinueWatchingSheetHeader(item = item)
-            NuvioBottomSheetDivider()
-            NuvioBottomSheetActionRow(
-                icon = Icons.Default.Info,
-                title = stringResource(Res.string.cw_action_go_to_details),
-                onClick = { dismissAfter(onOpenDetails) },
-            )
+            if (showDetailsOption) {
+                NuvioBottomSheetDivider()
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Default.Info,
+                    title = stringResource(Res.string.cw_action_go_to_details),
+                    onClick = { dismissAfter(onOpenDetails) },
+                )
+            }
             if (showManualPlayOption && onPlayManually != null) {
                 NuvioBottomSheetDivider()
                 NuvioBottomSheetActionRow(
@@ -128,10 +133,10 @@ private fun ContinueWatchingSheetHeader(
             val artwork = item.poster ?: item.imageUrl
             if (artwork != null) {
                 AsyncImage(
-                    model = artwork,
+                    model = cloudLibraryDisplayArtworkUrl(artwork),
                     contentDescription = item.title,
                     modifier = Modifier.matchParentSize(),
-                    contentScale = ContentScale.Crop,
+                    contentScale = if (item.isCloudLibraryItem()) ContentScale.Fit else ContentScale.Crop,
                 )
             } else {
                 Text(
@@ -167,3 +172,6 @@ private fun ContinueWatchingSheetHeader(
         }
     }
 }
+
+private fun ContinueWatchingItem.isCloudLibraryItem(): Boolean =
+    parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)

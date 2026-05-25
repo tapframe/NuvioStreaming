@@ -143,7 +143,8 @@ class DebridStreamTemplateEngine {
             op.startsWith("join(") -> {
                 val separator = parseArgs(op).firstOrNull() ?: ", "
                 when (value) {
-                    is Iterable<*> -> value.mapNotNull { valueToText(it).takeIf { text -> text.isNotBlank() } }.joinToString(separator)
+                    is Iterable<*> -> value.mapNotNull { valueToText(it).takeIf { text -> text.isNotBlank() } }
+                        .joinToString(separator)
                     else -> valueToText(value)
                 }
             }
@@ -342,7 +343,8 @@ class DebridStreamTemplateEngine {
     private fun valueToText(value: Any?): String =
         when (value) {
             null -> ""
-            is Iterable<*> -> value.mapNotNull { valueToText(it).takeIf { text -> text.isNotBlank() } }.joinToString(", ")
+            is Iterable<*> -> value.mapNotNull { valueToText(it).takeIf { text -> text.isNotBlank() } }
+                .joinToString(", ")
             is DebridTemplateBytes -> formatBytes(value.value.toDouble())
             is Double -> if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
             is Float -> if (value % 1f == 0f) value.toLong().toString() else value.toString()

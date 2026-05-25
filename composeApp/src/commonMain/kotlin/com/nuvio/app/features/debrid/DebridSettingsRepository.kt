@@ -21,8 +21,9 @@ object DebridSettingsRepository {
 
     private var hasLoaded = false
     private var enabled = false
-    private var torboxApiKey = ""
-    private var realDebridApiKey = ""
+    private var cloudLibraryEnabled = true
+    private var providerApiKeys = emptyMap<String, String>()
+    private var preferredResolverProviderId = ""
     private var instantPlaybackPreparationLimit = 0
     private var streamMaxResults = 0
     private var streamSortMode = DebridStreamSortMode.DEFAULT
@@ -50,31 +51,64 @@ object DebridSettingsRepository {
 
     fun setEnabled(value: Boolean) {
         ensureLoaded()
-        if (value && !hasVisibleApiKey()) return
+        if (value && !hasResolverProvider()) return
         if (enabled == value) return
         enabled = value
         publish()
         DebridSettingsStorage.saveEnabled(value)
     }
 
-    fun setTorboxApiKey(value: String) {
+    fun setLinkResolvingEnabled(value: Boolean) {
+        setEnabled(value)
+    }
+
+    fun setCloudLibraryEnabled(value: Boolean) {
         ensureLoaded()
-        val normalized = value.trim()
-        if (torboxApiKey == normalized) return
-        torboxApiKey = normalized
-        disableIfNoKeys()
+        if (value && !hasCloudLibraryProvider()) return
+        if (cloudLibraryEnabled == value) return
+        cloudLibraryEnabled = value
         publish()
-        DebridSettingsStorage.saveTorboxApiKey(normalized)
+        DebridSettingsStorage.saveCloudLibraryEnabled(value)
+    }
+
+    fun setProviderApiKey(providerId: String, value: String) {
+        ensureLoaded()
+        val provider = DebridProviders.byId(providerId) ?: return
+        val normalized = value.trim()
+        if (providerApiKeys[provider.id].orEmpty() == normalized) return
+        providerApiKeys = if (normalized.isBlank()) {
+            providerApiKeys - provider.id
+        } else {
+            providerApiKeys + (provider.id to normalized)
+        }
+        normalizePreferredResolverProviderId(save = true)
+        disableIfNoResolver()
+        publish()
+        DebridSettingsStorage.saveProviderApiKey(provider.id, normalized)
+    }
+
+    fun setTorboxApiKey(value: String) {
+        setProviderApiKey(DebridProviders.TORBOX_ID, value)
     }
 
     fun setRealDebridApiKey(value: String) {
+        setProviderApiKey(DebridProviders.REAL_DEBRID_ID, value)
+    }
+
+    fun setPremiumizeApiKey(value: String) {
+        setProviderApiKey(DebridProviders.PREMIUMIZE_ID, value)
+    }
+
+    fun setPreferredResolverProviderId(providerId: String) {
         ensureLoaded()
-        val normalized = value.trim()
-        if (realDebridApiKey == normalized) return
-        realDebridApiKey = normalized
-        disableIfNoKeys()
+        val normalized = DebridProviders.byId(providerId)?.id.orEmpty()
+        val next = connectedResolverProviderIds()
+            .firstOrNull { it == normalized }
+            ?: connectedResolverProviderIds().firstOrNull().orEmpty()
+        if (preferredResolverProviderId == next) return
+        preferredResolverProviderId = next
         publish()
-        DebridSettingsStorage.saveRealDebridApiKey(normalized)
+        DebridSettingsStorage.savePreferredResolverProviderId(next)
     }
 
     fun setInstantPlaybackPreparationLimit(value: Int) {
@@ -160,7 +194,7 @@ object DebridSettingsRepository {
 
     fun setStreamNameTemplate(value: String) {
         ensureLoaded()
-        val normalized = value.ifBlank { DebridStreamFormatterDefaults.NAME_TEMPLATE }
+        val normalized = normalizeStreamTemplate(value, DebridTemplateKind.NAME)
         if (streamNameTemplate == normalized) return
         streamNameTemplate = normalized
         publish()
@@ -169,7 +203,7 @@ object DebridSettingsRepository {
 
     fun setStreamDescriptionTemplate(value: String) {
         ensureLoaded()
-        val normalized = value.ifBlank { DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE }
+        val normalized = normalizeStreamTemplate(value, DebridTemplateKind.DESCRIPTION)
         if (streamDescriptionTemplate == normalized) return
         streamDescriptionTemplate = normalized
         publish()
@@ -178,8 +212,8 @@ object DebridSettingsRepository {
 
     fun setStreamTemplates(nameTemplate: String, descriptionTemplate: String) {
         ensureLoaded()
-        streamNameTemplate = nameTemplate.ifBlank { DebridStreamFormatterDefaults.NAME_TEMPLATE }
-        streamDescriptionTemplate = descriptionTemplate.ifBlank { DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE }
+        streamNameTemplate = normalizeStreamTemplate(nameTemplate, DebridTemplateKind.NAME)
+        streamDescriptionTemplate = normalizeStreamTemplate(descriptionTemplate, DebridTemplateKind.DESCRIPTION)
         publish()
         DebridSettingsStorage.saveStreamNameTemplate(streamNameTemplate)
         DebridSettingsStorage.saveStreamDescriptionTemplate(streamDescriptionTemplate)
@@ -192,22 +226,63 @@ object DebridSettingsRepository {
         )
     }
 
-    private fun disableIfNoKeys() {
-        if (!hasVisibleApiKey()) {
+    private fun disableIfNoResolver() {
+        if (!hasResolverProvider()) {
             enabled = false
             DebridSettingsStorage.saveEnabled(false)
         }
     }
 
-    private fun hasVisibleApiKey(): Boolean =
-        (DebridProviders.isVisible(DebridProviders.TORBOX_ID) && torboxApiKey.isNotBlank()) ||
-            (DebridProviders.isVisible(DebridProviders.REAL_DEBRID_ID) && realDebridApiKey.isNotBlank())
+    private fun hasCloudLibraryProvider(): Boolean =
+        DebridProviders.visible().any { provider ->
+            provider.supports(DebridProviderCapability.CloudLibrary) &&
+                providerApiKeys[provider.id].orEmpty().isNotBlank()
+        }
+
+    private fun hasResolverProvider(): Boolean = connectedResolverProviderIds().isNotEmpty()
+
+    private fun connectedResolverProviderIds(): List<String> =
+        DebridProviders.visible().filter { provider ->
+            (
+                provider.supports(DebridProviderCapability.ClientResolve) ||
+                    provider.supports(DebridProviderCapability.LocalTorrentResolve)
+                ) &&
+            providerApiKeys[provider.id].orEmpty().isNotBlank()
+        }.map { it.id }
+
+    private fun normalizePreferredResolverProviderId(save: Boolean = false) {
+        val providerId = DebridProviders.byId(preferredResolverProviderId)?.id.orEmpty()
+        val connectedResolverIds = connectedResolverProviderIds()
+        val normalized = if (providerId in connectedResolverIds) {
+            providerId
+        } else {
+            connectedResolverIds.firstOrNull().orEmpty()
+        }
+        if (preferredResolverProviderId != normalized) {
+            preferredResolverProviderId = normalized
+            if (save) {
+                DebridSettingsStorage.savePreferredResolverProviderId(normalized)
+            }
+        }
+    }
 
     private fun loadFromDisk() {
         hasLoaded = true
-        torboxApiKey = DebridSettingsStorage.loadTorboxApiKey()?.trim().orEmpty()
-        realDebridApiKey = DebridSettingsStorage.loadRealDebridApiKey()?.trim().orEmpty()
-        enabled = (DebridSettingsStorage.loadEnabled() ?: false) && hasVisibleApiKey()
+        providerApiKeys = DebridProviders.all()
+            .mapNotNull { provider ->
+                DebridSettingsStorage.loadProviderApiKey(provider.id)
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { apiKey -> provider.id to apiKey }
+            }
+            .toMap()
+        preferredResolverProviderId = DebridSettingsStorage.loadPreferredResolverProviderId()
+            ?.let(DebridProviders::byId)
+            ?.id
+            .orEmpty()
+        normalizePreferredResolverProviderId(save = true)
+        enabled = (DebridSettingsStorage.loadEnabled() ?: false) && hasResolverProvider()
+        cloudLibraryEnabled = DebridSettingsStorage.loadCloudLibraryEnabled() ?: true
         instantPlaybackPreparationLimit = normalizeDebridInstantPlaybackPreparationLimit(
             DebridSettingsStorage.loadInstantPlaybackPreparationLimit() ?: 0,
         )
@@ -241,20 +316,23 @@ object DebridSettingsRepository {
                 hdrFilter = streamHdrFilter,
                 codecFilter = streamCodecFilter,
             )
-        streamNameTemplate = DebridSettingsStorage.loadStreamNameTemplate()
-            ?.takeIf { it.isNotBlank() }
-            ?: DebridStreamFormatterDefaults.NAME_TEMPLATE
-        streamDescriptionTemplate = DebridSettingsStorage.loadStreamDescriptionTemplate()
-            ?.takeIf { it.isNotBlank() }
-            ?: DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE
+        streamNameTemplate = normalizeStreamTemplate(
+            DebridSettingsStorage.loadStreamNameTemplate().orEmpty(),
+            DebridTemplateKind.NAME,
+        )
+        streamDescriptionTemplate = normalizeStreamTemplate(
+            DebridSettingsStorage.loadStreamDescriptionTemplate().orEmpty(),
+            DebridTemplateKind.DESCRIPTION,
+        )
         publish()
     }
 
     private fun publish() {
         _uiState.value = DebridSettings(
             enabled = enabled,
-            torboxApiKey = torboxApiKey,
-            realDebridApiKey = realDebridApiKey,
+            cloudLibraryEnabled = cloudLibraryEnabled,
+            providerApiKeys = providerApiKeys,
+            preferredResolverProviderId = preferredResolverProviderId,
             instantPlaybackPreparationLimit = instantPlaybackPreparationLimit,
             streamMaxResults = streamMaxResults,
             streamSortMode = streamSortMode,
@@ -283,6 +361,21 @@ object DebridSettingsRepository {
             null
         } catch (_: IllegalArgumentException) {
             null
+        }
+    }
+
+    private enum class DebridTemplateKind {
+        NAME,
+        DESCRIPTION,
+    }
+
+    private fun normalizeStreamTemplate(value: String, kind: DebridTemplateKind): String {
+        val trimmed = value.trim()
+        return when {
+            trimmed.isBlank() -> ""
+            kind == DebridTemplateKind.NAME && trimmed == DebridStreamFormatterDefaults.LEGACY_NAME_TEMPLATE -> ""
+            kind == DebridTemplateKind.DESCRIPTION && trimmed == DebridStreamFormatterDefaults.LEGACY_DESCRIPTION_TEMPLATE -> ""
+            else -> value
         }
     }
 }

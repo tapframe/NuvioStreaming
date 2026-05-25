@@ -1,5 +1,7 @@
 package com.nuvio.app.features.watchprogress
 
+import com.nuvio.app.features.cloud.CloudLibraryContentType
+import com.nuvio.app.features.cloud.cloudLibraryProviderPosterUrl
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.Serializable
@@ -199,6 +201,7 @@ internal fun nextUpDismissKey(
 
 internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
     val normalizedEntry = normalizedCompletion()
+    val cloudPosterUrl = normalizedEntry.cloudLibraryPosterFallbackUrl()
     val explicitResumeProgressFraction = normalizedEntry.normalizedProgressPercent
         ?.takeIf { durationMs <= 0L && it > 0f }
         ?.let { explicitPercent -> (explicitPercent / 100f).coerceIn(0f, 1f) }
@@ -213,9 +216,9 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
             episodeNumber = normalizedEntry.episodeNumber,
             episodeTitle = normalizedEntry.episodeTitle,
         ),
-        imageUrl = normalizedEntry.episodeThumbnail ?: normalizedEntry.background ?: normalizedEntry.poster,
+        imageUrl = normalizedEntry.episodeThumbnail ?: normalizedEntry.background ?: normalizedEntry.poster ?: cloudPosterUrl,
         logo = normalizedEntry.logo,
-        poster = normalizedEntry.poster,
+        poster = normalizedEntry.poster ?: cloudPosterUrl,
         background = normalizedEntry.background,
         seasonNumber = normalizedEntry.seasonNumber,
         episodeNumber = normalizedEntry.episodeNumber,
@@ -231,6 +234,16 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
         durationMs = normalizedEntry.durationMs,
         progressFraction = normalizedEntry.progressFraction,
     )
+}
+
+private fun WatchProgressEntry.cloudLibraryPosterFallbackUrl(): String? {
+    if (!contentType.equals(CloudLibraryContentType, ignoreCase = true) &&
+        !parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
+    ) {
+        return null
+    }
+    return cloudLibraryProviderPosterUrl(parentMetaId)
+        ?: cloudLibraryProviderPosterUrl(providerAddonId)
 }
 
 internal fun WatchProgressEntry.toUpNextContinueWatchingItem(

@@ -2,7 +2,6 @@ package com.nuvio.app.features.search
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,31 +12,16 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,12 +33,9 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
+import com.nuvio.app.core.ui.NuvioDropdownChip
+import com.nuvio.app.core.ui.NuvioDropdownOption
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
-import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
-import com.nuvio.app.core.ui.NuvioBottomSheetDivider
-import com.nuvio.app.core.ui.NuvioModalBottomSheet
-import com.nuvio.app.core.ui.dismissNuvioBottomSheet
-import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.core.ui.posterCardClickable
@@ -62,7 +43,6 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.watching.application.WatchingState
-import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -174,19 +154,19 @@ private fun DiscoverFilterRow(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        DiscoverDropdownChip(
+        NuvioDropdownChip(
             title = stringResource(Res.string.discover_select_type),
             label = state.selectedType?.displayTypeLabel() ?: stringResource(Res.string.discover_type),
             selectedKey = state.selectedType,
-            options = state.typeOptions.map { DiscoverOptionItem(key = it, label = it.displayTypeLabel()) },
+            options = state.typeOptions.map { NuvioDropdownOption(key = it, label = it.displayTypeLabel()) },
             enabled = state.typeOptions.isNotEmpty(),
             onSelected = { onTypeSelected(it.key) },
         )
-        DiscoverDropdownChip(
+        NuvioDropdownChip(
             title = stringResource(Res.string.discover_select_catalog),
             label = state.selectedCatalog?.catalogName ?: stringResource(Res.string.discover_catalog),
             selectedKey = state.selectedCatalogKey,
-            options = state.catalogOptions.map { option -> DiscoverOptionItem(key = option.key, label = option.catalogName) },
+            options = state.catalogOptions.map { option -> NuvioDropdownOption(key = option.key, label = option.catalogName) },
             enabled = state.catalogOptions.isNotEmpty(),
             onSelected = { onCatalogSelected(it.key) },
         )
@@ -194,11 +174,11 @@ private fun DiscoverFilterRow(
         val selectedCatalog = state.selectedCatalog
         val genreOptions = buildList {
             if (selectedCatalog?.genreRequired != true) {
-                add(DiscoverOptionItem(key = "", label = stringResource(Res.string.discover_all_genres)))
+                add(NuvioDropdownOption(key = "", label = stringResource(Res.string.discover_all_genres)))
             }
-            addAll(state.genreOptions.map { genre -> DiscoverOptionItem(key = genre, label = genre) })
+            addAll(state.genreOptions.map { genre -> NuvioDropdownOption(key = genre, label = genre) })
         }
-        DiscoverDropdownChip(
+        NuvioDropdownChip(
             title = stringResource(Res.string.discover_select_genre),
             label = state.selectedGenre ?: stringResource(Res.string.discover_all_genres),
             selectedKey = state.selectedGenre ?: "",
@@ -208,132 +188,6 @@ private fun DiscoverFilterRow(
                 onGenreSelected(option.key.ifBlank { null })
             },
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DiscoverDropdownChip(
-    title: String,
-    label: String,
-    selectedKey: String?,
-    options: List<DiscoverOptionItem>,
-    enabled: Boolean,
-    onSelected: (DiscoverOptionItem) -> Unit,
-) {
-    var isSheetVisible by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val coroutineScope = rememberCoroutineScope()
-
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .then(
-                if (enabled) {
-                    Modifier.clickable { isSheetVisible = true }
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Icon(
-            imageVector = Icons.Rounded.KeyboardArrowDown,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline,
-        )
-    }
-
-    if (isSheetVisible) {
-        DiscoverOptionsSheet(
-            title = title,
-            options = options,
-            selectedKey = selectedKey,
-            sheetState = sheetState,
-            onDismiss = {
-                coroutineScope.launch {
-                    dismissNuvioBottomSheet(
-                        sheetState = sheetState,
-                        onDismiss = { isSheetVisible = false },
-                    )
-                }
-            },
-            onSelected = { option ->
-                onSelected(option)
-                coroutineScope.launch {
-                    dismissNuvioBottomSheet(
-                        sheetState = sheetState,
-                        onDismiss = { isSheetVisible = false },
-                    )
-                }
-            },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DiscoverOptionsSheet(
-    title: String,
-    options: List<DiscoverOptionItem>,
-    selectedKey: String?,
-    sheetState: SheetState,
-    onDismiss: () -> Unit,
-    onSelected: (DiscoverOptionItem) -> Unit,
-) {
-    NuvioModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = nuvioSafeBottomPadding(16.dp)),
-        ) {
-            Text(
-                text = title,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            NuvioBottomSheetDivider()
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp),
-            ) {
-                itemsIndexed(options) { index, option ->
-                    NuvioBottomSheetActionRow(
-                        title = option.label,
-                        onClick = { onSelected(option) },
-                        trailingContent = {
-                            if (option.key == selectedKey) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        },
-                    )
-                    if (index < options.lastIndex) {
-                        NuvioBottomSheetDivider()
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -517,11 +371,6 @@ private fun DiscoverEmptyStateCard(
         message = message,
     )
 }
-
-private data class DiscoverOptionItem(
-    val key: String,
-    val label: String,
-)
 
 @Composable
 private fun String.displayTypeLabel(): String =

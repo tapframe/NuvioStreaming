@@ -57,10 +57,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.streams.isSelectableForPlayback
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watching.application.WatchingState
@@ -460,6 +463,10 @@ private fun EpisodeStreamsSubView(
     onDismiss: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val debridSettings by remember {
+        DebridSettingsRepository.ensureLoaded()
+        DebridSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
 
     val episode = state.selectedEpisode ?: return
     val streamsUiState = state.streamsUiState
@@ -601,6 +608,7 @@ private fun EpisodeStreamsSubView(
                     ) { _, stream ->
                         EpisodeSourceStreamRow(
                             stream = stream,
+                            enabled = stream.isSelectableForPlayback(debridSettings.canResolvePlayableLinks),
                             onClick = { onStreamSelected(stream, episode) },
                         )
                     }
@@ -613,6 +621,7 @@ private fun EpisodeStreamsSubView(
 @Composable
 private fun EpisodeSourceStreamRow(
     stream: StreamItem,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -622,7 +631,7 @@ private fun EpisodeSourceStreamRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(colorScheme.surfaceVariant.copy(alpha = 0.35f))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),

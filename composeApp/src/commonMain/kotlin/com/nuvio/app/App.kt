@@ -103,9 +103,18 @@ import com.nuvio.app.core.ui.isLiquidGlassNativeTabBarSupported
 import com.nuvio.app.core.ui.localizedContinueWatchingSubtitle
 import com.nuvio.app.features.auth.AuthScreen
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.catalog.CatalogRepository
 import com.nuvio.app.features.catalog.CatalogScreen
 import com.nuvio.app.features.catalog.INTERNAL_LIBRARY_MANIFEST_URL
+import com.nuvio.app.features.cloud.CloudLibraryContentType
+import com.nuvio.app.features.cloud.CloudLibraryFile
+import com.nuvio.app.features.cloud.CloudLibraryItem
+import com.nuvio.app.features.cloud.CloudLibraryPlaybackResult
+import com.nuvio.app.features.cloud.CloudLibraryPlaybackTargetLookupResult
+import com.nuvio.app.features.cloud.CloudLibraryRepository
+import com.nuvio.app.features.cloud.playbackVideoId
+import com.nuvio.app.features.cloud.providerPosterUrl
 import com.nuvio.app.features.debrid.DirectDebridPlayableResult
 import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
 import com.nuvio.app.features.debrid.toastMessage
@@ -180,6 +189,7 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepositor
 import com.nuvio.app.features.watchprogress.ResumePromptRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.nextUpDismissKey
+import com.nuvio.app.features.watchprogress.toContinueWatchingItem
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.Flow
@@ -565,6 +575,7 @@ private fun MainAppContent(
         var showExitConfirmation by rememberSaveable { mutableStateOf(false) }
         var selectedPosterActionTarget by remember { mutableStateOf<PosterActionTarget?>(null) }
         var selectedContinueWatchingForActions by remember { mutableStateOf<ContinueWatchingItem?>(null) }
+        var requestedSettingsPageName by rememberSaveable { mutableStateOf<String?>(null) }
         var showLibraryListPicker by remember { mutableStateOf(false) }
         var pickerItem by remember { mutableStateOf<LibraryItem?>(null) }
         var pickerTitle by remember { mutableStateOf("") }
@@ -601,6 +612,9 @@ private fun MainAppContent(
     val externalPlayerNotConfiguredText = stringResource(Res.string.external_player_not_configured)
     val externalPlayerUnavailableText = stringResource(Res.string.external_player_unavailable)
     val externalPlayerFailedText = stringResource(Res.string.external_player_failed)
+    val cloudLibraryPlayFailedText = stringResource(Res.string.cloud_library_play_failed)
+    val cloudLibraryPlayDisabledText = stringResource(Res.string.cloud_library_play_disabled)
+    val cloudLibraryPlayNotConnectedText = stringResource(Res.string.cloud_library_play_not_connected)
     val isTraktLibrarySource = libraryUiState.sourceMode == LibrarySourceMode.TRAKT
     var initialHomeReady by rememberSaveable { mutableStateOf(false) }
     var offlineLaunchRouteHandled by rememberSaveable { mutableStateOf(false) }
@@ -609,6 +623,7 @@ private fun MainAppContent(
 
     val addonProbeTargets = remember(addonsUiState.addons) {
         addonsUiState.addons
+            .enabledAddons()
             .mapNotNull { it.manifest?.transportUrl }
             .distinct()
             .sorted()
@@ -836,6 +851,52 @@ private fun MainAppContent(
             }
         }
 
+        suspend fun launchCloudLibraryFile(
+            item: CloudLibraryItem,
+            file: CloudLibraryFile,
+            resumePositionMs: Long? = null,
+            resumeProgressFraction: Float? = null,
+            startFromBeginning: Boolean = false,
+        ): Boolean {
+            return when (
+                val resolved = CloudLibraryRepository.resolvePlayback(
+                    item = item,
+                    file = file,
+                )
+            ) {
+                is CloudLibraryPlaybackResult.Success -> {
+                    val playbackTitle = resolved.filename
+                        ?.takeIf { it.isNotBlank() }
+                        ?: file.name.ifBlank { item.name }
+                    val playerLaunch = PlayerLaunch(
+                        title = playbackTitle,
+                        sourceUrl = resolved.url,
+                        streamTitle = playbackTitle,
+                        streamSubtitle = item.name.takeIf { it != playbackTitle },
+                        providerName = item.providerName,
+                        providerAddonId = "cloud:${item.providerId}",
+                        poster = item.providerPosterUrl(),
+                        contentType = CloudLibraryContentType,
+                        videoId = item.playbackVideoId(file),
+                        parentMetaId = item.stableKey,
+                        parentMetaType = CloudLibraryContentType,
+                        initialPositionMs = if (startFromBeginning) 0L else (resumePositionMs ?: 0L),
+                        initialProgressFraction = if (startFromBeginning) null else resumeProgressFraction,
+                    )
+                    if (playerSettingsUiState.externalPlayerEnabled) {
+                        openExternalPlayback(playerLaunch)
+                        true
+                    } else {
+                        val launchId = PlayerLaunchStore.put(playerLaunch)
+                        navController.navigate(PlayerRoute(launchId = launchId))
+                        true
+                    }
+                }
+
+                else -> false
+            }
+        }
+
         fun launchPlaybackWithDownloadPreference(
             type: String,
             videoId: String,
@@ -1006,25 +1067,67 @@ private fun MainAppContent(
         }
 
         val openContinueWatching: (ContinueWatchingItem, Boolean, Boolean) -> Unit = { item, manualSelection, startFromBeginning ->
-            launchPlaybackWithDownloadPreference(
-                type = item.parentMetaType,
-                videoId = item.videoId,
-                parentMetaId = item.parentMetaId,
-                parentMetaType = item.parentMetaType,
-                title = item.title,
-                logo = item.logo,
-                poster = item.poster,
-                background = item.background,
-                seasonNumber = item.seasonNumber,
-                episodeNumber = item.episodeNumber,
-                episodeTitle = item.episodeTitle,
-                episodeThumbnail = item.episodeThumbnail,
-                pauseDescription = item.pauseDescription,
-                resumePositionMs = item.resumePositionMs,
-                resumeProgressFraction = item.resumeProgressFraction,
-                manualSelection = manualSelection,
-                startFromBeginning = startFromBeginning,
-            )
+            if (item.isCloudLibraryContinueWatchingItem()) {
+                coroutineScope.launch {
+                    when (
+                        val lookup = CloudLibraryRepository.findPlaybackTargetForProgressResult(
+                            contentId = item.parentMetaId,
+                            videoId = item.videoId,
+                        )
+                    ) {
+                        is CloudLibraryPlaybackTargetLookupResult.Found -> {
+                            val launched = launchCloudLibraryFile(
+                                item = lookup.target.item,
+                                file = lookup.target.file,
+                                resumePositionMs = item.resumePositionMs,
+                                resumeProgressFraction = item.resumeProgressFraction,
+                                startFromBeginning = startFromBeginning,
+                            )
+                            if (!launched) {
+                                NuvioToastController.show(cloudLibraryPlayFailedText)
+                            }
+                        }
+
+                        CloudLibraryPlaybackTargetLookupResult.Disabled -> {
+                            NuvioToastController.show(cloudLibraryPlayDisabledText)
+                        }
+
+                        is CloudLibraryPlaybackTargetLookupResult.NotConnected -> {
+                            val providerName = lookup.providerName?.takeIf { it.isNotBlank() }
+                            NuvioToastController.show(
+                                providerName?.let { name ->
+                                    getString(Res.string.cloud_library_play_provider_not_connected, name)
+                                }
+                                    ?: cloudLibraryPlayNotConnectedText,
+                            )
+                        }
+
+                        CloudLibraryPlaybackTargetLookupResult.NotFound -> {
+                            NuvioToastController.show(cloudLibraryPlayFailedText)
+                        }
+                    }
+                }
+            } else {
+                launchPlaybackWithDownloadPreference(
+                    type = item.parentMetaType,
+                    videoId = item.videoId,
+                    parentMetaId = item.parentMetaId,
+                    parentMetaType = item.parentMetaType,
+                    title = item.title,
+                    logo = item.logo,
+                    poster = item.poster,
+                    background = item.background,
+                    seasonNumber = item.seasonNumber,
+                    episodeNumber = item.episodeNumber,
+                    episodeTitle = item.episodeTitle,
+                    episodeThumbnail = item.episodeThumbnail,
+                    pauseDescription = item.pauseDescription,
+                    resumePositionMs = item.resumePositionMs,
+                    resumeProgressFraction = item.resumeProgressFraction,
+                    manualSelection = manualSelection,
+                    startFromBeginning = startFromBeginning,
+                )
+            }
         }
 
         val onContinueWatchingClick: (ContinueWatchingItem) -> Unit = { item ->
@@ -1157,6 +1260,28 @@ private fun MainAppContent(
                                             )
                                         },
                                         onLibrarySectionViewAllClick = onLibrarySectionViewAllClick,
+                                        onCloudFilePlay = { item, file ->
+                                            coroutineScope.launch {
+                                                val resumeItem = WatchProgressRepository
+                                                    .progressForVideo(item.playbackVideoId(file))
+                                                    ?.takeIf { it.isResumable }
+                                                    ?.toContinueWatchingItem()
+                                                if (
+                                                    !launchCloudLibraryFile(
+                                                        item = item,
+                                                        file = file,
+                                                        resumePositionMs = resumeItem?.resumePositionMs,
+                                                        resumeProgressFraction = resumeItem?.resumeProgressFraction,
+                                                    )
+                                                ) {
+                                                    NuvioToastController.show(cloudLibraryPlayFailedText)
+                                                }
+                                            }
+                                        },
+                                        onConnectCloudClick = {
+                                            requestedSettingsPageName = "Debrid"
+                                            selectedTab = AppScreenTab.Settings
+                                        },
                                         onContinueWatchingClick = onContinueWatchingClick,
                                         onContinueWatchingLongPress = onContinueWatchingLongPress,
                                         onSwitchProfile = onSwitchProfile,
@@ -1190,6 +1315,10 @@ private fun MainAppContent(
                                         onCollectionsSettingsClick = { navController.navigate(CollectionsRoute) },
                                         onFolderClick = { collectionId, folderId ->
                                             navController.navigate(FolderDetailRoute(collectionId = collectionId, folderId = folderId))
+                                        },
+                                        requestedSettingsPageName = requestedSettingsPageName,
+                                        onRequestedSettingsPageConsumed = {
+                                            requestedSettingsPageName = null
                                         },
                                         onInitialHomeContentRendered = { initialHomeReady = true },
                                     )
@@ -1512,31 +1641,41 @@ private fun MainAppContent(
                         if (autoPlayHandled) return@LaunchedEffect
                         if (streamsUiState.requestToken != expectedStreamsRequestToken) return@LaunchedEffect
                         val selectedStream = streamsUiState.autoPlayStream ?: return@LaunchedEffect
-                        val stream = when (
-                            val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
-                                stream = selectedStream,
-                                season = launch.seasonNumber,
-                                episode = launch.episodeNumber,
-                            )
-                        ) {
-                            is DirectDebridPlayableResult.Success -> resolved.stream
-                            else -> {
-                                resolved.toastMessage()?.let { NuvioToastController.show(it) }
-                                StreamsRepository.consumeAutoPlay()
-                                if (resolved == DirectDebridPlayableResult.Stale) {
-                                    StreamsRepository.reload(
-                                        type = launch.type,
-                                        videoId = effectiveVideoId,
-                                        parentMetaId = launch.parentMetaId,
-                                        season = launch.seasonNumber,
-                                        episode = launch.episodeNumber,
-                                        manualSelection = launch.manualSelection,
-                                    )
+                        val stream = if (DirectDebridPlaybackResolver.shouldResolveToPlayableStream(selectedStream)) {
+                            when (
+                                val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
+                                    stream = selectedStream,
+                                    season = launch.seasonNumber,
+                                    episode = launch.episodeNumber,
+                                )
+                            ) {
+                                is DirectDebridPlayableResult.Success -> resolved.stream
+                                else -> {
+                                    val hasNextCandidate = StreamsRepository.skipAutoPlayStream(selectedStream)
+                                    if (!hasNextCandidate) {
+                                        resolved.toastMessage()?.let { NuvioToastController.show(it) }
+                                    }
+                                    if (!hasNextCandidate && resolved == DirectDebridPlayableResult.Stale) {
+                                        StreamsRepository.reload(
+                                            type = launch.type,
+                                            videoId = effectiveVideoId,
+                                            parentMetaId = launch.parentMetaId,
+                                            season = launch.seasonNumber,
+                                            episode = launch.episodeNumber,
+                                            manualSelection = launch.manualSelection,
+                                        )
+                                    }
+                                    return@LaunchedEffect
                                 }
-                                return@LaunchedEffect
                             }
+                        } else {
+                            selectedStream
                         }
-                        val sourceUrl = stream.directPlaybackUrl ?: return@LaunchedEffect
+                        val sourceUrl = stream.playableDirectUrl
+                        if (sourceUrl == null) {
+                            StreamsRepository.skipAutoPlayStream(selectedStream)
+                            return@LaunchedEffect
+                        }
                         autoPlayHandled = true
                         if (playerSettings.streamReuseLastLinkEnabled) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
@@ -1613,7 +1752,7 @@ private fun MainAppContent(
                         forceExternal: Boolean,
                         forceInternal: Boolean,
                     ) {
-                        if (stream.isDirectDebridStream && stream.directPlaybackUrl == null) {
+                        if (DirectDebridPlaybackResolver.shouldResolveToPlayableStream(stream)) {
                             if (resolvingDebridStream) return
                             streamRouteScope.launch {
                                 resolvingDebridStream = true
@@ -1648,7 +1787,7 @@ private fun MainAppContent(
                             }
                             return
                         }
-                        val sourceUrl = stream.directPlaybackUrl ?: return
+                        val sourceUrl = stream.playableDirectUrl ?: return
                         if (playerSettings.streamReuseLastLinkEnabled) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
                                 type = launch.type,
@@ -2104,6 +2243,7 @@ private fun MainAppContent(
             NuvioContinueWatchingActionSheet(
                 item = selectedContinueWatchingForActions,
                 showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState),
+                showDetailsOption = selectedContinueWatchingForActions?.isCloudLibraryContinueWatchingItem() != true,
                 onDismiss = { selectedContinueWatchingForActions = null },
                 onOpenDetails = {
                     selectedContinueWatchingForActions?.let { item ->
@@ -2280,6 +2420,8 @@ private fun AppTabHost(
     onLibraryPosterClick: ((LibraryItem) -> Unit)? = null,
     onLibraryPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)? = null,
     onLibrarySectionViewAllClick: ((LibrarySection) -> Unit)? = null,
+    onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
+    onConnectCloudClick: (() -> Unit)? = null,
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     onSwitchProfile: (() -> Unit)? = null,
@@ -2295,6 +2437,8 @@ private fun AppTabHost(
     onCheckForUpdatesClick: (() -> Unit)? = null,
     onCollectionsSettingsClick: () -> Unit = {},
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
+    requestedSettingsPageName: String? = null,
+    onRequestedSettingsPageConsumed: () -> Unit = {},
     onInitialHomeContentRendered: () -> Unit = {},
 ) {
     val tabStateHolder = rememberSaveableStateHolder()
@@ -2334,6 +2478,8 @@ private fun AppTabHost(
                         onPosterClick = onLibraryPosterClick,
                         onPosterLongClick = onLibraryPosterLongClick,
                         onSectionViewAllClick = onLibrarySectionViewAllClick,
+                        onCloudFilePlay = onCloudFilePlay,
+                        onConnectCloudClick = onConnectCloudClick,
                     )
                 }
 
@@ -2341,6 +2487,8 @@ private fun AppTabHost(
                     SettingsScreen(
                         modifier = Modifier.fillMaxSize(),
                         rootActionRequests = settingsRootActionRequests,
+                        requestedPageName = requestedSettingsPageName,
+                        onRequestedPageConsumed = onRequestedSettingsPageConsumed,
                         rootActionsEnabled = rootActionsEnabled,
                         onSwitchProfile = onSwitchProfile,
                         onHomescreenClick = onHomescreenSettingsClick,
@@ -2474,6 +2622,9 @@ private fun TabletFloatingTopBar(
         }
     }
 }
+
+private fun ContinueWatchingItem.isCloudLibraryContinueWatchingItem(): Boolean =
+    parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
 
 @Composable
 private fun TabletTopPillItem(

@@ -1,55 +1,146 @@
 package com.nuvio.app.features.debrid
 
+import com.nuvio.app.features.streams.AddonStreamGroup
+import com.nuvio.app.features.streams.StreamDebridCacheState
 import com.nuvio.app.features.streams.StreamItem
 
-object DirectDebridStreamFilter {
-    const val FALLBACK_SOURCE_NAME = "Direct Debrid"
+object DebridStreamPresentation {
+    private val formatter = DebridStreamFormatter()
 
-    fun filterInstant(streams: List<StreamItem>, settings: DebridSettings? = null): List<StreamItem> {
-        val instantStreams = streams
-            .filter(::isInstantCandidate)
-            .map { stream ->
-                val providerId = stream.clientResolve?.service
-                val sourceName = DebridProviders.instantName(providerId)
-                stream.copy(
-                    name = stream.name ?: sourceName,
-                    addonName = sourceName,
-                    addonId = DebridProviders.addonId(providerId),
-                    sourceName = stream.sourceName ?: FALLBACK_SOURCE_NAME,
-                )
-            }
-            .distinctBy { stream ->
-                listOf(
-                    stream.clientResolve?.infoHash?.lowercase(),
-                    stream.clientResolve?.fileIdx?.toString(),
-                    stream.clientResolve?.filename,
-                    stream.name,
-                    stream.title,
-                ).joinToString("|")
-            }
-        return if (settings == null) instantStreams else applyPreferences(instantStreams, settings)
+    fun apply(groups: List<AddonStreamGroup>, settings: DebridSettings): List<AddonStreamGroup> {
+        if (!settings.canResolvePlayableLinks) return groups
+        return groups.map { group ->
+            val visibleStreams = group.streams
+                .filterNot { stream -> stream.isInactiveResolverStream(settings) }
+                .filterNot { stream -> stream.isUncachedDebridStream }
+            val debridStreams = visibleStreams.filter { stream -> stream.isManagedDebridStream }
+            if (debridStreams.isEmpty()) return@map group.copy(streams = visibleStreams)
+
+            val presentedDebridStreams = applyPreferences(debridStreams, settings)
+                .map { stream ->
+                    if (settings.hasCustomStreamFormatting) {
+                        formatter.format(stream, settings)
+                    } else {
+                        stream
+                    }
+                }
+            val passthroughStreams = visibleStreams.filterNot { stream -> stream.isManagedDebridStream }
+
+            group.copy(streams = presentedDebridStreams + passthroughStreams)
+        }
     }
 
-    fun isInstantCandidate(stream: StreamItem): Boolean {
-        val resolve = stream.clientResolve ?: return false
-        return resolve.type.equals("debrid", ignoreCase = true) &&
-            DebridProviders.isSupported(resolve.service) &&
-            resolve.isCached == true
-    }
-
-    fun isDirectDebridSourceName(addonName: String): Boolean =
-        DebridProviders.all().any { addonName == DebridProviders.instantName(it.id) }
-
-    private fun applyPreferences(streams: List<StreamItem>, settings: DebridSettings): List<StreamItem> {
-        val preferences = effectivePreferences(settings)
-        return streams.map { it to streamFacts(it, preferences) }
+    internal fun applyPreferences(streams: List<StreamItem>, settings: DebridSettings): List<StreamItem> {
+        val preferences = DebridStreamMetadata.effectivePreferences(settings)
+        return streams.map { it to DebridStreamMetadata.facts(it, preferences) }
             .filter { (_, facts) -> facts.matchesFilters(preferences) }
             .sortedWith { left, right -> compareFacts(left.second, right.second, preferences.sortCriteria) }
             .let { sorted -> applyLimits(sorted, preferences) }
             .map { it.first }
     }
 
-    private fun effectivePreferences(settings: DebridSettings): DebridStreamPreferences {
+    internal val StreamItem.isManagedDebridStream: Boolean
+        get() {
+            val status = debridCacheStatus
+            return isAddonDebridCandidate && (isDirectDebridStream || (
+                isTorrentStream &&
+                    status != null &&
+                    DebridProviders.byId(status.providerId)?.supports(DebridProviderCapability.LocalTorrentCacheCheck) == true &&
+                    status.state != StreamDebridCacheState.CHECKING
+            ))
+        }
+
+    private val StreamItem.isUncachedDebridStream: Boolean
+        get() = isInstalledAddonStream &&
+            DebridProviders.byId(debridCacheStatus?.providerId)?.supports(DebridProviderCapability.LocalTorrentCacheCheck) == true &&
+            debridCacheStatus?.state == StreamDebridCacheState.NOT_CACHED
+
+    private fun StreamItem.isInactiveResolverStream(settings: DebridSettings): Boolean {
+        val streamProviderId = DebridProviders.byId(clientResolve?.service)?.id ?: return false
+        val activeProviderId = settings.activeResolverProviderId ?: return false
+        return isDirectDebridStream && streamProviderId != activeProviderId
+    }
+
+    private fun applyLimits(
+        streams: List<Pair<StreamItem, DebridStreamFacts>>,
+        preferences: DebridStreamPreferences,
+    ): List<Pair<StreamItem, DebridStreamFacts>> {
+        val resolutionCounts = mutableMapOf<DebridStreamResolution, Int>()
+        val qualityCounts = mutableMapOf<DebridStreamQuality, Int>()
+        val result = mutableListOf<Pair<StreamItem, DebridStreamFacts>>()
+        for (stream in streams) {
+            if (preferences.maxResults > 0 && result.size >= preferences.maxResults) break
+            if (preferences.maxPerResolution > 0) {
+                val count = resolutionCounts[stream.second.resolution] ?: 0
+                if (count >= preferences.maxPerResolution) continue
+            }
+            if (preferences.maxPerQuality > 0) {
+                val count = qualityCounts[stream.second.quality] ?: 0
+                if (count >= preferences.maxPerQuality) continue
+            }
+            resolutionCounts[stream.second.resolution] = (resolutionCounts[stream.second.resolution] ?: 0) + 1
+            qualityCounts[stream.second.quality] = (qualityCounts[stream.second.quality] ?: 0) + 1
+            result += stream
+        }
+        return result
+    }
+
+    private fun DebridStreamFacts.matchesFilters(preferences: DebridStreamPreferences): Boolean {
+        if (preferences.requiredResolutions.isNotEmpty() && resolution !in preferences.requiredResolutions) return false
+        if (resolution in preferences.excludedResolutions) return false
+        if (preferences.requiredQualities.isNotEmpty() && quality !in preferences.requiredQualities) return false
+        if (quality in preferences.excludedQualities) return false
+        if (preferences.requiredVisualTags.isNotEmpty() && visualTags.none { it in preferences.requiredVisualTags }) return false
+        if (visualTags.any { it in preferences.excludedVisualTags }) return false
+        if (preferences.requiredAudioTags.isNotEmpty() && audioTags.none { it in preferences.requiredAudioTags }) return false
+        if (audioTags.any { it in preferences.excludedAudioTags }) return false
+        if (preferences.requiredAudioChannels.isNotEmpty() && audioChannels.none { it in preferences.requiredAudioChannels }) return false
+        if (audioChannels.any { it in preferences.excludedAudioChannels }) return false
+        if (preferences.requiredEncodes.isNotEmpty() && encode !in preferences.requiredEncodes) return false
+        if (encode in preferences.excludedEncodes) return false
+        if (preferences.requiredLanguages.isNotEmpty() && languages.none { it in preferences.requiredLanguages }) return false
+        if (languages.isNotEmpty() && languages.all { it in preferences.excludedLanguages }) return false
+        if (preferences.requiredReleaseGroups.isNotEmpty() && preferences.requiredReleaseGroups.none { releaseGroup.equals(it, ignoreCase = true) }) return false
+        if (preferences.excludedReleaseGroups.any { releaseGroup.equals(it, ignoreCase = true) }) return false
+        if (preferences.sizeMinGb > 0 && size != null && size < preferences.sizeMinGb.gigabytes()) return false
+        if (preferences.sizeMaxGb > 0 && size != null && size > preferences.sizeMaxGb.gigabytes()) return false
+        return true
+    }
+
+    private fun compareFacts(
+        left: DebridStreamFacts,
+        right: DebridStreamFacts,
+        criteria: List<DebridStreamSortCriterion>,
+    ): Int {
+        for (criterion in criteria.ifEmpty { DebridStreamSortCriterion.defaultOrder }) {
+            val comparison = compareKey(left, right, criterion)
+            if (comparison != 0) return comparison
+        }
+        return 0
+    }
+
+    private fun compareKey(
+        left: DebridStreamFacts,
+        right: DebridStreamFacts,
+        criterion: DebridStreamSortCriterion,
+    ): Int {
+        val direction = if (criterion.direction == DebridStreamSortDirection.ASC) 1 else -1
+        return when (criterion.key) {
+            DebridStreamSortKey.RESOLUTION -> left.resolutionRank.compareTo(right.resolutionRank) * -direction
+            DebridStreamSortKey.QUALITY -> left.qualityRank.compareTo(right.qualityRank) * -direction
+            DebridStreamSortKey.VISUAL_TAG -> left.visualRank.compareTo(right.visualRank) * -direction
+            DebridStreamSortKey.AUDIO_TAG -> left.audioRank.compareTo(right.audioRank) * -direction
+            DebridStreamSortKey.AUDIO_CHANNEL -> left.channelRank.compareTo(right.channelRank) * -direction
+            DebridStreamSortKey.ENCODE -> left.encodeRank.compareTo(right.encodeRank) * -direction
+            DebridStreamSortKey.SIZE -> (left.size ?: 0L).compareTo(right.size ?: 0L) * direction
+            DebridStreamSortKey.LANGUAGE -> left.languageRank.compareTo(right.languageRank) * -direction
+            DebridStreamSortKey.RELEASE_GROUP -> left.releaseGroup.compareTo(right.releaseGroup, ignoreCase = true)
+        }
+    }
+}
+
+internal object DebridStreamMetadata {
+    fun effectivePreferences(settings: DebridSettings): DebridStreamPreferences {
         val default = DebridStreamPreferences()
         if (settings.streamPreferences != default) return settings.streamPreferences.normalized()
         if (
@@ -71,8 +162,12 @@ object DirectDebridStreamFilter {
                     DebridStreamSortCriterion(DebridStreamSortKey.QUALITY, DebridStreamSortDirection.DESC),
                     DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.DESC),
                 )
-                DebridStreamSortMode.SIZE_DESC -> listOf(DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.DESC))
-                DebridStreamSortMode.SIZE_ASC -> listOf(DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.ASC))
+                DebridStreamSortMode.SIZE_DESC -> listOf(
+                    DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.DESC),
+                )
+                DebridStreamSortMode.SIZE_ASC -> listOf(
+                    DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.ASC),
+                )
             },
             requiredResolutions = DebridStreamResolution.defaultOrder.filter {
                 it.value >= settings.streamMinimumQuality.minResolution && it != DebridStreamResolution.UNKNOWN
@@ -126,84 +221,7 @@ object DirectDebridStreamFilter {
         }.normalized()
     }
 
-    private fun applyLimits(
-        streams: List<Pair<StreamItem, StreamFacts>>,
-        preferences: DebridStreamPreferences,
-    ): List<Pair<StreamItem, StreamFacts>> {
-        val resolutionCounts = mutableMapOf<DebridStreamResolution, Int>()
-        val qualityCounts = mutableMapOf<DebridStreamQuality, Int>()
-        val result = mutableListOf<Pair<StreamItem, StreamFacts>>()
-        for (stream in streams) {
-            if (preferences.maxResults > 0 && result.size >= preferences.maxResults) break
-            if (preferences.maxPerResolution > 0) {
-                val count = resolutionCounts[stream.second.resolution] ?: 0
-                if (count >= preferences.maxPerResolution) continue
-            }
-            if (preferences.maxPerQuality > 0) {
-                val count = qualityCounts[stream.second.quality] ?: 0
-                if (count >= preferences.maxPerQuality) continue
-            }
-            resolutionCounts[stream.second.resolution] = (resolutionCounts[stream.second.resolution] ?: 0) + 1
-            qualityCounts[stream.second.quality] = (qualityCounts[stream.second.quality] ?: 0) + 1
-            result += stream
-        }
-        return result
-    }
-
-    private fun StreamFacts.matchesFilters(preferences: DebridStreamPreferences): Boolean {
-        if (preferences.requiredResolutions.isNotEmpty() && resolution !in preferences.requiredResolutions) return false
-        if (resolution in preferences.excludedResolutions) return false
-        if (preferences.requiredQualities.isNotEmpty() && quality !in preferences.requiredQualities) return false
-        if (quality in preferences.excludedQualities) return false
-        if (preferences.requiredVisualTags.isNotEmpty() && visualTags.none { it in preferences.requiredVisualTags }) return false
-        if (visualTags.any { it in preferences.excludedVisualTags }) return false
-        if (preferences.requiredAudioTags.isNotEmpty() && audioTags.none { it in preferences.requiredAudioTags }) return false
-        if (audioTags.any { it in preferences.excludedAudioTags }) return false
-        if (preferences.requiredAudioChannels.isNotEmpty() && audioChannels.none { it in preferences.requiredAudioChannels }) return false
-        if (audioChannels.any { it in preferences.excludedAudioChannels }) return false
-        if (preferences.requiredEncodes.isNotEmpty() && encode !in preferences.requiredEncodes) return false
-        if (encode in preferences.excludedEncodes) return false
-        if (preferences.requiredLanguages.isNotEmpty() && languages.none { it in preferences.requiredLanguages }) return false
-        if (languages.isNotEmpty() && languages.all { it in preferences.excludedLanguages }) return false
-        if (preferences.requiredReleaseGroups.isNotEmpty() && preferences.requiredReleaseGroups.none { releaseGroup.equals(it, ignoreCase = true) }) return false
-        if (preferences.excludedReleaseGroups.any { releaseGroup.equals(it, ignoreCase = true) }) return false
-        if (preferences.sizeMinGb > 0 && size != null && size < preferences.sizeMinGb.gigabytes()) return false
-        if (preferences.sizeMaxGb > 0 && size != null && size > preferences.sizeMaxGb.gigabytes()) return false
-        return true
-    }
-
-    private fun compareFacts(
-        left: StreamFacts,
-        right: StreamFacts,
-        criteria: List<DebridStreamSortCriterion>,
-    ): Int {
-        for (criterion in criteria.ifEmpty { DebridStreamSortCriterion.defaultOrder }) {
-            val comparison = compareKey(left, right, criterion)
-            if (comparison != 0) return comparison
-        }
-        return 0
-    }
-
-    private fun compareKey(
-        left: StreamFacts,
-        right: StreamFacts,
-        criterion: DebridStreamSortCriterion,
-    ): Int {
-        val direction = if (criterion.direction == DebridStreamSortDirection.ASC) 1 else -1
-        return when (criterion.key) {
-            DebridStreamSortKey.RESOLUTION -> left.resolutionRank.compareTo(right.resolutionRank) * -direction
-            DebridStreamSortKey.QUALITY -> left.qualityRank.compareTo(right.qualityRank) * -direction
-            DebridStreamSortKey.VISUAL_TAG -> left.visualRank.compareTo(right.visualRank) * -direction
-            DebridStreamSortKey.AUDIO_TAG -> left.audioRank.compareTo(right.audioRank) * -direction
-            DebridStreamSortKey.AUDIO_CHANNEL -> left.channelRank.compareTo(right.channelRank) * -direction
-            DebridStreamSortKey.ENCODE -> left.encodeRank.compareTo(right.encodeRank) * -direction
-            DebridStreamSortKey.SIZE -> (left.size ?: 0L).compareTo(right.size ?: 0L) * direction
-            DebridStreamSortKey.LANGUAGE -> left.languageRank.compareTo(right.languageRank) * -direction
-            DebridStreamSortKey.RELEASE_GROUP -> left.releaseGroup.compareTo(right.releaseGroup, ignoreCase = true)
-        }
-    }
-
-    private fun streamFacts(stream: StreamItem, preferences: DebridStreamPreferences): StreamFacts {
+    fun facts(stream: StreamItem, preferences: DebridStreamPreferences): DebridStreamFacts {
         val parsed = stream.clientResolve?.stream?.raw?.parsed
         val searchText = streamSearchText(stream)
         val resolution = streamResolution(parsed?.resolution, parsed?.quality, searchText)
@@ -216,7 +234,7 @@ object DirectDebridStreamFilter {
             DebridStreamLanguage.entries.filter { searchText.hasToken(it.code) }
         }
         val releaseGroup = parsed?.group?.takeIf { it.isNotBlank() } ?: releaseGroupFromText(searchText)
-        return StreamFacts(
+        return DebridStreamFacts(
             resolution = resolution,
             quality = quality,
             visualTags = visualTags,
@@ -276,9 +294,9 @@ object DirectDebridStreamFilter {
         val text = (parsedHdr + searchText).joinToString(" ").lowercase()
         val tags = mutableListOf<DebridStreamVisualTag>()
         val hasDv = parsedHdr.any { it.isDolbyVisionToken() } ||
-            Regex("(^|[^a-z0-9])(dv|dovi|dolby[ ._-]?vision)([^a-z0-9]|$)").containsMatchIn(searchText)
+            Regex("(^|[^a-z0-9])(dv|dovi|dolby[ ._-]?vision)([^a-z0-9]|\$)").containsMatchIn(searchText)
         val hasHdr = parsedHdr.any { it.isHdrToken() } ||
-            Regex("(^|[^a-z0-9])(hdr|hdr10|hdr10plus|hdr10\\+|hlg)([^a-z0-9]|$)").containsMatchIn(searchText)
+            Regex("(^|[^a-z0-9])(hdr|hdr10|hdr10plus|hdr10\\+|hlg)([^a-z0-9]|\$)").containsMatchIn(searchText)
         if (hasDv && hasHdr) tags += DebridStreamVisualTag.HDR_DV
         if (hasDv && !hasHdr) tags += DebridStreamVisualTag.DV_ONLY
         if (hasHdr && !hasDv) tags += DebridStreamVisualTag.HDR_ONLY
@@ -380,7 +398,9 @@ object DirectDebridStreamFilter {
     }
 
     private fun streamSize(stream: StreamItem): Long? =
-        stream.clientResolve?.stream?.raw?.size ?: stream.behaviorHints.videoSize
+        stream.clientResolve?.stream?.raw?.size
+            ?: stream.behaviorHints.videoSize
+            ?: stream.debridCacheStatus?.cachedSize
 
     private fun streamSearchText(stream: StreamItem): String {
         val resolve = stream.clientResolve
@@ -390,6 +410,8 @@ object DirectDebridStreamFilter {
             stream.name,
             stream.title,
             stream.description,
+            stream.behaviorHints.filename,
+            stream.debridCacheStatus?.cachedName,
             resolve?.torrentName,
             resolve?.filename,
             raw?.torrentName,
@@ -401,25 +423,25 @@ object DirectDebridStreamFilter {
             parsed?.audio?.joinToString(" "),
         ).joinToString(" ").lowercase()
     }
-
-    private fun Int.gigabytes(): Long = this * 1_000_000_000L
-
-    private data class StreamFacts(
-        val resolution: DebridStreamResolution,
-        val quality: DebridStreamQuality,
-        val visualTags: List<DebridStreamVisualTag>,
-        val audioTags: List<DebridStreamAudioTag>,
-        val audioChannels: List<DebridStreamAudioChannel>,
-        val encode: DebridStreamEncode,
-        val languages: List<DebridStreamLanguage>,
-        val releaseGroup: String,
-        val size: Long?,
-        val resolutionRank: Int,
-        val qualityRank: Int,
-        val visualRank: Int,
-        val audioRank: Int,
-        val channelRank: Int,
-        val encodeRank: Int,
-        val languageRank: Int,
-    )
 }
+
+internal data class DebridStreamFacts(
+    val resolution: DebridStreamResolution,
+    val quality: DebridStreamQuality,
+    val visualTags: List<DebridStreamVisualTag>,
+    val audioTags: List<DebridStreamAudioTag>,
+    val audioChannels: List<DebridStreamAudioChannel>,
+    val encode: DebridStreamEncode,
+    val languages: List<DebridStreamLanguage>,
+    val releaseGroup: String,
+    val size: Long?,
+    val resolutionRank: Int,
+    val qualityRank: Int,
+    val visualRank: Int,
+    val audioRank: Int,
+    val channelRank: Int,
+    val encodeRank: Int,
+    val languageRank: Int,
+)
+
+private fun Int.gigabytes(): Long = this * 1_000_000_000L

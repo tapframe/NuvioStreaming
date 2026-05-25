@@ -62,7 +62,6 @@ import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.TraktListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
-import com.nuvio.app.features.debrid.DirectDebridStreamSource
 import com.nuvio.app.features.details.components.DetailActionButtons
 import com.nuvio.app.features.details.components.CommentDetailSheet
 import com.nuvio.app.features.details.components.DetailAdditionalInfoSection
@@ -76,11 +75,13 @@ import com.nuvio.app.features.details.components.DetailProductionSection
 import com.nuvio.app.features.details.components.DetailSeriesContent
 import com.nuvio.app.features.details.components.DetailTrailersSection
 import com.nuvio.app.features.details.components.EpisodeWatchedActionSheet
+import com.nuvio.app.features.details.components.SeasonWatchedActionSheet
 import com.nuvio.app.features.details.components.TrailerPlayerPopup
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.streams.AddonStreamWarmupRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
@@ -93,6 +94,7 @@ import com.nuvio.app.features.trailer.TrailerPlaybackResolver
 import com.nuvio.app.features.trailer.TrailerPlaybackSource
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watched.previousReleasedEpisodesBefore
+import com.nuvio.app.features.watched.releasedPlayableEpisodes
 import com.nuvio.app.features.watched.releasedEpisodesForSeason
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
@@ -152,6 +154,7 @@ fun MetaDetailsScreen(
     var autoLoadAttempted by remember(type, id) { mutableStateOf(false) }
     var observedOfflineState by remember(type, id) { mutableStateOf(false) }
     var selectedEpisodeForActions by remember(type, id) { mutableStateOf<MetaVideo?>(null) }
+    var selectedSeasonForActions by remember(type, id) { mutableStateOf<Int?>(null) }
     val commentsEnabled by remember {
         TraktCommentsSettings.ensureLoaded()
         TraktCommentsSettings.enabled
@@ -338,7 +341,26 @@ fun MetaDetailsScreen(
                         LibraryRepository.toggleSaved(meta.toLibraryItem(savedAtEpochMs = 0L))
                     }
                 }
-                val movieProgress = watchProgressUiState.byVideoId[meta.id]
+                val progressByVideoId = remember(watchProgressUiState.entries) {
+                    watchProgressUiState.byVideoId
+                }
+                LaunchedEffect(
+                    meta.id,
+                    meta.type,
+                    todayIsoDate,
+                    watchedUiState.isLoaded,
+                    watchProgressUiState.hasLoadedRemoteProgress,
+                    watchedUiState.watchedKeys,
+                    watchProgressUiState.entries,
+                ) {
+                    if (watchedUiState.isLoaded && watchProgressUiState.hasLoadedRemoteProgress) {
+                        WatchingActions.reconcileSeriesWatchedState(
+                            meta = meta,
+                            todayIsoDate = todayIsoDate,
+                        )
+                    }
+                }
+                val movieProgress = progressByVideoId[meta.id]
                     ?.takeUnless { it.isCompleted }
                 val cwPrefs by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
                 val seriesAction = remember(watchProgressUiState.entries, watchedUiState.items, meta, todayIsoDate, cwPrefs.upNextFromFurthestEpisode) {
@@ -373,15 +395,28 @@ fun MetaDetailsScreen(
                     seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
                 }
                 val hasEpisodes = meta.videos.any { it.season != null || it.episode != null }
-                val debridPreloadVideoId = remember(meta.id, meta.type, hasEpisodes, seriesStreamVideoId, seriesAction?.videoId) {
-                    if (meta.isSeriesLikeForDebridPreload(hasEpisodes)) {
-                        seriesStreamVideoId ?: seriesAction?.videoId ?: meta.id
+                val debridWarmupTarget = remember(meta.id, meta.type, hasEpisodes, seriesStreamVideoId, seriesAction) {
+                    if (meta.isSeriesLikeForDebridWarmup(hasEpisodes)) {
+                        DetailDebridWarmupTarget(
+                            videoId = seriesStreamVideoId ?: seriesAction?.videoId ?: meta.id,
+                            season = seriesAction?.seasonNumber,
+                            episode = seriesAction?.episodeNumber,
+                        )
                     } else {
-                        meta.id
+                        DetailDebridWarmupTarget(
+                            videoId = meta.id,
+                            season = null,
+                            episode = null,
+                        )
                     }
                 }
-                LaunchedEffect(meta.type, debridPreloadVideoId) {
-                    DirectDebridStreamSource.preloadStreams(meta.type, debridPreloadVideoId)
+                LaunchedEffect(meta.type, debridWarmupTarget) {
+                    AddonStreamWarmupRepository.preload(
+                        type = meta.type,
+                        videoId = debridWarmupTarget.videoId,
+                        season = debridWarmupTarget.season,
+                        episode = debridWarmupTarget.episode,
+                    )
                 }
                 val hasProductionSection = remember(meta) {
                     meta.productionCompanies.isNotEmpty() || meta.networks.isNotEmpty()
@@ -726,11 +761,12 @@ fun MetaDetailsScreen(
                                     },
                                     onCommentClick = { review -> selectedComment = review },
                                     onTrailerClick = resolveTrailer,
-                                    progressByVideoId = watchProgressUiState.byVideoId,
+                                    progressByVideoId = progressByVideoId,
                                     watchedKeys = watchedUiState.watchedKeys,
                                     blurUnwatchedEpisodes = metaScreenSettingsUiState.blurUnwatchedEpisodes,
                                     onEpisodeClick = onEpisodePlayClick,
                                     onEpisodeLongPress = { video -> selectedEpisodeForActions = video },
+                                    onSeasonLongPress = { season -> selectedSeasonForActions = season },
                                     onOpenMeta = onOpenMeta,
                                     onCastClick = onCastClick,
                                     onCompanyClick = onCompanyClick,
@@ -787,12 +823,12 @@ fun MetaDetailsScreen(
                         )
 
                         selectedEpisodeForActions?.let { selectedEpisode ->
-                            val isSelectedEpisodeWatched = remember(meta, selectedEpisode, watchedUiState.watchedKeys) {
-                                WatchingState.isEpisodeWatched(
-                                    watchedKeys = watchedUiState.watchedKeys,
-                                    metaType = meta.type,
-                                    metaId = meta.id,
+                            val isSelectedEpisodeWatched = remember(meta, selectedEpisode, watchedUiState.watchedKeys, progressByVideoId) {
+                                isEpisodeWatchedForActions(
+                                    meta = meta,
                                     episode = selectedEpisode,
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    progressByVideoId = progressByVideoId,
                                 )
                             }
                             val previousEpisodes = remember(meta, selectedEpisode, todayIsoDate) {
@@ -807,20 +843,20 @@ fun MetaDetailsScreen(
                                     todayIsoDate = todayIsoDate,
                                 )
                             }
-                            val arePreviousEpisodesWatched = remember(previousEpisodes, watchedUiState.watchedKeys) {
-                                WatchingState.areEpisodesWatched(
-                                    watchedKeys = watchedUiState.watchedKeys,
-                                    metaType = meta.type,
-                                    metaId = meta.id,
+                            val arePreviousEpisodesWatched = remember(previousEpisodes, watchedUiState.watchedKeys, progressByVideoId) {
+                                areEpisodesWatchedForActions(
+                                    meta = meta,
                                     episodes = previousEpisodes,
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    progressByVideoId = progressByVideoId,
                                 )
                             }
-                            val isSeasonWatched = remember(seasonEpisodes, watchedUiState.watchedKeys) {
-                                WatchingState.areEpisodesWatched(
-                                    watchedKeys = watchedUiState.watchedKeys,
-                                    metaType = meta.type,
-                                    metaId = meta.id,
+                            val isSeasonWatched = remember(seasonEpisodes, watchedUiState.watchedKeys, progressByVideoId) {
+                                areEpisodesWatchedForActions(
+                                    meta = meta,
                                     episodes = seasonEpisodes,
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    progressByVideoId = progressByVideoId,
                                 )
                             }
                             EpisodeWatchedActionSheet(
@@ -857,6 +893,62 @@ fun MetaDetailsScreen(
                                 showPlayManually = showManualPlayOption,
                                 onPlayManually = {
                                     onEpisodeManualPlayClick(selectedEpisode)
+                                },
+                            )
+                        }
+
+                        selectedSeasonForActions?.let { selectedSeason ->
+                            val seasonLabel = selectedSeasonLabel(selectedSeason)
+                            val seasonEpisodes = remember(meta, selectedSeason, todayIsoDate) {
+                                meta.releasedEpisodesForSeason(
+                                    seasonNumber = selectedSeason,
+                                    todayIsoDate = todayIsoDate,
+                                )
+                            }
+                            val previousSeasonEpisodes = remember(meta, selectedSeason, todayIsoDate) {
+                                val normalizedSelectedSeason = selectedSeason.coerceAtLeast(0)
+                                meta.releasedPlayableEpisodes(todayIsoDate)
+                                    .filter { episode ->
+                                        val season = episode.season?.coerceAtLeast(0) ?: 0
+                                        season > 0 && season < normalizedSelectedSeason
+                                    }
+                            }
+                            val isSeasonWatched = remember(seasonEpisodes, watchedUiState.watchedKeys, progressByVideoId) {
+                                areEpisodesWatchedForActions(
+                                    meta = meta,
+                                    episodes = seasonEpisodes,
+                                    watchedKeys = watchedUiState.watchedKeys,
+                                    progressByVideoId = progressByVideoId,
+                                )
+                            }
+                            val canMarkPreviousSeasons = remember(previousSeasonEpisodes, watchedUiState.watchedKeys, progressByVideoId) {
+                                previousSeasonEpisodes.any { episode ->
+                                    !isEpisodeWatchedForActions(
+                                        meta = meta,
+                                        episode = episode,
+                                        watchedKeys = watchedUiState.watchedKeys,
+                                        progressByVideoId = progressByVideoId,
+                                    )
+                                }
+                            }
+                            SeasonWatchedActionSheet(
+                                seasonLabel = seasonLabel,
+                                isSeasonWatched = isSeasonWatched,
+                                canMarkPreviousSeasons = canMarkPreviousSeasons,
+                                onDismiss = { selectedSeasonForActions = null },
+                                onToggleSeasonWatched = {
+                                    WatchingActions.toggleSeasonWatched(
+                                        meta = meta,
+                                        episodes = seasonEpisodes,
+                                        areCurrentlyWatched = isSeasonWatched,
+                                    )
+                                },
+                                onMarkPreviousSeasonsWatched = {
+                                    WatchingActions.togglePreviousEpisodesWatched(
+                                        meta = meta,
+                                        episodes = previousSeasonEpisodes,
+                                        areCurrentlyWatched = false,
+                                    )
                                 },
                             )
                         }
@@ -981,6 +1073,49 @@ private fun MetaDetails.isSeriesLikeForEpisodeRatings(): Boolean {
     return hasNumberedEpisodes && normalizedType in setOf("series", "show", "tv", "tvshow")
 }
 
+@Composable
+private fun selectedSeasonLabel(season: Int): String =
+    if (season == 0) {
+        stringResource(Res.string.episodes_specials)
+    } else {
+        stringResource(Res.string.episodes_season, season)
+    }
+
+private fun isEpisodeWatchedForActions(
+    meta: MetaDetails,
+    episode: MetaVideo,
+    watchedKeys: Set<String>,
+    progressByVideoId: Map<String, WatchProgressEntry>,
+): Boolean {
+    val episodeVideoId = buildPlaybackVideoId(
+        parentMetaId = meta.id,
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
+        fallbackVideoId = episode.id,
+    )
+    return progressByVideoId[episodeVideoId]?.isEffectivelyCompleted == true ||
+        WatchingState.isEpisodeWatched(
+            watchedKeys = watchedKeys,
+            metaType = meta.type,
+            metaId = meta.id,
+            episode = episode,
+        )
+}
+
+private fun areEpisodesWatchedForActions(
+    meta: MetaDetails,
+    episodes: Collection<MetaVideo>,
+    watchedKeys: Set<String>,
+    progressByVideoId: Map<String, WatchProgressEntry>,
+): Boolean = episodes.isNotEmpty() && episodes.all { episode ->
+    isEpisodeWatchedForActions(
+        meta = meta,
+        episode = episode,
+        watchedKeys = watchedKeys,
+        progressByVideoId = progressByVideoId,
+    )
+}
+
 private fun extractImdbId(value: String?): String? =
     value
         ?.trim()
@@ -1037,6 +1172,7 @@ private fun ConfiguredMetaSections(
     blurUnwatchedEpisodes: Boolean,
     onEpisodeClick: (MetaVideo) -> Unit,
     onEpisodeLongPress: (MetaVideo) -> Unit,
+    onSeasonLongPress: (Int) -> Unit,
     onOpenMeta: ((MetaPreview) -> Unit)?,
     onCastClick: ((MetaPerson, String?) -> Unit)?,
     onCompanyClick: ((MetaCompany, String) -> Unit)?,
@@ -1131,6 +1267,7 @@ private fun ConfiguredMetaSections(
                         blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                         onEpisodeClick = onEpisodeClick,
                         onEpisodeLongPress = onEpisodeLongPress,
+                        onSeasonLongPress = onSeasonLongPress,
                     )
                 }
             }
@@ -1271,7 +1408,13 @@ private fun detailTabletContentMaxWidth(maxWidth: Dp, isTablet: Boolean): Dp =
         (maxWidth * 0.6f).coerceIn(520.dp, 680.dp)
     }
 
-private fun MetaDetails.isSeriesLikeForDebridPreload(hasEpisodes: Boolean): Boolean =
+private data class DetailDebridWarmupTarget(
+    val videoId: String,
+    val season: Int?,
+    val episode: Int?,
+)
+
+private fun MetaDetails.isSeriesLikeForDebridWarmup(hasEpisodes: Boolean): Boolean =
     hasEpisodes || type.equals("series", ignoreCase = true) ||
         type.equals("show", ignoreCase = true) ||
         type.equals("tv", ignoreCase = true)

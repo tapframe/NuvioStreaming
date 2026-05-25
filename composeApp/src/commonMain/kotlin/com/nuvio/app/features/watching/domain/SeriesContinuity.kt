@@ -41,6 +41,7 @@ fun nextReleasedEpisodeAfter(
     seasonNumber: Int?,
     episodeNumber: Int?,
     todayIsoDate: String,
+    showUnairedNextUp: Boolean = false,
 ): WatchingReleasedEpisode? {
     val sortedEpisodes = episodes.sortedWith(
         compareBy<WatchingReleasedEpisode>({ normalizeSeasonNumber(it.seasonNumber) }, { it.episodeNumber ?: 0 }),
@@ -76,7 +77,7 @@ fun nextReleasedEpisodeAfter(
                 candidateSeasonNumber = episode.seasonNumber,
                 todayIsoDate = todayIsoDate,
                 releasedDate = episode.releasedDate,
-                showUnairedNextUp = false,
+                showUnairedNextUp = showUnairedNextUp,
             )
         }
     return candidates.firstOrNull { normalizeSeasonNumber(it.seasonNumber) > 0 }
@@ -89,6 +90,7 @@ fun decideSeriesPrimaryAction(
     watchedRecords: List<WatchingWatchedRecord>,
     todayIsoDate: String,
     preferFurthestEpisode: Boolean = true,
+    showUnairedNextUp: Boolean = false,
 ): WatchingSeriesPrimaryAction? {
     val resumeRecord = resumeProgressForSeries(
         content = content,
@@ -112,6 +114,7 @@ fun decideSeriesPrimaryAction(
             seasonNumber = latestCompletedEpisode.seasonNumber,
             episodeNumber = latestCompletedEpisode.episodeNumber,
             todayIsoDate = todayIsoDate,
+            showUnairedNextUp = showUnairedNextUp,
         )
     } else {
         val sorted = episodes

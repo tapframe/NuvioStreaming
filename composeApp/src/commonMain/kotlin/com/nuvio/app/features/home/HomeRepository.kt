@@ -2,6 +2,7 @@ package com.nuvio.app.features.home
 
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.catalog.fetchCatalogPage
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionRepository
@@ -41,7 +42,8 @@ object HomeRepository {
     private var lastErrorMessage: String? = null
 
     fun refresh(addons: List<ManagedAddon>, force: Boolean = false) {
-        val requests = buildHomeCatalogDefinitions(addons)
+        val activeAddons = addons.enabledAddons()
+        val requests = buildHomeCatalogDefinitions(activeAddons)
         currentDefinitions = requests
         val requestKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::key)
         cachedSections = cachedSections.filterKeys(requestKeys::contains)
@@ -71,7 +73,7 @@ object HomeRepository {
                 requestKey = requestKey,
             )
             ensureCollectionHeroFallback(
-                addons = addons,
+                addons = activeAddons,
                 force = force,
                 requestKey = requestKey,
             )
@@ -135,7 +137,7 @@ object HomeRepository {
                 requestKey = requestKey,
             )
             ensureCollectionHeroFallback(
-                addons = addons,
+                addons = activeAddons,
                 force = force,
                 requestKey = requestKey,
             )
@@ -148,7 +150,7 @@ object HomeRepository {
             requestKey = activeRequestKey ?: lastRequestKey,
         )
         ensureCollectionHeroFallback(
-            addons = AddonRepository.uiState.value.addons,
+            addons = AddonRepository.uiState.value.addons.enabledAddons(),
             force = false,
             requestKey = activeRequestKey ?: lastRequestKey,
         )

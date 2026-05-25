@@ -11,6 +11,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
@@ -31,10 +32,11 @@ fun HomescreenSettingsScreen(
 ) {
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val homescreenCatalogRefreshKey = remember(addonsUiState.addons) {
-        val allManifestsSettled = addonsUiState.addons.isNotEmpty() &&
-            addonsUiState.addons.none { it.isRefreshing }
+        val enabledAddons = addonsUiState.addons.enabledAddons()
+        val allManifestsSettled = enabledAddons.isNotEmpty() &&
+            enabledAddons.none { it.isRefreshing }
         if (!allManifestsSettled) return@remember emptyList<String>()
-        addonsUiState.addons.mapNotNull { addon ->
+        enabledAddons.mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             buildString {
                 append(manifest.transportUrl)
@@ -58,7 +60,7 @@ fun HomescreenSettingsScreen(
 
     LaunchedEffect(homescreenCatalogRefreshKey) {
         if (homescreenCatalogRefreshKey.isEmpty()) return@LaunchedEffect
-        HomeCatalogSettingsRepository.syncCatalogs(addonsUiState.addons)
+        HomeCatalogSettingsRepository.syncCatalogs(addonsUiState.addons.enabledAddons())
     }
 
     LaunchedEffect(collections) {

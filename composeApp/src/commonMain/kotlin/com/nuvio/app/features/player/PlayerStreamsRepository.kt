@@ -4,14 +4,18 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.debrid.DebridStreamPresentation
 import com.nuvio.app.features.debrid.DirectDebridStreamPreparer
-import com.nuvio.app.features.debrid.DirectDebridStreamSource
+import com.nuvio.app.features.debrid.LocalDebridAvailabilityService
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginRuntimeResult
 import com.nuvio.app.features.plugins.PluginScraper
+import com.nuvio.app.features.streams.AddonStreamWarmupRepository
 import com.nuvio.app.features.streams.AddonStreamGroup
 import com.nuvio.app.features.streams.StreamAutoPlaySelector
 import com.nuvio.app.features.streams.StreamItem
@@ -155,11 +159,11 @@ object PlayerStreamsRepository {
             return
         }
 
-        val installedAddons = AddonRepository.uiState.value.addons
+        val installedAddons = AddonRepository.uiState.value.addons.enabledAddons()
         val installedAddonNames = installedAddons.map { it.displayTitle }.toSet()
         PlayerSettingsRepository.ensureLoaded()
         val playerSettings = PlayerSettingsRepository.uiState.value
-        val debridTargets = DirectDebridStreamSource.configuredTargets()
+        val debridSettings = DebridSettingsRepository.snapshot()
         val pluginScrapers = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
             PluginRepository.getEnabledScrapersForType(type)
@@ -167,7 +171,7 @@ object PlayerStreamsRepository {
             emptyList()
         }
 
-        if (installedAddons.isEmpty() && pluginScrapers.isEmpty() && debridTargets.isEmpty()) {
+        if (installedAddons.isEmpty() && pluginScrapers.isEmpty()) {
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoAddonsInstalled,
@@ -193,7 +197,7 @@ object PlayerStreamsRepository {
                 )
             }
 
-        if (streamAddons.isEmpty() && pluginScrapers.isEmpty() && debridTargets.isEmpty()) {
+        if (streamAddons.isEmpty() && pluginScrapers.isEmpty()) {
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoCompatibleAddons,
@@ -202,8 +206,13 @@ object PlayerStreamsRepository {
         }
 
         val installedAddonOrder = streamAddons.map { it.addonName }
+        val warmedAddonGroups = AddonStreamWarmupRepository
+            .cachedGroups(type = type, videoId = videoId, season = season, episode = episode)
+            .orEmpty()
+            .associateBy { it.addonId }
+        val warmedAddonIds = warmedAddonGroups.keys
         val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
-            AddonStreamGroup(
+            warmedAddonGroups[addon.addonId] ?: AddonStreamGroup(
                 addonName = addon.addonName,
                 addonId = addon.addonId,
                 streams = emptyList(),
@@ -216,22 +225,73 @@ object PlayerStreamsRepository {
                 streams = emptyList(),
                 isLoading = true,
             )
-        } + debridTargets.map { target ->
-            AddonStreamGroup(
-                addonName = target.addonName,
-                addonId = target.addonId,
-                streams = emptyList(),
-                isLoading = true,
-            )
         }, installedAddonOrder)
+        val isInitiallyLoading = initialGroups.any { it.isLoading }
         stateFlow.value = StreamsUiState(
             groups = initialGroups,
             activeAddonIds = initialGroups.map { it.addonId }.toSet(),
-            isAnyLoading = true,
+            isAnyLoading = isInitiallyLoading,
         )
 
         val job = scope.launch {
-            val addonJobs = streamAddons.map { addon ->
+            val pendingStreamAddons = streamAddons.filterNot { it.addonId in warmedAddonIds }
+            val installedAddonIds = streamAddons.map { it.addonId }.toSet()
+            val debridAvailabilityJobs = mutableListOf<Job>()
+            fun emptyStateReason(groups: List<AddonStreamGroup>, anyLoading: Boolean) =
+                if (!anyLoading && groups.all { it.streams.isEmpty() }) {
+                    if (groups.all { !it.error.isNullOrBlank() }) {
+                        com.nuvio.app.features.streams.StreamsEmptyStateReason.StreamFetchFailed
+                    } else {
+                        com.nuvio.app.features.streams.StreamsEmptyStateReason.NoStreamsFound
+                    }
+                } else {
+                    null
+                }
+
+            fun presentDebridGroup(group: AddonStreamGroup): AddonStreamGroup =
+                DebridStreamPresentation.apply(
+                    groups = listOf(group),
+                    settings = debridSettings,
+                ).firstOrNull() ?: group
+
+            fun publishStreamGroup(group: AddonStreamGroup) {
+                stateFlow.update { current ->
+                    val updated = StreamAutoPlaySelector.orderAddonStreams(
+                        groups = current.groups.map { currentGroup ->
+                            if (currentGroup.addonId == group.addonId) group else currentGroup
+                        },
+                        installedOrder = installedAddonOrder,
+                    )
+                    val anyLoading = updated.any { it.isLoading }
+                    current.copy(
+                        groups = updated,
+                        isAnyLoading = anyLoading,
+                        emptyStateReason = emptyStateReason(updated, anyLoading),
+                    )
+                }
+            }
+
+            fun launchDebridAvailability(group: AddonStreamGroup) {
+                if (group.addonId !in installedAddonIds || group.streams.isEmpty()) return
+
+                val eligibleGroupIds = setOf(group.addonId)
+                val checkingGroup = LocalDebridAvailabilityService.markChecking(
+                    groups = listOf(group),
+                    eligibleGroupIds = eligibleGroupIds,
+                ).firstOrNull() ?: group
+                publishStreamGroup(checkingGroup)
+
+                val availabilityJob = launch {
+                    val availabilityGroup = LocalDebridAvailabilityService.annotateCachedAvailability(
+                        groups = listOf(checkingGroup),
+                        eligibleGroupIds = eligibleGroupIds,
+                    ).firstOrNull() ?: checkingGroup
+                    publishStreamGroup(presentDebridGroup(availabilityGroup))
+                }
+                debridAvailabilityJobs += availabilityJob
+            }
+
+            val addonJobs = pendingStreamAddons.map { addon ->
                 async {
                     val url = buildAddonResourceUrl(
                         manifestUrl = addon.manifest.transportUrl,
@@ -291,64 +351,40 @@ object PlayerStreamsRepository {
                 }
             }
 
-            val debridJobs = debridTargets.map { target ->
-                async {
-                    DirectDebridStreamSource.fetchProviderStreams(
-                        type = type,
-                        videoId = videoId,
-                        target = target,
-                    )
-                }
-            }
-
-            val jobs = addonJobs + pluginJobs + debridJobs
+            val jobs = addonJobs + pluginJobs
             val completions = Channel<AddonStreamGroup>(capacity = Channel.BUFFERED)
             jobs.forEach { deferred ->
                 launch {
                     completions.send(deferred.await())
                 }
             }
-            var debridPreparationLaunched = false
             repeat(jobs.size) {
                 val result = completions.receive()
-                stateFlow.update { current ->
-                    val updated = StreamAutoPlaySelector.orderAddonStreams(
-                        groups = current.groups.map { g -> if (g.addonId == result.addonId) result else g },
-                        installedOrder = installedAddonOrder,
-                    )
-                    val anyLoading = updated.any { it.isLoading }
-                    current.copy(
-                        groups = updated,
-                        isAnyLoading = anyLoading,
-                        emptyStateReason = if (!anyLoading && updated.all { it.streams.isEmpty() }) {
-                            if (updated.all { !it.error.isNullOrBlank() }) {
-                                com.nuvio.app.features.streams.StreamsEmptyStateReason.StreamFetchFailed
-                            } else {
-                                com.nuvio.app.features.streams.StreamsEmptyStateReason.NoStreamsFound
-                            }
-                        } else null,
-                    )
-                }
-                if (!debridPreparationLaunched && result.streams.any { it.isDirectDebridStream }) {
-                    debridPreparationLaunched = true
-                    launch {
-                        DirectDebridStreamPreparer.prepare(
-                            streams = stateFlow.value.groups.flatMap { it.streams },
-                            season = season,
-                            episode = episode,
-                            playerSettings = playerSettings,
-                            installedAddonNames = installedAddonNames,
-                        ) { original, prepared ->
-                            stateFlow.update { current ->
-                                current.copy(
-                                    groups = DirectDebridStreamPreparer.replacePreparedStream(
-                                        groups = current.groups,
-                                        original = original,
-                                        prepared = prepared,
-                                    ),
-                                )
-                            }
-                        }
+                publishStreamGroup(result)
+                launchDebridAvailability(result)
+            }
+            for (availabilityJob in debridAvailabilityJobs) {
+                availabilityJob.join()
+            }
+            launch {
+                DirectDebridStreamPreparer.prepare(
+                    streams = stateFlow.value.groups
+                        .filter { it.addonId in installedAddonIds }
+                        .flatMap { it.streams },
+                    season = season,
+                    episode = episode,
+                    playerSettings = playerSettings,
+                    installedAddonNames = installedAddonNames,
+                ) { original, prepared ->
+                    stateFlow.update { current ->
+                        current.copy(
+                            groups = DirectDebridStreamPreparer.replacePreparedStream(
+                                groups = current.groups,
+                                original = original,
+                                prepared = prepared,
+                                eligibleGroupIds = installedAddonIds,
+                            ),
+                        )
                     }
                 }
             }

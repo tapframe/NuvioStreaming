@@ -2,7 +2,9 @@ package com.nuvio.app.features.streams
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class StreamAutoPlaySelectorTest {
 
@@ -167,26 +169,117 @@ class StreamAutoPlaySelectorTest {
         assertEquals(directDebrid, selected)
     }
 
+    @Test
+    fun `timeout evaluation keeps pending regex debrid candidate open`() {
+        val pending = stream(
+            addonName = "Torrentio",
+            name = "The Show 1080p",
+            infoHash = "hash-pending",
+            cacheState = StreamDebridCacheState.CHECKING,
+        )
+
+        val evaluation = StreamAutoPlaySelector.evaluateAutoPlayStream(
+            streams = listOf(pending),
+            mode = StreamAutoPlayMode.REGEX_MATCH,
+            regexPattern = "1080p",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("Torrentio"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            debridEnabled = true,
+            activeResolverProviderId = "premiumize",
+        )
+
+        assertNull(evaluation.stream)
+        assertTrue(evaluation.hasPendingDebridCandidate)
+    }
+
+    @Test
+    fun `timeout evaluation still selects direct link while debrid candidate is pending`() {
+        val pending = stream(
+            addonName = "Torrentio",
+            name = "The Show 1080p",
+            infoHash = "hash-pending",
+            cacheState = StreamDebridCacheState.CHECKING,
+        )
+        val direct = stream(
+            addonName = "Direct Addon",
+            url = "https://example.com/video.mp4",
+            name = "The Show 1080p",
+        )
+
+        val evaluation = StreamAutoPlaySelector.evaluateAutoPlayStream(
+            streams = listOf(pending, direct),
+            mode = StreamAutoPlayMode.REGEX_MATCH,
+            regexPattern = "1080p",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("Torrentio", "Direct Addon"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            debridEnabled = true,
+            activeResolverProviderId = "premiumize",
+        )
+
+        assertEquals(direct, evaluation.stream)
+        assertFalse(evaluation.hasPendingDebridCandidate)
+    }
+
+    @Test
+    fun `direct debrid candidate must match active resolver`() {
+        val torbox = stream(
+            addonName = "Comet",
+            name = "TB Instant",
+            directDebrid = true,
+            directDebridService = "torbox",
+        )
+
+        val evaluation = StreamAutoPlaySelector.evaluateAutoPlayStream(
+            streams = listOf(torbox),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("Comet"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+            debridEnabled = true,
+            activeResolverProviderId = "premiumize",
+        )
+
+        assertNull(evaluation.stream)
+        assertFalse(evaluation.hasPendingDebridCandidate)
+    }
+
     private fun stream(
         addonName: String,
         url: String? = null,
         name: String? = null,
         bingeGroup: String? = null,
         directDebrid: Boolean = false,
+        directDebridService: String = "torbox",
+        infoHash: String? = null,
+        cacheState: StreamDebridCacheState? = null,
     ): StreamItem = StreamItem(
         name = name,
         url = url,
+        infoHash = infoHash,
         addonName = addonName,
-        addonId = addonName,
+        addonId = "addon:$addonName",
         clientResolve = if (directDebrid) {
             StreamClientResolve(
                 type = "debrid",
-                service = "torbox",
+                service = directDebridService,
                 isCached = true,
                 infoHash = "hash",
             )
         } else {
             null
+        },
+        debridCacheStatus = cacheState?.let { state ->
+            StreamDebridCacheStatus(
+                providerId = "premiumize",
+                providerName = "Premiumize",
+                state = state,
+            )
         },
         behaviorHints = StreamBehaviorHints(
             bingeGroup = bingeGroup,

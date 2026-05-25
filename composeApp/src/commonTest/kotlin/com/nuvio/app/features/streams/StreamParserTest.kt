@@ -158,7 +158,7 @@ class StreamParserTest {
                   ]
                 }
                 """.trimIndent(),
-            addonName = "Direct Debrid",
+            addonName = "Debrid Fixture",
             addonId = "debrid:torbox",
         )
 

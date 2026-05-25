@@ -19,6 +19,7 @@ import platform.Foundation.NSUserDefaults
 
 actual object AddonStorage {
     private const val addonUrlsKey = "installed_manifest_urls"
+    private const val addonEnabledStatesKey = "installed_manifest_enabled_states"
 
     actual fun loadInstalledAddonUrls(profileId: Int): List<String> =
         NSUserDefaults.standardUserDefaults
@@ -35,6 +36,34 @@ actual object AddonStorage {
             forKey = "${addonUrlsKey}_$profileId",
         )
     }
+
+    actual fun loadAddonEnabledStates(profileId: Int): Map<String, Boolean> =
+        NSUserDefaults.standardUserDefaults
+            .stringForKey("${addonEnabledStatesKey}_$profileId")
+            .orEmpty()
+            .lineSequence()
+            .mapNotNull(::parseEnabledStateLine)
+            .toMap()
+
+    actual fun saveAddonEnabledStates(profileId: Int, states: Map<String, Boolean>) {
+        val payload = states.entries.joinToString(separator = "\n") { (url, enabled) ->
+            "$url\t$enabled"
+        }
+        NSUserDefaults.standardUserDefaults.setObject(
+            payload,
+            forKey = "${addonEnabledStatesKey}_$profileId",
+        )
+    }
+}
+
+private fun parseEnabledStateLine(line: String): Pair<String, Boolean>? {
+    val url = line.substringBefore("\t").trim().takeIf { it.isNotEmpty() } ?: return null
+    val rawEnabled = line.substringAfter("\t", "true").trim().lowercase()
+    val enabled = when (rawEnabled) {
+        "false" -> false
+        else -> true
+    }
+    return url to enabled
 }
 
 private val addonHttpClient = HttpClient(Darwin) {

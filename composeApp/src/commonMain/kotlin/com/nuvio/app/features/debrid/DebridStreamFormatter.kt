@@ -1,21 +1,25 @@
 package com.nuvio.app.features.debrid
 
+import com.nuvio.app.features.debrid.DebridStreamPresentation.isManagedDebridStream
 import com.nuvio.app.features.streams.StreamClientResolve
 import com.nuvio.app.features.streams.StreamClientResolveParsed
+import com.nuvio.app.features.streams.StreamDebridCacheState
 import com.nuvio.app.features.streams.StreamItem
 
 class DebridStreamFormatter(
     private val engine: DebridStreamTemplateEngine = DebridStreamTemplateEngine(),
 ) {
     fun format(stream: StreamItem, settings: DebridSettings): StreamItem {
-        if (!stream.isDirectDebridStream) return stream
-        val values = buildValues(stream)
-        val formattedName = engine.render(settings.streamNameTemplate, values)
+        if (!stream.isManagedDebridStream) return stream
+        val values = buildValues(stream, settings)
+        val nameTemplate = settings.streamNameTemplate.ifBlank { DebridStreamFormatterDefaults.NAME_TEMPLATE }
+        val descriptionTemplate = settings.streamDescriptionTemplate.ifBlank { DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE }
+        val formattedName = engine.render(nameTemplate, values)
             .lineSequence()
             .joinToString(" ") { it.trim() }
             .replace(Regex("\\s+"), " ")
             .trim()
-        val formattedDescription = engine.render(settings.streamDescriptionTemplate, values)
+        val formattedDescription = engine.render(descriptionTemplate, values)
             .lineSequence()
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -23,23 +27,26 @@ class DebridStreamFormatter(
             .trim()
 
         return stream.copy(
-            name = formattedName.ifBlank { stream.name ?: DebridProviders.instantName(stream.clientResolve?.service) },
+            name = formattedName.ifBlank { stream.name ?: DebridProviders.displayName(serviceId(stream)) },
             description = formattedDescription.ifBlank { stream.description ?: stream.title },
         )
     }
 
-    private fun buildValues(stream: StreamItem): Map<String, Any?> {
+    private fun buildValues(stream: StreamItem, settings: DebridSettings): Map<String, Any?> {
         val resolve = stream.clientResolve
         val raw = resolve?.stream?.raw
         val parsed = raw?.parsed
+        val facts = DebridStreamMetadata.facts(
+            stream = stream,
+            preferences = DebridStreamMetadata.effectivePreferences(settings),
+        )
         val seasons = parsed?.seasons.orEmpty()
         val episodes = parsed?.episodes.orEmpty()
         val season = resolve?.season ?: seasons.singleOrFirstOrNull()
         val episode = resolve?.episode ?: episodes.singleOrFirstOrNull()
-        val visualTags = buildList {
-            addAll(parsed?.hdr.orEmpty())
-            parsed?.bitDepth?.takeIf { it.isNotBlank() }?.let { add(it) }
-        }
+        val visualTags = facts.visualTags.mapNotUnknown { it.label }
+        val audioTags = facts.audioTags.mapNotUnknown { it.label }
+        val audioChannels = facts.audioChannels.mapNotUnknown { it.label }
         val edition = parsed?.edition ?: buildEdition(parsed)
 
         return linkedMapOf(
@@ -52,45 +59,51 @@ class DebridStreamFormatter(
             "stream.seasonEpisode" to buildSeasonEpisodeList(season, episode, seasons, episodes),
             "stream.formattedEpisodes" to formatEpisodes(episodes),
             "stream.formattedSeasons" to formatSeasons(seasons),
-            "stream.resolution" to parsed?.resolution,
+            "stream.resolution" to facts.resolution.labelUnlessUnknown(),
             "stream.library" to false,
-            "stream.quality" to parsed?.quality,
+            "stream.quality" to facts.quality.labelUnlessUnknown(),
             "stream.visualTags" to visualTags,
-            "stream.audioTags" to parsed?.audio.orEmpty(),
-            "stream.audioChannels" to parsed?.channels.orEmpty(),
-            "stream.languages" to parsed?.languages.orEmpty(),
-            "stream.languageEmojis" to parsed?.languages.orEmpty().map { languageEmoji(it) },
-            "stream.size" to (raw?.size ?: stream.behaviorHints.videoSize)?.let(::DebridTemplateBytes),
+            "stream.audioTags" to audioTags,
+            "stream.audioChannels" to audioChannels,
+            "stream.languages" to languageValues(parsed, facts),
+            "stream.languageEmojis" to languageValues(parsed, facts).map { languageEmoji(it) },
+            "stream.size" to facts.size?.let(::DebridTemplateBytes),
             "stream.folderSize" to raw?.folderSize?.let(::DebridTemplateBytes),
-            "stream.encode" to parsed?.codec?.uppercase(),
-            "stream.indexer" to (raw?.indexer ?: raw?.tracker),
+            "stream.encode" to facts.encode.labelUnlessUnknown(),
+            "stream.indexer" to (raw?.indexer ?: raw?.tracker ?: stream.sourceName),
             "stream.network" to (parsed?.network ?: raw?.network),
-            "stream.releaseGroup" to parsed?.group,
+            "stream.releaseGroup" to facts.releaseGroup.takeIf { it.isNotBlank() },
             "stream.duration" to parsed?.duration,
             "stream.edition" to edition,
-            "stream.filename" to (raw?.filename ?: resolve?.filename ?: stream.behaviorHints.filename),
+            "stream.filename" to (raw?.filename ?: resolve?.filename ?: stream.behaviorHints.filename ?: stream.debridCacheStatus?.cachedName),
             "stream.regexMatched" to null,
-            "stream.type" to streamType(resolve),
-            "service.cached" to resolve?.isCached,
-            "service.shortName" to serviceShortName(resolve),
-            "service.name" to serviceName(resolve),
-            "addon.name" to "Nuvio Direct Debrid",
+            "stream.type" to streamType(stream, resolve),
+            "service.cached" to serviceCached(stream, resolve),
+            "service.shortName" to DebridProviders.shortName(serviceId(stream)),
+            "service.name" to DebridProviders.displayName(serviceId(stream)),
+            "addon.name" to stream.addonName,
         )
     }
 
-    private fun streamType(resolve: StreamClientResolve?): String =
+    private fun serviceId(stream: StreamItem): String? =
+        stream.debridCacheStatus?.providerId ?: stream.clientResolve?.service
+
+    private fun serviceCached(stream: StreamItem, resolve: StreamClientResolve?): Boolean? =
+        when (stream.debridCacheStatus?.state) {
+            StreamDebridCacheState.CACHED -> true
+            StreamDebridCacheState.NOT_CACHED -> false
+            StreamDebridCacheState.CHECKING,
+            StreamDebridCacheState.UNKNOWN,
+            null -> resolve?.isCached
+        }
+
+    private fun streamType(stream: StreamItem, resolve: StreamClientResolve?): String =
         when {
+            stream.debridCacheStatus != null -> "Debrid"
             resolve?.type.equals("debrid", ignoreCase = true) -> "Debrid"
             resolve?.type.equals("torrent", ignoreCase = true) -> "p2p"
             else -> resolve?.type.orEmpty()
         }
-
-    private fun serviceShortName(resolve: StreamClientResolve?): String =
-        resolve?.serviceExtension?.takeIf { it.isNotBlank() }
-            ?: DebridProviders.shortName(resolve?.service)
-
-    private fun serviceName(resolve: StreamClientResolve?): String =
-        DebridProviders.displayName(resolve?.service)
 
     private fun buildEdition(parsed: StreamClientResolveParsed?): String? {
         if (parsed == null) return null
@@ -124,6 +137,9 @@ class DebridStreamFormatter(
 
     private fun Int.twoDigits(): String = toString().padStart(2, '0')
 
+    private fun languageValues(parsed: StreamClientResolveParsed?, facts: DebridStreamFacts): List<String> =
+        parsed?.languages.orEmpty().ifEmpty { facts.languages.map { it.code } }
+
     private fun languageEmoji(language: String): String =
         when (language.lowercase()) {
             "en", "eng", "english" -> "GB"
@@ -140,4 +156,16 @@ class DebridStreamFormatter(
             "multi" -> "Multi"
             else -> language
         }
+
+    private inline fun <T> List<T>.mapNotUnknown(label: (T) -> String): List<String> =
+        map(label).filterNot { it.equals("Unknown", ignoreCase = true) }
+
+    private fun DebridStreamResolution.labelUnlessUnknown(): String? =
+        label.takeUnless { this == DebridStreamResolution.UNKNOWN }
+
+    private fun DebridStreamQuality.labelUnlessUnknown(): String? =
+        label.takeUnless { this == DebridStreamQuality.UNKNOWN }
+
+    private fun DebridStreamEncode.labelUnlessUnknown(): String? =
+        label.takeUnless { this == DebridStreamEncode.UNKNOWN }
 }

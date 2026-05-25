@@ -28,8 +28,12 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.features.cloud.PremiumizeCloudLibraryPosterUrl
+import com.nuvio.app.features.cloud.TorboxCloudLibraryPosterUrl
+import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.isIos
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
@@ -38,6 +42,8 @@ import org.jetbrains.compose.resources.stringResource
 private const val TmdbUrl = "https://www.themoviedb.org"
 private const val ImdbDatasetsUrl = "https://developer.imdb.com/non-commercial-datasets/"
 private const val TraktUrl = "https://trakt.tv"
+private const val PremiumizeUrl = "https://www.premiumize.me"
+private const val TorboxUrl = "https://torbox.app"
 private const val MdbListUrl = "https://mdblist.com"
 private const val IntroDbUrl = "https://introdb.app/"
 private const val NuvioRepositoryUrl = "https://github.com/NuvioMedia/NuvioMobile"
@@ -48,6 +54,7 @@ private data class AttributionItem(
     val titleRes: StringResource,
     val bodyRes: StringResource,
     val logo: IntegrationLogo?,
+    val logoUrl: String? = null,
     val link: String,
 )
 
@@ -165,14 +172,26 @@ private fun AttributionRow(
         body = stringResource(item.bodyRes),
         link = item.link,
         isTablet = isTablet,
-        leading = item.logo?.let { logo ->
-            {
-                IntegrationLogoImage(
-                    painter = integrationLogoPainter(logo),
-                    contentDescription = title,
-                    isTablet = isTablet,
-                )
+        leading = when {
+            item.logo != null -> item.logo.let { logo ->
+                {
+                    IntegrationLogoImage(
+                        painter = integrationLogoPainter(logo),
+                        contentDescription = title,
+                        isTablet = isTablet,
+                    )
+                }
             }
+            item.logoUrl != null -> item.logoUrl.let { logoUrl ->
+                {
+                    ProviderLogoImage(
+                        url = logoUrl,
+                        contentDescription = title,
+                        isTablet = isTablet,
+                    )
+                }
+            }
+            else -> null
         },
         onOpen = { uriHandler.openUri(item.link) },
     )
@@ -275,6 +294,22 @@ private fun IntegrationLogoImage(
 }
 
 @Composable
+private fun ProviderLogoImage(
+    url: String,
+    contentDescription: String,
+    isTablet: Boolean,
+) {
+    AsyncImage(
+        model = url,
+        contentDescription = contentDescription,
+        modifier = Modifier
+            .padding(top = 2.dp)
+            .size(if (isTablet) 46.dp else 40.dp),
+        contentScale = ContentScale.Fit,
+    )
+}
+
+@Composable
 private fun PlainStackDivider() {
     HorizontalDivider(
         thickness = 0.5.dp,
@@ -294,6 +329,20 @@ private fun attributionItems(): List<AttributionItem> = listOf(
         bodyRes = Res.string.settings_licenses_attributions_trakt_body,
         logo = IntegrationLogo.Trakt,
         link = TraktUrl,
+    ),
+    AttributionItem(
+        titleRes = Res.string.settings_licenses_attributions_premiumize_title,
+        bodyRes = Res.string.settings_licenses_attributions_premiumize_body,
+        logo = null,
+        logoUrl = PremiumizeCloudLibraryPosterUrl,
+        link = PremiumizeUrl,
+    ),
+    AttributionItem(
+        titleRes = Res.string.settings_licenses_attributions_torbox_title,
+        bodyRes = Res.string.settings_licenses_attributions_torbox_body,
+        logo = null,
+        logoUrl = cloudLibraryDisplayArtworkUrl(TorboxCloudLibraryPosterUrl),
+        link = TorboxUrl,
     ),
     AttributionItem(
         titleRes = Res.string.settings_licenses_attributions_mdblist_title,

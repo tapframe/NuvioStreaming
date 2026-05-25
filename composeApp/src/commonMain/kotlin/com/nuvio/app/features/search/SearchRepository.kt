@@ -5,6 +5,7 @@ import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.features.addons.AddonCatalog
 import com.nuvio.app.features.addons.AddonExtraProperty
 import com.nuvio.app.features.addons.ManagedAddon
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.catalog.CatalogPage
 import com.nuvio.app.features.catalog.buildCatalogUrl
 import com.nuvio.app.features.catalog.fetchCatalogPage
@@ -50,7 +51,7 @@ object SearchRepository {
             return
         }
 
-        val activeAddons = addons.filter { it.manifest != null }
+        val activeAddons = addons.enabledAddons().filter { it.manifest != null }
         if (activeAddons.isEmpty()) {
             activeJob?.cancel()
             lastRequestKey = null
@@ -173,7 +174,7 @@ object SearchRepository {
     }
 
     fun refreshDiscover(addons: List<ManagedAddon>) {
-        val activeAddons = addons.filter { it.manifest != null }
+        val activeAddons = addons.enabledAddons().filter { it.manifest != null }
         if (activeAddons.isEmpty()) {
             activeDiscoverJob?.cancel()
             discoverSources = emptyList()

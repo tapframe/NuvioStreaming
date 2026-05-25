@@ -181,7 +181,10 @@ fun HomeSkeletonHero(
 }
 
 @Composable
-fun HomeSkeletonRow(modifier: Modifier = Modifier) {
+fun HomeSkeletonRow(
+    modifier: Modifier = Modifier,
+    showHeaderAccent: Boolean = true,
+) {
     val brush = rememberHomeSkeletonBrush()
     val posterCardStyle = rememberPosterCardStyleUiState()
     val skeletonWidth = if (posterCardStyle.catalogLandscapeModeEnabled) {
@@ -207,15 +210,17 @@ fun HomeSkeletonRow(modifier: Modifier = Modifier) {
                 .clip(RoundedCornerShape(6.dp))
                 .background(brush),
         )
-        // Accent bar
-        Box(
-            modifier = Modifier
-                .width(60.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(brush),
-        )
-        Spacer(modifier = Modifier.height(2.dp))
+        if (showHeaderAccent) {
+            // Accent bar
+            Box(
+                modifier = Modifier
+                    .width(60.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(brush),
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+        }
         // Poster row
         Row(
             horizontalArrangement = Arrangement.spacedBy(10.dp),

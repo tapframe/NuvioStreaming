@@ -127,6 +127,42 @@ class DebridFileSelectorTest {
         assertEquals(1, selected?.id)
     }
 
+    @Test
+    fun `Premiumize direct download selector ignores non-video and matches episode`() {
+        val files = listOf(
+            PremiumizeDirectDownloadFileDto(path = "Show/Readme.txt", size = 9_000, link = "https://pm/readme"),
+            PremiumizeDirectDownloadFileDto(path = "Show/Show.S01E02.mkv", size = 2_000, link = "https://pm/e02"),
+            PremiumizeDirectDownloadFileDto(path = "Show/Show.S01E01.mkv", size = 1_000, link = "https://pm/e01"),
+        )
+
+        val selected = PremiumizeDirectDownloadFileSelector().selectFile(
+            files = files,
+            resolve = resolve(season = 1, episode = 1),
+            season = null,
+            episode = null,
+        )
+
+        assertEquals("Show/Show.S01E01.mkv", selected?.path)
+    }
+
+    @Test
+    fun `Premiumize direct download selector falls back to largest playable file`() {
+        val files = listOf(
+            PremiumizeDirectDownloadFileDto(path = "small.mp4", size = 1_000, link = "https://pm/small"),
+            PremiumizeDirectDownloadFileDto(path = "large.mkv", size = 3_000, link = "https://pm/large"),
+            PremiumizeDirectDownloadFileDto(path = "large-without-link.mkv", size = 9_000, link = null),
+        )
+
+        val selected = PremiumizeDirectDownloadFileSelector().selectFile(
+            files = files,
+            resolve = resolve(),
+            season = null,
+            episode = null,
+        )
+
+        assertEquals("large.mkv", selected?.path)
+    }
+
     private fun resolve(
         fileIdx: Int? = null,
         season: Int? = null,
