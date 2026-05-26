@@ -1040,4 +1040,20 @@
     <string name="unit_bytes_kb">KB</string>
     <string name="unit_bytes_mb">MB</string>
     <string name="unit_bytes_gb">GB</string>
+    <string name="cw_airs_date">Πρεμιέρα %1$s</string>
+    <string name="cw_airs_today">Πρεμιέρα σήμερα</string>
+    <string name="cw_airs_tomorrow">Πρεμιέρα αύριο</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Πρεμιέρα σε %1$d ημέρα</item>
+        <item quantity="other">Πρεμιέρα σε %1$d ημέρες</item>
+    </plurals>
+    <string name="cw_airs_date_short">%1$s</string>
+    <string name="cw_airs_today_short">Σήμερα</string>
+    <string name="cw_airs_tomorrow_short">Αύριο</string>
+    <plurals name="cw_airs_in_days_short">
+        <item quantity="one">Σε %1$d ημέρα</item>
+        <item quantity="other">Σε %1$d ημέρες</item>
+    </plurals>
+    <string name="cw_new_episode">Νέο επεισόδιο</string>
+    <string name="cw_new_season">Νέα σεζόν</string>
 </resources>

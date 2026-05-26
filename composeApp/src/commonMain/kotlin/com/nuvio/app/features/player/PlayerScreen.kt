@@ -38,7 +38,15 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.debrid.DirectDebridPlayableResult
+import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
+import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.AddonResource
+import com.nuvio.app.features.addons.ManagedAddon
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
@@ -50,21 +58,27 @@ import com.nuvio.app.features.player.skip.PlayerNextEpisodeRules
 import com.nuvio.app.features.player.skip.SkipIntroButton
 import com.nuvio.app.features.player.skip.SkipIntroRepository
 import com.nuvio.app.features.player.skip.SkipInterval
+import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySelector
+import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktScrobbleRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressClock
 import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.isIos
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
@@ -78,6 +92,8 @@ private const val PlayerLockedOverlayDurationMs = 2_000L
 private const val PlayerLeftGestureBoundary = 0.4f
 private const val PlayerRightGestureBoundary = 0.6f
 private const val PlayerVerticalGestureSensitivity = 1f
+/** Hard ceiling for next-episode stream search to prevent hanging forever. */
+private const val NEXT_EPISODE_HARD_TIMEOUT_MS = 120_000L
 private val PlayerSliderOverlayGap = 12.dp
 private val PlayerTimeRowHeight = 36.dp
 private val PlayerActionRowHeight = 50.dp
@@ -175,6 +191,16 @@ fun PlayerScreen(
         val downloadedLabel = stringResource(Res.string.compose_player_downloaded)
         val airsPrefix = stringResource(Res.string.compose_player_airs_prefix)
         val tbaLabel = stringResource(Res.string.compose_player_tba)
+        val parentalGuideLabels = ParentalGuideLabels(
+            nudity = stringResource(Res.string.parental_nudity),
+            violence = stringResource(Res.string.parental_violence),
+            profanity = stringResource(Res.string.parental_profanity),
+            alcohol = stringResource(Res.string.parental_alcohol),
+            frightening = stringResource(Res.string.parental_frightening),
+            severe = stringResource(Res.string.parental_severity_severe),
+            moderate = stringResource(Res.string.parental_severity_moderate),
+            mild = stringResource(Res.string.parental_severity_mild),
+        )
         val gestureController = rememberPlayerGestureController()
         var controlsVisible by rememberSaveable { mutableStateOf(true) }
         var playerControlsLocked by rememberSaveable { mutableStateOf(false) }
@@ -211,6 +237,7 @@ fun PlayerScreen(
         val keepScreenAwake = errorMessage == null &&
             (playbackSnapshot.isPlaying || (shouldPlay && playbackSnapshot.isLoading))
         EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
+        var isScrubbingTimeline by remember { mutableStateOf(false) }
         var scrubbingPositionMs by remember { mutableStateOf<Long?>(null) }
         var pausedOverlayVisible by remember { mutableStateOf(false) }
         var gestureFeedback by remember { mutableStateOf<GestureFeedbackState?>(null) }
@@ -276,6 +303,12 @@ fun PlayerScreen(
         var activeSkipInterval by remember { mutableStateOf<SkipInterval?>(null) }
         var skipIntervalDismissed by remember { mutableStateOf(false) }
 
+        // Parental guide overlay state
+        var parentalWarnings by remember { mutableStateOf<List<ParentalWarning>>(emptyList()) }
+        var showParentalGuide by remember { mutableStateOf(false) }
+        var parentalGuideHasShown by remember { mutableStateOf(false) }
+        var playbackStartedForParentalGuide by remember { mutableStateOf(false) }
+
         // Next episode state
         var nextEpisodeInfo by remember { mutableStateOf<NextEpisodeInfo?>(null) }
         var showNextEpisodeCard by remember { mutableStateOf(false) }
@@ -295,6 +328,15 @@ fun PlayerScreen(
             val currentMeta = metaUiState.meta ?: return@LaunchedEffect
             if (currentMeta.type == parentMetaType && currentMeta.id == parentMetaId) {
                 playerMetaVideos = currentMeta.videos
+            }
+        }
+
+        // Persist binge group per content so subsequent episode plays
+        // (from CW, Details, or next-episode) can reuse the same source group.
+        LaunchedEffect(currentStreamBingeGroup, parentMetaId) {
+            val bg = currentStreamBingeGroup
+            if (bg != null && parentMetaId.isNotBlank()) {
+                BingeGroupCacheRepository.save(parentMetaId, bg)
             }
         }
 
@@ -357,9 +399,10 @@ fun PlayerScreen(
                 .coerceIn(0f, 100f)
         }
 
-        fun currentTraktScrobbleItem() = TraktScrobbleRepository.buildItem(
+        suspend fun currentTraktScrobbleItem() = TraktScrobbleRepository.buildItem(
             contentType = contentType ?: parentMetaType,
             parentMetaId = parentMetaId,
+            videoId = activeVideoId,
             title = title,
             seasonNumber = activeSeasonNumber,
             episodeNumber = activeEpisodeNumber,
@@ -367,11 +410,15 @@ fun PlayerScreen(
         )
 
         fun emitTraktScrobbleStart() {
-            val item = currentTraktScrobbleItem() ?: return
             if (hasRequestedScrobbleStartForCurrentItem) return
             hasRequestedScrobbleStartForCurrentItem = true
 
             scope.launch {
+                val item = currentTraktScrobbleItem()
+                if (item == null) {
+                    hasRequestedScrobbleStartForCurrentItem = false
+                    return@launch
+                }
                 TraktScrobbleRepository.scrobbleStart(
                     item = item,
                     progressPercent = currentPlaybackProgressPercent(),
@@ -380,12 +427,12 @@ fun PlayerScreen(
         }
 
         fun emitTraktScrobbleStop(progressPercent: Float? = null) {
-            val item = currentTraktScrobbleItem() ?: return
             val provided = progressPercent
             if (!hasRequestedScrobbleStartForCurrentItem && (provided ?: 0f) < 80f) return
 
             val percent = provided ?: currentPlaybackProgressPercent()
             scope.launch {
+                val item = currentTraktScrobbleItem() ?: return@launch
                 TraktScrobbleRepository.scrobbleStop(
                     item = item,
                     progressPercent = percent,
@@ -407,6 +454,25 @@ fun PlayerScreen(
             }
         }
 
+        fun tryShowParentalGuide() {
+            if (!parentalGuideHasShown && parentalWarnings.isNotEmpty() && !playbackStartedForParentalGuide) {
+                playbackStartedForParentalGuide = true
+                controlsVisible = true
+                showParentalGuide = true
+                parentalGuideHasShown = true
+            }
+        }
+
+        suspend fun resolveParentalGuideImdbId(): String? {
+            val candidates = listOf(parentMetaId, activeVideoId)
+            candidates.firstNotNullOfOrNull(::extractParentalGuideImdbId)?.let { return it }
+            val tmdbId = candidates.firstNotNullOfOrNull(::extractParentalGuideTmdbId) ?: return null
+            return TmdbService.tmdbToImdb(
+                tmdbId = tmdbId,
+                mediaType = contentType ?: parentMetaType,
+            )
+        }
+
         fun flushWatchProgress() {
             emitStopScrobbleForCurrentProgress()
             WatchProgressRepository.flushPlaybackProgress(
@@ -424,6 +490,7 @@ fun PlayerScreen(
 
         var showAudioModal by remember { mutableStateOf(false) }
         var showSubtitleModal by remember { mutableStateOf(false) }
+        var showVideoSettingsModal by remember { mutableStateOf(false) }
         var audioTracks by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
         var subtitleTracks by remember { mutableStateOf<List<SubtitleTrack>>(emptyList()) }
         var selectedAudioIndex by remember { mutableStateOf(-1) }
@@ -434,8 +501,24 @@ fun PlayerScreen(
         var preferredSubtitleSelectionApplied by rememberSaveable(sourceUrl) { mutableStateOf(false) }
         var activeSubtitleTab by remember { mutableStateOf(SubtitleTab.BuiltIn) }
         val subtitleStyle = playerSettingsUiState.subtitleStyle
+        val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
         val addonSubtitles by SubtitleRepository.addonSubtitles.collectAsStateWithLifecycle()
         val isLoadingAddonSubtitles by SubtitleRepository.isLoading.collectAsStateWithLifecycle()
+        val activeAddonSubtitleType = contentType ?: parentMetaType
+        val addonSubtitleFetchKey = remember(
+            addonsUiState.addons,
+            activeAddonSubtitleType,
+            activeVideoId,
+        ) {
+            buildAddonSubtitleFetchKey(
+                addons = addonsUiState.addons,
+                type = activeAddonSubtitleType,
+                videoId = activeVideoId,
+            )
+        }
+        var autoFetchedAddonSubtitlesForKey by rememberSaveable(activeSourceUrl, activeVideoId) {
+            mutableStateOf<String?>(null)
+        }
 
         fun refreshTracks() {
             val ctrl = playerController ?: return
@@ -537,6 +620,7 @@ fun PlayerScreen(
             controlsVisible = false
             lockedOverlayVisible = false
             pausedOverlayVisible = false
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             gestureMessageJob?.cancel()
             gestureFeedback = null
@@ -544,6 +628,7 @@ fun PlayerScreen(
             renderedGestureFeedback = null
             showAudioModal = false
             showSubtitleModal = false
+            showVideoSettingsModal = false
             showSourcesPanel = false
             showEpisodesPanel = false
             episodeStreamsPanelState = EpisodeStreamsPanelState()
@@ -779,15 +864,66 @@ fun PlayerScreen(
             playerController?.seekTo(targetPositionMs)
         }
 
+        fun resolveDebridForPlayer(
+            stream: StreamItem,
+            season: Int?,
+            episode: Int?,
+            onResolved: (StreamItem) -> Unit,
+            onStale: () -> Unit,
+        ): Boolean {
+            if (!DirectDebridPlaybackResolver.shouldResolveToPlayableStream(stream)) return false
+            scope.launch {
+                val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
+                    stream = stream,
+                    season = season,
+                    episode = episode,
+                )
+                when (resolved) {
+                    is DirectDebridPlayableResult.Success -> onResolved(resolved.stream)
+                    else -> {
+                        resolved.toastMessage()?.let { NuvioToastController.show(it) }
+                        if (resolved == DirectDebridPlayableResult.Stale) {
+                            onStale()
+                        }
+                    }
+                }
+            }
+            return true
+        }
+
         fun switchToSource(stream: StreamItem) {
-            val url = stream.directPlaybackUrl ?: return
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
+                    onResolved = ::switchToSource,
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        val vid = activeVideoId
+                        if (vid != null) {
+                            PlayerStreamsRepository.loadSources(
+                                type = type,
+                                videoId = vid,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
+                                forceRefresh = true,
+                            )
+                        }
+                    },
+                )
+            ) return
+            val url = stream.playableDirectUrl ?: return
             if (url == activeSourceUrl) return
             val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
             flushWatchProgress()
             if (playerSettingsUiState.streamReuseLastLinkEnabled && activeVideoId != null) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    activeVideoId!!,
+                    type = contentType ?: parentMetaType,
+                    videoId = activeVideoId!!,
+                    parentMetaId = parentMetaId,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -818,7 +954,27 @@ fun PlayerScreen(
         }
 
         fun switchToEpisodeStream(stream: StreamItem, episode: MetaVideo) {
-            val url = stream.directPlaybackUrl ?: return
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = episode.season,
+                    episode = episode.episode,
+                    onResolved = { resolvedStream ->
+                        switchToEpisodeStream(resolvedStream, episode)
+                    },
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        PlayerStreamsRepository.loadEpisodeStreams(
+                            type = type,
+                            videoId = episode.id,
+                            season = episode.season,
+                            episode = episode.episode,
+                            forceRefresh = true,
+                        )
+                    },
+                )
+            ) return
+            val url = stream.playableDirectUrl ?: return
             showNextEpisodeCard = false
             showSourcesPanel = false
             showEpisodesPanel = false
@@ -846,8 +1002,11 @@ fun PlayerScreen(
             val epResumePositionMs = epEntry?.lastPositionMs?.takeIf { it > 0L } ?: 0L
             if (playerSettingsUiState.streamReuseLastLinkEnabled) {
                 val cacheKey = StreamLinkCacheRepository.contentKey(
-                    contentType ?: parentMetaType,
-                    epVideoId,
+                    type = contentType ?: parentMetaType,
+                    videoId = epVideoId,
+                    parentMetaId = parentMetaId,
+                    season = episode.season,
+                    episode = episode.episode,
                 )
                 StreamLinkCacheRepository.save(
                     contentKey = cacheKey,
@@ -959,6 +1118,12 @@ fun PlayerScreen(
                             settings.streamAutoPlayPreferBingeGroup
                         )
 
+            // bingeGroupOnly manual mode: only binge group preference is active (not next-episode toggle)
+            val bingeGroupOnlyManualMode =
+                shouldAutoSelectInManualMode &&
+                    !settings.streamAutoPlayNextEpisodeEnabled &&
+                    settings.streamAutoPlayPreferBingeGroup
+
             // Determine auto-play mode for next episode
             val effectiveMode = if (shouldAutoSelectInManualMode) {
                 StreamAutoPlayMode.FIRST_STREAM
@@ -966,7 +1131,7 @@ fun PlayerScreen(
                 settings.streamAutoPlayMode
             }
             val effectiveSource = if (shouldAutoSelectInManualMode) {
-                com.nuvio.app.features.streams.StreamAutoPlaySource.ALL_SOURCES
+                StreamAutoPlaySource.ALL_SOURCES
             } else {
                 settings.streamAutoPlaySource
             }
@@ -986,6 +1151,13 @@ fun PlayerScreen(
                 settings.streamAutoPlayRegex
             }
 
+            // Determine preferred binge group from current stream (not cache)
+            val preferredBingeGroup = if (settings.streamAutoPlayPreferBingeGroup) {
+                currentStreamBingeGroup
+            } else {
+                null
+            }
+
             nextEpisodeAutoPlayJob = scope.launch {
                 PlayerStreamsRepository.loadEpisodeStreams(
                     type = type,
@@ -995,61 +1167,198 @@ fun PlayerScreen(
                 )
 
                 val installedAddonNames = AddonRepository.uiState.value.addons
+                    .enabledAddons()
                     .map { it.displayTitle }
                     .toSet()
+                val debridSettings = DebridSettingsRepository.snapshot()
 
-                val timeoutMs = settings.streamAutoPlayTimeoutSeconds * 1000L
-                val startTime = WatchProgressClock.nowEpochMs()
+                val timeoutSeconds = settings.streamAutoPlayTimeoutSeconds
+                var autoSelectTriggered = false
+                var timeoutElapsed = false
+                var selectedStream: StreamItem? = null
+                val autoSelectSettled = CompletableDeferred<Unit>()
 
-                // Collect streams as they arrive
-                PlayerStreamsRepository.episodeStreamsState.collectLatest { state ->
-                    if (state.groups.isEmpty() && state.isAnyLoading) return@collectLatest
-
-                    val allStreams = state.groups.flatMap { it.streams }
-                    val elapsed = WatchProgressClock.nowEpochMs() - startTime
-
-                    val selected = if (allStreams.isNotEmpty()) {
-                        StreamAutoPlaySelector.selectAutoPlayStream(
-                            streams = allStreams,
-                            mode = effectiveMode,
-                            regexPattern = effectiveRegex,
-                            source = effectiveSource,
-                            installedAddonNames = installedAddonNames,
-                            selectedAddons = effectiveSelectedAddons,
-                            selectedPlugins = effectiveSelectedPlugins,
-                            preferredBingeGroup = if (settings.streamAutoPlayPreferBingeGroup) {
-                                currentStreamBingeGroup
-                            } else {
-                                null
-                            },
-                            preferBingeGroupInSelection = settings.streamAutoPlayPreferBingeGroup,
-                        )
-                    } else null
-
-                    if (selected != null || !state.isAnyLoading || elapsed >= timeoutMs) {
-                        nextEpisodeAutoPlaySearching = false
-                        if (selected != null) {
-                            nextEpisodeAutoPlaySourceName = selected.addonName
-                            // Countdown before playing
-                            for (i in 3 downTo 1) {
-                                nextEpisodeAutoPlayCountdown = i
-                                delay(1000)
-                            }
-                            switchToEpisodeStream(selected, nextVideo)
-                            showNextEpisodeCard = false
-                            nextEpisodeAutoPlayCountdown = null
-                            nextEpisodeAutoPlaySourceName = null
-                        } else if (!state.isAnyLoading || elapsed >= timeoutMs) {
-                            // No stream found — open the episode streams panel for manual selection
-                            episodeStreamsPanelState = EpisodeStreamsPanelState(
-                                showStreams = true,
-                                selectedEpisode = nextVideo,
-                            )
-                            showEpisodesPanel = true
-                            showNextEpisodeCard = false
-                        }
-                        return@collectLatest
+                fun settleAutoSelect() {
+                    if (!autoSelectSettled.isCompleted) {
+                        autoSelectSettled.complete(Unit)
                     }
+                }
+
+                fun selectStream(stream: StreamItem) {
+                    autoSelectTriggered = true
+                    selectedStream = stream
+                    settleAutoSelect()
+                }
+
+                fun finishWithoutSelection() {
+                    autoSelectTriggered = true
+                    settleAutoSelect()
+                }
+
+                // Full select: tries binge group first, then falls back to mode-based selection
+                fun trySelectStream(streams: List<StreamItem>): StreamItem? {
+                    return StreamAutoPlaySelector.selectAutoPlayStream(
+                        streams = streams,
+                        mode = effectiveMode,
+                        regexPattern = effectiveRegex,
+                        source = effectiveSource,
+                        installedAddonNames = installedAddonNames,
+                        selectedAddons = effectiveSelectedAddons,
+                        selectedPlugins = effectiveSelectedPlugins,
+                        preferredBingeGroup = preferredBingeGroup,
+                        preferBingeGroupInSelection = settings.streamAutoPlayPreferBingeGroup,
+                        bingeGroupOnly = bingeGroupOnlyManualMode,
+                        debridEnabled = debridSettings.canResolvePlayableLinks,
+                        activeResolverProviderId = debridSettings.activeResolverProviderId,
+                    )
+                }
+
+                // Binge group only early match: returns null if no binge group match
+                fun tryBingeGroupOnly(streams: List<StreamItem>): StreamItem? {
+                    if (preferredBingeGroup == null || !settings.streamAutoPlayPreferBingeGroup) return null
+                    return StreamAutoPlaySelector.selectAutoPlayStream(
+                        streams = streams,
+                        mode = effectiveMode,
+                        regexPattern = effectiveRegex,
+                        source = effectiveSource,
+                        installedAddonNames = installedAddonNames,
+                        selectedAddons = effectiveSelectedAddons,
+                        selectedPlugins = effectiveSelectedPlugins,
+                        preferredBingeGroup = preferredBingeGroup,
+                        preferBingeGroupInSelection = true,
+                        bingeGroupOnly = true,
+                        debridEnabled = debridSettings.canResolvePlayableLinks,
+                        activeResolverProviderId = debridSettings.activeResolverProviderId,
+                    )
+                }
+
+                val innerJob = launch {
+                    // Collect streams as they arrive
+                    PlayerStreamsRepository.episodeStreamsState.collectLatest { state ->
+                        if (state.groups.isEmpty() && state.isAnyLoading) return@collectLatest
+
+                        val allStreams = state.groups.flatMap { it.streams }
+
+                        if (autoSelectTriggered) {
+                            // Already resolved
+                        } else if (timeoutElapsed) {
+                            // Timeout elapsed: full select (binge group + fallback to mode)
+	                            if (allStreams.isNotEmpty()) {
+	                                val candidate = trySelectStream(allStreams)
+	                                if (candidate != null) {
+	                                    selectStream(candidate)
+	                                }
+	                            }
+	                        } else {
+	                            // Before timeout: eagerly check binge group only
+	                            if (allStreams.isNotEmpty()) {
+	                                val earlyMatch = tryBingeGroupOnly(allStreams)
+	                                if (earlyMatch != null) {
+	                                    selectStream(earlyMatch)
+	                                }
+	                            }
+	                        }
+
+                        // If all addons finished loading and no match yet, do a final full select
+                        if (!autoSelectTriggered && !state.isAnyLoading) {
+	                            if (allStreams.isNotEmpty()) {
+	                                val candidate = trySelectStream(allStreams)
+	                                if (candidate != null) {
+	                                    selectStream(candidate)
+	                                }
+	                            }
+	                            if (!autoSelectTriggered) {
+	                                finishWithoutSelection()
+	                            }
+	                            return@collectLatest
+	                        }
+
+                        if (autoSelectTriggered) return@collectLatest
+                    }
+                }
+
+                // Timeout logic
+                val timeoutMs = timeoutSeconds * 1_000L
+                val isBoundedTimeout = timeoutSeconds in 1..30
+
+                if (isBoundedTimeout) {
+                    // Bounded timeout (1-30s): wait, then trigger full select
+                    delay(timeoutMs)
+                    timeoutElapsed = true
+                    if (!autoSelectTriggered) {
+                        val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                        if (allStreams.isNotEmpty()) {
+	                            val candidate = trySelectStream(allStreams)
+	                            if (candidate != null) {
+	                                selectStream(candidate)
+	                            }
+	                        }
+	                    }
+	                    if (selectedStream != null) {
+	                        innerJob.cancel()
+	                    } else if (PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }.isNotEmpty()) {
+	                        // Streams arrived but no match after full select — don't wait further
+	                        innerJob.cancel()
+	                        finishWithoutSelection()
+	                    } else {
+	                        // No addon responded yet — wait with hard ceiling
+	                        val completed = withTimeoutOrNull(timeoutMs) { autoSelectSettled.await() }
+	                        innerJob.cancel()
+	                        if (completed == null) {
+	                            if (!autoSelectTriggered) {
+	                                val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                                if (allStreams.isNotEmpty()) {
+	                                    selectedStream = trySelectStream(allStreams)
+	                                }
+	                                finishWithoutSelection()
+	                            }
+	                        }
+	                    }
+	                } else {
+	                    // Instant (0) or unlimited: timeoutElapsed immediately so each
+	                    // addon response triggers a full select attempt in the collect.
+	                    timeoutElapsed = true
+	                    if (!autoSelectTriggered) {
+	                        val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                        if (allStreams.isNotEmpty()) {
+	                            trySelectStream(allStreams)?.let(::selectStream)
+	                        }
+	                    }
+	                    val hardTimeout = NEXT_EPISODE_HARD_TIMEOUT_MS
+	                    val completed = withTimeoutOrNull(hardTimeout) { autoSelectSettled.await() }
+	                    innerJob.cancel()
+	                    if (completed == null) {
+	                        if (!autoSelectTriggered) {
+	                            val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                            if (allStreams.isNotEmpty()) {
+	                                selectedStream = trySelectStream(allStreams)
+	                            }
+	                            finishWithoutSelection()
+	                        }
+	                    }
+	                }
+
+                // Handle result
+                nextEpisodeAutoPlaySearching = false
+                if (selectedStream != null) {
+                    nextEpisodeAutoPlaySourceName = selectedStream!!.addonName
+                    // Countdown before playing
+                    for (i in 3 downTo 1) {
+                        nextEpisodeAutoPlayCountdown = i
+                        delay(1000)
+                    }
+                    switchToEpisodeStream(selectedStream!!, nextVideo)
+                    showNextEpisodeCard = false
+                    nextEpisodeAutoPlayCountdown = null
+                    nextEpisodeAutoPlaySourceName = null
+                } else {
+                    // No stream found — open the episode streams panel for manual selection
+                    episodeStreamsPanelState = EpisodeStreamsPanelState(
+                        showStreams = true,
+                        selectedEpisode = nextVideo,
+                    )
+                    showEpisodesPanel = true
+                    showNextEpisodeCard = false
                 }
             }
         }
@@ -1081,8 +1390,8 @@ fun PlayerScreen(
         }
 
         fun fetchAddonSubtitlesForActiveItem() {
-            val type = contentType ?: return
-            val videoId = activeVideoId ?: return
+            val type = activeAddonSubtitleType.takeIf { it.isNotBlank() } ?: return
+            val videoId = activeVideoId?.takeIf { it.isNotBlank() } ?: return
             SubtitleRepository.fetchAddonSubtitles(type, videoId)
         }
 
@@ -1091,6 +1400,7 @@ fun PlayerScreen(
             playerController = null
             playerControllerSourceUrl = null
             playbackSnapshot = PlayerPlaybackSnapshot()
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             liveGestureFeedback = null
             renderedGestureFeedback = null
@@ -1116,11 +1426,11 @@ fun PlayerScreen(
             playerController?.applySubtitleStyle(subtitleStyle)
         }
 
-        LaunchedEffect(showSubtitleModal, activeSubtitleTab, contentType, activeVideoId) {
-            if (!showSubtitleModal || activeSubtitleTab != SubtitleTab.Addons) return@LaunchedEffect
-            if (!isLoadingAddonSubtitles && addonSubtitles.isEmpty()) {
-                fetchAddonSubtitlesForActiveItem()
-            }
+        LaunchedEffect(activeSourceUrl, addonSubtitleFetchKey) {
+            val fetchKey = addonSubtitleFetchKey ?: return@LaunchedEffect
+            if (autoFetchedAddonSubtitlesForKey == fetchKey) return@LaunchedEffect
+            autoFetchedAddonSubtitlesForKey = fetchKey
+            fetchAddonSubtitlesForActiveItem()
         }
 
         LaunchedEffect(playbackSnapshot.isLoading, playerController) {
@@ -1188,8 +1498,22 @@ fun PlayerScreen(
             initialSeekApplied = true
         }
 
-        LaunchedEffect(controlsVisible, playbackSnapshot.isPlaying, playbackSnapshot.isLoading, errorMessage) {
-            if (!controlsVisible || !playbackSnapshot.isPlaying || playbackSnapshot.isLoading || errorMessage != null) {
+        LaunchedEffect(
+            controlsVisible,
+            isScrubbingTimeline,
+            playbackSnapshot.isPlaying,
+            playbackSnapshot.isLoading,
+            showParentalGuide,
+            errorMessage,
+        ) {
+            if (
+                !controlsVisible ||
+                isScrubbingTimeline ||
+                !playbackSnapshot.isPlaying ||
+                playbackSnapshot.isLoading ||
+                showParentalGuide ||
+                errorMessage != null
+            ) {
                 return@LaunchedEffect
             }
             delay(3500)
@@ -1251,6 +1575,28 @@ fun PlayerScreen(
                 session = playbackSession,
                 snapshot = playbackSnapshot,
             )
+        }
+
+        // Fetch parental guide when the playable item changes.
+        LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber, parentMetaId, parentMetaType) {
+            parentalWarnings = emptyList()
+            showParentalGuide = false
+            parentalGuideHasShown = false
+            playbackStartedForParentalGuide = false
+
+            val imdbId = resolveParentalGuideImdbId() ?: return@LaunchedEffect
+            val guide = ParentalGuideRepository.getParentalGuide(imdbId) ?: return@LaunchedEffect
+            parentalWarnings = buildParentalWarnings(guide, parentalGuideLabels)
+
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
+        }
+
+        LaunchedEffect(playbackSnapshot.isPlaying, parentalWarnings) {
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
         }
 
         // Fetch skip intervals when episode changes
@@ -1558,8 +1904,11 @@ fun PlayerScreen(
                         val currentVideoId = activeVideoId
                         if (currentVideoId != null) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
-                                contentType ?: parentMetaType,
-                                currentVideoId,
+                                type = contentType ?: parentMetaType,
+                                videoId = currentVideoId,
+                                parentMetaId = parentMetaId,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
                             )
                             StreamLinkCacheRepository.remove(cacheKey)
                         }
@@ -1588,7 +1937,7 @@ fun PlayerScreen(
             }
 
             AnimatedVisibility(
-                visible = controlsVisible && !playerControlsLocked,
+                visible = (controlsVisible || showParentalGuide) && !playerControlsLocked,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -1604,6 +1953,7 @@ fun PlayerScreen(
                     metrics = metrics,
                     resizeMode = resizeMode,
                     isLocked = playerControlsLocked,
+                    showPlaybackControls = controlsVisible,
                     onLockToggle = {
                         if (playerControlsLocked) {
                             unlockPlayerControls()
@@ -1625,11 +1975,26 @@ fun PlayerScreen(
                         refreshTracks()
                         showAudioModal = true
                     },
+                    onVideoSettingsClick = if (isIos) {
+                        {
+                            showVideoSettingsModal = true
+                            controlsVisible = true
+                        }
+                    } else {
+                        null
+                    },
                     onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
                     onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
                     onSubmitIntroClick = if (isSeries && playerSettingsUiState.introSubmitEnabled && playerSettingsUiState.introDbApiKey.isNotBlank()) { { showSubmitIntroModal = true } } else null,
-                    onScrubChange = { positionMs -> scrubbingPositionMs = positionMs },
+                    parentalWarnings = parentalWarnings,
+                    showParentalGuide = showParentalGuide,
+                    onParentalGuideAnimationComplete = { showParentalGuide = false },
+                    onScrubChange = { positionMs ->
+                        isScrubbingTimeline = true
+                        scrubbingPositionMs = positionMs
+                    },
                     onScrubFinished = { positionMs ->
+                        isScrubbingTimeline = false
                         scrubbingPositionMs = null
                         playerController?.seekTo(positionMs)
                     },
@@ -1692,7 +2057,7 @@ fun PlayerScreen(
             // Skip intro/recap/outro button
             if (!playerControlsLocked) {
                 SkipIntroButton(
-                    interval = activeSkipInterval,
+                    interval = if (!initialLoadCompleted || pausedOverlayVisible) null else activeSkipInterval,
                     dismissed = skipIntervalDismissed,
                     controlsVisible = controlsVisible,
                     onSkip = {
@@ -1784,6 +2149,15 @@ fun PlayerScreen(
                 onFetchAddonSubtitles = ::fetchAddonSubtitlesForActiveItem,
                 onStyleChanged = PlayerSettingsRepository::setSubtitleStyle,
                 onDismiss = { showSubtitleModal = false },
+            )
+
+            IosVideoSettingsModal(
+                visible = showVideoSettingsModal,
+                settings = playerSettingsUiState,
+                onSettingsChanged = {
+                    playerController?.configureIosVideoOutput(PlayerSettingsRepository.uiState.value)
+                },
+                onDismiss = { showVideoSettingsModal = false },
             )
 
             // Sources Panel
@@ -1908,6 +2282,47 @@ fun PlayerScreen(
             }
         }
     }
+}
+
+private fun buildAddonSubtitleFetchKey(
+    addons: List<ManagedAddon>,
+    type: String?,
+    videoId: String?,
+): String? {
+    val normalizedType = type?.takeIf { it.isNotBlank() } ?: return null
+    val normalizedVideoId = videoId?.takeIf { it.isNotBlank() } ?: return null
+    val compatibleSubtitleAddons = addons.enabledAddons().mapNotNull { addon ->
+        val manifest = addon.manifest ?: return@mapNotNull null
+        val supportsSubtitles = manifest.resources.any { resource ->
+            resource.isCompatibleSubtitleResource(
+                type = normalizedType,
+                videoId = normalizedVideoId,
+            )
+        }
+        if (!supportsSubtitles) return@mapNotNull null
+        "${manifest.id}:${manifest.transportUrl}"
+    }
+
+    if (compatibleSubtitleAddons.isEmpty()) return null
+    return buildString {
+        append(normalizedType)
+        append('|')
+        append(normalizedVideoId)
+        append('|')
+        append(compatibleSubtitleAddons.sorted().joinToString("|"))
+    }
+}
+
+private fun AddonResource.isCompatibleSubtitleResource(type: String, videoId: String): Boolean {
+    val isSubtitleResource = name.equals("subtitles", ignoreCase = true) ||
+        name.equals("subtitle", ignoreCase = true)
+    if (!isSubtitleResource) return false
+
+    val requestType = if (type.equals("tv", ignoreCase = true)) "series" else type
+    val typeMatches = types.isEmpty() || types.any { it.equals(requestType, ignoreCase = true) }
+    if (!typeMatches) return false
+
+    return idPrefixes.isEmpty() || idPrefixes.any { prefix -> videoId.startsWith(prefix) }
 }
 
 private fun <T> findPreferredTrackIndex(

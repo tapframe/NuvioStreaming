@@ -2,6 +2,7 @@ package com.nuvio.app.features.details
 
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -87,5 +88,72 @@ class SeriesPlaybackResolverTest {
         assertNotNull(action)
         assertEquals("Up Next • S1E3", action.label)
         assertEquals("show:1:3", action.videoId)
+    }
+
+    @Test
+    fun seriesPrimaryAction_uses_explicit_content_when_meta_id_is_alias() {
+        val meta = MetaDetails(
+            id = "tt1234567",
+            type = "series",
+            name = "Show",
+            videos = listOf(
+                MetaVideo(id = "s4e14", title = "Episode 14", season = 4, episode = 14, released = "2026-03-01"),
+                MetaVideo(id = "s4e15", title = "Episode 15", season = 4, episode = 15, released = "2026-03-08"),
+            ),
+        )
+
+        val action = meta.seriesPrimaryAction(
+            content = WatchingContentRef(type = "series", id = "tmdb:98765"),
+            entries = listOf(
+                WatchProgressEntry(
+                    contentType = "series",
+                    parentMetaId = "tmdb:98765",
+                    parentMetaType = "series",
+                    videoId = "tmdb:98765:4:14",
+                    title = "Show",
+                    seasonNumber = 4,
+                    episodeNumber = 14,
+                    lastPositionMs = 10_000L,
+                    durationMs = 10_000L,
+                    lastUpdatedEpochMs = 100L,
+                    isCompleted = true,
+                ),
+            ),
+            watchedItems = emptyList(),
+            todayIsoDate = "2026-03-30",
+        )
+
+        assertNotNull(action)
+        assertEquals("Up Next • S4E15", action.label)
+        assertEquals("tmdb:98765:4:15", action.videoId)
+        assertEquals(4, action.seasonNumber)
+        assertEquals(15, action.episodeNumber)
+    }
+
+    @Test
+    fun nextReleasedEpisodeAfter_global_index_fallback_ignores_specials() {
+        val meta = MetaDetails(
+            id = "show",
+            type = "series",
+            name = "Show",
+            videos = listOf(
+                MetaVideo(id = "sp1", title = "Special 1", season = 0, episode = 1, released = "2026-01-01"),
+                MetaVideo(id = "s1e1", title = "Episode 1", season = 1, episode = 1, released = "2026-01-08"),
+                MetaVideo(id = "s1e2", title = "Episode 2", season = 1, episode = 2, released = "2026-01-15"),
+                MetaVideo(id = "s2e1", title = "Episode 3", season = 2, episode = 1, released = "2026-01-22"),
+                MetaVideo(id = "s2e2", title = "Episode 4", season = 2, episode = 2, released = "2026-01-29"),
+            ),
+        )
+
+        val nextEpisode = meta.nextReleasedEpisodeAfter(
+            seasonNumber = 1,
+            episodeNumber = 3,
+            todayIsoDate = "2026-02-01",
+        )
+
+        assertNotNull(nextEpisode)
+        assertEquals(2, nextEpisode.season)
+        assertEquals(2, nextEpisode.episode)
+        assertEquals("s2e2", nextEpisode.id)
     }
 }

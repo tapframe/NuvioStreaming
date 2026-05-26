@@ -25,6 +25,8 @@ data class CachedNextUpItem(
     val sortTimestamp: Long,
     val seedSeason: Int? = null,
     val seedEpisode: Int? = null,
+    val isReleaseAlert: Boolean = false,
+    val isNewSeasonRelease: Boolean = false,
 )
 
 @Serializable
@@ -60,6 +62,7 @@ internal object ContinueWatchingEnrichmentCache {
     }
 
     private const val storageKey = "cw_enrichment_cache"
+    private var lastPayloadHash: Int? = null
 
     fun getNextUpSnapshot(): List<CachedNextUpItem> =
         loadPayload()?.nextUp ?: emptyList()
@@ -69,17 +72,27 @@ internal object ContinueWatchingEnrichmentCache {
 
     fun getSnapshots(): Pair<List<CachedNextUpItem>, List<CachedInProgressItem>> {
         val payload = loadPayload()
-        return (payload?.nextUp ?: emptyList()) to (payload?.inProgress ?: emptyList())
+        val nextUp = payload?.nextUp ?: emptyList()
+        val inProgress = payload?.inProgress ?: emptyList()
+        return nextUp to inProgress
     }
 
     fun saveSnapshots(
         nextUp: List<CachedNextUpItem>,
         inProgress: List<CachedInProgressItem>,
+        force: Boolean = false,
     ) {
+        val payload = CachedEnrichmentPayload(nextUp = nextUp, inProgress = inProgress)
+        val payloadHash = payload.hashCode()
+        if (!force && lastPayloadHash == payloadHash) {
+            return
+        }
+
         val encoded = runCatching {
-            json.encodeToString(CachedEnrichmentPayload(nextUp = nextUp, inProgress = inProgress))
+            json.encodeToString(payload)
         }.getOrNull() ?: return
         ContinueWatchingEnrichmentStorage.savePayload(ProfileScopedKey.of(storageKey), encoded)
+        lastPayloadHash = payloadHash
     }
 
     private fun loadPayload(): CachedEnrichmentPayload? {
@@ -87,6 +100,8 @@ internal object ContinueWatchingEnrichmentCache {
             ?: return null
         return runCatching {
             json.decodeFromString<CachedEnrichmentPayload>(raw)
-        }.getOrNull()
+        }.getOrNull()?.also { payload ->
+            lastPayloadHash = payload.hashCode()
+        }
     }
 }

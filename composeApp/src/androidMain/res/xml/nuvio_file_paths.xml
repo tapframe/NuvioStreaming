@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path
+        name="nuvio_updates"
+        path="updates/" />
+    <files-path
+        name="nuvio_downloads"
+        path="downloads/" />
+</paths>

@@ -23,6 +23,8 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -157,6 +159,9 @@ internal fun AddonsSettingsPageContent(
                         null
                     },
                     onRefreshClick = { AddonRepository.refreshAddon(addon.manifestUrl) },
+                    onEnabledChange = { enabled ->
+                        AddonRepository.setAddonEnabled(addon.manifestUrl, enabled)
+                    },
                     onConfigureClick = if (showConfigureAction && !configureUrl.isNullOrBlank()) {
                         {
                             runCatching {
@@ -347,6 +352,7 @@ private fun InstalledAddonCard(
     onMoveUpClick: (() -> Unit)?,
     onMoveDownClick: (() -> Unit)?,
     onRefreshClick: () -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
     onConfigureClick: (() -> Unit)?,
     onDeleteClick: () -> Unit,
 ) {
@@ -380,6 +386,17 @@ private fun InstalledAddonCard(
                     )
                 }
             }
+            Spacer(modifier = Modifier.width(12.dp))
+            Switch(
+                checked = addon.enabled,
+                onCheckedChange = onEnabledChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                ),
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -438,6 +455,7 @@ private fun InstalledAddonCard(
         ) {
             NuvioInfoBadge(
                 text = when {
+                    !addon.enabled -> stringResource(Res.string.addons_badge_disabled)
                     addon.isRefreshing -> stringResource(Res.string.addons_badge_refreshing)
                     manifest != null -> stringResource(Res.string.addons_badge_active)
                     else -> stringResource(Res.string.addons_badge_unavailable)

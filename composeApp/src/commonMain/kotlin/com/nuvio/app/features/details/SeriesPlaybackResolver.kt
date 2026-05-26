@@ -98,11 +98,14 @@ internal fun MetaDetails.nextReleasedEpisodeAfter(
     // Fallback: if the seed wasn't found by season+episode (anime with absolute
     // numbering on Trakt vs multi-season on addon), try global index matching.
     if (watchedIndex < 0 && seasonNumber != null && episodeNumber != null) {
-        val addonSeasons = sortedEpisodes.mapTo(mutableSetOf()) { it.season }
+        val mainEpisodes = sortedEpisodes.filter { episode -> normalizeSeasonNumber(episode.season) > 0 }
+        val addonSeasons = mainEpisodes.mapTo(mutableSetOf()) { episode ->
+            normalizeSeasonNumber(episode.season)
+        }
         if (seasonNumber == 1 && addonSeasons.size > 1 && episodeNumber > 0) {
             val globalIndex = episodeNumber - 1
-            if (globalIndex in sortedEpisodes.indices) {
-                watchedIndex = globalIndex
+            if (globalIndex in mainEpisodes.indices) {
+                watchedIndex = sortedEpisodes.indexOf(mainEpisodes[globalIndex])
             }
         }
     }
@@ -139,14 +142,33 @@ internal fun MetaDetails.seriesPrimaryAction(
     watchedItems: List<WatchedItem>,
     todayIsoDate: String,
     preferFurthestEpisode: Boolean = true,
+    showUnairedNextUp: Boolean = false,
+): SeriesPrimaryAction? =
+    seriesPrimaryAction(
+        content = WatchingContentRef(type = type, id = id),
+        entries = entries,
+        watchedItems = watchedItems,
+        todayIsoDate = todayIsoDate,
+        preferFurthestEpisode = preferFurthestEpisode,
+        showUnairedNextUp = showUnairedNextUp,
+    )
+
+internal fun MetaDetails.seriesPrimaryAction(
+    content: WatchingContentRef,
+    entries: List<WatchProgressEntry>,
+    watchedItems: List<WatchedItem>,
+    todayIsoDate: String,
+    preferFurthestEpisode: Boolean = true,
+    showUnairedNextUp: Boolean = false,
 ): SeriesPrimaryAction? =
     decideSeriesPrimaryAction(
-        content = WatchingContentRef(type = type, id = id),
+        content = content,
         episodes = videos.map(MetaVideo::toDomainReleasedEpisode),
         progressRecords = entries.map(WatchProgressEntry::toDomainProgressRecord),
         watchedRecords = watchedItems.map(WatchedItem::toDomainWatchedRecord),
         todayIsoDate = todayIsoDate,
         preferFurthestEpisode = preferFurthestEpisode,
+        showUnairedNextUp = showUnairedNextUp,
     )?.toLegacySeriesPrimaryAction()
 
 internal fun MetaVideo.playLabel(): String =

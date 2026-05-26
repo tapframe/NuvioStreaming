@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit
 actual object AddonStorage {
     private const val preferencesName = "nuvio_addons"
     private const val addonUrlsKey = "installed_manifest_urls"
+    private const val addonEnabledStatesKey = "installed_manifest_enabled_states"
 
     private var preferences: SharedPreferences? = null
 
@@ -41,6 +42,34 @@ actual object AddonStorage {
             ?.putString("${addonUrlsKey}_$profileId", urls.joinToString(separator = "\n"))
             ?.apply()
     }
+
+    actual fun loadAddonEnabledStates(profileId: Int): Map<String, Boolean> =
+        preferences
+            ?.getString("${addonEnabledStatesKey}_$profileId", null)
+            .orEmpty()
+            .lineSequence()
+            .mapNotNull(::parseEnabledStateLine)
+            .toMap()
+
+    actual fun saveAddonEnabledStates(profileId: Int, states: Map<String, Boolean>) {
+        val payload = states.entries.joinToString(separator = "\n") { (url, enabled) ->
+            "$url\t$enabled"
+        }
+        preferences
+            ?.edit()
+            ?.putString("${addonEnabledStatesKey}_$profileId", payload)
+            ?.apply()
+    }
+}
+
+private fun parseEnabledStateLine(line: String): Pair<String, Boolean>? {
+    val url = line.substringBefore("\t").trim().takeIf { it.isNotEmpty() } ?: return null
+    val rawEnabled = line.substringAfter("\t", "true").trim().lowercase()
+    val enabled = when (rawEnabled) {
+        "false" -> false
+        else -> true
+    }
+    return url to enabled
 }
 
 private val addonHttpClient = OkHttpClient.Builder()

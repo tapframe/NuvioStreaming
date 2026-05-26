@@ -33,7 +33,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,8 +46,10 @@ import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
+import com.nuvio.app.core.ui.nuvioBlockPointerPassthrough
 import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import com.nuvio.app.features.addons.AddonRepository
+import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
@@ -55,7 +58,9 @@ import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWid
 import com.nuvio.app.features.home.components.HomeSkeletonRow
 import com.nuvio.app.features.watched.WatchedRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import nuvio.composeapp.generated.resources.Res
@@ -80,7 +85,17 @@ fun SearchScreen(
     modifier: Modifier = Modifier,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
+    searchFocusRequestCount: Int = 0,
+    scrollToTopRequests: Flow<Unit> = emptyFlow(),
 ) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(searchFocusRequestCount) {
+        if (searchFocusRequestCount > 0) {
+            focusRequester.requestFocus()
+        }
+    }
+
     LaunchedEffect(Unit) {
         AddonRepository.initialize()
         WatchedRepository.ensureLoaded()
@@ -90,7 +105,10 @@ fun SearchScreen(
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val uiState by SearchRepository.uiState.collectAsStateWithLifecycle()
     val discoverUiState by SearchRepository.discoverUiState.collectAsStateWithLifecycle()
-    val homeCatalogSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val homeCatalogSettingsUiState by remember {
+        HomeCatalogSettingsRepository.snapshot()
+        HomeCatalogSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
     val recentSearches by SearchHistoryRepository.uiState.collectAsStateWithLifecycle()
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
@@ -104,8 +122,14 @@ fun SearchScreen(
         }
     }
 
+    LaunchedEffect(scrollToTopRequests) {
+        scrollToTopRequests.collect {
+            listState.animateScrollToItem(0)
+        }
+    }
+
     val addonRefreshKey = remember(addonsUiState.addons) {
-        addonsUiState.addons.mapNotNull { addon ->
+        addonsUiState.addons.enabledAddons().mapNotNull { addon ->
             val manifest = addon.manifest ?: return@mapNotNull null
             buildString {
                 append(manifest.transportUrl)
@@ -221,14 +245,8 @@ fun SearchScreen(
             androidx.compose.foundation.layout.Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent()
-                            }
-                        }
-                    },
+                    .nuvioBlockPointerPassthrough()
+                    .background(MaterialTheme.colorScheme.background),
             ) {
                 NuvioScreenHeader(
                     title = headerTitle,
@@ -240,6 +258,7 @@ fun SearchScreen(
                         value = query,
                         onValueChange = { query = it },
                         placeholder = stringResource(Res.string.compose_search_placeholder),
+                        modifier = Modifier.focusRequester(focusRequester),
                         trailingContent = if (query.isNotBlank()) {
                             {
                                 IconButton(onClick = { query = "" }) {
@@ -290,13 +309,19 @@ fun SearchScreen(
                 when {
                     isWaitingForSearch -> {
                         items(2) {
-                            HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                            HomeSkeletonRow(
+                                modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
+                            )
                         }
                     }
 
                     uiState.isLoading && uiState.sections.isEmpty() -> {
                         items(2) {
-                            HomeSkeletonRow(modifier = Modifier.padding(horizontal = homeSectionPadding))
+                            HomeSkeletonRow(
+                                modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
+                            )
                         }
                     }
 
@@ -333,6 +358,14 @@ fun SearchScreen(
                                 onPosterClick = onPosterClick,
                                 onPosterLongClick = onPosterLongClick,
                             )
+                        }
+                        if (uiState.isLoading) {
+                            item(key = "search_loading_more") {
+                                HomeSkeletonRow(
+                                    modifier = Modifier.padding(horizontal = homeSectionPadding),
+                                    showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
+                                )
+                            }
                         }
                     }
                 }

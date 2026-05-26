@@ -29,9 +29,44 @@ jobs:
               return (next === -1 ? rest : rest.slice(0, next)).trim();
             }
 
-            const required = ["Summary", "Why", "Testing", "Breaking changes", "Linked issues"];
+            function cleanedContent(title) {
+              const content = sectionContent(title);
+              if (content === null) return null;
+              return content
+                .replace(/<!--[\s\S]*?-->/g, "")
+                .replace(/`/g, "")
+                .replace(/\s+/g, " ")
+                .trim();
+            }
+
+            function checkedLines(content) {
+              return (content || "").match(/^\s*-\s+\[[xX]\]\s+.+$/gm) || [];
+            }
+
+            function uncheckedLines(content) {
+              return (content || "").match(/^\s*-\s+\[\s\]\s+.+$/gm) || [];
+            }
+
+            function hasIssueReference(content) {
+              return /(^|\s)(#\d+|https:\/\/github\.com\/\S+\/issues\/\d+)/i.test(content || "");
+            }
+
+            const required = [
+              "Summary",
+              "PR type",
+              "Why",
+              "Issue or approval",
+              "UI / behavior impact",
+              "Policy check",
+              "Scope boundaries",
+              "Testing",
+              "Screenshots / Video",
+              "Breaking changes",
+              "Linked issues",
+            ];
             const missing = [];
             const empty = [];
+            const failedRules = [];
 
             for (const name of required) {
               const content = sectionContent(name);
@@ -40,34 +75,73 @@ jobs:
                 continue;
               }
 
-              const cleaned = content
-                .replace(/<!--[\s\S]*?-->/g, "")
-                .replace(/`/g, "")
-                .replace(/\s+/g, " ")
-                .trim()
-                .toLowerCase();
+              const cleaned = cleanedContent(name);
+              const normalized = cleaned.toLowerCase();
+              const allowsNone = name === "Breaking changes" || name === "Screenshots / Video";
 
               if (
                 cleaned.length < 4 ||
-                cleaned === "none" ||
-                cleaned.includes("what changed in this pr") ||
-                cleaned.includes("why this change is needed") ||
-                cleaned.includes("what you tested") ||
-                cleaned.includes("example: fixes #123")
+                (!allowsNone && ["none", "n/a", "na", "not applicable"].includes(normalized)) ||
+                normalized.includes("what changed in this pr") ||
+                normalized.includes("why this change is needed") ||
+                normalized.includes("what you tested") ||
+                normalized.includes("example: fixes #123")
               ) {
                 empty.push(name);
               }
             }
 
-            if (missing.length || empty.length) {
+            const prTypeContent = sectionContent("PR type") || "";
+            const prTypeChecked = checkedLines(prTypeContent);
+            if (sectionContent("PR type") !== null && prTypeChecked.length !== 1) {
+              failedRules.push("Check exactly one PR type.");
+            }
+
+            const impactContent = sectionContent("UI / behavior impact") || "";
+            const impactChecked = checkedLines(impactContent);
+            if (sectionContent("UI / behavior impact") !== null && impactChecked.length === 0) {
+              failedRules.push("Check at least one UI / behavior impact box.");
+            }
+
+            const policyContent = sectionContent("Policy check") || "";
+            const policyChecked = checkedLines(policyContent);
+            const policyUnchecked = uncheckedLines(policyContent);
+            if (sectionContent("Policy check") !== null && policyChecked.length === 0) {
+              failedRules.push("Policy check must include checked boxes.");
+            }
+            if (policyUnchecked.length) {
+              failedRules.push("Every Policy check box must be checked.");
+            }
+
+            const checkedTypeText = prTypeChecked.join(" ");
+            const issueRequired =
+              /bug fix|ui glitch|behavior bug|approved larger|approved directional/i.test(checkedTypeText);
+            const issueText = [
+              cleanedContent("Issue or approval") || "",
+              cleanedContent("Linked issues") || "",
+            ].join(" ");
+            if (issueRequired && !hasIssueReference(issueText)) {
+              failedRules.push("Bug fixes, UI glitch fixes, behavior fixes, and approved changes must link an issue or approved request.");
+            }
+
+            const uiChanged = checkedLines(impactContent).some((line) =>
+              /UI changed only to fix a documented glitch\/bug|UI change has explicit maintainer approval/i.test(line)
+            );
+            const screenshotText = (cleanedContent("Screenshots / Video") || "").toLowerCase();
+            if (uiChanged && ["none", "n/a", "na", "not a ui change", "not applicable"].includes(screenshotText)) {
+              failedRules.push("UI changes must include before/after screenshots or video.");
+            }
+
+            if (missing.length || empty.length || failedRules.length) {
               const lines = [
                 "PR description is missing required detail.",
                 "",
               ];
               if (missing.length) lines.push(`Missing sections: ${missing.join(", ")}`);
               if (empty.length) lines.push(`Incomplete sections: ${empty.join(", ")}`);
+              if (failedRules.length) lines.push(`Failed policy rules: ${failedRules.join(" ")}`);
               lines.push("");
-              lines.push("Please fill the PR template before merging.");
+              lines.push("Please complete the PR template and make sure the PR fits CONTRIBUTING.md before review.");
               core.setFailed(lines.join("\n"));
             } else {
               core.info("PR template check passed.");

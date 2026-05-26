@@ -25,6 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -37,19 +40,38 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.nuvio.app.core.ui.localizedContinueWatchingSubtitle
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.posterCardClickable
+import com.nuvio.app.features.cloud.CloudLibraryContentType
+import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
+import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
+import com.nuvio.app.features.watchprogress.computeAirDateBadgeText
 import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 private fun continueWatchingProgressPercent(progressFraction: Float): Int =
     (progressFraction * 100f).roundToInt().coerceIn(1, 99)
+
+@Composable
+private fun localizedContinueWatchingMetaLine(item: ContinueWatchingItem): String =
+    when {
+        item.seasonNumber != null && item.episodeNumber != null ->
+            stringResource(Res.string.compose_player_episode_code_full, item.seasonNumber, item.episodeNumber)
+        item.isCloudLibraryItem() ->
+            stringResource(Res.string.library_source_cloud)
+        else ->
+            stringResource(Res.string.media_movie)
+    }
+
+private fun ContinueWatchingItem.isCloudLibraryItem(): Boolean =
+    parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
 
 private fun ContinueWatchingItem.continueWatchingArtworkUrl(
     useEpisodeThumbnails: Boolean,
@@ -76,6 +98,27 @@ private fun ContinueWatchingItem.continueWatchingArtworkUrl(
         poster,
         background,
         episodeThumbnail,
+        imageUrl,
+    )
+}
+
+private fun ContinueWatchingItem.continueWatchingPosterArtworkUrl(
+    useEpisodeThumbnails: Boolean,
+): String? {
+    if (seasonNumber == null || episodeNumber == null) {
+        return continueWatchingArtworkUrl(useEpisodeThumbnails)
+    }
+
+    val normalizedEpisodeThumbnail = episodeThumbnail?.trim()?.takeIf { it.isNotBlank() }
+    val nonEpisodeImageUrl = imageUrl
+        ?.trim()
+        ?.takeIf { it.isNotBlank() && it != normalizedEpisodeThumbnail }
+
+    return firstNonBlank(
+        poster,
+        background,
+        nonEpisodeImageUrl,
+        if (useEpisodeThumbnails) episodeThumbnail else null,
         imageUrl,
     )
 }
@@ -138,35 +181,64 @@ private fun HomeContinueWatchingSectionContent(
     onItemClick: ((ContinueWatchingItem) -> Unit)?,
     onItemLongPress: ((ContinueWatchingItem) -> Unit)?,
 ) {
-    NuvioShelfSection(
-        title = stringResource(Res.string.compose_settings_page_continue_watching),
-        entries = items,
-        modifier = modifier,
-        headerHorizontalPadding = sectionPadding,
-        rowContentPadding = PaddingValues(horizontal = sectionPadding),
-        itemSpacing = layout.itemGap,
-        key = { item -> item.videoId },
-    ) { item ->
-        when (style) {
-            ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
-                item = item,
-                layout = layout,
-                useEpisodeThumbnails = useEpisodeThumbnails,
-                blurNextUp = blurNextUp,
-                onClick = onItemClick?.let { { it(item) } },
-                onLongClick = onItemLongPress?.let { { it(item) } },
-            )
-            ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
-                item = item,
-                layout = layout,
-                useEpisodeThumbnails = useEpisodeThumbnails,
-                blurNextUp = blurNextUp,
-                onClick = onItemClick?.let { { it(item) } },
-                onLongClick = onItemLongPress?.let { { it(item) } },
-            )
+    val homeCatalogSettings by remember {
+        HomeCatalogSettingsRepository.snapshot()
+        HomeCatalogSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+
+    val itemOrderKey = remember(items) {
+        items.joinToString(separator = "|") { item -> item.continueWatchingRowOrderKey() }
+    }
+
+    key(itemOrderKey) {
+        NuvioShelfSection(
+            title = stringResource(Res.string.compose_settings_page_continue_watching),
+            entries = items,
+            modifier = modifier,
+            headerHorizontalPadding = sectionPadding,
+            rowContentPadding = PaddingValues(horizontal = sectionPadding),
+            itemSpacing = layout.itemGap,
+            showHeaderAccent = !homeCatalogSettings.hideCatalogUnderline,
+            key = { item -> item.videoId },
+        ) { item ->
+            when (style) {
+                ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
+                    item = item,
+                    layout = layout,
+                    useEpisodeThumbnails = useEpisodeThumbnails,
+                    blurNextUp = blurNextUp,
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongPress?.let { { it(item) } },
+                )
+                ContinueWatchingSectionStyle.Poster -> ContinueWatchingPosterCard(
+                    item = item,
+                    layout = layout,
+                    useEpisodeThumbnails = useEpisodeThumbnails,
+                    blurNextUp = blurNextUp,
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongPress?.let { { it(item) } },
+                )
+            }
         }
     }
 }
+
+private fun ContinueWatchingItem.continueWatchingRowOrderKey(): String =
+    buildString {
+        append(if (isNextUp) "next" else "progress")
+        append(':')
+        append(parentMetaId)
+        append(':')
+        append(videoId)
+        append(':')
+        append(seasonNumber)
+        append('x')
+        append(episodeNumber)
+        append(":seed=")
+        append(nextUpSeedSeasonNumber)
+        append('x')
+        append(nextUpSeedEpisodeNumber)
+    }
 
 @Composable
 fun ContinueWatchingStylePreview(
@@ -346,6 +418,7 @@ private fun ContinueWatchingWideCard(
             imageUrl = artworkUrl,
             width = layout.widePosterStripWidth,
             blurred = shouldBlurArtwork,
+            contentScale = if (item.isCloudLibraryItem()) ContentScale.Fit else ContentScale.Crop,
             modifier = Modifier.fillMaxHeight(),
         )
         Column(
@@ -355,9 +428,9 @@ private fun ContinueWatchingWideCard(
                 .padding(layout.wideContentPadding),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            val isEpisodeCard = item.seasonNumber != null && item.episodeNumber != null
-            val hasEpisodeTitle = !item.episodeTitle.isNullOrBlank()
-            val wideMetaLine = localizedContinueWatchingSubtitle(item)
+            val isCompact = layout.wideCardWidth < 350.dp
+            val wideMetaLine = localizedContinueWatchingMetaLine(item)
+            val episodeTitle = item.episodeTitle?.trim()?.takeIf { it.isNotBlank() }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -376,7 +449,18 @@ private fun ContinueWatchingWideCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
-                        UpNextBadge(compact = false, textSize = layout.wideBadgeTextSize)
+                        val todayIsoDate = CurrentDateProvider.todayIsoDate()
+                        val badgeText = when {
+                            item.isReleaseAlert -> {
+                                if (item.isNewSeasonRelease) stringResource(Res.string.cw_new_season)
+                                else stringResource(Res.string.cw_new_episode)
+                            }
+                            else -> {
+                                computeAirDateBadgeText(item.released, todayIsoDate, compact = isCompact)
+                                    ?: stringResource(Res.string.home_continue_watching_up_next)
+                            }
+                        }
+                        UpNextBadge(text = badgeText, compact = isCompact, textSize = layout.wideBadgeTextSize)
                     }
                 }
                 Text(
@@ -389,9 +473,9 @@ private fun ContinueWatchingWideCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (hasEpisodeTitle) {
+                if (episodeTitle != null) {
                     Text(
-                        text = item.episodeTitle.orEmpty(),
+                        text = episodeTitle,
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = layout.wideMetaSize,
                             fontWeight = FontWeight.Medium,
@@ -455,16 +539,19 @@ private fun ContinueWatchingPosterCard(
                 )
                 .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
         ) {
-            val shouldBlurArtwork = blurNextUp && useEpisodeThumbnails && item.isNextUp
-            val imageUrl = item.continueWatchingArtworkUrl(useEpisodeThumbnails)
+            val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
+            val shouldBlurArtwork = blurNextUp &&
+                useEpisodeThumbnails &&
+                item.isNextUp &&
+                imageUrl == firstNonBlank(item.episodeThumbnail)
             if (imageUrl != null) {
                 AsyncImage(
-                    model = imageUrl,
+                    model = cloudLibraryDisplayArtworkUrl(imageUrl),
                     contentDescription = item.title,
                     modifier = Modifier
                         .fillMaxSize()
                         .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier),
-                    contentScale = ContentScale.Crop,
+                    contentScale = if (item.isCloudLibraryItem()) ContentScale.Fit else ContentScale.Crop,
                 )
             }
             if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
@@ -473,7 +560,18 @@ private fun ContinueWatchingPosterCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp),
                 ) {
-                    UpNextBadge(compact = true, textSize = layout.posterBadgeTextSize)
+                    val todayIsoDate = CurrentDateProvider.todayIsoDate()
+                    val badgeText = when {
+                        item.isReleaseAlert -> {
+                            if (item.isNewSeasonRelease) stringResource(Res.string.cw_new_season)
+                            else stringResource(Res.string.cw_new_episode)
+                        }
+                        else -> {
+                            computeAirDateBadgeText(item.released, todayIsoDate, compact = true)
+                                ?: stringResource(Res.string.home_continue_watching_up_next)
+                        }
+                    }
+                    UpNextBadge(text = badgeText, compact = true, textSize = layout.posterBadgeTextSize)
                 }
             }
             if (item.progressFraction > 0f) {
@@ -544,6 +642,7 @@ private fun ArtworkPanel(
     imageUrl: String?,
     width: Dp,
     blurred: Boolean = false,
+    contentScale: ContentScale = ContentScale.Crop,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -553,12 +652,12 @@ private fun ArtworkPanel(
     ) {
         if (imageUrl != null) {
             AsyncImage(
-                model = imageUrl,
+                model = cloudLibraryDisplayArtworkUrl(imageUrl),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
                     .then(if (blurred) Modifier.blur(18.dp) else Modifier),
-                contentScale = ContentScale.Crop,
+                contentScale = contentScale,
             )
         }
     }
@@ -566,6 +665,7 @@ private fun ArtworkPanel(
 
 @Composable
 private fun UpNextBadge(
+    text: String,
     compact: Boolean,
     textSize: androidx.compose.ui.unit.TextUnit,
 ) {
@@ -582,7 +682,7 @@ private fun UpNextBadge(
             ),
     ) {
         Text(
-            text = stringResource(Res.string.home_continue_watching_up_next),
+            text = text,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = textSize,
                 fontWeight = FontWeight.Bold,

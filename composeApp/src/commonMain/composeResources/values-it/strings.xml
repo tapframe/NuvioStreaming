@@ -1170,4 +1170,22 @@
   <string name="collections_editor_tmdb_subtitle_person">Persona</string>
   <string name="collections_editor_tmdb_subtitle_director">Regista</string>
   <string name="collections_editor_tmdb_subtitle_discover">TMDB Discover</string>
+  <string name="cw_airs_date">In onda il %1$s</string>
+  <string name="cw_airs_today">In onda oggi</string>
+  <string name="cw_airs_tomorrow">In onda domani</string>
+  <plurals name="cw_airs_in_days">
+      <item quantity="one">In onda tra %1$d giorno</item>
+      <item quantity="many">In onda tra %1$d giorni</item>
+      <item quantity="other">In onda tra %1$d giorni</item>
+  </plurals>
+  <string name="cw_airs_date_short">%1$s</string>
+  <string name="cw_airs_today_short">Oggi</string>
+  <string name="cw_airs_tomorrow_short">Domani</string>
+  <plurals name="cw_airs_in_days_short">
+      <item quantity="one">Tra %1$d giorno</item>
+      <item quantity="many">Tra %1$d giorni</item>
+      <item quantity="other">Tra %1$d giorni</item>
+  </plurals>
+  <string name="cw_new_episode">Nuovo episodio</string>
+  <string name="cw_new_season">Nuova stagione</string>
 </resources>

@@ -1170,4 +1170,22 @@
     <string name="unit_bytes_kb">KB</string>
     <string name="unit_bytes_mb">MB</string>
     <string name="unit_bytes_gb">GB</string>
+    <string name="cw_airs_date">Disponível em %1$s</string>
+    <string name="cw_airs_today">Disponível hoje</string>
+    <string name="cw_airs_tomorrow">Disponível amanhã</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Disponível em %1$d dia</item>
+        <item quantity="many">Disponível em %1$d dias</item>
+        <item quantity="other">Disponível em %1$d dias</item>
+    </plurals>
+    <string name="cw_airs_date_short">%1$s</string>
+    <string name="cw_airs_today_short">Hoje</string>
+    <string name="cw_airs_tomorrow_short">Amanhã</string>
+    <plurals name="cw_airs_in_days_short">
+        <item quantity="one">Em %1$d dia</item>
+        <item quantity="many">Em %1$d dias</item>
+        <item quantity="other">Em %1$d dias</item>
+    </plurals>
+    <string name="cw_new_episode">Novo Episódio</string>
+    <string name="cw_new_season">Nova Temporada</string>
 </resources>

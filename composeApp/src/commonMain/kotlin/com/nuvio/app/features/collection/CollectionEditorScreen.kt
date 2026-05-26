@@ -1125,6 +1125,7 @@ private fun TmdbSourcePickerScreen(
                                 val sorts = listOf(
                                     TmdbCollectionSort.POPULAR_DESC,
                                     TmdbCollectionSort.VOTE_AVERAGE_DESC,
+                                    TmdbCollectionSort.VOTE_COUNT_DESC,
                                     if (state.tmdbMediaType == TmdbCollectionMediaType.TV && !state.tmdbMediaBoth) {
                                         TmdbCollectionSort.FIRST_AIR_DATE_DESC
                                     } else {
@@ -1350,6 +1351,54 @@ private fun TmdbSourcePickerScreen(
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(year = value.toIntOrNull())
+                                    }
+                                },
+                            )
+                            TmdbQuickChips(
+                                label = stringResource(Res.string.collections_editor_tmdb_quick_watch_providers),
+                                chips = listOf(
+                                    stringResource(Res.string.collections_editor_tmdb_watch_provider_netflix) to "8",
+                                    stringResource(Res.string.collections_editor_tmdb_watch_provider_prime) to "119",
+                                    stringResource(Res.string.collections_editor_tmdb_watch_provider_disney) to "337",
+                                    stringResource(Res.string.collections_editor_tmdb_watch_provider_apple) to "350",
+                                    stringResource(Res.string.collections_editor_tmdb_watch_provider_hulu) to "15",
+                                ),
+                                onSelect = { value ->
+                                    CollectionEditorRepository.updateTmdbFilters { it.copy(withWatchProviders = value) }
+                                },
+                            )
+                            TmdbFilterField(
+                                label = stringResource(Res.string.collections_editor_tmdb_watch_providers),
+                                helper = stringResource(Res.string.collections_editor_tmdb_watch_providers_helper),
+                                value = state.tmdbFilters.withWatchProviders.orEmpty(),
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_watch_providers_placeholder),
+                                onValueChange = { value ->
+                                    CollectionEditorRepository.updateTmdbFilters {
+                                        it.copy(withWatchProviders = value.ifBlank { null })
+                                    }
+                                },
+                            )
+                            TmdbQuickChips(
+                                label = stringResource(Res.string.collections_editor_tmdb_quick_watch_regions),
+                                chips = listOf(
+                                    stringResource(Res.string.collections_editor_tmdb_country_us) to "US",
+                                    stringResource(Res.string.collections_editor_tmdb_country_uk) to "GB",
+                                    "Canada" to "CA",
+                                    "Australia" to "AU",
+                                    "Germany" to "DE",
+                                ),
+                                onSelect = { value ->
+                                    CollectionEditorRepository.updateTmdbFilters { it.copy(watchRegion = value) }
+                                },
+                            )
+                            TmdbFilterField(
+                                label = stringResource(Res.string.collections_editor_tmdb_watch_region),
+                                helper = stringResource(Res.string.collections_editor_tmdb_watch_region_helper),
+                                value = state.tmdbFilters.watchRegion.orEmpty(),
+                                placeholder = "US",
+                                onValueChange = { value ->
+                                    CollectionEditorRepository.updateTmdbFilters {
+                                        it.copy(watchRegion = value.ifBlank { null })
                                     }
                                 },
                             )
@@ -2255,6 +2304,7 @@ private fun tmdbSortLabel(sort: TmdbCollectionSort): String =
         TmdbCollectionSort.ORIGINAL -> stringResource(Res.string.collections_editor_tmdb_sort_original)
         TmdbCollectionSort.POPULAR_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_popular)
         TmdbCollectionSort.VOTE_AVERAGE_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_top_rated)
+        TmdbCollectionSort.VOTE_COUNT_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_vote_count)
         TmdbCollectionSort.RELEASE_DATE_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_recent)
         TmdbCollectionSort.FIRST_AIR_DATE_DESC -> stringResource(Res.string.collections_editor_tmdb_sort_recent)
     }

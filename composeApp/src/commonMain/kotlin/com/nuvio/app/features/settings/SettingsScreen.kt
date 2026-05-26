@@ -58,6 +58,10 @@ import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsUiState
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleUiState
+import com.nuvio.app.features.collection.CollectionRepository
+import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.debrid.DebridSettings
+import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.mdblist.MdbListSettings
@@ -77,6 +81,9 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesUiState
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_page_root
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
@@ -87,6 +94,10 @@ private const val SettingsSearchRevealHapticDelayMillis = 90L
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
+    rootActionRequests: Flow<Unit> = emptyFlow(),
+    requestedPageName: String? = null,
+    onRequestedPageConsumed: () -> Unit = {},
+    rootActionsEnabled: Boolean = true,
     onSwitchProfile: (() -> Unit)? = null,
     onHomescreenClick: () -> Unit = {},
     onMetaScreenClick: () -> Unit = {},
@@ -96,6 +107,7 @@ fun SettingsScreen(
     onDownloadsClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onSupportersContributorsClick: () -> Unit = {},
+    onLicensesAttributionsClick: () -> Unit = {},
     onCheckForUpdatesClick: (() -> Unit)? = null,
     onCollectionsClick: () -> Unit = {},
 ) {
@@ -125,6 +137,10 @@ fun SettingsScreen(
             MdbListSettingsRepository.ensureLoaded()
             MdbListSettingsRepository.uiState
         }.collectAsStateWithLifecycle()
+        val debridSettings by remember {
+            DebridSettingsRepository.ensureLoaded()
+            DebridSettingsRepository.uiState
+        }.collectAsStateWithLifecycle()
         val traktAuthUiState by remember {
             TraktAuthRepository.ensureLoaded()
             TraktAuthRepository.uiState
@@ -142,10 +158,11 @@ fun SettingsScreen(
             AddonRepository.uiState
         }.collectAsStateWithLifecycle()
         val homescreenCatalogRefreshKey = remember(addonsUiState.addons) {
-            val allManifestsSettled = addonsUiState.addons.isNotEmpty() &&
-                addonsUiState.addons.none { it.isRefreshing }
+            val enabledAddons = addonsUiState.addons.enabledAddons()
+            val allManifestsSettled = enabledAddons.isNotEmpty() &&
+                enabledAddons.none { it.isRefreshing }
             if (!allManifestsSettled) return@remember emptyList<String>()
-            addonsUiState.addons.mapNotNull { addon ->
+            enabledAddons.mapNotNull { addon ->
                 val manifest = addon.manifest ?: return@mapNotNull null
                 buildString {
                     append(manifest.transportUrl)
@@ -160,6 +177,7 @@ fun SettingsScreen(
             HomeCatalogSettingsRepository.snapshot()
             HomeCatalogSettingsRepository.uiState
         }.collectAsStateWithLifecycle()
+        val collections by CollectionRepository.collections.collectAsStateWithLifecycle()
         val metaScreenSettingsUiState by remember {
             MetaScreenSettingsRepository.ensureLoaded()
             MetaScreenSettingsRepository.uiState
@@ -179,21 +197,52 @@ fun SettingsScreen(
 
         LaunchedEffect(homescreenCatalogRefreshKey) {
             if (homescreenCatalogRefreshKey.isEmpty()) return@LaunchedEffect
-            HomeCatalogSettingsRepository.syncCatalogs(addonsUiState.addons)
+            HomeCatalogSettingsRepository.syncCatalogs(addonsUiState.addons.enabledAddons())
+        }
+
+        LaunchedEffect(Unit) {
+            CollectionRepository.initialize()
+        }
+
+        LaunchedEffect(collections) {
+            HomeCatalogSettingsRepository.syncCollections(collections)
         }
 
         var currentPage by rememberSaveable { mutableStateOf(SettingsPage.Root.name) }
+        val scrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
         val page = remember(currentPage) { SettingsPage.valueOf(currentPage) }
         val previousPage = page.previousPage()
 
+        LaunchedEffect(rootActionRequests, rootActionsEnabled, page) {
+            rootActionRequests.collect {
+                if (!rootActionsEnabled) return@collect
+                val pageToOpen = page.previousPage()
+                if (pageToOpen != null) {
+                    currentPage = pageToOpen.name
+                } else {
+                    scrollToTopRequests.tryEmit(Unit)
+                }
+            }
+        }
+
+        LaunchedEffect(requestedPageName, rootActionsEnabled) {
+            val targetPage = requestedPageName
+                ?.let { runCatching { SettingsPage.valueOf(it) }.getOrNull() }
+                ?: return@LaunchedEffect
+            if (!rootActionsEnabled) return@LaunchedEffect
+            currentPage = targetPage.name
+            onRequestedPageConsumed()
+        }
+
         PlatformBackHandler(
-            enabled = previousPage != null,
+            enabled = rootActionsEnabled && previousPage != null,
             onBack = { previousPage?.let { currentPage = it.name } },
         )
 
         if (maxWidth >= 768.dp) {
             TabletSettingsScreen(
                 page = page,
+                scrollToTopRequests = scrollToTopRequests,
                 onPageChange = { currentPage = it.name },
                 showLoadingOverlay = playerSettingsUiState.showLoadingOverlay,
                 holdToSpeedEnabled = playerSettingsUiState.holdToSpeedEnabled,
@@ -221,11 +270,13 @@ fun SettingsScreen(
                 episodeReleaseNotificationsUiState = episodeReleaseNotificationsUiState,
                 tmdbSettings = tmdbSettings,
                 mdbListSettings = mdbListSettings,
+                debridSettings = debridSettings,
                 traktAuthUiState = traktAuthUiState,
                 traktCommentsEnabled = traktCommentsEnabled,
                 traktSettingsUiState = traktSettingsUiState,
                 homescreenHeroEnabled = homescreenSettingsUiState.heroEnabled,
                 homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
+                homescreenHideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
                 homescreenItems = homescreenSettingsUiState.items,
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
@@ -233,12 +284,14 @@ fun SettingsScreen(
                 onSwitchProfile = onSwitchProfile,
                 onDownloadsClick = onDownloadsClick,
                 onSupportersContributorsClick = onSupportersContributorsClick,
+                onLicensesAttributionsClick = onLicensesAttributionsClick,
                 onCheckForUpdatesClick = onCheckForUpdatesClick,
                 onCollectionsClick = onCollectionsClick,
             )
         } else {
             MobileSettingsScreen(
                 page = page,
+                scrollToTopRequests = scrollToTopRequests,
                 onPageChange = { currentPage = it.name },
                 showLoadingOverlay = playerSettingsUiState.showLoadingOverlay,
                 holdToSpeedEnabled = playerSettingsUiState.holdToSpeedEnabled,
@@ -266,11 +319,13 @@ fun SettingsScreen(
                 episodeReleaseNotificationsUiState = episodeReleaseNotificationsUiState,
                 tmdbSettings = tmdbSettings,
                 mdbListSettings = mdbListSettings,
+                debridSettings = debridSettings,
                 traktAuthUiState = traktAuthUiState,
                 traktCommentsEnabled = traktCommentsEnabled,
                 traktSettingsUiState = traktSettingsUiState,
                 homescreenHeroEnabled = homescreenSettingsUiState.heroEnabled,
                 homescreenHideUnreleasedContent = homescreenSettingsUiState.hideUnreleasedContent,
+                homescreenHideCatalogUnderline = homescreenSettingsUiState.hideCatalogUnderline,
                 homescreenItems = homescreenSettingsUiState.items,
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
@@ -284,6 +339,7 @@ fun SettingsScreen(
                 onDownloadsClick = onDownloadsClick,
                 onAccountClick = onAccountClick,
                 onSupportersContributorsClick = onSupportersContributorsClick,
+                onLicensesAttributionsClick = onLicensesAttributionsClick,
                 onCheckForUpdatesClick = onCheckForUpdatesClick,
                 onCollectionsClick = onCollectionsClick,
             )
@@ -294,6 +350,7 @@ fun SettingsScreen(
 @Composable
 private fun MobileSettingsScreen(
     page: SettingsPage,
+    scrollToTopRequests: Flow<Unit>,
     onPageChange: (SettingsPage) -> Unit,
     showLoadingOverlay: Boolean,
     holdToSpeedEnabled: Boolean,
@@ -321,11 +378,13 @@ private fun MobileSettingsScreen(
     episodeReleaseNotificationsUiState: EpisodeReleaseNotificationsUiState,
     tmdbSettings: TmdbSettings,
     mdbListSettings: MdbListSettings,
+    debridSettings: DebridSettings,
     traktAuthUiState: TraktAuthUiState,
     traktCommentsEnabled: Boolean,
     traktSettingsUiState: TraktSettingsUiState,
     homescreenHeroEnabled: Boolean,
     homescreenHideUnreleasedContent: Boolean,
+    homescreenHideCatalogUnderline: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
@@ -339,6 +398,7 @@ private fun MobileSettingsScreen(
     onDownloadsClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
     onSupportersContributorsClick: () -> Unit = {},
+    onLicensesAttributionsClick: () -> Unit = {},
     onCheckForUpdatesClick: (() -> Unit)? = null,
     onCollectionsClick: () -> Unit = {},
 ) {
@@ -375,6 +435,7 @@ private fun MobileSettingsScreen(
                 is SettingsSearchTarget.Page -> when (target.page) {
                     SettingsPage.Account -> onAccountClick()
                     SettingsPage.SupportersContributors -> onSupportersContributorsClick()
+                    SettingsPage.LicensesAttributions -> onLicensesAttributionsClick()
                     SettingsPage.ContinueWatching -> onContinueWatchingClick()
                     SettingsPage.Addons -> onAddonsClick()
                     SettingsPage.Plugins -> {
@@ -397,6 +458,12 @@ private fun MobileSettingsScreen(
             if (rootSearchRevealAnimating) {
                 delay(SettingsSearchRevealAnimationMillis)
                 rootSearchRevealAnimating = false
+            }
+        }
+
+        LaunchedEffect(scrollToTopRequests) {
+            scrollToTopRequests.collect {
+                listState.animateScrollToItem(0)
             }
         }
 
@@ -433,6 +500,7 @@ private fun MobileSettingsScreen(
                             onIntegrationsClick = { onPageChange(SettingsPage.Integrations) },
                             onTraktClick = { onPageChange(SettingsPage.TraktAuthentication) },
                             onSupportersContributorsClick = onSupportersContributorsClick,
+                            onLicensesAttributionsClick = onLicensesAttributionsClick,
                             onCheckForUpdatesClick = onCheckForUpdatesClick,
                             onDownloadsClick = onDownloadsClick,
                             onAccountClick = onAccountClick,
@@ -444,6 +512,9 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                 )
                 SettingsPage.SupportersContributors -> supportersContributorsContent(
+                    isTablet = false,
+                )
+                SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                     isTablet = false,
                 )
                 SettingsPage.Playback -> playbackSettingsContent(
@@ -490,6 +561,7 @@ private fun MobileSettingsScreen(
                     showUnairedNextUp = continueWatchingPreferencesUiState.showUnairedNextUp,
                     blurNextUp = continueWatchingPreferencesUiState.blurNextUp,
                     showResumePromptOnLaunch = continueWatchingPreferencesUiState.showResumePromptOnLaunch,
+                    sortMode = continueWatchingPreferencesUiState.sortMode,
                 )
                 SettingsPage.PosterCustomization -> posterCustomizationSettingsContent(
                     isTablet = false,
@@ -510,6 +582,7 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     heroEnabled = homescreenHeroEnabled,
                     hideUnreleasedContent = homescreenHideUnreleasedContent,
+                    hideCatalogUnderline = homescreenHideCatalogUnderline,
                     items = homescreenItems,
                 )
                 SettingsPage.MetaScreen -> metaScreenSettingsContent(
@@ -520,6 +593,7 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                     onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
+                    onDebridClick = { onPageChange(SettingsPage.Debrid) },
                 )
                 SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                     isTablet = false,
@@ -528,6 +602,10 @@ private fun MobileSettingsScreen(
                 SettingsPage.MdbListRatings -> mdbListSettingsContent(
                     isTablet = false,
                     settings = mdbListSettings,
+                )
+                SettingsPage.Debrid -> debridSettingsContent(
+                    isTablet = false,
+                    settings = debridSettings,
                 )
                 SettingsPage.TraktAuthentication -> traktSettingsContent(
                     isTablet = false,
@@ -586,6 +664,7 @@ private fun rememberSettingsRootSearchRevealConnection(
 @Composable
 private fun TabletSettingsScreen(
     page: SettingsPage,
+    scrollToTopRequests: Flow<Unit>,
     onPageChange: (SettingsPage) -> Unit,
     showLoadingOverlay: Boolean,
     holdToSpeedEnabled: Boolean,
@@ -613,11 +692,13 @@ private fun TabletSettingsScreen(
     episodeReleaseNotificationsUiState: EpisodeReleaseNotificationsUiState,
     tmdbSettings: TmdbSettings,
     mdbListSettings: MdbListSettings,
+    debridSettings: DebridSettings,
     traktAuthUiState: TraktAuthUiState,
     traktCommentsEnabled: Boolean,
     traktSettingsUiState: TraktSettingsUiState,
     homescreenHeroEnabled: Boolean,
     homescreenHideUnreleasedContent: Boolean,
+    homescreenHideCatalogUnderline: Boolean,
     homescreenItems: List<HomeCatalogSettingsItem>,
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
@@ -625,6 +706,7 @@ private fun TabletSettingsScreen(
     onSwitchProfile: (() -> Unit)? = null,
     onDownloadsClick: () -> Unit = {},
     onSupportersContributorsClick: () -> Unit = {},
+    onLicensesAttributionsClick: () -> Unit = {},
     onCheckForUpdatesClick: (() -> Unit)? = null,
     onCollectionsClick: () -> Unit = {},
 ) {
@@ -732,6 +814,11 @@ private fun TabletSettingsScreen(
                     rootSearchRevealAnimating = false
                 }
             }
+            LaunchedEffect(scrollToTopRequests) {
+                scrollToTopRequests.collect {
+                    listState.animateScrollToItem(0)
+                }
+            }
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -782,6 +869,7 @@ private fun TabletSettingsScreen(
                                 onIntegrationsClick = { openInlinePage(SettingsPage.Integrations) },
                                 onTraktClick = { openInlinePage(SettingsPage.TraktAuthentication) },
                                 onSupportersContributorsClick = { openInlinePage(SettingsPage.SupportersContributors) },
+                                onLicensesAttributionsClick = { openInlinePage(SettingsPage.LicensesAttributions) },
                                 onCheckForUpdatesClick = onCheckForUpdatesClick,
                                 onDownloadsClick = onDownloadsClick,
                                 onAccountClick = { openInlinePage(SettingsPage.Account) },
@@ -796,6 +884,9 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                     )
                     SettingsPage.SupportersContributors -> supportersContributorsContent(
+                        isTablet = true,
+                    )
+                    SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                         isTablet = true,
                     )
                     SettingsPage.Playback -> playbackSettingsContent(
@@ -842,6 +933,7 @@ private fun TabletSettingsScreen(
                         showUnairedNextUp = continueWatchingPreferencesUiState.showUnairedNextUp,
                         blurNextUp = continueWatchingPreferencesUiState.blurNextUp,
                         showResumePromptOnLaunch = continueWatchingPreferencesUiState.showResumePromptOnLaunch,
+                        sortMode = continueWatchingPreferencesUiState.sortMode,
                     )
                     SettingsPage.PosterCustomization -> posterCustomizationSettingsContent(
                         isTablet = true,
@@ -862,6 +954,7 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         heroEnabled = homescreenHeroEnabled,
                         hideUnreleasedContent = homescreenHideUnreleasedContent,
+                        hideCatalogUnderline = homescreenHideCatalogUnderline,
                         items = homescreenItems,
                     )
                     SettingsPage.MetaScreen -> metaScreenSettingsContent(
@@ -872,6 +965,7 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         onTmdbClick = { onPageChange(SettingsPage.TmdbEnrichment) },
                         onMdbListClick = { onPageChange(SettingsPage.MdbListRatings) },
+                        onDebridClick = { onPageChange(SettingsPage.Debrid) },
                     )
                     SettingsPage.TmdbEnrichment -> tmdbSettingsContent(
                         isTablet = true,
@@ -880,6 +974,10 @@ private fun TabletSettingsScreen(
                     SettingsPage.MdbListRatings -> mdbListSettingsContent(
                         isTablet = true,
                         settings = mdbListSettings,
+                    )
+                    SettingsPage.Debrid -> debridSettingsContent(
+                        isTablet = true,
+                        settings = debridSettings,
                     )
                     SettingsPage.TraktAuthentication -> traktSettingsContent(
                         isTablet = true,

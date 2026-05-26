@@ -17,11 +17,23 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
         encodeDefaults = true
     }
 
-    override suspend fun pull(profileId: Int): List<ProgressSyncRecord> {
-        val params = buildJsonObject { put("p_profile_id", profileId) }
+    override suspend fun pull(
+        profileId: Int,
+        sinceLastWatched: Long?,
+        limit: Int?,
+    ): List<ProgressSyncRecord> {
+        val params = buildJsonObject {
+            put("p_profile_id", profileId)
+            if (sinceLastWatched != null) {
+                put("p_since_last_watched", sinceLastWatched)
+            }
+            if (limit != null) {
+                put("p_limit", limit)
+            }
+        }
         val result = SupabaseProvider.client.postgrest.rpc("sync_pull_watch_progress", params)
         val serverEntries = result.decodeList<WatchProgressSyncEntry>()
-        val records = serverEntries.map { entry ->
+        return serverEntries.map { entry ->
             ProgressSyncRecord(
                 contentId = entry.contentId,
                 contentType = entry.contentType,
@@ -33,7 +45,6 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
                 lastWatched = entry.lastWatched,
             )
         }
-        return records
     }
 
     override suspend fun push(
@@ -50,6 +61,7 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
                 position = entry.lastPositionMs,
                 duration = entry.durationMs,
                 lastWatched = entry.lastUpdatedEpochMs,
+                progressKey = progressKeyForEntry(entry),
             )
         }
         val params = buildJsonObject {
@@ -76,6 +88,13 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
         }
         SupabaseProvider.client.postgrest.rpc("sync_delete_watch_progress", params)
     }
+
+    private fun progressKeyForEntry(entry: WatchProgressEntry): String =
+        if (entry.seasonNumber != null && entry.episodeNumber != null) {
+            "${entry.parentMetaId}_s${entry.seasonNumber}e${entry.episodeNumber}"
+        } else {
+            entry.parentMetaId
+        }
 }
 
 @Serializable

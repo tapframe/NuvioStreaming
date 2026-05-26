@@ -5,6 +5,7 @@ import com.nuvio.app.features.player.PlayerSettingsUiState
 object StreamAutoPlayPolicy {
     fun isEffectivelyEnabled(settings: PlayerSettingsUiState): Boolean {
         if (settings.streamReuseLastLinkEnabled) return true
+        if (settings.streamAutoPlayReuseBingeGroup && settings.streamAutoPlayPreferBingeGroup) return true
 
         return when (settings.streamAutoPlayMode) {
             StreamAutoPlayMode.MANUAL -> false
