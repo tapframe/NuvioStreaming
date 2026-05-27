@@ -518,6 +518,8 @@ actual fun PlatformPlayerSurface(
 
                 override fun setExitCallback(callback: (() -> Unit)?) {
                     // No-op on Android; keyboard handling is done at Compose layer
+                }
+                
                 override fun setSubtitleDelayMs(delayMs: Int) {
                     subtitleDelayMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
                 }
