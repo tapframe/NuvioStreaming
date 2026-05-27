@@ -33,4 +33,24 @@ class ReleaseDateDisplayTest {
     fun extractsYearFromYearOnly() {
         assertEquals(2024, extractReleaseYearForDisplay("2024"))
     }
+
+    @Test
+    fun formatsIsoDateWithoutYear() {
+        assertEquals("February 1", formatReleaseDateWithoutYear("2025-02-01"))
+    }
+
+    @Test
+    fun formatReleaseDateWithoutYearStripsTimePortion() {
+        assertEquals("January 15", formatReleaseDateWithoutYear("2024-01-15T12:30:00Z"))
+    }
+
+    @Test
+    fun formatReleaseDateWithoutYearLeavesYearOnlyUnchanged() {
+        assertEquals("2024", formatReleaseDateWithoutYear("2024"))
+    }
+
+    @Test
+    fun formatReleaseDateWithoutYearLeavesNonIsoUnchanged() {
+        assertEquals("TBA", formatReleaseDateWithoutYear("TBA"))
+    }
 }

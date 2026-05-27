@@ -99,6 +99,11 @@ internal fun WatchProgressEntry.shouldUseAsCompletedSeedForContinueWatching(): B
     return explicitPercent >= WatchProgressTraktPlaybackNextUpSeedPercentThreshold
 }
 
+internal fun shouldCascadeCompletedProgressToWatchedHistory(
+    entry: WatchProgressEntry,
+    isUsingTraktProgress: Boolean,
+): Boolean = !isUsingTraktProgress && entry.normalizedCompletion().isCompleted
+
 internal fun String?.isSeriesTypeForContinueWatching(): Boolean =
     equals("series", ignoreCase = true) || equals("tv", ignoreCase = true)
 

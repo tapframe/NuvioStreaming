@@ -1192,4 +1192,22 @@
     <string name="unit_bytes_kb">Ko</string>
     <string name="unit_bytes_mb">Mo</string>
     <string name="unit_bytes_gb">Go</string>
+    <string name="cw_airs_date">Diffusion le %1$s</string>
+    <string name="cw_airs_today">Diffusion aujourd\'hui</string>
+    <string name="cw_airs_tomorrow">Diffusion demain</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Diffusion dans %1$d jour</item>
+        <item quantity="many">Diffusion dans %1$d jours</item>
+        <item quantity="other">Diffusion dans %1$d jours</item>
+    </plurals>
+    <string name="cw_airs_date_short">%1$s</string>
+    <string name="cw_airs_today_short">Aujourd\'hui</string>
+    <string name="cw_airs_tomorrow_short">Demain</string>
+    <plurals name="cw_airs_in_days_short">
+        <item quantity="one">Dans %1$d jour</item>
+        <item quantity="many">Dans %1$d jours</item>
+        <item quantity="other">Dans %1$d jours</item>
+    </plurals>
+    <string name="cw_new_episode">Nouvel épisode</string>
+    <string name="cw_new_season">Nouvelle saison</string>
 </resources>

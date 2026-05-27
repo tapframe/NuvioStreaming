@@ -1,14 +1,9 @@
 package com.nuvio.app.features.details.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoneAll
@@ -125,6 +120,73 @@ fun EpisodeWatchedActionSheet(
                     title = stringResource(Res.string.play_manually),
                     onClick = {
                         onPlayManually()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SeasonWatchedActionSheet(
+    seasonLabel: String,
+    isSeasonWatched: Boolean,
+    canMarkPreviousSeasons: Boolean,
+    onDismiss: () -> Unit,
+    onToggleSeasonWatched: () -> Unit,
+    onMarkPreviousSeasonsWatched: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    NuvioModalBottomSheet(
+        onDismissRequest = {
+            coroutineScope.launch {
+                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+            }
+        },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = nuvioSafeBottomPadding(16.dp)),
+        ) {
+            Text(
+                text = seasonLabel,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            )
+            NuvioBottomSheetDivider()
+            NuvioBottomSheetActionRow(
+                icon = Icons.Default.PlaylistAddCheckCircle,
+                title = if (isSeasonWatched) {
+                    stringResource(Res.string.episode_mark_season_unwatched, seasonLabel)
+                } else {
+                    stringResource(Res.string.episode_mark_season_watched, seasonLabel)
+                },
+                onClick = {
+                    onToggleSeasonWatched()
+                    coroutineScope.launch {
+                        dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                    }
+                },
+            )
+            if (canMarkPreviousSeasons) {
+                NuvioBottomSheetDivider()
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Default.DoneAll,
+                    title = stringResource(Res.string.episode_mark_previous_seasons_watched),
+                    onClick = {
+                        onMarkPreviousSeasonsWatched()
                         coroutineScope.launch {
                             dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
                         }

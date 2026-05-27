@@ -25,12 +25,26 @@ internal expect object PlayerSettingsStorage {
     fun saveSecondaryPreferredSubtitleLanguage(language: String?)
     fun loadSubtitleTextColor(): String?
     fun saveSubtitleTextColor(colorHex: String)
+    fun loadSubtitleBackgroundColor(): String?
+    fun saveSubtitleBackgroundColor(colorHex: String)
+    fun loadSubtitleOutlineColor(): String?
+    fun saveSubtitleOutlineColor(colorHex: String)
     fun loadSubtitleOutlineEnabled(): Boolean?
     fun saveSubtitleOutlineEnabled(enabled: Boolean)
+    fun loadSubtitleOutlineWidth(): Int?
+    fun saveSubtitleOutlineWidth(width: Int)
+    fun loadSubtitleBold(): Boolean?
+    fun saveSubtitleBold(enabled: Boolean)
     fun loadSubtitleFontSizeSp(): Int?
     fun saveSubtitleFontSizeSp(fontSizeSp: Int)
     fun loadSubtitleBottomOffset(): Int?
     fun saveSubtitleBottomOffset(bottomOffset: Int)
+    fun loadSubtitleUseForcedSubtitles(): Boolean?
+    fun saveSubtitleUseForcedSubtitles(enabled: Boolean)
+    fun loadSubtitleShowOnlyPreferredLanguages(): Boolean?
+    fun saveSubtitleShowOnlyPreferredLanguages(enabled: Boolean)
+    fun loadAddonSubtitleStartupMode(): String?
+    fun saveAddonSubtitleStartupMode(mode: String)
     fun loadStreamReuseLastLinkEnabled(): Boolean?
     fun saveStreamReuseLastLinkEnabled(enabled: Boolean)
     fun loadStreamReuseLastLinkCacheHours(): Int?
@@ -68,6 +82,8 @@ internal expect object PlayerSettingsStorage {
     fun saveStreamAutoPlayNextEpisodeEnabled(enabled: Boolean)
     fun loadStreamAutoPlayPreferBingeGroup(): Boolean?
     fun saveStreamAutoPlayPreferBingeGroup(enabled: Boolean)
+    fun loadStreamAutoPlayReuseBingeGroup(): Boolean?
+    fun saveStreamAutoPlayReuseBingeGroup(enabled: Boolean)
     fun loadNextEpisodeThresholdMode(): String?
     fun saveNextEpisodeThresholdMode(mode: String)
     fun loadNextEpisodeThresholdPercent(): Float?
@@ -78,6 +94,34 @@ internal expect object PlayerSettingsStorage {
     fun saveUseLibass(enabled: Boolean)
     fun loadLibassRenderType(): String?
     fun saveLibassRenderType(renderType: String)
+    fun loadIosVideoOutputPreset(): String?
+    fun saveIosVideoOutputPreset(preset: String)
+    fun loadIosToneMappingMode(): String?
+    fun saveIosToneMappingMode(mode: String)
+    fun loadIosTargetPrimaries(): String?
+    fun saveIosTargetPrimaries(primaries: String)
+    fun loadIosTargetTransfer(): String?
+    fun saveIosTargetTransfer(transfer: String)
+    fun loadIosHardwareDecoderMode(): String?
+    fun saveIosHardwareDecoderMode(mode: String)
+    fun loadIosExtendedDynamicRangeEnabled(): Boolean?
+    fun saveIosExtendedDynamicRangeEnabled(enabled: Boolean)
+    fun loadIosTargetColorspaceHintEnabled(): Boolean?
+    fun saveIosTargetColorspaceHintEnabled(enabled: Boolean)
+    fun loadIosHdrComputePeakEnabled(): Boolean?
+    fun saveIosHdrComputePeakEnabled(enabled: Boolean)
+    fun loadIosDebandEnabled(): Boolean?
+    fun saveIosDebandEnabled(enabled: Boolean)
+    fun loadIosInterpolationEnabled(): Boolean?
+    fun saveIosInterpolationEnabled(enabled: Boolean)
+    fun loadIosBrightness(): Int?
+    fun saveIosBrightness(value: Int)
+    fun loadIosContrast(): Int?
+    fun saveIosContrast(value: Int)
+    fun loadIosSaturation(): Int?
+    fun saveIosSaturation(value: Int)
+    fun loadIosGamma(): Int?
+    fun saveIosGamma(value: Int)
     fun exportToSyncPayload(): JsonObject
     fun replaceFromSyncPayload(payload: JsonObject)
 }

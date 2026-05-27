@@ -25,7 +25,18 @@ import kotlinx.serialization.json.Json
 @Serializable
 private data class StoredWatchedPayload(
     val items: List<WatchedItem> = emptyList(),
+    val lastSuccessfulPushEpochMs: Long = 0L,
 )
+
+internal enum class WatchedTraktHistorySync {
+    Mirror,
+    Skip,
+}
+
+internal fun shouldMirrorWatchedMarkToTraktHistory(
+    sync: WatchedTraktHistorySync,
+    isTraktAuthenticated: Boolean,
+): Boolean = sync == WatchedTraktHistorySync.Mirror && isTraktAuthenticated
 
 object WatchedRepository {
     private const val watchedItemsPageSize = 900
@@ -43,6 +54,7 @@ object WatchedRepository {
     private var hasLoaded = false
     private var currentProfileId: Int = 1
     private var itemsByKey: MutableMap<String, WatchedItem> = mutableMapOf()
+    private var lastSuccessfulPushEpochMs: Long = 0L
     internal var syncAdapter: WatchedSyncAdapter = SupabaseWatchedSyncAdapter
 
     private fun activePullSyncAdapter(): WatchedSyncAdapter =
@@ -62,6 +74,7 @@ object WatchedRepository {
         hasLoaded = false
         currentProfileId = 1
         itemsByKey.clear()
+        lastSuccessfulPushEpochMs = 0L
         _uiState.value = WatchedUiState()
     }
 
@@ -72,13 +85,16 @@ object WatchedRepository {
 
         val payload = WatchedStorage.loadPayload(profileId).orEmpty().trim()
         if (payload.isNotEmpty()) {
-            val items = runCatching {
-                json.decodeFromString<StoredWatchedPayload>(payload).items
-            }.getOrDefault(emptyList())
-            itemsByKey = items
+            val storedPayload = runCatching {
+                json.decodeFromString<StoredWatchedPayload>(payload)
+            }.getOrDefault(StoredWatchedPayload())
+            lastSuccessfulPushEpochMs = storedPayload.lastSuccessfulPushEpochMs
+            itemsByKey = storedPayload.items
                 .map(WatchedItem::normalizedMarkedAt)
                 .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
                 .toMutableMap()
+        } else {
+            lastSuccessfulPushEpochMs = 0L
         }
 
         publish()
@@ -88,16 +104,23 @@ object WatchedRepository {
         TraktAuthRepository.ensureLoaded()
         TraktSettingsRepository.ensureLoaded()
         currentProfileId = profileId
+        val pullStartedEpochMs = WatchedClock.nowEpochMs()
+        val localBeforePull = itemsByKey.values
+            .map(WatchedItem::normalizedMarkedAt)
+            .toList()
+        val lastPushEpochMs = lastSuccessfulPushEpochMs
         runCatching {
             val serverItems = activePullSyncAdapter().pull(
                 profileId = profileId,
                 pageSize = watchedItemsPageSize,
             )
 
-            itemsByKey = serverItems
-                .map(WatchedItem::normalizedMarkedAt)
-                .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
-                .toMutableMap()
+            itemsByKey = mergeWatchedItemsPreservingUnsynced(
+                serverItems = serverItems,
+                localItems = localBeforePull,
+                lastSuccessfulPushEpochMs = lastPushEpochMs,
+                pullStartedEpochMs = pullStartedEpochMs,
+            ).toMutableMap()
             hasLoaded = true
             publish()
             persist()
@@ -121,6 +144,17 @@ object WatchedRepository {
     }
 
     fun markWatched(items: Collection<WatchedItem>) {
+        markWatched(items = items, traktHistorySync = WatchedTraktHistorySync.Mirror)
+    }
+
+    internal fun markWatchedFromPlaybackCompletion(item: WatchedItem) {
+        markWatched(items = listOf(item), traktHistorySync = WatchedTraktHistorySync.Skip)
+    }
+
+    private fun markWatched(
+        items: Collection<WatchedItem>,
+        traktHistorySync: WatchedTraktHistorySync,
+    ) {
         ensureLoaded()
         if (items.isEmpty()) return
         val markedAt = WatchedClock.nowEpochMs()
@@ -133,7 +167,7 @@ object WatchedRepository {
         }
         publish()
         persist()
-        pushMarksToServer(timestampedItems)
+        pushMarksToServer(timestampedItems, traktHistorySync)
     }
 
     fun unmarkWatched(item: WatchedItem) {
@@ -188,6 +222,8 @@ object WatchedRepository {
         todayIsoDate: String,
         isEpisodeCompleted: (com.nuvio.app.features.details.MetaVideo) -> Boolean = { false },
     ) {
+        if (!meta.type.isSeriesLikeWatchedType()) return
+
         ensureLoaded()
         val shouldMarkSeriesWatched = meta.hasWatchedAllMainSeasonEpisodes(todayIsoDate) { episode ->
             isWatched(
@@ -198,21 +234,32 @@ object WatchedRepository {
             ) || isEpisodeCompleted(episode)
         }
         val seriesWatchedItem = meta.toSeriesWatchedItem()
+        val hasSeriesWatchedMarker = isWatched(id = meta.id, type = meta.type)
         if (shouldMarkSeriesWatched) {
-            if (!isWatched(id = meta.id, type = meta.type)) {
+            if (!hasSeriesWatchedMarker) {
                 markWatched(seriesWatchedItem)
             }
-        } else if (isWatched(id = meta.id, type = meta.type)) {
+        } else if (hasSeriesWatchedMarker) {
             unmarkWatched(seriesWatchedItem)
         }
     }
 
-    private fun pushMarksToServer(items: Collection<WatchedItem>) {
+    private fun pushMarksToServer(
+        items: Collection<WatchedItem>,
+        traktHistorySync: WatchedTraktHistorySync,
+    ) {
         syncScope.launch {
             runCatching {
                 if (items.isEmpty()) return@runCatching
                 val profileId = ProfileRepository.activeProfileId
-                pushToActiveTargets(profileId = profileId, items = items)
+                val pushed = pushToActiveTargets(
+                    profileId = profileId,
+                    items = items,
+                    traktHistorySync = traktHistorySync,
+                )
+                if (pushed) {
+                    recordSuccessfulPush(profileId = profileId, items = items)
+                }
             }.onFailure { e ->
                 log.e(e) { "Failed to push watched items" }
             }
@@ -252,9 +299,22 @@ object WatchedRepository {
                     items = itemsByKey.values
                         .map(WatchedItem::normalizedMarkedAt)
                         .sortedByDescending { it.markedAtEpochMs },
+                    lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
                 ),
             ),
         )
+    }
+
+    private fun recordSuccessfulPush(profileId: Int, items: Collection<WatchedItem>) {
+        if (profileId != currentProfileId) return
+        val latestPushed = items
+            .asSequence()
+            .map { item -> normalizeWatchedMarkedAtEpochMs(item.markedAtEpochMs) }
+            .maxOrNull()
+            ?: return
+        if (latestPushed <= lastSuccessfulPushEpochMs) return
+        lastSuccessfulPushEpochMs = latestPushed
+        persist()
     }
 
     private fun shouldUseTraktWatchedSync(): Boolean =
@@ -266,16 +326,24 @@ object WatchedRepository {
     private suspend fun pushToActiveTargets(
         profileId: Int,
         items: Collection<WatchedItem>,
-    ) {
+        traktHistorySync: WatchedTraktHistorySync,
+    ): Boolean {
+        val shouldMirrorToTrakt = shouldMirrorWatchedMarkToTraktHistory(
+            sync = traktHistorySync,
+            isTraktAuthenticated = TraktAuthRepository.isAuthenticated.value,
+        )
+
         if (shouldUseTraktWatchedSync()) {
+            if (!shouldMirrorToTrakt) return false
             TraktWatchedSyncAdapter.push(profileId = profileId, items = items)
-            return
+            return true
         }
 
         syncAdapter.push(profileId = profileId, items = items)
-        if (TraktAuthRepository.isAuthenticated.value) {
+        if (shouldMirrorToTrakt) {
             TraktWatchedSyncAdapter.push(profileId = profileId, items = items)
         }
+        return true
     }
 
     private suspend fun deleteFromActiveTargets(
@@ -294,6 +362,33 @@ object WatchedRepository {
     }
 }
 
+internal fun mergeWatchedItemsPreservingUnsynced(
+    serverItems: Collection<WatchedItem>,
+    localItems: Collection<WatchedItem>,
+    lastSuccessfulPushEpochMs: Long,
+    pullStartedEpochMs: Long,
+): Map<String, WatchedItem> {
+    val merged = serverItems
+        .map(WatchedItem::normalizedMarkedAt)
+        .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
+        .toMutableMap()
+
+    localItems
+        .map(WatchedItem::normalizedMarkedAt)
+        .forEach { localItem ->
+            val key = watchedItemKey(localItem.type, localItem.id, localItem.season, localItem.episode)
+            if (key in merged) return@forEach
+            val markedAt = localItem.markedAtEpochMs
+            val wasMarkedAfterLastPush = lastSuccessfulPushEpochMs > 0L && markedAt > lastSuccessfulPushEpochMs
+            val wasMarkedDuringPull = pullStartedEpochMs > 0L && markedAt >= pullStartedEpochMs
+            if (wasMarkedAfterLastPush || wasMarkedDuringPull) {
+                merged[key] = localItem
+            }
+        }
+
+    return merged
+}
+
 internal fun shouldUseTraktWatchedSync(
     isAuthenticated: Boolean,
     source: WatchProgressSource,
@@ -301,3 +396,6 @@ internal fun shouldUseTraktWatchedSync(
     isAuthenticated = isAuthenticated,
     source = source,
 )
+
+private fun String.isSeriesLikeWatchedType(): Boolean =
+    trim().lowercase() in setOf("series", "show", "tv", "tvshow")

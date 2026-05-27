@@ -20,6 +20,8 @@ interface PlayerEngineController {
     fun applySubtitleStyle(style: SubtitleStyleState) {}
     fun setKeyboardModalState(isAnyModalVisible: Boolean) {}
     fun setExitCallback(callback: (() -> Unit)?) {}
+    fun setSubtitleDelayMs(delayMs: Int) {}
+    fun configureIosVideoOutput(settings: PlayerSettingsUiState) {}
 }
 
 internal fun sanitizePlaybackHeaders(headers: Map<String, String>?): Map<String, String> {

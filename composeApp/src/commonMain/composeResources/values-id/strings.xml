@@ -1100,7 +1100,7 @@
     <string name="streams_resume_from_percent">Lanjutkan dari %1$d%</string>
     <string name="streams_resume_from_time">Lanjutkan dari %1$s</string>
     <string name="streams_size">UKURAN %1$s</string>
-    <string name="streams_torrent_not_supported">Stream torrent tidak didukung</string>
+    <string name="streams_torrent_not_supported">Jenis stream ini tidak didukung</string>
     <string name="trailer_close">Tutup trailer</string>
     <string name="trailer_unable_to_play">Tidak dapat memutar trailer</string>
     <string name="trakt_lists_load_failed">Gagal memuat daftar Trakt</string>
@@ -1274,4 +1274,18 @@
     <string name="unit_bytes_kb">KB</string>
     <string name="unit_bytes_mb">MB</string>
     <string name="unit_bytes_gb">GB</string>
+    <string name="cw_new_episode">Episode Baru</string>
+    <string name="cw_new_season">Musim Baru</string>
+    <string name="cw_airs_date">Tayang %1$s</string>
+    <string name="cw_airs_today">Tayang hari ini</string>
+    <string name="cw_airs_tomorrow">Tayang besok</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="other">Tayang dalam %d hari</item>
+    </plurals>
+    <string name="cw_airs_date_short">%1$s</string>
+    <string name="cw_airs_today_short">Hari ini</string>
+    <string name="cw_airs_tomorrow_short">Besok</string>
+    <plurals name="cw_airs_in_days_short">
+        <item quantity="other">Dalam %d hari</item>
+    </plurals>
 </resources>

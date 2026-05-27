@@ -3,11 +3,13 @@ package com.nuvio.app.features.player
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitViewController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.delay
@@ -37,6 +39,9 @@ actual fun PlatformPlayerSurface(
     val latestOnControllerReady = rememberUpdatedState(onControllerReady)
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
+    PlayerSettingsRepository.ensureLoaded()
+    val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val latestPlayerSettings = rememberUpdatedState(playerSettings)
 
     val bridge = remember {
         NuvioPlayerBridgeFactory.create()
@@ -69,6 +74,10 @@ actual fun PlatformPlayerSurface(
 
             override fun retry() {
                 bridge.retry()
+            }
+
+            override fun configureIosVideoOutput(settings: PlayerSettingsUiState) {
+                bridge.applyIosVideoOutputSettings(settings)
             }
 
             override fun setPlaybackSpeed(speed: Float) {
@@ -197,10 +206,17 @@ actual fun PlatformPlayerSurface(
                 bridge.clearExternalSubtitleAndSelect(trackId)
             }
 
+            override fun setSubtitleDelayMs(delayMs: Int) {
+                bridge.setSubtitleDelayMs(delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS))
+            }
+
             override fun applySubtitleStyle(style: SubtitleStyleState) {
                 bridge.applySubtitleStyle(
                     textColor = style.textColor.toMpvColorString(),
-                    outlineSize = if (style.outlineEnabled) 1.65f else 0f,
+                    backgroundColor = style.backgroundColor.toMpvColorString(),
+                    outlineColor = style.outlineColor.toMpvColorString(),
+                    outlineSize = if (style.outlineEnabled) style.outlineWidth.toFloat() else 0f,
+                    bold = style.bold,
                     fontSize = style.toMpvSubtitleFontSize(),
                     subPos = style.toMpvSubtitlePosition(),
                 )
@@ -222,6 +238,7 @@ actual fun PlatformPlayerSurface(
 
     // Load file and set initial state
     LaunchedEffect(bridge, sourceUrl, sourceAudioUrl, sourceHeaders) {
+        bridge.applyIosVideoOutputSettings(latestPlayerSettings.value)
         bridge.loadFileWithAudio(
             sourceUrl,
             sourceAudioUrl,
@@ -248,6 +265,10 @@ actual fun PlatformPlayerSurface(
                 PlayerResizeMode.Zoom -> 2
             }
         )
+    }
+
+    LaunchedEffect(bridge, playerSettings) {
+        bridge.applyIosVideoOutputSettings(playerSettings)
     }
 
     // Polling for snapshots
@@ -288,12 +309,32 @@ actual fun PlatformPlayerSurface(
     )
 }
 
+private fun NuvioPlayerBridge.applyIosVideoOutputSettings(settings: PlayerSettingsUiState) {
+    configureVideoOutput(
+        hardwareDecoder = settings.iosHardwareDecoderMode.mpvValue,
+        targetColorspaceHint = settings.iosTargetColorspaceHintEnabled,
+        toneMapping = settings.iosToneMappingMode.mpvValue,
+        hdrComputePeak = settings.iosHdrComputePeakEnabled,
+        targetPrimaries = settings.iosTargetPrimaries.mpvValue,
+        targetTransfer = settings.iosTargetTransfer.mpvValue,
+        extendedDynamicRange = settings.iosExtendedDynamicRangeEnabled,
+        deband = settings.iosDebandEnabled,
+        interpolation = settings.iosInterpolationEnabled,
+        brightness = settings.iosBrightness,
+        contrast = settings.iosContrast,
+        saturation = settings.iosSaturation,
+        gamma = settings.iosGamma,
+    )
+}
+
 private fun Color.toMpvColorString(): String {
+    val alphaInt = (alpha * 255f).toInt().coerceIn(0, 255)
     val redInt = (red * 255f).toInt().coerceIn(0, 255)
     val greenInt = (green * 255f).toInt().coerceIn(0, 255)
     val blueInt = (blue * 255f).toInt().coerceIn(0, 255)
     return buildString {
         append('#')
+        append(alphaInt.toHexByte())
         append(redInt.toHexByte())
         append(greenInt.toHexByte())
         append(blueInt.toHexByte())

@@ -73,7 +73,7 @@ private fun isExplicitlyReleasedBy(
     return isoDate <= todayIsoDate
 }
 
-private fun daysUntilExplicitRelease(
+internal fun daysUntilExplicitRelease(
     todayIsoDate: String,
     releasedDate: String?,
 ): Int? {
@@ -82,7 +82,7 @@ private fun daysUntilExplicitRelease(
     return (isoEpochDay(targetDate) - isoEpochDay(startDate)).toInt()
 }
 
-private fun isoCalendarDateOrNull(value: String?): String? {
+internal fun isoCalendarDateOrNull(value: String?): String? {
     val datePart = value
         ?.trim()
         ?.substringBefore('T')
@@ -99,7 +99,7 @@ private fun isoCalendarDateOrNull(value: String?): String? {
     return "$normalizedYear-$normalizedMonth-$normalizedDay"
 }
 
-private fun isoEpochDay(date: String): Long {
+internal fun isoEpochDay(date: String): Long {
     val year = date.substring(0, 4).toLong()
     val month = date.substring(5, 7).toLong()
     val day = date.substring(8, 10).toLong()

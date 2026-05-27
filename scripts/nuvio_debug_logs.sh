@@ -128,7 +128,14 @@ fi
 # ── Colour-coding function ──────────────────────────────────────────────────
 colorize_line() {
   local line="$1"
-  local level="${line:0:1}"
+  local level=""
+  if [[ "$line" =~ ^[[:space:]]*[0-9]{2}-[0-9]{2}[[:space:]]+[0-9:.]+[[:space:]]+([VDIWEF])/ ]]; then
+    level="${BASH_REMATCH[1]}"
+  elif [[ "$line" =~ ^([VDIWEF])/ ]]; then
+    level="${BASH_REMATCH[1]}"
+  else
+    level="${line:0:1}"
+  fi
   local clr=""
   case "$level" in
     V) clr="$CLR_V" ;;
@@ -160,7 +167,7 @@ stream_logcat_colored() {
   local value="$2"
   local noise_re="$NOISE_TAGS"
 
-  "${ADB[@]}" logcat -v brief "$mode" "$value" 2>/dev/null \
+  "${ADB[@]}" logcat -v time "$mode" "$value" 2>/dev/null \
     | while IFS= read -r raw_line; do
         if [[ "$raw_line" =~ $noise_re ]]; then
           continue

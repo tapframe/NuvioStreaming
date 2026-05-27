@@ -1,5 +1,7 @@
 package com.nuvio.app.features.watchprogress
 
+import com.nuvio.app.features.cloud.CloudLibraryContentType
+import com.nuvio.app.features.cloud.cloudLibraryProviderPosterUrl
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlinx.serialization.Serializable
@@ -118,6 +120,7 @@ data class WatchProgressEntry(
 
 data class WatchProgressUiState(
     val entries: List<WatchProgressEntry> = emptyList(),
+    val hasLoadedRemoteProgress: Boolean = false,
 ) {
     val byVideoId: Map<String, WatchProgressEntry>
         get() = entries.associateBy { it.videoId }
@@ -170,6 +173,8 @@ data class ContinueWatchingItem(
     val resumeProgressFraction: Float? = null,
     val durationMs: Long,
     val progressFraction: Float,
+    val isReleaseAlert: Boolean = false,
+    val isNewSeasonRelease: Boolean = false,
 )
 
 data class ContinueWatchingPreferencesUiState(
@@ -198,6 +203,7 @@ internal fun nextUpDismissKey(
 
 internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
     val normalizedEntry = normalizedCompletion()
+    val cloudPosterUrl = normalizedEntry.cloudLibraryPosterFallbackUrl()
     val explicitResumeProgressFraction = normalizedEntry.normalizedProgressPercent
         ?.takeIf { durationMs <= 0L && it > 0f }
         ?.let { explicitPercent -> (explicitPercent / 100f).coerceIn(0f, 1f) }
@@ -212,9 +218,9 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
             episodeNumber = normalizedEntry.episodeNumber,
             episodeTitle = normalizedEntry.episodeTitle,
         ),
-        imageUrl = normalizedEntry.episodeThumbnail ?: normalizedEntry.background ?: normalizedEntry.poster,
+        imageUrl = normalizedEntry.episodeThumbnail ?: normalizedEntry.background ?: normalizedEntry.poster ?: cloudPosterUrl,
         logo = normalizedEntry.logo,
-        poster = normalizedEntry.poster,
+        poster = normalizedEntry.poster ?: cloudPosterUrl,
         background = normalizedEntry.background,
         seasonNumber = normalizedEntry.seasonNumber,
         episodeNumber = normalizedEntry.episodeNumber,
@@ -229,12 +235,30 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
         resumeProgressFraction = explicitResumeProgressFraction,
         durationMs = normalizedEntry.durationMs,
         progressFraction = normalizedEntry.progressFraction,
+        isReleaseAlert = false,
+        isNewSeasonRelease = false,
     )
+}
+
+private fun WatchProgressEntry.cloudLibraryPosterFallbackUrl(): String? {
+    if (!contentType.equals(CloudLibraryContentType, ignoreCase = true) &&
+        !parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
+    ) {
+        return null
+    }
+    return cloudLibraryProviderPosterUrl(parentMetaId)
+        ?: cloudLibraryProviderPosterUrl(providerAddonId)
 }
 
 internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
     nextEpisode: MetaVideo,
 ): ContinueWatchingItem {
+    val alertState = calculateReleaseAlertState(
+        seedLastUpdatedEpochMs = lastUpdatedEpochMs,
+        seedSeasonNumber = seasonNumber,
+        nextSeasonNumber = nextEpisode.season,
+        releasedIso = nextEpisode.released,
+    )
     return ContinueWatchingItem(
         parentMetaId = parentMetaId,
         parentMetaType = parentMetaType,
@@ -267,6 +291,8 @@ internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
         resumeProgressFraction = null,
         durationMs = 0L,
         progressFraction = 0f,
+        isReleaseAlert = alertState.isReleaseAlert,
+        isNewSeasonRelease = alertState.isNewSeasonRelease,
     )
 }
 

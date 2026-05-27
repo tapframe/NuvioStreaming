@@ -90,6 +90,19 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
             )
         }
 
+        outDir.resolve("com/nuvio/app/features/debrid").apply {
+            mkdirs()
+            resolve("PremiumizeConfig.kt").writeText(
+                """
+                |package com.nuvio.app.features.debrid
+                |
+                |object PremiumizeConfig {
+                |    const val CLIENT_ID = "${props.getProperty("PREMIUMIZE_CLIENT_ID", "")}"
+                |}
+                """.trimMargin()
+            )
+        }
+
         outDir.resolve("com/nuvio/app/core/build").apply {
             mkdirs()
             resolve("AppVersionConfig.kt").writeText(

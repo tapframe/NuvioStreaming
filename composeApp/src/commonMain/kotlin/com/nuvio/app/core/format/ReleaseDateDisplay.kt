@@ -18,6 +18,17 @@ fun formatReleaseDateForDisplay(raw: String): String {
     return "$year ${localizedMonthName(month)} $day"
 }
 
+fun formatReleaseDateWithoutYear(raw: String): String {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return raw
+    val datePart = trimmed.substringBefore('T').trim()
+    val parts = datePart.split('-')
+    if (parts.size != 3) return raw
+    val month = parts[1].toIntOrNull()?.takeIf { it in 1..12 } ?: return raw
+    val day = parts[2].toIntOrNull()?.takeIf { it in 1..31 } ?: return raw
+    return "${localizedMonthName(month)} $day"
+}
+
 /**
  * Parses a release/air string (ISO date, year-only, or timestamp prefix) for compact UI (e.g. year chips).
  */

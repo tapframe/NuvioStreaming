@@ -1,8 +1,11 @@
 package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.build.AppVersionConfig
 import com.nuvio.app.features.addons.httpRequestRaw
+import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -38,6 +41,7 @@ internal sealed interface TraktScrobbleItem {
 
 internal object TraktScrobbleRepository {
     private data class ScrobbleStamp(
+        val profileId: Int,
         val action: String,
         val itemKey: String,
         val progress: Float,
@@ -54,6 +58,9 @@ internal object TraktScrobbleRepository {
     private var lastScrobbleStamp: ScrobbleStamp? = null
     private val minSendIntervalMs = 8_000L
     private val progressWindow = 1.5f
+    private val maxStopRetries = 2
+    private val retryDelayMs = 1_500L
+    private val serverOverloadedRetryDelayMs = 5_000L
 
     suspend fun scrobbleStart(item: TraktScrobbleItem, progressPercent: Float) {
         sendScrobble(action = "start", item = item, progressPercent = progressPercent)
@@ -113,8 +120,9 @@ internal object TraktScrobbleRepository {
         progressPercent: Float,
     ) {
         val headers = TraktAuthRepository.authorizedHeaders() ?: return
+        val activeProfileId = ProfileRepository.activeProfileId
         val clampedProgress = progressPercent.coerceIn(0f, 100f)
-        if (shouldSkip(action, item.itemKey, clampedProgress)) return
+        if (shouldSkip(activeProfileId, action, item.itemKey, clampedProgress)) return
 
         val url = "$BASE_URL/scrobble/$action"
         val requestBody = json.encodeToString(buildRequestBody(item, clampedProgress))
@@ -140,70 +148,74 @@ internal object TraktScrobbleRepository {
             }
         }
 
-        val response = runCatching {
-            httpRequestRaw(
-                method = "POST",
-                url = url,
-                body = requestBody,
-                headers = requestHeaders,
-            )
-        }.onFailure { error ->
-            if (error is CancellationException) throw error
-            log.w(error) {
+        val attempts = if (action == "stop") maxStopRetries + 1 else 1
+        var wasSent = false
+        for (attempt in 1..attempts) {
+            val response = runCatching {
+                httpRequestRaw(
+                    method = "POST",
+                    url = url,
+                    body = requestBody,
+                    headers = requestHeaders,
+                )
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                log.w(error) {
+                    "Trakt scrobble $action transport failure on attempt $attempt/$attempts"
+                }
+            }.getOrNull()
+
+            if (response == null) {
+                if (attempt < attempts) {
+                    delay(retryDelayMs * attempt)
+                    continue
+                }
+                return
+            }
+
+            log.d {
                 buildString {
                     append("Trakt scrobble ")
                     append(action)
-                    append(" transport failure")
+                    append(" response")
+                    append('\n')
+                    append("status=")
+                    append(response.status)
+                    append(' ')
+                    append(response.statusText.ifBlank { "<no-status-text>" })
                     append('\n')
                     append("url=")
-                    append(url)
+                    append(response.url)
                     append('\n')
                     append("headers=")
-                    append(requestHeaders.redactedForLogs().formatForLog())
+                    append(response.headers.formatForLog())
                     append('\n')
                     append("body=")
-                    append(requestBody.ifBlank { "<empty>" })
+                    append(response.body.ifBlank { "<empty>" })
                 }
             }
-        }.getOrNull()
 
-        if (response == null) return
-
-        log.d {
-            buildString {
-                append("Trakt scrobble ")
-                append(action)
-                append(" response")
-                append('\n')
-                append("status=")
-                append(response.status)
-                append(' ')
-                append(response.statusText.ifBlank { "<no-status-text>" })
-                append('\n')
-                append("url=")
-                append(response.url)
-                append('\n')
-                append("headers=")
-                append(response.headers.formatForLog())
-                append('\n')
-                append("body=")
-                append(response.body.ifBlank { "<empty>" })
+            if (response.status in 200..299 || response.status == 409) {
+                wasSent = true
+                break
             }
-        }
 
-        val wasSent = when (response.status) {
-            in 200..299, 409 -> true
-            else -> {
-                log.w {
-                    "Failed Trakt scrobble $action: HTTP ${response.status} ${response.statusText.ifBlank { "<no-status-text>" }}"
-                }
-                false
+            if (response.status in 500..599 && attempt < attempts) {
+                val delayMs = if (response.status in 502..504) serverOverloadedRetryDelayMs else retryDelayMs * attempt
+                delay(delayMs)
+                continue
             }
+
+            log.w {
+                "Failed Trakt scrobble $action: HTTP ${response.status} ${response.statusText.ifBlank { "<no-status-text>" }}"
+            }
+            return
         }
 
         if (!wasSent) return
 
         lastScrobbleStamp = ScrobbleStamp(
+            profileId = activeProfileId,
             action = action,
             itemKey = item.itemKey,
             progress = clampedProgress,
@@ -231,6 +243,7 @@ internal object TraktScrobbleRepository {
                     ids = item.ids.toRequestBodyOrNull(),
                 ),
                 progress = clampedProgress,
+                appVersion = AppVersionConfig.VERSION_NAME,
             )
 
             is TraktScrobbleItem.Episode -> TraktScrobbleRequest(
@@ -245,21 +258,23 @@ internal object TraktScrobbleRepository {
                     number = item.number,
                 ),
                 progress = clampedProgress,
+                appVersion = AppVersionConfig.VERSION_NAME,
             )
         }
     }
 
-    private fun shouldSkip(action: String, itemKey: String, progress: Float): Boolean {
+    private fun shouldSkip(profileId: Int, action: String, itemKey: String, progress: Float): Boolean {
         val last = lastScrobbleStamp ?: return false
         val now = TraktPlatformClock.nowEpochMs()
         val isSameWindow = now - last.timestampMs < minSendIntervalMs
+        val isSameProfile = last.profileId == profileId
         val isSameAction = last.action == action
         val isSameItem = last.itemKey == itemKey
         val isNearProgress = abs(last.progress - progress) <= progressWindow
-        if (action == "stop" && last.action == "start" && isSameItem) {
+        if (action == "stop" && last.action == "start" && isSameItem && isSameProfile) {
             return false
         }
-        return isSameWindow && isSameAction && isSameItem && isNearProgress
+        return isSameWindow && isSameProfile && isSameAction && isSameItem && isNearProgress
     }
 
     private fun Map<String, String>.redactedForLogs(): Map<String, String> =
@@ -302,6 +317,7 @@ private data class TraktScrobbleRequest(
     @SerialName("show") val show: TraktShowBody? = null,
     @SerialName("episode") val episode: TraktEpisodeBody? = null,
     @SerialName("progress") val progress: Float,
+    @SerialName("app_version") val appVersion: String? = null,
 )
 
 @Serializable

@@ -142,14 +142,33 @@ internal fun MetaDetails.seriesPrimaryAction(
     watchedItems: List<WatchedItem>,
     todayIsoDate: String,
     preferFurthestEpisode: Boolean = true,
+    showUnairedNextUp: Boolean = false,
+): SeriesPrimaryAction? =
+    seriesPrimaryAction(
+        content = WatchingContentRef(type = type, id = id),
+        entries = entries,
+        watchedItems = watchedItems,
+        todayIsoDate = todayIsoDate,
+        preferFurthestEpisode = preferFurthestEpisode,
+        showUnairedNextUp = showUnairedNextUp,
+    )
+
+internal fun MetaDetails.seriesPrimaryAction(
+    content: WatchingContentRef,
+    entries: List<WatchProgressEntry>,
+    watchedItems: List<WatchedItem>,
+    todayIsoDate: String,
+    preferFurthestEpisode: Boolean = true,
+    showUnairedNextUp: Boolean = false,
 ): SeriesPrimaryAction? =
     decideSeriesPrimaryAction(
-        content = WatchingContentRef(type = type, id = id),
+        content = content,
         episodes = videos.map(MetaVideo::toDomainReleasedEpisode),
         progressRecords = entries.map(WatchProgressEntry::toDomainProgressRecord),
         watchedRecords = watchedItems.map(WatchedItem::toDomainWatchedRecord),
         todayIsoDate = todayIsoDate,
         preferFurthestEpisode = preferFurthestEpisode,
+        showUnairedNextUp = showUnairedNextUp,
     )?.toLegacySeriesPrimaryAction()
 
 internal fun MetaVideo.playLabel(): String =

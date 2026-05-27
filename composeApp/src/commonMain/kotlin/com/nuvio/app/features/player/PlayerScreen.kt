@@ -47,9 +47,16 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.NuvioToastController
+import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.debrid.DirectDebridPlayableResult
+import com.nuvio.app.features.debrid.DirectDebridPlaybackResolver
+import com.nuvio.app.features.debrid.toastMessage
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.AddonResource
 import com.nuvio.app.features.addons.ManagedAddon
+import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaScreenSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
@@ -61,21 +68,29 @@ import com.nuvio.app.features.player.skip.PlayerNextEpisodeRules
 import com.nuvio.app.features.player.skip.SkipIntroButton
 import com.nuvio.app.features.player.skip.SkipIntroRepository
 import com.nuvio.app.features.player.skip.SkipInterval
+import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamAutoPlayMode
 import com.nuvio.app.features.streams.StreamAutoPlaySelector
+import com.nuvio.app.features.streams.StreamAutoPlaySource
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamsUiState
+import com.nuvio.app.features.tmdb.TmdbService
+import com.nuvio.app.features.trakt.TraktScrobbleItem
 import com.nuvio.app.features.trakt.TraktScrobbleRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressClock
 import com.nuvio.app.features.watchprogress.WatchProgressPlaybackSession
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
+import com.nuvio.app.isIos
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
@@ -89,6 +104,9 @@ private const val PlayerLockedOverlayDurationMs = 2_000L
 private const val PlayerLeftGestureBoundary = 0.4f
 private const val PlayerRightGestureBoundary = 0.6f
 private const val PlayerVerticalGestureSensitivity = 1f
+private const val PlayerSeekProgressSyncDebounceMs = 700L
+/** Hard ceiling for next-episode stream search to prevent hanging forever. */
+private const val NEXT_EPISODE_HARD_TIMEOUT_MS = 120_000L
 private val PlayerSliderOverlayGap = 12.dp
 private val PlayerTimeRowHeight = 36.dp
 private val PlayerActionRowHeight = 50.dp
@@ -191,6 +209,16 @@ fun PlayerScreen(
         val downloadedLabel = stringResource(Res.string.compose_player_downloaded)
         val airsPrefix = stringResource(Res.string.compose_player_airs_prefix)
         val tbaLabel = stringResource(Res.string.compose_player_tba)
+        val parentalGuideLabels = ParentalGuideLabels(
+            nudity = stringResource(Res.string.parental_nudity),
+            violence = stringResource(Res.string.parental_violence),
+            profanity = stringResource(Res.string.parental_profanity),
+            alcohol = stringResource(Res.string.parental_alcohol),
+            frightening = stringResource(Res.string.parental_frightening),
+            severe = stringResource(Res.string.parental_severity_severe),
+            moderate = stringResource(Res.string.parental_severity_moderate),
+            mild = stringResource(Res.string.parental_severity_mild),
+        )
         val gestureController = rememberPlayerGestureController()
         var controlsVisible by rememberSaveable { mutableStateOf(true) }
         var playerControlsLocked by rememberSaveable { mutableStateOf(false) }
@@ -227,6 +255,7 @@ fun PlayerScreen(
         val keepScreenAwake = errorMessage == null &&
             (playbackSnapshot.isPlaying || (shouldPlay && playbackSnapshot.isLoading))
         EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
+        var isScrubbingTimeline by remember { mutableStateOf(false) }
         var scrubbingPositionMs by remember { mutableStateOf<Long?>(null) }
         var pausedOverlayVisible by remember { mutableStateOf(false) }
         var gestureFeedback by remember { mutableStateOf<GestureFeedbackState?>(null) }
@@ -235,6 +264,7 @@ fun PlayerScreen(
         var lockedOverlayVisible by remember { mutableStateOf(false) }
         var gestureMessageJob by remember { mutableStateOf<Job?>(null) }
         var accumulatedSeekResetJob by remember { mutableStateOf<Job?>(null) }
+        var seekProgressSyncJob by remember { mutableStateOf<Job?>(null) }
         var accumulatedSeekState by remember { mutableStateOf<PlayerAccumulatedSeekState?>(null) }
         var initialLoadCompleted by remember(activeSourceUrl) { mutableStateOf(false) }
         var speedBoostRestoreSpeed by remember(activeSourceUrl) { mutableStateOf<Float?>(null) }
@@ -254,11 +284,29 @@ fun PlayerScreen(
             activeSeasonNumber,
             activeEpisodeNumber,
         ) { mutableStateOf(false) }
+        var scrobbleStartRequestGeneration by remember(
+            activeSourceUrl,
+            activeVideoId,
+            activeSeasonNumber,
+            activeEpisodeNumber,
+        ) { mutableStateOf(0L) }
+        var pendingScrobbleStartAfterSeek by remember(
+            activeSourceUrl,
+            activeVideoId,
+            activeSeasonNumber,
+            activeEpisodeNumber,
+        ) { mutableStateOf(false) }
         var hasSentCompletionScrobbleForCurrentItem by remember(
             activeVideoId,
             activeSeasonNumber,
             activeEpisodeNumber,
         ) { mutableStateOf(false) }
+        var currentTraktScrobbleItem by remember(
+            activeSourceUrl,
+            activeVideoId,
+            activeSeasonNumber,
+            activeEpisodeNumber,
+        ) { mutableStateOf<TraktScrobbleItem?>(null) }
         val backdropArtwork = background ?: poster
         val displayedPositionMs = scrubbingPositionMs ?: playbackSnapshot.positionMs
         val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
@@ -292,6 +340,12 @@ fun PlayerScreen(
         var activeSkipInterval by remember { mutableStateOf<SkipInterval?>(null) }
         var skipIntervalDismissed by remember { mutableStateOf(false) }
 
+        // Parental guide overlay state
+        var parentalWarnings by remember { mutableStateOf<List<ParentalWarning>>(emptyList()) }
+        var showParentalGuide by remember { mutableStateOf(false) }
+        var parentalGuideHasShown by remember { mutableStateOf(false) }
+        var playbackStartedForParentalGuide by remember { mutableStateOf(false) }
+
         // Next episode state
         var nextEpisodeInfo by remember { mutableStateOf<NextEpisodeInfo?>(null) }
         var showNextEpisodeCard by remember { mutableStateOf(false) }
@@ -311,6 +365,15 @@ fun PlayerScreen(
             val currentMeta = metaUiState.meta ?: return@LaunchedEffect
             if (currentMeta.type == parentMetaType && currentMeta.id == parentMetaId) {
                 playerMetaVideos = currentMeta.videos
+            }
+        }
+
+        // Persist binge group per content so subsequent episode plays
+        // (from CW, Details, or next-episode) can reuse the same source group.
+        LaunchedEffect(currentStreamBingeGroup, parentMetaId) {
+            val bg = currentStreamBingeGroup
+            if (bg != null && parentMetaId.isNotBlank()) {
+                BingeGroupCacheRepository.save(parentMetaId, bg)
             }
         }
 
@@ -386,6 +449,8 @@ fun PlayerScreen(
         fun emitTraktScrobbleStart() {
             if (hasRequestedScrobbleStartForCurrentItem) return
             hasRequestedScrobbleStartForCurrentItem = true
+            val requestGeneration = scrobbleStartRequestGeneration + 1L
+            scrobbleStartRequestGeneration = requestGeneration
 
             scope.launch {
                 val item = currentTraktScrobbleItem()
@@ -393,6 +458,10 @@ fun PlayerScreen(
                     hasRequestedScrobbleStartForCurrentItem = false
                     return@launch
                 }
+                if (requestGeneration != scrobbleStartRequestGeneration || !hasRequestedScrobbleStartForCurrentItem) {
+                    return@launch
+                }
+                currentTraktScrobbleItem = item
                 TraktScrobbleRepository.scrobbleStart(
                     item = item,
                     progressPercent = currentPlaybackProgressPercent(),
@@ -405,14 +474,17 @@ fun PlayerScreen(
             if (!hasRequestedScrobbleStartForCurrentItem && (provided ?: 0f) < 80f) return
 
             val percent = provided ?: currentPlaybackProgressPercent()
-            scope.launch {
-                val item = currentTraktScrobbleItem() ?: return@launch
+            val itemSnapshot = currentTraktScrobbleItem
+            scope.launch(NonCancellable) {
+                val item = itemSnapshot ?: currentTraktScrobbleItem() ?: return@launch
                 TraktScrobbleRepository.scrobbleStop(
                     item = item,
                     progressPercent = percent,
                 )
             }
+            currentTraktScrobbleItem = null
             hasRequestedScrobbleStartForCurrentItem = false
+            scrobbleStartRequestGeneration += 1L
         }
 
         fun emitStopScrobbleForCurrentProgress() {
@@ -428,12 +500,55 @@ fun PlayerScreen(
             }
         }
 
+        fun tryShowParentalGuide() {
+            if (!parentalGuideHasShown && parentalWarnings.isNotEmpty() && !playbackStartedForParentalGuide) {
+                playbackStartedForParentalGuide = true
+                controlsVisible = true
+                showParentalGuide = true
+                parentalGuideHasShown = true
+            }
+        }
+
+        suspend fun resolveParentalGuideImdbId(): String? {
+            val candidates = listOf(parentMetaId, activeVideoId)
+            candidates.firstNotNullOfOrNull(::extractParentalGuideImdbId)?.let { return it }
+            val tmdbId = candidates.firstNotNullOfOrNull(::extractParentalGuideTmdbId) ?: return null
+            return TmdbService.tmdbToImdb(
+                tmdbId = tmdbId,
+                mediaType = contentType ?: parentMetaType,
+            )
+        }
+
         fun flushWatchProgress() {
             emitStopScrobbleForCurrentProgress()
             WatchProgressRepository.flushPlaybackProgress(
                 session = playbackSession,
                 snapshot = playbackSnapshot,
             )
+        }
+
+        fun scheduleProgressSyncAfterSeek() {
+            val shouldRestartScrobbleAfterSeek = shouldPlay || playbackSnapshot.isPlaying
+            seekProgressSyncJob?.cancel()
+            seekProgressSyncJob = scope.launch {
+                delay(PlayerSeekProgressSyncDebounceMs)
+                WatchProgressRepository.upsertPlaybackProgress(
+                    session = playbackSession,
+                    snapshot = playbackSnapshot,
+                )
+
+                val progressPercent = currentPlaybackProgressPercent()
+                if (progressPercent >= 1f && progressPercent < 80f) {
+                    emitTraktScrobbleStop(progressPercent)
+                    val shouldRestartScrobbleNow = shouldRestartScrobbleAfterSeek && shouldPlay
+                    if (shouldRestartScrobbleNow && playbackSnapshot.isPlaying) {
+                        pendingScrobbleStartAfterSeek = false
+                        emitTraktScrobbleStart()
+                    } else if (shouldRestartScrobbleNow) {
+                        pendingScrobbleStartAfterSeek = true
+                    }
+                }
+            }
         }
 
         val onBackWithProgress = remember(onBack, playbackSession, playbackSnapshot) {
@@ -445,6 +560,7 @@ fun PlayerScreen(
 
         var showAudioModal by remember { mutableStateOf(false) }
         var showSubtitleModal by remember { mutableStateOf(false) }
+        var showVideoSettingsModal by remember { mutableStateOf(false) }
         var audioTracks by remember { mutableStateOf<List<AudioTrack>>(emptyList()) }
         var subtitleTracks by remember { mutableStateOf<List<SubtitleTrack>>(emptyList()) }
         var selectedAudioIndex by remember { mutableStateOf(-1) }
@@ -472,6 +588,146 @@ fun PlayerScreen(
         }
         var autoFetchedAddonSubtitlesForKey by rememberSaveable(activeSourceUrl, activeVideoId) {
             mutableStateOf<String?>(null)
+        }
+        var trackPreferenceRestoreApplied by rememberSaveable(activeSourceUrl, parentMetaId) {
+            mutableStateOf(false)
+        }
+        var subtitleDelayMs by rememberSaveable(playbackSession.videoId) {
+            mutableStateOf(
+                PlayerTrackPreferenceStorage.loadSubtitleDelayMs(playbackSession.videoId)
+                    ?: 0
+            )
+        }
+        var subtitleAutoSyncState by remember(playbackSession.videoId, selectedAddonSubtitleId) {
+            mutableStateOf(SubtitleAutoSyncUiState())
+        }
+        val visibleAddonSubtitles = remember(
+            addonSubtitles,
+            playerSettingsUiState.preferredSubtitleLanguage,
+            playerSettingsUiState.secondaryPreferredSubtitleLanguage,
+            subtitleStyle.showOnlyPreferredLanguages,
+            playerSettingsUiState.addonSubtitleStartupMode,
+            selectedAddonSubtitleId,
+        ) {
+            filterAddonSubtitlesForSettings(
+                subtitles = addonSubtitles,
+                settings = playerSettingsUiState,
+                selectedAddonSubtitleId = selectedAddonSubtitleId,
+            )
+        }
+        val selectedAddonSubtitle = remember(addonSubtitles, selectedAddonSubtitleId) {
+            addonSubtitles.firstOrNull { subtitle ->
+                subtitle.id == selectedAddonSubtitleId || subtitle.url == selectedAddonSubtitleId
+            }
+        }
+
+        fun updateTrackPreference(update: (PersistedPlayerTrackPreference) -> PersistedPlayerTrackPreference) {
+            if (parentMetaId.isBlank()) return
+            val current = PlayerTrackPreferenceStorage.load(parentMetaId) ?: PersistedPlayerTrackPreference()
+            PlayerTrackPreferenceStorage.save(parentMetaId, update(current))
+        }
+
+        fun persistAudioPreference(track: AudioTrack?) {
+            updateTrackPreference { current ->
+                current.copy(
+                    audioLanguage = track?.language,
+                    audioName = track?.label,
+                    audioTrackId = track?.id,
+                )
+            }
+        }
+
+        fun persistInternalSubtitlePreference(track: SubtitleTrack?) {
+            updateTrackPreference { current ->
+                current.copy(
+                    subtitleType = if (track == null) {
+                        PersistedSubtitleSelectionType.DISABLED
+                    } else {
+                        PersistedSubtitleSelectionType.INTERNAL
+                    },
+                    subtitleLanguage = track?.language,
+                    subtitleName = track?.label,
+                    subtitleTrackId = track?.id,
+                    addonSubtitleId = null,
+                    addonSubtitleUrl = null,
+                    addonSubtitleAddonName = null,
+                )
+            }
+        }
+
+        fun persistAddonSubtitlePreference(subtitle: AddonSubtitle) {
+            updateTrackPreference { current ->
+                current.copy(
+                    subtitleType = PersistedSubtitleSelectionType.ADDON,
+                    subtitleLanguage = subtitle.language,
+                    subtitleName = subtitle.display,
+                    subtitleTrackId = null,
+                    addonSubtitleId = subtitle.id,
+                    addonSubtitleUrl = subtitle.url,
+                    addonSubtitleAddonName = subtitle.addonName,
+                )
+            }
+        }
+
+        fun restorePersistedTrackPreferenceIfNeeded() {
+            if (trackPreferenceRestoreApplied) return
+            val preference = PlayerTrackPreferenceStorage.load(parentMetaId)
+            if (preference == null) {
+                trackPreferenceRestoreApplied = true
+                return
+            }
+
+            if (
+                audioTracks.isNotEmpty() &&
+                (!preference.audioTrackId.isNullOrBlank() ||
+                    !preference.audioLanguage.isNullOrBlank() ||
+                    !preference.audioName.isNullOrBlank())
+            ) {
+                val restoredAudioIndex = findPersistedAudioTrackIndex(audioTracks, preference)
+                if (restoredAudioIndex >= 0 && restoredAudioIndex != selectedAudioIndex) {
+                    playerController?.selectAudioTrack(restoredAudioIndex)
+                    selectedAudioIndex = restoredAudioIndex
+                }
+                preferredAudioSelectionApplied = true
+            }
+
+            when (preference.subtitleType) {
+                PersistedSubtitleSelectionType.DISABLED -> {
+                    playerController?.selectSubtitleTrack(-1)
+                    selectedSubtitleIndex = -1
+                    selectedAddonSubtitleId = null
+                    useCustomSubtitles = false
+                    preferredSubtitleSelectionApplied = true
+                }
+                PersistedSubtitleSelectionType.INTERNAL -> {
+                    if (subtitleTracks.isNotEmpty()) {
+                        val restoredSubtitleIndex = findPersistedSubtitleTrackIndex(subtitleTracks, preference)
+                        if (restoredSubtitleIndex >= 0) {
+                            if (useCustomSubtitles) {
+                                playerController?.clearExternalSubtitleAndSelect(restoredSubtitleIndex)
+                            } else {
+                                playerController?.selectSubtitleTrack(restoredSubtitleIndex)
+                            }
+                            selectedSubtitleIndex = restoredSubtitleIndex
+                            selectedAddonSubtitleId = null
+                            useCustomSubtitles = false
+                            preferredSubtitleSelectionApplied = true
+                        }
+                    }
+                }
+                PersistedSubtitleSelectionType.ADDON -> {
+                    val url = preference.addonSubtitleUrl?.takeIf { it.isNotBlank() }
+                    if (url != null) {
+                        selectedAddonSubtitleId = preference.addonSubtitleId ?: url
+                        selectedSubtitleIndex = -1
+                        useCustomSubtitles = true
+                        playerController?.setSubtitleUri(url)
+                        preferredSubtitleSelectionApplied = true
+                    }
+                }
+            }
+
+            trackPreferenceRestoreApplied = true
         }
 
         // Maintain focus when modals are dismissed or controls visibility changes
@@ -505,6 +761,8 @@ fun PlayerScreen(
             val selectedSub = subtitleTracks.firstOrNull { it.isSelected }
             if (selectedSub != null && !useCustomSubtitles) selectedSubtitleIndex = selectedSub.index
 
+            restorePersistedTrackPreferenceIfNeeded()
+
             if (!preferredAudioSelectionApplied) {
                 val preferredAudioTargets = resolvePreferredAudioLanguageTargets(
                     preferredAudioLanguage = playerSettingsUiState.preferredAudioLanguage,
@@ -529,7 +787,11 @@ fun PlayerScreen(
 
             if (!preferredSubtitleSelectionApplied) {
                 val preferredSubtitleTargets = resolvePreferredSubtitleLanguageTargets(
-                    preferredSubtitleLanguage = playerSettingsUiState.preferredSubtitleLanguage,
+                    preferredSubtitleLanguage = if (subtitleStyle.useForcedSubtitles) {
+                        SubtitleLanguageOption.FORCED
+                    } else {
+                        playerSettingsUiState.preferredSubtitleLanguage
+                    },
                     secondaryPreferredSubtitleLanguage = playerSettingsUiState.secondaryPreferredSubtitleLanguage,
                     deviceLanguages = DeviceLanguagePreferences.preferredLanguageCodes(),
                 )
@@ -554,7 +816,8 @@ fun PlayerScreen(
                         useCustomSubtitles = false
                     } else if (
                         preferredSubtitleIndex < 0 &&
-                        normalizeLanguageCode(playerSettingsUiState.preferredSubtitleLanguage) == SubtitleLanguageOption.FORCED
+                        (subtitleStyle.useForcedSubtitles ||
+                            normalizeLanguageCode(playerSettingsUiState.preferredSubtitleLanguage) == SubtitleLanguageOption.FORCED)
                     ) {
                         if (selectedSubtitleIndex != -1 || subtitleTracks.any { it.isSelected }) {
                             playerController?.selectSubtitleTrack(-1)
@@ -596,6 +859,7 @@ fun PlayerScreen(
             controlsVisible = false
             lockedOverlayVisible = false
             pausedOverlayVisible = false
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             gestureMessageJob?.cancel()
             gestureFeedback = null
@@ -603,6 +867,7 @@ fun PlayerScreen(
             renderedGestureFeedback = null
             showAudioModal = false
             showSubtitleModal = false
+            showVideoSettingsModal = false
             showSourcesPanel = false
             showEpisodesPanel = false
             episodeStreamsPanelState = EpisodeStreamsPanelState()
@@ -702,6 +967,7 @@ fun PlayerScreen(
 
         fun seekBy(offsetMs: Long) {
             playerController?.seekBy(offsetMs)
+            scheduleProgressSyncAfterSeek()
             controlsVisible = true
             when {
                 offsetMs > 0L -> showSeekFeedback(PlayerSeekDirection.Forward, offsetMs)
@@ -734,6 +1000,7 @@ fun PlayerScreen(
                 }
             }
             playerController?.seekTo(targetPositionMs)
+            scheduleProgressSyncAfterSeek()
             showSeekFeedback(direction, nextState.amountMs)
 
             accumulatedSeekResetJob?.cancel()
@@ -836,10 +1103,59 @@ fun PlayerScreen(
         val currentDurationMsState = rememberUpdatedState(playbackSnapshot.durationMs)
         val commitHorizontalSeekState = rememberUpdatedState { targetPositionMs: Long ->
             playerController?.seekTo(targetPositionMs)
+            scheduleProgressSyncAfterSeek()
+        }
+
+        fun resolveDebridForPlayer(
+            stream: StreamItem,
+            season: Int?,
+            episode: Int?,
+            onResolved: (StreamItem) -> Unit,
+            onStale: () -> Unit,
+        ): Boolean {
+            if (!DirectDebridPlaybackResolver.shouldResolveToPlayableStream(stream)) return false
+            scope.launch {
+                val resolved = DirectDebridPlaybackResolver.resolveToPlayableStream(
+                    stream = stream,
+                    season = season,
+                    episode = episode,
+                )
+                when (resolved) {
+                    is DirectDebridPlayableResult.Success -> onResolved(resolved.stream)
+                    else -> {
+                        resolved.toastMessage()?.let { NuvioToastController.show(it) }
+                        if (resolved == DirectDebridPlayableResult.Stale) {
+                            onStale()
+                        }
+                    }
+                }
+            }
+            return true
         }
 
         fun switchToSource(stream: StreamItem) {
-            val url = stream.directPlaybackUrl ?: return
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = activeSeasonNumber,
+                    episode = activeEpisodeNumber,
+                    onResolved = ::switchToSource,
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        val vid = activeVideoId
+                        if (vid != null) {
+                            PlayerStreamsRepository.loadSources(
+                                type = type,
+                                videoId = vid,
+                                season = activeSeasonNumber,
+                                episode = activeEpisodeNumber,
+                                forceRefresh = true,
+                            )
+                        }
+                    },
+                )
+            ) return
+            val url = stream.playableDirectUrl ?: return
             if (url == activeSourceUrl) return
             val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
             flushWatchProgress()
@@ -880,7 +1196,27 @@ fun PlayerScreen(
         }
 
         fun switchToEpisodeStream(stream: StreamItem, episode: MetaVideo) {
-            val url = stream.directPlaybackUrl ?: return
+            if (
+                resolveDebridForPlayer(
+                    stream = stream,
+                    season = episode.season,
+                    episode = episode.episode,
+                    onResolved = { resolvedStream ->
+                        switchToEpisodeStream(resolvedStream, episode)
+                    },
+                    onStale = {
+                        val type = contentType ?: parentMetaType
+                        PlayerStreamsRepository.loadEpisodeStreams(
+                            type = type,
+                            videoId = episode.id,
+                            season = episode.season,
+                            episode = episode.episode,
+                            forceRefresh = true,
+                        )
+                    },
+                )
+            ) return
+            val url = stream.playableDirectUrl ?: return
             showNextEpisodeCard = false
             showSourcesPanel = false
             showEpisodesPanel = false
@@ -1024,6 +1360,12 @@ fun PlayerScreen(
                             settings.streamAutoPlayPreferBingeGroup
                         )
 
+            // bingeGroupOnly manual mode: only binge group preference is active (not next-episode toggle)
+            val bingeGroupOnlyManualMode =
+                shouldAutoSelectInManualMode &&
+                    !settings.streamAutoPlayNextEpisodeEnabled &&
+                    settings.streamAutoPlayPreferBingeGroup
+
             // Determine auto-play mode for next episode
             val effectiveMode = if (shouldAutoSelectInManualMode) {
                 StreamAutoPlayMode.FIRST_STREAM
@@ -1031,7 +1373,7 @@ fun PlayerScreen(
                 settings.streamAutoPlayMode
             }
             val effectiveSource = if (shouldAutoSelectInManualMode) {
-                com.nuvio.app.features.streams.StreamAutoPlaySource.ALL_SOURCES
+                StreamAutoPlaySource.ALL_SOURCES
             } else {
                 settings.streamAutoPlaySource
             }
@@ -1051,6 +1393,13 @@ fun PlayerScreen(
                 settings.streamAutoPlayRegex
             }
 
+            // Determine preferred binge group from current stream (not cache)
+            val preferredBingeGroup = if (settings.streamAutoPlayPreferBingeGroup) {
+                currentStreamBingeGroup
+            } else {
+                null
+            }
+
             nextEpisodeAutoPlayJob = scope.launch {
                 PlayerStreamsRepository.loadEpisodeStreams(
                     type = type,
@@ -1060,61 +1409,198 @@ fun PlayerScreen(
                 )
 
                 val installedAddonNames = AddonRepository.uiState.value.addons
+                    .enabledAddons()
                     .map { it.displayTitle }
                     .toSet()
+                val debridSettings = DebridSettingsRepository.snapshot()
 
-                val timeoutMs = settings.streamAutoPlayTimeoutSeconds * 1000L
-                val startTime = WatchProgressClock.nowEpochMs()
+                val timeoutSeconds = settings.streamAutoPlayTimeoutSeconds
+                var autoSelectTriggered = false
+                var timeoutElapsed = false
+                var selectedStream: StreamItem? = null
+                val autoSelectSettled = CompletableDeferred<Unit>()
 
-                // Collect streams as they arrive
-                PlayerStreamsRepository.episodeStreamsState.collectLatest { state ->
-                    if (state.groups.isEmpty() && state.isAnyLoading) return@collectLatest
-
-                    val allStreams = state.groups.flatMap { it.streams }
-                    val elapsed = WatchProgressClock.nowEpochMs() - startTime
-
-                    val selected = if (allStreams.isNotEmpty()) {
-                        StreamAutoPlaySelector.selectAutoPlayStream(
-                            streams = allStreams,
-                            mode = effectiveMode,
-                            regexPattern = effectiveRegex,
-                            source = effectiveSource,
-                            installedAddonNames = installedAddonNames,
-                            selectedAddons = effectiveSelectedAddons,
-                            selectedPlugins = effectiveSelectedPlugins,
-                            preferredBingeGroup = if (settings.streamAutoPlayPreferBingeGroup) {
-                                currentStreamBingeGroup
-                            } else {
-                                null
-                            },
-                            preferBingeGroupInSelection = settings.streamAutoPlayPreferBingeGroup,
-                        )
-                    } else null
-
-                    if (selected != null || !state.isAnyLoading || elapsed >= timeoutMs) {
-                        nextEpisodeAutoPlaySearching = false
-                        if (selected != null) {
-                            nextEpisodeAutoPlaySourceName = selected.addonName
-                            // Countdown before playing
-                            for (i in 3 downTo 1) {
-                                nextEpisodeAutoPlayCountdown = i
-                                delay(1000)
-                            }
-                            switchToEpisodeStream(selected, nextVideo)
-                            showNextEpisodeCard = false
-                            nextEpisodeAutoPlayCountdown = null
-                            nextEpisodeAutoPlaySourceName = null
-                        } else if (!state.isAnyLoading || elapsed >= timeoutMs) {
-                            // No stream found — open the episode streams panel for manual selection
-                            episodeStreamsPanelState = EpisodeStreamsPanelState(
-                                showStreams = true,
-                                selectedEpisode = nextVideo,
-                            )
-                            showEpisodesPanel = true
-                            showNextEpisodeCard = false
-                        }
-                        return@collectLatest
+                fun settleAutoSelect() {
+                    if (!autoSelectSettled.isCompleted) {
+                        autoSelectSettled.complete(Unit)
                     }
+                }
+
+                fun selectStream(stream: StreamItem) {
+                    autoSelectTriggered = true
+                    selectedStream = stream
+                    settleAutoSelect()
+                }
+
+                fun finishWithoutSelection() {
+                    autoSelectTriggered = true
+                    settleAutoSelect()
+                }
+
+                // Full select: tries binge group first, then falls back to mode-based selection
+                fun trySelectStream(streams: List<StreamItem>): StreamItem? {
+                    return StreamAutoPlaySelector.selectAutoPlayStream(
+                        streams = streams,
+                        mode = effectiveMode,
+                        regexPattern = effectiveRegex,
+                        source = effectiveSource,
+                        installedAddonNames = installedAddonNames,
+                        selectedAddons = effectiveSelectedAddons,
+                        selectedPlugins = effectiveSelectedPlugins,
+                        preferredBingeGroup = preferredBingeGroup,
+                        preferBingeGroupInSelection = settings.streamAutoPlayPreferBingeGroup,
+                        bingeGroupOnly = bingeGroupOnlyManualMode,
+                        debridEnabled = debridSettings.canResolvePlayableLinks,
+                        activeResolverProviderId = debridSettings.activeResolverProviderId,
+                    )
+                }
+
+                // Binge group only early match: returns null if no binge group match
+                fun tryBingeGroupOnly(streams: List<StreamItem>): StreamItem? {
+                    if (preferredBingeGroup == null || !settings.streamAutoPlayPreferBingeGroup) return null
+                    return StreamAutoPlaySelector.selectAutoPlayStream(
+                        streams = streams,
+                        mode = effectiveMode,
+                        regexPattern = effectiveRegex,
+                        source = effectiveSource,
+                        installedAddonNames = installedAddonNames,
+                        selectedAddons = effectiveSelectedAddons,
+                        selectedPlugins = effectiveSelectedPlugins,
+                        preferredBingeGroup = preferredBingeGroup,
+                        preferBingeGroupInSelection = true,
+                        bingeGroupOnly = true,
+                        debridEnabled = debridSettings.canResolvePlayableLinks,
+                        activeResolverProviderId = debridSettings.activeResolverProviderId,
+                    )
+                }
+
+                val innerJob = launch {
+                    // Collect streams as they arrive
+                    PlayerStreamsRepository.episodeStreamsState.collectLatest { state ->
+                        if (state.groups.isEmpty() && state.isAnyLoading) return@collectLatest
+
+                        val allStreams = state.groups.flatMap { it.streams }
+
+                        if (autoSelectTriggered) {
+                            // Already resolved
+                        } else if (timeoutElapsed) {
+                            // Timeout elapsed: full select (binge group + fallback to mode)
+	                            if (allStreams.isNotEmpty()) {
+	                                val candidate = trySelectStream(allStreams)
+	                                if (candidate != null) {
+	                                    selectStream(candidate)
+	                                }
+	                            }
+	                        } else {
+	                            // Before timeout: eagerly check binge group only
+	                            if (allStreams.isNotEmpty()) {
+	                                val earlyMatch = tryBingeGroupOnly(allStreams)
+	                                if (earlyMatch != null) {
+	                                    selectStream(earlyMatch)
+	                                }
+	                            }
+	                        }
+
+                        // If all addons finished loading and no match yet, do a final full select
+                        if (!autoSelectTriggered && !state.isAnyLoading) {
+	                            if (allStreams.isNotEmpty()) {
+	                                val candidate = trySelectStream(allStreams)
+	                                if (candidate != null) {
+	                                    selectStream(candidate)
+	                                }
+	                            }
+	                            if (!autoSelectTriggered) {
+	                                finishWithoutSelection()
+	                            }
+	                            return@collectLatest
+	                        }
+
+                        if (autoSelectTriggered) return@collectLatest
+                    }
+                }
+
+                // Timeout logic
+                val timeoutMs = timeoutSeconds * 1_000L
+                val isBoundedTimeout = timeoutSeconds in 1..30
+
+                if (isBoundedTimeout) {
+                    // Bounded timeout (1-30s): wait, then trigger full select
+                    delay(timeoutMs)
+                    timeoutElapsed = true
+                    if (!autoSelectTriggered) {
+                        val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                        if (allStreams.isNotEmpty()) {
+	                            val candidate = trySelectStream(allStreams)
+	                            if (candidate != null) {
+	                                selectStream(candidate)
+	                            }
+	                        }
+	                    }
+	                    if (selectedStream != null) {
+	                        innerJob.cancel()
+	                    } else if (PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }.isNotEmpty()) {
+	                        // Streams arrived but no match after full select — don't wait further
+	                        innerJob.cancel()
+	                        finishWithoutSelection()
+	                    } else {
+	                        // No addon responded yet — wait with hard ceiling
+	                        val completed = withTimeoutOrNull(timeoutMs) { autoSelectSettled.await() }
+	                        innerJob.cancel()
+	                        if (completed == null) {
+	                            if (!autoSelectTriggered) {
+	                                val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                                if (allStreams.isNotEmpty()) {
+	                                    selectedStream = trySelectStream(allStreams)
+	                                }
+	                                finishWithoutSelection()
+	                            }
+	                        }
+	                    }
+	                } else {
+	                    // Instant (0) or unlimited: timeoutElapsed immediately so each
+	                    // addon response triggers a full select attempt in the collect.
+	                    timeoutElapsed = true
+	                    if (!autoSelectTriggered) {
+	                        val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                        if (allStreams.isNotEmpty()) {
+	                            trySelectStream(allStreams)?.let(::selectStream)
+	                        }
+	                    }
+	                    val hardTimeout = NEXT_EPISODE_HARD_TIMEOUT_MS
+	                    val completed = withTimeoutOrNull(hardTimeout) { autoSelectSettled.await() }
+	                    innerJob.cancel()
+	                    if (completed == null) {
+	                        if (!autoSelectTriggered) {
+	                            val allStreams = PlayerStreamsRepository.episodeStreamsState.value.groups.flatMap { it.streams }
+	                            if (allStreams.isNotEmpty()) {
+	                                selectedStream = trySelectStream(allStreams)
+	                            }
+	                            finishWithoutSelection()
+	                        }
+	                    }
+	                }
+
+                // Handle result
+                nextEpisodeAutoPlaySearching = false
+                if (selectedStream != null) {
+                    nextEpisodeAutoPlaySourceName = selectedStream!!.addonName
+                    // Countdown before playing
+                    for (i in 3 downTo 1) {
+                        nextEpisodeAutoPlayCountdown = i
+                        delay(1000)
+                    }
+                    switchToEpisodeStream(selectedStream!!, nextVideo)
+                    showNextEpisodeCard = false
+                    nextEpisodeAutoPlayCountdown = null
+                    nextEpisodeAutoPlaySourceName = null
+                } else {
+                    // No stream found — open the episode streams panel for manual selection
+                    episodeStreamsPanelState = EpisodeStreamsPanelState(
+                        showStreams = true,
+                        selectedEpisode = nextVideo,
+                    )
+                    showEpisodesPanel = true
+                    showNextEpisodeCard = false
                 }
             }
         }
@@ -1151,11 +1637,65 @@ fun PlayerScreen(
             SubtitleRepository.fetchAddonSubtitles(type, videoId)
         }
 
+        fun setSubtitleDelay(delayMs: Int) {
+            val clamped = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+            subtitleDelayMs = clamped
+            PlayerTrackPreferenceStorage.saveSubtitleDelayMs(playbackSession.videoId, clamped)
+            playerController?.setSubtitleDelayMs(clamped)
+        }
+
+        fun loadSubtitleAutoSyncCues(force: Boolean = false) {
+            val subtitle = selectedAddonSubtitle ?: return
+            if (!force && subtitleAutoSyncState.cues.isNotEmpty()) return
+            subtitleAutoSyncState = subtitleAutoSyncState.copy(isLoading = true, errorMessage = null)
+            scope.launch {
+                val result = runCatching {
+                    val body = httpGetTextWithHeaders(
+                        url = subtitle.url,
+                        headers = sanitizePlaybackHeaders(activeSourceHeaders),
+                    )
+                    PlayerSubtitleCueParser.parse(body, subtitle.url)
+                }
+                result.fold(
+                    onSuccess = { cues ->
+                        subtitleAutoSyncState = subtitleAutoSyncState.copy(
+                            cues = cues,
+                            isLoading = false,
+                            errorMessage = if (cues.isEmpty()) "No subtitle lines found" else null,
+                        )
+                    },
+                    onFailure = { error ->
+                        subtitleAutoSyncState = subtitleAutoSyncState.copy(
+                            isLoading = false,
+                            errorMessage = error.message ?: "Unable to load subtitle lines",
+                        )
+                    },
+                )
+            }
+        }
+
+        fun captureSubtitleAutoSyncTime() {
+            subtitleAutoSyncState = subtitleAutoSyncState.copy(
+                capturedPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L),
+                errorMessage = null,
+            )
+            loadSubtitleAutoSyncCues()
+        }
+
+        fun applySubtitleAutoSyncCue(cue: SubtitleSyncCue) {
+            val capturedPositionMs = subtitleAutoSyncState.capturedPositionMs ?: return
+            val newDelayMs = (capturedPositionMs - cue.startTimeMs - SUBTITLE_AUTO_SYNC_REACTION_COMPENSATION_MS)
+                .toInt()
+                .coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+            setSubtitleDelay(newDelayMs)
+        }
+
         LaunchedEffect(activeSourceUrl, activeSourceAudioUrl, activeSourceHeaders, activeSourceResponseHeaders) {
             errorMessage = null
             playerController = null
             playerControllerSourceUrl = null
             playbackSnapshot = PlayerPlaybackSnapshot()
+            isScrubbingTimeline = false
             scrubbingPositionMs = null
             liveGestureFeedback = null
             renderedGestureFeedback = null
@@ -1163,6 +1703,9 @@ fun PlayerScreen(
             initialLoadCompleted = false
             lastProgressPersistEpochMs = 0L
             previousIsPlaying = false
+            pendingScrobbleStartAfterSeek = false
+            seekProgressSyncJob?.cancel()
+            seekProgressSyncJob = null
             accumulatedSeekResetJob?.cancel()
             accumulatedSeekResetJob = null
             accumulatedSeekState = null
@@ -1177,6 +1720,19 @@ fun PlayerScreen(
             WatchProgressRepository.ensureLoaded()
         }
 
+        LaunchedEffect(playbackSession.videoId) {
+            subtitleDelayMs = PlayerTrackPreferenceStorage.loadSubtitleDelayMs(playbackSession.videoId) ?: 0
+            subtitleAutoSyncState = SubtitleAutoSyncUiState()
+        }
+
+        LaunchedEffect(playerController, subtitleDelayMs) {
+            playerController?.setSubtitleDelayMs(subtitleDelayMs)
+        }
+
+        LaunchedEffect(selectedAddonSubtitleId, useCustomSubtitles, activeSourceUrl) {
+            subtitleAutoSyncState = SubtitleAutoSyncUiState()
+        }
+
         LaunchedEffect(playerController, subtitleStyle) {
             playerController?.applySubtitleStyle(subtitleStyle)
         }
@@ -1185,8 +1741,11 @@ fun PlayerScreen(
             playerController?.setExitCallback(onBackWithProgress)
         }
 
-        LaunchedEffect(activeSourceUrl, addonSubtitleFetchKey) {
+        LaunchedEffect(activeSourceUrl, addonSubtitleFetchKey, playerSettingsUiState.addonSubtitleStartupMode) {
             val fetchKey = addonSubtitleFetchKey ?: return@LaunchedEffect
+            if (playerSettingsUiState.addonSubtitleStartupMode == AddonSubtitleStartupMode.FAST_STARTUP) {
+                return@LaunchedEffect
+            }
             if (autoFetchedAddonSubtitlesForKey == fetchKey) return@LaunchedEffect
             autoFetchedAddonSubtitlesForKey = fetchKey
             fetchAddonSubtitlesForActiveItem()
@@ -1264,8 +1823,22 @@ fun PlayerScreen(
             initialSeekApplied = true
         }
 
-        LaunchedEffect(controlsVisible, playbackSnapshot.isPlaying, playbackSnapshot.isLoading, errorMessage) {
-            if (!controlsVisible || !playbackSnapshot.isPlaying || playbackSnapshot.isLoading || errorMessage != null) {
+        LaunchedEffect(
+            controlsVisible,
+            isScrubbingTimeline,
+            playbackSnapshot.isPlaying,
+            playbackSnapshot.isLoading,
+            showParentalGuide,
+            errorMessage,
+        ) {
+            if (
+                !controlsVisible ||
+                isScrubbingTimeline ||
+                !playbackSnapshot.isPlaying ||
+                playbackSnapshot.isLoading ||
+                showParentalGuide ||
+                errorMessage != null
+            ) {
                 return@LaunchedEffect
             }
             delay(3500)
@@ -1299,14 +1872,19 @@ fun PlayerScreen(
             if (playbackSnapshot.isEnded) {
                 flushWatchProgress()
                 previousIsPlaying = false
+                pendingScrobbleStartAfterSeek = false
                 return@LaunchedEffect
             }
 
             if (previousIsPlaying && !playbackSnapshot.isPlaying && !playbackSnapshot.isLoading) {
+                pendingScrobbleStartAfterSeek = false
                 flushWatchProgress()
             }
 
-            if (!previousIsPlaying && playbackSnapshot.isPlaying) {
+            if (playbackSnapshot.isPlaying && pendingScrobbleStartAfterSeek) {
+                pendingScrobbleStartAfterSeek = false
+                emitTraktScrobbleStart()
+            } else if (!previousIsPlaying && playbackSnapshot.isPlaying) {
                 emitTraktScrobbleStart()
             }
 
@@ -1327,6 +1905,28 @@ fun PlayerScreen(
                 session = playbackSession,
                 snapshot = playbackSnapshot,
             )
+        }
+
+        // Fetch parental guide when the playable item changes.
+        LaunchedEffect(activeVideoId, activeSeasonNumber, activeEpisodeNumber, parentMetaId, parentMetaType) {
+            parentalWarnings = emptyList()
+            showParentalGuide = false
+            parentalGuideHasShown = false
+            playbackStartedForParentalGuide = false
+
+            val imdbId = resolveParentalGuideImdbId() ?: return@LaunchedEffect
+            val guide = ParentalGuideRepository.getParentalGuide(imdbId) ?: return@LaunchedEffect
+            parentalWarnings = buildParentalWarnings(guide, parentalGuideLabels)
+
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
+        }
+
+        LaunchedEffect(playbackSnapshot.isPlaying, parentalWarnings) {
+            if (playbackSnapshot.isPlaying) {
+                tryShowParentalGuide()
+            }
         }
 
         // Fetch skip intervals when episode changes
@@ -1694,7 +2294,7 @@ fun PlayerScreen(
             }
 
             AnimatedVisibility(
-                visible = controlsVisible && !playerControlsLocked,
+                visible = (controlsVisible || showParentalGuide) && !playerControlsLocked,
                 enter = fadeIn(),
                 exit = fadeOut(),
             ) {
@@ -1710,6 +2310,7 @@ fun PlayerScreen(
                     metrics = metrics,
                     resizeMode = resizeMode,
                     isLocked = playerControlsLocked,
+                    showPlaybackControls = controlsVisible,
                     onLockToggle = {
                         if (playerControlsLocked) {
                             unlockPlayerControls()
@@ -1731,13 +2332,29 @@ fun PlayerScreen(
                         refreshTracks()
                         showAudioModal = true
                     },
+                    onVideoSettingsClick = if (isIos) {
+                        {
+                            showVideoSettingsModal = true
+                            controlsVisible = true
+                        }
+                    } else {
+                        null
+                    },
                     onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
                     onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
                     onSubmitIntroClick = if (isSeries && playerSettingsUiState.introSubmitEnabled && playerSettingsUiState.introDbApiKey.isNotBlank()) { { showSubmitIntroModal = true } } else null,
-                    onScrubChange = { positionMs -> scrubbingPositionMs = positionMs },
+                    parentalWarnings = parentalWarnings,
+                    showParentalGuide = showParentalGuide,
+                    onParentalGuideAnimationComplete = { showParentalGuide = false },
+                    onScrubChange = { positionMs ->
+                        isScrubbingTimeline = true
+                        scrubbingPositionMs = positionMs
+                    },
                     onScrubFinished = { positionMs ->
+                        isScrubbingTimeline = false
                         scrubbingPositionMs = null
                         playerController?.seekTo(positionMs)
+                        scheduleProgressSyncAfterSeek()
                     },
                     horizontalSafePadding = horizontalSafePadding,
                     modifier = Modifier.fillMaxSize(),
@@ -1798,12 +2415,13 @@ fun PlayerScreen(
             // Skip intro/recap/outro button
             if (!playerControlsLocked) {
                 SkipIntroButton(
-                    interval = activeSkipInterval,
+                    interval = if (!initialLoadCompleted || pausedOverlayVisible) null else activeSkipInterval,
                     dismissed = skipIntervalDismissed,
                     controlsVisible = controlsVisible,
                     onSkip = {
                         val interval = activeSkipInterval ?: return@SkipIntroButton
                         playerController?.seekTo((interval.endTime * 1000).toLong())
+                        scheduleProgressSyncAfterSeek()
                         skipIntervalDismissed = true
                     },
                     onDismiss = { skipIntervalDismissed = true },
@@ -1851,6 +2469,7 @@ fun PlayerScreen(
                 selectedIndex = selectedAudioIndex,
                 onTrackSelected = { index ->
                     selectedAudioIndex = index
+                    persistAudioPreference(audioTracks.firstOrNull { it.index == index })
                     playerController?.selectAudioTrack(index)
                     scope.launch {
                         delay(200)
@@ -1865,16 +2484,20 @@ fun PlayerScreen(
                 activeTab = activeSubtitleTab,
                 subtitleTracks = subtitleTracks,
                 selectedSubtitleIndex = selectedSubtitleIndex,
-                addonSubtitles = addonSubtitles,
+                addonSubtitles = visibleAddonSubtitles,
                 selectedAddonSubtitleId = selectedAddonSubtitleId,
                 isLoadingAddonSubtitles = isLoadingAddonSubtitles,
                 subtitleStyle = subtitleStyle,
+                subtitleDelayMs = subtitleDelayMs,
+                selectedAddonSubtitle = selectedAddonSubtitle,
+                subtitleAutoSyncState = subtitleAutoSyncState,
                 onTabSelected = { activeSubtitleTab = it },
                 onBuiltInTrackSelected = { index ->
                     val wasCustom = useCustomSubtitles
                     selectedSubtitleIndex = index
                     selectedAddonSubtitleId = null
                     useCustomSubtitles = false
+                    persistInternalSubtitlePreference(subtitleTracks.firstOrNull { it.index == index })
                     if (wasCustom) {
                         playerController?.clearExternalSubtitleAndSelect(index)
                     } else {
@@ -1885,11 +2508,26 @@ fun PlayerScreen(
                     selectedAddonSubtitleId = addon.id
                     selectedSubtitleIndex = -1
                     useCustomSubtitles = true
+                    persistAddonSubtitlePreference(addon)
                     playerController?.setSubtitleUri(addon.url)
                 },
                 onFetchAddonSubtitles = ::fetchAddonSubtitlesForActiveItem,
                 onStyleChanged = PlayerSettingsRepository::setSubtitleStyle,
+                onSubtitleDelayChanged = ::setSubtitleDelay,
+                onSubtitleDelayReset = { setSubtitleDelay(0) },
+                onAutoSyncCapture = ::captureSubtitleAutoSyncTime,
+                onAutoSyncCueSelected = ::applySubtitleAutoSyncCue,
+                onAutoSyncReload = { loadSubtitleAutoSyncCues(force = true) },
                 onDismiss = { showSubtitleModal = false },
+            )
+
+            IosVideoSettingsModal(
+                visible = showVideoSettingsModal,
+                settings = playerSettingsUiState,
+                onSettingsChanged = {
+                    playerController?.configureIosVideoOutput(PlayerSettingsRepository.uiState.value)
+                },
+                onDismiss = { showVideoSettingsModal = false },
             )
 
             // Sources Panel
@@ -2023,7 +2661,7 @@ private fun buildAddonSubtitleFetchKey(
 ): String? {
     val normalizedType = type?.takeIf { it.isNotBlank() } ?: return null
     val normalizedVideoId = videoId?.takeIf { it.isNotBlank() } ?: return null
-    val compatibleSubtitleAddons = addons.mapNotNull { addon ->
+    val compatibleSubtitleAddons = addons.enabledAddons().mapNotNull { addon ->
         val manifest = addon.manifest ?: return@mapNotNull null
         val supportsSubtitles = manifest.resources.any { resource ->
             resource.isCompatibleSubtitleResource(
@@ -2101,5 +2739,79 @@ private fun findPreferredSubtitleTrackIndex(
         if (matchIndex >= 0) return matchIndex
     }
 
+    return -1
+}
+
+private fun filterAddonSubtitlesForSettings(
+    subtitles: List<AddonSubtitle>,
+    settings: PlayerSettingsUiState,
+    selectedAddonSubtitleId: String?,
+): List<AddonSubtitle> {
+    val shouldFilter = settings.subtitleStyle.showOnlyPreferredLanguages ||
+        settings.addonSubtitleStartupMode == AddonSubtitleStartupMode.PREFERRED_ONLY
+    if (!shouldFilter) return subtitles
+
+    val targets = preferredSubtitleTargetsForSettings(settings)
+    if (targets.isEmpty()) {
+        return subtitles.filter { subtitle ->
+            subtitle.id == selectedAddonSubtitleId || subtitle.url == selectedAddonSubtitleId
+        }
+    }
+
+    val filtered = subtitles.filter { subtitle ->
+        subtitle.id == selectedAddonSubtitleId ||
+            subtitle.url == selectedAddonSubtitleId ||
+            targets.any { target ->
+                languageMatchesPreference(
+                    trackLanguage = subtitle.language,
+                    targetLanguage = target,
+                )
+            }
+    }
+    return filtered
+}
+
+private fun preferredSubtitleTargetsForSettings(settings: PlayerSettingsUiState): List<String> {
+    val preferredLanguage = if (settings.subtitleStyle.useForcedSubtitles) {
+        SubtitleLanguageOption.FORCED
+    } else {
+        settings.preferredSubtitleLanguage
+    }
+    return resolvePreferredSubtitleLanguageTargets(
+        preferredSubtitleLanguage = preferredLanguage,
+        secondaryPreferredSubtitleLanguage = settings.secondaryPreferredSubtitleLanguage,
+        deviceLanguages = DeviceLanguagePreferences.preferredLanguageCodes(),
+    ).filterNot { it == SubtitleLanguageOption.FORCED }
+}
+
+private fun findPersistedAudioTrackIndex(
+    tracks: List<AudioTrack>,
+    preference: PersistedPlayerTrackPreference,
+): Int {
+    preference.audioTrackId?.takeIf { it.isNotBlank() }?.let { trackId ->
+        tracks.firstOrNull { it.id == trackId }?.let { return it.index }
+    }
+    preference.audioLanguage?.takeIf { it.isNotBlank() }?.let { language ->
+        tracks.firstOrNull { languageMatchesPreference(it.language, language) }?.let { return it.index }
+    }
+    preference.audioName?.takeIf { it.isNotBlank() }?.let { name ->
+        tracks.firstOrNull { it.label.equals(name, ignoreCase = true) }?.let { return it.index }
+    }
+    return -1
+}
+
+private fun findPersistedSubtitleTrackIndex(
+    tracks: List<SubtitleTrack>,
+    preference: PersistedPlayerTrackPreference,
+): Int {
+    preference.subtitleTrackId?.takeIf { it.isNotBlank() }?.let { trackId ->
+        tracks.firstOrNull { it.id == trackId }?.let { return it.index }
+    }
+    preference.subtitleLanguage?.takeIf { it.isNotBlank() }?.let { language ->
+        tracks.firstOrNull { languageMatchesPreference(it.language, language) }?.let { return it.index }
+    }
+    preference.subtitleName?.takeIf { it.isNotBlank() }?.let { name ->
+        tracks.firstOrNull { it.label.equals(name, ignoreCase = true) }?.let { return it.index }
+    }
     return -1
 }

@@ -30,9 +30,16 @@ actual object PlayerSettingsStorage {
     private const val preferredSubtitleLanguageKey = "preferred_subtitle_language"
     private const val secondaryPreferredSubtitleLanguageKey = "secondary_preferred_subtitle_language"
     private const val subtitleTextColorKey = "subtitle_text_color"
+    private const val subtitleBackgroundColorKey = "subtitle_background_color"
+    private const val subtitleOutlineColorKey = "subtitle_outline_color"
     private const val subtitleOutlineEnabledKey = "subtitle_outline_enabled"
+    private const val subtitleOutlineWidthKey = "subtitle_outline_width"
+    private const val subtitleBoldKey = "subtitle_bold"
     private const val subtitleFontSizeSpKey = "subtitle_font_size_sp"
     private const val subtitleBottomOffsetKey = "subtitle_bottom_offset"
+    private const val subtitleUseForcedSubtitlesKey = "subtitle_use_forced_subtitles"
+    private const val subtitleShowOnlyPreferredLanguagesKey = "subtitle_show_only_preferred_languages"
+    private const val addonSubtitleStartupModeKey = "addon_subtitle_startup_mode"
     private const val streamReuseLastLinkEnabledKey = "stream_reuse_last_link_enabled"
     private const val streamReuseLastLinkCacheHoursKey = "stream_reuse_last_link_cache_hours"
     private const val decoderPriorityKey = "decoder_priority"
@@ -51,11 +58,26 @@ actual object PlayerSettingsStorage {
     private const val introSubmitEnabledKey = "intro_submit_enabled"
     private const val streamAutoPlayNextEpisodeEnabledKey = "stream_auto_play_next_episode_enabled"
     private const val streamAutoPlayPreferBingeGroupKey = "stream_auto_play_prefer_binge_group"
+    private const val streamAutoPlayReuseBingeGroupKey = "stream_auto_play_reuse_binge_group"
     private const val nextEpisodeThresholdModeKey = "next_episode_threshold_mode"
     private const val nextEpisodeThresholdPercentKey = "next_episode_threshold_percent_v2"
     private const val nextEpisodeThresholdMinutesBeforeEndKey = "next_episode_threshold_minutes_before_end_v2"
     private const val useLibassKey = "use_libass"
     private const val libassRenderTypeKey = "libass_render_type"
+    private const val iosVideoOutputPresetKey = "ios_video_output_preset"
+    private const val iosToneMappingModeKey = "ios_tone_mapping_mode"
+    private const val iosTargetPrimariesKey = "ios_target_primaries"
+    private const val iosTargetTransferKey = "ios_target_transfer"
+    private const val iosHardwareDecoderModeKey = "ios_hardware_decoder_mode"
+    private const val iosExtendedDynamicRangeEnabledKey = "ios_extended_dynamic_range_enabled"
+    private const val iosTargetColorspaceHintEnabledKey = "ios_target_colorspace_hint_enabled"
+    private const val iosHdrComputePeakEnabledKey = "ios_hdr_compute_peak_enabled"
+    private const val iosDebandEnabledKey = "ios_deband_enabled"
+    private const val iosInterpolationEnabledKey = "ios_interpolation_enabled"
+    private const val iosBrightnessKey = "ios_brightness"
+    private const val iosContrastKey = "ios_contrast"
+    private const val iosSaturationKey = "ios_saturation"
+    private const val iosGammaKey = "ios_gamma"
     private val syncKeys = listOf(
         showLoadingOverlayKey,
         resizeModeKey,
@@ -68,9 +90,16 @@ actual object PlayerSettingsStorage {
         preferredSubtitleLanguageKey,
         secondaryPreferredSubtitleLanguageKey,
         subtitleTextColorKey,
+        subtitleBackgroundColorKey,
+        subtitleOutlineColorKey,
         subtitleOutlineEnabledKey,
+        subtitleOutlineWidthKey,
+        subtitleBoldKey,
         subtitleFontSizeSpKey,
         subtitleBottomOffsetKey,
+        subtitleUseForcedSubtitlesKey,
+        subtitleShowOnlyPreferredLanguagesKey,
+        addonSubtitleStartupModeKey,
         streamReuseLastLinkEnabledKey,
         streamReuseLastLinkCacheHoursKey,
         decoderPriorityKey,
@@ -87,11 +116,26 @@ actual object PlayerSettingsStorage {
         animeSkipClientIdKey,
         streamAutoPlayNextEpisodeEnabledKey,
         streamAutoPlayPreferBingeGroupKey,
+        streamAutoPlayReuseBingeGroupKey,
         nextEpisodeThresholdModeKey,
         nextEpisodeThresholdPercentKey,
         nextEpisodeThresholdMinutesBeforeEndKey,
         useLibassKey,
         libassRenderTypeKey,
+        iosVideoOutputPresetKey,
+        iosToneMappingModeKey,
+        iosTargetPrimariesKey,
+        iosTargetTransferKey,
+        iosHardwareDecoderModeKey,
+        iosExtendedDynamicRangeEnabledKey,
+        iosTargetColorspaceHintEnabledKey,
+        iosHdrComputePeakEnabledKey,
+        iosDebandEnabledKey,
+        iosInterpolationEnabledKey,
+        iosBrightnessKey,
+        iosContrastKey,
+        iosSaturationKey,
+        iosGammaKey,
     )
 
     private var preferences: SharedPreferences? = null
@@ -259,11 +303,31 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadSubtitleBackgroundColor(): String? =
+        preferences?.getString(ProfileScopedKey.of(subtitleBackgroundColorKey), null)
+
+    actual fun saveSubtitleBackgroundColor(colorHex: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(subtitleBackgroundColorKey), colorHex)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleOutlineColor(): String? =
+        preferences?.getString(ProfileScopedKey.of(subtitleOutlineColorKey), null)
+
+    actual fun saveSubtitleOutlineColor(colorHex: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(subtitleOutlineColorKey), colorHex)
+            ?.apply()
+    }
+
     actual fun loadSubtitleOutlineEnabled(): Boolean? =
         preferences?.let { sharedPreferences ->
             val key = ProfileScopedKey.of(subtitleOutlineEnabledKey)
             if (sharedPreferences.contains(key)) {
-                sharedPreferences.getBoolean(key, false)
+                sharedPreferences.getBoolean(key, SubtitleStyleState.DEFAULT.outlineEnabled)
             } else {
                 null
             }
@@ -273,6 +337,40 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(subtitleOutlineEnabledKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleOutlineWidth(): Int? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(subtitleOutlineWidthKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getInt(key, SubtitleStyleState.DEFAULT.outlineWidth)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveSubtitleOutlineWidth(width: Int) {
+        preferences
+            ?.edit()
+            ?.putInt(ProfileScopedKey.of(subtitleOutlineWidthKey), width)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleBold(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(subtitleBoldKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, SubtitleStyleState.DEFAULT.bold)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveSubtitleBold(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(subtitleBoldKey), enabled)
             ?.apply()
     }
 
@@ -307,6 +405,50 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putInt(ProfileScopedKey.of(subtitleBottomOffsetKey), bottomOffset)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleUseForcedSubtitles(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(subtitleUseForcedSubtitlesKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, SubtitleStyleState.DEFAULT.useForcedSubtitles)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveSubtitleUseForcedSubtitles(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(subtitleUseForcedSubtitlesKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleShowOnlyPreferredLanguages(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(subtitleShowOnlyPreferredLanguagesKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, SubtitleStyleState.DEFAULT.showOnlyPreferredLanguages)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveSubtitleShowOnlyPreferredLanguages(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(subtitleShowOnlyPreferredLanguagesKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadAddonSubtitleStartupMode(): String? =
+        preferences?.getString(ProfileScopedKey.of(addonSubtitleStartupModeKey), null)
+
+    actual fun saveAddonSubtitleStartupMode(mode: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(addonSubtitleStartupModeKey), mode)
             ?.apply()
     }
 
@@ -581,6 +723,23 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadStreamAutoPlayReuseBingeGroup(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(streamAutoPlayReuseBingeGroupKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, true)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveStreamAutoPlayReuseBingeGroup(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(streamAutoPlayReuseBingeGroupKey), enabled)
+            ?.apply()
+    }
+
     actual fun loadNextEpisodeThresholdMode(): String? =
         preferences?.getString(ProfileScopedKey.of(nextEpisodeThresholdModeKey), null)
 
@@ -652,6 +811,120 @@ actual object PlayerSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadIosVideoOutputPreset(): String? =
+        preferences?.getString(ProfileScopedKey.of(iosVideoOutputPresetKey), null)
+
+    actual fun saveIosVideoOutputPreset(preset: String) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(iosVideoOutputPresetKey), preset)?.apply()
+    }
+
+    actual fun loadIosToneMappingMode(): String? =
+        preferences?.getString(ProfileScopedKey.of(iosToneMappingModeKey), null)
+
+    actual fun saveIosToneMappingMode(mode: String) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(iosToneMappingModeKey), mode)?.apply()
+    }
+
+    actual fun loadIosTargetPrimaries(): String? =
+        preferences?.getString(ProfileScopedKey.of(iosTargetPrimariesKey), null)
+
+    actual fun saveIosTargetPrimaries(primaries: String) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(iosTargetPrimariesKey), primaries)?.apply()
+    }
+
+    actual fun loadIosTargetTransfer(): String? =
+        preferences?.getString(ProfileScopedKey.of(iosTargetTransferKey), null)
+
+    actual fun saveIosTargetTransfer(transfer: String) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(iosTargetTransferKey), transfer)?.apply()
+    }
+
+    actual fun loadIosHardwareDecoderMode(): String? =
+        preferences?.getString(ProfileScopedKey.of(iosHardwareDecoderModeKey), null)
+
+    actual fun saveIosHardwareDecoderMode(mode: String) {
+        preferences?.edit()?.putString(ProfileScopedKey.of(iosHardwareDecoderModeKey), mode)?.apply()
+    }
+
+    private fun loadIosBoolean(keyBase: String, defaultValue: Boolean): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(keyBase)
+            if (sharedPreferences.contains(key)) sharedPreferences.getBoolean(key, defaultValue) else null
+        }
+
+    private fun saveIosBoolean(keyBase: String, enabled: Boolean) {
+        preferences?.edit()?.putBoolean(ProfileScopedKey.of(keyBase), enabled)?.apply()
+    }
+
+    private fun loadIosInt(keyBase: String): Int? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(keyBase)
+            if (sharedPreferences.contains(key)) sharedPreferences.getInt(key, 0) else null
+        }
+
+    private fun saveIosInt(keyBase: String, value: Int) {
+        preferences?.edit()?.putInt(ProfileScopedKey.of(keyBase), value)?.apply()
+    }
+
+    actual fun loadIosExtendedDynamicRangeEnabled(): Boolean? =
+        loadIosBoolean(iosExtendedDynamicRangeEnabledKey, true)
+
+    actual fun saveIosExtendedDynamicRangeEnabled(enabled: Boolean) {
+        saveIosBoolean(iosExtendedDynamicRangeEnabledKey, enabled)
+    }
+
+    actual fun loadIosTargetColorspaceHintEnabled(): Boolean? =
+        loadIosBoolean(iosTargetColorspaceHintEnabledKey, true)
+
+    actual fun saveIosTargetColorspaceHintEnabled(enabled: Boolean) {
+        saveIosBoolean(iosTargetColorspaceHintEnabledKey, enabled)
+    }
+
+    actual fun loadIosHdrComputePeakEnabled(): Boolean? =
+        loadIosBoolean(iosHdrComputePeakEnabledKey, true)
+
+    actual fun saveIosHdrComputePeakEnabled(enabled: Boolean) {
+        saveIosBoolean(iosHdrComputePeakEnabledKey, enabled)
+    }
+
+    actual fun loadIosDebandEnabled(): Boolean? =
+        loadIosBoolean(iosDebandEnabledKey, false)
+
+    actual fun saveIosDebandEnabled(enabled: Boolean) {
+        saveIosBoolean(iosDebandEnabledKey, enabled)
+    }
+
+    actual fun loadIosInterpolationEnabled(): Boolean? =
+        loadIosBoolean(iosInterpolationEnabledKey, false)
+
+    actual fun saveIosInterpolationEnabled(enabled: Boolean) {
+        saveIosBoolean(iosInterpolationEnabledKey, enabled)
+    }
+
+    actual fun loadIosBrightness(): Int? = loadIosInt(iosBrightnessKey)
+
+    actual fun saveIosBrightness(value: Int) {
+        saveIosInt(iosBrightnessKey, value)
+    }
+
+    actual fun loadIosContrast(): Int? = loadIosInt(iosContrastKey)
+
+    actual fun saveIosContrast(value: Int) {
+        saveIosInt(iosContrastKey, value)
+    }
+
+    actual fun loadIosSaturation(): Int? = loadIosInt(iosSaturationKey)
+
+    actual fun saveIosSaturation(value: Int) {
+        saveIosInt(iosSaturationKey, value)
+    }
+
+    actual fun loadIosGamma(): Int? = loadIosInt(iosGammaKey)
+
+    actual fun saveIosGamma(value: Int) {
+        saveIosInt(iosGammaKey, value)
+    }
+
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {
         loadShowLoadingOverlay()?.let { put(showLoadingOverlayKey, encodeSyncBoolean(it)) }
         loadResizeMode()?.let { put(resizeModeKey, encodeSyncString(it)) }
@@ -664,9 +937,16 @@ actual object PlayerSettingsStorage {
         loadPreferredSubtitleLanguage()?.let { put(preferredSubtitleLanguageKey, encodeSyncString(it)) }
         loadSecondaryPreferredSubtitleLanguage()?.let { put(secondaryPreferredSubtitleLanguageKey, encodeSyncString(it)) }
         loadSubtitleTextColor()?.let { put(subtitleTextColorKey, encodeSyncString(it)) }
+        loadSubtitleBackgroundColor()?.let { put(subtitleBackgroundColorKey, encodeSyncString(it)) }
+        loadSubtitleOutlineColor()?.let { put(subtitleOutlineColorKey, encodeSyncString(it)) }
         loadSubtitleOutlineEnabled()?.let { put(subtitleOutlineEnabledKey, encodeSyncBoolean(it)) }
+        loadSubtitleOutlineWidth()?.let { put(subtitleOutlineWidthKey, encodeSyncInt(it)) }
+        loadSubtitleBold()?.let { put(subtitleBoldKey, encodeSyncBoolean(it)) }
         loadSubtitleFontSizeSp()?.let { put(subtitleFontSizeSpKey, encodeSyncInt(it)) }
         loadSubtitleBottomOffset()?.let { put(subtitleBottomOffsetKey, encodeSyncInt(it)) }
+        loadSubtitleUseForcedSubtitles()?.let { put(subtitleUseForcedSubtitlesKey, encodeSyncBoolean(it)) }
+        loadSubtitleShowOnlyPreferredLanguages()?.let { put(subtitleShowOnlyPreferredLanguagesKey, encodeSyncBoolean(it)) }
+        loadAddonSubtitleStartupMode()?.let { put(addonSubtitleStartupModeKey, encodeSyncString(it)) }
         loadStreamReuseLastLinkEnabled()?.let { put(streamReuseLastLinkEnabledKey, encodeSyncBoolean(it)) }
         loadStreamReuseLastLinkCacheHours()?.let { put(streamReuseLastLinkCacheHoursKey, encodeSyncInt(it)) }
         loadDecoderPriority()?.let { put(decoderPriorityKey, encodeSyncInt(it)) }
@@ -683,11 +963,26 @@ actual object PlayerSettingsStorage {
         loadAnimeSkipClientId()?.let { put(animeSkipClientIdKey, encodeSyncString(it)) }
         loadStreamAutoPlayNextEpisodeEnabled()?.let { put(streamAutoPlayNextEpisodeEnabledKey, encodeSyncBoolean(it)) }
         loadStreamAutoPlayPreferBingeGroup()?.let { put(streamAutoPlayPreferBingeGroupKey, encodeSyncBoolean(it)) }
+        loadStreamAutoPlayReuseBingeGroup()?.let { put(streamAutoPlayReuseBingeGroupKey, encodeSyncBoolean(it)) }
         loadNextEpisodeThresholdMode()?.let { put(nextEpisodeThresholdModeKey, encodeSyncString(it)) }
         loadNextEpisodeThresholdPercent()?.let { put(nextEpisodeThresholdPercentKey, encodeSyncFloat(it)) }
         loadNextEpisodeThresholdMinutesBeforeEnd()?.let { put(nextEpisodeThresholdMinutesBeforeEndKey, encodeSyncFloat(it)) }
         loadUseLibass()?.let { put(useLibassKey, encodeSyncBoolean(it)) }
         loadLibassRenderType()?.let { put(libassRenderTypeKey, encodeSyncString(it)) }
+        loadIosVideoOutputPreset()?.let { put(iosVideoOutputPresetKey, encodeSyncString(it)) }
+        loadIosToneMappingMode()?.let { put(iosToneMappingModeKey, encodeSyncString(it)) }
+        loadIosTargetPrimaries()?.let { put(iosTargetPrimariesKey, encodeSyncString(it)) }
+        loadIosTargetTransfer()?.let { put(iosTargetTransferKey, encodeSyncString(it)) }
+        loadIosHardwareDecoderMode()?.let { put(iosHardwareDecoderModeKey, encodeSyncString(it)) }
+        loadIosExtendedDynamicRangeEnabled()?.let { put(iosExtendedDynamicRangeEnabledKey, encodeSyncBoolean(it)) }
+        loadIosTargetColorspaceHintEnabled()?.let { put(iosTargetColorspaceHintEnabledKey, encodeSyncBoolean(it)) }
+        loadIosHdrComputePeakEnabled()?.let { put(iosHdrComputePeakEnabledKey, encodeSyncBoolean(it)) }
+        loadIosDebandEnabled()?.let { put(iosDebandEnabledKey, encodeSyncBoolean(it)) }
+        loadIosInterpolationEnabled()?.let { put(iosInterpolationEnabledKey, encodeSyncBoolean(it)) }
+        loadIosBrightness()?.let { put(iosBrightnessKey, encodeSyncInt(it)) }
+        loadIosContrast()?.let { put(iosContrastKey, encodeSyncInt(it)) }
+        loadIosSaturation()?.let { put(iosSaturationKey, encodeSyncInt(it)) }
+        loadIosGamma()?.let { put(iosGammaKey, encodeSyncInt(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -706,9 +1001,16 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncString(preferredSubtitleLanguageKey)?.let(::savePreferredSubtitleLanguage)
         payload.decodeSyncString(secondaryPreferredSubtitleLanguageKey)?.let(::saveSecondaryPreferredSubtitleLanguage)
         payload.decodeSyncString(subtitleTextColorKey)?.let(::saveSubtitleTextColor)
+        payload.decodeSyncString(subtitleBackgroundColorKey)?.let(::saveSubtitleBackgroundColor)
+        payload.decodeSyncString(subtitleOutlineColorKey)?.let(::saveSubtitleOutlineColor)
         payload.decodeSyncBoolean(subtitleOutlineEnabledKey)?.let(::saveSubtitleOutlineEnabled)
+        payload.decodeSyncInt(subtitleOutlineWidthKey)?.let(::saveSubtitleOutlineWidth)
+        payload.decodeSyncBoolean(subtitleBoldKey)?.let(::saveSubtitleBold)
         payload.decodeSyncInt(subtitleFontSizeSpKey)?.let(::saveSubtitleFontSizeSp)
         payload.decodeSyncInt(subtitleBottomOffsetKey)?.let(::saveSubtitleBottomOffset)
+        payload.decodeSyncBoolean(subtitleUseForcedSubtitlesKey)?.let(::saveSubtitleUseForcedSubtitles)
+        payload.decodeSyncBoolean(subtitleShowOnlyPreferredLanguagesKey)?.let(::saveSubtitleShowOnlyPreferredLanguages)
+        payload.decodeSyncString(addonSubtitleStartupModeKey)?.let(::saveAddonSubtitleStartupMode)
         payload.decodeSyncBoolean(streamReuseLastLinkEnabledKey)?.let(::saveStreamReuseLastLinkEnabled)
         payload.decodeSyncInt(streamReuseLastLinkCacheHoursKey)?.let(::saveStreamReuseLastLinkCacheHours)
         payload.decodeSyncInt(decoderPriorityKey)?.let(::saveDecoderPriority)
@@ -727,10 +1029,25 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(introSubmitEnabledKey)?.let(::saveIntroSubmitEnabled)
         payload.decodeSyncBoolean(streamAutoPlayNextEpisodeEnabledKey)?.let(::saveStreamAutoPlayNextEpisodeEnabled)
         payload.decodeSyncBoolean(streamAutoPlayPreferBingeGroupKey)?.let(::saveStreamAutoPlayPreferBingeGroup)
+        payload.decodeSyncBoolean(streamAutoPlayReuseBingeGroupKey)?.let(::saveStreamAutoPlayReuseBingeGroup)
         payload.decodeSyncString(nextEpisodeThresholdModeKey)?.let(::saveNextEpisodeThresholdMode)
         payload.decodeSyncFloat(nextEpisodeThresholdPercentKey)?.let(::saveNextEpisodeThresholdPercent)
         payload.decodeSyncFloat(nextEpisodeThresholdMinutesBeforeEndKey)?.let(::saveNextEpisodeThresholdMinutesBeforeEnd)
         payload.decodeSyncBoolean(useLibassKey)?.let(::saveUseLibass)
         payload.decodeSyncString(libassRenderTypeKey)?.let(::saveLibassRenderType)
+        payload.decodeSyncString(iosVideoOutputPresetKey)?.let(::saveIosVideoOutputPreset)
+        payload.decodeSyncString(iosToneMappingModeKey)?.let(::saveIosToneMappingMode)
+        payload.decodeSyncString(iosTargetPrimariesKey)?.let(::saveIosTargetPrimaries)
+        payload.decodeSyncString(iosTargetTransferKey)?.let(::saveIosTargetTransfer)
+        payload.decodeSyncString(iosHardwareDecoderModeKey)?.let(::saveIosHardwareDecoderMode)
+        payload.decodeSyncBoolean(iosExtendedDynamicRangeEnabledKey)?.let(::saveIosExtendedDynamicRangeEnabled)
+        payload.decodeSyncBoolean(iosTargetColorspaceHintEnabledKey)?.let(::saveIosTargetColorspaceHintEnabled)
+        payload.decodeSyncBoolean(iosHdrComputePeakEnabledKey)?.let(::saveIosHdrComputePeakEnabled)
+        payload.decodeSyncBoolean(iosDebandEnabledKey)?.let(::saveIosDebandEnabled)
+        payload.decodeSyncBoolean(iosInterpolationEnabledKey)?.let(::saveIosInterpolationEnabled)
+        payload.decodeSyncInt(iosBrightnessKey)?.let(::saveIosBrightness)
+        payload.decodeSyncInt(iosContrastKey)?.let(::saveIosContrast)
+        payload.decodeSyncInt(iosSaturationKey)?.let(::saveIosSaturation)
+        payload.decodeSyncInt(iosGammaKey)?.let(::saveIosGamma)
     }
 }
