@@ -216,9 +216,8 @@ fun SettingsScreen(
         LaunchedEffect(rootActionRequests, rootActionsEnabled, page) {
             rootActionRequests.collect {
                 if (!rootActionsEnabled) return@collect
-                val pageToOpen = page.previousPage()
-                if (pageToOpen != null) {
-                    currentPage = pageToOpen.name
+                if (page.previousPage() != null) {
+                    currentPage = SettingsPage.Root.name
                 } else {
                     scrollToTopRequests.tryEmit(Unit)
                 }
