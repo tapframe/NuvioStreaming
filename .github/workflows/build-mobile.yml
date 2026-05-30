@@ -9,7 +9,7 @@ on:
 jobs:
   build-ios-full:
     name: Build iOS Full Version
-    runs-on: macos-15
+    runs-on: macos-14
     steps:
       - name: Checkout Repository & Submodules
         uses: actions/checkout@v4
@@ -17,14 +17,10 @@ jobs:
       - name: Fetch iOS Specific Submodule
         run: git submodule update --init --recursive MPVKit
 
-      - name: Select Xcode
+      - name: Select Latest Stable Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.2'
-
-      - name: Download iOS SDK
-        run: |
-          xcodebuild -downloadPlatform iOS
+          xcode-version: latest-stable
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
