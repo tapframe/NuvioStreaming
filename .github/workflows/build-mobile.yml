@@ -17,10 +17,13 @@ jobs:
       - name: Fetch iOS Specific Submodule
         run: git submodule update --init --recursive MPVKit
 
-      - name: Select Latest Stable Xcode
+      - name: Select Xcode 16.3
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: '16.3'
+
+      - name: Download iOS 18.4 SDK
+        run: xcodebuild -downloadPlatform iOS
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
