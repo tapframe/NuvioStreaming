@@ -22,8 +22,10 @@ jobs:
         with:
           xcode-version: '16.3'
 
-      - name: Download iOS SDK
-        run: xcodebuild -downloadPlatform iOS
+      - name: Install iOS SDK
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.3.app
+          xcodebuild -showsdks
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
