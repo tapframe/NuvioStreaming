@@ -22,6 +22,10 @@ jobs:
         with:
           xcode-version: '16.2'
 
+      - name: Download iOS SDK
+        run: |
+          xcodebuild -downloadPlatform iOS
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
@@ -50,7 +54,6 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             build
 
       - name: Package App into .ipa
