@@ -1,0 +1,37 @@
+name: Build Nuvio Mobile (iOS & Android)
+
+on:
+  push:
+    branches:
+      - build-test
+
+jobs:
+  build-ios:
+    name: Build iOS Full Version
+    runs-on: macos-15
+    steps:
+      - name: Checkout Repository & Submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Gradle
+        run: chmod +x gradlew
+
+      - name: Build iOS Framework
+        run: ./gradlew :composeApp:assembleXCFramework
+
+      - name: Build IPA
+        run: ./scripts/build-distribution.sh
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nuvio-iOS
+          path: '*.ipa'
