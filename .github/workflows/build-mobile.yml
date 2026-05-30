@@ -9,7 +9,7 @@ on:
 jobs:
   build-ios-full:
     name: Build iOS Full Version
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout Repository & Submodules
         uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
         with:
           xcode-version: '16.3'
 
-      - name: Download iOS 18.4 SDK
+      - name: Download iOS SDK
         run: xcodebuild -downloadPlatform iOS
 
       - name: Make gradlew executable
