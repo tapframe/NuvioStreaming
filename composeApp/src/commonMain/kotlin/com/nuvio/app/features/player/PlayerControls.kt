@@ -13,6 +13,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -96,6 +106,8 @@ internal fun PlayerControlsShell(
     onScrubChange: (Long) -> Unit,
     onScrubFinished: (Long) -> Unit,
     horizontalSafePadding: androidx.compose.ui.unit.Dp,
+    seekPreviewState: SeekPreviewState = SeekPreviewState(),
+    isScrubbingTimeline: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -162,7 +174,7 @@ internal fun PlayerControlsShell(
                     ),
             )
 
-            if (showPlaybackControls) {
+            if (showPlaybackControls && !isScrubbingTimeline) {
                 CenterControls(
                     snapshot = playbackSnapshot,
                     metrics = metrics,
@@ -181,6 +193,9 @@ internal fun PlayerControlsShell(
                     displayedPositionMs = displayedPositionMs,
                     metrics = metrics,
                     resizeMode = resizeMode,
+                    seekPreviewState = seekPreviewState,
+                    isScrubbing = isScrubbingTimeline,
+                    scrubFraction = displayedPositionMs.toFloat() / playbackSnapshot.durationMs.coerceAtLeast(1L).toFloat(),
                     onScrubChange = onScrubChange,
                     onScrubFinished = onScrubFinished,
                     onResizeModeClick = onResizeModeClick,
@@ -479,6 +494,9 @@ private fun ProgressControls(
     displayedPositionMs: Long,
     metrics: PlayerLayoutMetrics,
     resizeMode: PlayerResizeMode,
+    seekPreviewState: SeekPreviewState,
+    isScrubbing: Boolean,
+    scrubFraction: Float,
     onScrubChange: (Long) -> Unit,
     onScrubFinished: (Long) -> Unit,
     onResizeModeClick: () -> Unit,
@@ -496,6 +514,17 @@ private fun ProgressControls(
     val audioPainter = appIconPainter(AppIconResource.PlayerAudioFilled)
 
     Column(modifier = modifier) {
+        // Thumbnail slider'ın hemen üstünde, 8dp boşlukla
+        if (seekPreviewState.isEnabled) {
+            SeekPreviewThumbnailOverlay(
+                scrubFraction = scrubFraction.coerceIn(0f, 1f),
+                positionMs = displayedPositionMs,
+                frame = seekPreviewState.frameAt(displayedPositionMs),
+                isVisible = isScrubbing,
+                horizontalPadding = 14.dp,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
         Slider(
             modifier = Modifier
                 .fillMaxWidth()
