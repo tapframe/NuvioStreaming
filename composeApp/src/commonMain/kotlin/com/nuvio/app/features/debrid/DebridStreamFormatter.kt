@@ -13,20 +13,16 @@ class DebridStreamFormatter(
     fun format(
         stream: StreamItem,
         settings: DebridSettings,
-        compiledBadgeFilters: List<CompiledStreamBadgeFilter> =
-            StreamBadgeMatcher.compile(settings.streamBadgeRules),
     ): StreamItem {
         if (!stream.isManagedDebridStream) return stream
-        val matchedBadges = StreamBadgeMatcher.matchedBadges(stream, compiledBadgeFilters)
+        val matchedBadges = stream.badges
         val values = buildValues(stream, settings, matchedBadges)
-        val nameTemplate = settings.streamNameTemplate.ifBlank { DebridStreamFormatterDefaults.NAME_TEMPLATE }
-        val descriptionTemplate = settings.streamDescriptionTemplate.ifBlank { DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE }
-        val formattedName = engine.render(nameTemplate, values)
+        val formattedName = engine.render(settings.streamNameTemplate, values)
             .lineSequence()
             .joinToString(" ") { it.trim() }
             .replace(Regex("\\s+"), " ")
             .trim()
-        val formattedDescription = engine.render(descriptionTemplate, values)
+        val formattedDescription = engine.render(settings.streamDescriptionTemplate, values)
             .lineSequence()
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -36,7 +32,7 @@ class DebridStreamFormatter(
         return stream.copy(
             name = formattedName.ifBlank { stream.name ?: DebridProviders.displayName(serviceId(stream)) },
             description = formattedDescription.ifBlank { stream.description ?: stream.title },
-            badges = matchedBadges,
+            badges = stream.badges,
         )
     }
 

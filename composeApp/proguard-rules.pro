@@ -21,9 +21,20 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
+# Avoid R8 merging/optimizing the stream badge chip used in lazy stream rows.
+-keep class com.nuvio.app.features.streams.StreamBadgeChipKt { *; }
+-keep class com.nuvio.app.features.streams.StreamBadgeChipSize { *; }
+-keep class com.nuvio.app.features.streams.StreamBadgeChipDefaults { *; }
+
+-keep class com.nuvio.app.features.streams.StreamsScreenKt { *; }
+-keep class com.nuvio.app.features.streams.StreamsScreenKt$* { *; }
+
 # QuickJS plugin runtime is dynamic; keep runtime and app plugin classes.
 -keep class com.dokar.quickjs.** { *; }
 -keep class com.nuvio.app.features.plugins.** { *; }
+
+# TorrServer based P2P streaming.
+-keep class com.nuvio.app.features.p2p.** { *; }
 
 # Media3 / ExoPlayer classes from local AAR decoders and stock modules.
 -dontwarn androidx.media3.**

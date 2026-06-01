@@ -117,7 +117,7 @@ object WatchingActions {
         )
     }
 
-    fun onProgressEntryUpdated(entry: WatchProgressEntry) {
+    fun onProgressEntryUpdated(entry: WatchProgressEntry, syncRemote: Boolean = true) {
         if (!entry.isCompleted) return
 
         val watchedItem = WatchedItem(
@@ -129,9 +129,9 @@ object WatchingActions {
             episode = entry.episodeNumber,
             markedAtEpochMs = entry.lastUpdatedEpochMs,
         )
-        WatchedRepository.markWatchedFromPlaybackCompletion(watchedItem)
+        WatchedRepository.markWatchedFromPlaybackCompletion(watchedItem, syncRemote = syncRemote)
 
-        if (!entry.isEpisode) return
+        if (!syncRemote || !entry.isEpisode) return
         actionScope.launch {
             val meta = runCatching {
                 MetaDetailsRepository.fetch(

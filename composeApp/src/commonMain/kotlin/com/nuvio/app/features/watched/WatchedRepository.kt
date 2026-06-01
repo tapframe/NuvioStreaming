@@ -9,6 +9,7 @@ import com.nuvio.app.features.trakt.WatchProgressSource
 import com.nuvio.app.features.trakt.shouldUseTraktProgress
 import com.nuvio.app.features.watching.sync.SupabaseWatchedSyncAdapter
 import com.nuvio.app.features.watching.sync.TraktWatchedSyncAdapter
+import com.nuvio.app.features.watching.sync.WatchedDeltaEvent
 import com.nuvio.app.features.watching.sync.WatchedSyncAdapter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +27,8 @@ import kotlinx.serialization.json.Json
 private data class StoredWatchedPayload(
     val items: List<WatchedItem> = emptyList(),
     val lastSuccessfulPushEpochMs: Long = 0L,
+    val deltaCursorEventId: Long = 0L,
+    val deltaInitialized: Boolean = false,
 )
 
 internal enum class WatchedTraktHistorySync {
@@ -40,6 +43,9 @@ internal fun shouldMirrorWatchedMarkToTraktHistory(
 
 object WatchedRepository {
     private const val watchedItemsPageSize = 900
+    private const val watchedItemsDeltaPageSize = 900
+    private const val watchedDeltaOperationUpsert = "upsert"
+    private const val watchedDeltaOperationDelete = "delete"
 
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("WatchedRepository")
@@ -55,10 +61,9 @@ object WatchedRepository {
     private var currentProfileId: Int = 1
     private var itemsByKey: MutableMap<String, WatchedItem> = mutableMapOf()
     private var lastSuccessfulPushEpochMs: Long = 0L
+    private var deltaCursorEventId: Long = 0L
+    private var deltaInitialized: Boolean = false
     internal var syncAdapter: WatchedSyncAdapter = SupabaseWatchedSyncAdapter
-
-    private fun activePullSyncAdapter(): WatchedSyncAdapter =
-        if (shouldUseTraktWatchedSync()) TraktWatchedSyncAdapter else syncAdapter
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -75,6 +80,8 @@ object WatchedRepository {
         currentProfileId = 1
         itemsByKey.clear()
         lastSuccessfulPushEpochMs = 0L
+        deltaCursorEventId = 0L
+        deltaInitialized = false
         _uiState.value = WatchedUiState()
     }
 
@@ -89,12 +96,16 @@ object WatchedRepository {
                 json.decodeFromString<StoredWatchedPayload>(payload)
             }.getOrDefault(StoredWatchedPayload())
             lastSuccessfulPushEpochMs = storedPayload.lastSuccessfulPushEpochMs
+            deltaCursorEventId = storedPayload.deltaCursorEventId
+            deltaInitialized = storedPayload.deltaInitialized
             itemsByKey = storedPayload.items
                 .map(WatchedItem::normalizedMarkedAt)
                 .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
                 .toMutableMap()
         } else {
             lastSuccessfulPushEpochMs = 0L
+            deltaCursorEventId = 0L
+            deltaInitialized = false
         }
 
         publish()
@@ -110,22 +121,135 @@ object WatchedRepository {
             .toList()
         val lastPushEpochMs = lastSuccessfulPushEpochMs
         runCatching {
-            val serverItems = activePullSyncAdapter().pull(
-                profileId = profileId,
-                pageSize = watchedItemsPageSize,
-            )
-
-            itemsByKey = mergeWatchedItemsPreservingUnsynced(
-                serverItems = serverItems,
-                localItems = localBeforePull,
-                lastSuccessfulPushEpochMs = lastPushEpochMs,
-                pullStartedEpochMs = pullStartedEpochMs,
-            ).toMutableMap()
-            hasLoaded = true
-            publish()
-            persist()
+            if (shouldUseTraktWatchedSync()) {
+                pullFullFromAdapter(
+                    adapter = TraktWatchedSyncAdapter,
+                    profileId = profileId,
+                    localBeforePull = localBeforePull,
+                    lastPushEpochMs = lastPushEpochMs,
+                    pullStartedEpochMs = pullStartedEpochMs,
+                    resetDeltaState = true,
+                )
+            } else {
+                pullSupabaseDeltaFromServer(
+                    profileId = profileId,
+                    localBeforePull = localBeforePull,
+                    lastPushEpochMs = lastPushEpochMs,
+                    pullStartedEpochMs = pullStartedEpochMs,
+                )
+            }
         }.onFailure { e ->
             log.e(e) { "Failed to pull watched items from server" }
+        }
+    }
+
+    private suspend fun pullFullFromAdapter(
+        adapter: WatchedSyncAdapter,
+        profileId: Int,
+        localBeforePull: List<WatchedItem>,
+        lastPushEpochMs: Long,
+        pullStartedEpochMs: Long,
+        resetDeltaState: Boolean,
+    ) {
+        val serverItems = adapter.pull(
+            profileId = profileId,
+            pageSize = watchedItemsPageSize,
+        )
+
+        itemsByKey = mergeWatchedItemsPreservingUnsynced(
+            serverItems = serverItems,
+            localItems = localBeforePull,
+            lastSuccessfulPushEpochMs = lastPushEpochMs,
+            pullStartedEpochMs = pullStartedEpochMs,
+        ).toMutableMap()
+        if (resetDeltaState) {
+            deltaCursorEventId = 0L
+            deltaInitialized = false
+        }
+        hasLoaded = true
+        publish()
+        persist()
+    }
+
+    private suspend fun pullSupabaseDeltaFromServer(
+        profileId: Int,
+        localBeforePull: List<WatchedItem>,
+        lastPushEpochMs: Long,
+        pullStartedEpochMs: Long,
+    ) {
+        if (!deltaInitialized) {
+            val cursorBeforeSnapshot = syncAdapter.getDeltaCursor(profileId) ?: return
+            pullFullFromAdapter(
+                adapter = syncAdapter,
+                profileId = profileId,
+                localBeforePull = localBeforePull,
+                lastPushEpochMs = lastPushEpochMs,
+                pullStartedEpochMs = pullStartedEpochMs,
+                resetDeltaState = false,
+            )
+            deltaCursorEventId = cursorBeforeSnapshot
+            deltaInitialized = true
+            persist()
+            return
+        }
+
+        var cursor = deltaCursorEventId
+        var changed = false
+
+        while (true) {
+            val events = syncAdapter.pullDelta(
+                profileId = profileId,
+                sinceEventId = cursor,
+                limit = watchedItemsDeltaPageSize,
+            )
+            if (events.isEmpty()) break
+
+            applyWatchedDeltaEvents(
+                events = events,
+                lastPushEpochMs = lastPushEpochMs,
+                pullStartedEpochMs = pullStartedEpochMs,
+            )
+            cursor = maxOf(cursor, events.maxOf { it.eventId })
+            deltaCursorEventId = cursor
+            deltaInitialized = true
+            changed = true
+
+            if (events.size < watchedItemsDeltaPageSize) break
+        }
+
+        hasLoaded = true
+        if (changed) {
+            publish()
+            persist()
+        }
+    }
+
+    private fun applyWatchedDeltaEvents(
+        events: Collection<WatchedDeltaEvent>,
+        lastPushEpochMs: Long,
+        pullStartedEpochMs: Long,
+    ) {
+        events.forEach { event ->
+            val key = watchedItemKey(event.contentType, event.contentId, event.season, event.episode)
+            when (event.operation.lowercase()) {
+                watchedDeltaOperationUpsert -> {
+                    itemsByKey[key] = WatchedItem(
+                        id = event.contentId,
+                        type = event.contentType,
+                        name = event.title,
+                        season = event.season,
+                        episode = event.episode,
+                        markedAtEpochMs = normalizeWatchedMarkedAtEpochMs(event.watchedAt),
+                    )
+                }
+                watchedDeltaOperationDelete -> {
+                    val localItem = itemsByKey[key]
+                    if (localItem != null && shouldPreserveLocalWatchedItem(localItem, lastPushEpochMs, pullStartedEpochMs)) {
+                        return@forEach
+                    }
+                    itemsByKey.remove(key)
+                }
+            }
         }
     }
 
@@ -147,13 +271,14 @@ object WatchedRepository {
         markWatched(items = items, traktHistorySync = WatchedTraktHistorySync.Mirror)
     }
 
-    internal fun markWatchedFromPlaybackCompletion(item: WatchedItem) {
-        markWatched(items = listOf(item), traktHistorySync = WatchedTraktHistorySync.Skip)
+    internal fun markWatchedFromPlaybackCompletion(item: WatchedItem, syncRemote: Boolean = true) {
+        markWatched(items = listOf(item), traktHistorySync = WatchedTraktHistorySync.Skip, syncRemote = syncRemote)
     }
 
     private fun markWatched(
         items: Collection<WatchedItem>,
         traktHistorySync: WatchedTraktHistorySync,
+        syncRemote: Boolean = true,
     ) {
         ensureLoaded()
         if (items.isEmpty()) return
@@ -167,7 +292,9 @@ object WatchedRepository {
         }
         publish()
         persist()
-        pushMarksToServer(timestampedItems, traktHistorySync)
+        if (syncRemote) {
+            pushMarksToServer(timestampedItems, traktHistorySync)
+        }
     }
 
     fun unmarkWatched(item: WatchedItem) {
@@ -300,6 +427,8 @@ object WatchedRepository {
                         .map(WatchedItem::normalizedMarkedAt)
                         .sortedByDescending { it.markedAtEpochMs },
                     lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
+                    deltaCursorEventId = deltaCursorEventId,
+                    deltaInitialized = deltaInitialized,
                 ),
             ),
         )
@@ -378,15 +507,23 @@ internal fun mergeWatchedItemsPreservingUnsynced(
         .forEach { localItem ->
             val key = watchedItemKey(localItem.type, localItem.id, localItem.season, localItem.episode)
             if (key in merged) return@forEach
-            val markedAt = localItem.markedAtEpochMs
-            val wasMarkedAfterLastPush = lastSuccessfulPushEpochMs > 0L && markedAt > lastSuccessfulPushEpochMs
-            val wasMarkedDuringPull = pullStartedEpochMs > 0L && markedAt >= pullStartedEpochMs
-            if (wasMarkedAfterLastPush || wasMarkedDuringPull) {
+            if (shouldPreserveLocalWatchedItem(localItem, lastSuccessfulPushEpochMs, pullStartedEpochMs)) {
                 merged[key] = localItem
             }
         }
 
     return merged
+}
+
+internal fun shouldPreserveLocalWatchedItem(
+    localItem: WatchedItem,
+    lastSuccessfulPushEpochMs: Long,
+    pullStartedEpochMs: Long,
+): Boolean {
+    val markedAt = localItem.markedAtEpochMs
+    val wasMarkedAfterLastPush = lastSuccessfulPushEpochMs > 0L && markedAt > lastSuccessfulPushEpochMs
+    val wasMarkedDuringPull = pullStartedEpochMs > 0L && markedAt >= pullStartedEpochMs
+    return wasMarkedAfterLastPush || wasMarkedDuringPull
 }
 
 internal fun shouldUseTraktWatchedSync(

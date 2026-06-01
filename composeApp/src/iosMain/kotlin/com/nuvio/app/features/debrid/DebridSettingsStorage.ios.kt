@@ -28,7 +28,6 @@ actual object DebridSettingsStorage {
     private const val streamPreferencesKey = "debrid_stream_preferences"
     private const val streamNameTemplateKey = "debrid_stream_name_template"
     private const val streamDescriptionTemplateKey = "debrid_stream_description_template"
-    private const val streamBadgeRulesKey = "debrid_stream_badge_rules"
     private fun syncKeys(): List<String> =
         listOf(
             enabledKey,
@@ -141,12 +140,6 @@ actual object DebridSettingsStorage {
 
     actual fun saveStreamDescriptionTemplate(template: String) {
         saveString(streamDescriptionTemplateKey, template)
-    }
-
-    actual fun loadStreamBadgeRules(): String? = loadString(streamBadgeRulesKey)
-
-    actual fun saveStreamBadgeRules(rules: String) {
-        saveString(streamBadgeRulesKey, rules)
     }
 
     private fun loadBoolean(key: String): Boolean? {

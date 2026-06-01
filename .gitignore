@@ -20,6 +20,7 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 logs/
+analysis/
 Docs
 keystore/
 scripts/build-distribution.sh

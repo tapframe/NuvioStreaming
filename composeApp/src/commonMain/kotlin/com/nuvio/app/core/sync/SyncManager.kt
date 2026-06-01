@@ -21,7 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val FOREGROUND_PULL_DELAY_MS = 2500L
-private const val FOREGROUND_PULL_MIN_INTERVAL_MS = 60_000L
+private const val FOREGROUND_PULL_MIN_INTERVAL_MS = 30 * 60_000L
 
 object SyncManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

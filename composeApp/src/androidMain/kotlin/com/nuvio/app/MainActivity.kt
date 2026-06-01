@@ -29,6 +29,8 @@ import com.nuvio.app.features.player.PlayerSettingsStorage
 import com.nuvio.app.features.player.PlayerTrackPreferenceStorage
 import com.nuvio.app.features.player.ExternalPlayerPlatform
 import com.nuvio.app.features.player.PlayerPictureInPictureManager
+import com.nuvio.app.features.p2p.P2pSettingsStorage
+import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.plugins.PluginStorage
 import com.nuvio.app.features.profiles.AvatarStorage
 import com.nuvio.app.features.profiles.ProfilePinCacheStorage
@@ -45,6 +47,7 @@ import com.nuvio.app.features.updater.AndroidAppUpdaterPlatform
 import com.nuvio.app.core.ui.PosterCardStyleStorage
 import com.nuvio.app.features.watched.WatchedStorage
 import com.nuvio.app.features.streams.StreamLinkCacheStorage
+import com.nuvio.app.features.streams.StreamBadgeSettingsStorage
 import com.nuvio.app.features.streams.BingeGroupCacheStorage
 import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentStorage
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesStorage
@@ -70,6 +73,8 @@ class MainActivity : AppCompatActivity() {
         HomeCatalogSettingsStorage.initialize(applicationContext)
         PlayerSettingsStorage.initialize(applicationContext)
         PlayerTrackPreferenceStorage.initialize(applicationContext)
+        P2pSettingsStorage.initialize(applicationContext)
+        P2pStreamingEngine.initialize(applicationContext)
         ExternalPlayerPlatform.initialize(applicationContext)
         ProfileStorage.initialize(applicationContext)
         AvatarStorage.initialize(applicationContext)
@@ -90,6 +95,7 @@ class MainActivity : AppCompatActivity() {
         EpisodeReleaseNotificationsStorage.initialize(applicationContext)
         WatchProgressStorage.initialize(applicationContext)
         StreamLinkCacheStorage.initialize(applicationContext)
+        StreamBadgeSettingsStorage.initialize(applicationContext)
         BingeGroupCacheStorage.initialize(applicationContext)
         PluginStorage.initialize(applicationContext)
         CollectionMobileSettingsStorage.initialize(applicationContext)

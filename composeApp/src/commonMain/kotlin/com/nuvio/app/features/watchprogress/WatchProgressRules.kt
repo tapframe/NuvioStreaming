@@ -15,8 +15,11 @@ import kotlinx.serialization.json.Json
 internal const val ContinueWatchingLimit = DefaultContinueWatchingLimit
 
 @Serializable
-private data class StoredWatchProgressPayload(
+internal data class StoredWatchProgressPayload(
     val entries: List<WatchProgressEntry> = emptyList(),
+    val lastSuccessfulPushEpochMs: Long = 0L,
+    val deltaCursorEventId: Long = 0L,
+    val deltaInitialized: Boolean = false,
 )
 
 internal object WatchProgressCodec {
@@ -26,15 +29,37 @@ internal object WatchProgressCodec {
     }
 
     fun decodeEntries(payload: String): List<WatchProgressEntry> =
+        decodePayload(payload).entries
+
+    fun decodePayload(payload: String): StoredWatchProgressPayload =
         runCatching {
-            json.decodeFromString<StoredWatchProgressPayload>(payload).entries
-                .map(WatchProgressEntry::normalizedCompletion)
-        }.getOrDefault(emptyList())
+            json.decodeFromString<StoredWatchProgressPayload>(payload).let { storedPayload ->
+                storedPayload.copy(
+                    entries = storedPayload.entries.map(WatchProgressEntry::normalizedCompletion),
+                )
+            }
+        }.getOrDefault(StoredWatchProgressPayload())
 
     fun encodeEntries(entries: Collection<WatchProgressEntry>): String =
+        encodePayload(
+            entries = entries,
+            lastSuccessfulPushEpochMs = 0L,
+            deltaCursorEventId = 0L,
+            deltaInitialized = false,
+        )
+
+    fun encodePayload(
+        entries: Collection<WatchProgressEntry>,
+        lastSuccessfulPushEpochMs: Long,
+        deltaCursorEventId: Long,
+        deltaInitialized: Boolean,
+    ): String =
         json.encodeToString(
             StoredWatchProgressPayload(
                 entries = entries.toList().sortedByDescending { it.lastUpdatedEpochMs },
+                lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
+                deltaCursorEventId = deltaCursorEventId,
+                deltaInitialized = deltaInitialized,
             ),
         )
 }

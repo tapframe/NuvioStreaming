@@ -18,6 +18,40 @@ object SupabaseWatchedSyncAdapter : WatchedSyncAdapter {
         encodeDefaults = true
     }
 
+    override suspend fun getDeltaCursor(profileId: Int): Long {
+        val params = buildJsonObject {
+            put("p_profile_id", profileId)
+        }
+        return SupabaseProvider.client.postgrest
+            .rpc("sync_get_watched_items_delta_cursor", params)
+            .decodeAs<Long>()
+    }
+
+    override suspend fun pullDelta(
+        profileId: Int,
+        sinceEventId: Long,
+        limit: Int,
+    ): List<WatchedDeltaEvent> {
+        val params = buildJsonObject {
+            put("p_profile_id", profileId)
+            put("p_since_event_id", sinceEventId)
+            put("p_limit", limit)
+        }
+        val result = SupabaseProvider.client.postgrest.rpc("sync_pull_watched_items_delta", params)
+        return result.decodeList<WatchedDeltaSyncItem>().map { event ->
+            WatchedDeltaEvent(
+                eventId = event.eventId,
+                operation = event.operation,
+                contentId = event.contentId,
+                contentType = event.contentType,
+                title = event.title,
+                season = event.season,
+                episode = event.episode,
+                watchedAt = event.watchedAt,
+            )
+        }
+    }
+
     override suspend fun pull(
         profileId: Int,
         pageSize: Int,
@@ -93,6 +127,18 @@ object SupabaseWatchedSyncAdapter : WatchedSyncAdapter {
 
 @Serializable
 private data class WatchedSyncItem(
+    @SerialName("content_id") val contentId: String,
+    @SerialName("content_type") val contentType: String,
+    val title: String = "",
+    val season: Int? = null,
+    val episode: Int? = null,
+    @SerialName("watched_at") val watchedAt: Long = 0,
+)
+
+@Serializable
+private data class WatchedDeltaSyncItem(
+    @SerialName("event_id") val eventId: Long,
+    val operation: String,
     @SerialName("content_id") val contentId: String,
     @SerialName("content_type") val contentType: String,
     val title: String = "",

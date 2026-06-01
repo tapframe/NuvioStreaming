@@ -1,5 +1,7 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,8 +50,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +104,8 @@ internal fun OpeningOverlay(
     onBack: () -> Unit,
     horizontalSafePadding: Dp,
     modifier: Modifier = Modifier,
+    message: String? = null,
+    progress: Float? = null,
 ) {
     val contentAlpha by animateFloatAsState(
         targetValue = 1f,
@@ -164,20 +171,48 @@ internal fun OpeningOverlay(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val targetProgress = progress?.coerceIn(0f, 1f)
+            val animatedProgress by animateFloatAsState(
+                targetValue = targetProgress ?: 0f,
+                animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+                label = "openingOverlayP2pProgress",
+            )
+            val progressActive = targetProgress != null
             if (logo != null) {
-                AsyncImage(
-                    model = logo,
-                    contentDescription = null,
+                Box(
                     modifier = Modifier
                         .width(300.dp)
-                        .height(180.dp)
-                        .graphicsLayer {
-                            alpha = contentAlpha
-                            scaleX = contentScale
-                            scaleY = contentScale
-                        },
-                    contentScale = ContentScale.Fit,
-                )
+                        .height(180.dp),
+                ) {
+                    AsyncImage(
+                        model = logo,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = if (progressActive) 0.25f else contentAlpha
+                                if (!progressActive) {
+                                    scaleX = contentScale
+                                    scaleY = contentScale
+                                }
+                            },
+                        contentScale = ContentScale.Fit,
+                    )
+                    if (progressActive) {
+                        AsyncImage(
+                            model = logo,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .drawWithContent {
+                                    clipRect(right = size.width * animatedProgress) {
+                                        this@drawWithContent.drawContent()
+                                    }
+                                },
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
+                }
             } else if (!title.isNullOrBlank()) {
                 Text(
                     text = title,
@@ -202,6 +237,59 @@ internal fun OpeningOverlay(
                     strokeWidth = 3.dp,
                     modifier = Modifier.size(54.dp),
                 )
+            }
+
+            val showHorizontalProgress = progressActive && logo == null
+            if (!message.isNullOrBlank() || showHorizontalProgress) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Crossfade(
+                    targetState = message?.takeIf { it.isNotBlank() },
+                    animationSpec = tween(durationMillis = 260),
+                    label = "openingOverlayMessageCrossfade",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                ) { loadingMessage ->
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (loadingMessage != null) {
+                            Text(
+                                text = loadingMessage,
+                                color = Color.White.copy(alpha = 0.72f),
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp),
+                            )
+                        }
+                    }
+                }
+                if (showHorizontalProgress) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(240.dp)
+                            .height(4.dp)
+                            .background(
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(2.dp),
+                            ),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(animatedProgress)
+                                .height(4.dp)
+                                .background(
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    shape = RoundedCornerShape(2.dp),
+                                ),
+                        )
+                    }
+                }
             }
         }
     }

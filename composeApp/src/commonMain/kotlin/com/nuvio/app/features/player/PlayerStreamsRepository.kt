@@ -18,6 +18,8 @@ import com.nuvio.app.features.plugins.PluginScraper
 import com.nuvio.app.features.streams.AddonStreamWarmupRepository
 import com.nuvio.app.features.streams.AddonStreamGroup
 import com.nuvio.app.features.streams.StreamAutoPlaySelector
+import com.nuvio.app.features.streams.StreamBadgePresentation
+import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamParser
 import com.nuvio.app.features.streams.StreamsUiState
@@ -142,6 +144,7 @@ object PlayerStreamsRepository {
         jobHolder()?.cancel()
         stateFlow.value = StreamsUiState()
 
+        val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
         val embeddedStreams = MetaDetailsRepository.findEmbeddedStreams(videoId)
         if (embeddedStreams.isNotEmpty()) {
             log.d { "Using ${embeddedStreams.size} embedded streams for type=$type id=$videoId" }
@@ -151,8 +154,12 @@ object PlayerStreamsRepository {
                 streams = embeddedStreams,
                 isLoading = false,
             )
-            stateFlow.value = StreamsUiState(
+            val presentedGroup = StreamBadgePresentation.apply(
                 groups = listOf(group),
+                rules = streamBadgeRules,
+            ).firstOrNull() ?: group
+            stateFlow.value = StreamsUiState(
+                groups = listOf(presentedGroup),
                 activeAddonIds = setOf("embedded"),
                 isAnyLoading = false,
             )
@@ -248,11 +255,16 @@ object PlayerStreamsRepository {
                     null
                 }
 
-            fun presentDebridGroup(group: AddonStreamGroup): AddonStreamGroup =
-                DebridStreamPresentation.apply(
+            fun presentStreamGroup(group: AddonStreamGroup): AddonStreamGroup {
+                val badgeGroup = StreamBadgePresentation.apply(
                     groups = listOf(group),
-                    settings = debridSettings,
+                    rules = streamBadgeRules,
                 ).firstOrNull() ?: group
+                return DebridStreamPresentation.apply(
+                    groups = listOf(badgeGroup),
+                    settings = debridSettings,
+                ).firstOrNull() ?: badgeGroup
+            }
 
             fun publishStreamGroup(group: AddonStreamGroup) {
                 stateFlow.update { current ->
@@ -273,7 +285,7 @@ object PlayerStreamsRepository {
 
             fun publishStreamGroupAfterCacheCheck(group: AddonStreamGroup) {
                 if (group.addonId !in installedAddonIds || group.streams.isEmpty()) {
-                    publishStreamGroup(presentDebridGroup(group))
+                    publishStreamGroup(presentStreamGroup(group))
                     return
                 }
 
@@ -283,7 +295,7 @@ object PlayerStreamsRepository {
                     eligibleGroupIds = eligibleGroupIds,
                 )
                 if (!shouldWaitForCacheCheck) {
-                    publishStreamGroup(presentDebridGroup(group))
+                    publishStreamGroup(presentStreamGroup(group))
                     return
                 }
 
@@ -297,7 +309,7 @@ object PlayerStreamsRepository {
                         groups = listOf(checkingGroup),
                         eligibleGroupIds = eligibleGroupIds,
                     ).firstOrNull() ?: checkingGroup
-                    publishStreamGroup(presentDebridGroup(availabilityGroup))
+                    publishStreamGroup(presentStreamGroup(availabilityGroup))
                 }
                 debridAvailabilityJobs += availabilityJob
             }

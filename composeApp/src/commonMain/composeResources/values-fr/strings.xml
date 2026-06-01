@@ -1535,7 +1535,8 @@
     <string name="settings_debrid_template_default_format">Format par défaut</string>
     <string name="settings_debrid_release_groups_hint">Saisis un groupe par ligne.</string>
     <!-- Debrid sort profiles -->
-    <string name="settings_debrid_sort_default">Par défaut</string>
+    <string name="settings_debrid_sort_original">Ordre original</string>
+    <string name="settings_debrid_sort_best_quality">Meilleure qualité d’abord</string>
     <string name="settings_debrid_sort_largest">Plus gros d’abord</string>
     <string name="settings_debrid_sort_smallest">Plus petits d’abord</string>
     <string name="settings_debrid_sort_best_audio">Meilleur audio d’abord</string>

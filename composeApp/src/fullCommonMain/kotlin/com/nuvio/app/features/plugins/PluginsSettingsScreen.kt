@@ -244,7 +244,7 @@ fun PluginsSettingsPageContent(
                         when (val result = PluginRepository.addRepository(requested)) {
                             is AddPluginRepositoryResult.Success -> {
                                 repositoryUrl = ""
-                                message = installedTemplate.format(result.repository.name)
+                                message = installedTemplate.replace("%1\$s", result.repository.name)
                             }
                             is AddPluginRepositoryResult.Error -> {
                                 message = result.message

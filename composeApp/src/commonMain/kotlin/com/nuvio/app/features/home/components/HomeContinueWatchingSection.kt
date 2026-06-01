@@ -656,47 +656,45 @@ private fun ContinueWatchingCard(
                 contentScale = ContentScale.Crop,
             )
         }
-        if (!posterCardStyle.hideLabelsEnabled) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(cardMetrics.contentPadding),
-                verticalArrangement = Arrangement.spacedBy(cardMetrics.textGap),
-            ) {
-                if (episodeCode != null) {
-                    Text(
-                        text = episodeCode,
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontSize = cardMetrics.metaTextSize,
-                            fontWeight = FontWeight.SemiBold,
-                        ),
-                        color = MaterialTheme.colorScheme.onBackground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(cardMetrics.contentPadding),
+            verticalArrangement = Arrangement.spacedBy(cardMetrics.textGap),
+        ) {
+            if (episodeCode != null) {
                 Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = cardMetrics.titleTextSize,
+                    text = episodeCode,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = cardMetrics.metaTextSize,
                         fontWeight = FontWeight.SemiBold,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (episodeTitle != null) {
-                    Text(
-                        text = episodeTitle,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = cardMetrics.metaTextSize,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            }
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontSize = cardMetrics.titleTextSize,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (episodeTitle != null) {
+                Text(
+                    text = episodeTitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = cardMetrics.metaTextSize,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
         Box(

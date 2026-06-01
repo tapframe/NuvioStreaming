@@ -73,12 +73,15 @@ import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.home.components.HomeCollectionRowSection
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import com.nuvio.app.features.trakt.TraktEpisodeMappingService
 import com.nuvio.app.features.home.components.ContinueWatchingLayout
 import com.nuvio.app.features.home.components.continueWatchingLandscapeCardHeight
 import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
@@ -236,6 +239,12 @@ fun HomeScreen(
 
     val visibleContinueWatchingEntries = remember(effectiveWatchProgressEntries) {
         effectiveWatchProgressEntries.continueWatchingEntries(limit = HomeContinueWatchingMaxRecentProgressItems)
+    }
+
+    val watchProgressSeedKey = remember(watchProgressUiState.entries) {
+        watchProgressUiState.entries.map { entry ->
+            Triple(entry.parentMetaId, entry.seasonNumber, entry.episodeNumber)
+        }
     }
 
     LaunchedEffect(visibleContinueWatchingEntries) {
@@ -440,12 +449,11 @@ fun HomeScreen(
 
     LaunchedEffect(
         completedSeriesCandidates,
-        visibleContinueWatchingEntries,
         metaProviderKey,
         continueWatchingPreferences.showUnairedNextUp,
         continueWatchingPreferences.upNextFromFurthestEpisode,
         isRefreshingEnabledAddons,
-        watchProgressUiState.entries,
+        watchProgressSeedKey,
         watchedUiState.items,
         watchedUiState.isLoaded,
     ) {
@@ -463,93 +471,105 @@ fun HomeScreen(
             return@LaunchedEffect
         }
 
-        val cachedResolvedNextUpItems = completedSeriesCandidates.mapNotNull { candidate ->
-            val cached = cachedNextUpItems[candidate.content.id] ?: return@mapNotNull null
-            val item = cached.second
-            if (
-                item.nextUpSeedSeasonNumber != candidate.seasonNumber ||
-                item.nextUpSeedEpisodeNumber != candidate.episodeNumber
-            ) {
-                return@mapNotNull null
+        withContext(Dispatchers.Default) {
+            val cachedResolvedNextUpItems = completedSeriesCandidates.mapNotNull { candidate ->
+                val cached = cachedNextUpItems[candidate.content.id] ?: return@mapNotNull null
+                val item = cached.second
+                if (
+                    item.nextUpSeedSeasonNumber != candidate.seasonNumber ||
+                    item.nextUpSeedEpisodeNumber != candidate.episodeNumber
+                ) {
+                    return@mapNotNull null
+                }
+                candidate.content.id to cached
+            }.toMap()
+            val candidatesToResolve = completedSeriesCandidates.filter { candidate ->
+                candidate.content.id !in cachedResolvedNextUpItems
             }
-            candidate.content.id to cached
-        }.toMap()
-        val candidatesToResolve = completedSeriesCandidates.filter { candidate ->
-            candidate.content.id !in cachedResolvedNextUpItems
-        }
-        val resolutionCandidates = candidatesToResolve.take(HomeNextUpInitialResolutionLimit)
-        val seedLastWatchedMap = completedSeriesCandidates.associate { it.content.id to it.markedAtEpochMs }
-        if (candidatesToResolve.isEmpty()) {
-            nextUpItemsBySeries = cachedResolvedNextUpItems
-            processedNextUpContentIds = completedSeriesCandidates.mapTo(mutableSetOf()) { candidate ->
-                candidate.content.id
-            }
-            saveContinueWatchingSnapshots(
-                nextUpItemsBySeries = cachedResolvedNextUpItems,
-                visibleContinueWatchingEntries = visibleContinueWatchingEntries,
-                todayIsoDate = CurrentDateProvider.todayIsoDate(),
-                seedLastWatchedMap = seedLastWatchedMap,
-            )
-            return@LaunchedEffect
-        }
-
-        if (metaProviderKey.isEmpty()) {
-            return@LaunchedEffect
-        }
-
-        val todayIsoDate = CurrentDateProvider.todayIsoDate()
-        val semaphore = Semaphore(NEXT_UP_RESOLUTION_CONCURRENCY)
-        val freshResults = mutableMapOf<String, Pair<Long, ContinueWatchingItem>>()
-        val processedFreshContentIds = mutableSetOf<String>()
-        val candidateBatches = resolutionCandidates.chunked(NEXT_UP_RESOLUTION_BATCH_SIZE)
-
-        for (batch in candidateBatches) {
-            val batchResults = batch.map { completedEntry ->
-                async {
-                    semaphore.withPermit {
-                        resolveHomeNextUpCandidate(
-                            completedEntry = completedEntry,
-                            watchProgressEntries = watchProgressUiState.entries,
-                            watchedItems = watchedUiState.items,
-                            todayIsoDate = todayIsoDate,
-                            preferFurthestEpisode = continueWatchingPreferences.upNextFromFurthestEpisode,
-                            showUnairedNextUp = continueWatchingPreferences.showUnairedNextUp,
-                            dismissedNextUpKeys = continueWatchingPreferences.dismissedNextUpKeys,
-                        )
+            val resolutionCandidates = candidatesToResolve.take(HomeNextUpInitialResolutionLimit)
+            val seedLastWatchedMap = completedSeriesCandidates.associate { it.content.id to it.markedAtEpochMs }
+            if (candidatesToResolve.isEmpty()) {
+                withContext(Dispatchers.Main) {
+                    nextUpItemsBySeries = cachedResolvedNextUpItems
+                    processedNextUpContentIds = completedSeriesCandidates.mapTo(mutableSetOf()) { candidate ->
+                        candidate.content.id
                     }
                 }
-            }.awaitAll()
-            batch.forEach { candidate -> processedFreshContentIds += candidate.content.id }
-
-            val resolvedBeforeBatch = freshResults.size
-            batchResults.filterNotNull().forEach { (contentId, item) ->
-                freshResults[contentId] = item
+                saveContinueWatchingSnapshots(
+                    nextUpItemsBySeries = cachedResolvedNextUpItems,
+                    visibleContinueWatchingEntries = visibleContinueWatchingEntries,
+                    todayIsoDate = CurrentDateProvider.todayIsoDate(),
+                    seedLastWatchedMap = seedLastWatchedMap,
+                )
+                return@withContext
             }
-            val batchResolvedCount = freshResults.size - resolvedBeforeBatch
-            if (batchResolvedCount > 0) {
-                val progressiveResults = cachedResolvedNextUpItems + freshResults
-                nextUpItemsBySeries = progressiveResults
+
+            if (metaProviderKey.isEmpty()) {
+                return@withContext
+            }
+
+            val todayIsoDate = CurrentDateProvider.todayIsoDate()
+            val semaphore = Semaphore(NEXT_UP_RESOLUTION_CONCURRENCY)
+            val freshResults = mutableMapOf<String, Pair<Long, ContinueWatchingItem>>()
+            val processedFreshContentIds = mutableSetOf<String>()
+            val candidateBatches = resolutionCandidates.chunked(NEXT_UP_RESOLUTION_BATCH_SIZE)
+
+            for (batch in candidateBatches) {
+                val batchResults = batch.map { completedEntry ->
+                    async {
+                        semaphore.withPermit {
+                            resolveHomeNextUpCandidate(
+                                completedEntry = completedEntry,
+                                watchProgressEntries = watchProgressUiState.entries,
+                                watchedItems = watchedUiState.items,
+                                todayIsoDate = todayIsoDate,
+                                preferFurthestEpisode = continueWatchingPreferences.upNextFromFurthestEpisode,
+                                showUnairedNextUp = continueWatchingPreferences.showUnairedNextUp,
+                                dismissedNextUpKeys = continueWatchingPreferences.dismissedNextUpKeys,
+                                isTraktProgressActive = isTraktProgressActive,
+                            )
+                        }
+                    }
+                }.awaitAll()
+                batch.forEach { candidate -> processedFreshContentIds += candidate.content.id }
+
+                val resolvedBeforeBatch = freshResults.size
+                batchResults.filterNotNull().forEach { (contentId, item) ->
+                    freshResults[contentId] = item
+                }
+                val batchResolvedCount = freshResults.size - resolvedBeforeBatch
+                if (batchResolvedCount > 0) {
+                    val progressiveResults = cachedResolvedNextUpItems + freshResults
+                    withContext(Dispatchers.Main) {
+                        nextUpItemsBySeries = progressiveResults
+                        processedNextUpContentIds = (
+                            cachedResolvedNextUpItems.keys +
+                                processedFreshContentIds
+                            ).toSet()
+                    }
+                }
+
+                if (cachedResolvedNextUpItems.size + freshResults.size >= HomeContinueWatchingMaxRecentProgressItems) {
+                    break
+                }
+            }
+
+            val results = cachedResolvedNextUpItems + freshResults
+            withContext(Dispatchers.Main) {
+                nextUpItemsBySeries = results
                 processedNextUpContentIds = (
                     cachedResolvedNextUpItems.keys +
                         processedFreshContentIds
                     ).toSet()
             }
 
+            saveContinueWatchingSnapshots(
+                nextUpItemsBySeries = results,
+                visibleContinueWatchingEntries = visibleContinueWatchingEntries,
+                todayIsoDate = todayIsoDate,
+                seedLastWatchedMap = seedLastWatchedMap,
+            )
         }
-
-        val results = cachedResolvedNextUpItems + freshResults
-        nextUpItemsBySeries = results
-        processedNextUpContentIds = (
-            cachedResolvedNextUpItems.keys +
-                processedFreshContentIds
-            ).toSet()
-
-        saveContinueWatchingSnapshots(
-            nextUpItemsBySeries = results,
-            visibleContinueWatchingEntries = visibleContinueWatchingEntries,
-            todayIsoDate = todayIsoDate,
-            seedLastWatchedMap = seedLastWatchedMap,
-        )
     }
 
     val hasActiveAddons = enabledAddons.any { it.manifest != null }
@@ -892,6 +912,7 @@ private suspend fun resolveHomeNextUpCandidate(
     preferFurthestEpisode: Boolean,
     showUnairedNextUp: Boolean,
     dismissedNextUpKeys: Set<String>,
+    isTraktProgressActive: Boolean,
 ): Pair<String, Pair<Long, ContinueWatchingItem>>? {
     val contentId = completedEntry.content.id
     val meta = try {
@@ -905,10 +926,21 @@ private suspend fun resolveHomeNextUpCandidate(
     }
     if (meta == null) return null
 
+    val resolvedProgressEntries = if (isTraktProgressActive) {
+        remapTraktProgressEntries(watchProgressEntries, contentId)
+    } else {
+        watchProgressEntries
+    }
+    val resolvedWatchedItems = if (isTraktProgressActive) {
+        remapTraktWatchedItems(watchedItems, contentId)
+    } else {
+        watchedItems
+    }
+
     val action = meta.seriesPrimaryAction(
         content = completedEntry.content,
-        entries = watchProgressEntries,
-        watchedItems = watchedItems,
+        entries = resolvedProgressEntries,
+        watchedItems = resolvedWatchedItems,
         todayIsoDate = todayIsoDate,
         preferFurthestEpisode = preferFurthestEpisode,
         showUnairedNextUp = showUnairedNextUp,
@@ -1318,3 +1350,63 @@ private fun ContinueWatchingItem.isCloudLibraryContinueWatchingItem(): Boolean =
 private fun WatchProgressEntry.isCloudLibraryProgressEntry(): Boolean =
     contentType.equals(CloudLibraryContentType, ignoreCase = true) ||
         parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
+
+private suspend fun remapTraktProgressEntries(
+    entries: List<WatchProgressEntry>,
+    contentId: String,
+): List<WatchProgressEntry> {
+    return entries.map { entry ->
+        if (entry.parentMetaId != contentId) {
+            entry
+        } else {
+            val mapping = TraktEpisodeMappingService.resolveAddonEpisodeMapping(
+                contentId = entry.parentMetaId,
+                contentType = entry.contentType ?: "series",
+                season = entry.seasonNumber,
+                episode = entry.episodeNumber,
+                episodeTitle = entry.episodeTitle,
+            )
+            if (mapping != null) {
+                entry.copy(
+                    seasonNumber = mapping.season,
+                    episodeNumber = mapping.episode,
+                    videoId = com.nuvio.app.features.watchprogress.buildPlaybackVideoId(
+                        parentMetaId = entry.parentMetaId,
+                        seasonNumber = mapping.season,
+                        episodeNumber = mapping.episode,
+                        fallbackVideoId = entry.videoId,
+                    ),
+                    episodeTitle = mapping.title ?: entry.episodeTitle,
+                )
+            } else {
+                entry
+            }
+        }
+    }
+}
+
+private suspend fun remapTraktWatchedItems(
+    items: List<WatchedItem>,
+    contentId: String,
+): List<WatchedItem> {
+    return items.map { item ->
+        if (item.id != contentId) {
+            item
+        } else {
+            val mapping = TraktEpisodeMappingService.resolveAddonEpisodeMapping(
+                contentId = item.id,
+                contentType = item.type ?: "series",
+                season = item.season,
+                episode = item.episode,
+            )
+            if (mapping != null) {
+                item.copy(
+                    season = mapping.season,
+                    episode = mapping.episode,
+                )
+            } else {
+                item
+            }
+        }
+    }
+}

@@ -418,6 +418,7 @@
     <string name="compose_settings_page_plugins">Plugins</string>
     <string name="compose_settings_page_poster_customization">Poster Card Style</string>
     <string name="compose_settings_page_root">Settings</string>
+    <string name="compose_settings_page_streams">Streams</string>
     <string name="compose_settings_page_supporters_contributors">Supporters &amp; Contributors</string>
     <string name="compose_settings_page_tmdb_enrichment">TMDB Enrichment</string>
     <string name="compose_settings_page_trakt">Trakt</string>
@@ -433,6 +434,7 @@
     <string name="compose_settings_root_general_section">GENERAL</string>
     <string name="compose_settings_root_integrations_description">Manage available integrations</string>
     <string name="compose_settings_root_notifications_description">Manage episode release alerts and send a test notification.</string>
+    <string name="compose_settings_root_streams_description">Stream result display and badge URL rules.</string>
     <string name="compose_settings_root_switch_profile_description">Change to a different profile.</string>
     <string name="compose_settings_root_switch_profile_title">Switch Profile</string>
     <string name="compose_settings_root_trakt_description">Open Trakt connection screen</string>
@@ -661,11 +663,30 @@
     <string name="settings_debrid_prepare_count_many">%1$d links</string>
     <string name="settings_debrid_section_formatting">Formatting</string>
     <string name="settings_debrid_name_template">Name template</string>
-    <string name="settings_debrid_name_template_description">Controls how result names appear.</string>
+    <string name="settings_debrid_name_template_description">Controls how result names appear. Leave blank to use the original result name.</string>
     <string name="settings_debrid_description_template">Description template</string>
-    <string name="settings_debrid_description_template_description">Controls the metadata shown under each result.</string>
+    <string name="settings_debrid_description_template_description">Controls the metadata shown under each result. Leave blank to use the original result details.</string>
     <string name="settings_debrid_formatter_reset_title">Reset formatting</string>
     <string name="settings_debrid_formatter_reset_subtitle">Restore default result formatting.</string>
+    <string name="settings_stream_badges_section">Fusion Style</string>
+    <string name="settings_stream_size_badges_title">Size badges</string>
+    <string name="settings_stream_size_badges_description">Show file size badges in stream results and player source panels.</string>
+    <string name="settings_stream_badge_urls_title">Fusion badge URLs</string>
+    <string name="settings_stream_badge_urls_description">Import up to %1$d Fusion-style stream badge JSON URLs. Each URL can be updated or deleted separately.</string>
+    <string name="settings_stream_badge_urls_search_description">Manage imported Fusion-style stream badge JSON URLs.</string>
+    <string name="settings_fusion_badges_summary">%1$d/%2$d URLs, %3$d active Fusion badges</string>
+    <string name="settings_fusion_badges_empty">No Fusion badge URLs imported.</string>
+    <string name="settings_fusion_badge_url_label">Fusion badge JSON URL</string>
+    <string name="settings_fusion_badge_urls_imported">%1$d/%2$d Fusion URLs imported</string>
+    <string name="settings_fusion_badge_url_active">Active</string>
+    <string name="settings_fusion_badge_url_inactive">Inactive</string>
+    <string name="settings_fusion_badge_url_status_summary">%1$s, %2$d enabled badges, %3$d groups</string>
+    <string name="settings_fusion_badge_preview_action">Preview</string>
+    <string name="settings_fusion_badge_preview_title">Fusion badge preview</string>
+    <string name="settings_fusion_badge_preview_count">%1$d Fusion-style badges from this URL</string>
+    <string name="settings_fusion_badge_preview_empty">No Fusion-style badge images in this URL.</string>
+    <string name="settings_fusion_badge_group_title">Group %1$d</string>
+    <string name="settings_fusion_badge_other_group_title">Other Fusion badges</string>
     <string name="settings_debrid_key_valid">API key validated.</string>
     <string name="settings_debrid_key_invalid">Could not validate this API key.</string>
     <string name="settings_mdb_add_api_key_first">Add your MDBList API key below before turning ratings on.</string>
@@ -788,7 +809,13 @@
     <string name="settings_playback_external_player_app">External Player App</string>
     <string name="settings_playback_external_player_description_android">Open new playback with Android&apos;s default video app or system chooser.</string>
     <string name="settings_playback_external_player_description_ios">Open new playback with the selected installed player.</string>
+    <string name="settings_playback_external_player_forward_subtitles">Forward Subtitles to External Player</string>
+    <string name="settings_playback_external_player_forward_subtitles_description">Fetch addon subtitles in your preferred language and pass them to the external player.</string>
     <string name="settings_playback_external_player_none_available">No supported external players installed</string>
+    <string name="settings_playback_player_preference">Player</string>
+    <string name="settings_playback_player_preference_internal">Internal</string>
+    <string name="settings_playback_player_preference_external">External</string>
+    <string name="settings_playback_player_preference_description">Choose which player handles new playback.</string>
     <string name="settings_playback_hold_speed">Hold Speed</string>
     <string name="settings_playback_hold_to_speed">Hold To Speed</string>
     <string name="settings_playback_hold_to_speed_description">Long-press anywhere on the player surface to temporarily boost playback speed.</string>
@@ -1222,6 +1249,7 @@
     <string name="streams_episode_title_with_name">S%1$dE%2$d - %3$s</string>
     <string name="streams_fetching">Fetching…</string>
     <string name="streams_finding_source">Finding source…</string>
+    <string name="streams_loading_subtitles">Loading subtitles from addons…</string>
     <string name="streams_finding_streams">Finding streams…</string>
     <string name="streams_link_copied">Stream link copied</string>
     <string name="streams_no_direct_link">No direct stream link available</string>
@@ -1545,9 +1573,11 @@
     <!-- Debrid misc -->
     <string name="settings_debrid_learn_more">Learn more</string>
     <string name="settings_debrid_template_default_format">Default format</string>
+    <string name="settings_debrid_template_original_format">Original format</string>
     <string name="settings_debrid_release_groups_hint">Enter one group per line.</string>
     <!-- Debrid sort profiles -->
-    <string name="settings_debrid_sort_default">Default</string>
+    <string name="settings_debrid_sort_original">Original order</string>
+    <string name="settings_debrid_sort_best_quality">Best quality first</string>
     <string name="settings_debrid_sort_largest">Largest first</string>
     <string name="settings_debrid_sort_smallest">Smallest first</string>
     <string name="settings_debrid_sort_best_audio">Best audio first</string>
@@ -1790,4 +1820,20 @@
     <!-- Pass 4 — platform stubs and dynamic title fallbacks -->
     <string name="collections_editor_trakt_list_title_format">Trakt List %1$s</string>
     <string name="external_player_android_system">Android system player</string>
+    <string name="p2p_consent_title">P2P Streaming</string>
+    <string name="p2p_consent_body">This stream uses peer-to-peer (P2P) technology. By enabling P2P, you acknowledge and agree that:\n\n• Your IP address will be visible to other peers in the network\n• You are solely responsible for the content you access\n• You confirm you have the legal right to stream this content in your jurisdiction\n• Nuvio does not host, distribute, or control any P2P content\n• Nuvio bears no liability for any legal consequences arising from your use of P2P streaming\n\nYou use this feature entirely at your own risk. P2P can be disabled anytime in Settings.</string>
+    <string name="p2p_consent_enable">Enable P2P</string>
+    <string name="p2p_consent_cancel">Cancel</string>
+    <string name="settings_p2p_title">P2P Streaming</string>
+    <string name="settings_p2p_subtitle">Allow peer-to-peer (torrent) streams</string>
+    <string name="settings_p2p_hide_stats_title">Hide torrent stats</string>
+    <string name="settings_p2p_hide_stats_subtitle">Hide buffer, seeds, peers and download speed during loading and playback</string>
+    <string name="player_torrent_peer_info">%1$d seeds · %2$d peers</string>
+    <string name="player_torrent_buffered_status">%1$s buffered · %2$s · %3$s</string>
+    <string name="player_torrent_status">%1$s · %2$s</string>
+    <string name="player_torrent_stats">%1$d peers · %2$d seeds · %3$d%%</string>
+    <string name="player_torrent_connecting_peers">Connecting to peers…</string>
+    <string name="player_torrent_starting_engine">Starting P2P engine…</string>
+    <string name="player_error_failed_start_torrent">Failed to start torrent: %1$s</string>
+    <string name="player_error_torrent">Torrent error: %1$s</string>
 </resources>
