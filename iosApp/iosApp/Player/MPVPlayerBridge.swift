@@ -28,6 +28,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func seekTo(positionMs: Int64) { playerVC?.seekToMs(positionMs) }
     func seekBy(offsetMs: Int64) { playerVC?.seekByMs(offsetMs) }
     func retry() { playerVC?.retryPlayback() }
+    func setKeyboardModalState(isAnyModalVisible: Bool) { playerVC?.setKeyboardModalState(isAnyModalVisible) }
+    func setExitCallback(callback: (() -> Void)?) { playerVC?.setExitCallback(callback) }
     func configureVideoOutput(
         hardwareDecoder: String,
         targetColorspaceHint: Bool,
@@ -200,6 +202,8 @@ final class MPVPlayerViewController: UIViewController {
     private lazy var eventQueue = DispatchQueue(label: "mpv-events", qos: .userInitiated)
     private var recentPlaybackLogs: [String] = []
     private var activeRequestHeaders: [String: String] = [:]
+    private var isAnyModalVisible: Bool = false
+    private var exitCallback: (() -> Void)? = nil
 
     // Cached track lists
     var audioTracks: [TrackInfo] = []
@@ -457,13 +461,13 @@ final class MPVPlayerViewController: UIViewController {
     func seekToMs(_ ms: Int64) {
         guard mpv != nil else { return }
         let seconds = Double(ms) / 1000.0
-        command("seek", args: [String(format: "%.3f", seconds), "absolute"])
+        command("seek", args: [String(format: "%.3f", seconds), "absolute+exact"])
     }
 
     func seekByMs(_ ms: Int64) {
         guard mpv != nil else { return }
         let seconds = Double(ms) / 1000.0
-        command("seek", args: [String(format: "%.3f", seconds), "relative"])
+        command("seek", args: [String(format: "%.3f", seconds), "relative+exact"])
     }
 
     func retryPlayback() {
@@ -991,6 +995,57 @@ final class MPVPlayerViewController: UIViewController {
                 rootController.refreshImmersiveSystemUI()
             }
             currentParent = controller.parent
+        }
+    }
+
+    // MARK: - Keyboard Input Handling
+
+    func setKeyboardModalState(_ isModalVisible: Bool) {
+        self.isAnyModalVisible = isModalVisible
+    }
+
+    func setExitCallback(_ callback: (() -> Void)?) {
+        self.exitCallback = callback
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        var didHandleEvent = false
+
+        // Don't handle keyboard input if any modal is visible
+        guard !isAnyModalVisible else {
+            super.pressesBegan(presses, with: event)
+            return
+        }
+
+        for press in presses {
+            guard let key = press.key else { continue }
+
+            if key.charactersIgnoringModifiers == UIKeyCommand.inputEscape {
+                print("[NuvioPlayer] Escape -> exit player")
+                exitCallback?()
+                didHandleEvent = true
+            } else if key.charactersIgnoringModifiers == UIKeyCommand.inputLeftArrow {
+                print("[NuvioPlayer] Left -> seekBy -10s")
+                seekByMs(-10_000)
+                didHandleEvent = true
+            } else if key.charactersIgnoringModifiers == UIKeyCommand.inputRightArrow {
+                print("[NuvioPlayer] Right -> seekBy +10s")
+                seekByMs(10_000)
+                didHandleEvent = true
+            } else if key.characters == " " {
+                print("[NuvioPlayer] Space -> togglePlayback")
+                if isPlayerPlaying {
+                    pausePlayback()
+                } else {
+                    playPlayback()
+                }
+                didHandleEvent = true
+            }
+        }
+
+        if !didHandleEvent {
+            // Didn't handle this key press, so pass the event to the next responder.
+            super.pressesBegan(presses, with: event)
         }
     }
 }

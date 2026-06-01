@@ -67,6 +67,8 @@ interface NuvioPlayerBridge {
     fun getBufferedMs(): Long
     fun getPlaybackSpeed(): Float
     fun getErrorMessage(): String
+    fun setKeyboardModalState(isAnyModalVisible: Boolean)
+    fun setExitCallback(callback: (() -> Unit)?)
     fun destroy()
 }
 
