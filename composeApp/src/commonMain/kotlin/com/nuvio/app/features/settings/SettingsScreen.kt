@@ -69,6 +69,7 @@ import com.nuvio.app.features.mdblist.MdbListSettingsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsUiState
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.search.SearchHistoryRepository
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCommentsSettings
@@ -194,6 +195,10 @@ fun SettingsScreen(
             EpisodeReleaseNotificationsRepository.ensureLoaded()
             EpisodeReleaseNotificationsRepository.uiState
         }.collectAsStateWithLifecycle()
+        val searchHistorySettingsUiState by remember {
+            SearchHistoryRepository.ensureLoaded()
+            SearchHistoryRepository.settingsUiState
+        }.collectAsStateWithLifecycle()
 
         LaunchedEffect(homescreenCatalogRefreshKey) {
             if (homescreenCatalogRefreshKey.isEmpty()) return@LaunchedEffect
@@ -281,6 +286,7 @@ fun SettingsScreen(
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
                 posterCardStyleUiState = posterCardStyleUiState,
+                searchHistoryLimitOverride = searchHistorySettingsUiState.limitOverride,
                 onSwitchProfile = onSwitchProfile,
                 onDownloadsClick = onDownloadsClick,
                 onSupportersContributorsClick = onSupportersContributorsClick,
@@ -330,6 +336,7 @@ fun SettingsScreen(
                 metaScreenSettingsUiState = metaScreenSettingsUiState,
                 continueWatchingPreferencesUiState = continueWatchingPreferencesUiState,
                 posterCardStyleUiState = posterCardStyleUiState,
+                searchHistoryLimitOverride = searchHistorySettingsUiState.limitOverride,
                 onSwitchProfile = onSwitchProfile,
                 onHomescreenClick = onHomescreenClick,
                 onMetaScreenClick = onMetaScreenClick,
@@ -389,6 +396,7 @@ private fun MobileSettingsScreen(
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
     posterCardStyleUiState: PosterCardStyleUiState,
+    searchHistoryLimitOverride: Int?,
     onSwitchProfile: (() -> Unit)? = null,
     onHomescreenClick: () -> Unit = {},
     onMetaScreenClick: () -> Unit = {},
@@ -573,6 +581,8 @@ private fun MobileSettingsScreen(
                 )
                 SettingsPage.ContentDiscovery -> contentDiscoveryContent(
                     isTablet = false,
+                    searchHistoryLimitOverride = searchHistoryLimitOverride,
+                    onSearchHistoryLimitSelected = SearchHistoryRepository::setLimitOverride,
                     showPluginsEntry = AppFeaturePolicy.pluginsEnabled,
                     onAddonsClick = onAddonsClick,
                     onPluginsClick = onPluginsClick,
@@ -707,6 +717,7 @@ private fun TabletSettingsScreen(
     metaScreenSettingsUiState: MetaScreenSettingsUiState,
     continueWatchingPreferencesUiState: ContinueWatchingPreferencesUiState,
     posterCardStyleUiState: PosterCardStyleUiState,
+    searchHistoryLimitOverride: Int?,
     onSwitchProfile: (() -> Unit)? = null,
     onDownloadsClick: () -> Unit = {},
     onSupportersContributorsClick: () -> Unit = {},
@@ -949,6 +960,8 @@ private fun TabletSettingsScreen(
                     )
                     SettingsPage.ContentDiscovery -> contentDiscoveryContent(
                         isTablet = true,
+                        searchHistoryLimitOverride = searchHistoryLimitOverride,
+                        onSearchHistoryLimitSelected = SearchHistoryRepository::setLimitOverride,
                         showPluginsEntry = AppFeaturePolicy.pluginsEnabled,
                         onAddonsClick = { openInlinePage(SettingsPage.Addons) },
                         onPluginsClick = { openInlinePage(SettingsPage.Plugins) },
