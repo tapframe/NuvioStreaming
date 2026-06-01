@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="about_licenses_attributions_subtitle">Sources de données, remerciements et licences de plateforme</string>
     <string name="about_supporters_contributors_subtitle">Reconnaissance et crédits du projet</string>
@@ -167,9 +166,13 @@
     <string name="collections_editor_tmdb_quick_networks">Chaînes rapides</string>
     <string name="collections_editor_tmdb_genres">ID de genre</string>
     <string name="collections_editor_tmdb_genres_helper">Utilisez des numéros de genre TMDB. Sépare plusieurs valeurs par des virgules pour ET, ou des barres verticales pour OU.</string>
-    <string name="collections_editor_tmdb_date_from">Date de sortie ou de diffusion depuis</string>
+    <string name="collections_editor_tmdb_genres_movie_placeholder">28,12</string>
+	<string name="collections_editor_tmdb_genres_series_placeholder">18,35</string>
+	<string name="collections_editor_tmdb_date_from">Date de sortie ou de diffusion depuis</string>
     <string name="collections_editor_tmdb_date_to">Date de sortie ou de diffusion jusqu’au</string>
     <string name="collections_editor_tmdb_date_helper">Utilisez le format AAAA-MM-JJ, ex. 2024-01-01.</string>
+	<string name="collections_editor_tmdb_date_from_placeholder">2020-01-01</string>
+	<string name="collections_editor_tmdb_date_to_placeholder">2024-12-31</string>
     <string name="collections_editor_tmdb_rating_min">Note minimale</string>
     <string name="collections_editor_tmdb_rating_max">Note maximale</string>
     <string name="collections_editor_tmdb_rating_helper">Note TMDB de 0 à 10. Exemple : 7.0.</string>
@@ -177,10 +180,13 @@
     <string name="collections_editor_tmdb_rating_max_placeholder">10</string>
     <string name="collections_editor_tmdb_votes_min">Votes minimum</string>
     <string name="collections_editor_tmdb_votes_helper">Utilisez ceci pour éviter les titres peu connus avec peu de votes. Exemple : 100.</string>
-    <string name="collections_editor_tmdb_language">Langue originale</string>
+    <string name="collections_editor_tmdb_votes_min_placeholder">100</string>
+	<string name="collections_editor_tmdb_language">Langue originale</string>
     <string name="collections_editor_tmdb_language_helper">Utilisez des codes de langue à deux lettres, ex. en, ko, ja, hi.</string>
+	<string name="collections_editor_tmdb_language_placeholder">en, ko, ja, hi</string>
     <string name="collections_editor_tmdb_country">Pays d’origine</string>
     <string name="collections_editor_tmdb_country_helper">Utilisez des codes de pays à deux lettres, ex. US, KR, JP, IN.</string>
+	<string name="collections_editor_tmdb_country_placeholder">US, KR, JP, IN</string>
     <string name="collections_editor_tmdb_keywords">ID de mots-clés</string>
     <string name="collections_editor_tmdb_keywords_helper">Utilisez des numéros de mots-clés TMDB. Les puces rapides remplissent des exemples courants.</string>
     <string name="collections_editor_tmdb_keywords_placeholder">9715 pour super-héros</string>
@@ -192,6 +198,7 @@
     <string name="collections_editor_tmdb_networks_placeholder">213 pour Netflix</string>
     <string name="collections_editor_tmdb_year">Année</string>
     <string name="collections_editor_tmdb_year_helper">Utilisez une année à quatre chiffres, ex. 2024.</string>
+	<string name="collections_editor_tmdb_year_placeholder">2024</string>
     <string name="collections_editor_tmdb_presets">Préréglages</string>
     <string name="collections_editor_tmdb_search">Rechercher</string>
     <string name="collections_editor_add_source">Ajouter une source</string>
@@ -201,7 +208,7 @@
     <string name="collections_editor_trakt_list">Liste Trakt</string>
     <string name="collections_editor_trakt_input_placeholder">Rechercher un titre, URL Trakt ou ID de liste</string>
     <string name="collections_editor_trakt_input_helper">Utilisez une URL publique de liste Trakt ou un ID numérique de liste, ou cherche par nom.</string>
-    <string name="collections_editor_trakt_title_placeholder">Programme du week-end, Lauréats</string>
+    <string name="collections_editor_trakt_title_placeholder">À voir ce week-end, Les Lauréats</string>
     <string name="collections_editor_trakt_search_results">Résultats de recherche</string>
     <string name="collections_editor_trakt_trending">Listes en vogue</string>
     <string name="collections_editor_trakt_popular">Listes populaires</string>
@@ -255,6 +262,7 @@
     <string name="collections_editor_tmdb_network_disney_plus">Disney+</string>
     <string name="collections_editor_tmdb_network_prime_video">Prime Video</string>
     <string name="collections_editor_tmdb_network_hulu">Hulu</string>
+	<string name="collections_editor_tmdb_sort_original">Ordre original</string>
     <string name="collections_editor_tmdb_sort_popular">Populaire</string>
     <string name="collections_editor_tmdb_sort_top_rated">Mieux notés</string>
     <string name="collections_editor_tmdb_sort_recent">Récent</string>
@@ -410,6 +418,7 @@
     <string name="compose_settings_page_plugins">Plugins</string>
     <string name="compose_settings_page_poster_customization">Personnalisation des affiches</string>
     <string name="compose_settings_page_root">Paramètres</string>
+	<string name="compose_settings_page_streams">Streams</string>
     <string name="compose_settings_page_supporters_contributors">Supporters et contributeurs</string>
     <string name="compose_settings_page_tmdb_enrichment">Enrichissement TMDB</string>
     <string name="compose_settings_page_trakt">Trakt</string>
@@ -425,6 +434,7 @@
     <string name="compose_settings_root_general_section">GÉNÉRAL</string>
     <string name="compose_settings_root_integrations_description">Connecte les services TMDB et MDBList.</string>
     <string name="compose_settings_root_notifications_description">Gérez les alertes de sortie d’épisodes et envoie une notification de test.</string>
+	<string name="compose_settings_root_streams_description">Affichage des résultats de streams et règles d’URL des badges.</string>
     <string name="compose_settings_root_switch_profile_description">Basculer vers un profil différent.</string>
     <string name="compose_settings_root_switch_profile_title">Changer de profil</string>
     <string name="compose_settings_root_trakt_description">Connecte Trakt, synchronise des listes et enregistre des titres directement dans Trakt.</string>
@@ -658,6 +668,25 @@
     <string name="settings_debrid_description_template_description">Contrôle les métadonnées affichées sous chaque résultat.</string>
     <string name="settings_debrid_formatter_reset_title">Réinitialiser la mise en forme</string>
     <string name="settings_debrid_formatter_reset_subtitle">Restaurer la mise en forme par défaut des résultats.</string>
+	<string name="settings_stream_badges_section">Style Fusion</string>
+    <string name="settings_stream_size_badges_title">Badges de taille</string>
+    <string name="settings_stream_size_badges_description">Affichez les badges de taille de fichier dans les résultats de streams et les panneaux de sources du lecteur.</string>
+    <string name="settings_stream_badge_urls_title">URL des badges Fusion</string>
+    <string name="settings_stream_badge_urls_description">Importez jusqu'à %1$d URL JSON de badges de stream style Fusion. Chaque URL peut être mise à jour ou supprimée séparément.</string>
+    <string name="settings_stream_badge_urls_search_description">Gérez les URL JSON de badges de stream style Fusion importées.</string>
+    <string name="settings_fusion_badges_summary">%1$d/%2$d URL, %3$d badges Fusion actifs</string>
+    <string name="settings_fusion_badges_empty">Aucune URL de badge Fusion importée.</string>
+    <string name="settings_fusion_badge_url_label">URL JSON du badge Fusion</string>
+    <string name="settings_fusion_badge_urls_imported">%1$d/%2$d URL Fusion importées</string>
+    <string name="settings_fusion_badge_url_active">Actif</string>
+    <string name="settings_fusion_badge_url_inactive">Inactif</string>
+    <string name="settings_fusion_badge_url_status_summary">%1$s, %2$d badges activés, %3$d groupes</string>
+    <string name="settings_fusion_badge_preview_action">Aperçu</string>
+    <string name="settings_fusion_badge_preview_title">Aperçu du badge Fusion</string>
+    <string name="settings_fusion_badge_preview_count">%1$d badges style Fusion depuis cette URL</string>
+    <string name="settings_fusion_badge_preview_empty">Aucune image de badge style Fusion dans cette URL.</string>
+    <string name="settings_fusion_badge_group_title">Groupe %1$d</string>
+    <string name="settings_fusion_badge_other_group_title">Autres badges Fusion</string>
     <string name="settings_debrid_key_valid">Clé API validée.</string>
     <string name="settings_debrid_key_invalid">Impossible de valider cette clé API.</string>
     <string name="settings_mdb_add_api_key_first">Ajoutez votre clé API MDBList ci-dessous avant d’activer les notes.</string>
@@ -781,6 +810,8 @@
     <string name="settings_playback_external_player_description_android">Ouvre les nouvelles lectures avec l’app vidéo par défaut d’Android ou le sélecteur système.</string>
     <string name="settings_playback_external_player_description_ios">Ouvre les nouvelles lectures avec le lecteur installé sélectionné.</string>
     <string name="settings_playback_external_player_none_available">Aucun lecteur externe compatible n’est installé</string>
+    <string name="settings_playback_external_player_forward_subtitles">Transférer les sous-titres au lecteur externe</string>
+    <string name="settings_playback_external_player_forward_subtitles_description">Récupère les sous-titres des addons dans votre langue préférée et les transmet au lecteur externe.</string>
     <string name="settings_playback_hold_speed">Vitesse au maintien</string>
     <string name="settings_playback_hold_to_speed">Maintenir pour accélérer</string>
     <string name="settings_playback_hold_to_speed_description">Gardez le doigt appuyé n’importe où sur le lecteur pour accélérer temporairement.</string>
@@ -804,6 +835,10 @@
     <string name="settings_playback_addon_subtitle_startup_mode">Démarrage des sous-titres d’addon</string>
     <string name="settings_playback_addon_subtitle_startup_preferred">Langue préférée uniquement</string>
     <string name="settings_playback_addon_subtitle_startup_preferred_description">Récupère les sous-titres d’addon, mais n’affiche que ceux correspondant à la langue préférée.</string>
+    <string name="settings_playback_player_preference">Lecteur</string>
+    <string name="settings_playback_player_preference_description">Choisissez quel lecteur gère les nouvelles lectures.</string>
+    <string name="settings_playback_player_preference_external">Externe</string>
+    <string name="settings_playback_player_preference_internal">Interne</string>
     <string name="settings_playback_prefer_binge_group">Préférer le groupe binge</string>
     <string name="settings_playback_prefer_binge_group_description">Lors de la lecture automatique, préférer un stream du même groupe binge que le stream actuel.</string>
     <string name="settings_playback_reuse_binge_group">Réutiliser le groupe de binge</string>
@@ -1213,6 +1248,7 @@
     <string name="streams_episode_fallback_title">Épisode</string>
     <string name="streams_episode_title_with_name">S%1$dE%2$d - %3$s</string>
     <string name="streams_fetching">Récupération…</string>
+    <string name="streams_loading_subtitles">Chargement des sous-titres depuis les addons…</string>
     <string name="streams_finding_source">Recherche de la source…</string>
     <string name="streams_finding_streams">Recherche des streams…</string>
     <string name="streams_link_copied">Lien du stream copié</string>
@@ -1237,6 +1273,8 @@
     <string name="updates_asset_line">%1$s • %2$s</string>
     <string name="updates_check_failed">Échec de la vérification des mises à jour</string>
     <string name="updates_download_failed">Échec du téléchargement</string>
+	<string name="updates_download_empty_body">Corps de téléchargement vide</string>
+    <string name="updates_download_file_missing">Le fichier de mise à jour téléchargé est introuvable.</string>
     <string name="updates_downloading_progress">Téléchargement %1$d %</string>
     <string name="updates_install_failed">Impossible de démarrer l’installation</string>
     <string name="updates_latest_version">Tu utilises la version la plus récente.</string>
@@ -1297,6 +1335,8 @@
     <string name="source_embedded">Intégré</string>
     <string name="trakt_authorization_denied">Autorisation refusée</string>
     <string name="trakt_complete_sign_in_browser">Terminez la connexion Trakt dans votre navigateur</string>
+	<string name="trakt_connected">Connecté à Trakt</string>
+    <string name="trakt_disconnected">Déconnecté de Trakt</string>
     <string name="trakt_invalid_callback">Callback Trakt invalide</string>
     <string name="trakt_invalid_callback_state">État du callback Trakt invalide</string>
     <string name="trakt_invalid_token_response">Réponse de jeton Trakt invalide</string>
@@ -1533,9 +1573,11 @@
     <!-- Debrid misc -->
     <string name="settings_debrid_learn_more">En savoir plus</string>
     <string name="settings_debrid_template_default_format">Format par défaut</string>
+	<string name="settings_debrid_template_original_format">Format original</string>
     <string name="settings_debrid_release_groups_hint">Saisissez un groupe par ligne.</string>
     <!-- Debrid sort profiles -->
-    <string name="settings_debrid_sort_default">Par défaut</string>
+	<string name="settings_debrid_sort_original">Ordre original</string>
+    <string name="settings_debrid_sort_best_quality">Meilleure qualité d'abord</string>
     <string name="settings_debrid_sort_largest">Plus gros d’abord</string>
     <string name="settings_debrid_sort_smallest">Plus petits d’abord</string>
     <string name="settings_debrid_sort_best_audio">Meilleur audio d’abord</string>
@@ -1636,23 +1678,9 @@
     <string name="collections_editor_media_movies_suffix">Films</string>
     <string name="collections_editor_media_series_suffix">Séries</string>
     <!-- Cloud library -->
-    <string name="cloud_library_playback_disabled">La cloud library est désactivée.</string>
+    <string name="cloud_library_playback_disabled">La librairie cloud est désactivée.</string>
     <!-- IntroDB settings -->
     <string name="settings_playback_introdb_invalid_api_key">Clé API invalide ou échec de connexion</string>
-    <!-- TMDB placeholders & trakt status (restored after cherry-pick) -->
-    <string name="collections_editor_tmdb_country_placeholder">US, KR, JP, IN</string>
-    <string name="collections_editor_tmdb_date_from_placeholder">2020-01-01</string>
-    <string name="collections_editor_tmdb_date_to_placeholder">2024-12-31</string>
-    <string name="collections_editor_tmdb_genres_movie_placeholder">28,12</string>
-    <string name="collections_editor_tmdb_genres_series_placeholder">18,35</string>
-    <string name="collections_editor_tmdb_language_placeholder">en, ko, ja, hi</string>
-    <string name="collections_editor_tmdb_sort_original">Ordre original</string>
-    <string name="collections_editor_tmdb_votes_min_placeholder">100</string>
-    <string name="collections_editor_tmdb_year_placeholder">2024</string>
-    <string name="trakt_connected">Connecté à Trakt</string>
-    <string name="trakt_disconnected">Déconnecté de Trakt</string>
-    <string name="updates_download_empty_body">Corps de téléchargement vide</string>
-    <string name="updates_download_file_missing">Le fichier de mise à jour téléchargé est introuvable.</string>
     <string name="addons_manifest_missing_field">Champ « %1$s » manquant dans le manifeste</string>
     <string name="collections_editor_tmdb_collection_title_format">Collection TMDB %1$s</string>
     <string name="collections_editor_tmdb_director_title_format">Réalisateur TMDB %1$s</string>
@@ -1786,7 +1814,6 @@
     <string name="cw_airs_tomorrow_short">Demain</string>
     <plurals name="cw_airs_in_days_short">
         <item quantity="one">Dans %1$d jour</item>
-        <item quantity="many">Dans %1$d jours</item>
         <item quantity="other">Dans %1$d jours</item>
     </plurals>
     <string name="cw_new_episode">Nouvel épisode</string>
@@ -1794,4 +1821,20 @@
     <!-- Pass 4 — platform stubs and dynamic title fallbacks -->
     <string name="collections_editor_trakt_list_title_format">Liste Trakt %1$s</string>
     <string name="external_player_android_system">Lecteur système Android</string>
+	<string name="p2p_consent_title">Streaming P2P</string>
+    <string name="p2p_consent_body">Ce stream utilise la technologie peer-to-peer (P2P). En activant le P2P, vous reconnaissez et acceptez que :\n\n• Votre adresse IP sera visible par les autres pairs du réseau\n• Vous êtes seul responsable du contenu auquel vous accédez\n• Vous confirmez avoir le droit légal de lire ce contenu dans votre juridiction\n• Nuvio n\'héberge, ne distribue ni ne contrôle aucun contenu P2P\n• Nuvio décline toute responsabilité quant aux conséquences légales découlant de votre utilisation du streaming P2P\n\nVous utilisez cette fonctionnalité entièrement à vos propres risques. Le P2P peut être désactivé à tout moment dans les Paramètres.</string>
+    <string name="p2p_consent_enable">Activer le P2P</string>
+    <string name="p2p_consent_cancel">Annuler</string>
+    <string name="settings_p2p_title">Streaming P2P</string>
+    <string name="settings_p2p_subtitle">Autorisez les streams peer-to-peer (torrent)</string>
+    <string name="settings_p2p_hide_stats_title">Masquez les statistiques torrent</string>
+    <string name="settings_p2p_hide_stats_subtitle">Masquez la mémoire tampon, les sources, les pairs et la vitesse de téléchargement pendant le chargement et la lecture</string>
+    <string name="player_torrent_peer_info">%1$d sources · %2$d pairs</string>
+    <string name="player_torrent_buffered_status">%1$s en mémoire tampon · %2$s · %3$s</string>
+    <string name="player_torrent_status">%1$s · %2$s</string>
+    <string name="player_torrent_stats">%1$d pairs · %2$d sources · %3$d%%</string>
+    <string name="player_torrent_connecting_peers">Connexion aux pairs…</string>
+    <string name="player_torrent_starting_engine">Démarrage du moteur P2P…</string>
+    <string name="player_error_failed_start_torrent">Échec du démarrage du torrent : %1$s</string>
+    <string name="player_error_torrent">Erreur torrent : %1$s</string>
 </resources>
