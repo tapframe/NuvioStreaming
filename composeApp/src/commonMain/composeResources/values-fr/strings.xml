@@ -207,7 +207,7 @@
     <string name="collections_editor_trakt_sources">Listes Trakt</string>
     <string name="collections_editor_trakt_list">Liste Trakt</string>
     <string name="collections_editor_trakt_input_placeholder">Rechercher un titre, URL Trakt ou ID de liste</string>
-    <string name="collections_editor_trakt_input_helper">Utilisez une URL publique de liste Trakt ou un ID numérique de liste, ou cherche par nom.</string>
+    <string name="collections_editor_trakt_input_helper">Utilisez une URL publique de liste Trakt ou un ID numérique de liste, ou chercher par nom.</string>
     <string name="collections_editor_trakt_title_placeholder">À voir ce week-end, Les Lauréats</string>
     <string name="collections_editor_trakt_search_results">Résultats de recherche</string>
     <string name="collections_editor_trakt_trending">Listes en vogue</string>
@@ -271,7 +271,7 @@
     <string name="collections_editor_tmdb_watch_region_helper">Code pays ISO 3166-1 où le titre est disponible. Exemple : US, GB.</string>
     <string name="collections_editor_tmdb_quick_watch_regions">Régions rapides</string>
     <string name="collections_editor_tmdb_watch_providers">ID des fournisseurs de visionnage</string>
-    <string name="collections_editor_tmdb_watch_providers_helper">Utilisez les ID de fournisseurs de visionnage TMDB. Sépare-les par des virgules pour ET, ou par des barres verticales pour OU.</string>
+    <string name="collections_editor_tmdb_watch_providers_helper">Utilisez les ID de fournisseurs de visionnage TMDB. Séparer-les par des virgules pour ET, ou par des barres verticales pour OU.</string>
     <string name="collections_editor_tmdb_watch_providers_placeholder">8|337|350</string>
     <string name="collections_editor_tmdb_quick_watch_providers">Fournisseurs rapides</string>
     <string name="collections_editor_tmdb_watch_provider_netflix">Netflix</string>
