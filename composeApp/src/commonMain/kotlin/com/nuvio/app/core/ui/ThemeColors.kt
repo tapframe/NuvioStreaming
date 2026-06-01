@@ -36,7 +36,7 @@ object ThemeColors {
         backgroundCard = Color(0xFF1A1F24),
     )
 
-    val Violet = ThemeColorPalette(
+    val Amethyst = ThemeColorPalette(
         secondary = Color(0xFF8E24AA),
         secondaryVariant = Color(0xFF6A1B9A),
         focusRing = Color(0xFFAB47BC),
@@ -76,7 +76,7 @@ object ThemeColors {
         backgroundCard = Color(0xFF241A1F),
     )
 
-    val White = ThemeColorPalette(
+    val Glacier = ThemeColorPalette(
         secondary = Color(0xFFF5F5F5),
         secondaryVariant = Color(0xFFE0E0E0),
         onSecondary = Color(0xFF111111),
@@ -91,10 +91,10 @@ object ThemeColors {
     fun getColorPalette(theme: AppTheme): ThemeColorPalette = when (theme) {
         AppTheme.CRIMSON -> Crimson
         AppTheme.OCEAN -> Ocean
-        AppTheme.VIOLET -> Violet
+        AppTheme.AMETHYST -> Amethyst
         AppTheme.EMERALD -> Emerald
         AppTheme.AMBER -> Amber
         AppTheme.ROSE -> Rose
-        AppTheme.WHITE -> White
+        AppTheme.GLACIER -> Glacier
     }
 }

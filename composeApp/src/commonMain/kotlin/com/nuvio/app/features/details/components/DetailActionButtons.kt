@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,11 +39,13 @@ fun DetailActionButtons(
     playLabel: String = stringResource(Res.string.action_play),
     saveLabel: String = stringResource(Res.string.action_save),
     isSaved: Boolean = false,
+    isWatched: Boolean = false,
     isTablet: Boolean = false,
     onPlayClick: () -> Unit = {},
     onPlayLongClick: (() -> Unit)? = null,
     onSaveClick: () -> Unit = {},
     onSaveLongClick: (() -> Unit)? = null,
+    onWatchedClick: () -> Unit = {},
 ) {
     val playPainter = appIconPainter(AppIconResource.PlayerPlay)
     val libraryAddPainter = appIconPainter(AppIconResource.LibraryAddPlus)
@@ -135,6 +139,22 @@ fun DetailActionButtons(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier.size(50.dp),
+            shape = RoundedCornerShape(40.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            color = if (isWatched) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+            contentColor = if (isWatched) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        ) {
+            IconButton(onClick = onWatchedClick) {
+                Icon(
+                    imageVector = Icons.Default.Visibility,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

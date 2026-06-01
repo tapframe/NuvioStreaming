@@ -3,6 +3,7 @@ package com.nuvio.app.features.watching.application
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.details.toMetaPreview
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.WatchedRepository
@@ -21,6 +22,12 @@ import kotlinx.coroutines.launch
 
 object WatchingActions {
     private val actionScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    fun toggleMetaWatched(meta: MetaDetails) {
+        actionScope.launch {
+            togglePosterWatched(meta.toMetaPreview())
+        }
+    }
 
     suspend fun togglePosterWatched(preview: MetaPreview) {
         if (!preview.type.isSeriesLikeType()) {

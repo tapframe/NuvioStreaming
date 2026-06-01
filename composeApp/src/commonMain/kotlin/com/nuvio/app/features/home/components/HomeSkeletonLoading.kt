@@ -40,21 +40,23 @@ import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 private fun rememberHomeSkeletonBrush(): Brush {
     val shimmerColors = listOf(
         MaterialTheme.colorScheme.surface,
-        MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+        MaterialTheme.colorScheme.surface,
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+        MaterialTheme.colorScheme.surface,
         MaterialTheme.colorScheme.surface,
     )
     val transition = rememberInfiniteTransition()
     val translateAnim by transition.animateFloat(
         initialValue = 0f,
-        targetValue = 1000f,
+        targetValue = 1300f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            animation = tween(durationMillis = 1500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
     )
     val brush = Brush.linearGradient(
         colors = shimmerColors,
-        start = Offset(translateAnim - 200f, 0f),
+        start = Offset(translateAnim - 600f, 0f),
         end = Offset(translateAnim, 0f),
     )
     return brush

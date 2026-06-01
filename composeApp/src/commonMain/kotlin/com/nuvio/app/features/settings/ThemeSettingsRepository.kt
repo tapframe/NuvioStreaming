@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 object ThemeSettingsRepository {
-    private val _selectedTheme = MutableStateFlow(AppTheme.WHITE)
+    private val _selectedTheme = MutableStateFlow(AppTheme.GLACIER)
     val selectedTheme: StateFlow<AppTheme> = _selectedTheme.asStateFlow()
 
     private val _amoledEnabled = MutableStateFlow(false)
@@ -32,10 +32,10 @@ object ThemeSettingsRepository {
 
     fun clearLocalState() {
         hasLoaded = false
-        _selectedTheme.value = AppTheme.WHITE
+        _selectedTheme.value = AppTheme.GLACIER
         _amoledEnabled.value = false
         _liquidGlassNativeTabBarEnabled.value = false
-        NativeTabBridge.publishAccentColor(AppTheme.WHITE.nativeTabAccentHex())
+        NativeTabBridge.publishAccentColor(AppTheme.GLACIER.nativeTabAccentHex())
         NativeTabBridge.publishLiquidGlassEnabled(false)
         _selectedAppLanguage.value = AppLanguage.ENGLISH
     }
@@ -45,12 +45,16 @@ object ThemeSettingsRepository {
         val stored = ThemeSettingsStorage.loadSelectedTheme()
         val theme = if (stored != null) {
             try {
-                AppTheme.valueOf(stored)
+                when (stored) {
+                    "VIOLET" -> AppTheme.AMETHYST
+                    "WHITE" -> AppTheme.GLACIER
+                    else -> AppTheme.valueOf(stored)
+                }
             } catch (_: IllegalArgumentException) {
-                AppTheme.WHITE
+                AppTheme.GLACIER
             }
         } else {
-            AppTheme.WHITE
+            AppTheme.GLACIER
         }
         _selectedTheme.value = theme
         NativeTabBridge.publishAccentColor(theme.nativeTabAccentHex())
@@ -98,9 +102,9 @@ object ThemeSettingsRepository {
 private fun AppTheme.nativeTabAccentHex(): String = when (this) {
     AppTheme.CRIMSON -> "#E53935"
     AppTheme.OCEAN -> "#1E88E5"
-    AppTheme.VIOLET -> "#8E24AA"
+    AppTheme.AMETHYST -> "#8E24AA"
     AppTheme.EMERALD -> "#43A047"
     AppTheme.AMBER -> "#FB8C00"
     AppTheme.ROSE -> "#D81B60"
-    AppTheme.WHITE -> "#F5F5F5"
+    AppTheme.GLACIER -> "#F5F5F5"
 }

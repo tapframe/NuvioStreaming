@@ -757,8 +757,8 @@
     <string name="theme_emerald">Esmeralda</string>
     <string name="theme_ocean">Océano</string>
     <string name="theme_rose">Rosa</string>
-    <string name="theme_violet">Violeta</string>
-    <string name="theme_white">Blanco</string>
+    <string name="theme_violet">Amatista</string>
+    <string name="theme_white">Glaciar</string>
     <string name="player_next_episode">Siguiente episodio</string>
     <string name="player_next_episode_finding_source">Buscando fuente…</string>
     <string name="player_next_episode_playing_via_countdown">Reproduciendo vía %1$s en %2$d…</string>

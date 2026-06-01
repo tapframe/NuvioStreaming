@@ -18,7 +18,13 @@ object WatchingState {
     fun isPosterWatched(
         watchedKeys: Set<String>,
         item: MetaPreview,
-    ): Boolean = watchedKeys.contains(watchedItemKey(item.type, item.id))
+    ): Boolean = isPosterWatched(watchedKeys, item.type, item.id)
+
+    fun isPosterWatched(
+        watchedKeys: Set<String>,
+        type: String,
+        id: String,
+    ): Boolean = watchedKeys.contains(watchedItemKey(type, id))
 
     fun isEpisodeWatched(
         watchedKeys: Set<String>,
