@@ -8,4 +8,7 @@ internal actual object TraktPlatformClock {
 
     actual fun parseIsoDateTimeToEpochMs(value: String): Long? =
         parseTraktIsoDateTimeToEpochMs(value)
+
+    @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
+    actual fun availableProcessors(): Int = kotlin.native.Platform.getAvailableProcessors()
 }

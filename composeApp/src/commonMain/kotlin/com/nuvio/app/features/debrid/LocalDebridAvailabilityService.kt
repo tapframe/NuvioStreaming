@@ -6,6 +6,21 @@ import com.nuvio.app.features.streams.StreamDebridCacheStatus
 import com.nuvio.app.features.streams.StreamItem
 
 object LocalDebridAvailabilityService {
+    fun hasPendingCacheCheck(
+        groups: List<AddonStreamGroup>,
+        eligibleGroupIds: Set<String>? = null,
+    ): Boolean {
+        cacheCheckAccount() ?: return false
+        return groups
+            .filter { group -> eligibleGroupIds == null || group.addonId in eligibleGroupIds }
+            .any { group ->
+                group.streams.any { stream ->
+                    stream.localAvailabilityHash() != null &&
+                        stream.debridCacheStatus?.state !in FINAL_CACHE_STATES
+                }
+            }
+    }
+
     fun markChecking(
         groups: List<AddonStreamGroup>,
         eligibleGroupIds: Set<String>? = null,

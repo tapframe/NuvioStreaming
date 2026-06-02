@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -497,7 +498,7 @@ private fun ensureManifestSuffix(url: String): String {
 
 private fun normalizeManifestUrl(rawUrl: String): String {
     val trimmed = rawUrl.trim()
-    require(trimmed.isNotEmpty()) { "Enter an addon URL." }
+    require(trimmed.isNotEmpty()) { runBlocking { getString(Res.string.addons_error_enter_url) } }
 
     val normalizedScheme = when {
         trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed

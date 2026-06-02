@@ -51,3 +51,6 @@ internal fun extractTraktYear(value: String?): Int? {
     if (value.isNullOrBlank()) return null
     return Regex("(\\d{4})").find(value)?.groupValues?.getOrNull(1)?.toIntOrNull()
 }
+
+internal fun TraktExternalIds.hasAnyId(): Boolean =
+    trakt != null || !imdb.isNullOrBlank() || tmdb != null || !slug.isNullOrBlank()

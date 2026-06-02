@@ -10,6 +10,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.download_failed
+import nuvio.composeapp.generated.resources.downloads_error_finalize_file_failed
+import nuvio.composeapp.generated.resources.downloads_error_open_partial_file_failed
+import nuvio.composeapp.generated.resources.downloads_error_partial_file_not_open
+import nuvio.composeapp.generated.resources.downloads_error_write_partial_file_failed
+import nuvio.composeapp.generated.resources.network_request_failed_http
+import org.jetbrains.compose.resources.getString
 import platform.Foundation.NSError
 import platform.Foundation.NSDate
 import platform.Foundation.NSData
@@ -99,7 +108,7 @@ internal actual object DownloadsPlatformDownloader {
                 }
 
                 if (result.statusCode !in 200..299) {
-                    error("Request failed with HTTP ${result.statusCode}")
+                    error(runBlocking { getString(Res.string.network_request_failed_http, result.statusCode) })
                 }
 
                 val isPartialResume = attemptedRangeRequest && result.statusCode == 206 && resumeFromBytes > 0L
@@ -118,7 +127,7 @@ internal actual object DownloadsPlatformDownloader {
                     error = null,
                 )
                 if (!moved) {
-                    error("Failed to finalize download file")
+                    error(runBlocking { getString(Res.string.downloads_error_finalize_file_failed) })
                 }
 
                 val localFileUri = NSURL.fileURLWithPath(destinationPath).absoluteString ?: "file://$destinationPath"
@@ -127,7 +136,7 @@ internal actual object DownloadsPlatformDownloader {
             } catch (_: CancellationException) {
                 handle.cancelNativeTask()
             } catch (error: Throwable) {
-                onFailure(error.message ?: "Download failed")
+                onFailure(error.message ?: runBlocking { getString(Res.string.download_failed) })
             }
         }
 
@@ -248,7 +257,7 @@ private class IosDownloadDelegate(
             )
 
             outputFile = fopen(tempPath, if (isPartialResume) "ab" else "wb") ?: run {
-                fileError = IllegalStateException("Failed to open partial download file")
+                fileError = IllegalStateException(runBlocking { getString(Res.string.downloads_error_open_partial_file_failed) })
                 null
             }
 
@@ -266,7 +275,7 @@ private class IosDownloadDelegate(
         if (fileError != null) return
 
         val file = outputFile ?: run {
-            fileError = IllegalStateException("Partial download file is not open")
+            fileError = IllegalStateException(runBlocking { getString(Res.string.downloads_error_partial_file_not_open) })
             return
         }
 
@@ -278,7 +287,7 @@ private class IosDownloadDelegate(
             file,
         ).toLong()
         if (wrote != bytesToWrite) {
-            fileError = IllegalStateException("Failed to write partial download file")
+            fileError = IllegalStateException(runBlocking { getString(Res.string.downloads_error_write_partial_file_failed) })
             return
         }
         fflush(file)

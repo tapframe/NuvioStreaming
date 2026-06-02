@@ -4,6 +4,7 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WatchedRepositoryTest {
@@ -96,5 +97,27 @@ class WatchedRepositoryTest {
         )
 
         assertTrue(merged.isEmpty())
+    }
+
+    @Test
+    fun playbackCompletionWatchedMarks_doNotMirrorToTraktHistory() {
+        assertFalse(
+            shouldMirrorWatchedMarkToTraktHistory(
+                sync = WatchedTraktHistorySync.Skip,
+                isTraktAuthenticated = true,
+            ),
+        )
+        assertTrue(
+            shouldMirrorWatchedMarkToTraktHistory(
+                sync = WatchedTraktHistorySync.Mirror,
+                isTraktAuthenticated = true,
+            ),
+        )
+        assertFalse(
+            shouldMirrorWatchedMarkToTraktHistory(
+                sync = WatchedTraktHistorySync.Mirror,
+                isTraktAuthenticated = false,
+            ),
+        )
     }
 }

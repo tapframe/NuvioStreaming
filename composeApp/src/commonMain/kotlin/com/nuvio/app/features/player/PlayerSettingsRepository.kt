@@ -37,12 +37,14 @@ data class PlayerSettingsUiState(
     val holdToSpeedEnabled: Boolean = true,
     val holdToSpeedValue: Float = 2f,
     val externalPlayerEnabled: Boolean = false,
+    val externalPlayerForwardSubtitles: Boolean = false,
     val externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId(),
     val preferredAudioLanguage: String = AudioLanguageOption.DEVICE,
     val secondaryPreferredAudioLanguage: String? = null,
     val preferredSubtitleLanguage: String = SubtitleLanguageOption.NONE,
     val secondaryPreferredSubtitleLanguage: String? = null,
     val subtitleStyle: SubtitleStyleState = SubtitleStyleState.DEFAULT,
+    val addonSubtitleStartupMode: AddonSubtitleStartupMode = AddonSubtitleStartupMode.ALL_SUBTITLES,
     val streamReuseLastLinkEnabled: Boolean = false,
     val streamReuseLastLinkCacheHours: Int = 24,
     val decoderPriority: Int = 1,
@@ -93,12 +95,14 @@ object PlayerSettingsRepository {
     private var holdToSpeedEnabled = true
     private var holdToSpeedValue = 2f
     private var externalPlayerEnabled = false
+    private var externalPlayerForwardSubtitles = false
     private var externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId()
     private var preferredAudioLanguage = AudioLanguageOption.DEVICE
     private var secondaryPreferredAudioLanguage: String? = null
     private var preferredSubtitleLanguage = SubtitleLanguageOption.NONE
     private var secondaryPreferredSubtitleLanguage: String? = null
     private var subtitleStyle = SubtitleStyleState.DEFAULT
+    private var addonSubtitleStartupMode = AddonSubtitleStartupMode.ALL_SUBTITLES
     private var streamReuseLastLinkEnabled = false
     private var streamReuseLastLinkCacheHours = 24
     private var decoderPriority = 1
@@ -154,12 +158,14 @@ object PlayerSettingsRepository {
         holdToSpeedEnabled = true
         holdToSpeedValue = 2f
         externalPlayerEnabled = false
+        externalPlayerForwardSubtitles = false
         externalPlayerId = ExternalPlayerPlatform.defaultPlayerId()
         preferredAudioLanguage = AudioLanguageOption.DEVICE
         secondaryPreferredAudioLanguage = null
         preferredSubtitleLanguage = SubtitleLanguageOption.NONE
         secondaryPreferredSubtitleLanguage = null
         subtitleStyle = SubtitleStyleState.DEFAULT
+        addonSubtitleStartupMode = AddonSubtitleStartupMode.ALL_SUBTITLES
         streamReuseLastLinkEnabled = false
         streamReuseLastLinkCacheHours = 24
         decoderPriority = 1
@@ -210,6 +216,7 @@ object PlayerSettingsRepository {
         holdToSpeedEnabled = PlayerSettingsStorage.loadHoldToSpeedEnabled() ?: true
         holdToSpeedValue = PlayerSettingsStorage.loadHoldToSpeedValue() ?: 2f
         externalPlayerEnabled = PlayerSettingsStorage.loadExternalPlayerEnabled() ?: false
+        externalPlayerForwardSubtitles = PlayerSettingsStorage.loadExternalPlayerForwardSubtitles() ?: false
         externalPlayerId = PlayerSettingsStorage.loadExternalPlayerId()
             ?: ExternalPlayerPlatform.defaultPlayerId()
         preferredAudioLanguage =
@@ -225,13 +232,28 @@ object PlayerSettingsRepository {
         subtitleStyle = SubtitleStyleState(
             textColor = subtitleColorFromStorage(PlayerSettingsStorage.loadSubtitleTextColor())
                 ?: SubtitleStyleState.DEFAULT.textColor,
+            backgroundColor = subtitleColorFromStorage(PlayerSettingsStorage.loadSubtitleBackgroundColor())
+                ?: SubtitleStyleState.DEFAULT.backgroundColor,
+            outlineColor = subtitleColorFromStorage(PlayerSettingsStorage.loadSubtitleOutlineColor())
+                ?: SubtitleStyleState.DEFAULT.outlineColor,
             outlineEnabled = PlayerSettingsStorage.loadSubtitleOutlineEnabled()
                 ?: SubtitleStyleState.DEFAULT.outlineEnabled,
+            outlineWidth = PlayerSettingsStorage.loadSubtitleOutlineWidth()
+                ?: SubtitleStyleState.DEFAULT.outlineWidth,
+            bold = PlayerSettingsStorage.loadSubtitleBold()
+                ?: SubtitleStyleState.DEFAULT.bold,
             fontSizeSp = PlayerSettingsStorage.loadSubtitleFontSizeSp()
                 ?: SubtitleStyleState.DEFAULT.fontSizeSp,
             bottomOffset = PlayerSettingsStorage.loadSubtitleBottomOffset()
                 ?: SubtitleStyleState.DEFAULT.bottomOffset,
+            useForcedSubtitles = PlayerSettingsStorage.loadSubtitleUseForcedSubtitles()
+                ?: SubtitleStyleState.DEFAULT.useForcedSubtitles,
+            showOnlyPreferredLanguages = PlayerSettingsStorage.loadSubtitleShowOnlyPreferredLanguages()
+                ?: SubtitleStyleState.DEFAULT.showOnlyPreferredLanguages,
         )
+        addonSubtitleStartupMode = PlayerSettingsStorage.loadAddonSubtitleStartupMode()
+            ?.let { runCatching { AddonSubtitleStartupMode.valueOf(it) }.getOrNull() }
+            ?: AddonSubtitleStartupMode.ALL_SUBTITLES
         streamReuseLastLinkEnabled = PlayerSettingsStorage.loadStreamReuseLastLinkEnabled() ?: false
         streamReuseLastLinkCacheHours = PlayerSettingsStorage.loadStreamReuseLastLinkCacheHours() ?: 24
         decoderPriority = PlayerSettingsStorage.loadDecoderPriority() ?: 1
@@ -366,6 +388,14 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveExternalPlayerId(normalized)
     }
 
+    fun setExternalPlayerForwardSubtitles(enabled: Boolean) {
+        ensureLoaded()
+        if (externalPlayerForwardSubtitles == enabled) return
+        externalPlayerForwardSubtitles = enabled
+        publish()
+        PlayerSettingsStorage.saveExternalPlayerForwardSubtitles(enabled)
+    }
+
     fun setPreferredAudioLanguage(language: String) {
         ensureLoaded()
         val normalized = normalizeLanguageCode(language) ?: AudioLanguageOption.DEVICE
@@ -408,9 +438,23 @@ object PlayerSettingsRepository {
         subtitleStyle = style
         publish()
         PlayerSettingsStorage.saveSubtitleTextColor(style.textColor.toStorageHexString())
+        PlayerSettingsStorage.saveSubtitleBackgroundColor(style.backgroundColor.toStorageHexString())
+        PlayerSettingsStorage.saveSubtitleOutlineColor(style.outlineColor.toStorageHexString())
         PlayerSettingsStorage.saveSubtitleOutlineEnabled(style.outlineEnabled)
+        PlayerSettingsStorage.saveSubtitleOutlineWidth(style.outlineWidth)
+        PlayerSettingsStorage.saveSubtitleBold(style.bold)
         PlayerSettingsStorage.saveSubtitleFontSizeSp(style.fontSizeSp)
         PlayerSettingsStorage.saveSubtitleBottomOffset(style.bottomOffset)
+        PlayerSettingsStorage.saveSubtitleUseForcedSubtitles(style.useForcedSubtitles)
+        PlayerSettingsStorage.saveSubtitleShowOnlyPreferredLanguages(style.showOnlyPreferredLanguages)
+    }
+
+    fun setAddonSubtitleStartupMode(mode: AddonSubtitleStartupMode) {
+        ensureLoaded()
+        if (addonSubtitleStartupMode == mode) return
+        addonSubtitleStartupMode = mode
+        publish()
+        PlayerSettingsStorage.saveAddonSubtitleStartupMode(mode.name)
     }
 
     fun setStreamReuseLastLinkEnabled(enabled: Boolean) {
@@ -772,12 +816,14 @@ object PlayerSettingsRepository {
             holdToSpeedEnabled = holdToSpeedEnabled,
             holdToSpeedValue = holdToSpeedValue,
             externalPlayerEnabled = externalPlayerEnabled,
+            externalPlayerForwardSubtitles = externalPlayerForwardSubtitles,
             externalPlayerId = externalPlayerId,
             preferredAudioLanguage = preferredAudioLanguage,
             secondaryPreferredAudioLanguage = secondaryPreferredAudioLanguage,
             preferredSubtitleLanguage = preferredSubtitleLanguage,
             secondaryPreferredSubtitleLanguage = secondaryPreferredSubtitleLanguage,
             subtitleStyle = subtitleStyle,
+            addonSubtitleStartupMode = addonSubtitleStartupMode,
             streamReuseLastLinkEnabled = streamReuseLastLinkEnabled,
             streamReuseLastLinkCacheHours = streamReuseLastLinkCacheHours,
             decoderPriority = decoderPriority,

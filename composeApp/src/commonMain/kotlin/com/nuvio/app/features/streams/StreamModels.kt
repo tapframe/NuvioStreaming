@@ -1,5 +1,6 @@
 package com.nuvio.app.features.streams
 
+import com.nuvio.app.core.build.AppFeaturePolicy
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -19,6 +20,7 @@ data class StreamItem(
     val behaviorHints: StreamBehaviorHints = StreamBehaviorHints(),
     val clientResolve: StreamClientResolve? = null,
     val debridCacheStatus: StreamDebridCacheStatus? = null,
+    val badges: List<StreamBadge> = emptyList(),
 ) {
     val streamLabel: String
         get() = name ?: runBlocking { getString(Res.string.stream_default_name) }
@@ -56,6 +58,20 @@ data class StreamItem(
     val needsLocalDebridResolve: Boolean
         get() = isTorrentStream && playableDirectUrl == null
 
+    val p2pInfoHash: String?
+        get() = infoHash.normalizedInfoHash()
+            ?: clientResolve?.infoHash.normalizedInfoHash()
+            ?: torrentMagnetUri.extractBtihInfoHash()
+
+    val p2pTrackers: List<String>
+        get() = sources
+            .asSequence()
+            .filter { it.startsWith("tracker:") }
+            .map { it.removePrefix("tracker:").trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .toList()
+
     val isAddonDebridCandidate: Boolean
         get() = isInstalledAddonStream && (needsLocalDebridResolve || isDirectDebridStream)
 
@@ -63,11 +79,39 @@ data class StreamItem(
         get() = url != null || infoHash != null || externalUrl != null || clientResolve != null
 }
 
+data class StreamBadge(
+    val name: String,
+    val imageURL: String = "",
+    val tagColor: String = "",
+    val tagStyle: String = "",
+    val textColor: String = "",
+    val borderColor: String = "",
+)
+
 private fun String?.isMagnetLink(): Boolean =
     this?.trimStart()?.startsWith("magnet:", ignoreCase = true) == true
 
+private fun String?.normalizedInfoHash(): String? =
+    this
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+
+private fun String?.extractBtihInfoHash(): String? {
+    val raw = this?.trim()?.takeIf { it.startsWith("magnet:", ignoreCase = true) } ?: return null
+    val marker = "btih:"
+    val markerIndex = raw.indexOf(marker, ignoreCase = true)
+    if (markerIndex < 0) return null
+    val start = markerIndex + marker.length
+    val end = raw.indexOf('&', start).takeIf { it >= 0 } ?: raw.length
+    return raw.substring(start, end)
+        .trim()
+        .takeIf { it.isNotEmpty() }
+}
+
 fun StreamItem.isSelectableForPlayback(debridEnabled: Boolean): Boolean =
-    playableDirectUrl != null || (debridEnabled && isAddonDebridCandidate)
+    playableDirectUrl != null ||
+        (AppFeaturePolicy.p2pEnabled && needsLocalDebridResolve && p2pInfoHash != null) ||
+        (debridEnabled && isAddonDebridCandidate)
 
 data class StreamBehaviorHints(
     val bingeGroup: String? = null,
@@ -189,6 +233,7 @@ data class StreamsUiState(
     val autoPlayCandidates: List<StreamItem> = emptyList(),
     val isDirectAutoPlayFlow: Boolean = false,
     val showDirectAutoPlayOverlay: Boolean = false,
+    val overlayMessage: String? = null,
 ) {
     val filteredGroups: List<AddonStreamGroup>
         get() = if (selectedFilter == null) groups

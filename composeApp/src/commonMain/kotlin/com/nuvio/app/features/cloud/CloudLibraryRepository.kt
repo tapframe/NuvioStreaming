@@ -12,6 +12,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.cloud_library_playback_disabled
+import nuvio.composeapp.generated.resources.cloud_library_provider_unavailable
+import org.jetbrains.compose.resources.getString
 
 internal class CloudLibraryStore(
     private val credentialsProvider: suspend () -> List<DebridServiceCredential>,
@@ -26,7 +30,10 @@ internal class CloudLibraryStore(
             if (api == null) {
                 return@map CloudLibraryProviderState(
                     provider = credential.provider,
-                    errorMessage = "Cloud library is not available for ${credential.provider.displayName}.",
+                    errorMessage = getString(
+                        Res.string.cloud_library_provider_unavailable,
+                        credential.provider.displayName,
+                    ),
                 )
             }
 
@@ -191,7 +198,7 @@ object CloudLibraryRepository {
     ): CloudLibraryPlaybackResult {
         DebridSettingsRepository.ensureLoaded()
         if (!DebridSettingsRepository.snapshot().cloudLibraryEnabled) {
-            return CloudLibraryPlaybackResult.Failed("Cloud library is disabled.")
+            return CloudLibraryPlaybackResult.Failed(getString(Res.string.cloud_library_playback_disabled))
         }
         val result = store.resolvePlayback(item, file)
         if (result is CloudLibraryPlaybackResult.Success) {

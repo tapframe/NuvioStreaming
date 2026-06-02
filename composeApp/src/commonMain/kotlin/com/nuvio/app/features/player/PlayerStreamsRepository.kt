@@ -18,6 +18,8 @@ import com.nuvio.app.features.plugins.PluginScraper
 import com.nuvio.app.features.streams.AddonStreamWarmupRepository
 import com.nuvio.app.features.streams.AddonStreamGroup
 import com.nuvio.app.features.streams.StreamAutoPlaySelector
+import com.nuvio.app.features.streams.StreamBadgePresentation
+import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamParser
 import com.nuvio.app.features.streams.StreamsUiState
@@ -142,6 +144,7 @@ object PlayerStreamsRepository {
         jobHolder()?.cancel()
         stateFlow.value = StreamsUiState()
 
+        val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
         val embeddedStreams = MetaDetailsRepository.findEmbeddedStreams(videoId)
         if (embeddedStreams.isNotEmpty()) {
             log.d { "Using ${embeddedStreams.size} embedded streams for type=$type id=$videoId" }
@@ -151,8 +154,12 @@ object PlayerStreamsRepository {
                 streams = embeddedStreams,
                 isLoading = false,
             )
-            stateFlow.value = StreamsUiState(
+            val presentedGroup = StreamBadgePresentation.apply(
                 groups = listOf(group),
+                rules = streamBadgeRules,
+            ).firstOrNull() ?: group
+            stateFlow.value = StreamsUiState(
+                groups = listOf(presentedGroup),
                 activeAddonIds = setOf("embedded"),
                 isAnyLoading = false,
             )
@@ -248,11 +255,16 @@ object PlayerStreamsRepository {
                     null
                 }
 
-            fun presentDebridGroup(group: AddonStreamGroup): AddonStreamGroup =
-                DebridStreamPresentation.apply(
+            fun presentStreamGroup(group: AddonStreamGroup): AddonStreamGroup {
+                val badgeGroup = StreamBadgePresentation.apply(
                     groups = listOf(group),
-                    settings = debridSettings,
+                    rules = streamBadgeRules,
                 ).firstOrNull() ?: group
+                return DebridStreamPresentation.apply(
+                    groups = listOf(badgeGroup),
+                    settings = debridSettings,
+                ).firstOrNull() ?: badgeGroup
+            }
 
             fun publishStreamGroup(group: AddonStreamGroup) {
                 stateFlow.update { current ->
@@ -271,22 +283,33 @@ object PlayerStreamsRepository {
                 }
             }
 
-            fun launchDebridAvailability(group: AddonStreamGroup) {
-                if (group.addonId !in installedAddonIds || group.streams.isEmpty()) return
+            fun publishStreamGroupAfterCacheCheck(group: AddonStreamGroup) {
+                if (group.addonId !in installedAddonIds || group.streams.isEmpty()) {
+                    publishStreamGroup(presentStreamGroup(group))
+                    return
+                }
 
                 val eligibleGroupIds = setOf(group.addonId)
+                val shouldWaitForCacheCheck = LocalDebridAvailabilityService.hasPendingCacheCheck(
+                    groups = listOf(group),
+                    eligibleGroupIds = eligibleGroupIds,
+                )
+                if (!shouldWaitForCacheCheck) {
+                    publishStreamGroup(presentStreamGroup(group))
+                    return
+                }
+
                 val checkingGroup = LocalDebridAvailabilityService.markChecking(
                     groups = listOf(group),
                     eligibleGroupIds = eligibleGroupIds,
                 ).firstOrNull() ?: group
-                publishStreamGroup(checkingGroup)
 
                 val availabilityJob = launch {
                     val availabilityGroup = LocalDebridAvailabilityService.annotateCachedAvailability(
                         groups = listOf(checkingGroup),
                         eligibleGroupIds = eligibleGroupIds,
                     ).firstOrNull() ?: checkingGroup
-                    publishStreamGroup(presentDebridGroup(availabilityGroup))
+                    publishStreamGroup(presentStreamGroup(availabilityGroup))
                 }
                 debridAvailabilityJobs += availabilityJob
             }
@@ -360,8 +383,7 @@ object PlayerStreamsRepository {
             }
             repeat(jobs.size) {
                 val result = completions.receive()
-                publishStreamGroup(result)
-                launchDebridAvailability(result)
+                publishStreamGroupAfterCacheCheck(result)
             }
             for (availabilityJob in debridAvailabilityJobs) {
                 availabilityJob.join()

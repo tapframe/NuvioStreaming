@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.home.components.ContinueWatchingStylePreview
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
@@ -54,6 +55,8 @@ import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming_desc
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_title
+import nuvio.composeapp.generated.resources.settings_continue_watching_style_card
+import nuvio.composeapp.generated.resources.settings_continue_watching_style_card_description
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_poster
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_poster_description
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_wide
@@ -205,7 +208,7 @@ private fun ContinueWatchingStyleSelector(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (isTablet) 12.dp else 8.dp),
     ) {
         ContinueWatchingSectionStyle.entries.forEach { style ->
             Box(modifier = Modifier.weight(1f)) {
@@ -237,36 +240,33 @@ private fun ContinueWatchingStyleOption(
             MaterialTheme.colorScheme.surface
         },
         shape = RoundedCornerShape(12.dp),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outlineVariant,
-        ),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 16.dp),
+                .padding(horizontal = if (isTablet) 12.dp else 8.dp, vertical = if (isTablet) 14.dp else 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isTablet) 8.dp else 6.dp),
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = if (isTablet) 4.dp else 0.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
                 Icon(
                     imageVector = Icons.Rounded.CheckCircle,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.alpha(if (selected) 1f else 0f),
+                    modifier = Modifier
+                        .size(if (isTablet) 24.dp else 18.dp)
+                        .alpha(if (selected) 1f else 0f),
                 )
             }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(148.dp),
+                    .height(if (isTablet) 96.dp else 66.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 ContinueWatchingStylePreview(
@@ -276,14 +276,18 @@ private fun ContinueWatchingStyleOption(
             }
             Text(
                 text = stringResource(style.labelRes),
-                style = MaterialTheme.typography.bodyMedium,
+                style = if (isTablet) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelMedium,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = stringResource(style.descriptionRes),
-                style = if (isTablet) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelMedium,
+                style = if (isTablet) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -291,12 +295,14 @@ private fun ContinueWatchingStyleOption(
 
 private val ContinueWatchingSectionStyle.labelRes: StringResource
     get() = when (this) {
+        ContinueWatchingSectionStyle.Card -> Res.string.settings_continue_watching_style_card
         ContinueWatchingSectionStyle.Wide -> Res.string.settings_continue_watching_style_wide
         ContinueWatchingSectionStyle.Poster -> Res.string.settings_continue_watching_style_poster
     }
 
 private val ContinueWatchingSectionStyle.descriptionRes: StringResource
     get() = when (this) {
+        ContinueWatchingSectionStyle.Card -> Res.string.settings_continue_watching_style_card_description
         ContinueWatchingSectionStyle.Wide -> Res.string.settings_continue_watching_style_wide_description
         ContinueWatchingSectionStyle.Poster -> Res.string.settings_continue_watching_style_poster_description
     }

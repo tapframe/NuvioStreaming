@@ -1,7 +1,10 @@
 package com.nuvio.app.features.library
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.auth.AuthRepository
+import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktLibraryRepository
@@ -13,9 +16,16 @@ import com.nuvio.app.features.trakt.effectiveLibrarySourceMode as resolveEffecti
 import com.nuvio.app.features.trakt.shouldUseTraktLibrary
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.library_local_tab_title
+import nuvio.composeapp.generated.resources.library_other
+import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -49,10 +59,13 @@ private data class LibrarySyncItem(
     @SerialName("release_info") val releaseInfo: String? = null,
     @SerialName("imdb_rating") val imdbRating: Float? = null,
     val genres: List<String> = emptyList(),
+    @SerialName("addon_base_url") val addonBaseUrl: String? = null,
     @SerialName("added_at") val addedAt: Long = 0,
 )
 
 object LibraryRepository {
+    private const val PULL_PAGE_SIZE = 500
+
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("LibraryRepository")
     private val json = Json {
@@ -66,6 +79,9 @@ object LibraryRepository {
     private var hasLoaded = false
     private var currentProfileId: Int = 1
     private var itemsById: MutableMap<String, LibraryItem> = mutableMapOf()
+    private var isPullingNuvioSyncFromServer = false
+    private var hasCompletedInitialNuvioSyncPull = false
+    private var pushJob: Job? = null
 
     init {
         syncScope.launch {
@@ -119,6 +135,9 @@ object LibraryRepository {
 
     fun onProfileChanged(profileId: Int) {
         if (profileId == currentProfileId && hasLoaded) return
+        pushJob?.cancel()
+        isPullingNuvioSyncFromServer = false
+        hasCompletedInitialNuvioSyncPull = false
         TraktSettingsRepository.onProfileChanged()
         loadFromDisk(profileId)
         TraktAuthRepository.onProfileChanged()
@@ -135,6 +154,9 @@ object LibraryRepository {
         hasLoaded = false
         currentProfileId = 1
         itemsById.clear()
+        pushJob?.cancel()
+        isPullingNuvioSyncFromServer = false
+        hasCompletedInitialNuvioSyncPull = false
         TraktAuthRepository.clearLocalState()
         TraktLibraryRepository.clearLocalState()
         _uiState.value = LibraryUiState()
@@ -150,7 +172,7 @@ object LibraryRepository {
             val items = runCatching {
                 json.decodeFromString<StoredLibraryPayload>(payload).items
             }.getOrDefault(emptyList())
-            itemsById = items.associateBy { it.id }.toMutableMap()
+            itemsById = items.associateBy { libraryItemKey(it.id, it.type) }.toMutableMap()
         }
 
         publish()
@@ -162,24 +184,30 @@ object LibraryRepository {
         if (isTraktLibrarySourceActive()) {
             runCatching { TraktLibraryRepository.refreshNow() }
                 .onFailure { e -> log.e(e) { "Failed to pull Trakt library" } }
+            hasCompletedInitialNuvioSyncPull = true
             publish()
             return
         }
 
+        isPullingNuvioSyncFromServer = true
         runCatching {
-            val params = buildJsonObject {
-                put("p_profile_id", profileId)
-                put("p_limit", 500)
-                put("p_offset", 0)
+            val serverItems = pullAllLibrarySyncItems(profileId)
+            if (serverItems.isEmpty() && itemsById.isNotEmpty()) {
+                log.w { "Remote library is empty while local has ${itemsById.size} entries; preserving local library" }
+            } else {
+                itemsById = serverItems
+                    .map { it.toLibraryItem() }
+                    .associateBy { libraryItemKey(it.id, it.type) }
+                    .toMutableMap()
+                persist()
             }
-            val result = SupabaseProvider.client.postgrest.rpc("sync_pull_library", params)
-            val serverItems = result.decodeList<LibrarySyncItem>()
-            itemsById = serverItems.map { it.toLibraryItem() }.associateBy { it.id }.toMutableMap()
             hasLoaded = true
             publish()
-            persist()
         }.onFailure { e ->
             log.e(e) { "Failed to pull library from server" }
+        }.also {
+            hasCompletedInitialNuvioSyncPull = true
+            isPullingNuvioSyncFromServer = false
         }
     }
 
@@ -195,8 +223,8 @@ object LibraryRepository {
             return
         }
 
-        if (itemsById.containsKey(item.id)) {
-            remove(item.id)
+        if (itemsById.containsKey(libraryItemKey(item.id, item.type))) {
+            remove(item.id, item.type)
         } else {
             save(item)
         }
@@ -204,7 +232,7 @@ object LibraryRepository {
 
     fun save(item: LibraryItem) {
         ensureLoaded()
-        itemsById[item.id] = item.copy(savedAtEpochMs = LibraryClock.nowEpochMs())
+        itemsById[libraryItemKey(item.id, item.type)] = item.copy(savedAtEpochMs = LibraryClock.nowEpochMs())
         publish()
         persist()
         pushToServer()
@@ -212,7 +240,18 @@ object LibraryRepository {
 
     fun remove(id: String) {
         ensureLoaded()
-        if (itemsById.remove(id) != null) {
+        val before = itemsById.size
+        itemsById.entries.removeAll { (_, item) -> item.id == id }
+        if (itemsById.size != before) {
+            publish()
+            persist()
+            pushToServer()
+        }
+    }
+
+    private fun remove(id: String, type: String) {
+        ensureLoaded()
+        if (itemsById.remove(libraryItemKey(id, type)) != null) {
             publish()
             persist()
             pushToServer()
@@ -233,7 +272,11 @@ object LibraryRepository {
             return false
         }
 
-        return itemsById.containsKey(id)
+        return if (type != null) {
+            itemsById.containsKey(libraryItemKey(id, type))
+        } else {
+            itemsById.values.any { it.id == id }
+        }
     }
 
     fun savedItem(id: String): LibraryItem? {
@@ -243,7 +286,7 @@ object LibraryRepository {
             return TraktLibraryRepository.uiState.value.allItems.firstOrNull { it.id == id }
         }
 
-        return itemsById[id]
+        return itemsById.values.firstOrNull { it.id == id }
     }
 
     fun libraryListTabs(): List<TraktListTab> {
@@ -259,7 +302,7 @@ object LibraryRepository {
 
     suspend fun getMembershipSnapshot(item: LibraryItem): Map<String, Boolean> {
         ensureLoaded()
-        val inLocal = itemsById.containsKey(item.id)
+        val inLocal = itemsById.containsKey(libraryItemKey(item.id, item.type))
         if (TraktAuthRepository.isAuthenticated.value) {
             val traktMembership = TraktLibraryRepository.getMembershipSnapshot(item).listMembership
             return libraryMembershipWithLocal(
@@ -273,12 +316,12 @@ object LibraryRepository {
     suspend fun applyMembershipChanges(item: LibraryItem, desiredMembership: Map<String, Boolean>) {
         ensureLoaded()
         val localDesired = desiredMembership[LOCAL_LIBRARY_LIST_KEY] == true
-        val currentlyInLocal = itemsById.containsKey(item.id)
+        val currentlyInLocal = itemsById.containsKey(libraryItemKey(item.id, item.type))
         if (localDesired != currentlyInLocal) {
             if (localDesired) {
                 save(item)
             } else {
-                remove(item.id)
+                remove(item.id, item.type)
             }
         }
 
@@ -305,10 +348,17 @@ object LibraryRepository {
     }
 
     private fun pushToServer() {
-        syncScope.launch {
+        val authState = AuthRepository.state.value
+        if (authState !is AuthState.Authenticated || authState.isAnonymous) return
+        if (isPullingNuvioSyncFromServer || !hasCompletedInitialNuvioSyncPull) return
+
+        pushJob?.cancel()
+        pushJob = syncScope.launch {
+            delay(500)
             runCatching {
                 val profileId = ProfileRepository.activeProfileId
                 val syncItems = itemsById.values.map { it.toSyncItem() }
+                if (syncItems.isEmpty()) return@runCatching
                 val params = buildJsonObject {
                     put("p_profile_id", profileId)
                     put("p_items", json.encodeToJsonElement(syncItems))
@@ -318,6 +368,27 @@ object LibraryRepository {
                 log.e(e) { "Failed to push library to server" }
             }
         }
+    }
+
+    private suspend fun pullAllLibrarySyncItems(profileId: Int): List<LibrarySyncItem> {
+        val allItems = mutableListOf<LibrarySyncItem>()
+        var offset = 0
+
+        while (true) {
+            val params = buildJsonObject {
+                put("p_profile_id", profileId)
+                put("p_limit", PULL_PAGE_SIZE)
+                put("p_offset", offset)
+            }
+            val result = SupabaseProvider.client.postgrest.rpc("sync_pull_library", params)
+            val page = result.decodeList<LibrarySyncItem>()
+            allItems.addAll(page)
+
+            if (page.size < PULL_PAGE_SIZE) break
+            offset += PULL_PAGE_SIZE
+        }
+
+        return allItems
     }
 
     private fun publish() {
@@ -405,12 +476,11 @@ object LibraryRepository {
 }
 
 internal const val LOCAL_LIBRARY_LIST_KEY = "local"
-internal const val LOCAL_LIBRARY_LIST_TITLE = "Nuvio Library"
 
 internal fun localLibraryListTab(): TraktListTab =
     TraktListTab(
         key = LOCAL_LIBRARY_LIST_KEY,
-        title = LOCAL_LIBRARY_LIST_TITLE,
+        title = runBlocking { getString(Res.string.library_local_tab_title) },
         type = TraktListType.WATCHLIST,
     )
 
@@ -443,6 +513,8 @@ private fun LibrarySyncItem.toLibraryItem(): LibraryItem = LibraryItem(
     releaseInfo = releaseInfo,
     imdbRating = imdbRating?.toString(),
     genres = genres,
+    posterShape = posterShape.toPosterShape(),
+    addonBaseUrl = addonBaseUrl,
     savedAtEpochMs = addedAt,
 )
 
@@ -451,17 +523,36 @@ private fun LibraryItem.toSyncItem(): LibrarySyncItem = LibrarySyncItem(
     contentType = type,
     name = name,
     poster = poster,
+    posterShape = posterShape.toSyncName(),
     background = banner,
     description = description,
     releaseInfo = releaseInfo,
     imdbRating = imdbRating?.toFloatOrNull(),
     genres = genres,
+    addonBaseUrl = addonBaseUrl,
     addedAt = savedAtEpochMs,
 )
 
+private fun libraryItemKey(id: String, type: String): String =
+    "${type.trim().lowercase()}:${id.trim()}"
+
+private fun String.toPosterShape(): PosterShape =
+    when (trim().uppercase()) {
+        "LANDSCAPE" -> PosterShape.Landscape
+        "SQUARE" -> PosterShape.Square
+        else -> PosterShape.Poster
+    }
+
+private fun PosterShape.toSyncName(): String =
+    when (this) {
+        PosterShape.Poster -> "POSTER"
+        PosterShape.Square -> "SQUARE"
+        PosterShape.Landscape -> "LANDSCAPE"
+    }
+
 internal fun String.toLibraryDisplayTitle(): String {
     val normalized = trim()
-    if (normalized.isBlank()) return "Other"
+    if (normalized.isBlank()) return runBlocking { getString(Res.string.library_other) }
 
     return normalized
         .split('-', '_', ' ')
@@ -469,5 +560,5 @@ internal fun String.toLibraryDisplayTitle(): String {
         .joinToString(" ") { token ->
             token.lowercase().replaceFirstChar { char -> char.uppercase() }
         }
-        .ifBlank { "Other" }
+        .ifBlank { runBlocking { getString(Res.string.library_other) } }
 }

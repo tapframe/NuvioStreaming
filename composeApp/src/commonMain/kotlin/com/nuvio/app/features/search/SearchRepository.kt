@@ -369,7 +369,9 @@ object SearchRepository {
             search = query,
         ).withUnreleasedFilter()
         val items = page.items
-        require(items.isNotEmpty()) { "No search results returned for $catalogName." }
+        require(items.isNotEmpty()) {
+            getString(Res.string.search_error_no_results_for_catalog, catalogName)
+        }
 
         return HomeCatalogSection(
             key = "${manifest.id}:search:$type:$catalogId:${query.lowercase()}",

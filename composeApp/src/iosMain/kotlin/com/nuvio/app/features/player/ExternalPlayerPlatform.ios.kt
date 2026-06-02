@@ -82,6 +82,22 @@ internal actual object ExternalPlayerPlatform {
         )
         return ExternalPlayerOpenResult.Opened
     }
+
+    actual fun buildIntent(
+        request: ExternalPlayerPlaybackRequest,
+        playerId: String?,
+    ): ExternalPlayerIntentResult {
+        // iOS doesn't use Android intents; this returns the URL as the "intent" payload
+        if (playerId.isNullOrBlank()) return ExternalPlayerIntentResult.NotConfigured
+        val spec = iosExternalPlayerSpecs.firstOrNull { it.id == playerId }
+            ?: return ExternalPlayerIntentResult.NotConfigured
+        if (!UIApplication.sharedApplication.canOpenURL(spec.schemeProbeUrl())) {
+            return ExternalPlayerIntentResult.Failed
+        }
+        val url = NSURL.URLWithString(spec.buildUrl(request))
+            ?: return ExternalPlayerIntentResult.Failed
+        return ExternalPlayerIntentResult.Success(url)
+    }
 }
 
 private fun IosExternalPlayerSpec.schemeProbeUrl(): NSURL =

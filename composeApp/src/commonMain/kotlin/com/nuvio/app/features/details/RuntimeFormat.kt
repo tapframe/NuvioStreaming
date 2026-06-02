@@ -1,5 +1,12 @@
 package com.nuvio.app.features.details
 
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.details_runtime_hours_minutes
+import nuvio.composeapp.generated.resources.details_runtime_hours_only
+import nuvio.composeapp.generated.resources.details_runtime_minutes_only
+import org.jetbrains.compose.resources.getString
+
 private val hourTokenRegex = Regex("""(?i)(\d+)\s*h(?:ours?)?""")
 private val minuteTokenRegex = Regex("""(?i)(\d+)\s*m(?:in(?:ute)?s?)?""")
 private val hourMinuteColonRegex = Regex("""^\s*(\d+)\s*:\s*(\d{1,2})\s*$""")
@@ -16,10 +23,12 @@ internal fun formatRuntimeFromMinutes(totalMinutes: Int): String {
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
 
-    return when {
-        hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
-        hours > 0 -> "${hours}h"
-        else -> "${minutes}m"
+    return runBlocking {
+        when {
+            hours > 0 && minutes > 0 -> getString(Res.string.details_runtime_hours_minutes, hours, minutes)
+            hours > 0 -> getString(Res.string.details_runtime_hours_only, hours)
+            else -> getString(Res.string.details_runtime_minutes_only, minutes)
+        }
     }
 }
 

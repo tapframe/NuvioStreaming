@@ -18,6 +18,12 @@ import kotlin.test.assertTrue
 class HomeScreenTest {
 
     @Test
+    fun `home trakt continue watching candidate limits match TV`() {
+        assertEquals(300, HomeContinueWatchingMaxRecentProgressItems)
+        assertEquals(32, HomeNextUpInitialResolutionLimit)
+    }
+
+    @Test
     fun `build home continue watching items removes duplicate video ids`() {
         val inProgress = progressEntry(
             videoId = "tt0944947:1:4",

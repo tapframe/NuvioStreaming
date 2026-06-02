@@ -62,11 +62,19 @@ fun SubtitleModal(
     selectedAddonSubtitleId: String?,
     isLoadingAddonSubtitles: Boolean,
     subtitleStyle: SubtitleStyleState,
+    subtitleDelayMs: Int,
+    selectedAddonSubtitle: AddonSubtitle?,
+    subtitleAutoSyncState: SubtitleAutoSyncUiState,
     onTabSelected: (SubtitleTab) -> Unit,
     onBuiltInTrackSelected: (Int) -> Unit,
     onAddonSubtitleSelected: (AddonSubtitle) -> Unit,
     onFetchAddonSubtitles: () -> Unit,
     onStyleChanged: (SubtitleStyleState) -> Unit,
+    onSubtitleDelayChanged: (Int) -> Unit,
+    onSubtitleDelayReset: () -> Unit,
+    onAutoSyncCapture: () -> Unit,
+    onAutoSyncCueSelected: (SubtitleSyncCue) -> Unit,
+    onAutoSyncReload: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -151,8 +159,16 @@ fun SubtitleModal(
                                 )
                                 SubtitleTab.Style -> SubtitleStylePanel(
                                     style = subtitleStyle,
+                                    subtitleDelayMs = subtitleDelayMs,
+                                    selectedAddonSubtitle = selectedAddonSubtitle,
+                                    subtitleAutoSyncState = subtitleAutoSyncState,
                                     isCompact = isCompact,
                                     onStyleChanged = onStyleChanged,
+                                    onSubtitleDelayChanged = onSubtitleDelayChanged,
+                                    onSubtitleDelayReset = onSubtitleDelayReset,
+                                    onAutoSyncCapture = onAutoSyncCapture,
+                                    onAutoSyncCueSelected = onAutoSyncCueSelected,
+                                    onAutoSyncReload = onAutoSyncReload,
                                 )
                             }
                         }

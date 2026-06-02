@@ -15,6 +15,11 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.network_empty_response_body
+import nuvio.composeapp.generated.resources.network_request_failed_http
+import org.jetbrains.compose.resources.getString
 import platform.Foundation.NSUserDefaults
 
 actual object AddonStorage {
@@ -83,10 +88,10 @@ actual suspend fun httpGetText(url: String): String =
         .let { response ->
             val payload = response.bodyAsText()
             if (!response.status.isSuccess()) {
-                error("Request failed with HTTP ${response.status.value}")
+                error(runBlocking { getString(Res.string.network_request_failed_http, response.status.value) })
             }
             if (payload.isBlank()) {
-                throw IllegalStateException("Empty response body")
+                throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
             }
             payload
         }
@@ -101,10 +106,10 @@ actual suspend fun httpPostJson(url: String, body: String): String =
         .let { response ->
             val payload = response.bodyAsText()
             if (!response.status.isSuccess()) {
-                error("Request failed with HTTP ${response.status.value}")
+                error(runBlocking { getString(Res.string.network_request_failed_http, response.status.value) })
             }
             if (payload.isBlank()) {
-                throw IllegalStateException("Empty response body")
+                throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
             }
             payload
         }
@@ -123,10 +128,10 @@ actual suspend fun httpGetTextWithHeaders(
         .let { response ->
             val payload = response.bodyAsText()
             if (!response.status.isSuccess()) {
-                error("Request failed with HTTP ${response.status.value}")
+                error(runBlocking { getString(Res.string.network_request_failed_http, response.status.value) })
             }
             if (payload.isBlank()) {
-                throw IllegalStateException("Empty response body")
+                throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
             }
             payload
         }
@@ -148,10 +153,10 @@ actual suspend fun httpPostJsonWithHeaders(
         .let { response ->
             val payload = response.bodyAsText()
             if (!response.status.isSuccess()) {
-                error("Request failed with HTTP ${response.status.value}")
+                error(runBlocking { getString(Res.string.network_request_failed_http, response.status.value) })
             }
             if (payload.isBlank()) {
-                throw IllegalStateException("Empty response body")
+                throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
             }
             payload
         }

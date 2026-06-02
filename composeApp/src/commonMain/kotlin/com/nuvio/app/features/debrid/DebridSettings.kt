@@ -129,7 +129,7 @@ data class DebridStreamPreferences(
     val excludedLanguages: List<DebridStreamLanguage> = emptyList(),
     val requiredReleaseGroups: List<String> = emptyList(),
     val excludedReleaseGroups: List<String> = emptyList(),
-    val sortCriteria: List<DebridStreamSortCriterion> = DebridStreamSortCriterion.defaultOrder,
+    val sortCriteria: List<DebridStreamSortCriterion> = DebridStreamSortCriterion.originalOrder,
 )
 
 @Serializable
@@ -266,6 +266,7 @@ data class DebridStreamSortCriterion(
     val direction: DebridStreamSortDirection = DebridStreamSortDirection.DESC,
 ) {
     companion object {
+        val originalOrder = emptyList<DebridStreamSortCriterion>()
         val defaultOrder = listOf(
             DebridStreamSortCriterion(DebridStreamSortKey.RESOLUTION, DebridStreamSortDirection.DESC),
             DebridStreamSortCriterion(DebridStreamSortKey.QUALITY, DebridStreamSortDirection.DESC),

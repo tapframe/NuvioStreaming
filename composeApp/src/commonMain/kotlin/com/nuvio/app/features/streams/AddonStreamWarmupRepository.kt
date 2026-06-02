@@ -129,10 +129,14 @@ object AddonStreamWarmupRepository {
                         groups = listOf(checkingGroup),
                         eligibleGroupIds = eligibleGroupIds,
                     ).firstOrNull() ?: checkingGroup
-                    DebridStreamPresentation.apply(
+                    val badgeGroup = StreamBadgePresentation.apply(
                         groups = listOf(availabilityGroup),
-                        settings = key.settings,
+                        rules = key.streamBadgeRules,
                     ).firstOrNull() ?: availabilityGroup
+                    DebridStreamPresentation.apply(
+                        groups = listOf(badgeGroup),
+                        settings = key.settings,
+                    ).firstOrNull() ?: badgeGroup
                 }
             }.awaitAll()
         }.let { groups ->
@@ -211,6 +215,7 @@ object AddonStreamWarmupRepository {
         DebridSettingsRepository.ensureLoaded()
         val settings = DebridSettingsRepository.snapshot()
         if (!settings.canResolvePlayableLinks || settings.torboxApiKey.isBlank()) return null
+        val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
 
         AddonRepository.initialize()
         val addonTargets = AddonRepository.uiState.value.addons
@@ -225,7 +230,9 @@ object AddonStreamWarmupRepository {
             episode = episode,
             addonFingerprint = addonTargets.joinToString("|") { it.fingerprint },
             settingsFingerprint = settings.warmupFingerprint(),
+            streamBadgeRulesFingerprint = streamBadgeRules.toString(),
             settings = settings,
+            streamBadgeRules = streamBadgeRules,
             addonTargets = addonTargets,
         )
     }
@@ -249,7 +256,9 @@ private data class AddonStreamWarmupKey(
     val episode: Int?,
     val addonFingerprint: String,
     val settingsFingerprint: String,
+    val streamBadgeRulesFingerprint: String,
     val settings: DebridSettings,
+    val streamBadgeRules: StreamBadgeRules,
     val addonTargets: List<AddonStreamWarmupTarget>,
 )
 

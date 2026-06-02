@@ -90,7 +90,9 @@ object TraktCommentsRepository {
             return TraktCommentsPage(emptyList(), page, 0, 0)
         }
         if (response.status !in 200..299) {
-            throw IllegalStateException("Failed to load Trakt comments (${response.status})")
+            throw IllegalStateException(
+                getString(Res.string.details_comments_trakt_load_failed_with_code, response.status),
+            )
         }
 
         val dtos = commentsJson.decodeFromString<List<TraktCommentDto>>(response.body)

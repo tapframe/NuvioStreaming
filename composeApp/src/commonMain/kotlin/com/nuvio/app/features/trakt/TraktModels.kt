@@ -47,6 +47,19 @@ enum class TraktListType {
 }
 
 @Serializable
+enum class TraktListPrivacy(val apiValue: String) {
+    PRIVATE("private"),
+    LINK("link"),
+    FRIENDS("friends"),
+    PUBLIC("public");
+
+    companion object {
+        fun fromApi(value: String?): TraktListPrivacy =
+            entries.firstOrNull { it.apiValue.equals(value, ignoreCase = true) } ?: PRIVATE
+    }
+}
+
+@Serializable
 data class TraktListTab(
     val key: String,
     val title: String,
@@ -54,6 +67,9 @@ data class TraktListTab(
     val traktListId: Long? = null,
     val slug: String? = null,
     val description: String? = null,
+    val privacy: TraktListPrivacy? = null,
+    val sortBy: String? = null,
+    val sortHow: String? = null,
 )
 
 data class TraktMembershipSnapshot(

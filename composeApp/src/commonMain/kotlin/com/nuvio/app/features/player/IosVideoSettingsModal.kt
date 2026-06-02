@@ -41,6 +41,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.player_video_settings_brightness
+import nuvio.composeapp.generated.resources.player_video_settings_contrast
+import nuvio.composeapp.generated.resources.player_video_settings_deband
+import nuvio.composeapp.generated.resources.player_video_settings_deband_desc
+import nuvio.composeapp.generated.resources.player_video_settings_gamma
+import nuvio.composeapp.generated.resources.player_video_settings_hdr_peak_detection
+import nuvio.composeapp.generated.resources.player_video_settings_hdr_peak_detection_desc
+import nuvio.composeapp.generated.resources.player_video_settings_interpolation
+import nuvio.composeapp.generated.resources.player_video_settings_interpolation_desc
+import nuvio.composeapp.generated.resources.player_video_settings_output_preset
+import nuvio.composeapp.generated.resources.player_video_settings_reset_tuning
+import nuvio.composeapp.generated.resources.player_video_settings_saturation
+import nuvio.composeapp.generated.resources.player_video_settings_title
+import nuvio.composeapp.generated.resources.player_video_settings_tone_mapping
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.roundToInt
 
 @Composable
@@ -96,7 +112,7 @@ internal fun IosVideoSettingsModal(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Video",
+                            text = stringResource(Res.string.player_video_settings_title),
                             color = colorScheme.onSurface,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
@@ -106,7 +122,7 @@ internal fun IosVideoSettingsModal(
                             PlayerSettingsRepository.resetIosVideoOutputTuning()
                             onSettingsChanged()
                         }) {
-                            Text("Reset tuning")
+                            Text(stringResource(Res.string.player_video_settings_reset_tuning))
                         }
                     }
 
@@ -118,11 +134,11 @@ internal fun IosVideoSettingsModal(
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         OptionGroup(
-                            title = "Output preset",
+                            title = stringResource(Res.string.player_video_settings_output_preset),
                             options = IosVideoOutputPreset.entries,
                             selected = settings.iosVideoOutputPreset,
-                            label = { it.label },
-                            description = { it.description },
+                            label = { it.localizedLabel() },
+                            description = { it.localizedDescription() },
                             onSelect = {
                                 PlayerSettingsRepository.setIosVideoOutputPreset(it)
                                 onSettingsChanged()
@@ -130,8 +146,8 @@ internal fun IosVideoSettingsModal(
                         )
 
                         ToggleRow(
-                            title = "HDR peak detection",
-                            description = "Estimate HDR peak brightness when metadata is bad or missing.",
+                            title = stringResource(Res.string.player_video_settings_hdr_peak_detection),
+                            description = stringResource(Res.string.player_video_settings_hdr_peak_detection_desc),
                             checked = settings.iosHdrComputePeakEnabled,
                             onCheckedChange = {
                                 PlayerSettingsRepository.setIosHdrComputePeakEnabled(it)
@@ -140,7 +156,7 @@ internal fun IosVideoSettingsModal(
                         )
 
                         OptionGroup(
-                            title = "Tone mapping",
+                            title = stringResource(Res.string.player_video_settings_tone_mapping),
                             options = IosToneMappingMode.entries,
                             selected = settings.iosToneMappingMode,
                             label = { it.label },
@@ -151,8 +167,8 @@ internal fun IosVideoSettingsModal(
                         )
 
                         ToggleRow(
-                            title = "Deband",
-                            description = "Reduce color banding at a small performance cost.",
+                            title = stringResource(Res.string.player_video_settings_deband),
+                            description = stringResource(Res.string.player_video_settings_deband_desc),
                             checked = settings.iosDebandEnabled,
                             onCheckedChange = {
                                 PlayerSettingsRepository.setIosDebandEnabled(it)
@@ -160,8 +176,8 @@ internal fun IosVideoSettingsModal(
                             },
                         )
                         ToggleRow(
-                            title = "Frame interpolation",
-                            description = "Smooth motion when mpv can use display sync cleanly.",
+                            title = stringResource(Res.string.player_video_settings_interpolation),
+                            description = stringResource(Res.string.player_video_settings_interpolation_desc),
                             checked = settings.iosInterpolationEnabled,
                             onCheckedChange = {
                                 PlayerSettingsRepository.setIosInterpolationEnabled(it)
@@ -170,7 +186,7 @@ internal fun IosVideoSettingsModal(
                         )
 
                         PictureSlider(
-                            title = "Brightness",
+                            title = stringResource(Res.string.player_video_settings_brightness),
                             value = settings.iosBrightness,
                             onValueChanged = {
                                 PlayerSettingsRepository.setIosBrightness(it)
@@ -178,7 +194,7 @@ internal fun IosVideoSettingsModal(
                             },
                         )
                         PictureSlider(
-                            title = "Contrast",
+                            title = stringResource(Res.string.player_video_settings_contrast),
                             value = settings.iosContrast,
                             onValueChanged = {
                                 PlayerSettingsRepository.setIosContrast(it)
@@ -186,7 +202,7 @@ internal fun IosVideoSettingsModal(
                             },
                         )
                         PictureSlider(
-                            title = "Saturation",
+                            title = stringResource(Res.string.player_video_settings_saturation),
                             value = settings.iosSaturation,
                             onValueChanged = {
                                 PlayerSettingsRepository.setIosSaturation(it)
@@ -194,7 +210,7 @@ internal fun IosVideoSettingsModal(
                             },
                         )
                         PictureSlider(
-                            title = "Gamma",
+                            title = stringResource(Res.string.player_video_settings_gamma),
                             value = settings.iosGamma,
                             onValueChanged = {
                                 PlayerSettingsRepository.setIosGamma(it)
@@ -260,8 +276,8 @@ private fun <T> OptionGroup(
     title: String,
     options: List<T>,
     selected: T,
-    label: (T) -> String,
-    description: ((T) -> String)? = null,
+    label: @Composable (T) -> String,
+    description: @Composable ((T) -> String)? = null,
     onSelect: (T) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

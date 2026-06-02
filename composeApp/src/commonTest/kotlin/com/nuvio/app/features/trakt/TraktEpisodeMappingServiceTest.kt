@@ -31,7 +31,7 @@ class TraktEpisodeMappingServiceTest {
     }
 
     @Test
-    fun `forward mapping uses global sorted index for anime numbering`() {
+    fun `forward mapping uses global sorted index for anime numbering`() = kotlinx.coroutines.runBlocking {
         val addon = listOf(
             episode(1, 1, videoId = "show:1:1"),
             episode(1, 2, videoId = "show:1:2"),
@@ -59,7 +59,7 @@ class TraktEpisodeMappingServiceTest {
     }
 
     @Test
-    fun `reverse mapping uses global sorted index for Trakt absolute numbering`() {
+    fun `reverse mapping uses global sorted index for Trakt absolute numbering`() = kotlinx.coroutines.runBlocking {
         val addon = listOf(
             episode(1, 1),
             episode(1, 2),
@@ -86,7 +86,7 @@ class TraktEpisodeMappingServiceTest {
     }
 
     @Test
-    fun `unique normalized title wins over index`() {
+    fun `unique normalized title wins over index`() = kotlinx.coroutines.runBlocking {
         val addon = listOf(
             episode(1, 1, title = "The Storm"),
             episode(1, 2, title = "Aftermath"),
@@ -110,7 +110,7 @@ class TraktEpisodeMappingServiceTest {
     }
 
     @Test
-    fun `generic title falls back to index`() {
+    fun `generic title falls back to index`() = kotlinx.coroutines.runBlocking {
         val addon = listOf(
             episode(1, 1, title = "Episode 1"),
             episode(2, 1, title = "Actual Title"),
@@ -134,7 +134,7 @@ class TraktEpisodeMappingServiceTest {
     }
 
     @Test
-    fun `duplicate title falls back to index`() {
+    fun `duplicate title falls back to index`() = kotlinx.coroutines.runBlocking {
         val addon = listOf(
             episode(1, 1, title = "Pilot"),
             episode(2, 1, title = "Other"),
@@ -158,7 +158,7 @@ class TraktEpisodeMappingServiceTest {
     }
 
     @Test
-    fun `video id selects source episode before season episode`() {
+    fun `video id selects source episode before season episode`() = kotlinx.coroutines.runBlocking {
         val addon = listOf(
             episode(1, 1, videoId = "show:1:1"),
             episode(2, 1, videoId = "show:2:1"),
@@ -182,7 +182,7 @@ class TraktEpisodeMappingServiceTest {
     }
 
     @Test
-    fun `index outside target range returns null`() {
+    fun `index outside target range returns null`() = kotlinx.coroutines.runBlocking {
         val addon = listOf(
             episode(1, 1),
             episode(1, 2),

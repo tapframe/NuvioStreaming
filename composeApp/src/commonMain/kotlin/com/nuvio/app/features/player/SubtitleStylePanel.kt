@@ -25,17 +25,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun SubtitleStylePanel(
     style: SubtitleStyleState,
+    subtitleDelayMs: Int,
+    selectedAddonSubtitle: AddonSubtitle?,
+    subtitleAutoSyncState: SubtitleAutoSyncUiState,
     isCompact: Boolean,
     onStyleChanged: (SubtitleStyleState) -> Unit,
+    onSubtitleDelayChanged: (Int) -> Unit,
+    onSubtitleDelayReset: () -> Unit,
+    onAutoSyncCapture: () -> Unit,
+    onAutoSyncCueSelected: (SubtitleSyncCue) -> Unit,
+    onAutoSyncReload: () -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val sectionPadding = if (isCompact) 12.dp else 16.dp
@@ -46,10 +57,18 @@ fun SubtitleStylePanel(
     ) {
         StyleControlsCard(
             style = style,
+            subtitleDelayMs = subtitleDelayMs,
+            selectedAddonSubtitle = selectedAddonSubtitle,
+            subtitleAutoSyncState = subtitleAutoSyncState,
             isCompact = isCompact,
             sectionPadding = sectionPadding,
             colorScheme = colorScheme,
             onStyleChanged = onStyleChanged,
+            onSubtitleDelayChanged = onSubtitleDelayChanged,
+            onSubtitleDelayReset = onSubtitleDelayReset,
+            onAutoSyncCapture = onAutoSyncCapture,
+            onAutoSyncCueSelected = onAutoSyncCueSelected,
+            onAutoSyncReload = onAutoSyncReload,
         )
     }
 }
@@ -57,10 +76,18 @@ fun SubtitleStylePanel(
 @Composable
 private fun StyleControlsCard(
     style: SubtitleStyleState,
+    subtitleDelayMs: Int,
+    selectedAddonSubtitle: AddonSubtitle?,
+    subtitleAutoSyncState: SubtitleAutoSyncUiState,
     isCompact: Boolean,
     sectionPadding: androidx.compose.ui.unit.Dp,
     colorScheme: androidx.compose.material3.ColorScheme,
     onStyleChanged: (SubtitleStyleState) -> Unit,
+    onSubtitleDelayChanged: (Int) -> Unit,
+    onSubtitleDelayReset: () -> Unit,
+    onAutoSyncCapture: () -> Unit,
+    onAutoSyncCueSelected: (SubtitleSyncCue) -> Unit,
+    onAutoSyncReload: () -> Unit,
 ) {
     val btnSize = if (isCompact) 28.dp else 32.dp
     val btnRadius = if (isCompact) 14.dp else 16.dp
@@ -76,6 +103,50 @@ private fun StyleControlsCard(
         SectionHeader(
             icon = Icons.Rounded.Tune,
             label = stringResource(Res.string.compose_player_style),
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_player_subtitle_delay),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            StepperControl(
+                value = formatSubtitleDelay(subtitleDelayMs),
+                onMinus = {
+                    onSubtitleDelayChanged((subtitleDelayMs - SUBTITLE_DELAY_STEP_MS).coerceAtLeast(SUBTITLE_DELAY_MIN_MS))
+                },
+                onPlus = {
+                    onSubtitleDelayChanged((subtitleDelayMs + SUBTITLE_DELAY_STEP_MS).coerceAtMost(SUBTITLE_DELAY_MAX_MS))
+                },
+                buttonSize = btnSize,
+                buttonRadius = btnRadius,
+                minWidth = 72.dp,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            SmallActionPill(
+                text = stringResource(Res.string.compose_player_reset),
+                onClick = onSubtitleDelayReset,
+            )
+        }
+
+        AutoSyncControls(
+            selectedAddonSubtitle = selectedAddonSubtitle,
+            state = subtitleAutoSyncState,
+            isCompact = isCompact,
+            onCapture = onAutoSyncCapture,
+            onCueSelected = onAutoSyncCueSelected,
+            onReload = onAutoSyncReload,
         )
 
         Row(
@@ -137,6 +208,12 @@ private fun StyleControlsCard(
             }
         }
 
+        ToggleRow(
+            label = stringResource(Res.string.compose_player_bold),
+            enabled = style.bold,
+            onToggle = { onStyleChanged(style.copy(bold = !style.bold)) },
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -160,38 +237,47 @@ private fun StyleControlsCard(
             )
         }
 
+        ColorPickerRow(
+            label = stringResource(Res.string.compose_player_color),
+            colors = SubtitleColorSwatches,
+            selectedColor = style.textColor,
+            onColorSelected = { onStyleChanged(style.copy(textColor = it)) },
+        )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val currentAlphaPercent = (style.textColor.alpha * 100f).roundToInt().coerceIn(0, 100)
             Text(
-                text = stringResource(Res.string.compose_player_color),
+                text = stringResource(Res.string.compose_player_text_opacity),
                 color = colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
             )
+            StepperControl(
+                value = "$currentAlphaPercent%",
+                onMinus = {
+                    val newAlpha = (currentAlphaPercent - 10).coerceAtLeast(0) / 100f
+                    onStyleChanged(style.copy(textColor = style.textColor.copy(alpha = newAlpha)))
+                },
+                onPlus = {
+                    val newAlpha = (currentAlphaPercent + 10).coerceAtMost(100) / 100f
+                    onStyleChanged(style.copy(textColor = style.textColor.copy(alpha = newAlpha)))
+                },
+                buttonSize = btnSize,
+                buttonRadius = btnRadius,
+                minWidth = 58.dp,
+            )
         }
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SubtitleColorSwatches.forEach { color ->
-                val isSelected = style.textColor == color
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(color)
-                        .border(
-                            2.dp,
-                            if (isSelected) colorScheme.primary else colorScheme.outlineVariant,
-                            CircleShape,
-                        )
-                        .clickable { onStyleChanged(style.copy(textColor = color)) },
-                )
-            }
-        }
+        ColorPickerRow(
+            label = stringResource(Res.string.compose_player_outline_color),
+            colors = SubtitleColorSwatches,
+            selectedColor = style.outlineColor,
+            onColorSelected = { onStyleChanged(style.copy(outlineColor = it)) },
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -213,6 +299,213 @@ private fun StyleControlsCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AutoSyncControls(
+    selectedAddonSubtitle: AddonSubtitle?,
+    state: SubtitleAutoSyncUiState,
+    isCompact: Boolean,
+    onCapture: () -> Unit,
+    onCueSelected: (SubtitleSyncCue) -> Unit,
+    onReload: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val capturedPositionMs = state.capturedPositionMs
+    val nearestCues = if (capturedPositionMs == null) {
+        emptyList()
+    } else {
+        state.cues.sortedBy { abs(it.startTimeMs - capturedPositionMs) }.take(5)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colorScheme.surface.copy(alpha = 0.55f))
+            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .padding(if (isCompact) 10.dp else 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_player_auto_sync),
+                color = colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SmallActionPill(
+                    text = stringResource(Res.string.compose_player_reload),
+                    enabled = selectedAddonSubtitle != null,
+                    onClick = onReload,
+                )
+                SmallActionPill(
+                    text = stringResource(Res.string.compose_player_capture_line),
+                    enabled = selectedAddonSubtitle != null,
+                    onClick = onCapture,
+                )
+            }
+        }
+
+        if (selectedAddonSubtitle == null) {
+            Text(
+                text = stringResource(Res.string.compose_player_select_addon_subtitle_first),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            return@Column
+        }
+
+        if (state.isLoading) {
+            Text(
+                text = stringResource(Res.string.compose_player_loading_lines),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+        }
+
+        state.errorMessage?.let { message ->
+            Text(
+                text = message,
+                color = colorScheme.error,
+                fontSize = 12.sp,
+            )
+        }
+
+        if (capturedPositionMs != null && nearestCues.isNotEmpty()) {
+            nearestCues.forEach { cue ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colorScheme.surfaceVariant.copy(alpha = 0.52f))
+                        .clickable { onCueSelected(cue) }
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = formatCueTimestamp(cue.startTimeMs),
+                        color = colorScheme.primary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = cue.text,
+                        color = colorScheme.onSurface,
+                        fontSize = 12.sp,
+                        maxLines = 2,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    label: String,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = colorScheme.onSurfaceVariant,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        SmallActionPill(
+            text = if (enabled) stringResource(Res.string.compose_action_on)
+            else stringResource(Res.string.compose_action_off),
+            selected = enabled,
+            onClick = onToggle,
+        )
+    }
+}
+
+@Composable
+private fun ColorPickerRow(
+    label: String,
+    colors: List<Color>,
+    selectedColor: Color,
+    onColorSelected: (Color) -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = label,
+            color = colorScheme.onSurfaceVariant,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            colors.forEach { color ->
+                val isSelected = selectedColor == color
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(if (color.alpha == 0f) colorScheme.surface else color)
+                        .border(
+                            2.dp,
+                            if (isSelected) colorScheme.primary else colorScheme.outlineVariant,
+                            CircleShape,
+                        )
+                        .clickable { onColorSelected(color) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmallActionPill(
+    text: String,
+    enabled: Boolean = true,
+    selected: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                when {
+                    selected -> colorScheme.primaryContainer
+                    enabled -> colorScheme.surface.copy(alpha = 0.82f)
+                    else -> colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                }
+            )
+            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text = text,
+            color = when {
+                selected -> colorScheme.onPrimaryContainer
+                enabled -> colorScheme.onSurface
+                else -> colorScheme.onSurfaceVariant.copy(alpha = 0.58f)
+            },
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 12.sp,
+        )
     }
 }
 
@@ -309,4 +602,19 @@ private fun SectionHeader(
             fontWeight = FontWeight.SemiBold,
         )
     }
+}
+
+private fun formatSubtitleDelay(delayMs: Int): String {
+    val sign = if (delayMs >= 0) "+" else "-"
+    val absMs = abs(delayMs)
+    val seconds = absMs / 1000
+    val millis = absMs % 1000
+    return "$sign$seconds.${millis.toString().padStart(3, '0')}s"
+}
+
+private fun formatCueTimestamp(timeMs: Long): String {
+    val totalSeconds = (timeMs / 1000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return "${minutes}:${seconds.toString().padStart(2, '0')}"
 }

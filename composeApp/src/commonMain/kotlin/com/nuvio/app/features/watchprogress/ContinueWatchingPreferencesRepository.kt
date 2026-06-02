@@ -12,7 +12,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 private data class StoredContinueWatchingPreferences(
     val isVisible: Boolean = true,
-    val style: ContinueWatchingSectionStyle = ContinueWatchingSectionStyle.Wide,
+    val style: ContinueWatchingSectionStyle = ContinueWatchingSectionStyle.Card,
     val upNextFromFurthestEpisode: Boolean = true,
     @SerialName("use_episode_thumbnails_in_cw")
     val useEpisodeThumbnails: Boolean = true,

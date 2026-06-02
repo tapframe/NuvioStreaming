@@ -111,7 +111,7 @@ internal actual object DownloadsLiveStatusPlatform {
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .addAction(
                         0,
-                        "Pause",
+                        runBlocking { getString(Res.string.compose_action_pause) },
                         buildActionPendingIntent(
                             context = context,
                             action = DownloadsNotificationActionReceiver.actionPause,
@@ -178,7 +178,15 @@ internal actual object DownloadsLiveStatusPlatform {
 
     private fun formatBytes(bytes: Long): String {
         val safe = bytes.coerceAtLeast(0L).toDouble()
-        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val units = runBlocking {
+            arrayOf(
+                getString(Res.string.unit_bytes_b),
+                getString(Res.string.unit_bytes_kb),
+                getString(Res.string.unit_bytes_mb),
+                getString(Res.string.unit_bytes_gb),
+                getString(Res.string.unit_bytes_tb),
+            )
+        }
         var value = safe
         var unitIndex = 0
         while (value >= 1024.0 && unitIndex < units.lastIndex) {

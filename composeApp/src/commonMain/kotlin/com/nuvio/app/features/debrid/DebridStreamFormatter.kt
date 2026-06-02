@@ -4,22 +4,25 @@ import com.nuvio.app.features.debrid.DebridStreamPresentation.isManagedDebridStr
 import com.nuvio.app.features.streams.StreamClientResolve
 import com.nuvio.app.features.streams.StreamClientResolveParsed
 import com.nuvio.app.features.streams.StreamDebridCacheState
+import com.nuvio.app.features.streams.StreamBadge
 import com.nuvio.app.features.streams.StreamItem
 
 class DebridStreamFormatter(
     private val engine: DebridStreamTemplateEngine = DebridStreamTemplateEngine(),
 ) {
-    fun format(stream: StreamItem, settings: DebridSettings): StreamItem {
+    fun format(
+        stream: StreamItem,
+        settings: DebridSettings,
+    ): StreamItem {
         if (!stream.isManagedDebridStream) return stream
-        val values = buildValues(stream, settings)
-        val nameTemplate = settings.streamNameTemplate.ifBlank { DebridStreamFormatterDefaults.NAME_TEMPLATE }
-        val descriptionTemplate = settings.streamDescriptionTemplate.ifBlank { DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE }
-        val formattedName = engine.render(nameTemplate, values)
+        val matchedBadges = stream.badges
+        val values = buildValues(stream, settings, matchedBadges)
+        val formattedName = engine.render(settings.streamNameTemplate, values)
             .lineSequence()
             .joinToString(" ") { it.trim() }
             .replace(Regex("\\s+"), " ")
             .trim()
-        val formattedDescription = engine.render(descriptionTemplate, values)
+        val formattedDescription = engine.render(settings.streamDescriptionTemplate, values)
             .lineSequence()
             .map { it.trim() }
             .filter { it.isNotBlank() }
@@ -29,10 +32,15 @@ class DebridStreamFormatter(
         return stream.copy(
             name = formattedName.ifBlank { stream.name ?: DebridProviders.displayName(serviceId(stream)) },
             description = formattedDescription.ifBlank { stream.description ?: stream.title },
+            badges = stream.badges,
         )
     }
 
-    private fun buildValues(stream: StreamItem, settings: DebridSettings): Map<String, Any?> {
+    private fun buildValues(
+        stream: StreamItem,
+        settings: DebridSettings,
+        matchedBadges: List<StreamBadge>,
+    ): Map<String, Any?> {
         val resolve = stream.clientResolve
         val raw = resolve?.stream?.raw
         val parsed = raw?.parsed
@@ -48,6 +56,7 @@ class DebridStreamFormatter(
         val audioTags = facts.audioTags.mapNotUnknown { it.label }
         val audioChannels = facts.audioChannels.mapNotUnknown { it.label }
         val edition = parsed?.edition ?: buildEdition(parsed)
+        val matchedBadgeNames = matchedBadges.map { it.name }
 
         return linkedMapOf(
             "stream.title" to (parsed?.parsedTitle ?: resolve?.title ?: stream.title),
@@ -76,7 +85,8 @@ class DebridStreamFormatter(
             "stream.duration" to parsed?.duration,
             "stream.edition" to edition,
             "stream.filename" to (raw?.filename ?: resolve?.filename ?: stream.behaviorHints.filename ?: stream.debridCacheStatus?.cachedName),
-            "stream.regexMatched" to null,
+            "stream.regexMatched" to matchedBadgeNames,
+            "stream.rseMatched" to matchedBadgeNames,
             "stream.type" to streamType(stream, resolve),
             "service.cached" to serviceCached(stream, resolve),
             "service.shortName" to DebridProviders.shortName(serviceId(stream)),

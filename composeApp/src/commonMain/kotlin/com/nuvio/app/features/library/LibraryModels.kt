@@ -18,6 +18,12 @@ data class LibraryItem(
     val imdbRating: String? = null,
     val genres: List<String> = emptyList(),
     val posterShape: PosterShape = PosterShape.Poster,
+    val addonBaseUrl: String? = null,
+    val listKeys: Set<String> = emptySet(),
+    val traktRank: Int? = null,
+    val imdbId: String? = null,
+    val tmdbId: Int? = null,
+    val traktId: Int? = null,
     val savedAtEpochMs: Long,
 )
 
@@ -54,6 +60,7 @@ fun MetaDetails.toLibraryItem(savedAtEpochMs: Long): LibraryItem =
         imdbRating = imdbRating,
         genres = genres,
         posterShape = PosterShape.Poster,
+        imdbId = id.takeIf { it.startsWith("tt") },
         savedAtEpochMs = savedAtEpochMs,
     )
 
@@ -70,6 +77,7 @@ fun MetaPreview.toLibraryItem(savedAtEpochMs: Long): LibraryItem =
         imdbRating = imdbRating,
         genres = genres,
         posterShape = posterShape,
+        imdbId = id.takeIf { it.startsWith("tt") },
         savedAtEpochMs = savedAtEpochMs,
     )
 

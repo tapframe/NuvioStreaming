@@ -4,7 +4,12 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.nuvio.app.core.network.IPv4FirstDns
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.network_empty_response_body
+import nuvio.composeapp.generated.resources.network_request_failed_http
+import org.jetbrains.compose.resources.getString
 import okhttp3.ResponseBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -182,10 +187,10 @@ private suspend fun executeTextRequest(
     addonHttpClient.newCall(request).execute().use { response ->
         val payload = readResponseBody(response.body)
         if (!response.isSuccessful) {
-            error("Request failed with HTTP ${response.code}")
+            error(runBlocking { getString(Res.string.network_request_failed_http, response.code) })
         }
         if (payload.isBlank()) {
-            throw IllegalStateException("Empty response body")
+            throw IllegalStateException(runBlocking { getString(Res.string.network_empty_response_body) })
         }
         payload
     }

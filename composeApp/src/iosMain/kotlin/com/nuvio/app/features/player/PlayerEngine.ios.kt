@@ -16,6 +16,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.player_error_mpv_unavailable
+import org.jetbrains.compose.resources.getString
 
 private const val TAG = "NuvioiOSPlayer"
 
@@ -49,7 +52,7 @@ actual fun PlatformPlayerSurface(
 
     if (bridge == null) {
         LaunchedEffect(Unit) {
-            latestOnError.value("MPV player engine not available. Please rebuild the app.")
+            latestOnError.value(getString(Res.string.player_error_mpv_unavailable))
         }
         return
     }
@@ -206,10 +209,17 @@ actual fun PlatformPlayerSurface(
                 bridge.clearExternalSubtitleAndSelect(trackId)
             }
 
+            override fun setSubtitleDelayMs(delayMs: Int) {
+                bridge.setSubtitleDelayMs(delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS))
+            }
+
             override fun applySubtitleStyle(style: SubtitleStyleState) {
                 bridge.applySubtitleStyle(
                     textColor = style.textColor.toMpvColorString(),
-                    outlineSize = if (style.outlineEnabled) 1.65f else 0f,
+                    backgroundColor = style.backgroundColor.toMpvColorString(),
+                    outlineColor = style.outlineColor.toMpvColorString(),
+                    outlineSize = if (style.outlineEnabled) style.outlineWidth.toFloat() else 0f,
+                    bold = style.bold,
                     fontSize = style.toMpvSubtitleFontSize(),
                     subPos = style.toMpvSubtitlePosition(),
                 )
@@ -313,11 +323,13 @@ private fun NuvioPlayerBridge.applyIosVideoOutputSettings(settings: PlayerSettin
 }
 
 private fun Color.toMpvColorString(): String {
+    val alphaInt = (alpha * 255f).toInt().coerceIn(0, 255)
     val redInt = (red * 255f).toInt().coerceIn(0, 255)
     val greenInt = (green * 255f).toInt().coerceIn(0, 255)
     val blueInt = (blue * 255f).toInt().coerceIn(0, 255)
     return buildString {
         append('#')
+        append(alphaInt.toHexByte())
         append(redInt.toHexByte())
         append(greenInt.toHexByte())
         append(blueInt.toHexByte())

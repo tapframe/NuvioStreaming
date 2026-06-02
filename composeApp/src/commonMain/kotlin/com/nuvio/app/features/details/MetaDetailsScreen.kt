@@ -344,6 +344,11 @@ fun MetaDetailsScreen(
                 val progressByVideoId = remember(watchProgressUiState.entries) {
                     watchProgressUiState.byVideoId
                 }
+                LaunchedEffect(meta.id, meta.type, watchProgressUiState.hasLoadedRemoteProgress) {
+                    if (meta.type.lowercase() in setOf("series", "show", "tv", "tvshow")) {
+                        WatchProgressRepository.refreshEpisodeProgress(meta.id)
+                    }
+                }
                 LaunchedEffect(
                     meta.id,
                     meta.type,

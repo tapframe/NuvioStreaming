@@ -7,18 +7,14 @@ import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-fun localizedContinueWatchingSubtitle(item: ContinueWatchingItem): String {
+fun localizedContinueWatchingSubtitle(item: ContinueWatchingItem, compact: Boolean = false): String {
     val seasonNumber = item.seasonNumber
     val episodeNumber = item.episodeNumber
     val episodeTitle = item.episodeTitle?.takeIf { it.isNotBlank() }
 
     val base = when {
-        seasonNumber != null && episodeNumber != null && item.isNextUp ->
-            stringResource(Res.string.continue_watching_up_next_episode, seasonNumber, episodeNumber)
         seasonNumber != null && episodeNumber != null ->
             stringResource(Res.string.compose_player_episode_code_full, seasonNumber, episodeNumber)
-        item.isNextUp ->
-            stringResource(Res.string.continue_watching_up_next)
         item.parentMetaType.equals(CloudLibraryContentType, ignoreCase = true) ->
             stringResource(Res.string.library_source_cloud)
         else ->

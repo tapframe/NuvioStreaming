@@ -220,6 +220,7 @@ internal fun SettingsNavigationRow(
     description: String,
     icon: ImageVector? = null,
     iconPainter: Painter? = null,
+    enabled: Boolean = true,
     isTablet: Boolean,
     onClick: () -> Unit,
 ) {
@@ -231,8 +232,9 @@ internal fun SettingsNavigationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding)
+            .alpha(if (enabled) 1f else 0.55f),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
     ) {

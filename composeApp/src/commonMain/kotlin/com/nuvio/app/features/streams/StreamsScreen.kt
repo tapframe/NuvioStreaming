@@ -9,6 +9,7 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -75,7 +77,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
-import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
@@ -93,7 +94,6 @@ import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.launch
-import kotlin.math.round
 import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -331,7 +331,8 @@ fun StreamsScreen(
                         strokeWidth = 2.5.dp,
                     )
                     Text(
-                        text = stringResource(Res.string.streams_finding_source),
+                        text = uiState.overlayMessage
+                            ?: stringResource(Res.string.streams_finding_source),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.8f),
                     )
@@ -781,6 +782,10 @@ internal fun StreamList(
     val hasGroups = filteredGroups.isNotEmpty()
     val hasAnyStreams = filteredGroups.any { it.streams.isNotEmpty() }
     val anyLoading = filteredGroups.any { it.isLoading }
+    val streamBadgeSettings by remember {
+        StreamBadgeSettingsRepository.ensureLoaded()
+        StreamBadgeSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -811,6 +816,7 @@ internal fun StreamList(
                         showHeader = uiState.selectedFilter == null,
                         debridEnabled = debridEnabled,
                         appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                        showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
                         onStreamSelected = onStreamSelected,
                         onStreamLongPress = onStreamLongPress,
                         resumePositionMs = resumePositionMs,
@@ -836,6 +842,7 @@ private fun LazyListScope.streamSection(
     showHeader: Boolean,
     debridEnabled: Boolean,
     appendInstantServiceToDefaultName: Boolean,
+    showFileSizeBadges: Boolean,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
     resumePositionMs: Long?,
@@ -881,6 +888,7 @@ private fun LazyListScope.streamSection(
                 stream = stream,
                 enabled = stream.isSelectableForPlayback(debridEnabled),
                 appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                showFileSizeBadges = showFileSizeBadges,
                 onClick = {
                     if (stream.isSelectableForPlayback(debridEnabled)) {
                         onStreamSelected(stream, resumePositionMs, resumeProgressFraction)
@@ -986,6 +994,7 @@ private fun StreamCard(
     stream: StreamItem,
     enabled: Boolean,
     appendInstantServiceToDefaultName: Boolean,
+    showFileSizeBadges: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -1030,9 +1039,21 @@ private fun StreamCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StreamFileSizeBadge(stream = stream)
+            val badgeImages = stream.badges.filter { it.imageURL.isNotBlank() }
+            if (badgeImages.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints.videoSize != null)) {
+                Spacer(modifier = Modifier.height(5.dp))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    badgeImages.forEach { badge ->
+                        StreamBadgeImage(badge = badge)
+                    }
+                    if (showFileSizeBadges) {
+                        StreamFileSizeBadge(stream = stream)
+                    }
+                }
             }
         }
     }
@@ -1198,36 +1219,6 @@ private fun StreamItem.instantServiceLabel(): String? {
         .ifBlank { status.providerName.trim() }
         .ifBlank { DebridProviders.displayName(status.providerId) }
     return "- $providerLabel Instant"
-}
-
-@Composable
-private fun StreamFileSizeBadge(stream: StreamItem) {
-    val bytes = stream.behaviorHints.videoSize ?: return
-    val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-    val sizeLabel = if (gib >= 1.0) {
-        val roundedGiB = round(gib * 10.0) / 10.0
-        "$roundedGiB ${localizedByteUnit("GB")}"
-    } else {
-        val mib = bytes.toDouble() / (1024.0 * 1024.0)
-        "${round(mib).toInt()} ${localizedByteUnit("MB")}"
-    }
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF0A0C0C))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-    ) {
-        Text(
-            text = stringResource(Res.string.streams_size, sizeLabel),
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 0.2.sp,
-            ),
-            color = Color.White,
-        )
-    }
 }
 
 private fun Long.toPlaybackClock(): String {

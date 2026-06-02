@@ -1,6 +1,8 @@
 package com.nuvio.app.features.library
 
+import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.home.PosterShape
+import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.trakt.TraktListTab
 import com.nuvio.app.features.trakt.TraktListType
 import kotlin.test.Test
@@ -38,6 +40,29 @@ class LibraryRepositoryTest {
         assertEquals("anime-series", preview.type)
         assertEquals(PosterShape.Poster, preview.posterShape)
         assertEquals("banner", preview.banner)
+    }
+
+    @Test
+    fun `metadata mappings keep imdb ids for Trakt-compatible sync`() {
+        val previewItem = MetaPreview(
+            id = "tt1234567",
+            type = "movie",
+            name = "Movie",
+        ).toLibraryItem(savedAtEpochMs = 1L)
+        val detailsItem = MetaDetails(
+            id = "tt7654321",
+            type = "series",
+            name = "Show",
+        ).toLibraryItem(savedAtEpochMs = 2L)
+        val tmdbOnlyItem = MetaPreview(
+            id = "tmdb:42",
+            type = "movie",
+            name = "TMDB",
+        ).toLibraryItem(savedAtEpochMs = 3L)
+
+        assertEquals("tt1234567", previewItem.imdbId)
+        assertEquals("tt7654321", detailsItem.imdbId)
+        assertEquals(null, tmdbOnlyItem.imdbId)
     }
 
     @Test

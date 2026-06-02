@@ -21,6 +21,8 @@ import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleStorage
 import com.nuvio.app.features.settings.ThemeSettingsStorage
 import com.nuvio.app.features.settings.ThemeSettingsRepository
+import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
+import com.nuvio.app.features.streams.StreamBadgeSettingsStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsStorage
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.trakt.TraktCommentsStorage
@@ -159,6 +161,7 @@ object ProfileSettingsSync {
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.map { "liquid_glass_tab_bar" },
             PosterCardStyleRepository.uiState.map { "poster_card_style" },
             PlayerSettingsRepository.uiState.map { "player" },
+            StreamBadgeSettingsRepository.uiState.map { "stream_badges" },
             DebridSettingsRepository.uiState.map { "debrid" },
             TmdbSettingsRepository.uiState.map { "tmdb" },
             MdbListSettingsRepository.uiState.map { "mdblist" },
@@ -205,6 +208,7 @@ object ProfileSettingsSync {
                 themeSettings = ThemeSettingsStorage.exportToSyncPayload(),
                 posterCardStyleSettingsPayload = PosterCardStyleStorage.loadPayload().orEmpty().trim(),
                 playerSettings = PlayerSettingsStorage.exportToSyncPayload(),
+                streamBadgeSettings = StreamBadgeSettingsStorage.exportToSyncPayload(),
                 debridSettings = DebridSettingsStorage.exportToSyncPayload(),
                 tmdbSettings = TmdbSettingsStorage.exportToSyncPayload(),
                 mdbListSettings = MdbListSettingsStorage.exportToSyncPayload(),
@@ -229,6 +233,9 @@ object ProfileSettingsSync {
 
         PlayerSettingsStorage.replaceFromSyncPayload(blob.features.playerSettings)
         PlayerSettingsRepository.onProfileChanged()
+
+        StreamBadgeSettingsStorage.replaceFromSyncPayload(blob.features.streamBadgeSettings)
+        StreamBadgeSettingsRepository.onProfileChanged()
 
         DebridSettingsStorage.replaceFromSyncPayload(blob.features.debridSettings)
         DebridSettingsRepository.onProfileChanged()
@@ -262,6 +269,7 @@ object ProfileSettingsSync {
         ThemeSettingsRepository.ensureLoaded()
         PosterCardStyleRepository.ensureLoaded()
         PlayerSettingsRepository.ensureLoaded()
+        StreamBadgeSettingsRepository.ensureLoaded()
         DebridSettingsRepository.ensureLoaded()
         TmdbSettingsRepository.ensureLoaded()
         MdbListSettingsRepository.ensureLoaded()
@@ -285,6 +293,7 @@ object ProfileSettingsSync {
         "liquid_glass_tab_bar=${ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.value}",
         "poster_card_style=${PosterCardStyleRepository.uiState.value}",
         "player=${PlayerSettingsRepository.uiState.value}",
+        "stream_badges=${StreamBadgeSettingsRepository.uiState.value}",
         "debrid=${DebridSettingsRepository.uiState.value}",
         "tmdb=${TmdbSettingsRepository.uiState.value}",
         "mdblist=${MdbListSettingsRepository.uiState.value}",
@@ -299,7 +308,7 @@ object ProfileSettingsSync {
 
 @Serializable
 private data class MobileProfileSettingsBlob(
-    val version: Int = 2,
+    val version: Int = 3,
     val features: MobileProfileSettingsFeatures = MobileProfileSettingsFeatures(),
 )
 
@@ -308,6 +317,7 @@ private data class MobileProfileSettingsFeatures(
     @SerialName("theme_settings") val themeSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("poster_card_style_settings_payload") val posterCardStyleSettingsPayload: String = "",
     @SerialName("player_settings") val playerSettings: JsonObject = JsonObject(emptyMap()),
+    @SerialName("stream_badge_settings") val streamBadgeSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("debrid_settings") val debridSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("tmdb_settings") val tmdbSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("mdblist_settings") val mdbListSettings: JsonObject = JsonObject(emptyMap()),

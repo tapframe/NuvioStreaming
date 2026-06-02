@@ -12,11 +12,27 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
 import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.collections_editor_trakt_fallback_title
+import nuvio.composeapp.generated.resources.collections_trakt_credentials_missing
+import nuvio.composeapp.generated.resources.collections_trakt_error_with_code
+import nuvio.composeapp.generated.resources.collections_trakt_invalid_list_id_or_url
+import nuvio.composeapp.generated.resources.collections_trakt_list_items_count
+import nuvio.composeapp.generated.resources.collections_trakt_list_likes_count
+import nuvio.composeapp.generated.resources.collections_trakt_list_not_found_or_private
+import nuvio.composeapp.generated.resources.collections_editor_trakt_load_failed
+import nuvio.composeapp.generated.resources.collections_trakt_missing_list_id
+import nuvio.composeapp.generated.resources.collections_trakt_missing_numeric_id
+import nuvio.composeapp.generated.resources.collections_trakt_public_list
+import nuvio.composeapp.generated.resources.collections_trakt_rate_limit_reached
+import nuvio.composeapp.generated.resources.collections_trakt_request_failed
+import org.jetbrains.compose.resources.getString
 import kotlin.math.roundToInt
 
 data class TraktPublicListImportMetadata(
@@ -44,7 +60,7 @@ object TraktPublicListSourceResolver {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun resolve(source: CollectionSource, page: Int = 1): CatalogPage = withContext(Dispatchers.Default) {
-        val listId = source.traktListId?.takeIf { it > 0L } ?: error("Missing Trakt list ID")
+        val listId = source.traktListId?.takeIf { it > 0L } ?: error(getString(Res.string.collections_trakt_missing_list_id))
         val mediaType = TmdbCollectionMediaType.fromString(source.mediaType)
         val type = mediaType.toTraktType()
         val sortBy = TraktListSort.normalize(source.sortBy)
@@ -60,7 +76,7 @@ object TraktPublicListSourceResolver {
             ),
         )
         if (response.status !in 200..299) {
-            error(errorMessageFor(response.status, "Could not load Trakt list"))
+            error(errorMessageFor(response.status, getString(Res.string.collections_editor_trakt_load_failed)))
         }
 
         val rawItems = json.decodeFromString<List<PublicTraktListItemDto>>(response.body)
@@ -76,12 +92,12 @@ object TraktPublicListSourceResolver {
     }
 
     suspend fun listImportMetadata(input: String): TraktPublicListImportMetadata = withContext(Dispatchers.Default) {
-        val idPath = parseTraktListPath(input) ?: error("Enter a valid Trakt list ID or URL")
+        val idPath = parseTraktListPath(input) ?: error(getString(Res.string.collections_trakt_invalid_list_id_or_url))
         val list = requestJson<PublicTraktListSummaryDto>(
             endpoint = "lists/$idPath",
             query = mapOf("extended" to "full,images"),
         )
-        val id = list.ids?.trakt ?: idPath.toLongOrNull() ?: error("Trakt list did not include a numeric ID")
+        val id = list.ids?.trakt ?: idPath.toLongOrNull() ?: error(getString(Res.string.collections_trakt_missing_numeric_id))
         TraktPublicListImportMetadata(
             title = list.name?.takeIf { it.isNotBlank() },
             coverImageUrl = list.images?.posters.firstTraktImageUrl(),
@@ -132,7 +148,7 @@ object TraktPublicListSourceResolver {
     ): T {
         val response = requestRaw(endpoint = endpoint, query = query)
         if (response.status !in 200..299) {
-            error(errorMessageFor(response.status, "Trakt request failed"))
+            error(errorMessageFor(response.status, getString(Res.string.collections_trakt_request_failed)))
         }
         return runCatching { json.decodeFromString<T>(response.body) }
             .onFailure { error -> log.w(error) { "Failed to parse Trakt response for $endpoint" } }
@@ -144,7 +160,7 @@ object TraktPublicListSourceResolver {
         query: Map<String, String> = emptyMap(),
     ): RawHttpResponse {
         if (TraktConfig.CLIENT_ID.isBlank()) {
-            error("Missing Trakt credentials in local.properties (TRAKT_CLIENT_ID).")
+            error(getString(Res.string.collections_trakt_credentials_missing))
         }
         val url = buildTraktUrl(endpoint, query)
         return httpRequestRaw(
@@ -237,21 +253,25 @@ object TraktPublicListSourceResolver {
 
     private fun PublicTraktListSummaryDto.toPublicListResult(likeCount: Int? = null): TraktPublicListSearchResult? {
         val id = ids?.trakt ?: return null
-        val listTitle = name?.takeIf { it.isNotBlank() } ?: "Trakt List $id"
-        val owner = user?.username?.takeIf { it.isNotBlank() }
-        val stats = buildList {
-            itemCount?.let { add("$it items") }
-            (likeCount ?: likes)?.let { add("$it likes") }
+        return runBlocking {
+            val listTitle = name?.takeIf { it.isNotBlank() }
+                ?: getString(Res.string.collections_editor_trakt_fallback_title, id)
+            val owner = user?.username?.takeIf { it.isNotBlank() }
+            val stats = buildList {
+                itemCount?.let { add(getString(Res.string.collections_trakt_list_items_count, it)) }
+                (likeCount ?: likes)?.let { add(getString(Res.string.collections_trakt_list_likes_count, it)) }
+            }
+            val subtitle = (listOfNotNull(owner) + stats).joinToString(" • ")
+                .ifBlank { getString(Res.string.collections_trakt_public_list) }
+            TraktPublicListSearchResult(
+                traktListId = id,
+                title = listTitle,
+                subtitle = subtitle,
+                coverImageUrl = images?.posters.firstTraktImageUrl(),
+                sortBy = sortBy,
+                sortHow = sortHow,
+            )
         }
-        val subtitle = (listOfNotNull(owner) + stats).joinToString(" • ").ifBlank { "Trakt public list" }
-        return TraktPublicListSearchResult(
-            traktListId = id,
-            title = listTitle,
-            subtitle = subtitle,
-            coverImageUrl = images?.posters.firstTraktImageUrl(),
-            sortBy = sortBy,
-            sortHow = sortHow,
-        )
     }
 
     private fun parseTraktListPath(input: String): String? {
@@ -292,11 +312,11 @@ object TraktPublicListSourceResolver {
             ?.trim()
             ?.toIntOrNull()
 
-    private fun errorMessageFor(code: Int, fallback: String): String {
-        return when (code) {
-            401, 403, 404 -> "Trakt list not found or not public"
-            429 -> "Trakt rate limit reached"
-            else -> "$fallback ($code)"
+    private fun errorMessageFor(code: Int, fallback: String): String = runBlocking {
+        when (code) {
+            401, 403, 404 -> getString(Res.string.collections_trakt_list_not_found_or_private)
+            429 -> getString(Res.string.collections_trakt_rate_limit_reached)
+            else -> getString(Res.string.collections_trakt_error_with_code, fallback, code)
         }
     }
 }

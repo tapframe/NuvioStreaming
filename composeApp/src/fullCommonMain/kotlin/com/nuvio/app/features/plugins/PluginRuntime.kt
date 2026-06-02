@@ -22,6 +22,10 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.generic_unknown
+import org.jetbrains.compose.resources.getString
 import kotlin.random.Random
 
 private const val PLUGIN_TIMEOUT_MS = 60_000L
@@ -438,7 +442,7 @@ internal object PluginRuntime {
                     ?.takeIf { it.isNotEmpty() }
 
                 PluginRuntimeResult(
-                    title = item.stringOrNull("title") ?: item.stringOrNull("name") ?: "Unknown",
+                    title = item.stringOrNull("title") ?: item.stringOrNull("name") ?: runBlocking { getString(Res.string.generic_unknown) },
                     name = item.stringOrNull("name"),
                     url = url,
                     quality = item.stringOrNull("quality"),

@@ -1162,7 +1162,11 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_genres),
                                 helper = stringResource(Res.string.collections_editor_tmdb_genres_helper),
                                 value = state.tmdbFilters.withGenres.orEmpty(),
-                                placeholder = if (state.tmdbMediaType == TmdbCollectionMediaType.MOVIE) "28,12" else "18,35",
+                                placeholder = if (state.tmdbMediaType == TmdbCollectionMediaType.MOVIE) {
+                                    stringResource(Res.string.collections_editor_tmdb_genres_movie_placeholder)
+                                } else {
+                                    stringResource(Res.string.collections_editor_tmdb_genres_series_placeholder)
+                                },
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(withGenres = value.ifBlank { null })
@@ -1173,7 +1177,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_date_from),
                                 helper = stringResource(Res.string.collections_editor_tmdb_date_helper),
                                 value = state.tmdbFilters.releaseDateGte.orEmpty(),
-                                placeholder = "2020-01-01",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_date_from_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(releaseDateGte = value.ifBlank { null })
@@ -1184,7 +1188,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_date_to),
                                 helper = stringResource(Res.string.collections_editor_tmdb_date_helper),
                                 value = state.tmdbFilters.releaseDateLte.orEmpty(),
-                                placeholder = "2024-12-31",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_date_to_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(releaseDateLte = value.ifBlank { null })
@@ -1195,7 +1199,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_rating_min),
                                 helper = stringResource(Res.string.collections_editor_tmdb_rating_helper),
                                 value = state.tmdbFilters.voteAverageGte?.toString().orEmpty(),
-                                placeholder = "7.0",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_rating_min_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(voteAverageGte = value.toDoubleOrNull())
@@ -1206,7 +1210,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_rating_max),
                                 helper = stringResource(Res.string.collections_editor_tmdb_rating_helper),
                                 value = state.tmdbFilters.voteAverageLte?.toString().orEmpty(),
-                                placeholder = "10",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_rating_max_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(voteAverageLte = value.toDoubleOrNull())
@@ -1217,7 +1221,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_votes_min),
                                 helper = stringResource(Res.string.collections_editor_tmdb_votes_helper),
                                 value = state.tmdbFilters.voteCountGte?.toString().orEmpty(),
-                                placeholder = "100",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_votes_min_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(voteCountGte = value.toIntOrNull())
@@ -1241,7 +1245,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_language),
                                 helper = stringResource(Res.string.collections_editor_tmdb_language_helper),
                                 value = state.tmdbFilters.withOriginalLanguage.orEmpty(),
-                                placeholder = "en, ko, ja, hi",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_language_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(withOriginalLanguage = value.ifBlank { null })
@@ -1265,7 +1269,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_country),
                                 helper = stringResource(Res.string.collections_editor_tmdb_country_helper),
                                 value = state.tmdbFilters.withOriginCountry.orEmpty(),
-                                placeholder = "US, KR, JP, IN",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_country_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(withOriginCountry = value.ifBlank { null })
@@ -1347,7 +1351,7 @@ private fun TmdbSourcePickerScreen(
                                 label = stringResource(Res.string.collections_editor_tmdb_year),
                                 helper = stringResource(Res.string.collections_editor_tmdb_year_helper),
                                 value = state.tmdbFilters.year?.toString().orEmpty(),
-                                placeholder = "2024",
+                                placeholder = stringResource(Res.string.collections_editor_tmdb_year_placeholder),
                                 onValueChange = { value ->
                                     CollectionEditorRepository.updateTmdbFilters {
                                         it.copy(year = value.toIntOrNull())
@@ -1383,9 +1387,9 @@ private fun TmdbSourcePickerScreen(
                                 chips = listOf(
                                     stringResource(Res.string.collections_editor_tmdb_country_us) to "US",
                                     stringResource(Res.string.collections_editor_tmdb_country_uk) to "GB",
-                                    "Canada" to "CA",
-                                    "Australia" to "AU",
-                                    "Germany" to "DE",
+                                    stringResource(Res.string.collections_editor_tmdb_country_ca) to "CA",
+                                    stringResource(Res.string.collections_editor_tmdb_country_au) to "AU",
+                                    stringResource(Res.string.collections_editor_tmdb_country_de) to "DE",
                                 ),
                                 onSelect = { value ->
                                     CollectionEditorRepository.updateTmdbFilters { it.copy(watchRegion = value) }
@@ -2352,7 +2356,7 @@ private fun traktSourceSubtitle(source: CollectionSource): String {
         media,
         traktSortLabel(source.sortBy),
         traktDirectionLabel(source.sortHow),
-        "ID ${source.traktListId ?: ""}".trim(),
+        stringResource(Res.string.collections_editor_trakt_list_id_format, source.traktListId ?: ""),
     ).joinToString(" • ")
 }
 

@@ -283,7 +283,7 @@ object TraktAuthRepository {
         refreshUserSettings()
         publish(
             isLoading = false,
-            statusMessage = "Connected to Trakt",
+            statusMessage = localizedString(Res.string.trakt_connected_status),
             errorMessage = null,
         )
     }
@@ -316,7 +316,7 @@ object TraktAuthRepository {
         persist()
         publish(
             isLoading = false,
-            statusMessage = "Disconnected from Trakt",
+            statusMessage = localizedString(Res.string.trakt_disconnected_status),
             errorMessage = null,
         )
     }

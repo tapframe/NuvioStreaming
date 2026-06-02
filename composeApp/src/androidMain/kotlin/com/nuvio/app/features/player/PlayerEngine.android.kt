@@ -3,6 +3,7 @@ package com.nuvio.app.features.player
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.text.SpannableString
 import android.net.Uri
 import android.util.Log
 import android.util.TypedValue
@@ -29,17 +30,23 @@ import org.jetbrains.compose.resources.getString
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.text.Cue
+import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.ForwardingRenderer
+import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MergingMediaSource
+import androidx.media3.exoplayer.text.TextOutput
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
@@ -105,9 +112,50 @@ actual fun PlatformPlayerSurface(
         sanitizedSourceResponseHeaders,
         useYoutubeChunkedPlayback,
     )
+    var subtitleDelayMs by remember(playerSourceKey) { mutableStateOf(0) }
+    var selectedExternalSubtitleMimeType by remember(playerSourceKey) { mutableStateOf<String?>(null) }
+    val latestSubtitleDelayMs = rememberUpdatedState(subtitleDelayMs)
+    val latestExternalSubtitleMimeType = rememberUpdatedState(selectedExternalSubtitleMimeType)
     var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
     var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
     val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
+
+    val extractorsFactory = remember {
+        DefaultExtractorsFactory()
+            .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
+            .setTsExtractorTimestampSearchBytes(1500 * TsExtractor.TS_PACKET_SIZE)
+    }
+    val dataSourceFactory = remember(
+        context,
+        sanitizedSourceHeaders,
+        sanitizedSourceResponseHeaders,
+        useYoutubeChunkedPlayback,
+    ) {
+        PlatformPlaybackDataSourceFactory.create(
+            context = context,
+            defaultRequestHeaders = sanitizedSourceHeaders,
+            defaultResponseHeaders = sanitizedSourceResponseHeaders,
+            useYoutubeChunkedPlayback = useYoutubeChunkedPlayback,
+        )
+    }
+
+    fun ExoPlayer.setPlaybackMediaItem(videoMediaItem: MediaItem, startPositionMs: Long? = null) {
+        if (!sourceAudioUrl.isNullOrBlank()) {
+            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
+            val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
+            val audioSource = mediaSourceFactory.createMediaSource(MediaItem.fromUri(sourceAudioUrl))
+            val mergedSource = MergingMediaSource(videoSource, audioSource)
+            if (startPositionMs != null) {
+                setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
+            } else {
+                setMediaSource(mergedSource)
+            }
+        } else if (startPositionMs != null) {
+            setMediaItem(videoMediaItem, startPositionMs.coerceAtLeast(0L))
+        } else {
+            setMediaItem(videoMediaItem)
+        }
+    }
 
     val exoPlayer = remember(
         sourceUrl,
@@ -117,7 +165,13 @@ actual fun PlatformPlayerSurface(
         useYoutubeChunkedPlayback,
         effectiveDecoderPriority,
     ) {
-        val renderersFactory = DefaultRenderersFactory(context)
+        val renderersFactory = SubtitleOffsetRenderersFactory(
+            context = context,
+            subtitleDelayUsProvider = { latestSubtitleDelayMs.value.toLong() * 1_000L },
+            shouldNormalizeCuePositionProvider = {
+                latestExternalSubtitleMimeType.value == MimeTypes.TEXT_VTT
+            },
+        )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
             .setMapDV7ToHevc(playerSettings.mapDV7ToHevc)
@@ -141,17 +195,6 @@ actual fun PlatformPlayerSurface(
                 5_000
             )
             .build()
-
-        val extractorsFactory = DefaultExtractorsFactory()
-            .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
-            .setTsExtractorTimestampSearchBytes(1500 * TsExtractor.TS_PACKET_SIZE)
-
-        val dataSourceFactory = PlatformPlaybackDataSourceFactory.create(
-            context = context,
-                defaultRequestHeaders = sanitizedSourceHeaders,
-                defaultResponseHeaders = sanitizedSourceResponseHeaders,
-                useYoutubeChunkedPlayback = useYoutubeChunkedPlayback,
-            )
 
         val player = if (useLibass) {
             ExoPlayer.Builder(context)
@@ -179,27 +222,30 @@ actual fun PlatformPlayerSurface(
         }
 
         player.apply {
-                if (!sourceAudioUrl.isNullOrBlank()) {
-                    val msf = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
-                    val videoSource = msf.createMediaSource(MediaItem.fromUri(sourceUrl))
-                    val audioSource = msf.createMediaSource(MediaItem.fromUri(sourceAudioUrl))
-                    setMediaSource(MergingMediaSource(videoSource, audioSource))
-                } else {
-                    setMediaItem(MediaItem.fromUri(sourceUrl))
-                }
-                fallbackStartPositionMs?.let { seekTo(it.coerceAtLeast(0L)) }
-                prepare()
-                this.playWhenReady = playWhenReady
-            }
+            setPlaybackMediaItem(
+                videoMediaItem = MediaItem.fromUri(sourceUrl),
+                startPositionMs = fallbackStartPositionMs,
+            )
+            prepare()
+            this.playWhenReady = playWhenReady
+        }
     }
 
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
+    val pendingAudioTrackSelection = remember { mutableListOf<TrackSelectionSnapshot>() }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
     var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
 
     fun syncPlayerViewKeepScreenOn() {
         playerViewRef?.keepScreenOn = exoPlayer.shouldKeepPlayerScreenOn()
+    }
+
+    fun preserveAudioSelectionForReload(reason: String) {
+        pendingAudioTrackSelection.clear()
+        val selection = exoPlayer.captureSelectedTrack(C.TRACK_TYPE_AUDIO) ?: return
+        pendingAudioTrackSelection.add(selection)
+        Log.d(TAG, "$reason: preserving audio track index=${selection.index} id=${selection.id}")
     }
 
     DisposableEffect(exoPlayer) {
@@ -258,6 +304,13 @@ actual fun PlatformPlayerSurface(
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
                 Log.d(TAG, "onTracksChanged: ${tracks.groups.size} groups total")
                 exoPlayer.logCurrentTracks("onTracksChanged")
+                pendingAudioTrackSelection.firstOrNull()?.let { selection ->
+                    if (tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO }) {
+                        pendingAudioTrackSelection.clear()
+                        val restored = exoPlayer.restoreTrackSelection(selection)
+                        Log.d(TAG, "onTracksChanged: restored pending audio selection=$restored")
+                    }
+                }
                 if (pendingSubtitleTrackIndex.isNotEmpty() && tracks.groups.isNotEmpty()) {
                     val idx = pendingSubtitleTrackIndex.removeAt(0)
                     Log.d(TAG, "onTracksChanged: applying pending subtitle selection index=$idx")
@@ -385,9 +438,11 @@ actual fun PlatformPlayerSurface(
                             Log.e(TAG, "setSubtitleUri: currentMediaItem is null, aborting")
                             return@launch
                         }
+                        preserveAudioSelectionForReload("setSubtitleUri")
                         val resolvedMime = withContext(Dispatchers.IO) {
                             resolveSubtitleMimeType(url)
                         }
+                        selectedExternalSubtitleMimeType = resolvedMime
                         Log.d(TAG, "setSubtitleUri: currentPosition=$currentPosition, wasPlaying=$wasPlaying")
                         val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(Uri.parse(url))
                             .setMimeType(resolvedMime)
@@ -409,7 +464,7 @@ actual fun PlatformPlayerSurface(
                             .setPreferredTextRoleFlags(C.ROLE_FLAG_SUBTITLE)
                             .build()
                         Log.d(TAG, "setSubtitleUri: track params set before prepare, textDisabled=${exoPlayer.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_TEXT)}")
-                        exoPlayer.setMediaItem(newMediaItem, currentPosition)
+                        exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
                         exoPlayer.prepare()
                         exoPlayer.playWhenReady = wasPlaying
                         Log.d(TAG, "setSubtitleUri: prepare() called, waiting for STATE_READY")
@@ -418,13 +473,16 @@ actual fun PlatformPlayerSurface(
 
                 override fun clearExternalSubtitle() {
                     Log.d(TAG, "clearExternalSubtitle called")
+                    subtitleSelectionJob?.cancel()
+                    selectedExternalSubtitleMimeType = null
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
                     val currentMediaItem = exoPlayer.currentMediaItem ?: return
+                    preserveAudioSelectionForReload("clearExternalSubtitle")
                     val newMediaItem = currentMediaItem.buildUpon()
                         .setSubtitleConfigurations(emptyList())
                         .build()
-                    exoPlayer.setMediaItem(newMediaItem, currentPosition)
+                    exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = wasPlaying
                     Log.d(TAG, "clearExternalSubtitle: done, position=$currentPosition")
@@ -432,15 +490,18 @@ actual fun PlatformPlayerSurface(
 
                 override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
                     Log.d(TAG, "clearExternalSubtitleAndSelect: trackIndex=$trackIndex")
+                    subtitleSelectionJob?.cancel()
+                    selectedExternalSubtitleMimeType = null
                     pendingSubtitleTrackIndex.clear()
                     pendingSubtitleTrackIndex.add(trackIndex)
                     val currentPosition = exoPlayer.currentPosition
                     val wasPlaying = exoPlayer.isPlaying
                     val currentMediaItem = exoPlayer.currentMediaItem ?: return
+                    preserveAudioSelectionForReload("clearExternalSubtitleAndSelect")
                     val newMediaItem = currentMediaItem.buildUpon()
                         .setSubtitleConfigurations(emptyList())
                         .build()
-                    exoPlayer.setMediaItem(newMediaItem, currentPosition)
+                    exoPlayer.setPlaybackMediaItem(newMediaItem, currentPosition)
                     exoPlayer.prepare()
                     exoPlayer.playWhenReady = wasPlaying
                     Log.d(TAG, "clearExternalSubtitleAndSelect: done, pending=$trackIndex position=$currentPosition")
@@ -449,6 +510,10 @@ actual fun PlatformPlayerSurface(
                 override fun applySubtitleStyle(style: SubtitleStyleState) {
                     currentSubtitleStyle = style
                     playerViewRef?.applySubtitleStyle(style)
+                }
+
+                override fun setSubtitleDelayMs(delayMs: Int) {
+                    subtitleDelayMs = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
                 }
             }
         )
@@ -518,6 +583,86 @@ private fun ExoPlayer.shouldKeepPlayerScreenOn(): Boolean =
     playerError == null &&
         playWhenReady &&
         playbackState in setOf(Player.STATE_BUFFERING, Player.STATE_READY)
+
+private data class TrackSelectionSnapshot(
+    val trackType: Int,
+    val index: Int,
+    val id: String?,
+    val language: String?,
+    val label: String?,
+    val sampleMimeType: String?,
+    val codecs: String?,
+    val channelCount: Int,
+    val roleFlags: Int,
+)
+
+private fun ExoPlayer.captureSelectedTrack(trackType: Int): TrackSelectionSnapshot? {
+    var idx = 0
+    for (group in currentTracks.groups) {
+        if (group.type != trackType) continue
+        if (group.isSelected) {
+            val format = group.mediaTrackGroup.getFormat(0)
+            return TrackSelectionSnapshot(
+                trackType = trackType,
+                index = idx,
+                id = format.id,
+                language = format.language,
+                label = format.label,
+                sampleMimeType = format.sampleMimeType,
+                codecs = format.codecs,
+                channelCount = format.channelCount,
+                roleFlags = format.roleFlags,
+            )
+        }
+        idx++
+    }
+    return null
+}
+
+private fun ExoPlayer.restoreTrackSelection(selection: TrackSelectionSnapshot): Boolean {
+    selection.id?.takeIf { it.isNotBlank() }?.let { id ->
+        val restored = selectTrackByPredicate(selection.trackType, "id=$id") { _, format ->
+            format.id == id
+        }
+        if (restored) {
+            return true
+        }
+    }
+
+    selection.label?.takeIf { it.isNotBlank() }?.let { label ->
+        val restored = selectTrackByPredicate(selection.trackType, "label=$label") { _, format ->
+            format.label.equals(label, ignoreCase = true) &&
+                (selection.language.isNullOrBlank() ||
+                    format.language.equals(selection.language, ignoreCase = true))
+        }
+        if (restored) {
+            return true
+        }
+    }
+
+    val technicalMatchIndexes = mutableListOf<Int>()
+    var idx = 0
+    for (group in currentTracks.groups) {
+        if (group.type != selection.trackType) continue
+        val format = group.mediaTrackGroup.getFormat(0)
+        if (
+            !selection.language.isNullOrBlank() &&
+            format.language.equals(selection.language, ignoreCase = true) &&
+            format.sampleMimeType == selection.sampleMimeType &&
+            format.codecs == selection.codecs &&
+            format.channelCount == selection.channelCount &&
+            format.roleFlags == selection.roleFlags
+        ) {
+            technicalMatchIndexes.add(idx)
+        }
+        idx++
+    }
+    if (technicalMatchIndexes.size == 1) {
+        return selectTrackByIndex(selection.trackType, technicalMatchIndexes.first())
+    }
+
+    return selectTrackByIndex(selection.trackType, selection.index)
+}
 
 private fun PlaybackException.isDecoderFailure(): Boolean =
     errorCode in setOf(
@@ -607,11 +752,11 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
         setStyle(
             CaptionStyleCompat(
                 style.textColor.toArgb(),
-                android.graphics.Color.TRANSPARENT,
+                style.backgroundColor.toArgb(),
                 android.graphics.Color.TRANSPARENT,
                 if (style.outlineEnabled) CaptionStyleCompat.EDGE_TYPE_OUTLINE else CaptionStyleCompat.EDGE_TYPE_NONE,
-                android.graphics.Color.BLACK,
-                Typeface.DEFAULT,
+                style.outlineColor.toArgb(),
+                if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT,
             )
         )
         setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, style.fontSizeSp.toFloat())
@@ -669,27 +814,39 @@ private fun ExoPlayer.extractSubtitleTracks(context: Context): List<SubtitleTrac
     return tracks
 }
 
-private fun ExoPlayer.selectTrackByIndex(trackType: Int, targetIndex: Int) {
+private fun ExoPlayer.selectTrackByIndex(trackType: Int, targetIndex: Int): Boolean {
+    return selectTrackByPredicate(trackType, "index=$targetIndex") { idx, _ ->
+        idx == targetIndex
+    }
+}
+
+private fun ExoPlayer.selectTrackByPredicate(
+    trackType: Int,
+    targetDescription: String,
+    predicate: (index: Int, format: Format) -> Boolean,
+): Boolean {
     val typeName = if (trackType == C.TRACK_TYPE_AUDIO) "AUDIO" else "TEXT"
-    Log.d(TAG, "selectTrackByIndex: type=$typeName targetIndex=$targetIndex")
+    Log.d(TAG, "selectTrack: type=$typeName target=$targetDescription")
     var idx = 0
     for (group in currentTracks.groups) {
         if (group.type != trackType) continue
-        if (idx == targetIndex) {
-            val format = group.mediaTrackGroup.getFormat(0)
-            Log.d(TAG, "selectTrackByIndex: found group at idx=$idx, format.id=${format.id}, lang=${format.language}, label=${format.label}")
-            trackSelectionParameters = trackSelectionParameters
-                .buildUpon()
-                .setOverrideForType(
-                    TrackSelectionOverride(group.mediaTrackGroup, listOf(0))
-                )
-                .build()
-            Log.d(TAG, "selectTrackByIndex: override applied")
-            return
+        val format = group.mediaTrackGroup.getFormat(0)
+        if (!predicate(idx, format)) {
+            idx++
+            continue
         }
-        idx++
+        Log.d(TAG, "selectTrack: found group at idx=$idx, format.id=${format.id}, lang=${format.language}, label=${format.label}")
+        trackSelectionParameters = trackSelectionParameters
+            .buildUpon()
+            .setOverrideForType(
+                TrackSelectionOverride(group.mediaTrackGroup, listOf(0))
+            )
+            .build()
+        Log.d(TAG, "selectTrack: override applied")
+        return true
     }
-    Log.w(TAG, "selectTrackByIndex: no group found for type=$typeName at index=$targetIndex (total groups scanned=$idx)")
+    Log.w(TAG, "selectTrack: no group found for type=$typeName target=$targetDescription (total groups scanned=$idx)")
+    return false
 }
 
 private fun ExoPlayer.logCurrentTracks(context: String) {
@@ -707,6 +864,114 @@ private fun ExoPlayer.logCurrentTracks(context: String) {
         Log.d(TAG, "  group type=$typeName id=${format.id} lang=${format.language} label=${format.label} selected=${group.isSelected} supported=${group.isSupported}")
     }
     Log.d(TAG, "--- end logCurrentTracks ---")
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+private class SubtitleOffsetRenderersFactory(
+    context: Context,
+    private val subtitleDelayUsProvider: () -> Long,
+    private val shouldNormalizeCuePositionProvider: () -> Boolean,
+) : DefaultRenderersFactory(context) {
+    override fun buildTextRenderers(
+        context: Context,
+        output: TextOutput,
+        outputLooper: android.os.Looper,
+        extensionRendererMode: Int,
+        out: ArrayList<Renderer>,
+    ) {
+        val normalizingOutput = CueNormalizingTextOutput(
+            delegate = output,
+            shouldNormalizeCuePositionProvider = shouldNormalizeCuePositionProvider,
+        )
+        val startIndex = out.size
+        super.buildTextRenderers(context, normalizingOutput, outputLooper, extensionRendererMode, out)
+        for (index in startIndex until out.size) {
+            out[index] = SubtitleOffsetRenderer(
+                baseRenderer = out[index],
+                subtitleDelayUsProvider = subtitleDelayUsProvider,
+            )
+        }
+    }
+}
+
+private class CueNormalizingTextOutput(
+    private val delegate: TextOutput,
+    private val shouldNormalizeCuePositionProvider: () -> Boolean,
+) : TextOutput {
+    override fun onCues(cueGroup: CueGroup) {
+        val processed = cueGroup.cues.map(::processCue)
+        delegate.onCues(CueGroup(processed, cueGroup.presentationTimeUs))
+    }
+
+    @Deprecated("Uses the deprecated Media3 callback for text outputs.")
+    override fun onCues(cues: List<Cue>) {
+        delegate.onCues(cues.map(::processCue))
+    }
+
+    private fun processCue(cue: Cue): Cue {
+        var processed = fixRtlCueText(cue)
+        if (shouldNormalizeCuePositionProvider()) {
+            processed = normalizeCuePosition(processed)
+        }
+        return processed
+    }
+
+    private fun normalizeCuePosition(cue: Cue): Cue {
+        if (cue.bitmap != null || cue.verticalType != Cue.TYPE_UNSET || cue.line == Cue.DIMEN_UNSET) {
+            return cue
+        }
+        return cue.buildUpon()
+            .setLine(Cue.DIMEN_UNSET, Cue.TYPE_UNSET)
+            .setLineAnchor(Cue.TYPE_UNSET)
+            .build()
+    }
+
+    private fun fixRtlCueText(cue: Cue): Cue {
+        val text = cue.text ?: return cue
+        if (!containsRtlChars(text)) return cue
+        val original = text.toString()
+        val fixed = original.split('\n').joinToString("\n") { line ->
+            moveLeadingRtlPunctuationToEnd(line)
+        }
+        if (fixed == original) return cue
+        return cue.buildUpon().setText(SpannableString(fixed)).build()
+    }
+
+    private fun moveLeadingRtlPunctuationToEnd(line: String): String {
+        if (line.isEmpty()) return line
+        var end = 0
+        while (end < line.length && line[end] in RTL_PUNCTUATION) end++
+        if (end == 0) return line
+        return line.substring(end) + line.substring(0, end)
+    }
+
+    private fun containsRtlChars(text: CharSequence): Boolean {
+        for (char in text) {
+            val directionality = Character.getDirectionality(char)
+            if (
+                directionality == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
+                directionality == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    companion object {
+        private val RTL_PUNCTUATION = setOf('.', ',', '?', '!', '-', ':', ';', '…', ')', '(')
+    }
+}
+
+@androidx.annotation.OptIn(UnstableApi::class)
+private class SubtitleOffsetRenderer(
+    baseRenderer: Renderer,
+    private val subtitleDelayUsProvider: () -> Long,
+) : ForwardingRenderer(baseRenderer) {
+    override fun render(positionUs: Long, elapsedRealtimeUs: Long) {
+        val adjustedPositionUs = (positionUs - subtitleDelayUsProvider()).coerceAtLeast(0L)
+        super.render(adjustedPositionUs, elapsedRealtimeUs)
+    }
 }
 
 private fun resolveSubtitleMimeType(url: String): String {

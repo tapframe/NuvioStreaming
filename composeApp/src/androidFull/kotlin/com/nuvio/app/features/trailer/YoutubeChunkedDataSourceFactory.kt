@@ -8,6 +8,10 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.TransferListener
+import kotlinx.coroutines.runBlocking
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.player_error_unable_to_play_stream
+import org.jetbrains.compose.resources.getString
 
 /**
  * A DataSource.Factory that wraps DefaultHttpDataSource and appends YouTube's
@@ -75,7 +79,9 @@ class YoutubeChunkedDataSourceFactory(
         }
 
         private fun openNextChunk(): Long {
-            val spec = originalDataSpec ?: throw IllegalStateException("No DataSpec")
+            val spec = originalDataSpec ?: throw IllegalStateException(
+                runBlocking { getString(Res.string.player_error_unable_to_play_stream) },
+            )
             val end = if (totalContentLength != C.LENGTH_UNSET.toLong()) {
                 minOf(currentChunkStart + chunkSize - 1, currentChunkStart + totalContentLength - 1)
             } else {

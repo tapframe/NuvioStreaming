@@ -265,6 +265,19 @@ class WatchProgressRulesTest {
         assertEquals("kitsu:244:2", item.videoId)
     }
 
+    @Test
+    fun `parseReleaseDateToEpochMs handles ISO and date-only formats`() {
+        val t1 = parseReleaseDateToEpochMs("2026-05-24T15:00:00Z")
+        assertEquals(1779634800000L, t1)
+
+        val t2 = parseReleaseDateToEpochMs("2026-05-24")
+        assertEquals(1779580800000L, t2) // 2026-05-24T00:00:00Z is 1779580800 seconds
+
+        assertNull(parseReleaseDateToEpochMs(null))
+        assertNull(parseReleaseDateToEpochMs("   "))
+        assertNull(parseReleaseDateToEpochMs("invalid-date"))
+    }
+
     private fun entry(
         videoId: String,
         parentMetaId: String = videoId.substringBefore(':'),

@@ -49,6 +49,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_cancel
+import nuvio.composeapp.generated.resources.action_close
+import nuvio.composeapp.generated.resources.submit_intro_button_submit
+import nuvio.composeapp.generated.resources.submit_intro_capture_button
+import nuvio.composeapp.generated.resources.submit_intro_end_time_label
+import nuvio.composeapp.generated.resources.submit_intro_segment_intro
+import nuvio.composeapp.generated.resources.submit_intro_segment_outro
+import nuvio.composeapp.generated.resources.submit_intro_segment_recap
+import nuvio.composeapp.generated.resources.submit_intro_segment_type_label
+import nuvio.composeapp.generated.resources.submit_intro_start_time_label
+import nuvio.composeapp.generated.resources.submit_intro_title
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.floor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,20 +104,24 @@ fun SubmitIntroDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Submit Timestamps",
+                        text = stringResource(Res.string.submit_intro_title),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(
+                            Icons.Rounded.Close,
+                            contentDescription = stringResource(Res.string.action_close),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
 
                 // Segment Type
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "SEGMENT TYPE",
+                        text = stringResource(Res.string.submit_intro_segment_type_label),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold,
@@ -114,21 +131,21 @@ fun SubmitIntroDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         SegmentTypeButton(
-                            label = "Intro",
+                            label = stringResource(Res.string.submit_intro_segment_intro),
                             icon = Icons.Rounded.PlayCircleOutline,
                             selected = segmentType == "intro",
                             onClick = { onSegmentTypeChange("intro") },
                             modifier = Modifier.weight(1f)
                         )
                         SegmentTypeButton(
-                            label = "Recap",
+                            label = stringResource(Res.string.submit_intro_segment_recap),
                             icon = Icons.Rounded.Replay,
                             selected = segmentType == "recap",
                             onClick = { onSegmentTypeChange("recap") },
                             modifier = Modifier.weight(1f)
                         )
                         SegmentTypeButton(
-                            label = "Outro",
+                            label = stringResource(Res.string.submit_intro_segment_outro),
                             icon = Icons.Rounded.StopCircle,
                             selected = segmentType == "outro",
                             onClick = { onSegmentTypeChange("outro") },
@@ -139,7 +156,7 @@ fun SubmitIntroDialog(
 
                 // Start Time
                 TimeInputRow(
-                    label = "START TIME (MM:SS)",
+                    label = stringResource(Res.string.submit_intro_start_time_label),
                     value = startTimeStr,
                     onValueChange = onStartTimeChange,
                     onCapture = { onStartTimeChange(formatSecondsToMMSS(currentTimeSec)) }
@@ -147,7 +164,7 @@ fun SubmitIntroDialog(
 
                 // End Time
                 TimeInputRow(
-                    label = "END TIME (MM:SS)",
+                    label = stringResource(Res.string.submit_intro_end_time_label),
                     value = endTimeStr,
                     onValueChange = onEndTimeChange,
                     onCapture = { onEndTimeChange(formatSecondsToMMSS(currentTimeSec)) }
@@ -170,7 +187,7 @@ fun SubmitIntroDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Cancel",
+                            text = stringResource(Res.string.action_cancel),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -217,7 +234,7 @@ fun SubmitIntroDialog(
                             ) {
                                 Icon(Icons.Rounded.Send, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
                                 Text(
-                                    text = "Submit",
+                                    text = stringResource(Res.string.submit_intro_button_submit),
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -328,7 +345,7 @@ private fun TimeInputRow(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Capture",
+                    text = stringResource(Res.string.submit_intro_capture_button),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold

@@ -32,27 +32,48 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.NuvioShelfSection
+import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
+import com.nuvio.app.core.ui.landscapePosterHeightForWidth
+import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.posterCardClickable
+import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
+import com.nuvio.app.features.watchprogress.computeAirDateBadgeText
 import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+
+private val ContinueWatchingStatusBadgeShape = RoundedCornerShape(4.dp)
+private val ContinueWatchingNewEpisodeBadgeColor = Color(0xFF1D4ED8)
+private val ContinueWatchingNewSeasonBadgeColor = Color(0xFFB45309)
+private const val ContinueWatchingLandscapeCardScale = 1.2f
+
+internal fun continueWatchingLandscapeCardWidth(basePosterWidthDp: Int): Dp =
+    (landscapePosterWidth(basePosterWidthDp).value * ContinueWatchingLandscapeCardScale).dp
+
+internal fun continueWatchingLandscapeCardHeight(basePosterWidthDp: Int): Dp =
+    landscapePosterHeightForWidth(continueWatchingLandscapeCardWidth(basePosterWidthDp))
 
 private fun continueWatchingProgressPercent(progressFraction: Float): Int =
     (progressFraction * 100f).roundToInt().coerceIn(1, 99)
@@ -60,12 +81,8 @@ private fun continueWatchingProgressPercent(progressFraction: Float): Int =
 @Composable
 private fun localizedContinueWatchingMetaLine(item: ContinueWatchingItem): String =
     when {
-        item.seasonNumber != null && item.episodeNumber != null && item.isNextUp ->
-            stringResource(Res.string.continue_watching_up_next_episode, item.seasonNumber, item.episodeNumber)
         item.seasonNumber != null && item.episodeNumber != null ->
             stringResource(Res.string.compose_player_episode_code_full, item.seasonNumber, item.episodeNumber)
-        item.isNextUp ->
-            stringResource(Res.string.continue_watching_up_next)
         item.isCloudLibraryItem() ->
             stringResource(Res.string.library_source_cloud)
         else ->
@@ -121,6 +138,42 @@ private fun ContinueWatchingItem.continueWatchingPosterArtworkUrl(
         background,
         nonEpisodeImageUrl,
         if (useEpisodeThumbnails) episodeThumbnail else null,
+        imageUrl,
+    )
+}
+
+private fun ContinueWatchingItem.continueWatchingCardArtworkUrl(
+    useEpisodeThumbnails: Boolean,
+    preferBackdropForNextUp: Boolean,
+): String? = when {
+    isNextUp && preferBackdropForNextUp -> firstNonBlank(
+        background,
+        poster,
+        episodeThumbnail,
+        imageUrl,
+    )
+    isNextUp && useEpisodeThumbnails -> firstNonBlank(
+        episodeThumbnail,
+        background,
+        poster,
+        imageUrl,
+    )
+    isNextUp -> firstNonBlank(
+        background,
+        poster,
+        episodeThumbnail,
+        imageUrl,
+    )
+    useEpisodeThumbnails -> firstNonBlank(
+        episodeThumbnail,
+        background,
+        poster,
+        imageUrl,
+    )
+    else -> firstNonBlank(
+        background,
+        poster,
+        episodeThumbnail,
         imageUrl,
     )
 }
@@ -204,6 +257,13 @@ private fun HomeContinueWatchingSectionContent(
             key = { item -> item.videoId },
         ) { item ->
             when (style) {
+                ContinueWatchingSectionStyle.Card -> ContinueWatchingCard(
+                    item = item,
+                    useEpisodeThumbnails = useEpisodeThumbnails,
+                    blurNextUp = blurNextUp,
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongPress?.let { { it(item) } },
+                )
                 ContinueWatchingSectionStyle.Wide -> ContinueWatchingWideCard(
                     item = item,
                     layout = layout,
@@ -248,11 +308,6 @@ fun ContinueWatchingStylePreview(
     modifier: Modifier = Modifier,
     isSelected: Boolean = false,
 ) {
-    val borderColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-    }
     val backgroundColor = if (isSelected) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
     } else {
@@ -263,15 +318,79 @@ fun ContinueWatchingStylePreview(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
-            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         when (style) {
+            ContinueWatchingSectionStyle.Card -> CardStylePreview()
             ContinueWatchingSectionStyle.Wide -> WideCardPreview()
             ContinueWatchingSectionStyle.Poster -> PosterCardPreview()
         }
+    }
+}
+
+@Composable
+private fun CardStylePreview() {
+    Box(
+        modifier = Modifier
+            .width(100.dp)
+            .height(56.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color.Transparent,
+                            0.60f to MaterialTheme.colorScheme.background.copy(alpha = 0.45f),
+                            1.0f to MaterialTheme.colorScheme.background.copy(alpha = 0.90f),
+                        ),
+                    ),
+                ),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(5.dp)
+                .width(26.dp)
+                .height(9.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.80f)),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(7.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(28.dp)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.55f)),
+            )
+            Box(
+                modifier = Modifier
+                    .width(58.dp)
+                    .height(7.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.75f)),
+            )
+        }
+        NuvioProgressBar(
+            progress = 0.55f,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 5.dp, vertical = 3.dp)
+                .fillMaxWidth(),
+            height = 3.dp,
+            trackColor = Color.Black.copy(alpha = 0.30f),
+        )
     }
 }
 
@@ -387,6 +506,278 @@ private fun PosterCardPreview() {
     }
 }
 
+private data class ContinueWatchingLandscapeCardMetrics(
+    val width: Dp,
+    val cornerRadius: Dp,
+    val contentPadding: Dp,
+    val textGap: Dp,
+    val badgeInset: Dp,
+    val badgeHorizontalPadding: Dp,
+    val badgeVerticalPadding: Dp,
+    val progressHorizontalPadding: Dp,
+    val progressBottomPadding: Dp,
+    val progressHeight: Dp,
+    val titleTextSize: TextUnit,
+    val metaTextSize: TextUnit,
+    val badgeTextSize: TextUnit,
+)
+
+private fun continueWatchingLandscapeCardMetrics(
+    basePosterWidthDp: Int,
+    cornerRadiusDp: Int,
+): ContinueWatchingLandscapeCardMetrics {
+    val width = continueWatchingLandscapeCardWidth(basePosterWidthDp)
+    return when {
+        basePosterWidthDp <= 108 -> ContinueWatchingLandscapeCardMetrics(
+            width = width,
+            cornerRadius = cornerRadiusDp.dp,
+            contentPadding = 8.dp,
+            textGap = 1.dp,
+            badgeInset = 6.dp,
+            badgeHorizontalPadding = 6.dp,
+            badgeVerticalPadding = 2.dp,
+            progressHorizontalPadding = 8.dp,
+            progressBottomPadding = 3.dp,
+            progressHeight = 3.dp,
+            titleTextSize = 12.sp,
+            metaTextSize = 9.sp,
+            badgeTextSize = 8.sp,
+        )
+        basePosterWidthDp <= 120 -> ContinueWatchingLandscapeCardMetrics(
+            width = width,
+            cornerRadius = cornerRadiusDp.dp,
+            contentPadding = 9.dp,
+            textGap = 1.dp,
+            badgeInset = 6.dp,
+            badgeHorizontalPadding = 7.dp,
+            badgeVerticalPadding = 3.dp,
+            progressHorizontalPadding = 8.dp,
+            progressBottomPadding = 3.dp,
+            progressHeight = 3.dp,
+            titleTextSize = 13.sp,
+            metaTextSize = 10.sp,
+            badgeTextSize = 9.sp,
+        )
+        else -> ContinueWatchingLandscapeCardMetrics(
+            width = width,
+            cornerRadius = cornerRadiusDp.dp,
+            contentPadding = 10.dp,
+            textGap = 2.dp,
+            badgeInset = 7.dp,
+            badgeHorizontalPadding = 7.dp,
+            badgeVerticalPadding = 3.dp,
+            progressHorizontalPadding = 9.dp,
+            progressBottomPadding = 4.dp,
+            progressHeight = 3.dp,
+            titleTextSize = 14.sp,
+            metaTextSize = 10.sp,
+            badgeTextSize = 10.sp,
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ContinueWatchingCard(
+    item: ContinueWatchingItem,
+    useEpisodeThumbnails: Boolean,
+    blurNextUp: Boolean,
+    onClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)?,
+) {
+    val posterCardStyle = rememberPosterCardStyleUiState()
+    val cardMetrics = remember(posterCardStyle.widthDp, posterCardStyle.cornerRadiusDp) {
+        continueWatchingLandscapeCardMetrics(
+            basePosterWidthDp = posterCardStyle.widthDp,
+            cornerRadiusDp = posterCardStyle.cornerRadiusDp,
+        )
+    }
+    val todayIsoDate = CurrentDateProvider.todayIsoDate()
+    val compactAirDateText = if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
+        computeAirDateBadgeText(item.released, todayIsoDate, compact = true)
+    } else {
+        null
+    }
+    val preferBackdropForNextUp = item.isNextUp && compactAirDateText != null && !item.isReleaseAlert
+    val imageUrl = item.continueWatchingCardArtworkUrl(
+        useEpisodeThumbnails = useEpisodeThumbnails,
+        preferBackdropForNextUp = preferBackdropForNextUp,
+    )
+    val shouldBlurArtwork = blurNextUp && useEpisodeThumbnails && item.isNextUp
+    val episodeCode = if (item.seasonNumber != null && item.episodeNumber != null) {
+        stringResource(Res.string.streams_episode_badge, item.seasonNumber, item.episodeNumber)
+    } else {
+        null
+    }
+    val episodeTitle = item.episodeTitle?.trim()?.takeIf { it.isNotBlank() } ?: compactAirDateText
+    val badgeText = continueWatchingCardBadgeText(item = item, compactAirDateText = compactAirDateText)
+    val backgroundColor = MaterialTheme.colorScheme.background
+    val badgeBackground = when {
+        item.isNewSeasonRelease -> ContinueWatchingNewSeasonBadgeColor
+        item.isReleaseAlert -> ContinueWatchingNewEpisodeBadgeColor
+        else -> backgroundColor.copy(alpha = 0.80f)
+    }
+
+    Box(
+        modifier = Modifier
+            .width(cardMetrics.width)
+            .aspectRatio(PosterLandscapeAspectRatio)
+            .clip(RoundedCornerShape(cardMetrics.cornerRadius))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
+    ) {
+        if (imageUrl != null) {
+            AsyncImage(
+                model = cloudLibraryDisplayArtworkUrl(imageUrl),
+                contentDescription = item.title,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (shouldBlurArtwork) Modifier.blur(18.dp) else Modifier)
+                    .drawWithContent {
+                        drawContent()
+
+                        val startY = size.height * 0.45f
+                        val gradient = Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                0.60f to backgroundColor.copy(alpha = 0.70f),
+                                1.0f to backgroundColor.copy(alpha = 0.95f),
+                            ),
+                            startY = startY,
+                            endY = size.height,
+                        )
+
+                        drawRect(
+                            brush = gradient,
+                            topLeft = Offset(-2f, startY),
+                            size = Size(size.width + 4f, (size.height - startY) + 4f),
+                        )
+                    },
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(cardMetrics.contentPadding),
+            verticalArrangement = Arrangement.spacedBy(cardMetrics.textGap),
+        ) {
+            if (episodeCode != null) {
+                Text(
+                    text = episodeCode,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = cardMetrics.metaTextSize,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontSize = cardMetrics.titleTextSize,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (episodeTitle != null) {
+                Text(
+                    text = episodeTitle,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = cardMetrics.metaTextSize,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(cardMetrics.badgeInset)
+                .clip(ContinueWatchingStatusBadgeShape)
+                .background(badgeBackground)
+                .padding(
+                    horizontal = cardMetrics.badgeHorizontalPadding,
+                    vertical = cardMetrics.badgeVerticalPadding,
+                ),
+        ) {
+            Text(
+                text = badgeText,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = cardMetrics.badgeTextSize,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+            )
+        }
+        if (item.progressFraction > 0f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(
+                        horizontal = cardMetrics.progressHorizontalPadding,
+                        vertical = cardMetrics.progressBottomPadding,
+                    )
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(999.dp))
+                    .height(cardMetrics.progressHeight)
+                    .background(Color.Black.copy(alpha = 0.30f)),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(item.progressFraction.coerceIn(0f, 1f))
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun continueWatchingCardBadgeText(
+    item: ContinueWatchingItem,
+    compactAirDateText: String?,
+): String {
+    if (item.progressFraction > 0f) {
+        if (item.durationMs <= 0L) {
+            return stringResource(
+                Res.string.home_continue_watching_watched,
+                "${continueWatchingProgressPercent(item.progressFraction)}%",
+            )
+        }
+        val effectivePositionMs = when {
+            item.resumePositionMs > 0L -> item.resumePositionMs
+            else -> (item.durationMs * item.progressFraction.coerceIn(0f, 1f)).toLong()
+        }
+        val remainingMinutes = ((item.durationMs - effectivePositionMs).coerceAtLeast(0L) / 60_000L)
+            .coerceAtLeast(1L)
+        val hours = remainingMinutes / 60L
+        val minutes = remainingMinutes % 60L
+        return if (hours > 0L) {
+            stringResource(Res.string.home_continue_watching_hours_minutes_left, hours, minutes)
+        } else {
+            stringResource(Res.string.home_continue_watching_minutes_left, remainingMinutes)
+        }
+    }
+
+    return when {
+        item.isReleaseAlert && item.isNewSeasonRelease -> stringResource(Res.string.cw_new_season)
+        item.isReleaseAlert -> stringResource(Res.string.cw_new_episode)
+        compactAirDateText != null -> compactAirDateText
+        else -> stringResource(Res.string.home_continue_watching_up_next)
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContinueWatchingWideCard(
@@ -430,6 +821,7 @@ private fun ContinueWatchingWideCard(
                 .padding(layout.wideContentPadding),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
+            val isCompact = layout.wideCardWidth < 350.dp
             val wideMetaLine = localizedContinueWatchingMetaLine(item)
             val episodeTitle = item.episodeTitle?.trim()?.takeIf { it.isNotBlank() }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -450,7 +842,18 @@ private fun ContinueWatchingWideCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (item.progressFraction <= 0f && item.seasonNumber != null && item.episodeNumber != null) {
-                        UpNextBadge(compact = false, textSize = layout.wideBadgeTextSize)
+                        val todayIsoDate = CurrentDateProvider.todayIsoDate()
+                        val badgeText = when {
+                            item.isReleaseAlert -> {
+                                if (item.isNewSeasonRelease) stringResource(Res.string.cw_new_season)
+                                else stringResource(Res.string.cw_new_episode)
+                            }
+                            else -> {
+                                computeAirDateBadgeText(item.released, todayIsoDate, compact = isCompact)
+                                    ?: stringResource(Res.string.home_continue_watching_up_next)
+                            }
+                        }
+                        UpNextBadge(text = badgeText, compact = isCompact, textSize = layout.wideBadgeTextSize)
                     }
                 }
                 Text(
@@ -522,11 +925,6 @@ private fun ContinueWatchingPosterCard(
                 .height(layout.posterCardHeight)
                 .clip(RoundedCornerShape(layout.cardRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(
-                    width = 1.5.dp,
-                    color = Color.White.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(layout.cardRadius),
-                )
                 .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
         ) {
             val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
@@ -550,7 +948,18 @@ private fun ContinueWatchingPosterCard(
                         .align(Alignment.TopEnd)
                         .padding(8.dp),
                 ) {
-                    UpNextBadge(compact = true, textSize = layout.posterBadgeTextSize)
+                    val todayIsoDate = CurrentDateProvider.todayIsoDate()
+                    val badgeText = when {
+                        item.isReleaseAlert -> {
+                            if (item.isNewSeasonRelease) stringResource(Res.string.cw_new_season)
+                            else stringResource(Res.string.cw_new_episode)
+                        }
+                        else -> {
+                            computeAirDateBadgeText(item.released, todayIsoDate, compact = true)
+                                ?: stringResource(Res.string.home_continue_watching_up_next)
+                        }
+                    }
+                    UpNextBadge(text = badgeText, compact = true, textSize = layout.posterBadgeTextSize)
                 }
             }
             if (item.progressFraction > 0f) {
@@ -644,6 +1053,7 @@ private fun ArtworkPanel(
 
 @Composable
 private fun UpNextBadge(
+    text: String,
     compact: Boolean,
     textSize: androidx.compose.ui.unit.TextUnit,
 ) {
@@ -660,7 +1070,7 @@ private fun UpNextBadge(
             ),
     ) {
         Text(
-            text = stringResource(Res.string.home_continue_watching_up_next),
+            text = text,
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = textSize,
                 fontWeight = FontWeight.Bold,

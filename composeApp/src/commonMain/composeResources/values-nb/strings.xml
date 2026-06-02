@@ -1352,4 +1352,20 @@
     <string name="unit_bytes_kb">KB</string>
     <string name="unit_bytes_mb">MB</string>
     <string name="unit_bytes_gb">GB</string>
+    <string name="cw_new_episode">Ny episode</string>
+    <string name="cw_new_season">Ny sesong</string>
+    <string name="cw_airs_date">Sendes %1$s</string>
+    <string name="cw_airs_today">Sendes i dag</string>
+    <string name="cw_airs_tomorrow">Sendes i morgen</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Sendes om %d dag</item>
+        <item quantity="other">Sendes om %d dager</item>
+    </plurals>
+    <string name="cw_airs_date_short">%1$s</string>
+    <string name="cw_airs_today_short">I dag</string>
+    <string name="cw_airs_tomorrow_short">I morgen</string>
+    <plurals name="cw_airs_in_days_short">
+        <item quantity="one">Om %d dag</item>
+        <item quantity="other">Om %d dager</item>
+    </plurals>
 </resources>

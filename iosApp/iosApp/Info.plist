@@ -31,5 +31,7 @@
 	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 </dict>
 </plist>

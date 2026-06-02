@@ -143,4 +143,38 @@ class WatchingPoliciesTest {
         assertEquals(2, latestCompleted.seasonNumber)
         assertEquals(3, latestCompleted.episodeNumber)
     }
+
+    @Test
+    fun `isoCalendarDateOrNull parses various date formats`() {
+        assertEquals("2026-05-23", isoCalendarDateOrNull("2026-05-23T12:00:00Z"))
+        assertEquals("2026-05-23", isoCalendarDateOrNull(" 2026-05-23 "))
+        assertEquals(null, isoCalendarDateOrNull("2026-5-23"))
+        assertEquals(null, isoCalendarDateOrNull("2026-5-9"))
+        assertEquals(null, isoCalendarDateOrNull("2026-05"))
+        assertEquals(null, isoCalendarDateOrNull("invalid"))
+        assertEquals(null, isoCalendarDateOrNull(null))
+    }
+
+    @Test
+    fun `daysUntilExplicitRelease calculates correct offset`() {
+        assertEquals(0, daysUntilExplicitRelease("2026-05-23", "2026-05-23"))
+        assertEquals(1, daysUntilExplicitRelease("2026-05-23", "2026-05-24"))
+        assertEquals(7, daysUntilExplicitRelease("2026-05-23", "2026-05-30"))
+        assertEquals(-3, daysUntilExplicitRelease("2026-05-23", "2026-05-20"))
+        assertEquals(null, daysUntilExplicitRelease("invalid", "2026-05-23"))
+        assertEquals(null, daysUntilExplicitRelease("2026-05-23", null))
+    }
+
+    @Test
+    fun `isoEpochDay handles leap years and standard calculations`() {
+        // Epoch reference (1970-01-01 is epoch day 0)
+        assertEquals(0L, isoEpochDay("1970-01-01"))
+        assertEquals(20596L, isoEpochDay("2026-05-23"))
+        // Leap year: 2024-02-29
+        assertEquals(19782L, isoEpochDay("2024-02-29"))
+        assertEquals(19783L, isoEpochDay("2024-03-01"))
+        // Non-leap year: 2023-02-28
+        assertEquals(19416L, isoEpochDay("2023-02-28"))
+        assertEquals(19417L, isoEpochDay("2023-03-01"))
+    }
 }

@@ -113,10 +113,22 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func setSubtitleUrl(url: String) { playerVC?.addSubtitleUrl(url) }
     func clearExternalSubtitle() { playerVC?.removeExternalSubtitles() }
     func clearExternalSubtitleAndSelect(trackId: Int32) { playerVC?.removeExternalSubtitlesAndSelect(Int(trackId)) }
-    func applySubtitleStyle(textColor: String, outlineSize: Float, fontSize: Float, subPos: Int32) {
+    func setSubtitleDelayMs(delayMs: Int32) { playerVC?.setSubtitleDelayMs(Int(delayMs)) }
+    func applySubtitleStyle(
+        textColor: String,
+        backgroundColor: String,
+        outlineColor: String,
+        outlineSize: Float,
+        bold: Bool,
+        fontSize: Float,
+        subPos: Int32
+    ) {
         playerVC?.applySubtitleStyle(
             textColor: textColor,
+            backgroundColor: backgroundColor,
+            outlineColor: outlineColor,
             outlineSize: outlineSize,
+            bold: bold,
             fontSize: fontSize,
             subPos: Int(subPos)
         )
@@ -575,12 +587,29 @@ final class MPVPlayerViewController: UIViewController {
         }
     }
 
-    func applySubtitleStyle(textColor: String, outlineSize: Float, fontSize: Float, subPos: Int) {
+    func setSubtitleDelayMs(_ delayMs: Int) {
+        guard mpv != nil else { return }
+        var delaySeconds = Double(max(-60_000, min(60_000, delayMs))) / 1000.0
+        checkError(mpv_set_property(mpv, "sub-delay", MPV_FORMAT_DOUBLE, &delaySeconds))
+    }
+
+    func applySubtitleStyle(
+        textColor: String,
+        backgroundColor: String,
+        outlineColor: String,
+        outlineSize: Float,
+        bold: Bool,
+        fontSize: Float,
+        subPos: Int
+    ) {
         guard mpv != nil else { return }
 
         checkError(mpv_set_property_string(mpv, "sub-ass-override", "force"))
         checkError(mpv_set_property_string(mpv, "sub-color", textColor))
-        checkError(mpv_set_property_string(mpv, "sub-outline-color", "#000000"))
+        checkError(mpv_set_property_string(mpv, "sub-back-color", backgroundColor))
+        checkError(mpv_set_property_string(mpv, "sub-outline-color", outlineColor))
+        checkError(mpv_set_property_string(mpv, "sub-border-style", backgroundColor.hasPrefix("#00") ? "outline-and-shadow" : "opaque-box"))
+        setStringProperty("sub-bold", bold ? "yes" : "no")
 
         var outline = Double(outlineSize)
         checkError(mpv_set_property(mpv, "sub-outline-size", MPV_FORMAT_DOUBLE, &outline))

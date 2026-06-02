@@ -184,11 +184,17 @@ object DebridSettingsRepository {
     fun setStreamPreferences(value: DebridStreamPreferences) {
         ensureLoaded()
         val normalized = value.normalized()
-        if (streamPreferences == normalized) return
+        val nextSortMode = legacyModeForSortCriteria(normalized.sortCriteria)
+        val sortModeChanged = streamSortMode != nextSortMode
+        if (streamPreferences == normalized && !sortModeChanged) return
         streamPreferences = normalized
         streamMaxResults = normalized.maxResults
+        streamSortMode = nextSortMode
         publish()
         DebridSettingsStorage.saveStreamMaxResults(streamMaxResults)
+        if (sortModeChanged) {
+            DebridSettingsStorage.saveStreamSortMode(nextSortMode.name)
+        }
         saveStreamPreferences()
     }
 
@@ -307,7 +313,8 @@ object DebridSettingsRepository {
             DebridSettingsStorage.loadStreamCodecFilter(),
             DebridStreamCodecFilter.ANY,
         )
-        streamPreferences = parseStreamPreferences(DebridSettingsStorage.loadStreamPreferences())
+        val parsedStreamPreferences = parseStreamPreferences(DebridSettingsStorage.loadStreamPreferences())
+        streamPreferences = parsedStreamPreferences
             ?: legacyStreamPreferences(
                 maxResults = streamMaxResults,
                 sortMode = streamSortMode,
@@ -316,12 +323,21 @@ object DebridSettingsRepository {
                 hdrFilter = streamHdrFilter,
                 codecFilter = streamCodecFilter,
             )
+        if (parsedStreamPreferences != null) {
+            val normalizedSortMode = legacyModeForSortCriteria(streamPreferences.sortCriteria)
+            if (streamSortMode != normalizedSortMode) {
+                streamSortMode = normalizedSortMode
+                DebridSettingsStorage.saveStreamSortMode(normalizedSortMode.name)
+            }
+        }
         streamNameTemplate = normalizeStreamTemplate(
-            DebridSettingsStorage.loadStreamNameTemplate().orEmpty(),
+            DebridSettingsStorage.loadStreamNameTemplate()
+                ?: DebridStreamFormatterDefaults.NAME_TEMPLATE,
             DebridTemplateKind.NAME,
         )
         streamDescriptionTemplate = normalizeStreamTemplate(
-            DebridSettingsStorage.loadStreamDescriptionTemplate().orEmpty(),
+            DebridSettingsStorage.loadStreamDescriptionTemplate()
+                ?: DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE,
             DebridTemplateKind.DESCRIPTION,
         )
         publish()
@@ -410,7 +426,7 @@ internal fun DebridStreamPreferences.normalized(): DebridStreamPreferences =
         excludedLanguages = excludedLanguages,
         requiredReleaseGroups = requiredReleaseGroups.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
         excludedReleaseGroups = excludedReleaseGroups.map { it.trim() }.filter { it.isNotBlank() }.distinct(),
-        sortCriteria = sortCriteria.ifEmpty { DebridStreamSortCriterion.defaultOrder },
+        sortCriteria = sortCriteria,
     )
 
 private fun legacyStreamPreferences(
@@ -486,7 +502,7 @@ private fun resolutionsForMinimumQuality(quality: DebridStreamMinimumQuality): L
 
 private fun sortCriteriaForLegacyMode(mode: DebridStreamSortMode): List<DebridStreamSortCriterion> =
     when (mode) {
-        DebridStreamSortMode.DEFAULT -> DebridStreamSortCriterion.defaultOrder
+        DebridStreamSortMode.DEFAULT -> DebridStreamSortCriterion.originalOrder
         DebridStreamSortMode.QUALITY_DESC -> listOf(
             DebridStreamSortCriterion(DebridStreamSortKey.RESOLUTION, DebridStreamSortDirection.DESC),
             DebridStreamSortCriterion(DebridStreamSortKey.QUALITY, DebridStreamSortDirection.DESC),
@@ -495,6 +511,20 @@ private fun sortCriteriaForLegacyMode(mode: DebridStreamSortMode): List<DebridSt
         DebridStreamSortMode.SIZE_DESC -> listOf(DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.DESC))
         DebridStreamSortMode.SIZE_ASC -> listOf(DebridStreamSortCriterion(DebridStreamSortKey.SIZE, DebridStreamSortDirection.ASC))
     }
+
+private fun legacyModeForSortCriteria(criteria: List<DebridStreamSortCriterion>): DebridStreamSortMode {
+    val normalized = criteria.map { it.key to it.direction }
+    val bestQuality = DebridStreamSortCriterion.defaultOrder.map { it.key to it.direction }
+    fun legacySignature(mode: DebridStreamSortMode) = sortCriteriaForLegacyMode(mode).map { it.key to it.direction }
+    return when {
+        normalized.isEmpty() -> DebridStreamSortMode.DEFAULT
+        normalized == bestQuality -> DebridStreamSortMode.QUALITY_DESC
+        normalized == legacySignature(DebridStreamSortMode.QUALITY_DESC) -> DebridStreamSortMode.QUALITY_DESC
+        normalized == legacySignature(DebridStreamSortMode.SIZE_DESC) -> DebridStreamSortMode.SIZE_DESC
+        normalized == legacySignature(DebridStreamSortMode.SIZE_ASC) -> DebridStreamSortMode.SIZE_ASC
+        else -> DebridStreamSortMode.DEFAULT
+    }
+}
 
 private val dolbyVisionTags = listOf(
     DebridStreamVisualTag.DV,

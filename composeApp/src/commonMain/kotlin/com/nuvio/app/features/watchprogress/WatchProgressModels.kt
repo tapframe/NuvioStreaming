@@ -15,6 +15,7 @@ internal const val WatchProgressSourceTraktShowProgress = "trakt_show_progress"
 
 @Serializable
 enum class ContinueWatchingSectionStyle {
+    Card,
     Wide,
     Poster,
 }
@@ -173,11 +174,13 @@ data class ContinueWatchingItem(
     val resumeProgressFraction: Float? = null,
     val durationMs: Long,
     val progressFraction: Float,
+    val isReleaseAlert: Boolean = false,
+    val isNewSeasonRelease: Boolean = false,
 )
 
 data class ContinueWatchingPreferencesUiState(
     val isVisible: Boolean = true,
-    val style: ContinueWatchingSectionStyle = ContinueWatchingSectionStyle.Wide,
+    val style: ContinueWatchingSectionStyle = ContinueWatchingSectionStyle.Card,
     val upNextFromFurthestEpisode: Boolean = true,
     val useEpisodeThumbnails: Boolean = true,
     val showUnairedNextUp: Boolean = true,
@@ -233,6 +236,8 @@ internal fun WatchProgressEntry.toContinueWatchingItem(): ContinueWatchingItem {
         resumeProgressFraction = explicitResumeProgressFraction,
         durationMs = normalizedEntry.durationMs,
         progressFraction = normalizedEntry.progressFraction,
+        isReleaseAlert = false,
+        isNewSeasonRelease = false,
     )
 }
 
@@ -249,6 +254,12 @@ private fun WatchProgressEntry.cloudLibraryPosterFallbackUrl(): String? {
 internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
     nextEpisode: MetaVideo,
 ): ContinueWatchingItem {
+    val alertState = calculateReleaseAlertState(
+        seedLastUpdatedEpochMs = lastUpdatedEpochMs,
+        seedSeasonNumber = seasonNumber,
+        nextSeasonNumber = nextEpisode.season,
+        releasedIso = nextEpisode.released,
+    )
     return ContinueWatchingItem(
         parentMetaId = parentMetaId,
         parentMetaType = parentMetaType,
@@ -281,6 +292,8 @@ internal fun WatchProgressEntry.toUpNextContinueWatchingItem(
         resumeProgressFraction = null,
         durationMs = 0L,
         progressFraction = 0f,
+        isReleaseAlert = alertState.isReleaseAlert,
+        isNewSeasonRelease = alertState.isNewSeasonRelease,
     )
 }
 
