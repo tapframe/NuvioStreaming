@@ -1,10 +1,15 @@
 package com.nuvio.app.features.streams
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.settings_stream_badge_error_invalid_json_format
+import nuvio.composeapp.generated.resources.settings_stream_badge_error_no_filters
+import org.jetbrains.compose.resources.getString
 
 const val STREAM_BADGE_IMPORT_LIMIT = 3
 
@@ -136,9 +141,17 @@ internal object StreamBadgeRulesParser {
         val decoded = try {
             json.decodeFromString<StreamBadgePayload>(payload)
         } catch (error: SerializationException) {
-            throw IllegalArgumentException("Invalid badge JSON: ${error.message.orEmpty()}")
+            throw IllegalArgumentException(
+                runBlocking {
+                    getString(Res.string.settings_stream_badge_error_invalid_json_format, error.message.orEmpty())
+                },
+            )
         } catch (error: IllegalArgumentException) {
-            throw IllegalArgumentException("Invalid badge JSON: ${error.message.orEmpty()}")
+            throw IllegalArgumentException(
+                runBlocking {
+                    getString(Res.string.settings_stream_badge_error_invalid_json_format, error.message.orEmpty())
+                },
+            )
         }
 
         val filters = decoded.filters.mapNotNull { filter ->
@@ -163,7 +176,9 @@ internal object StreamBadgeRulesParser {
         }
 
         if (filters.isEmpty()) {
-            throw IllegalArgumentException("Badge import did not contain any usable filters.")
+            throw IllegalArgumentException(
+                runBlocking { getString(Res.string.settings_stream_badge_error_no_filters) },
+            )
         }
 
         val groups = decoded.groups.map { group ->

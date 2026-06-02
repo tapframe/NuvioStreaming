@@ -1,5 +1,9 @@
 package com.nuvio.app.features.player
 
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.streams_loading_subtitles
+import org.jetbrains.compose.resources.getString
+
 /**
  * Orchestrates the full external player launch flow:
  * fetches subtitles if forwarding is enabled, then returns an enriched request
@@ -15,7 +19,7 @@ suspend fun prepareExternalPlayerLaunch(
     onOverlayMessage: (String?) -> Unit,
 ): ExternalPlayerPlaybackRequest {
     if (forwardSubtitles && !preferredLanguage.equals(SubtitleLanguageOption.NONE, ignoreCase = true)) {
-        onOverlayMessage("Loading subtitles from addons...")
+        onOverlayMessage(getString(Res.string.streams_loading_subtitles))
 
         val subtitles = SubtitleForwarder.fetchForExternalPlayer(
             type = type,

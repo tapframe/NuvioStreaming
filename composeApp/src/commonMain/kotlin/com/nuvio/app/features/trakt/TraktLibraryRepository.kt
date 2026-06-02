@@ -501,7 +501,7 @@ object TraktLibraryRepository {
                 val traktId = list.ids?.trakt
                 val listIdPath = traktId?.toString() ?: list.ids?.slug ?: return@mapNotNull null
                 val fallbackTitle = traktId?.let { getString(Res.string.trakt_list_fallback_title, it) }
-                    ?: "List $listIdPath"
+                    ?: getString(Res.string.trakt_list_path_fallback_title_format, listIdPath)
                 TraktListTab(
                     key = "$PERSONAL_LIST_PREFIX$listIdPath",
                     title = list.name?.ifBlank { null } ?: fallbackTitle,
@@ -615,10 +615,12 @@ object TraktLibraryRepository {
             followRedirects = true,
         )
         if (response.status !in 200..299) {
-            throw IllegalStateException(errorMessageForStatus(response.status, "Trakt request failed"))
+            throw IllegalStateException(
+                errorMessageForStatus(response.status, getString(Res.string.trakt_library_error_request_failed)),
+            )
         }
         if (response.body.isBlank()) {
-            throw IllegalStateException("Empty response body")
+            throw IllegalStateException(getString(Res.string.trakt_library_error_empty_response))
         }
         return response
     }
@@ -639,7 +641,9 @@ object TraktLibraryRepository {
             followRedirects = true,
         )
         if (response.status !in 200..299) {
-            throw IllegalStateException(errorMessageForStatus(response.status, "Trakt request failed"))
+            throw IllegalStateException(
+                errorMessageForStatus(response.status, getString(Res.string.trakt_library_error_request_failed)),
+            )
         }
         return response
     }
@@ -664,7 +668,9 @@ object TraktLibraryRepository {
             headers = headers,
         )
         if (!isSuccessfulAddResponse(response.body)) {
-            throw IllegalStateException(errorMessageForStatus(response.status, "Failed to add to Trakt watchlist"))
+            throw IllegalStateException(
+                errorMessageForStatus(response.status, getString(Res.string.trakt_library_error_add_to_watchlist_failed)),
+            )
         }
     }
 
@@ -685,7 +691,9 @@ object TraktLibraryRepository {
             headers = headers,
         )
         if (!isSuccessfulAddResponse(response.body)) {
-            throw IllegalStateException(errorMessageForStatus(response.status, "Failed to add to Trakt list"))
+            throw IllegalStateException(
+                errorMessageForStatus(response.status, getString(Res.string.trakt_library_error_add_to_list_failed)),
+            )
         }
     }
 
@@ -702,7 +710,7 @@ object TraktLibraryRepository {
         val type = normalizeType(item.type)
         val ids = resolveIds(item)
         if (!ids.hasAnyId()) {
-            throw IllegalStateException("Missing compatible Trakt IDs")
+            throw IllegalStateException(getString(Res.string.trakt_library_error_missing_compatible_ids))
         }
 
         val request = if (type == "movie") {
@@ -822,13 +830,13 @@ object TraktLibraryRepository {
         return addCount > 0 || existingCount > 0
     }
 
-    private fun errorMessageForStatus(status: Int, defaultMessage: String): String =
+    private suspend fun errorMessageForStatus(status: Int, defaultMessage: String): String =
         when (status) {
-            401, 403 -> "Trakt authorization expired"
-            404 -> "Trakt list not found"
-            420 -> "Trakt list limit reached"
-            429 -> "Trakt rate limit reached"
-            else -> "$defaultMessage ($status)"
+            401, 403 -> getString(Res.string.trakt_library_error_auth_expired)
+            404 -> getString(Res.string.trakt_library_error_list_not_found)
+            420 -> getString(Res.string.trakt_library_error_list_limit_reached)
+            429 -> getString(Res.string.trakt_public_list_rate_limit_reached)
+            else -> getString(Res.string.trakt_library_error_status_format, defaultMessage, status)
         }
 
     private fun normalizeType(type: String): String {

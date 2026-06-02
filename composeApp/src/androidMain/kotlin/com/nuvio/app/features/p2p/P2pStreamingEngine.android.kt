@@ -13,8 +13,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.p2p_error_add_torrent_failed
+import nuvio.composeapp.generated.resources.p2p_error_engine_not_initialized
+import nuvio.composeapp.generated.resources.p2p_error_torrserver_binary_missing
+import nuvio.composeapp.generated.resources.p2p_error_torrserver_process_died_format
+import nuvio.composeapp.generated.resources.p2p_error_torrserver_start_timeout_format
+import nuvio.composeapp.generated.resources.p2p_error_unknown_torrent
 import okhttp3.MediaType.Companion.toMediaType
+import org.jetbrains.compose.resources.getString
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -59,7 +68,7 @@ actual object P2pStreamingEngine {
             Log.d(TAG, "Starting stream: $magnetLink")
 
             val hash = api.addTorrent(magnetLink)
-                ?: throw P2pStreamingException("Failed to add torrent")
+                ?: throw P2pStreamingException(getString(Res.string.p2p_error_add_torrent_failed))
             if (!attachTorrentIfCurrent(generation, hash)) {
                 api.dropTorrent(hash)
                 throw CancellationException("P2P stream start was cancelled")
@@ -93,7 +102,9 @@ actual object P2pStreamingEngine {
             throw e
         } catch (e: Exception) {
             if (isCurrentGeneration(generation)) {
-                _state.value = P2pStreamingState.Error(e.message ?: "Unknown torrent error")
+                _state.value = P2pStreamingState.Error(
+                    e.message ?: getString(Res.string.p2p_error_unknown_torrent),
+                )
             }
             throw e
         }
@@ -275,7 +286,9 @@ actual object P2pStreamingEngine {
     }
 
     private fun requireContext(): Context =
-        appContext ?: throw P2pStreamingException("P2P streaming engine is not initialized")
+        appContext ?: throw P2pStreamingException(
+            runBlocking { getString(Res.string.p2p_error_engine_not_initialized) },
+        )
 
     private val DEFAULT_TRACKERS = listOf(
         "udp://tracker.opentrackr.org:1337/announce",
@@ -310,7 +323,8 @@ actual object P2pStreamingEngine {
             val ctx = requireContext()
             val binaryFile = File(ctx.applicationInfo.nativeLibraryDir, "libtorrserver.so")
             if (!binaryFile.exists()) {
-                throw P2pStreamingException("TorrServer binary not found at ${binaryFile.absolutePath}")
+                Log.e(TAG, "TorrServer binary not found at ${binaryFile.absolutePath}")
+                throw P2pStreamingException(getString(Res.string.p2p_error_torrserver_binary_missing))
             }
 
             if (!binaryFile.canExecute()) {
@@ -353,13 +367,17 @@ actual object P2pStreamingEngine {
                 if (!isProcessAlive(process)) {
                     val exitCode = process?.exitValue() ?: -1
                     process = null
-                    throw P2pStreamingException("TorrServer process died on startup (exit code $exitCode)")
+                    throw P2pStreamingException(
+                        getString(Res.string.p2p_error_torrserver_process_died_format, exitCode),
+                    )
                 }
                 delay(HEALTH_CHECK_INTERVAL_MS)
             }
 
             stop()
-            throw P2pStreamingException("TorrServer failed to start within ${STARTUP_TIMEOUT_MS / 1000}s")
+            throw P2pStreamingException(
+                getString(Res.string.p2p_error_torrserver_start_timeout_format, (STARTUP_TIMEOUT_MS / 1000).toInt()),
+            )
         }
 
         fun isRunning(): Boolean {
@@ -415,7 +433,9 @@ actual object P2pStreamingEngine {
         }
 
         private fun requireContext(): Context =
-            context ?: throw P2pStreamingException("P2P streaming engine is not initialized")
+            context ?: throw P2pStreamingException(
+                runBlocking { getString(Res.string.p2p_error_engine_not_initialized) },
+            )
 
         companion object {
             const val PORT = 8091

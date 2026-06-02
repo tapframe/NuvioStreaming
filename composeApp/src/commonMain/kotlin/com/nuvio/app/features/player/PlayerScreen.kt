@@ -1875,13 +1875,18 @@ fun PlayerScreen(
                         subtitleAutoSyncState = subtitleAutoSyncState.copy(
                             cues = cues,
                             isLoading = false,
-                            errorMessage = if (cues.isEmpty()) "No subtitle lines found" else null,
+                            errorMessage = if (cues.isEmpty()) {
+                                getString(Res.string.compose_player_no_subtitle_lines_found)
+                            } else {
+                                null
+                            },
                         )
                     },
                     onFailure = { error ->
                         subtitleAutoSyncState = subtitleAutoSyncState.copy(
                             isLoading = false,
-                            errorMessage = error.message ?: "Unable to load subtitle lines",
+                            errorMessage = error.message
+                                ?: getString(Res.string.compose_player_unable_to_load_subtitle_lines),
                         )
                     },
                 )

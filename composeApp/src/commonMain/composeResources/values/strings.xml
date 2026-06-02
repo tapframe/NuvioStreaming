@@ -1836,4 +1836,33 @@
     <string name="player_torrent_starting_engine">Starting P2P engine…</string>
     <string name="player_error_failed_start_torrent">Failed to start torrent: %1$s</string>
     <string name="player_error_torrent">Torrent error: %1$s</string>
+    <!-- Pass 5 — Stream badge import errors -->
+    <string name="settings_stream_badge_error_enter_url">Enter a badge JSON URL.</string>
+    <string name="settings_stream_badge_error_scheme">Badge URL must start with http:// or https://.</string>
+    <string name="settings_stream_badge_error_import_limit_format">You can import up to %1$d badge URLs.</string>
+    <string name="settings_stream_badge_error_import_failed">Badge import failed.</string>
+    <string name="settings_stream_badge_error_invalid_json_format">Invalid badge JSON: %1$s</string>
+    <string name="settings_stream_badge_error_no_filters">Badge import did not contain any usable filters.</string>
+    <!-- Pass 5 — Subtitle lines errors (player) -->
+    <string name="compose_player_no_subtitle_lines_found">No subtitle lines found</string>
+    <string name="compose_player_unable_to_load_subtitle_lines">Unable to load subtitle lines</string>
+    <!-- Pass 5 — Trakt library errors -->
+    <string name="trakt_library_error_auth_expired">Trakt authorization expired</string>
+    <string name="trakt_library_error_list_not_found">Trakt list not found</string>
+    <string name="trakt_library_error_list_limit_reached">Trakt list limit reached</string>
+    <string name="trakt_library_error_status_format">%1$s (%2$d)</string>
+    <string name="trakt_library_error_empty_response">Empty response body</string>
+    <string name="trakt_library_error_missing_compatible_ids">Missing compatible Trakt IDs</string>
+    <string name="trakt_library_error_add_to_watchlist_failed">Failed to add to Trakt watchlist</string>
+    <string name="trakt_library_error_add_to_list_failed">Failed to add to Trakt list</string>
+    <string name="trakt_library_error_request_failed">Trakt request failed</string>
+    <string name="trakt_list_path_fallback_title_format">List %1$s</string>
+    <!-- Pass 5 — P2P engine errors -->
+    <string name="p2p_error_add_torrent_failed">Failed to add torrent</string>
+    <string name="p2p_error_unknown_torrent">Unknown torrent error</string>
+    <string name="p2p_error_engine_not_initialized">P2P streaming engine is not initialized</string>
+    <string name="p2p_error_torrserver_binary_missing">TorrServer binary not found</string>
+    <string name="p2p_error_torrserver_process_died_format">TorrServer process died on startup (exit code %1$d)</string>
+    <string name="p2p_error_torrserver_start_timeout_format">TorrServer failed to start within %1$ds</string>
+    <string name="p2p_error_not_available_platform">P2P streaming is not available on this platform</string>
 </resources>
