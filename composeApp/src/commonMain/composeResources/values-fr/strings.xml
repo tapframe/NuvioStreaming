@@ -277,7 +277,7 @@
     <string name="collections_editor_tmdb_subtitle_network">Chaîne</string>
     <string name="collections_editor_tmdb_subtitle_person">Personne</string>
     <string name="collections_editor_tmdb_subtitle_director">Réalisateur</string>
-    <string name="collections_editor_tmdb_subtitle_discover">TMDB Discover</string>
+    <string name="collections_editor_tmdb_subtitle_discover">Découverte TMDB</string>
     <string name="collections_empty_subtitle">Crées-en une pour organiser tes catalogues.</string>
     <string name="collections_empty_title">Aucune collection</string>
     <string name="collections_folder_count">%1$d dossier(s)</string>
@@ -1107,7 +1107,7 @@
     <string name="network_back_online">De nouveau en ligne</string>
     <string name="network_cannot_reach_servers">Impossible d’atteindre les serveurs</string>
     <string name="network_error_empty_response_body">Corps de réponse vide</string>
-    <string name="network_error_request_failed_http">La requête a échoué avec HTTP %1$d</string>
+    <string name="network_error_request_failed_http">Échec de la requête (HTTP %1$d)</string>
     <string name="network_no_internet_connection">Pas de connexion Internet</string>
     <string name="person_age">(âge %1$d)</string>
     <string name="person_born">Né(e) le %1$s%2$s</string>
@@ -1368,8 +1368,8 @@
     <string name="downloads_enqueue_started">Téléchargement démarré</string>
     <string name="downloads_enqueue_unsupported_format">Format de stream non pris en charge pour les téléchargements</string>
     <string name="downloads_error_empty_body">Corps de réponse vide</string>
-    <string name="downloads_error_finalize_failed">Impossible de finaliser le fichier téléchargé</string>
-    <string name="downloads_error_http_failed">La requête a échoué avec HTTP %1$d</string>
+    <string name="downloads_error_finalize_failed">Impossible de finaliser le fichier de téléchargement</string>
+    <string name="downloads_error_http_failed">Échec de la requête (HTTP %1$d)</string>
     <string name="downloads_error_not_initialized">Le système de téléchargement n’est pas initialisé</string>
     <string name="downloads_error_open_partial_failed">Impossible d’ouvrir le fichier de téléchargement partiel</string>
     <string name="downloads_error_partial_not_open">Le fichier de téléchargement partiel n’est pas ouvert</string>
@@ -1586,10 +1586,10 @@
     <string name="settings_playback_ios_target_transfer_dialog">Transfert cible</string>
     <!-- Collection editor -->
     <string name="collections_editor_resolved_trakt_list">Liste Trakt résolue</string>
-    <string name="collections_editor_tmdb_discover">TMDB Discover</string>
+    <string name="collections_editor_tmdb_discover">Découverte TMDB</string>
     <string name="collections_editor_watch_region_placeholder">US, KR, JP, IN</string>
     <!-- Collection editor error messages -->
-    <string name="collections_editor_trakt_input_required">Saisis un nom de liste Trakt, une URL ou un ID</string>
+    <string name="collections_editor_trakt_input_required">Saisis un nom, une URL ou un ID de liste Trakt</string>
     <string name="collections_editor_tmdb_invalid_id_error">Saisis un ID ou une URL TMDB valide.</string>
     <string name="collections_editor_tmdb_load_error">Impossible de charger la source TMDB</string>
     <string name="collections_editor_trakt_id_url_required">Saisis un ID ou une URL de liste Trakt</string>
@@ -1633,7 +1633,7 @@
     <string name="collections_tmdb_api_key_required">Ajoute une clé API TMDB dans les paramètres pour utiliser les sources TMDB.</string>
     <string name="collections_tmdb_collection_not_found">Collection TMDB introuvable</string>
     <string name="collections_tmdb_company_not_found">Société TMDB introuvable</string>
-    <string name="collections_tmdb_discover_no_data">Découverte TMDB n’a retourné aucune donnée</string>
+    <string name="collections_tmdb_discover_no_data">La découverte TMDB n’a retourné aucune donnée</string>
     <string name="collections_tmdb_list_not_found">Liste TMDB introuvable</string>
     <string name="collections_tmdb_missing_collection_id">ID de collection TMDB manquant</string>
     <string name="collections_tmdb_missing_list_id">ID de liste TMDB manquant</string>
@@ -1775,7 +1775,7 @@
     <string name="compose_settings_root_streams_description">Affichage des résultats de streams et règles d’URL des badges.</string>
     <string name="home_continue_watching_hours_minutes_left">Encore %1$d h %2$d min</string>
     <string name="home_continue_watching_minutes_left">Encore %1$d min</string>
-    <string name="p2p_consent_body">Ce stream utilise la technologie peer-to-peer (P2P). En activant le P2P, tu reconnais et acceptes que :\n\n• Ton adresse IP sera visible des autres pairs du réseau\n• Tu es seul responsable du contenu auquel tu accèdes\n• Tu confirmes avoir le droit légal de diffuser ce contenu dans ta juridiction\n• Nuvio n’héberge, ne distribue ni ne contrôle aucun contenu P2P\n• Nuvio décline toute responsabilité quant aux conséquences légales de l’utilisation du streaming P2P\n\nTu utilises cette fonctionnalité entièrement à tes propres risques. Le P2P peut être désactivé à tout moment dans les paramètres.</string>
+    <string name="p2p_consent_body">Ce stream utilise la technologie peer-to-peer (P2P). En activant le P2P, tu reconnais et acceptes que :\n\n• Ton adresse IP sera visible par les autres pairs du réseau\n• Tu es seul responsable du contenu auquel tu accèdes\n• Tu confirmes avoir le droit légal de diffuser ce contenu dans ta juridiction\n• Nuvio n’héberge, ne distribue ni ne contrôle aucun contenu P2P\n• Nuvio décline toute responsabilité quant aux conséquences légales découlant de ton utilisation du streaming P2P\n\nTu utilises cette fonctionnalité entièrement à tes propres risques. Le P2P peut être désactivé à tout moment dans les paramètres.</string>
     <string name="p2p_consent_cancel">Annuler</string>
     <string name="p2p_consent_enable">Activer le P2P</string>
     <string name="p2p_consent_title">Streaming P2P</string>
@@ -1783,9 +1783,9 @@
     <string name="player_error_torrent">Erreur torrent : %1$s</string>
     <string name="player_torrent_buffered_status">%1$s buffered · %2$s · %3$s</string>
     <string name="player_torrent_connecting_peers">Connexion aux pairs…</string>
-    <string name="player_torrent_peer_info">%1$d sources · %2$d pairs</string>
+    <string name="player_torrent_peer_info">%1$d seeds · %2$d pairs</string>
     <string name="player_torrent_starting_engine">Démarrage du moteur P2P…</string>
-    <string name="player_torrent_stats">%1$d pairs · %2$d sources · %3$d %%</string>
+    <string name="player_torrent_stats">%1$d pairs · %2$d seeds · %3$d %%</string>
     <string name="player_torrent_status">%1$s · %2$s</string>
     <string name="settings_continue_watching_style_card">Carte</string>
     <string name="settings_continue_watching_style_card_description">Carte paysage style TV</string>
@@ -1793,19 +1793,19 @@
     <string name="settings_fusion_badge_group_title">Groupe %1$d</string>
     <string name="settings_fusion_badge_other_group_title">Autres badges Fusion</string>
     <string name="settings_fusion_badge_preview_action">Aperçu</string>
-    <string name="settings_fusion_badge_preview_count">%1$d badges style Fusion depuis cette URL</string>
-    <string name="settings_fusion_badge_preview_empty">Aucune image de badge style Fusion dans cette URL.</string>
+    <string name="settings_fusion_badge_preview_count">%1$d badges au style Fusion provenant de cette URL</string>
+    <string name="settings_fusion_badge_preview_empty">Aucune image de badge au style Fusion dans cette URL.</string>
     <string name="settings_fusion_badge_preview_title">Aperçu du badge Fusion</string>
     <string name="settings_fusion_badge_url_active">Actif</string>
     <string name="settings_fusion_badge_url_inactive">Inactif</string>
     <string name="settings_fusion_badge_url_label">URL JSON du badge Fusion</string>
-    <string name="settings_fusion_badge_url_status_summary">%1$s, %2$d badges activés, %3$d groupes</string>
+    <string name="settings_fusion_badge_url_status_summary">%1$s · %2$d badges activés · %3$d groupes</string>
     <string name="settings_fusion_badge_urls_imported">%1$d/%2$d URL Fusion importées</string>
     <string name="settings_fusion_badges_empty">Aucune URL de badge Fusion importée.</string>
     <string name="settings_fusion_badges_summary">%1$d/%2$d URL, %3$d badges Fusion actifs</string>
-    <string name="settings_p2p_hide_stats_subtitle">Masque le buffer, les sources, les pairs et la vitesse de téléchargement pendant le chargement et la lecture</string>
+    <string name="settings_p2p_hide_stats_subtitle">Masque le buffer, les seeds, les pairs et la vitesse de téléchargement pendant le chargement et la lecture</string>
     <string name="settings_p2p_hide_stats_title">Masquer les stats du torrent</string>
-    <string name="settings_p2p_subtitle">Autoriser les streams peer-to-peer (torrent)</string>
+    <string name="settings_p2p_subtitle">Autorise les streams peer-to-peer (torrent)</string>
     <string name="settings_p2p_title">Streaming P2P</string>
     <string name="settings_playback_addon_subtitle_startup_all">Tous les sous-titres</string>
     <string name="settings_playback_addon_subtitle_startup_all_description">Récupère et affiche tous les sous-titres d’addon pour la vidéo.</string>
@@ -1832,10 +1832,10 @@
     <string name="settings_playback_subtitle_size">Taille des sous-titres</string>
     <string name="settings_playback_subtitle_text_color">Couleur du texte</string>
     <string name="settings_playback_subtitle_use_forced">Utiliser les sous-titres forcés</string>
-    <string name="settings_playback_subtitle_use_forced_description">Préfère les sous-titres forcés correspondant à tes paramètres de langue de sous-titres.</string>
+    <string name="settings_playback_subtitle_use_forced_description">Préfère les sous-titres forcés correspondant à tes préférences de langue de sous-titres.</string>
     <string name="settings_playback_subtitle_vertical_offset">Décalage vertical</string>
-    <string name="settings_stream_badge_urls_description">Importe jusqu’à %1$d URL JSON de badges de stream style Fusion. Chaque URL peut être mise à jour ou supprimée séparément.</string>
-    <string name="settings_stream_badge_urls_search_description">Gère les URL JSON de badges de stream style Fusion importées.</string>
+    <string name="settings_stream_badge_urls_description">Importe jusqu’à %1$d URL JSON de badges de stream au style Fusion. Chaque URL peut être mise à jour ou supprimée séparément.</string>
+    <string name="settings_stream_badge_urls_search_description">Gère les URL JSON importées de badges de stream au style Fusion.</string>
     <string name="settings_stream_badge_urls_title">URL des badges Fusion</string>
     <string name="settings_stream_badges_section">Style Fusion</string>
     <string name="settings_stream_size_badges_description">Affiche les badges de taille de fichier dans les résultats de streams et les panneaux de sources du lecteur.</string>
