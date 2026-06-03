@@ -63,7 +63,9 @@ internal object PlayerPlaybackNetworking {
         val mergedHeaders = DEFAULT_STREAM_HEADERS + defaultHeaders
         return OkHttpDataSource.Factory(playbackHttpClient).apply {
             setDefaultRequestProperties(mergedHeaders)
-            setUserAgent(DEFAULT_USER_AGENT)
+            if (defaultHeaders.none { it.key.equals("User-Agent", ignoreCase = true) }) {
+                setUserAgent(DEFAULT_USER_AGENT)
+            }
         }
     }
 
