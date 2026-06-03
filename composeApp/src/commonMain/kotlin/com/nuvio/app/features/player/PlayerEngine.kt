@@ -18,6 +18,7 @@ interface PlayerEngineController {
         fraction = 1f,
         isMuted = false,
     )
+    fun setMuted(muted: Boolean) {}
     fun getAudioTracks(): List<AudioTrack>
     fun getSubtitleTracks(): List<SubtitleTrack>
     fun selectAudioTrack(index: Int)

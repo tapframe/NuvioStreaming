@@ -710,6 +710,8 @@
     <string name="settings_meta_comments_description">Reviews from Trakt</string>
     <string name="settings_meta_details">Details</string>
     <string name="settings_meta_details_description">Runtime, status, release, language, and related info.</string>
+    <string name="settings_meta_hero_trailer_playback">Hero Trailer Playback</string>
+    <string name="settings_meta_hero_trailer_playback_description">Play trailer previews in the metadata hero when a trailer is available.</string>
     <string name="settings_meta_episode_cards">Episode Cards</string>
     <string name="settings_meta_episode_cards_description">Choose how episodes are rendered on the metadata screen.</string>
     <string name="settings_meta_episode_style_horizontal">Horizontal</string>

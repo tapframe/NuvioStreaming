@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
@@ -979,14 +980,27 @@ private fun ImdbEpisodeRatingBadge(
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(Res.drawable.rating_imdb),
-            contentDescription = stringResource(Res.string.source_imdb),
-            modifier = Modifier
-                .width(logoWidth)
-                .height(logoHeight),
-            contentScale = ContentScale.Fit,
-        )
+        if (AppFeaturePolicy.imdbRatingLogoEnabled) {
+            Image(
+                painter = painterResource(Res.drawable.rating_imdb),
+                contentDescription = stringResource(Res.string.source_imdb),
+                modifier = Modifier
+                    .width(logoWidth)
+                    .height(logoHeight),
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            Text(
+                text = stringResource(Res.string.source_imdb),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = textSize,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.sp,
+                ),
+                color = Color.White.copy(alpha = 0.78f),
+                maxLines = 1,
+            )
+        }
         Text(
             text = rating,
             style = MaterialTheme.typography.labelSmall.copy(

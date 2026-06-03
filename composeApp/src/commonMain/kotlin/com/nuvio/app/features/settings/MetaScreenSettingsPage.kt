@@ -47,6 +47,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.features.details.MetaEpisodeCardStyle
 import com.nuvio.app.features.details.MetaScreenSectionItem
@@ -70,6 +72,8 @@ import nuvio.composeapp.generated.resources.settings_meta_comments
 import nuvio.composeapp.generated.resources.settings_meta_comments_description
 import nuvio.composeapp.generated.resources.settings_meta_details
 import nuvio.composeapp.generated.resources.settings_meta_details_description
+import nuvio.composeapp.generated.resources.settings_meta_hero_trailer_playback
+import nuvio.composeapp.generated.resources.settings_meta_hero_trailer_playback_description
 import nuvio.composeapp.generated.resources.settings_meta_episode_cards
 import nuvio.composeapp.generated.resources.settings_meta_episode_cards_description
 import nuvio.composeapp.generated.resources.settings_meta_episode_style_horizontal
@@ -105,6 +109,8 @@ internal fun LazyListScope.metaScreenSettingsContent(
     isTablet: Boolean,
     uiState: MetaScreenSettingsUiState,
 ) {
+    val showHeroTrailerPlaybackSetting = AppFeaturePolicy.heroTrailerPlaybackSupported &&
+        AppFeaturePolicy.trailerPlaybackMode == TrailerPlaybackMode.IN_APP
     item {
         SettingsSection(
             title = stringResource(Res.string.settings_meta_section_appearance),
@@ -118,6 +124,16 @@ internal fun LazyListScope.metaScreenSettingsContent(
                     isTablet = isTablet,
                     onCheckedChange = { MetaScreenSettingsRepository.setCinematicBackground(it) },
                 )
+                if (showHeroTrailerPlaybackSetting) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_meta_hero_trailer_playback),
+                        description = stringResource(Res.string.settings_meta_hero_trailer_playback_description),
+                        checked = uiState.heroTrailerPlayback,
+                        isTablet = isTablet,
+                        onCheckedChange = { MetaScreenSettingsRepository.setHeroTrailerPlayback(it) },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_meta_tab_layout),

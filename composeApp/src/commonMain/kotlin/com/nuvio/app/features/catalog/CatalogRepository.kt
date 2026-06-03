@@ -25,6 +25,7 @@ object CatalogRepository {
 
     private var activeJob: Job? = null
     private var activeRequest: CatalogRequest? = null
+    private val scrollPositions = linkedMapOf<CatalogRequest, CatalogScrollPosition>()
 
     fun load(
         manifestUrl: String,
@@ -34,7 +35,7 @@ object CatalogRepository {
         supportsPagination: Boolean = false,
         force: Boolean = false,
     ) {
-        val request = CatalogRequest(
+        val request = catalogRequest(
             manifestUrl = manifestUrl,
             type = type,
             catalogId = catalogId,
@@ -62,7 +63,34 @@ object CatalogRepository {
     fun clear() {
         activeJob?.cancel()
         activeRequest = null
+        scrollPositions.clear()
         _uiState.value = CatalogUiState()
+    }
+
+    fun scrollPosition(
+        manifestUrl: String,
+        type: String,
+        catalogId: String,
+        genre: String? = null,
+        supportsPagination: Boolean = false,
+    ): CatalogScrollPosition =
+        scrollPositions[catalogRequest(manifestUrl, type, catalogId, genre, supportsPagination)]
+            ?: CatalogScrollPosition()
+
+    fun saveScrollPosition(
+        manifestUrl: String,
+        type: String,
+        catalogId: String,
+        genre: String? = null,
+        supportsPagination: Boolean = false,
+        firstVisibleItemIndex: Int,
+        firstVisibleItemScrollOffset: Int,
+    ) {
+        val request = catalogRequest(manifestUrl, type, catalogId, genre, supportsPagination)
+        scrollPositions[request] = CatalogScrollPosition(
+            firstVisibleItemIndex = firstVisibleItemIndex,
+            firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
+        )
     }
 
     private fun fetchInternalLibrary(request: CatalogRequest) {
@@ -127,7 +155,7 @@ object CatalogRepository {
                     catalogId = request.catalogId,
                     genre = request.genre,
                     skip = requestedSkip.takeIf { it > 0 },
-                ).withUnreleasedFilter()
+                ).withUnreleasedFilter(request.hideUnreleasedContent)
             }.fold(
                 onSuccess = { page ->
                     if (activeRequest != request) return@fold
@@ -159,10 +187,26 @@ object CatalogRepository {
             )
         }
     }
+
+    private fun catalogRequest(
+        manifestUrl: String,
+        type: String,
+        catalogId: String,
+        genre: String? = null,
+        supportsPagination: Boolean = false,
+    ): CatalogRequest =
+        CatalogRequest(
+            manifestUrl = manifestUrl,
+            type = type,
+            catalogId = catalogId,
+            genre = genre,
+            supportsPagination = supportsPagination,
+            hideUnreleasedContent = HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent,
+        )
 }
 
-private fun CatalogPage.withUnreleasedFilter(): CatalogPage {
-    if (!HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent) return this
+private fun CatalogPage.withUnreleasedFilter(hideUnreleasedContent: Boolean): CatalogPage {
+    if (!hideUnreleasedContent) return this
     val filteredItems = items.filterReleasedItems(CurrentDateProvider.todayIsoDate())
     return if (filteredItems.size == items.size) this else copy(items = filteredItems)
 }
@@ -173,4 +217,5 @@ private data class CatalogRequest(
     val catalogId: String,
     val genre: String?,
     val supportsPagination: Boolean,
+    val hideUnreleasedContent: Boolean,
 )

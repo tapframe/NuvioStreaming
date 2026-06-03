@@ -27,6 +27,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,6 +68,7 @@ import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.TraktListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.features.details.components.DetailActionButtons
+import com.nuvio.app.features.details.components.DetailSecondaryAction
 import com.nuvio.app.features.details.components.CommentDetailSheet
 import com.nuvio.app.features.details.components.DetailAdditionalInfoSection
 import com.nuvio.app.features.details.components.DetailCastSection
@@ -302,6 +308,7 @@ fun MetaDetailsScreen(
 
             displayedMeta != null -> {
                 val meta = displayedMeta
+                val metaPreview = remember(meta) { meta.toMetaPreview() }
                 val todayIsoDate = CurrentDateProvider.todayIsoDate()
                 val isSaved = remember(
                     libraryUiState.items,
@@ -311,6 +318,12 @@ fun MetaDetailsScreen(
                     meta.type,
                 ) {
                     LibraryRepository.isSaved(meta.id, meta.type)
+                }
+                val isWatched = remember(watchedUiState.watchedKeys, metaPreview) {
+                    WatchingState.isPosterWatched(
+                        watchedKeys = watchedUiState.watchedKeys,
+                        item = metaPreview,
+                    )
                 }
                 val openLibraryListPicker = remember(meta) {
                     {
@@ -339,6 +352,14 @@ fun MetaDetailsScreen(
                 val toggleSaved = remember(meta) {
                     {
                         LibraryRepository.toggleSaved(meta.toLibraryItem(savedAtEpochMs = 0L))
+                    }
+                }
+                val toggleWatched = remember(metaPreview) {
+                    {
+                        detailsScope.launch {
+                            WatchingActions.togglePosterWatched(metaPreview)
+                        }
+                        Unit
                     }
                 }
                 val progressByVideoId = remember(watchProgressUiState.entries) {
@@ -451,11 +472,42 @@ fun MetaDetailsScreen(
                 var trailerLoading by remember(meta.id) { mutableStateOf(false) }
                 var trailerErrorMessage by remember(meta.id) { mutableStateOf<String?>(null) }
                 var trailerRequestToken by remember(meta.id) { mutableIntStateOf(0) }
+                var isLeavingDetails by remember(meta.id) { mutableStateOf(false) }
+                val heroTrailerCandidate = remember(meta.trailers) {
+                    selectHeroTrailer(meta.trailers)
+                }
+                val heroTrailerPlaybackEnabled = AppFeaturePolicy.heroTrailerPlaybackSupported &&
+                    inAppTrailerPlaybackEnabled &&
+                    metaScreenSettingsUiState.heroTrailerPlayback
+                var heroTrailerPlaybackSource by remember(meta.id, heroTrailerCandidate?.id) { mutableStateOf<TrailerPlaybackSource?>(null) }
+                var heroTrailerReady by remember(meta.id, heroTrailerCandidate?.id) { mutableStateOf(false) }
+                var heroTrailerFinished by remember(meta.id, heroTrailerCandidate?.id) { mutableStateOf(false) }
+                val heroTrailerMuted by HeroTrailerAudioState.muted.collectAsStateWithLifecycle()
+                LaunchedEffect(heroTrailerPlaybackEnabled, heroTrailerCandidate?.id, heroTrailerCandidate?.key) {
+                    heroTrailerPlaybackSource = null
+                    heroTrailerReady = false
+                    heroTrailerFinished = false
+                    if (!heroTrailerPlaybackEnabled || heroTrailerCandidate == null) {
+                        return@LaunchedEffect
+                    }
+                    val resolvedSource = runCatching {
+                        TrailerPlaybackResolver.resolveFromYouTubeUrl(heroTrailerCandidate.youtubePlaybackUrl())
+                    }.getOrNull()
+                    if (resolvedSource == null) {
+                        heroTrailerFinished = true
+                    } else {
+                        heroTrailerPlaybackSource = resolvedSource
+                    }
+                }
+                val onBackFromDetails: () -> Unit = {
+                    isLeavingDetails = true
+                    heroTrailerReady = false
+                    heroTrailerFinished = true
+                    onBack()
+                }
                 val resolveTrailer: (MetaTrailer) -> Unit = remember(meta.id, inAppTrailerPlaybackEnabled, uriHandler) {
                     { trailer ->
-                        val youtubeUrl = trailer.key.takeIf {
-                            it.startsWith("http://") || it.startsWith("https://")
-                        } ?: "https://www.youtube.com/watch?v=${trailer.key}"
+                        val youtubeUrl = trailer.youtubePlaybackUrl()
                         if (!inAppTrailerPlaybackEnabled) {
                             runCatching { uriHandler.openUri(youtubeUrl) }
                         } else {
@@ -651,6 +703,15 @@ fun MetaDetailsScreen(
                 var heroHeightPx by remember(meta.id) { mutableIntStateOf(0) }
                 val thresholdPx = (heroHeightPx - safeAreaTopPx).coerceAtLeast(0f)
                 val headerTarget = if (heroHeightPx > 0 && scrollState.value > thresholdPx) 1f else 0f
+                val heroTrailerSourceUrl = heroTrailerPlaybackSource
+                    ?.videoUrl
+                    ?.takeIf { it.isNotBlank() && heroTrailerPlaybackEnabled && !heroTrailerFinished && !isLeavingDetails }
+                val heroTrailerSourceAudioUrl = heroTrailerPlaybackSource
+                    ?.audioUrl
+                    ?.takeIf { heroTrailerSourceUrl != null && it.isNotBlank() }
+                val heroTrailerPlayWhenReady = heroTrailerSourceUrl != null &&
+                    !isLeavingDetails &&
+                    (heroHeightPx == 0 || scrollState.value <= thresholdPx)
                 val headerProgress by animateFloatAsState(
                     targetValue = headerTarget,
                     animationSpec = tween(
@@ -697,6 +758,27 @@ fun MetaDetailsScreen(
                                 contentMaxWidth = contentMaxWidth,
                                 scrollOffset = scrollState.value,
                                 onHeightChanged = { heroHeightPx = it },
+                                heroTrailerSourceUrl = heroTrailerSourceUrl,
+                                heroTrailerSourceAudioUrl = heroTrailerSourceAudioUrl,
+                                heroTrailerReady = heroTrailerReady,
+                                heroTrailerPlayWhenReady = heroTrailerPlayWhenReady,
+                                heroTrailerMuted = heroTrailerMuted,
+                                onHeroTrailerMuteToggle = {
+                                    HeroTrailerAudioState.toggleMuted()
+                                },
+                                onHeroTrailerReady = {
+                                    if (!heroTrailerFinished) {
+                                        heroTrailerReady = true
+                                    }
+                                },
+                                onHeroTrailerEnded = {
+                                    heroTrailerReady = false
+                                    heroTrailerFinished = true
+                                },
+                                onHeroTrailerError = {
+                                    heroTrailerReady = false
+                                    heroTrailerFinished = true
+                                },
                             )
 
                             Column(
@@ -713,10 +795,12 @@ fun MetaDetailsScreen(
                                     isTablet = isTablet,
                                     playButtonLabel = playButtonLabel,
                                     isSaved = isSaved,
+                                    isWatched = isWatched,
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                     onSaveClick = toggleSaved,
                                     onSaveLongClick = openLibraryListPicker,
+                                    onWatchedClick = toggleWatched,
                                     showManualPlayOption = showManualPlayOption,
                                     preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
                                     preferredEpisodeNumber = seriesAction?.episodeNumber,
@@ -808,12 +892,12 @@ fun MetaDetailsScreen(
 
                         if (headerProgress <= 0.05f) {
                             NuvioBackButton(
-                                onClick = onBack,
+                                onClick = onBackFromDetails,
                                 modifier = Modifier.padding(
                                     start = 12.dp,
                                     top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp,
                                 ).zIndex(2f),
-                                containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f),
+                                containerColor = Color.Transparent,
                                 contentColor = MaterialTheme.colorScheme.onBackground,
                             )
                         }
@@ -822,7 +906,7 @@ fun MetaDetailsScreen(
                             meta = meta,
                             isSaved = isSaved,
                             progress = headerProgress,
-                            onBack = onBack,
+                            onBack = onBackFromDetails,
                             onToggleSaved = toggleSaved,
                             modifier = Modifier.zIndex(2f),
                         )
@@ -1065,7 +1149,7 @@ fun MetaDetailsScreen(
                     start = 12.dp,
                     top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 8.dp,
                 ),
-                containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.5f),
+                containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onBackground,
             )
         }
@@ -1139,6 +1223,20 @@ private fun extractTmdbId(value: String?): Int? {
         ?.toIntOrNull()
 }
 
+private fun MetaDetails.toMetaPreview(): MetaPreview =
+    MetaPreview(
+        id = id,
+        type = type,
+        name = name,
+        poster = poster,
+        banner = background,
+        logo = logo,
+        description = description,
+        releaseInfo = releaseInfo,
+        imdbRating = imdbRating,
+        genres = genres,
+    )
+
 @Composable
 @OptIn(ExperimentalSharedTransitionApi::class)
 private fun ConfiguredMetaSections(
@@ -1147,10 +1245,12 @@ private fun ConfiguredMetaSections(
     isTablet: Boolean,
     playButtonLabel: String,
     isSaved: Boolean,
+    isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
+    onWatchedClick: () -> Unit,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -1208,17 +1308,40 @@ private fun ConfiguredMetaSections(
             MetaScreenSectionKey.ACTIONS -> {
                 DetailActionButtons(
                     playLabel = playButtonLabel,
-                    saveLabel = if (isSaved) {
-                        stringResource(Res.string.action_saved)
-                    } else {
-                        stringResource(Res.string.action_save)
-                    },
-                    isSaved = isSaved,
+                    secondaryActions = listOf(
+                        DetailSecondaryAction(
+                            label = if (isWatched) {
+                                stringResource(Res.string.hero_mark_unwatched)
+                            } else {
+                                stringResource(Res.string.hero_mark_watched)
+                            },
+                            icon = if (isWatched) {
+                                Icons.Default.CheckCircle
+                            } else {
+                                Icons.Default.CheckCircleOutline
+                            },
+                            isActive = isWatched,
+                            onClick = onWatchedClick,
+                        ),
+                        DetailSecondaryAction(
+                            label = if (isSaved) {
+                                stringResource(Res.string.hero_remove_from_library)
+                            } else {
+                                stringResource(Res.string.hero_add_to_library)
+                            },
+                            icon = if (isSaved) {
+                                Icons.Default.Check
+                            } else {
+                                Icons.Default.Add
+                            },
+                            isActive = isSaved,
+                            onClick = onSaveClick,
+                            onLongClick = onSaveLongClick,
+                        ),
+                    ),
                     isTablet = isTablet,
                     onPlayClick = onPrimaryPlayClick,
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
-                    onSaveClick = onSaveClick,
-                    onSaveLongClick = onSaveLongClick,
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {

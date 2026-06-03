@@ -11,3 +11,8 @@ data class CatalogUiState(
     val canLoadMore: Boolean
         get() = nextSkip != null
 }
+
+data class CatalogScrollPosition(
+    val firstVisibleItemIndex: Int = 0,
+    val firstVisibleItemScrollOffset: Int = 0,
+)

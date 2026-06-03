@@ -86,7 +86,26 @@ fun CatalogScreen(
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
-    val gridState = rememberLazyGridState()
+    val initialScrollPosition = remember(
+        manifestUrl,
+        type,
+        catalogId,
+        genre,
+        supportsPagination,
+        homeCatalogSettingsUiState.hideUnreleasedContent,
+    ) {
+        CatalogRepository.scrollPosition(
+            manifestUrl = manifestUrl,
+            type = type,
+            catalogId = catalogId,
+            genre = genre,
+            supportsPagination = supportsPagination,
+        )
+    }
+    val gridState = rememberLazyGridState(
+        initialFirstVisibleItemIndex = initialScrollPosition.firstVisibleItemIndex,
+        initialFirstVisibleItemScrollOffset = initialScrollPosition.firstVisibleItemScrollOffset,
+    )
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var observedOfflineState by remember { mutableStateOf(false) }
 
@@ -97,8 +116,23 @@ fun CatalogScreen(
             catalogId = catalogId,
             genre = genre,
             supportsPagination = supportsPagination,
-            force = true,
         )
+    }
+
+    LaunchedEffect(gridState, manifestUrl, type, catalogId, genre, supportsPagination, homeCatalogSettingsUiState.hideUnreleasedContent) {
+        snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
+            .distinctUntilChanged()
+            .collect { (index, offset) ->
+                CatalogRepository.saveScrollPosition(
+                    manifestUrl = manifestUrl,
+                    type = type,
+                    catalogId = catalogId,
+                    genre = genre,
+                    supportsPagination = supportsPagination,
+                    firstVisibleItemIndex = index,
+                    firstVisibleItemScrollOffset = offset,
+                )
+            }
     }
 
     LaunchedEffect(gridState, uiState.canLoadMore, uiState.isLoading) {
