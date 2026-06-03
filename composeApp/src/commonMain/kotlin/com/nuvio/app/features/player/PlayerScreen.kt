@@ -153,6 +153,7 @@ fun PlayerScreen(
     title: String,
     sourceUrl: String,
     sourceAudioUrl: String? = null,
+    streamType: String? = null,
     sourceHeaders: Map<String, String> = emptyMap(),
     sourceResponseHeaders: Map<String, String> = emptyMap(),
     providerName: String,
@@ -239,6 +240,7 @@ fun PlayerScreen(
         // Active playback state (mutable to support source/episode switching)
         var activeSourceUrl by rememberSaveable { mutableStateOf(sourceUrl) }
         var activeSourceAudioUrl by rememberSaveable { mutableStateOf(sourceAudioUrl) }
+        var activeStreamType by rememberSaveable { mutableStateOf(streamType) }
         var activeSourceHeaders by remember(sourceUrl, sourceHeaders) {
             mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))
         }
@@ -1257,6 +1259,7 @@ fun PlayerScreen(
             )
             activeSourceUrl = p2pSentinelUrl(infoHash, stream.fileIdx)
             activeSourceAudioUrl = null
+            activeStreamType = null
             activeSourceHeaders = emptyMap()
             activeSourceResponseHeaders = emptyMap()
             activeTorrentInfoHash = infoHash
@@ -1315,6 +1318,7 @@ fun PlayerScreen(
             )
             activeSourceUrl = p2pSentinelUrl(infoHash, stream.fileIdx)
             activeSourceAudioUrl = null
+            activeStreamType = null
             activeSourceHeaders = emptyMap()
             activeSourceResponseHeaders = emptyMap()
             activeTorrentInfoHash = infoHash
@@ -1363,7 +1367,10 @@ fun PlayerScreen(
                 return
             }
             val url = stream.playableDirectUrl ?: return
-            if (url == activeSourceUrl) return
+            if (url == activeSourceUrl) {
+                activeStreamType = stream.streamType
+                return
+            }
             val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
             flushWatchProgress()
             stopActiveP2pStream()
@@ -1390,6 +1397,7 @@ fun PlayerScreen(
             }
             activeSourceUrl = url
             activeSourceAudioUrl = null
+            activeStreamType = stream.streamType
             activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
             activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
             activeStreamTitle = stream.streamLabel
@@ -1478,6 +1486,7 @@ fun PlayerScreen(
             }
             activeSourceUrl = url
             activeSourceAudioUrl = null
+            activeStreamType = stream.streamType
             activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
             activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
             activeStreamTitle = stream.streamLabel
@@ -1525,6 +1534,7 @@ fun PlayerScreen(
 
             activeSourceUrl = localFileUri
             activeSourceAudioUrl = null
+            activeStreamType = null
             activeSourceHeaders = emptyMap()
             activeSourceResponseHeaders = emptyMap()
             activeStreamTitle = downloadItem.streamTitle.ifBlank {
@@ -1904,7 +1914,7 @@ fun PlayerScreen(
             setSubtitleDelay(newDelayMs)
         }
 
-        LaunchedEffect(activeSourceUrl, activeSourceAudioUrl, activeSourceHeaders, activeSourceResponseHeaders) {
+        LaunchedEffect(activeSourceUrl, activeSourceAudioUrl, activeStreamType, activeSourceHeaders, activeSourceResponseHeaders) {
             errorMessage = null
             playerController = null
             playerControllerSourceUrl = null
@@ -2310,7 +2320,7 @@ fun PlayerScreen(
             }
         }
 
-        DisposableEffect(playbackSession.videoId, activeSourceUrl, activeSourceAudioUrl) {
+        DisposableEffect(playbackSession.videoId, activeSourceUrl, activeSourceAudioUrl, activeStreamType) {
             onDispose {
                 flushWatchProgress()
             }
@@ -2477,6 +2487,7 @@ fun PlayerScreen(
                 PlatformPlayerSurface(
                     sourceUrl = playerSurfaceSourceUrl,
                     sourceAudioUrl = activeSourceAudioUrl,
+                    streamType = activeStreamType,
                     sourceHeaders = activeSourceHeaders,
                     sourceResponseHeaders = activeSourceResponseHeaders,
                     modifier = Modifier.fillMaxSize(),

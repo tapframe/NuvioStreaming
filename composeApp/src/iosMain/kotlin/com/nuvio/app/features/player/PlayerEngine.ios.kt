@@ -27,6 +27,7 @@ private const val TAG = "NuvioiOSPlayer"
 actual fun PlatformPlayerSurface(
     sourceUrl: String,
     sourceAudioUrl: String?,
+    streamType: String?,
     sourceHeaders: Map<String, String>,
     sourceResponseHeaders: Map<String, String>,
     useYoutubeChunkedPlayback: Boolean,

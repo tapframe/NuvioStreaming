@@ -10,6 +10,7 @@ data class StreamItem(
     val title: String? = null,
     val description: String? = null,
     val url: String? = null,
+    val streamType: String? = null,
     val infoHash: String? = null,
     val fileIdx: Int? = null,
     val externalUrl: String? = null,

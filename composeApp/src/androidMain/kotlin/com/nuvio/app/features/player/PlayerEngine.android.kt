@@ -68,11 +68,32 @@ import java.net.URL
 
 private const val TAG = "NuvioPlayer"
 
+private fun buildPlaybackMediaItem(
+    url: String,
+    streamType: String?,
+): MediaItem {
+    val isHls = streamType.equals("hls", ignoreCase = true) || url.isExplicitHlsPlaylistUrl()
+    return MediaItem.Builder()
+        .setUri(url)
+        .apply {
+            if (isHls) {
+                setMimeType(MimeTypes.APPLICATION_M3U8)
+            }
+        }
+        .build()
+}
+
+private fun String.isExplicitHlsPlaylistUrl(): Boolean =
+    endsWith(".m3u8", ignoreCase = true) ||
+        contains(".m3u8?", ignoreCase = true) ||
+        contains(".m3u8#", ignoreCase = true)
+
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 actual fun PlatformPlayerSurface(
     sourceUrl: String,
     sourceAudioUrl: String?,
+    streamType: String?,
     sourceHeaders: Map<String, String>,
     sourceResponseHeaders: Map<String, String>,
     useYoutubeChunkedPlayback: Boolean,
@@ -108,6 +129,7 @@ actual fun PlatformPlayerSurface(
     val playerSourceKey = listOf(
         sourceUrl,
         sourceAudioUrl.orEmpty(),
+        streamType.orEmpty(),
         sanitizedSourceHeaders,
         sanitizedSourceResponseHeaders,
         useYoutubeChunkedPlayback,
@@ -143,7 +165,7 @@ actual fun PlatformPlayerSurface(
         if (!sourceAudioUrl.isNullOrBlank()) {
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
             val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
-            val audioSource = mediaSourceFactory.createMediaSource(MediaItem.fromUri(sourceAudioUrl))
+            val audioSource = mediaSourceFactory.createMediaSource(buildPlaybackMediaItem(sourceAudioUrl, null))
             val mergedSource = MergingMediaSource(videoSource, audioSource)
             if (startPositionMs != null) {
                 setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
@@ -160,6 +182,7 @@ actual fun PlatformPlayerSurface(
     val exoPlayer = remember(
         sourceUrl,
         sourceAudioUrl,
+        streamType,
         sanitizedSourceHeaders,
         sanitizedSourceResponseHeaders,
         useYoutubeChunkedPlayback,
@@ -223,7 +246,7 @@ actual fun PlatformPlayerSurface(
 
         player.apply {
             setPlaybackMediaItem(
-                videoMediaItem = MediaItem.fromUri(sourceUrl),
+                videoMediaItem = buildPlaybackMediaItem(sourceUrl, streamType),
                 startPositionMs = fallbackStartPositionMs,
             )
             prepare()

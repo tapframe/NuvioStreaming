@@ -55,6 +55,7 @@ internal fun sanitizePlaybackResponseHeaders(headers: Map<String, String>?): Map
 expect fun PlatformPlayerSurface(
     sourceUrl: String,
     sourceAudioUrl: String? = null,
+    streamType: String? = null,
     sourceHeaders: Map<String, String> = emptyMap(),
     sourceResponseHeaders: Map<String, String> = emptyMap(),
     useYoutubeChunkedPlayback: Boolean = false,

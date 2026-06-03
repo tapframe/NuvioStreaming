@@ -1952,6 +1952,7 @@ private fun MainAppContent(
                         val playerLaunch = PlayerLaunch(
                                 title = launch.title,
                                 sourceUrl = sourceUrl,
+                                streamType = stream.streamType,
                                 sourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request),
                                 sourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response),
                                 logo = launch.logo,
@@ -2076,6 +2077,7 @@ private fun MainAppContent(
                         val playerLaunch = PlayerLaunch(
                             title = launch.title,
                             sourceUrl = sourceUrl,
+                            streamType = stream.streamType,
                             sourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request),
                             sourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response),
                             logo = launch.logo,
@@ -2234,6 +2236,7 @@ private fun MainAppContent(
                         title = launch.title,
                         sourceUrl = launch.sourceUrl,
                         sourceAudioUrl = launch.sourceAudioUrl,
+                        streamType = launch.streamType,
                         sourceHeaders = launch.sourceHeaders,
                         sourceResponseHeaders = launch.sourceResponseHeaders,
                         logo = launch.logo,

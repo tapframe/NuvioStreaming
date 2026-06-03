@@ -910,6 +910,7 @@ private fun PluginRuntimeResult.toStreamItem(
         name = name ?: title,
         description = subtitleParts.joinToString(" • ").ifBlank { null },
         url = url,
+        streamType = type,
         infoHash = infoHash,
         sourceName = scraper.name,
         addonName = addonName,

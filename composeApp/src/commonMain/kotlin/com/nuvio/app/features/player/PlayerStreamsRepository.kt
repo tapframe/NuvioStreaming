@@ -448,6 +448,7 @@ private fun PluginRuntimeResult.toStreamItem(scraper: PluginScraper): StreamItem
         name = name ?: title,
         description = subtitleParts.joinToString(" • ").ifBlank { null },
         url = url,
+        streamType = type,
         infoHash = infoHash,
         addonName = scraper.name,
         addonId = "plugin:${scraper.id}",
