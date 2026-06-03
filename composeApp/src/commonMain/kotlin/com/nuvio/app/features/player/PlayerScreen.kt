@@ -105,6 +105,7 @@ private const val PlayerLockedOverlayDurationMs = 2_000L
 private const val PlayerLeftGestureBoundary = 0.4f
 private const val PlayerRightGestureBoundary = 0.6f
 private const val PlayerVerticalGestureSensitivity = 1f
+private const val PlayerNormalVolumeCeiling = 1f
 private const val PlayerMaxVolumeBoost = 2f
 private const val PlayerSeekProgressSyncDebounceMs = 700L
 private const val P2pInitialPreloadTargetBytes = 5_242_880L
@@ -994,7 +995,9 @@ fun PlayerScreen(
         }
 
         fun showVolumeFeedback(level: PlayerAudioLevel) {
-            val percentage = (level.fraction.coerceIn(0f, PlayerMaxVolumeBoost) * 100f).roundToInt()
+            val normalized = level.fraction.coerceIn(0f, PlayerMaxVolumeBoost)
+            val percentage = (normalized * 100f).roundToInt()
+            val isBoosted = normalized > PlayerNormalVolumeCeiling
             showGestureFeedback(
                 GestureFeedbackState(
                     messageRes = if (level.isMuted) {
@@ -1004,9 +1007,51 @@ fun PlayerScreen(
                     },
                     messageArgs = if (level.isMuted) emptyList() else listOf("$percentage%"),
                     icon = if (level.isMuted) GestureFeedbackIcon.VolumeMuted else GestureFeedbackIcon.Volume,
-                    isDanger = level.isMuted,
+                    // Use the existing alternate feedback color path for the boosted range.
+                    isDanger = level.isMuted || isBoosted,
                 ),
             )
+        }
+
+        fun currentCombinedVolumeLevel(
+            systemVolume: PlayerAudioLevel?,
+            softwareVolume: PlayerAudioLevel?,
+        ): PlayerAudioLevel? {
+            if (systemVolume == null && softwareVolume == null) return null
+            if (systemVolume == null) return softwareVolume
+            if (systemVolume.fraction < PlayerNormalVolumeCeiling || softwareVolume == null) {
+                return systemVolume
+            }
+            val boostFraction = softwareVolume.fraction.coerceIn(PlayerNormalVolumeCeiling, PlayerMaxVolumeBoost)
+            return PlayerAudioLevel(
+                fraction = boostFraction,
+                isMuted = boostFraction <= 0.001f,
+            )
+        }
+
+        fun setCombinedVolumeLevel(
+            target: Float,
+            systemController: PlayerGestureController?,
+            engineController: PlayerEngineController?,
+        ): PlayerAudioLevel? {
+            val normalized = target.coerceIn(0f, PlayerMaxVolumeBoost)
+            return if (normalized <= PlayerNormalVolumeCeiling) {
+                // Normal range: change the device/media volume and keep software gain neutral.
+                engineController?.setPlayerVolume(PlayerNormalVolumeCeiling)
+                systemController?.setVolume(normalized)
+                    ?: PlayerAudioLevel(
+                        fraction = normalized,
+                        isMuted = normalized <= 0.001f,
+                    )
+            } else {
+                // Boost range: keep device/media volume at maximum and apply software gain above 100%.
+                val systemLevel = systemController?.setVolume(PlayerNormalVolumeCeiling)
+                val boostedLevel = engineController?.setPlayerVolume(normalized)
+                boostedLevel?.copy(
+                    fraction = normalized,
+                    isMuted = false,
+                ) ?: systemLevel
+            }
         }
 
         fun togglePlayback() {
@@ -2372,7 +2417,10 @@ fun PlayerScreen(
                             null
                         }
                         val initialVolume = if (region == PlayerSideGesture.Volume) {
-                            playerController?.currentPlayerVolume() ?: controller?.currentVolume()
+                            currentCombinedVolumeLevel(
+                                systemVolume = controller?.currentVolume(),
+                                softwareVolume = playerController?.currentPlayerVolume(),
+                            )
                         } else {
                             null
                         }
@@ -2457,11 +2505,13 @@ fun PlayerScreen(
                                 PlayerGestureMode.Volume -> {
                                     val gestureDeltaFraction =
                                         (-totalDy / height) * PlayerVerticalGestureSensitivity
-                                    val target = ((initialVolume?.fraction ?: 1f) + gestureDeltaFraction)
+                                    val target = ((initialVolume?.fraction ?: 0f) + gestureDeltaFraction)
                                         .coerceIn(0f, PlayerMaxVolumeBoost)
-                                    val level = playerController?.setPlayerVolume(target)
-                                        ?: controller?.setVolume(target.coerceIn(0f, 1f))
-                                    level?.let(showVolumeFeedbackState.value)
+                                    setCombinedVolumeLevel(
+                                        target = target,
+                                        systemController = controller,
+                                        engineController = playerController,
+                                    )?.let(showVolumeFeedbackState.value)
                                 }
 
                                 null -> Unit

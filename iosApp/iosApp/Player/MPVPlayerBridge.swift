@@ -323,6 +323,8 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
         checkError(mpv_set_option_string(mpv, "volume-max", "200"))
         checkError(mpv_set_option_string(mpv, "volume", "100"))
+        checkError(mpv_set_option_string(mpv, "volume-gain-max", "6.1"))
+        checkError(mpv_set_option_string(mpv, "volume-gain", "0"))
         checkError(mpv_set_option_string(mpv, "vulkan-swap-mode", "fifo"))
         checkError(mpv_set_option_string(mpv, "vulkan-queue-count", "1"))
         checkError(mpv_set_option_string(mpv, "vulkan-async-compute", "no"))
@@ -523,14 +525,30 @@ final class MPVPlayerViewController: UIViewController {
 
     func getVolume() -> Float {
         guard mpv != nil else { return 1.0 }
-        let volume = getDouble("volume") / 100.0
-        return Float(max(0.0, min(2.0, volume)))
+        let baseVolume = getDouble("volume") / 100.0
+        let gainDb = getDouble("volume-gain")
+        let gainMultiplier = pow(10.0, gainDb / 20.0)
+        return Float(max(0.0, min(2.0, baseVolume * gainMultiplier)))
     }
 
     func setVolume(_ volume: Float) {
         guard mpv != nil else { return }
-        var value = Double(max(0.0, min(2.0, volume)) * 100.0)
-        checkError(mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &value))
+        let clamped = max(0.0, min(2.0, Double(volume)))
+
+        if clamped <= 0.001 {
+            var mutedVolume = 0.0
+            var neutralGain = 0.0
+            checkError(mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &mutedVolume))
+            checkError(mpv_set_property(mpv, "volume-gain", MPV_FORMAT_DOUBLE, &neutralGain))
+            return
+        }
+
+        // Keep mpv's base volume at 100 and apply real software amplification through volume-gain.
+        // 2.0x equals about +6.02 dB.
+        var baseVolume = 100.0
+        var gainDb = 20.0 * log10(clamped)
+        checkError(mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &baseVolume))
+        checkError(mpv_set_property(mpv, "volume-gain", MPV_FORMAT_DOUBLE, &gainDb))
     }
 
     func setResize(_ mode: Int) {
