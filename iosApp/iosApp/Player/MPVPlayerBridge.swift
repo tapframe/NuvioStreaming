@@ -60,6 +60,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         )
     }
     func setPlaybackSpeed(speed: Float) { playerVC?.setSpeed(speed) }
+    func getVolume() -> Float { playerVC?.getVolume() ?? 1.0 }
+    func setVolume(volume: Float) { playerVC?.setVolume(volume) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
 
     // Audio tracks
@@ -319,6 +321,8 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "hwdec", "auto"))
         checkError(mpv_set_option_string(mpv, "audio-channels", "stereo"))
         checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
+        checkError(mpv_set_option_string(mpv, "volume-max", "200"))
+        checkError(mpv_set_option_string(mpv, "volume", "100"))
         checkError(mpv_set_option_string(mpv, "vulkan-swap-mode", "fifo"))
         checkError(mpv_set_option_string(mpv, "vulkan-queue-count", "1"))
         checkError(mpv_set_option_string(mpv, "vulkan-async-compute", "no"))
@@ -515,6 +519,18 @@ final class MPVPlayerViewController: UIViewController {
         guard mpv != nil else { return }
         var s = Double(speed)
         mpv_set_property(mpv, "speed", MPV_FORMAT_DOUBLE, &s)
+    }
+
+    func getVolume() -> Float {
+        guard mpv != nil else { return 1.0 }
+        let volume = getDouble("volume") / 100.0
+        return Float(max(0.0, min(2.0, volume)))
+    }
+
+    func setVolume(_ volume: Float) {
+        guard mpv != nil else { return }
+        var value = Double(max(0.0, min(2.0, volume)) * 100.0)
+        checkError(mpv_set_property(mpv, "volume", MPV_FORMAT_DOUBLE, &value))
     }
 
     func setResize(_ mode: Int) {

@@ -393,6 +393,23 @@ actual fun PlatformPlayerSurface(
                     exoPlayer.setPlaybackSpeed(speed)
                 }
 
+                override fun currentPlayerVolume(): PlayerAudioLevel {
+                    val current = exoPlayer.volume.coerceIn(0f, 2f)
+                    return PlayerAudioLevel(
+                        fraction = current,
+                        isMuted = current <= 0.001f,
+                    )
+                }
+
+                override fun setPlayerVolume(level: Float): PlayerAudioLevel {
+                    val target = level.coerceIn(0f, 2f)
+                    exoPlayer.volume = target
+                    return PlayerAudioLevel(
+                        fraction = target,
+                        isMuted = target <= 0.001f,
+                    )
+                }
+
                 override fun getAudioTracks(): List<AudioTrack> =
                     exoPlayer.extractAudioTracks(context)
 

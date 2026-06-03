@@ -105,6 +105,7 @@ private const val PlayerLockedOverlayDurationMs = 2_000L
 private const val PlayerLeftGestureBoundary = 0.4f
 private const val PlayerRightGestureBoundary = 0.6f
 private const val PlayerVerticalGestureSensitivity = 1f
+private const val PlayerMaxVolumeBoost = 2f
 private const val PlayerSeekProgressSyncDebounceMs = 700L
 private const val P2pInitialPreloadTargetBytes = 5_242_880L
 /** Hard ceiling for next-episode stream search to prevent hanging forever. */
@@ -993,7 +994,7 @@ fun PlayerScreen(
         }
 
         fun showVolumeFeedback(level: PlayerAudioLevel) {
-            val percentage = (level.fraction.coerceIn(0f, 1f) * 100f).roundToInt()
+            val percentage = (level.fraction.coerceIn(0f, PlayerMaxVolumeBoost) * 100f).roundToInt()
             showGestureFeedback(
                 GestureFeedbackState(
                     messageRes = if (level.isMuted) {
@@ -2344,7 +2345,7 @@ fun PlayerScreen(
                         },
                     )
                 }
-                .pointerInput(gestureController, layoutSize) {
+                .pointerInput(gestureController, playerController, layoutSize) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         if (playerControlsLockedState.value) {
@@ -2371,7 +2372,7 @@ fun PlayerScreen(
                             null
                         }
                         val initialVolume = if (region == PlayerSideGesture.Volume) {
-                            controller?.currentVolume()
+                            playerController?.currentPlayerVolume() ?: controller?.currentVolume()
                         } else {
                             null
                         }
@@ -2456,8 +2457,11 @@ fun PlayerScreen(
                                 PlayerGestureMode.Volume -> {
                                     val gestureDeltaFraction =
                                         (-totalDy / height) * PlayerVerticalGestureSensitivity
-                                    controller?.setVolume((initialVolume?.fraction ?: 0f) + gestureDeltaFraction)
-                                        ?.let(showVolumeFeedbackState.value)
+                                    val target = ((initialVolume?.fraction ?: 1f) + gestureDeltaFraction)
+                                        .coerceIn(0f, PlayerMaxVolumeBoost)
+                                    val level = playerController?.setPlayerVolume(target)
+                                        ?: controller?.setVolume(target.coerceIn(0f, 1f))
+                                    level?.let(showVolumeFeedbackState.value)
                                 }
 
                                 null -> Unit
