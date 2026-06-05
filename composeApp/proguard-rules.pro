@@ -29,6 +29,10 @@
 -keep class com.nuvio.app.features.streams.StreamsScreenKt { *; }
 -keep class com.nuvio.app.features.streams.StreamsScreenKt$* { *; }
 
+# Avoid R8 producing verifier-invalid bytecode for the large player composable.
+-keep class com.nuvio.app.features.player.PlayerScreenKt { *; }
+-keep class com.nuvio.app.features.player.PlayerScreenKt$* { *; }
+
 # QuickJS plugin runtime is dynamic; keep runtime and app plugin classes.
 -keep class com.dokar.quickjs.** { *; }
 -keep class com.nuvio.app.features.plugins.** { *; }

@@ -35,7 +35,6 @@ object TmdbMetadataService {
     private val entityBrowseCache = mutableMapOf<String, TmdbEntityBrowseData>()
     private val entityHeaderCache = mutableMapOf<String, TmdbEntityHeader>()
     private val entityRailCache = mutableMapOf<String, List<MetaPreview>>()
-    private val previewArtworkCache = mutableMapOf<String, TmdbPreviewArtwork>()
 
     suspend fun fetchPersonDetail(
         personId: Int,
@@ -79,20 +78,17 @@ object TmdbMetadataService {
 
             val preferCrew = preferCrewCredits ?: shouldPreferCrewCredits(person.knownForDepartment)
 
-            val castMovieCredits = mapPersonMovieCreditsFromCast(credits?.cast.orEmpty(), language)
-            val crewMovieCredits = mapPersonMovieCreditsFromCrew(credits?.crew.orEmpty(), language)
-            val movieCredits = when {
-                preferCrew && crewMovieCredits.isNotEmpty() -> crewMovieCredits
-                castMovieCredits.isNotEmpty() -> castMovieCredits
-                else -> crewMovieCredits
-            }
-
-            val castTvCredits = mapPersonTvCreditsFromCast(credits?.cast.orEmpty(), language)
-            val crewTvCredits = mapPersonTvCreditsFromCrew(credits?.crew.orEmpty(), language)
-            val tvCredits = when {
-                preferCrew && crewTvCredits.isNotEmpty() -> crewTvCredits
-                castTvCredits.isNotEmpty() -> castTvCredits
-                else -> crewTvCredits
+            val (castMovieCredits, crewMovieCredits, castTvCredits, crewTvCredits) = coroutineScope {
+                val castMovieDeferred = async { mapPersonMovieCreditsFromCast(credits?.cast.orEmpty()) }
+                val crewMovieDeferred = async { mapPersonMovieCreditsFromCrew(credits?.crew.orEmpty()) }
+                val castTvDeferred = async { mapPersonTvCreditsFromCast(credits?.cast.orEmpty()) }
+                val crewTvDeferred = async { mapPersonTvCreditsFromCrew(credits?.crew.orEmpty()) }
+                PersonCreditBuckets(
+                    castMovieCredits = castMovieDeferred.await(),
+                    crewMovieCredits = crewMovieDeferred.await(),
+                    castTvCredits = castTvDeferred.await(),
+                    crewTvCredits = crewTvDeferred.await(),
+                )
             }
 
             val detail = PersonDetail(
@@ -104,8 +100,16 @@ object TmdbMetadataService {
                 placeOfBirth = person.placeOfBirth?.takeIf { it.isNotBlank() },
                 profilePhoto = buildImageUrl(person.profilePath, "w500"),
                 knownFor = person.knownForDepartment?.takeIf { it.isNotBlank() },
-                movieCredits = movieCredits,
-                tvCredits = tvCredits,
+                movieCredits = selectPreferredCredits(
+                    preferCrew = preferCrew,
+                    castCredits = castMovieCredits,
+                    crewCredits = crewMovieCredits,
+                ),
+                tvCredits = selectPreferredCredits(
+                    preferCrew = preferCrew,
+                    castCredits = castTvCredits,
+                    crewCredits = crewTvCredits,
+                ),
             )
             personCache[cacheKey] = detail
             detail
@@ -120,160 +124,133 @@ object TmdbMetadataService {
         return department.isNotBlank() && department != "acting" && department != "actors"
     }
 
-    private suspend fun mapPersonMovieCreditsFromCast(
+    private data class PersonCreditBuckets(
+        val castMovieCredits: List<MetaPreview>,
+        val crewMovieCredits: List<MetaPreview>,
+        val castTvCredits: List<MetaPreview>,
+        val crewTvCredits: List<MetaPreview>,
+    )
+
+    private fun selectPreferredCredits(
+        preferCrew: Boolean,
+        castCredits: List<MetaPreview>,
+        crewCredits: List<MetaPreview>,
+    ): List<MetaPreview> = when {
+        preferCrew && crewCredits.isNotEmpty() -> crewCredits
+        castCredits.isNotEmpty() -> castCredits
+        else -> crewCredits
+    }
+
+    private fun mapPersonMovieCreditsFromCast(
         cast: List<TmdbPersonCreditCast>,
-        language: String,
-    ): List<MetaPreview> = coroutineScope {
+    ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
-        cast
+        return cast
             .filter { it.mediaType == "movie" && (it.posterPath != null || it.backdropPath != null) }
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = credit.title ?: credit.name ?: return@mapNotNull null
-                async {
-                    val artwork = fetchPreviewArtwork(
-                        tmdbId = credit.id,
-                        mediaType = "movie",
-                        language = language,
-                    )
-                    val poster = buildImageUrl(credit.posterPath, "w500")
-                        ?: buildImageUrl(credit.backdropPath, "w780")
-                        ?: artwork?.backdrop
-                        ?: return@async null
-                    MetaPreview(
-                        id = "tmdb:${credit.id}",
-                        type = "movie",
-                        name = title,
-                        poster = poster,
-                        banner = buildImageUrl(credit.backdropPath, "w780") ?: artwork?.backdrop,
-                        logo = artwork?.logo,
-                        description = credit.overview?.takeIf { it.isNotBlank() },
-                        releaseInfo = credit.releaseDate?.take(4),
-                        rawReleaseDate = credit.releaseDate,
-                        popularity = credit.popularity,
-                    )
-                }
+                val poster = buildImageUrl(credit.posterPath, "w500")
+                    ?: buildImageUrl(credit.backdropPath, "w780")
+                    ?: return@mapNotNull null
+                MetaPreview(
+                    id = "tmdb:${credit.id}",
+                    type = "movie",
+                    name = title,
+                    poster = poster,
+                    banner = buildImageUrl(credit.backdropPath, "w780"),
+                    logo = null,
+                    description = credit.overview?.takeIf { it.isNotBlank() },
+                    releaseInfo = credit.releaseDate?.take(4),
+                    rawReleaseDate = credit.releaseDate,
+                    popularity = credit.popularity,
+                )
             }
-            .awaitAll()
-            .filterNotNull()
     }
 
-    private suspend fun mapPersonMovieCreditsFromCrew(
+    private fun mapPersonMovieCreditsFromCrew(
         crew: List<TmdbPersonCreditCrew>,
-        language: String,
-    ): List<MetaPreview> = coroutineScope {
+    ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
-        crew
+        return crew
             .filter { it.mediaType == "movie" && (it.posterPath != null || it.backdropPath != null) }
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = credit.title ?: credit.name ?: return@mapNotNull null
-                async {
-                    val artwork = fetchPreviewArtwork(
-                        tmdbId = credit.id,
-                        mediaType = "movie",
-                        language = language,
-                    )
-                    val poster = buildImageUrl(credit.posterPath, "w500")
-                        ?: buildImageUrl(credit.backdropPath, "w780")
-                        ?: artwork?.backdrop
-                        ?: return@async null
-                    MetaPreview(
-                        id = "tmdb:${credit.id}",
-                        type = "movie",
-                        name = title,
-                        poster = poster,
-                        banner = buildImageUrl(credit.backdropPath, "w780") ?: artwork?.backdrop,
-                        logo = artwork?.logo,
-                        description = credit.overview?.takeIf { it.isNotBlank() },
-                        releaseInfo = credit.releaseDate?.take(4),
-                        rawReleaseDate = credit.releaseDate,
-                        popularity = credit.popularity,
-                    )
-                }
+                val poster = buildImageUrl(credit.posterPath, "w500")
+                    ?: buildImageUrl(credit.backdropPath, "w780")
+                    ?: return@mapNotNull null
+                MetaPreview(
+                    id = "tmdb:${credit.id}",
+                    type = "movie",
+                    name = title,
+                    poster = poster,
+                    banner = buildImageUrl(credit.backdropPath, "w780"),
+                    logo = null,
+                    description = credit.overview?.takeIf { it.isNotBlank() },
+                    releaseInfo = credit.releaseDate?.take(4),
+                    rawReleaseDate = credit.releaseDate,
+                    popularity = credit.popularity,
+                )
             }
-            .awaitAll()
-            .filterNotNull()
     }
 
-    private suspend fun mapPersonTvCreditsFromCast(
+    private fun mapPersonTvCreditsFromCast(
         cast: List<TmdbPersonCreditCast>,
-        language: String,
-    ): List<MetaPreview> = coroutineScope {
+    ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
-        cast
+        return cast
             .filter { it.mediaType == "tv" && (it.posterPath != null || it.backdropPath != null) }
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = credit.name ?: credit.title ?: return@mapNotNull null
-                async {
-                    val artwork = fetchPreviewArtwork(
-                        tmdbId = credit.id,
-                        mediaType = "tv",
-                        language = language,
-                    )
-                    val poster = buildImageUrl(credit.posterPath, "w500")
-                        ?: buildImageUrl(credit.backdropPath, "w780")
-                        ?: artwork?.backdrop
-                        ?: return@async null
-                    MetaPreview(
-                        id = "tmdb:${credit.id}",
-                        type = "series",
-                        name = title,
-                        poster = poster,
-                        banner = buildImageUrl(credit.backdropPath, "w780") ?: artwork?.backdrop,
-                        logo = artwork?.logo,
-                        description = credit.overview?.takeIf { it.isNotBlank() },
-                        releaseInfo = credit.firstAirDate?.take(4),
-                        rawReleaseDate = credit.firstAirDate,
-                        popularity = credit.popularity,
-                    )
-                }
+                val poster = buildImageUrl(credit.posterPath, "w500")
+                    ?: buildImageUrl(credit.backdropPath, "w780")
+                    ?: return@mapNotNull null
+                MetaPreview(
+                    id = "tmdb:${credit.id}",
+                    type = "series",
+                    name = title,
+                    poster = poster,
+                    banner = buildImageUrl(credit.backdropPath, "w780"),
+                    logo = null,
+                    description = credit.overview?.takeIf { it.isNotBlank() },
+                    releaseInfo = credit.firstAirDate?.take(4),
+                    rawReleaseDate = credit.firstAirDate,
+                    popularity = credit.popularity,
+                )
             }
-            .awaitAll()
-            .filterNotNull()
     }
 
-    private suspend fun mapPersonTvCreditsFromCrew(
+    private fun mapPersonTvCreditsFromCrew(
         crew: List<TmdbPersonCreditCrew>,
-        language: String,
-    ): List<MetaPreview> = coroutineScope {
+    ): List<MetaPreview> {
         val seen = mutableSetOf<Int>()
-        crew
+        return crew
             .filter { it.mediaType == "tv" && (it.posterPath != null || it.backdropPath != null) }
             .sortedByDescending { it.voteAverage ?: 0.0 }
             .mapNotNull { credit ->
                 if (!seen.add(credit.id)) return@mapNotNull null
                 val title = credit.name ?: credit.title ?: return@mapNotNull null
-                async {
-                    val artwork = fetchPreviewArtwork(
-                        tmdbId = credit.id,
-                        mediaType = "tv",
-                        language = language,
-                    )
-                    val poster = buildImageUrl(credit.posterPath, "w500")
-                        ?: buildImageUrl(credit.backdropPath, "w780")
-                        ?: artwork?.backdrop
-                        ?: return@async null
-                    MetaPreview(
-                        id = "tmdb:${credit.id}",
-                        type = "series",
-                        name = title,
-                        poster = poster,
-                        banner = buildImageUrl(credit.backdropPath, "w780") ?: artwork?.backdrop,
-                        logo = artwork?.logo,
-                        description = credit.overview?.takeIf { it.isNotBlank() },
-                        releaseInfo = credit.firstAirDate?.take(4),
-                        rawReleaseDate = credit.firstAirDate,
-                        popularity = credit.popularity,
-                    )
-                }
+                val poster = buildImageUrl(credit.posterPath, "w500")
+                    ?: buildImageUrl(credit.backdropPath, "w780")
+                    ?: return@mapNotNull null
+                MetaPreview(
+                    id = "tmdb:${credit.id}",
+                    type = "series",
+                    name = title,
+                    poster = poster,
+                    banner = buildImageUrl(credit.backdropPath, "w780"),
+                    logo = null,
+                    description = credit.overview?.takeIf { it.isNotBlank() },
+                    releaseInfo = credit.firstAirDate?.take(4),
+                    rawReleaseDate = credit.firstAirDate,
+                    popularity = credit.popularity,
+                )
             }
-            .awaitAll()
-            .filterNotNull()
     }
 
     suspend fun fetchEntityBrowse(
@@ -289,37 +266,43 @@ object TmdbMetadataService {
         val cacheKey = "${entityKind.routeValue}:$entityId:$normalizedSourceType:$language"
         entityBrowseCache[cacheKey]?.let { return@withContext it }
 
-        val header = fetchEntityHeader(
-            entityKind = entityKind,
-            entityId = entityId,
-            fallbackName = fallbackName,
-            language = language,
-        )
-
-        val rails = buildEntityMediaOrder(entityKind, normalizedSourceType)
-            .flatMap { mediaType ->
-                TmdbEntityRailType.entries.mapNotNull { railType ->
-                    val pageResult = fetchEntityRailPage(
-                        entityKind = entityKind,
-                        entityId = entityId,
-                        mediaType = mediaType,
-                        railType = railType,
-                        language = language,
-                        page = 1,
-                    )
-                    if (pageResult.items.isEmpty()) {
-                        null
-                    } else {
-                        TmdbEntityRail(
-                            mediaType = mediaType,
-                            railType = railType,
-                            items = pageResult.items,
-                            currentPage = 1,
-                            hasMore = pageResult.hasMore,
-                        )
+        val (header, rails) = coroutineScope {
+            val headerDeferred = async {
+                fetchEntityHeader(
+                    entityKind = entityKind,
+                    entityId = entityId,
+                    fallbackName = fallbackName,
+                    language = language,
+                )
+            }
+            val railDeferreds = buildEntityMediaOrder(entityKind, normalizedSourceType)
+                .flatMap { mediaType ->
+                    TmdbEntityRailType.entries.map { railType ->
+                        async {
+                            val pageResult = fetchEntityRailPage(
+                                entityKind = entityKind,
+                                entityId = entityId,
+                                mediaType = mediaType,
+                                railType = railType,
+                                language = language,
+                                page = 1,
+                            )
+                            if (pageResult.items.isEmpty()) {
+                                null
+                            } else {
+                                TmdbEntityRail(
+                                    mediaType = mediaType,
+                                    railType = railType,
+                                    items = pageResult.items,
+                                    currentPage = 1,
+                                    hasMore = pageResult.hasMore,
+                                )
+                            }
+                        }
                     }
                 }
-            }
+            headerDeferred.await() to railDeferreds.awaitAll().filterNotNull()
+        }
 
         if (header == null && rails.isEmpty()) return@withContext null
 
@@ -397,16 +380,10 @@ object TmdbMetadataService {
             val results = response?.results.orEmpty()
             val totalPages = response?.totalPages ?: page
 
-            val mappedItems = coroutineScope {
-                results
-                    .filter { it.id > 0 }
-                    .map { item ->
-                        async { mapEntityDiscoverResult(item, mediaType, language) }
-                    }
-                    .awaitAll()
-                    .filterNotNull()
-                    .take(ENTITY_RAIL_MAX_ITEMS)
-            }
+            val mappedItems = results
+                .filter { it.id > 0 }
+                .mapNotNull { item -> mapEntityDiscoverResult(item, mediaType) }
+                .take(ENTITY_RAIL_MAX_ITEMS)
 
             TmdbEntityRailPageResult(
                 items = mappedItems,
@@ -488,10 +465,9 @@ object TmdbMetadataService {
         return header
     }
 
-    private suspend fun mapEntityDiscoverResult(
+    private fun mapEntityDiscoverResult(
         result: TmdbDiscoverResult,
         mediaType: TmdbEntityMediaType,
-        language: String,
     ): MetaPreview? {
         val title = result.title?.takeIf { it.isNotBlank() }
             ?: result.name?.takeIf { it.isNotBlank() }
@@ -499,15 +475,8 @@ object TmdbMetadataService {
             ?: result.originalName?.takeIf { it.isNotBlank() }
             ?: return null
 
-        val artwork = fetchPreviewArtwork(
-            tmdbId = result.id,
-            mediaType = mediaType.value,
-            language = language,
-        )
-
         val poster = buildImageUrl(result.posterPath, "w500")
             ?: buildImageUrl(result.backdropPath, "w780")
-            ?: artwork?.backdrop
             ?: return null
         val releaseInfo = when (mediaType) {
             TmdbEntityMediaType.MOVIE -> result.releaseDate?.take(4)
@@ -518,58 +487,11 @@ object TmdbMetadataService {
             type = if (mediaType == TmdbEntityMediaType.TV) "series" else "movie",
             name = title,
             poster = poster,
-            banner = buildImageUrl(result.backdropPath, "w780") ?: artwork?.backdrop,
-            logo = artwork?.logo,
+            banner = buildImageUrl(result.backdropPath, "w780"),
+            logo = null,
             description = result.overview?.takeIf { it.isNotBlank() },
             releaseInfo = releaseInfo,
         )
-    }
-
-    private data class TmdbPreviewArtwork(
-        val backdrop: String?,
-        val logo: String?,
-    )
-
-    private suspend fun fetchPreviewArtwork(
-        tmdbId: Int,
-        mediaType: String,
-        language: String,
-    ): TmdbPreviewArtwork? = withContext(Dispatchers.Default) {
-        val normalizedLanguage = normalizeTmdbLanguage(language)
-        val cacheKey = "$tmdbId:$mediaType:$normalizedLanguage:preview_artwork"
-        previewArtworkCache[cacheKey]?.let { cached ->
-            return@withContext cached.takeIf { it.backdrop != null || it.logo != null }
-        }
-
-        val includeImageLanguage = buildString {
-            append(normalizedLanguage.substringBefore("-"))
-            append(",")
-            append(normalizedLanguage)
-            append(",en,null")
-        }
-
-        val response = coroutineScope {
-            val details = async {
-                fetch<TmdbDetailsResponse>(
-                    endpoint = "$mediaType/$tmdbId",
-                    query = mapOf("language" to normalizedLanguage),
-                )
-            }
-            val images = async {
-                fetch<TmdbImagesResponse>(
-                    endpoint = "$mediaType/$tmdbId/images",
-                    query = mapOf("include_image_language" to includeImageLanguage),
-                )
-            }
-            details.await() to images.await()
-        }
-
-        val artwork = TmdbPreviewArtwork(
-            backdrop = buildImageUrl(response.first?.backdropPath, "w1280"),
-            logo = buildImageUrl(response.second?.logos.orEmpty().selectBestLocalizedImagePath(normalizedLanguage), "w500"),
-        )
-        previewArtworkCache[cacheKey] = artwork
-        artwork.takeIf { it.backdrop != null || it.logo != null }
     }
 
     private fun buildEntityMediaOrder(

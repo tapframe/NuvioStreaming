@@ -16,6 +16,7 @@ data class CachedStreamLink(
     val videoSize: Long? = null,
     val infoHash: String? = null,
     val fileIdx: Int? = null,
+    val magnetUri: String? = null,
     val sources: List<String> = emptyList(),
     val bingeGroup: String? = null,
 )
@@ -52,6 +53,7 @@ object StreamLinkCacheRepository {
         videoSize: Long? = null,
         infoHash: String? = null,
         fileIdx: Int? = null,
+        magnetUri: String? = null,
         sources: List<String> = emptyList(),
         bingeGroup: String? = null,
     ) {
@@ -67,6 +69,7 @@ object StreamLinkCacheRepository {
             videoSize = videoSize,
             infoHash = infoHash,
             fileIdx = fileIdx,
+            magnetUri = magnetUri,
             sources = sources,
             bingeGroup = bingeGroup,
         )
@@ -92,7 +95,7 @@ object StreamLinkCacheRepository {
             StreamLinkCacheStorage.removeEntry(hashedKey(contentKey))
             return null
         }
-        if (entry.url.isBlank() && entry.infoHash.isNullOrBlank()) {
+        if (entry.url.isBlank() && entry.infoHash.isNullOrBlank() && entry.magnetUri.isNullOrBlank()) {
             StreamLinkCacheStorage.removeEntry(hashedKey(contentKey))
             return null
         }

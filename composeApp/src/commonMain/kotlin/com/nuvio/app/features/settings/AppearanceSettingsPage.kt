@@ -65,7 +65,7 @@ import nuvio.composeapp.generated.resources.settings_appearance_section_theme
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.nuvio.app.core.ui.rememberNuvioBottomSheetState
+import androidx.compose.material3.rememberModalBottomSheetState
 
 @OptIn(ExperimentalLayoutApi::class)
 internal fun LazyListScope.appearanceSettingsContent(
@@ -196,7 +196,7 @@ private fun AppearanceLanguageBottomSheet(
     onLanguageSelected: (AppLanguage) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberNuvioBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
     val options = remember {
         AppLanguage.entries.map { language ->

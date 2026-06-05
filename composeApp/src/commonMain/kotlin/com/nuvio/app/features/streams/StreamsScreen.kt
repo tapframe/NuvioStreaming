@@ -53,6 +53,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,11 +87,13 @@ import com.nuvio.app.core.ui.dismissNuvioBottomSheet
 import com.nuvio.app.features.downloads.DownloadsRepository
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.nuvio.app.core.ui.rememberNuvioBottomSheetState
+import androidx.compose.material3.rememberModalBottomSheetState
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.p2p.P2pSettingsRepository
+import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.launch
@@ -129,7 +132,6 @@ fun StreamsScreen(
     ) -> Unit = { _, _, _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    showBackButton: Boolean = true,
 ) {
     val uiState by StreamsRepository.uiState.collectAsStateWithLifecycle()
     val playerSettings by remember {
@@ -139,6 +141,10 @@ fun StreamsScreen(
     val debridSettings by remember {
         DebridSettingsRepository.ensureLoaded()
         DebridSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val p2pSettings by remember {
+        P2pSettingsRepository.ensureLoaded()
+        P2pSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
     val watchProgressUiState by remember {
         WatchProgressRepository.ensureLoaded()
@@ -178,6 +184,15 @@ fun StreamsScreen(
             null
         } else {
             (resumePositionMs ?: storedProgress?.takeIf { it.isResumable }?.lastPositionMs)?.takeIf { it > 0L }
+        }
+    }
+
+    DisposableEffect(P2pSettingsRepository.isVisible, p2pSettings.p2pEnabled) {
+        if (P2pSettingsRepository.isVisible && p2pSettings.p2pEnabled) {
+            P2pStreamingEngine.warmup()
+        }
+        onDispose {
+            P2pStreamingEngine.cooldownWarmup()
         }
     }
 
@@ -263,15 +278,13 @@ fun StreamsScreen(
                 .padding(start = 12.dp, top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (showBackButton) {
-                NuvioBackButton(
-                    onClick = onBack,
-                    modifier = Modifier
-                        .size(40.dp),
-                    containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.45f),
-                    contentColor = MaterialTheme.colorScheme.onBackground,
-                )
-            }
+            NuvioBackButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .size(40.dp),
+                containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.45f),
+                contentColor = MaterialTheme.colorScheme.onBackground,
+            )
 
             Box(
                 modifier = Modifier
@@ -1129,7 +1142,7 @@ private fun StreamActionsSheet(
 ) {
     if (stream == null) return
 
-    val sheetState = rememberNuvioBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
 
     NuvioModalBottomSheet(

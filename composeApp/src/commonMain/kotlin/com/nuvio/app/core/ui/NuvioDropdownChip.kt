@@ -18,7 +18,9 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +51,7 @@ fun NuvioDropdownChip(
     modifier: Modifier = Modifier,
 ) {
     var isSheetVisible by remember { mutableStateOf(false) }
-    val sheetState = rememberNuvioBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
 
     Row(
@@ -115,7 +117,7 @@ private fun NuvioDropdownOptionsSheet(
     title: String,
     options: List<NuvioDropdownOption>,
     selectedKey: String?,
-    sheetState: NuvioBottomSheetState,
+    sheetState: SheetState,
     onDismiss: () -> Unit,
     onSelected: (NuvioDropdownOption) -> Unit,
 ) {

@@ -140,46 +140,75 @@ android_flavor_task_part() {
   esac
 }
 
-android_apk_path() {
+android_apk_dir() {
   local flavor="$1"
 
   case "$flavor" in
     full)
-      echo "$ROOT_DIR/composeApp/build/outputs/apk/full/debug/composeApp-full-debug.apk"
+      echo "$ROOT_DIR/composeApp/build/outputs/apk/full/debug"
       ;;
     playstore)
-      echo "$ROOT_DIR/composeApp/build/outputs/apk/playstore/debug/composeApp-playstore-debug.apk"
+      echo "$ROOT_DIR/composeApp/build/outputs/apk/playstore/debug"
       ;;
   esac
 }
 
-build_android_apk() {
+android_device_primary_abi() {
+  local serial="$1"
+  adb -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\r'
+}
+
+android_split_apk_path() {
   local flavor="$1"
-  local flavor_task_part
+  local serial="$2"
+  local apk_dir
+  local abi
   local apk_path
 
-  flavor_task_part="$(android_flavor_task_part "$flavor")"
-  apk_path="$(android_apk_path "$flavor")"
+  apk_dir="$(android_apk_dir "$flavor")"
+  abi="$(android_device_primary_abi "$serial")"
 
-  echo "Building Android $flavor debug APK..." >&2
-  "$GRADLEW" ":composeApp:assemble${flavor_task_part}Debug" >&2
+  apk_path="$(find "$apk_dir" -maxdepth 1 -type f -name "*-${abi}-debug.apk" | sort | head -n 1)"
+  if [[ -z "$apk_path" ]]; then
+    apk_path="$(find "$apk_dir" -maxdepth 1 -type f -name "*${abi}*.apk" | sort | head -n 1)"
+  fi
 
-  if [[ ! -f "$apk_path" ]]; then
-    echo "Expected APK not found at: $apk_path" >&2
+  if [[ -z "$apk_path" || ! -f "$apk_path" ]]; then
+    echo "Expected split APK for ABI '$abi' not found in: $apk_dir" >&2
+    find "$apk_dir" -maxdepth 1 -type f -name "*.apk" -print >&2 || true
     exit 1
   fi
 
   printf '%s\n' "$apk_path"
 }
 
+build_android_apks() {
+  local flavor="$1"
+  local flavor_task_part
+  local apk_dir
+
+  flavor_task_part="$(android_flavor_task_part "$flavor")"
+  apk_dir="$(android_apk_dir "$flavor")"
+
+  echo "Building Android $flavor debug split APKs..." >&2
+  "$GRADLEW" ":composeApp:assemble${flavor_task_part}Debug" >&2
+
+  if ! find "$apk_dir" -maxdepth 1 -type f -name "*.apk" | grep -q .; then
+    echo "Expected split APKs not found in: $apk_dir" >&2
+    exit 1
+  fi
+}
+
 install_and_launch_android() {
   local device_label="$1"
-  local apk_path="$2"
+  local flavor="$2"
   shift 2
 
+  local apk_path
   local serial
   for serial in "$@"; do
-    echo "Installing on $device_label $serial..."
+    apk_path="$(android_split_apk_path "$flavor" "$serial")"
+    echo "Installing on $device_label $serial: $apk_path"
     adb -s "$serial" install -r "$apk_path"
 
     echo "Launching app on $serial..."
@@ -248,10 +277,9 @@ run_android_emulator() {
     wait_for_android_emulator "$serial"
   done
 
-  local apk_path
-  apk_path="$(build_android_apk "$flavor")"
+  build_android_apks "$flavor"
 
-  install_and_launch_android "emulator" "$apk_path" "${booted_serials[@]}"
+  install_and_launch_android "emulator" "$flavor" "${booted_serials[@]}"
 }
 
 run_android_physical() {
@@ -280,10 +308,9 @@ run_android_physical() {
     wait_for_android_device "$serial"
   done
 
-  local apk_path
-  apk_path="$(build_android_apk "$flavor")"
+  build_android_apks "$flavor"
 
-  install_and_launch_android "physical device" "$apk_path" "${serials[@]}"
+  install_and_launch_android "physical device" "$flavor" "${serials[@]}"
 }
 
 run_ios_simulator() {
