@@ -19,8 +19,11 @@ import kotlinx.serialization.json.Json
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.player_error_mpv_unavailable
 import org.jetbrains.compose.resources.getString
+import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSOperationQueue
 
 private const val TAG = "NuvioiOSPlayer"
+private const val playerPiPDidRequestExitPlaybackNotificationName = "NuvioPlayerPiPDidRequestExitPlayback"
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
@@ -37,11 +40,13 @@ actual fun PlatformPlayerSurface(
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
+    onExitRequested: (() -> Unit)?,
 ) {
     sanitizePlaybackResponseHeaders(sourceResponseHeaders)
     val latestOnControllerReady = rememberUpdatedState(onControllerReady)
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
+    val latestOnExitRequested = rememberUpdatedState(onExitRequested)
     PlayerSettingsRepository.ensureLoaded()
     val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     val latestPlayerSettings = rememberUpdatedState(playerSettings)
@@ -77,6 +82,18 @@ actual fun PlatformPlayerSurface(
 
             override fun retry() {
                 bridge.retry()
+            }
+
+            override fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {
+                bridge.updateNowPlayingMetadata(
+                    title = info.title,
+                    subtitle = info.subtitle,
+                    artworkUrl = info.artworkUrl,
+                )
+            }
+
+            override fun clearNowPlayingInfo() {
+                bridge.clearNowPlayingInfo()
             }
 
             override fun configureIosVideoOutput(settings: PlayerSettingsUiState) {
@@ -274,6 +291,7 @@ actual fun PlatformPlayerSurface(
     LaunchedEffect(bridge) {
         var lastReportedError: String? = null
         while (isActive) {
+            bridge.pollPlaybackState()
             val snapshot = PlayerPlaybackSnapshot(
                 isLoading = bridge.getIsLoading(),
                 isPlaying = bridge.getIsPlaying(),
@@ -290,6 +308,19 @@ actual fun PlatformPlayerSurface(
                 latestOnError.value(errorMessage)
             }
             delay(250L)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val observer = NSNotificationCenter.defaultCenter.addObserverForName(
+            name = playerPiPDidRequestExitPlaybackNotificationName,
+            `object` = null,
+            queue = NSOperationQueue.mainQueue,
+        ) { _ ->
+            latestOnExitRequested.value?.invoke()
+        }
+        onDispose {
+            NSNotificationCenter.defaultCenter.removeObserver(observer)
         }
     }
 

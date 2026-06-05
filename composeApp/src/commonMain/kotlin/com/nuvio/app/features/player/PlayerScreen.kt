@@ -274,6 +274,31 @@ fun PlayerScreen(
         var playerController by remember { mutableStateOf<PlayerEngineController?>(null) }
         var playerControllerSourceUrl by remember { mutableStateOf<String?>(null) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
+        val nowPlayingMetadata = remember(
+            title,
+            activeStreamTitle,
+            activeSeasonNumber,
+            activeEpisodeNumber,
+            activeEpisodeTitle,
+            poster,
+            background,
+        ) {
+            val isEpisode = activeSeasonNumber != null && activeEpisodeNumber != null
+            PlayerNowPlayingInfo(
+                title = title.ifBlank { activeStreamTitle },
+                subtitle = buildNowPlayingSubtitle(
+                    isEpisode = isEpisode,
+                    seasonNumber = activeSeasonNumber,
+                    episodeNumber = activeEpisodeNumber,
+                    episodeTitle = activeEpisodeTitle,
+                ),
+                artworkUrl = firstNonBlankUrl(poster, background),
+                isPlaying = false,
+                positionMs = 0L,
+                durationMs = 0L,
+                playbackSpeed = 1f,
+            )
+        }
         val keepScreenAwake = errorMessage == null &&
             (playbackSnapshot.isPlaying || (shouldPlay && playbackSnapshot.isLoading))
         EnterImmersivePlayerMode(keepScreenAwake = keepScreenAwake)
@@ -2310,6 +2335,11 @@ fun PlayerScreen(
             }
         }
 
+        LaunchedEffect(playerController, playerControllerSourceUrl, activeSourceUrl, nowPlayingMetadata) {
+            val controller = playerController ?: return@LaunchedEffect
+            controller.updateNowPlayingMetadata(nowPlayingMetadata)
+        }
+
         DisposableEffect(playbackSession.videoId, activeSourceUrl, activeSourceAudioUrl) {
             onDispose {
                 flushWatchProgress()
@@ -2489,7 +2519,9 @@ fun PlayerScreen(
                     onSnapshot = { snapshot ->
                         playbackSnapshot = snapshot
                         if (!snapshot.isLoading) {
-                            initialLoadCompleted = true
+                            if (!initialLoadCompleted) {
+                                initialLoadCompleted = true
+                            }
                         }
                         if (snapshot.isEnded) {
                             shouldPlay = false
@@ -2513,6 +2545,7 @@ fun PlayerScreen(
                             }
                         }
                     },
+                    onExitRequested = onBackWithProgress,
                 )
             }
 
@@ -3125,4 +3158,32 @@ private fun findPersistedSubtitleTrackIndex(
         tracks.firstOrNull { it.label.equals(name, ignoreCase = true) }?.let { return it.index }
     }
     return -1
+}
+
+private fun buildNowPlayingSubtitle(
+    isEpisode: Boolean,
+    seasonNumber: Int?,
+    episodeNumber: Int?,
+    episodeTitle: String?,
+): String? {
+    if (!isEpisode) return null
+
+    val episodeParts = buildList {
+        if (seasonNumber != null && episodeNumber != null) {
+            add("S${seasonNumber}E${episodeNumber}")
+        }
+        episodeTitle?.takeIf { it.isNotBlank() }?.let { add(it) }
+    }
+
+    val episodeLabel = when (episodeParts.size) {
+        0 -> null
+        1 -> episodeParts.first()
+        else -> "${episodeParts[0]} • ${episodeParts[1]}"
+    }
+
+    return episodeLabel
+}
+
+private fun firstNonBlankUrl(vararg values: String?): String? {
+    return values.firstOrNull { !it.isNullOrBlank() }?.trim()
 }

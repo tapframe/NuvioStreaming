@@ -21,6 +21,8 @@ interface PlayerEngineController {
     fun applySubtitleStyle(style: SubtitleStyleState) {}
     fun setSubtitleDelayMs(delayMs: Int) {}
     fun configureIosVideoOutput(settings: PlayerSettingsUiState) {}
+    fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {}
+    fun clearNowPlayingInfo() {}
 }
 
 internal fun sanitizePlaybackHeaders(headers: Map<String, String>?): Map<String, String> {
@@ -66,4 +68,5 @@ expect fun PlatformPlayerSurface(
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
+    onExitRequested: (() -> Unit)? = null,
 )

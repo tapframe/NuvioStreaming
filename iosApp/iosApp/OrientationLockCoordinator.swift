@@ -90,20 +90,15 @@ final class OrientationLockCoordinator {
 
     private func requestOrientationUpdate(for mask: UIInterfaceOrientationMask, forceRotate: Bool) {
         if #available(iOS 16.0, *) {
-            let preferences = UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: mask)
             UIApplication.shared.connectedScenes
                 .compactMap { $0 as? UIWindowScene }
+                .filter { $0.activationState == .foregroundActive }
                 .forEach { scene in
-                    scene.requestGeometryUpdate(preferences) { error in
-                        print("[OrientationLockCoordinator] Geometry update failed: \(error.localizedDescription)")
-                    }
+                    scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
                 }
-            UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap(\.windows)
-                .forEach { window in
-                    window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
-                }
+            if forceRotate {
+                UIViewController.attemptRotationToDeviceOrientation()
+            }
         } else {
             if forceRotate {
                 UIDevice.current.setValue(preferredLandscapeOrientation.rawValue, forKey: "orientation")

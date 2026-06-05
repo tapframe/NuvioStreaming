@@ -1,4 +1,9 @@
 import Foundation
+import AVFoundation
+import AVKit
+import CoreMedia
+import CoreVideo
+import MediaPlayer
 import UIKit
 import Libmpv
 import ComposeApp
@@ -28,6 +33,18 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func seekTo(positionMs: Int64) { playerVC?.seekToMs(positionMs) }
     func seekBy(offsetMs: Int64) { playerVC?.seekByMs(offsetMs) }
     func retry() { playerVC?.retryPlayback() }
+    func updateNowPlayingMetadata(
+        title: String,
+        subtitle: String?,
+        artworkUrl: String?
+    ) {
+        playerVC?.updateNowPlayingMetadata(
+            title: title,
+            subtitle: subtitle,
+            artworkUrl: artworkUrl
+        )
+    }
+    func clearNowPlayingInfo() { playerVC?.clearNowPlayingInfo() }
     func configureVideoOutput(
         hardwareDecoder: String,
         targetColorspaceHint: Bool,
@@ -135,7 +152,8 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 
     // State - refreshes position from mpv on each call (polled from Kotlin every 250ms)
-    func getIsLoading() -> Bool { playerVC?.refreshPlaybackState(); return playerVC?.isPlayerLoading ?? true }
+    func pollPlaybackState() { playerVC?.refreshPlaybackState() }
+    func getIsLoading() -> Bool { return playerVC?.isPlayerLoading ?? true }
     func getIsPlaying() -> Bool { return playerVC?.isPlayerPlaying ?? false }
     func getIsEnded() -> Bool { return playerVC?.isPlayerEnded ?? false }
     func getDurationMs() -> Int64 { return playerVC?.durationMs ?? 0 }
@@ -189,17 +207,49 @@ private struct PendingLoadRequest {
 
 // MARK: - MPV Player View Controller
 
-final class MPVPlayerViewController: UIViewController {
+final class MPVPlayerViewController: UIViewController, AVPictureInPictureSampleBufferPlaybackDelegate {
+
+    private struct CachedNowPlayingMetadata {
+        let title: String
+        let subtitle: String?
+        let artworkUrl: String?
+    }
 
     private let errorStateLock = NSLock()
-    private var metalLayer = MetalLayer()
-    private var lastAppliedDrawableSize: CGSize = .zero
+    private let pipDisplayLayer = AVSampleBufferDisplayLayer()
+    private var pipController: AVPictureInPictureController?
+    private var timebase: CMTimebase?
+    private var mpvRenderContext: OpaquePointer?
     private var pendingLoadRequest: PendingLoadRequest?
     private var pendingLoadRetryWorkItem: DispatchWorkItem?
+    private var pipStartRetryWorkItem: DispatchWorkItem?
+    private var pipForegroundTransitionTimeoutWorkItem: DispatchWorkItem?
+    private var pipPossibleObservation: NSKeyValueObservation?
+    private var audioSessionRetryWorkItem: DispatchWorkItem?
+    private var pipStartRetryCount = 0
+    private var pendingPiPStart = false
+    private var resumeInlineAfterPiPStop = false
+    private var isStoppingPiPForForegroundTransition = false
+    private var isRestoringPiPUserInterface = false
+    private var didRestorePiPUserInterface = false
+    private var shouldPresentPiPTransitionOverlay = false
+    private var didRequestForegroundTransitionStop = false
     private var mpv: OpaquePointer?
+    private var cachedNowPlayingMetadata: CachedNowPlayingMetadata?
+    private lazy var nowPlayingController = PlayerNowPlayingController(owner: self)
     private lazy var eventQueue = DispatchQueue(label: "mpv-events", qos: .userInitiated)
+    private lazy var renderQueue = DispatchQueue(label: "mpv-render", qos: .userInitiated)
     private var recentPlaybackLogs: [String] = []
     private var activeRequestHeaders: [String: String] = [:]
+    private var isAudioSessionConfigured = false
+    private var needsAudioSessionActivationOnPlayback = false
+    private let stateLock = NSLock()
+    private var renderInProgress = false
+    private var renderNeedsAnotherPass = false
+    private var renderSize: CGSize = .zero
+    private var pixelBufferPool: CVPixelBufferPool?
+    private var pipFormatDescription: CMVideoFormatDescription?
+    private let pipTransitionOverlay = UIView()
 
     // Cached track lists
     var audioTracks: [TrackInfo] = []
@@ -236,21 +286,25 @@ final class MPVPlayerViewController: UIViewController {
         .fade
     }
 
+    override var canBecomeFirstResponder: Bool {
+        true
+    }
+
+    private var isPiPEnabled: Bool {
+#if targetEnvironment(simulator)
+        return false
+#else
+        return true
+#endif
+    }
+
     // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
         view.layer.masksToBounds = true
-
-        metalLayer.contentsGravity = .resize
-        metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
-        metalLayer.framebufferOnly = true
-        metalLayer.backgroundColor = UIColor.black.cgColor
-        metalLayer.wantsExtendedDynamicRangeContent = true
-        view.layer.addSublayer(metalLayer)
-        layoutMetalLayer()
-
+        configurePipLayer()
         setupMpv()
         setupNotifications()
         refreshImmersiveSystemUI()
@@ -263,42 +317,84 @@ final class MPVPlayerViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        layoutMetalLayer()
+        layoutPipLayer()
         attemptStartPendingLoad()
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         refreshImmersiveSystemUI()
+        becomeFirstResponder()
+        UIApplication.shared.beginReceivingRemoteControlEvents()
+        publishCachedNowPlayingInfoIfNeeded()
         attemptStartPendingLoad()
     }
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        layoutMetalLayer()
+        layoutPipLayer()
         refreshImmersiveSystemUI()
         attemptStartPendingLoad()
     }
 
-    private func layoutMetalLayer() {
+    private func configurePipLayer() {
+        pipDisplayLayer.backgroundColor = UIColor.black.cgColor
+        pipDisplayLayer.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(pipDisplayLayer)
+        pipTransitionOverlay.backgroundColor = .black
+        pipTransitionOverlay.alpha = 0.0
+        pipTransitionOverlay.isUserInteractionEnabled = false
+        view.addSubview(pipTransitionOverlay)
+        layoutPipLayer()
+
+        if isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
+            let source = AVPictureInPictureController.ContentSource(
+                sampleBufferDisplayLayer: pipDisplayLayer,
+                playbackDelegate: self
+            )
+            pipController = AVPictureInPictureController(contentSource: source)
+            pipController?.canStartPictureInPictureAutomaticallyFromInline = true
+            observePictureInPictureAvailability()
+        }
+
+        createTimebaseIfNeeded()
+    }
+
+    private func observePictureInPictureAvailability() {
+        pipPossibleObservation?.invalidate()
+        pipPossibleObservation = pipController?.observe(\.isPictureInPicturePossible, options: [.initial, .new]) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.startPictureInPictureIfPossible()
+            }
+        }
+    }
+
+    private func layoutPipLayer() {
         let bounds = view.bounds
         guard bounds.width > 1, bounds.height > 1 else { return }
 
         let scale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
-        let drawableSize = CGSize(
+        let targetSize = CGSize(
             width: (bounds.width * scale).rounded(.toNearestOrAwayFromZero),
             height: (bounds.height * scale).rounded(.toNearestOrAwayFromZero)
         )
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        metalLayer.contentsScale = scale
-        metalLayer.frame = CGRect(origin: .zero, size: bounds.size)
-        if drawableSize != lastAppliedDrawableSize {
-            metalLayer.drawableSize = drawableSize
-            lastAppliedDrawableSize = drawableSize
-        }
+        pipDisplayLayer.contentsScale = scale
+        pipDisplayLayer.frame = CGRect(origin: .zero, size: bounds.size)
         CATransaction.commit()
+        pipTransitionOverlay.frame = CGRect(origin: .zero, size: bounds.size)
+
+        if renderSize != targetSize {
+            renderSize = targetSize
+            pixelBufferPool = makePixelBufferPool(width: Int(targetSize.width), height: Int(targetSize.height))
+            stateLock.lock()
+            pipFormatDescription = nil
+            stateLock.unlock()
+            flushPipLayer()
+            scheduleRender()
+        }
     }
 
     // MARK: - MPV Setup
@@ -306,35 +402,22 @@ final class MPVPlayerViewController: UIViewController {
     private func setupMpv() {
         mpv = mpv_create()
         guard mpv != nil else {
-            print("[MPV] Failed to create mpv instance")
             return
         }
 
-        checkError(mpv_request_log_messages(mpv, "warn"))
-
-        checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &metalLayer))
-        checkError(mpv_set_option_string(mpv, "vo", "gpu-next"))
-        checkError(mpv_set_option_string(mpv, "gpu-api", "vulkan"))
-        checkError(mpv_set_option_string(mpv, "gpu-context", "moltenvk"))
+        checkError(mpv_request_log_messages(mpv, "error"))
+        checkError(mpv_set_option_string(mpv, "vo", "libmpv"))
         checkError(mpv_set_option_string(mpv, "hwdec", "auto"))
-        checkError(mpv_set_option_string(mpv, "audio-channels", "stereo"))
+        checkError(mpv_set_option_string(mpv, "panscan", "1.0"))
+        checkError(mpv_set_option_string(mpv, "video-unscaled", "no"))
+        checkError(mpv_set_option_string(mpv, "audio-channels", "auto"))
         checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
-        checkError(mpv_set_option_string(mpv, "vulkan-swap-mode", "fifo"))
-        checkError(mpv_set_option_string(mpv, "vulkan-queue-count", "1"))
-        checkError(mpv_set_option_string(mpv, "vulkan-async-compute", "no"))
-        checkError(mpv_set_option_string(mpv, "vulkan-async-transfer", "no"))
-        checkError(mpv_set_option_string(mpv, "vulkan-disable-interop", "yes"))
-        checkError(mpv_set_option_string(mpv, "video-rotate", "no"))
+        checkError(mpv_set_option_string(mpv, "keep-open", "yes"))
         checkError(mpv_set_option_string(mpv, "subs-match-os-language", "yes"))
         checkError(mpv_set_option_string(mpv, "subs-fallback", "yes"))
-        checkError(mpv_set_option_string(mpv, "keep-open", "yes"))
-        checkError(mpv_set_option_string(mpv, "target-colorspace-hint", "yes"))
-        checkError(mpv_set_option_string(mpv, "tone-mapping", "auto"))
-        checkError(mpv_set_option_string(mpv, "hdr-compute-peak", "yes"))
 
         checkError(mpv_initialize(mpv))
 
-        // Observe properties
         mpv_observe_property(mpv, 0, "pause", MPV_FORMAT_FLAG)
         mpv_observe_property(mpv, 0, "paused-for-cache", MPV_FORMAT_FLAG)
         mpv_observe_property(mpv, 0, "core-idle", MPV_FORMAT_FLAG)
@@ -346,25 +429,440 @@ final class MPVPlayerViewController: UIViewController {
             let vc = unsafeBitCast(ctx, to: MPVPlayerViewController.self)
             vc.readEvents()
         }, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
+
+        setupRenderContext()
+    }
+
+    private func setupRenderContext() {
+        guard let mpv else { return }
+        let api = UnsafeMutableRawPointer(mutating: (MPV_RENDER_API_TYPE_SW as NSString).utf8String)
+        var advancedControl: CInt = 1
+        var didCreateContext = false
+
+        withUnsafeMutablePointer(to: &advancedControl) { advancedControlPtr in
+            var params = [
+                mpv_render_param(type: MPV_RENDER_PARAM_API_TYPE, data: api),
+                mpv_render_param(type: MPV_RENDER_PARAM_ADVANCED_CONTROL, data: advancedControlPtr),
+                mpv_render_param()
+            ]
+            if mpv_render_context_create(&mpvRenderContext, mpv, &params) < 0 {
+                return
+            }
+            didCreateContext = true
+        }
+
+        guard didCreateContext, mpvRenderContext != nil else { return }
+
+        mpv_render_context_set_update_callback(
+            mpvRenderContext,
+            { ctx in
+                let controller = Unmanaged<MPVPlayerViewController>.fromOpaque(ctx!).takeUnretainedValue()
+                controller.scheduleRender()
+            },
+            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        )
+    }
+
+    private func scheduleRender() {
+        guard mpvRenderContext != nil, renderSize.width > 1, renderSize.height > 1 else { return }
+
+        stateLock.lock()
+        renderNeedsAnotherPass = true
+        guard !renderInProgress else {
+            stateLock.unlock()
+            return
+        }
+        renderInProgress = true
+        renderNeedsAnotherPass = false
+        stateLock.unlock()
+
+        renderQueue.async { [weak self] in
+            self?.performRender()
+        }
+    }
+
+    private func performRender() {
+        defer {
+            let shouldContinue: Bool
+            stateLock.lock()
+            shouldContinue = renderNeedsAnotherPass
+            renderNeedsAnotherPass = false
+            renderInProgress = false
+            stateLock.unlock()
+            if shouldContinue {
+                scheduleRender()
+            }
+        }
+
+        guard let ctx = mpvRenderContext else { return }
+        let updateFlags = mpv_render_context_update(ctx)
+        guard updateFlags & UInt64(MPV_RENDER_UPDATE_FRAME.rawValue) != 0 else { return }
+        guard let pixelBuffer = makeRenderPixelBuffer() else { return }
+
+        CVPixelBufferLockBaseAddress(pixelBuffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
+
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        var size = [Int32(Int(renderSize.width)), Int32(Int(renderSize.height))]
+        var stride = bytesPerRow
+        var blockForTargetTime: CInt = 0
+        let format = UnsafeMutableRawPointer(mutating: ("bgr0" as NSString).utf8String)
+
+        size.withUnsafeMutableBufferPointer { sizePtr in
+            withUnsafeMutablePointer(to: &stride) { stridePtr in
+                withUnsafeMutablePointer(to: &blockForTargetTime) { blockPtr in
+                    var params = [
+                        mpv_render_param(type: MPV_RENDER_PARAM_SW_SIZE, data: sizePtr.baseAddress),
+                        mpv_render_param(type: MPV_RENDER_PARAM_SW_FORMAT, data: format),
+                        mpv_render_param(type: MPV_RENDER_PARAM_SW_STRIDE, data: stridePtr),
+                        mpv_render_param(type: MPV_RENDER_PARAM_SW_POINTER, data: baseAddress),
+                        mpv_render_param(type: MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME, data: blockPtr),
+                        mpv_render_param()
+                    ]
+                    _ = mpv_render_context_render(ctx, &params)
+                }
+            }
+        }
+
+        enqueue(frame: pixelBuffer, mediaTime: currentPresentationTime())
+    }
+
+    private func makeRenderPixelBuffer() -> CVPixelBuffer? {
+        guard renderSize.width > 1, renderSize.height > 1 else { return nil }
+        if let pool = pixelBufferPool {
+            var pixelBuffer: CVPixelBuffer?
+            let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &pixelBuffer)
+            if status == kCVReturnSuccess, let pixelBuffer {
+                return pixelBuffer
+            }
+        }
+
+        let attributes: [CFString: Any] = [
+            kCVPixelBufferCGImageCompatibilityKey: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+            kCVPixelBufferIOSurfacePropertiesKey: [:]
+        ]
+
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            Int(renderSize.width),
+            Int(renderSize.height),
+            kCVPixelFormatType_32BGRA,
+            attributes as CFDictionary,
+            &pixelBuffer
+        )
+        guard status == kCVReturnSuccess, let pixelBuffer else { return nil }
+        return pixelBuffer
+    }
+
+    private func makePixelBufferPool(width: Int, height: Int) -> CVPixelBufferPool? {
+        let poolAttributes: [CFString: Any] = [
+            kCVPixelBufferPoolMinimumBufferCountKey: 3
+        ]
+        let pixelAttributes: [CFString: Any] = [
+            kCVPixelBufferCGImageCompatibilityKey: true,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: true,
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+            kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
+            kCVPixelBufferWidthKey: width,
+            kCVPixelBufferHeightKey: height
+        ]
+
+        var pool: CVPixelBufferPool?
+        let status = CVPixelBufferPoolCreate(
+            kCFAllocatorDefault,
+            poolAttributes as CFDictionary,
+            pixelAttributes as CFDictionary,
+            &pool
+        )
+        guard status == kCVReturnSuccess else { return nil }
+        return pool
+    }
+
+    private func enqueue(frame pixelBuffer: CVPixelBuffer, mediaTime: CMTime) {
+        stateLock.lock()
+        if pipFormatDescription == nil {
+            var formatDescription: CMVideoFormatDescription?
+            guard CMVideoFormatDescriptionCreateForImageBuffer(
+                allocator: kCFAllocatorDefault,
+                imageBuffer: pixelBuffer,
+                formatDescriptionOut: &formatDescription
+            ) == noErr, let formatDescription else {
+                stateLock.unlock()
+                return
+            }
+            pipFormatDescription = formatDescription
+        }
+        let formatDescription = pipFormatDescription
+        stateLock.unlock()
+        guard let formatDescription else { return }
+
+        var timing = CMSampleTimingInfo(
+            duration: CMTime(value: 1, timescale: 30),
+            presentationTimeStamp: mediaTime,
+            decodeTimeStamp: .invalid
+        )
+        var sampleBuffer: CMSampleBuffer?
+        let status = CMSampleBufferCreateReadyWithImageBuffer(
+            allocator: kCFAllocatorDefault,
+            imageBuffer: pixelBuffer,
+            formatDescription: formatDescription,
+            sampleTiming: &timing,
+            sampleBufferOut: &sampleBuffer
+        )
+        guard status == noErr, let sampleBuffer else { return }
+
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: true),
+           CFArrayGetCount(attachments) > 0,
+           let attachment = CFArrayGetValueAtIndex(attachments, 0) {
+            let dictionary = unsafeBitCast(attachment, to: CFMutableDictionary.self)
+            CFDictionarySetValue(
+                dictionary,
+                Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
+                Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
+            )
+        }
+
+        if pipDisplayLayer.status == .failed {
+            pipDisplayLayer.flushAndRemoveImage()
+        }
+        pipDisplayLayer.enqueue(sampleBuffer)
+    }
+
+    private func flushPipLayer() {
+        DispatchQueue.main.async { [weak self] in
+            self?.pipDisplayLayer.flushAndRemoveImage()
+        }
+    }
+
+    private func createTimebaseIfNeeded() {
+        guard timebase == nil else { return }
+        var tb: CMTimebase?
+        let result = CMTimebaseCreateWithSourceClock(
+            allocator: kCFAllocatorDefault,
+            sourceClock: CMClockGetHostTimeClock(),
+            timebaseOut: &tb
+        )
+        guard result == noErr, let tb else { return }
+        timebase = tb
+        pipDisplayLayer.controlTimebase = tb
+        CMTimebaseSetRate(tb, rate: 0.0)
+        CMTimebaseSetTime(tb, time: .zero)
+    }
+
+    private func setTimebaseTime(seconds: Double) {
+        createTimebaseIfNeeded()
+        guard let timebase else { return }
+        let time = CMTime(seconds: seconds, preferredTimescale: 600)
+        CMTimebaseSetRate(timebase, rate: 0.0)
+        CMTimebaseSetTime(timebase, time: time)
+    }
+
+    private func setPlaybackRate(_ rate: Double) {
+        createTimebaseIfNeeded()
+        guard let timebase else { return }
+        CMTimebaseSetRate(timebase, rate: rate)
+    }
+
+    private func currentPresentationTime() -> CMTime {
+        CMTime(seconds: Double(positionMs) / 1000.0, preferredTimescale: 600)
+    }
+
+    private func invalidatePipPlaybackState() {
+        guard isPiPEnabled else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pipController?.invalidatePlaybackState()
+        }
     }
 
     private func setupNotifications() {
-        NotificationCenter.default.addObserver(self, selector: #selector(enterBackground),
+        NotificationCenter.default.addObserver(self, selector: #selector(willResignActive),
+                                               name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(didEnterBackground),
                                                name: UIApplication.didEnterBackgroundNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(enterForeground),
-                                               name: UIApplication.willEnterForegroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(didBecomeActive),
+                                               name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
-    @objc private func enterBackground() {
-        guard mpv != nil else { return }
-        pausePlayback()
-        setStringProperty("vid", "no")
+    @objc private func willResignActive() {
+        guard !isStoppingPiPForForegroundTransition else {
+            return
+        }
+        pendingPiPStart = true
+        pipStartRetryCount = 0
     }
 
-    @objc private func enterForeground() {
-        guard mpv != nil else { return }
-        setStringProperty("vid", "auto")
-        playPlayback()
+    @objc private func didEnterBackground() {
+        guard pendingPiPStart else { return }
+        startPictureInPictureIfPossible()
+    }
+
+    @objc private func didBecomeActive() {
+        if isRestoringPiPUserInterface {
+            refreshPlaybackState()
+            return
+        }
+        if isStoppingPiPForForegroundTransition {
+            if pipController?.isPictureInPictureActive != true {
+                completePiPForegroundTransition()
+            }
+            refreshPlaybackState()
+            return
+        }
+
+        if pipController?.isPictureInPictureActive == true {
+            stopPictureInPictureForForegroundTransition()
+        } else {
+            hidePiPTransitionOverlay()
+        }
+        refreshPlaybackState()
+    }
+
+    private func stopPictureInPictureForForegroundTransition() {
+        guard !isStoppingPiPForForegroundTransition else { return }
+        guard let pipController, pipController.isPictureInPictureActive else {
+            cancelPendingPiPStart()
+            shouldPresentPiPTransitionOverlay = false
+            hidePiPTransitionOverlay()
+            return
+        }
+
+        isStoppingPiPForForegroundTransition = true
+        didRestorePiPUserInterface = false
+        didRequestForegroundTransitionStop = true
+        resumeInlineAfterPiPStop = isPlayerPlaying
+        shouldPresentPiPTransitionOverlay = true
+        showPiPTransitionOverlay()
+        cancelPendingPiPStart()
+        schedulePiPForegroundTransitionTimeout()
+        pipController.stopPictureInPicture()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            guard let self, self.isStoppingPiPForForegroundTransition else { return }
+            self.completePiPForegroundTransition()
+        }
+    }
+
+    private func completePiPForegroundTransition() {
+        pipForegroundTransitionTimeoutWorkItem?.cancel()
+        pipForegroundTransitionTimeoutWorkItem = nil
+        let shouldResume = resumeInlineAfterPiPStop
+        resumeInlineAfterPiPStop = false
+        isStoppingPiPForForegroundTransition = false
+        isRestoringPiPUserInterface = false
+        shouldPresentPiPTransitionOverlay = false
+        if shouldResume {
+            DispatchQueue.main.async { [weak self] in
+                self?.playPlayback()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+                    guard let self else { return }
+                    self.hidePiPTransitionOverlay()
+                }
+            }
+        } else {
+            hidePiPTransitionOverlay()
+        }
+    }
+
+    private func startPictureInPictureIfPossible() {
+        guard isPiPEnabled else { return }
+        guard let pipController else { return }
+        guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
+        guard pendingPiPStart else { return }
+        guard !isStoppingPiPForForegroundTransition else {
+            return
+        }
+        guard UIApplication.shared.applicationState == .background else {
+            schedulePiPStartRetry()
+            return
+        }
+
+        if pipController.isPictureInPictureActive {
+            cancelPendingPiPStart()
+            return
+        }
+
+        guard pipController.isPictureInPicturePossible else {
+            schedulePiPStartRetry()
+            return
+        }
+
+        cancelPendingPiPStart()
+        didRestorePiPUserInterface = false
+        didRequestForegroundTransitionStop = false
+        pipController.startPictureInPicture()
+    }
+
+    private func schedulePiPStartRetry() {
+        guard pendingPiPStart else { return }
+        guard pipStartRetryCount < 20 else { return }
+        guard pipStartRetryWorkItem == nil else { return }
+
+        pipStartRetryCount += 1
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pipStartRetryWorkItem = nil
+            self.startPictureInPictureIfPossible()
+            if self.pendingPiPStart && self.pipController?.isPictureInPicturePossible != true {
+                self.schedulePiPStartRetry()
+            }
+        }
+        pipStartRetryWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
+    }
+
+    private func teardownPiPIfNeeded() {
+        cancelPendingPiPStart()
+        pipForegroundTransitionTimeoutWorkItem?.cancel()
+        pipForegroundTransitionTimeoutWorkItem = nil
+        shouldPresentPiPTransitionOverlay = false
+        if pipController?.isPictureInPictureActive == true {
+            pipController?.stopPictureInPicture()
+        }
+    }
+
+    private func cancelPendingPiPStart() {
+        pendingPiPStart = false
+        pipStartRetryCount = 0
+        pipStartRetryWorkItem?.cancel()
+        pipStartRetryWorkItem = nil
+    }
+
+    private func schedulePiPForegroundTransitionTimeout() {
+        pipForegroundTransitionTimeoutWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard self.isStoppingPiPForForegroundTransition else { return }
+            self.completePiPForegroundTransition()
+        }
+        pipForegroundTransitionTimeoutWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
+    }
+
+    private func showPiPTransitionOverlay() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard self.shouldPresentPiPTransitionOverlay else { return }
+            self.pipTransitionOverlay.layer.removeAllAnimations()
+            self.pipTransitionOverlay.isHidden = false
+            UIView.animate(withDuration: 0.18, delay: 0.0, options: [.beginFromCurrentState, .curveEaseOut]) {
+                self.pipTransitionOverlay.alpha = 1.0
+            }
+        }
+    }
+
+    private func hidePiPTransitionOverlay() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pipTransitionOverlay.layer.removeAllAnimations()
+            UIView.animate(withDuration: 0.18, delay: 0.0, options: [.beginFromCurrentState, .curveEaseIn], animations: {
+                self.pipTransitionOverlay.alpha = 0.0
+            }, completion: { _ in
+                self.pipTransitionOverlay.isHidden = true
+            })
+        }
     }
 
     // MARK: - Playback API
@@ -394,8 +892,11 @@ final class MPVPlayerViewController: UIViewController {
     private func attemptStartPendingLoad() {
         guard let request = pendingLoadRequest else { return }
         guard mpv != nil else { return }
-        layoutMetalLayer()
-        guard isViewportReadyForPlayback(queuedAtUptime: request.queuedAtUptime) else {
+        guard isViewLoaded, view.window != nil else {
+            schedulePendingLoadRetry()
+            return
+        }
+        guard view.bounds.width > 1, view.bounds.height > 1 else {
             schedulePendingLoadRetry()
             return
         }
@@ -408,19 +909,24 @@ final class MPVPlayerViewController: UIViewController {
 
     private func startLoad(_ request: PendingLoadRequest) {
         guard mpv != nil else { return }
-        layoutMetalLayer()
+        needsAudioSessionActivationOnPlayback = true
+        configureAudioSession()
         clearPlaybackError()
         let sanitizedHeaders = sanitizeRequestHeaders(request.requestHeaders)
         activeRequestHeaders = sanitizedHeaders
         applyRequestHeaders(sanitizedHeaders)
         isPlayerLoading = true
         isPlayerEnded = false
+        isPlayerPlaying = false
+        setTimebaseTime(seconds: 0)
+        flushPipLayer()
         command("loadfile", args: [request.urlString, "replace"])
         if let audioUrl = request.audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 self?.command("audio-add", args: [audioUrl, "select"], checkForErrors: false)
             }
         }
+        scheduleRender()
     }
 
     private func isViewportReadyForPlayback(queuedAtUptime: TimeInterval) -> Bool {
@@ -446,24 +952,82 @@ final class MPVPlayerViewController: UIViewController {
 
     func playPlayback() {
         guard mpv != nil else { return }
+        if pendingLoadRequest == nil && !isPlayerLoading {
+            configureAudioSession()
+        }
+        if needsAudioSessionActivationOnPlayback, !isAudioSessionConfigured {
+            configureAudioSession()
+        }
         setFlag("pause", false)
+        setPlaybackRate(1.0)
+        scheduleRender()
+        isPlayerPlaying = true
+        isPlayerLoading = false
+        isPlayerEnded = false
+        invalidatePipPlaybackState()
+        nowPlayingController.syncPlayback(
+            positionMs: positionMs,
+            durationMs: durationMs,
+            isPlaying: true,
+            playbackSpeed: currentSpeed
+        )
     }
 
     func pausePlayback() {
         guard mpv != nil else { return }
         setFlag("pause", true)
+        setPlaybackRate(0.0)
+        isPlayerPlaying = false
+        invalidatePipPlaybackState()
+        nowPlayingController.syncPlayback(
+            positionMs: positionMs,
+            durationMs: durationMs,
+            isPlaying: false,
+            playbackSpeed: currentSpeed
+        )
     }
 
     func seekToMs(_ ms: Int64) {
         guard mpv != nil else { return }
+        let wasPlaying = isPlayerPlaying
         let seconds = Double(ms) / 1000.0
+        setTimebaseTime(seconds: seconds)
+        flushPipLayer()
         command("seek", args: [String(format: "%.3f", seconds), "absolute"])
+        if wasPlaying {
+            setFlag("pause", false)
+            setPlaybackRate(1.0)
+            isPlayerPlaying = true
+            currentSpeed = 1.0
+        }
+        scheduleRender()
+        nowPlayingController.syncPlayback(
+            positionMs: ms,
+            durationMs: durationMs,
+            isPlaying: wasPlaying || isPlayerPlaying,
+            playbackSpeed: wasPlaying ? 1.0 : currentSpeed
+        )
     }
 
     func seekByMs(_ ms: Int64) {
         guard mpv != nil else { return }
+        let wasPlaying = isPlayerPlaying
         let seconds = Double(ms) / 1000.0
+        flushPipLayer()
         command("seek", args: [String(format: "%.3f", seconds), "relative"])
+        if wasPlaying {
+            setFlag("pause", false)
+            setPlaybackRate(1.0)
+            isPlayerPlaying = true
+            currentSpeed = 1.0
+        }
+        scheduleRender()
+        nowPlayingController.syncPlayback(
+            positionMs: positionMs,
+            durationMs: durationMs,
+            isPlaying: wasPlaying || isPlayerPlaying,
+            playbackSpeed: wasPlaying ? 1.0 : currentSpeed
+        )
     }
 
     func retryPlayback() {
@@ -477,6 +1041,36 @@ final class MPVPlayerViewController: UIViewController {
                 self?.command("seek", args: [String(format: "%.3f", pos), "absolute"])
             }
         }
+    }
+
+    private func configureAudioSession() {
+        guard !isAudioSessionConfigured else { return }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay])
+            try session.setActive(true)
+            isAudioSessionConfigured = true
+            needsAudioSessionActivationOnPlayback = false
+            audioSessionRetryWorkItem?.cancel()
+            audioSessionRetryWorkItem = nil
+        } catch {
+            scheduleAudioSessionRetryIfNeeded()
+            return
+        }
+    }
+
+    private func scheduleAudioSessionRetryIfNeeded() {
+        guard needsAudioSessionActivationOnPlayback else { return }
+        guard audioSessionRetryWorkItem == nil else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.audioSessionRetryWorkItem = nil
+            guard self.needsAudioSessionActivationOnPlayback, !self.isAudioSessionConfigured else { return }
+            self.configureAudioSession()
+        }
+        audioSessionRetryWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: workItem)
     }
 
     func configureVideoOutput(
@@ -494,7 +1088,6 @@ final class MPVPlayerViewController: UIViewController {
         saturation: Int,
         gamma: Int
     ) {
-        metalLayer.wantsExtendedDynamicRangeContent = extendedDynamicRange
         guard mpv != nil else { return }
 
         setStringProperty("hwdec", hardwareDecoder)
@@ -509,6 +1102,9 @@ final class MPVPlayerViewController: UIViewController {
         setVideoEqualizer("contrast", contrast)
         setVideoEqualizer("saturation", saturation)
         setVideoEqualizer("gamma", gamma)
+        if #available(iOS 17.0, *) {
+            pipDisplayLayer.wantsExtendedDynamicRangeContent = extendedDynamicRange
+        }
     }
 
     func setSpeed(_ speed: Float) {
@@ -538,6 +1134,7 @@ final class MPVPlayerViewController: UIViewController {
         guard mpv != nil else { return }
         var id = Int64(trackId)
         mpv_set_property(mpv, "aid", MPV_FORMAT_INT64, &id)
+        invalidatePipPlaybackState()
     }
 
     func selectSubtitle(_ trackId: Int) {
@@ -548,11 +1145,13 @@ final class MPVPlayerViewController: UIViewController {
             var id = Int64(trackId)
             mpv_set_property(mpv, "sid", MPV_FORMAT_INT64, &id)
         }
+        invalidatePipPlaybackState()
     }
 
     func addSubtitleUrl(_ url: String) {
         guard mpv != nil else { return }
         command("sub-add", args: [url, "select"])
+        invalidatePipPlaybackState()
     }
 
     func removeExternalSubtitles() {
@@ -567,6 +1166,7 @@ final class MPVPlayerViewController: UIViewController {
             }
         }
         setStringProperty("sid", "no")
+        invalidatePipPlaybackState()
     }
 
     func removeExternalSubtitlesAndSelect(_ trackId: Int) {
@@ -584,6 +1184,7 @@ final class MPVPlayerViewController: UIViewController {
             selectSubtitle(trackId)
         } else {
             setStringProperty("sid", "no")
+            invalidatePipPlaybackState()
         }
     }
 
@@ -623,12 +1224,32 @@ final class MPVPlayerViewController: UIViewController {
 
     func destroyPlayer() {
         NotificationCenter.default.removeObserver(self)
+        UIApplication.shared.endReceivingRemoteControlEvents()
+        resignFirstResponder()
+        pipPossibleObservation?.invalidate()
+        pipPossibleObservation = nil
         pendingLoadRetryWorkItem?.cancel()
         pendingLoadRetryWorkItem = nil
         pendingLoadRequest = nil
+        teardownPiPIfNeeded()
+        pipController = nil
+        nowPlayingController.clear()
         clearPlaybackError()
+        audioSessionRetryWorkItem?.cancel()
+        audioSessionRetryWorkItem = nil
+        if isAudioSessionConfigured {
+            try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            isAudioSessionConfigured = false
+        }
+        if let context = mpvRenderContext {
+            mpvRenderContext = nil
+            mpv_render_context_free(context)
+        }
         guard let ctx = mpv else { return }
         mpv = nil  // nil first so event loop stops reading
+        if let timebase {
+            CMTimebaseSetRate(timebase, rate: 0.0)
+        }
         mpv_terminate_destroy(ctx)
     }
 
@@ -655,6 +1276,47 @@ final class MPVPlayerViewController: UIViewController {
         positionMs = Int64(max(position, 0) * 1000)
         bufferedMs = Int64(max(position + cached, 0) * 1000)
         currentSpeed = Float(speed > 0 ? speed : 1.0)
+        let shouldPublishLoadingState = !isPlayerLoading || isPlayerPlaying || durationMs > 0 || positionMs > 0
+        if shouldPublishLoadingState {
+            nowPlayingController.syncPlayback(
+                positionMs: positionMs,
+                durationMs: durationMs,
+                isPlaying: isPlayerPlaying,
+                playbackSpeed: currentSpeed
+            )
+        }
+    }
+
+    func updateNowPlayingMetadata(
+        title: String,
+        subtitle: String?,
+        artworkUrl: String?
+    ) {
+        cachedNowPlayingMetadata = CachedNowPlayingMetadata(
+            title: title,
+            subtitle: subtitle,
+            artworkUrl: artworkUrl
+        )
+        nowPlayingController.updateMetadata(
+            title: title,
+            subtitle: subtitle,
+            artworkUrl: artworkUrl
+        )
+    }
+
+    func clearNowPlayingInfo() {
+        cachedNowPlayingMetadata = nil
+        nowPlayingController.clear()
+    }
+
+    private func publishCachedNowPlayingInfoIfNeeded() {
+        if let metadata = cachedNowPlayingMetadata {
+            nowPlayingController.updateMetadata(
+                title: metadata.title,
+                subtitle: metadata.subtitle,
+                artworkUrl: metadata.artworkUrl
+            )
+        }
     }
 
     /// Full state + track refresh — called from MPV event loop on property changes.
@@ -846,7 +1508,12 @@ final class MPVPlayerViewController: UIViewController {
                     DispatchQueue.main.async {
                         self.clearPlaybackError()
                         self.isPlayerLoading = false
+                        self.isPlayerPlaying = true
+                        self.isPlayerEnded = false
+                        self.setPlaybackRate(1.0)
+                        self.scheduleRender()
                         self.updateState()
+                        self.invalidatePipPlaybackState()
                     }
                 case MPV_EVENT_END_FILE:
                     if let data = eventPtr.pointee.data {
@@ -854,8 +1521,13 @@ final class MPVPlayerViewController: UIViewController {
                         if endFile.reason == MPV_END_FILE_REASON_ERROR {
                             let errorText = String(cString: mpv_error_string(endFile.error))
                             self.setPlaybackError("[mpv] \(errorText)")
-                            print("[MPV] End file error: \(errorText)")
                         }
+                    }
+                    DispatchQueue.main.async {
+                        self.flushPipLayer()
+                        self.isPlayerEnded = true
+                        self.isPlayerPlaying = false
+                        self.invalidatePipPlaybackState()
                     }
                 case MPV_EVENT_SHUTDOWN:
                     return
@@ -865,7 +1537,6 @@ final class MPVPlayerViewController: UIViewController {
                         let level = String(cString: msg.pointee.level!)
                         let text = String(cString: msg.pointee.text!)
                         self.appendPlaybackLog(prefix: prefix, level: level, text: text)
-                        print("[MPV][\(prefix)] \(level): \(text)", terminator: "")
                     }
                 default:
                     break
@@ -924,6 +1595,11 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_property_string(mpv, name, value))
     }
 
+    private func setOptionString(_ name: String, _ value: String) {
+        guard mpv != nil else { return }
+        _ = mpv_set_option_string(mpv, name, value)
+    }
+
     private func setVideoEqualizer(_ name: String, _ value: Int) {
         guard mpv != nil else { return }
         var clamped = Int64(max(-100, min(100, value)))
@@ -937,10 +1613,9 @@ final class MPVPlayerViewController: UIViewController {
         return Int(data)
     }
 
-    private func checkError(_ status: CInt) {
-        if status < 0 {
-            print("[MPV] API error: \(String(cString: mpv_error_string(status)))")
-        }
+    private func checkError(_ status: CInt, context: String? = nil) {
+        _ = context
+        if status < 0 { return }
     }
 
     private func sanitizeRequestHeaders(_ headers: [String: String]) -> [String: String] {
@@ -992,6 +1667,85 @@ final class MPVPlayerViewController: UIViewController {
             }
             currentParent = controller.parent
         }
+    }
+}
+
+extension MPVPlayerViewController {
+    func pictureInPictureControllerWillStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        guard isStoppingPiPForForegroundTransition else { return }
+    }
+
+    func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+    ) {
+        isRestoringPiPUserInterface = true
+        didRestorePiPUserInterface = true
+        shouldPresentPiPTransitionOverlay = true
+        showPiPTransitionOverlay()
+        DispatchQueue.main.async {
+            completionHandler(true)
+        }
+    }
+
+    func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        let shouldRequestExitPlayback = !didRequestForegroundTransitionStop
+        completePiPForegroundTransition()
+        if shouldRequestExitPlayback {
+            notifyPiPDidRequestExitPlayback()
+        }
+        didRestorePiPUserInterface = false
+        didRequestForegroundTransitionStop = false
+    }
+
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+                                    setPlaying playing: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            if playing {
+                self?.playPlayback()
+            } else {
+                self?.pausePlayback()
+            }
+        }
+    }
+
+    private func notifyPiPDidRequestExitPlayback() {
+        NotificationCenter.default.post(
+            name: Notification.Name("NuvioPlayerPiPDidRequestExitPlayback"),
+            object: nil
+        )
+    }
+
+    func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
+        guard durationMs > 0 else { return .invalid }
+        let start = CMTime(seconds: 0, preferredTimescale: 600)
+        let duration = CMTime(seconds: Double(durationMs) / 1000.0, preferredTimescale: 600)
+        return CMTimeRange(start: start, duration: duration)
+    }
+
+    func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
+        return !isPlayerPlaying
+    }
+
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+                                    didTransitionToRenderSize newRenderSize: CMVideoDimensions) {
+        // No-op. The layer already tracks the host bounds.
+    }
+
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+                                    skipByInterval skipInterval: CMTime,
+                                    completion: @escaping () -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            let deltaMs = Int64((skipInterval.seconds * 1000.0).rounded())
+            self?.seekByMs(deltaMs)
+            DispatchQueue.main.async {
+                completion()
+            }
+        }
+    }
+
+    func pictureInPictureControllerShouldProhibitBackgroundAudioPlayback(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
+        return false
     }
 }
 
