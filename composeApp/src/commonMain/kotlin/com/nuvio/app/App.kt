@@ -3,8 +3,10 @@ package com.nuvio.app
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import coil3.compose.AsyncImage
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
@@ -124,6 +126,9 @@ import com.nuvio.app.features.details.MetaDetailsScreen
 import com.nuvio.app.features.details.MetaPerson
 import com.nuvio.app.features.details.PersonDetailScreen
 import com.nuvio.app.features.details.TmdbEntityBrowseScreen
+import com.nuvio.app.features.details.nextReleasedEpisodeAfter
+import com.nuvio.app.features.watchprogress.CurrentDateProvider
+import co.touchlab.kermit.Logger
 import com.nuvio.app.features.tmdb.TmdbEntityKind
 import com.nuvio.app.features.home.HomeCatalogSection
 import com.nuvio.app.features.home.HomeScreen
@@ -139,6 +144,9 @@ import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepositor
 import com.nuvio.app.features.p2p.P2pConsentDialog
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerLaunch
+import com.nuvio.app.features.player.PendingExternalPlayback
+import com.nuvio.app.features.player.PendingExternalPlaybackRepository
+import com.nuvio.app.features.player.toPendingExternalPlayback
 import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerRoute
 import com.nuvio.app.features.player.PlayerScreen
@@ -799,6 +807,10 @@ private fun MainAppContent(
     var profileSwitchLoading by remember { mutableStateOf(false) }
     var resumePromptItem by remember { mutableStateOf<ContinueWatchingItem?>(null) }
     var lastExternalPlayerLaunch by remember { mutableStateOf<PlayerLaunch?>(null) }
+    // Set when an external episode finishes; the effect below resolves + launches the next one.
+    var pendingExternalAutoNext by remember { mutableStateOf<PendingExternalPlayback?>(null) }
+    // Drives the "Loading next episode" loader during the auto-next hand-off.
+    var externalAutoNextOverlay by remember { mutableStateOf<PendingExternalPlayback?>(null) }
     val launchExternalPlayer = rememberExternalPlayerLauncher { result ->
         if (result != null && result.positionMs > 0L) {
             coroutineScope.launch {
@@ -859,6 +871,28 @@ private fun MainAppContent(
                     )
                 }
             }
+            // Resolve the finished item from memory, or from disk if the player killed our
+            // process (its result is still redelivered). Flag completion (natural end or ~90%).
+            val finishedSnapshot = lastExternalPlayerLaunch?.toPendingExternalPlayback()
+                ?: PendingExternalPlaybackRepository.load()
+            if (finishedSnapshot?.seasonNumber != null && finishedSnapshot.episodeNumber != null) {
+                val resultDurationMs = result.durationMs
+                val completed = !result.endedByUser ||
+                    (
+                        resultDurationMs != null && resultDurationMs > 0L &&
+                            result.positionMs >= (resultDurationMs * 0.9).toLong()
+                        )
+                if (completed) {
+                    Logger.withTag("ExtAutoNext").i {
+                        "external episode finished S${finishedSnapshot.seasonNumber}E${finishedSnapshot.episodeNumber} " +
+                            "endedByUser=${result.endedByUser} recovered=${lastExternalPlayerLaunch == null}"
+                    }
+                    externalAutoNextOverlay = finishedSnapshot
+                    pendingExternalAutoNext = finishedSnapshot
+                }
+            }
+            // Consumed (or not a completion) — drop the persisted snapshot.
+            PendingExternalPlaybackRepository.clear()
         }
     }
     val continueWatchingPreferencesUiState by remember {
@@ -905,6 +939,10 @@ private fun MainAppContent(
 
         suspend fun openExternalPlayback(launch: PlayerLaunch): Boolean {
             lastExternalPlayerLaunch = launch
+            // A player is launching and will cover the screen — drop the hand-off loader.
+            externalAutoNextOverlay = null
+            // Persist so auto-next survives the player killing our process.
+            PendingExternalPlaybackRepository.save(launch)
 
             // Persist binge group for subsequent episode plays (same as internal player)
             val bingeGroup = launch.bingeGroup
@@ -1087,6 +1125,73 @@ private fun MainAppContent(
             navController.navigate(
                 StreamRoute(launchId = streamLaunchId),
             )
+        }
+
+        // Auto-play next episode after an external episode finishes: resolve the next
+        // episode and route it through the normal play path (reusing stream auto-play ->
+        // external relaunch). Gated by the same setting as the internal player.
+        LaunchedEffect(pendingExternalAutoNext) {
+            val finished = pendingExternalAutoNext ?: return@LaunchedEffect
+            pendingExternalAutoNext = null
+            val log = Logger.withTag("ExtAutoNext")
+            if (!playerSettingsUiState.streamAutoPlayNextEpisodeEnabled) {
+                log.i { "auto-play next episode OFF; skipping" }
+                externalAutoNextOverlay = null
+                return@LaunchedEffect
+            }
+            val metaType = finished.parentMetaType
+            val metaId = finished.parentMetaId
+            val seasonNumber = finished.seasonNumber
+            val episodeNumber = finished.episodeNumber
+            if (seasonNumber == null || episodeNumber == null || metaType.isBlank() || metaId.isBlank()) {
+                externalAutoNextOverlay = null
+                return@LaunchedEffect
+            }
+
+            val meta = MetaDetailsRepository.fetch(type = metaType, id = metaId)
+            if (meta == null) {
+                log.i { "could not load meta for $metaId; skipping" }
+                externalAutoNextOverlay = null
+                return@LaunchedEffect
+            }
+            val nextEpisode = meta.nextReleasedEpisodeAfter(
+                seasonNumber = seasonNumber,
+                episodeNumber = episodeNumber,
+                todayIsoDate = CurrentDateProvider.todayIsoDate(),
+            )
+            if (nextEpisode == null) {
+                log.i { "no next episode after S${seasonNumber}E$episodeNumber for $metaId" }
+                externalAutoNextOverlay = null
+                return@LaunchedEffect
+            }
+            log.i { "next episode resolved S${nextEpisode.season}E${nextEpisode.episode} videoId=${nextEpisode.id}; launching" }
+
+            launchPlaybackWithDownloadPreference(
+                type = finished.contentType ?: metaType,
+                videoId = nextEpisode.id,
+                parentMetaId = metaId,
+                parentMetaType = metaType,
+                title = finished.title,
+                logo = finished.logo,
+                poster = finished.poster,
+                background = finished.background,
+                seasonNumber = nextEpisode.season,
+                episodeNumber = nextEpisode.episode,
+                episodeTitle = nextEpisode.title,
+                episodeThumbnail = nextEpisode.thumbnail,
+                pauseDescription = finished.pauseDescription,
+                resumePositionMs = null,
+                resumeProgressFraction = null,
+                manualSelection = false,
+                startFromBeginning = true,
+            )
+
+            // Safety net: normally cleared when the next player launches, but Manual mode
+            // waits for the user, so don't leave the loader stuck.
+            kotlinx.coroutines.delay(20_000)
+            if (externalAutoNextOverlay === finished) {
+                externalAutoNextOverlay = null
+            }
         }
 
         val onPlay: (String, String, String, String, String, String?, String?, String?, Int?, Int?, String?, String?, String?, Long?) -> Unit =
@@ -2292,6 +2397,7 @@ private fun MainAppContent(
                                 initialPositionMs = request.resumePositionMs,
                             )
                             lastExternalPlayerLaunch = playerLaunch
+                            PendingExternalPlaybackRepository.save(playerLaunch)
                             val intentResult = ExternalPlayerPlatform.buildIntent(
                                 request = request,
                                 playerId = playerSettingsUiState.externalPlayerId,
@@ -2504,6 +2610,46 @@ private fun MainAppContent(
                         },
                     )
                 }
+                }
+            }
+
+            // Loader covering the auto-next hand-off (app cold-start + next-source resolution).
+            AnimatedVisibility(
+                visible = externalAutoNextOverlay != null,
+                enter = fadeIn(animationSpec = tween(250)),
+                exit = fadeOut(animationSpec = tween(200)),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                val overlayLogo = externalAutoNextOverlay?.logo
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.92f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        if (!overlayLogo.isNullOrBlank()) {
+                            AsyncImage(
+                                model = overlayLogo,
+                                contentDescription = null,
+                                modifier = Modifier.height(48.dp),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            color = Color.White,
+                            strokeWidth = 2.5.dp,
+                        )
+                        Text(
+                            text = "Loading next episode…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.8f),
+                        )
+                    }
                 }
             }
 
