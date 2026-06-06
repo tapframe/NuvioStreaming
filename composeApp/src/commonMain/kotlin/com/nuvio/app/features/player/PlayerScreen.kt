@@ -107,10 +107,6 @@ private const val PlayerRightGestureBoundary = 0.6f
 private const val PlayerVerticalGestureSensitivity = 1f
 private const val PlayerSeekProgressSyncDebounceMs = 700L
 private const val P2pInitialPreloadTargetBytes = 5_242_880L
-private const val PluginBrowserUserAgent =
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
-        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/120.0.0.0 Safari/537.36"
 
 /** Hard ceiling for next-episode stream search to prevent hanging forever. */
 private const val NEXT_EPISODE_HARD_TIMEOUT_MS = 120_000L
@@ -166,7 +162,7 @@ private fun playbackHeadersForStream(
     val hasUserAgent = sanitized.keys.any { it.equals("User-Agent", ignoreCase = true) }
     if (hasUserAgent) return sanitized
 
-    return sanitized + ("User-Agent" to PluginBrowserUserAgent)
+    return sanitized + ("User-Agent" to defaultPluginPlaybackUserAgent())
 }
 
 @Composable
