@@ -104,7 +104,10 @@ private const val PlayerDoubleTapSeekResetDelayMs = 800L
 private const val PlayerLockedOverlayDurationMs = 2_000L
 private const val PlayerLeftGestureBoundary = 0.4f
 private const val PlayerRightGestureBoundary = 0.6f
-private const val PlayerVerticalGestureSensitivity = 1f
+private const val PlayerVerticalGestureSensitivity = 0.75f
+/** Fraction of screen height from the top where vertical brightness/volume gestures are suppressed
+ *  to let the system notification shade swipe through. */
+private const val PlayerTopEdgeExclusionFraction = 0.12f
 private const val PlayerSeekProgressSyncDebounceMs = 700L
 private const val P2pInitialPreloadTargetBytes = 5_242_880L
 /** Hard ceiling for next-episode stream search to prevent hanging forever. */
@@ -2368,7 +2371,9 @@ fun PlayerScreen(
                         val controller = gestureController
                         val width = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
                         val height = size.height.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
+                        val startedInTopEdge = down.position.y < height * PlayerTopEdgeExclusionFraction
                         val region = when {
+                            startedInTopEdge -> null // suppress brightness/volume in top edge so notification shade works
                             down.position.x < width * PlayerLeftGestureBoundary -> PlayerSideGesture.Brightness
                             down.position.x > width * PlayerRightGestureBoundary -> PlayerSideGesture.Volume
                             else -> null
@@ -2429,6 +2434,11 @@ fun PlayerScreen(
                                 }
 
                                 if (gestureMode == null) {
+                                    // If this is a downward swipe from the top edge, abandon
+                                    // gesture tracking so the system notification shade can work.
+                                    if (startedInTopEdge && verticalDominant && totalDy > 0f) {
+                                        break
+                                    }
                                     continue
                                 }
                             }
