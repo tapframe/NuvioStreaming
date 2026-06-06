@@ -1,173 +1,122 @@
 name: Build Nuvio Mobile iOS IPA
 
 on:
-
   workflow_dispatch:
 
 jobs:
-
   build-ios-full:
-
     name: Build iOS Full IPA
-
     runs-on: macos-26-intel
-
     timeout-minutes: 90
 
     steps:
-
-      - name: Checkout repository
-
+      - name: Checkout repository and submodules
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Fix Git submodule URLs
-
         run: |
-
           git config --global url."https://github.com/".insteadOf "git@github.com:"
-
           git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 
       - name: Fetch iOS MPVKit submodule
-
-        run: |
-
-          git submodule sync --recursive MPVKit
-
-          git submodule update --init --recursive MPVKit
+        run: git submodule update --init --recursive MPVKit
 
       - name: Select latest stable Xcode
-
         uses: maxim-lobanov/setup-xcode@v1
-
         with:
-
           xcode-version: latest-stable
 
       - name: Set up JDK 17
-
         uses: actions/setup-java@v4
-
         with:
-
           java-version: '17'
-
           distribution: 'temurin'
 
       - name: Make Gradle executable
-
         run: chmod +x ./gradlew
 
-      - name: Increase Gradle and Kotlin memory
-
-        run: |
-
-          touch gradle.properties
-
-          grep -vE '^(org\.gradle\.jvmargs|kotlin\.daemon\.jvmargs|kotlin\.compiler\.execution\.strategy|org\.gradle\.workers\.max|org\.gradle\.parallel)=' gradle.properties > gradle.properties.tmp || true
-
-          mv gradle.properties.tmp gradle.properties
-
-          cat << 'EOF_GRADLE' >> gradle.properties
-
-          org.gradle.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8 -Dkotlin.daemon.jvm.options=-Xmx8g,XX:MaxMetaspaceSize=1g,XX:ReservedCodeCacheSize=512m
-
-          kotlin.daemon.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=1g -XX:ReservedCodeCacheSize=512m
-
-          kotlin.compiler.execution.strategy=in-process
-
-          org.gradle.workers.max=2
-
-          org.gradle.parallel=false
-
-          EOF_GRADLE
-
-          echo "Updated gradle.properties:"
-
-          cat gradle.properties
-
       - name: Generate local.properties
-
         run: |
-
           cat << 'EOF_PROPS' > local.properties
-
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-
           SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-
           TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
-
           TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
-
           TRAKT_REDIRECT_URI=${{ secrets.TRAKT_REDIRECT_URI }}
-
           TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}
-
           INTRODB_API_URL=${{ secrets.INTRODB_API_URL }}
-
           CONTRIBUTIONS_URL=${{ secrets.CONTRIBUTIONS_URL }}
-
           DONATIONS_BASE_URL=${{ secrets.DONATIONS_BASE_URL }}
-
           DONATIONS_DONATE_URL=${{ secrets.DONATIONS_DONATE_URL }}
-
           DIRECT_DEBRID_API_BASE_URL=${{ secrets.DIRECT_DEBRID_API_BASE_URL }}
-
           NUVIO_IOS_DISTRIBUTION=full
-
           EOF_PROPS
 
-      - name: Build iOS app with Xcode
-
+      - name: Force unsigned iOS build settings
         run: |
+          PBXPROJ="iosApp/iosApp.xcodeproj/project.pbxproj"
 
+          echo "Patching Xcode signing settings..."
+
+          perl -0pi -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
+          perl -0pi -e 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' "$PBXPROJ"
+          perl -0pi -e 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' "$PBXPROJ"
+          perl -0pi -e 's/DEVELOPMENT_TEAM = [A-Z0-9]+;/DEVELOPMENT_TEAM = "";/g' "$PBXPROJ"
+          perl -0pi -e 's/PROVISIONING_PROFILE_SPECIFIER = .*?;/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$PBXPROJ"
+          perl -0pi -e 's/PROVISIONING_PROFILE = .*?;/PROVISIONING_PROFILE = "";/g' "$PBXPROJ"
+
+      - name: Show Xcode schemes
+        run: |
+          cd iosApp
+          xcodebuild -list -project iosApp.xcodeproj
+
+      - name: Build iOS app with Xcode
+        run: |
           cd iosApp
 
           xcodebuild \
-
             -project iosApp.xcodeproj \
-
             -scheme iosApp \
-
             -configuration Release \
-
             -sdk iphoneos \
-
             -destination "generic/platform=iOS" \
-
             -derivedDataPath build \
-
+            CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_ALLOWED=NO \
-
             CODE_SIGNING_REQUIRED=NO \
-
             CODE_SIGN_IDENTITY="" \
-
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
             build
 
       - name: Package app into IPA
-
         run: |
-
           cd iosApp/build/Build/Products/Release-iphoneos
 
-          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Nuvio.app/Info.plist)
+          APP_PATH=$(find . -maxdepth 1 -name "*.app" -type d | head -n 1)
 
-          mkdir Payload
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found"
+            find . -maxdepth 3 -print
+            exit 1
+          fi
 
-          mv Nuvio.app Payload/
+          APP_NAME=$(basename "$APP_PATH")
+          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_PATH/Info.plist" || echo "1.0")
 
-          zip -q -r "Nuvio-v${APP_VERSION}-Patched.ipa" Payload
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
 
-          echo "IPA_FILENAME=Nuvio-v${APP_VERSION}-Patched.ipa" >> $GITHUB_ENV
+          IPA_NAME="Nuvio-v${APP_VERSION}-Patched.ipa"
+          zip -q -r "$IPA_NAME" Payload
+
+          echo "IPA_FILENAME=$IPA_NAME" >> $GITHUB_ENV
 
       - name: Upload iOS IPA artifact
-
         uses: actions/upload-artifact@v4
-
         with:
-
           name: Nuvio-iOS-Patched-IPA
-
           path: iosApp/build/Build/Products/Release-iphoneos/${{ env.IPA_FILENAME }}
