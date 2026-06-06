@@ -85,8 +85,11 @@ object ContinueWatchingPreferencesRepository {
             return
         }
 
+        val migratedPayload = payload
+            .replace("\"STREAMING_STYLE\"", "\"RELEASED_UPCOMING_LAST_WATCHED\"")
+
         val stored = runCatching {
-            json.decodeFromString<StoredContinueWatchingPreferences>(payload)
+            json.decodeFromString<StoredContinueWatchingPreferences>(migratedPayload)
         }.getOrNull()
 
         _uiState.value = if (stored != null) {
