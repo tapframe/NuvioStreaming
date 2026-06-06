@@ -1,185 +1,125 @@
 name: iOS Build
 
 on:
+workflow_dispatch:
+push:
+branches:
+- main
+- master
+- cmp-rewrite
+pull_request:
 
-  workflow_dispatch:
-
-  push:
-
-    branches:
-
-      - main
-
-      - master
-
-      - cmp-rewrite
-
-  pull_request:
+env:
+FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-
-  build:
-
-    runs-on: macos-15
-
-    timeout-minutes: 60
-
-    steps:
-
-      - name: Checkout repo without submodules
-
-        uses: actions/checkout@v4
-
-        with:
-
-          submodules: false
-
-      - name: Fix MPVKit dependency
-
-        run: |
-
-          rm -rf MPVKit
-
-          git clone --depth=1 https://github.com/tapframe/MPVNuvio.git MPVKit
-
-      - name: Set up Java 17
-
-        uses: actions/setup-java@v4
-
-        with:
-
-          distribution: zulu
-
-          java-version: "17"
-
-      - name: Setup Gradle
-
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Select Xcode
-
-        run: |
-
-          if [ -d "/Applications/Xcode_16.4.app" ]; then
-
-            sudo xcode-select -s /Applications/Xcode_16.4.app
-
-          else
-
-            sudo xcode-select -s /Applications/Xcode.app
-
-          fi
-
-          xcodebuild -version
-
-      - name: Make Gradle wrapper executable
-
-        run: chmod +x gradlew
-
-      - name: Create empty local properties
-
-        run: touch local.properties
-
-      - name: Patch iOS signing for simulator
-
-        run: |
-
-          python3 - <<'PY'
-
-          from pathlib import Path
-
-          project = Path("iosApp/iosApp.xcodeproj/project.pbxproj")
-
-          if not project.exists():
-
-              raise SystemExit("Could not find iosApp/iosApp.xcodeproj/project.pbxproj")
-
-          text = project.read_text()
-
-          replacements = {
-
-              "CODE_SIGNING_ALLOWED = YES;": "CODE_SIGNING_ALLOWED = NO;",
-
-              "CODE_SIGNING_REQUIRED = YES;": "CODE_SIGNING_REQUIRED = NO;",
-
-              'CODE_SIGN_IDENTITY = "Apple Development";': 'CODE_SIGN_IDENTITY = "";',
-
-              "CODE_SIGN_STYLE = Automatic;": "CODE_SIGN_STYLE = Manual;",
-
-          }
-
-          for old, new in replacements.items():
-
-              text = text.replace(old, new)
-
-          cleaned = []
-
-          blocked = (
-
-              "DEVELOPMENT_TEAM",
-
-              "PROVISIONING_PROFILE",
-
-              "PROVISIONING_PROFILE_SPECIFIER",
-
-          )
-
-          for line in text.splitlines():
-
-              stripped = line.strip()
-
-              if any(stripped.startswith(item) for item in blocked):
-
-                  continue
-
-              cleaned.append(line)
-
-          project.write_text("\n".join(cleaned) + "\n")
-
-          PY
-
-      - name: Build Kotlin iOS simulator code
-
-        run: ./gradlew :composeApp:compileKotlinIosSimulatorArm64 --no-daemon --stacktrace
-
-      - name: Show Xcode project info
-
-        run: cd iosApp && xcodebuild -list -project iosApp.xcodeproj
-
-      - name: Build iOS app for simulator
-
-        run: cd iosApp && xcodebuild -project iosApp.xcodeproj -scheme iosApp -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DerivedData ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" clean build
-
-      - name: Package app
-
-        if: success()
-
-        run: |
-
-          APP_PATH=$(find iosApp/build/DerivedData -name "*.app" -type d | head -n 1)
-
-          if [ -z "$APP_PATH" ]; then
-
-            echo "No .app found"
-
-            exit 1
-
-          fi
-
-          echo "Found app at: $APP_PATH"
-
-          mkdir -p artifacts
-
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" artifacts/Nuvio-iOS-Simulator-App.zip
-
-      - name: Upload app artifact
-
-        if: success()
-
-        uses: actions/upload-artifact@v4
-
-        with:
-
-          name: Nuvio-iOS-Simulator-App
-
-          path: artifacts/Nuvio-iOS-Simulator-App.zip
+build:
+runs-on: macos-15
+timeout-minutes: 60
+
+steps:
+  - name: Checkout repo without submodules
+    uses: actions/checkout@v4
+    with:
+      submodules: false
+  - name: Fix MPVKit dependency
+    run: |
+      rm -rf MPVKit
+      git clone --depth=1 https://github.com/tapframe/MPVNuvio.git MPVKit
+      # MPVKit is used as a local Swift package, not as a nested Git repo.
+      # Removing its Git metadata prevents GitHub checkout cleanup from crashing.
+      rm -rf MPVKit/.git MPVKit/.gitmodules
+  - name: Set up Java 17
+    uses: actions/setup-java@v4
+    with:
+      distribution: zulu
+      java-version: "17"
+  - name: Setup Gradle
+    uses: gradle/actions/setup-gradle@v4
+  - name: Select Xcode
+    run: |
+      if [ -d "/Applications/Xcode_16.4.app" ]; then
+        sudo xcode-select -s /Applications/Xcode_16.4.app
+      else
+        sudo xcode-select -s /Applications/Xcode.app
+      fi
+      xcodebuild -version
+  - name: Make Gradle wrapper executable
+    run: chmod +x gradlew
+  - name: Create empty local properties
+    run: touch local.properties
+  - name: Patch iOS signing for unsigned build
+    run: |
+      python3 - <<'PY'
+      from pathlib import Path
+      project = Path("iosApp/iosApp.xcodeproj/project.pbxproj")
+      if not project.exists():
+          raise SystemExit("Could not find iosApp/iosApp.xcodeproj/project.pbxproj")
+      text = project.read_text()
+      replacements = {
+          "CODE_SIGNING_ALLOWED = YES;": "CODE_SIGNING_ALLOWED = NO;",
+          "CODE_SIGNING_REQUIRED = YES;": "CODE_SIGNING_REQUIRED = NO;",
+          'CODE_SIGN_IDENTITY = "Apple Development";': 'CODE_SIGN_IDENTITY = "";',
+          "CODE_SIGN_STYLE = Automatic;": "CODE_SIGN_STYLE = Manual;",
+      }
+      for old, new in replacements.items():
+          text = text.replace(old, new)
+      cleaned = []
+      blocked = (
+          "DEVELOPMENT_TEAM",
+          "PROVISIONING_PROFILE",
+          "PROVISIONING_PROFILE_SPECIFIER",
+      )
+      for line in text.splitlines():
+          stripped = line.strip()
+          if any(stripped.startswith(item) for item in blocked):
+              continue
+          cleaned.append(line)
+      project.write_text("\n".join(cleaned) + "\n")
+      PY
+  - name: Show Xcode project info
+    run: cd iosApp && xcodebuild -list -project iosApp.xcodeproj
+  - name: Build unsigned iOS app
+    run: |
+      set -o pipefail
+      cd iosApp
+      xcodebuild \
+        -project iosApp.xcodeproj \
+        -scheme iosApp \
+        -configuration Release \
+        -sdk iphoneos \
+        -destination 'generic/platform=iOS' \
+        -derivedDataPath build/DerivedData \
+        ONLY_ACTIVE_ARCH=NO \
+        CODE_SIGNING_ALLOWED=NO \
+        CODE_SIGNING_REQUIRED=NO \
+        CODE_SIGN_IDENTITY="" \
+        clean build 2>&1 | tee ../xcodebuild.log
+  - name: Package unsigned IPA
+    if: success()
+    run: |
+      APP_PATH=$(find iosApp/build/DerivedData/Build/Products/Release-iphoneos -name "Nuvio.app" -type d | head -n 1)
+      if [ -z "$APP_PATH" ]; then
+        echo "No Nuvio.app found"
+        find iosApp/build/DerivedData -name "*.app" -type d || true
+        exit 1
+      fi
+      echo "Found app at: $APP_PATH"
+      rm -rf artifacts
+      mkdir -p artifacts/Payload
+      cp -R "$APP_PATH" artifacts/Payload/Nuvio.app
+      cd artifacts
+      zip -qry Nuvio-unsigned.ipa Payload
+  - name: Upload unsigned IPA
+    if: success()
+    uses: actions/upload-artifact@v4
+    with:
+      name: Nuvio-unsigned-IPA
+      path: artifacts/Nuvio-unsigned.ipa
+  - name: Upload Xcode log
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: xcodebuild-log
+      path: xcodebuild.log
+      if-no-files-found: ignore
