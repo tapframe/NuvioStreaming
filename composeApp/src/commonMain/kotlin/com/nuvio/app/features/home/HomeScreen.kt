@@ -1141,13 +1141,9 @@ private fun applyStreamingStylePrioritizeNewSort(
 
     // Released: prioritize new episodes (isReleaseAlert == true) sorted by last updated epoch, then others
     val sortedReleased = released
-        .sortedWith(
-            compareByDescending<HomeContinueWatchingCandidate> { candidate ->
-                candidate.item.isReleaseAlert
-            }.thenByDescending { candidate ->
-                candidate.lastUpdatedEpochMs
-            }
-        )
+        .sortedByDescending { candidate ->
+            candidate.lastUpdatedEpochMs
+        }
         .map(HomeContinueWatchingCandidate::item)
 
     // Unaired: soonest air date first; unknown dates go to the end
