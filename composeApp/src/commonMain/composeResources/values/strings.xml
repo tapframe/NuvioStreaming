@@ -598,6 +598,8 @@
     <string name="settings_continue_watching_sort_mode_default_desc">Sort all items by recency</string>
     <string name="settings_continue_watching_sort_mode_streaming">Streaming Style</string>
     <string name="settings_continue_watching_sort_mode_streaming_desc">Released items first, upcoming at the end</string>
+    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new">Prioritize new episodes</string>
+    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new_desc">Streaming Style, but new episodes come first</string>
     <string name="settings_continue_watching_section_card_style">Poster Card Style</string>
     <string name="settings_continue_watching_section_on_launch">ON LAUNCH</string>
     <string name="settings_continue_watching_section_up_next_behavior">UP NEXT BEHAVIOR</string>

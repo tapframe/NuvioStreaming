@@ -54,6 +54,8 @@ import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_default_desc
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming_desc
+import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming_prioritize_new
+import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming_prioritize_new_desc
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_title
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_card
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_card_description
@@ -176,6 +178,7 @@ internal fun LazyListScope.continueWatchingSettingsContent(
                     when (sortMode) {
                         ContinueWatchingSortMode.DEFAULT -> Res.string.settings_continue_watching_sort_mode_default
                         ContinueWatchingSortMode.STREAMING_STYLE -> Res.string.settings_continue_watching_sort_mode_streaming
+                        ContinueWatchingSortMode.STREAMING_PRIORITIZE_NEW -> Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new
                     }
                 )
                 SettingsNavigationRow(
@@ -324,6 +327,11 @@ private fun ContinueWatchingSortModeDialog(
             ContinueWatchingSortMode.STREAMING_STYLE,
             Res.string.settings_continue_watching_sort_mode_streaming,
             Res.string.settings_continue_watching_sort_mode_streaming_desc,
+        ),
+        Triple(
+            ContinueWatchingSortMode.STREAMING_PRIORITIZE_NEW,
+            Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new,
+            Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new_desc,
         ),
     )
 
