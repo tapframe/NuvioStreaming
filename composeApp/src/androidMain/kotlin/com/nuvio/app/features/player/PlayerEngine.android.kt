@@ -43,8 +43,6 @@ import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -71,6 +69,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 private const val TAG = "NuvioPlayer"
 
@@ -930,6 +930,7 @@ private class VolumeBoostAudioProcessor : BaseAudioProcessor() {
     }
 }
 
+@androidx.annotation.OptIn(UnstableApi::class)
 private class SubtitleOffsetRenderersFactory(
     context: Context,
     private val subtitleDelayUsProvider: () -> Long,
@@ -947,6 +948,7 @@ private class SubtitleOffsetRenderersFactory(
             .setAudioProcessors(arrayOf(volumeBoostAudioProcessor))
             .build()
     }
+
     override fun buildTextRenderers(
         context: Context,
         output: TextOutput,
