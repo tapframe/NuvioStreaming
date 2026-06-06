@@ -568,8 +568,10 @@
     <string name="settings_continue_watching_sort_mode_title">Ordem de ordenação</string>
     <string name="settings_continue_watching_sort_mode_default">Predefinida</string>
     <string name="settings_continue_watching_sort_mode_default_desc">Ordena todos os itens pelos mais recentes</string>
-    <string name="settings_continue_watching_sort_mode_streaming">Estilo Plataforma de Streaming</string>
-    <string name="settings_continue_watching_sort_mode_streaming_desc">Itens já lançados primeiro, os próximos no fim</string>
+    <string name="settings_continue_watching_sort_mode_streaming">Lançados / Próximos</string>
+    <string name="settings_continue_watching_sort_mode_streaming_desc">Itens lançados ordenados pelo último assistido, itens não lançados por data de lançamento</string>
+    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new">Priorizar novos episódios</string>
+    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new_desc">Itens lançados ordenados pelo último assistido (priorizando novos episódios), próximos itens por data de exibição</string>
     <string name="settings_continue_watching_section_card_style">Estilo dos Cartões de Póster</string>
     <string name="settings_continue_watching_section_on_launch">AO INICIAR</string>
     <string name="settings_continue_watching_section_up_next_behavior">COMPORTAMENTO DO SEGUINTE</string>

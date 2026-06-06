@@ -473,6 +473,14 @@
     <string name="settings_continue_watching_resume_prompt_title">Aviso para reanudar al iniciar</string>
     <string name="settings_continue_watching_section_card_style">ESTILO DE TARJETA</string>
     <string name="settings_continue_watching_section_on_launch">AL INICIAR</string>
+    <string name="settings_continue_watching_section_sort_order">ORDEN DE CLASIFICACIÓN</string>
+    <string name="settings_continue_watching_sort_mode_title">Orden de clasificación</string>
+    <string name="settings_continue_watching_sort_mode_default">Predeterminado</string>
+    <string name="settings_continue_watching_sort_mode_default_desc">Ordenar todos los elementos por fecha reciente</string>
+    <string name="settings_continue_watching_sort_mode_streaming">Estrenados / Próximos</string>
+    <string name="settings_continue_watching_sort_mode_streaming_desc">Elementos estrenados ordenados por último visto, elementos no estrenados por fecha de estreno</string>
+    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new">Priorizar nuevos episodios</string>
+    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new_desc">Elementos estrenados ordenados por último visto (priorizando nuevos episodios), próximos estrenos por fecha de emisión</string>
     <string name="settings_continue_watching_section_up_next_behavior">COMPORTAMIENTO DE SIGUIENTE</string>
     <string name="settings_continue_watching_section_visibility">VISIBILIDAD</string>
     <string name="settings_continue_watching_show_description">Mostrar el estante de Seguir viendo en la pantalla de inicio.</string>
