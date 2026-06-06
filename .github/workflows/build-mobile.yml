@@ -44,7 +44,11 @@ jobs:
 
       - name: Select Xcode
 
-        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        run: |
+
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+          xcodebuild -version
 
       - name: Show project files
 
@@ -58,7 +62,13 @@ jobs:
 
           ls -la iosApp || true
 
-      - name: Build iOS app
+          echo "Available schemes:"
+
+          cd iosApp
+
+          xcodebuild -list -project iosApp.xcodeproj
+
+      - name: Build iOS app without signing
 
         run: |
 
@@ -74,8 +84,20 @@ jobs:
 
             -sdk iphonesimulator \
 
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination 'generic/platform=iOS Simulator' \
 
             CODE_SIGNING_ALLOWED=NO \
+
+            CODE_SIGNING_REQUIRED=NO \
+
+            CODE_SIGN_IDENTITY="" \
+
+            CODE_SIGN_STYLE=Manual \
+
+            DEVELOPMENT_TEAM="" \
+
+            PROVISIONING_PROFILE_SPECIFIER="" \
+
+            AD_HOC_CODE_SIGNING_ALLOWED=NO \
 
             clean build
