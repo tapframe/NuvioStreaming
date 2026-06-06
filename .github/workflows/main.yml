@@ -79,9 +79,9 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Build Kotlin shared framework for iOS Simulator
+      - name: Build Kotlin framework for iOS Simulator
         run: |
-          ./gradlew :shared:linkReleaseFrameworkIosSimulatorArm64 --no-daemon --stacktrace
+          ./gradlew :composeApp:linkReleaseFrameworkIosSimulatorArm64 --no-daemon --stacktrace
 
       - name: Show available simulators
         run: xcrun simctl list devices available
