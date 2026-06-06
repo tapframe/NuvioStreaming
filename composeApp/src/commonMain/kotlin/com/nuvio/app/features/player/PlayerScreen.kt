@@ -107,6 +107,11 @@ private const val PlayerRightGestureBoundary = 0.6f
 private const val PlayerVerticalGestureSensitivity = 1f
 private const val PlayerSeekProgressSyncDebounceMs = 700L
 private const val P2pInitialPreloadTargetBytes = 5_242_880L
+private const val PluginBrowserUserAgent =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+        "AppleWebKit/537.36 (KHTML, like Gecko) " +
+        "Chrome/120.0.0.0 Safari/537.36"
+
 /** Hard ceiling for next-episode stream search to prevent hanging forever. */
 private const val NEXT_EPISODE_HARD_TIMEOUT_MS = 120_000L
 private val PlayerSliderOverlayGap = 12.dp
@@ -147,6 +152,22 @@ private data class PendingPlayerP2pSwitch(
     val episode: MetaVideo?,
     val isAutoPlay: Boolean,
 )
+
+private fun isPluginStream(addonId: String?): Boolean =
+    addonId?.startsWith("plugin_") == true
+
+private fun playbackHeadersForStream(
+    addonId: String?,
+    headers: Map<String, String>?,
+): Map<String, String> {
+    val sanitized = sanitizePlaybackHeaders(headers)
+    if (!isPluginStream(addonId)) return sanitized
+
+    val hasUserAgent = sanitized.keys.any { it.equals("User-Agent", ignoreCase = true) }
+    if (hasUserAgent) return sanitized
+
+    return sanitized + ("User-Agent" to PluginBrowserUserAgent)
+}
 
 @Composable
 fun PlayerScreen(
@@ -240,8 +261,13 @@ fun PlayerScreen(
         // Active playback state (mutable to support source/episode switching)
         var activeSourceUrl by rememberSaveable { mutableStateOf(sourceUrl) }
         var activeSourceAudioUrl by rememberSaveable { mutableStateOf(sourceAudioUrl) }
-        var activeSourceHeaders by remember(sourceUrl, sourceHeaders) {
-            mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))
+        var activeSourceHeaders by remember(sourceUrl, sourceHeaders, providerAddonId) {
+            mutableStateOf(
+                playbackHeadersForStream(
+                    addonId = providerAddonId,
+                    headers = sourceHeaders,
+                ),
+            )
         }
         var activeSourceResponseHeaders by remember(sourceUrl, sourceResponseHeaders) {
             mutableStateOf(sanitizePlaybackResponseHeaders(sourceResponseHeaders))
@@ -1387,7 +1413,10 @@ fun PlayerScreen(
                     streamName = stream.streamLabel,
                     addonName = stream.addonName,
                     addonId = stream.addonId,
-                    requestHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request),
+                    requestHeaders = playbackHeadersForStream(
+                        addonId = stream.addonId,
+                        headers = stream.behaviorHints.proxyHeaders?.request,
+                    ),
                     responseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response),
                     filename = stream.behaviorHints.filename,
                     videoSize = stream.behaviorHints.videoSize,
@@ -1396,7 +1425,10 @@ fun PlayerScreen(
             }
             activeSourceUrl = url
             activeSourceAudioUrl = null
-            activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
+            activeSourceHeaders = playbackHeadersForStream(
+                addonId = stream.addonId,
+                headers = stream.behaviorHints.proxyHeaders?.request,
+            )
             activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
             activeStreamTitle = stream.streamLabel
             activeStreamSubtitle = stream.streamSubtitle
@@ -1475,7 +1507,10 @@ fun PlayerScreen(
                     streamName = stream.streamLabel,
                     addonName = stream.addonName,
                     addonId = stream.addonId,
-                    requestHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request),
+                    requestHeaders = playbackHeadersForStream(
+                        addonId = stream.addonId,
+                        headers = stream.behaviorHints.proxyHeaders?.request,
+                    ),
                     responseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response),
                     filename = stream.behaviorHints.filename,
                     videoSize = stream.behaviorHints.videoSize,
@@ -1484,7 +1519,10 @@ fun PlayerScreen(
             }
             activeSourceUrl = url
             activeSourceAudioUrl = null
-            activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
+            activeSourceHeaders = playbackHeadersForStream(
+                addonId = stream.addonId,
+                headers = stream.behaviorHints.proxyHeaders?.request,
+            )
             activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
             activeStreamTitle = stream.streamLabel
             activeStreamSubtitle = stream.streamSubtitle
