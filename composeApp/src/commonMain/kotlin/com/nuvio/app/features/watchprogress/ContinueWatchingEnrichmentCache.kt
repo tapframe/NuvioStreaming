@@ -95,6 +95,11 @@ internal object ContinueWatchingEnrichmentCache {
         lastPayloadHash = payloadHash
     }
 
+    fun clearAll() {
+        ContinueWatchingEnrichmentStorage.removePayload(ProfileScopedKey.of(storageKey))
+        lastPayloadHash = null
+    }
+
     private fun loadPayload(): CachedEnrichmentPayload? {
         val raw = ContinueWatchingEnrichmentStorage.loadPayload(ProfileScopedKey.of(storageKey))
             ?: return null

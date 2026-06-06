@@ -43,6 +43,7 @@ import com.nuvio.app.features.trakt.TraktBrandAsset
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktConnectionMode
 import com.nuvio.app.features.trakt.TraktContinueWatchingDaysOptions
+import com.nuvio.app.features.trakt.MoreLikeThisSourcePreference
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.trakt.TraktSettingsUiState
 import com.nuvio.app.features.trakt.WatchProgressSource
@@ -82,6 +83,12 @@ import nuvio.composeapp.generated.resources.trakt_library_source_subtitle
 import nuvio.composeapp.generated.resources.trakt_library_source_title
 import nuvio.composeapp.generated.resources.trakt_library_source_trakt
 import nuvio.composeapp.generated.resources.trakt_library_source_trakt_selected
+import nuvio.composeapp.generated.resources.trakt_more_like_this_source_dialog_subtitle
+import nuvio.composeapp.generated.resources.trakt_more_like_this_source_dialog_title
+import nuvio.composeapp.generated.resources.trakt_more_like_this_source_subtitle
+import nuvio.composeapp.generated.resources.trakt_more_like_this_source_title
+import nuvio.composeapp.generated.resources.trakt_more_like_this_source_tmdb
+import nuvio.composeapp.generated.resources.trakt_more_like_this_source_trakt
 import nuvio.composeapp.generated.resources.trakt_watch_progress_dialog_subtitle
 import nuvio.composeapp.generated.resources.trakt_watch_progress_dialog_title
 import nuvio.composeapp.generated.resources.trakt_watch_progress_nuvio_selected
@@ -148,11 +155,13 @@ private fun TraktFeatureRows(
     var showLibrarySourceDialog by rememberSaveable { mutableStateOf(false) }
     var showWatchProgressDialog by rememberSaveable { mutableStateOf(false) }
     var showContinueWatchingWindowDialog by rememberSaveable { mutableStateOf(false) }
+    var showMoreLikeThisSourceDialog by rememberSaveable { mutableStateOf(false) }
     var statusMessage by rememberSaveable { mutableStateOf<String?>(null) }
 
     val librarySourceValue = librarySourceModeLabel(settingsUiState.librarySourceMode)
     val watchProgressValue = watchProgressSourceLabel(settingsUiState.watchProgressSource)
     val continueWatchingWindowValue = continueWatchingDaysCapLabel(settingsUiState.continueWatchingDaysCap)
+    val moreLikeThisSourceValue = moreLikeThisSourceLabel(settingsUiState.moreLikeThisSource)
     val traktProgressSelectedMessage = stringResource(Res.string.trakt_watch_progress_trakt_selected)
     val nuvioProgressSelectedMessage = stringResource(Res.string.trakt_watch_progress_nuvio_selected)
     val traktLibrarySelectedMessage = stringResource(Res.string.trakt_library_source_trakt_selected)
@@ -188,6 +197,14 @@ private fun TraktFeatureRows(
         checked = commentsEnabled,
         isTablet = isTablet,
         onCheckedChange = onCommentsEnabledChange,
+    )
+    SettingsGroupDivider(isTablet = isTablet)
+    TraktSettingsActionRow(
+        title = stringResource(Res.string.trakt_more_like_this_source_title),
+        description = stringResource(Res.string.trakt_more_like_this_source_subtitle),
+        value = moreLikeThisSourceValue,
+        isTablet = isTablet,
+        onClick = { showMoreLikeThisSourceDialog = true },
     )
     statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
         SettingsGroupDivider(isTablet = isTablet)
@@ -237,6 +254,17 @@ private fun TraktFeatureRows(
                 showContinueWatchingWindowDialog = false
             },
             onDismiss = { showContinueWatchingWindowDialog = false },
+        )
+    }
+
+    if (showMoreLikeThisSourceDialog) {
+        MoreLikeThisSourceDialog(
+            selectedSource = settingsUiState.moreLikeThisSource,
+            onSourceSelected = { source ->
+                TraktSettingsRepository.setMoreLikeThisSource(source)
+                showMoreLikeThisSourceDialog = false
+            },
+            onDismiss = { showMoreLikeThisSourceDialog = false },
         )
     }
 }
@@ -320,6 +348,13 @@ private fun watchProgressSourceLabel(source: WatchProgressSource): String =
     when (source) {
         WatchProgressSource.TRAKT -> stringResource(Res.string.trakt_watch_progress_source_trakt)
         WatchProgressSource.NUVIO_SYNC -> stringResource(Res.string.trakt_watch_progress_source_nuvio)
+    }
+
+@Composable
+private fun moreLikeThisSourceLabel(source: MoreLikeThisSourcePreference): String =
+    when (source) {
+        MoreLikeThisSourcePreference.TRAKT -> stringResource(Res.string.trakt_more_like_this_source_trakt)
+        MoreLikeThisSourcePreference.TMDB -> stringResource(Res.string.trakt_more_like_this_source_tmdb)
     }
 
 @Composable
@@ -479,6 +514,59 @@ private fun ContinueWatchingWindowDialog(
                             label = continueWatchingDaysCapLabel(days),
                             selected = normalizedDays == normalizedSelected,
                             onClick = { onDaysCapSelected(days) },
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(Res.string.settings_playback_dialog_close),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun MoreLikeThisSourceDialog(
+    selectedSource: MoreLikeThisSourcePreference,
+    onSourceSelected: (MoreLikeThisSourcePreference) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(Res.string.trakt_more_like_this_source_dialog_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = stringResource(Res.string.trakt_more_like_this_source_dialog_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(MoreLikeThisSourcePreference.TRAKT, MoreLikeThisSourcePreference.TMDB).forEach { source ->
+                        TraktDialogOption(
+                            label = moreLikeThisSourceLabel(source),
+                            selected = source == selectedSource,
+                            onClick = { onSourceSelected(source) },
                         )
                     }
                 }

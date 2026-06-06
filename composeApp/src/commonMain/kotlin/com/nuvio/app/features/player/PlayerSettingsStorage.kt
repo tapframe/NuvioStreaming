@@ -106,6 +106,8 @@ internal expect object PlayerSettingsStorage {
     fun saveIosTargetTransfer(transfer: String)
     fun loadIosHardwareDecoderMode(): String?
     fun saveIosHardwareDecoderMode(mode: String)
+    fun loadIosAudioOutputMode(): String?
+    fun saveIosAudioOutputMode(mode: String)
     fun loadIosExtendedDynamicRangeEnabled(): Boolean?
     fun saveIosExtendedDynamicRangeEnabled(enabled: Boolean)
     fun loadIosTargetColorspaceHintEnabled(): Boolean?

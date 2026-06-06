@@ -21,4 +21,11 @@ actual object ContinueWatchingEnrichmentStorage {
             ?.putString(key, payload)
             ?.apply()
     }
+
+    actual fun removePayload(key: String) {
+        preferences
+            ?.edit()
+            ?.remove(key)
+            ?.apply()
+    }
 }

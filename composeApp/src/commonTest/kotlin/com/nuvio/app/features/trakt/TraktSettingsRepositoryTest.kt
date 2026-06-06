@@ -35,6 +35,19 @@ class TraktSettingsRepositoryTest {
     }
 
     @Test
+    fun `more like this source defaults to Trakt for unset or invalid storage`() {
+        assertEquals(MoreLikeThisSourcePreference.TRAKT, MoreLikeThisSourcePreference.fromStorage(null))
+        assertEquals(MoreLikeThisSourcePreference.TRAKT, MoreLikeThisSourcePreference.fromStorage(""))
+        assertEquals(MoreLikeThisSourcePreference.TRAKT, MoreLikeThisSourcePreference.fromStorage("not-a-source"))
+    }
+
+    @Test
+    fun `more like this source restores valid storage values`() {
+        assertEquals(MoreLikeThisSourcePreference.TRAKT, MoreLikeThisSourcePreference.fromStorage("TRAKT"))
+        assertEquals(MoreLikeThisSourcePreference.TMDB, MoreLikeThisSourcePreference.fromStorage("TMDB"))
+    }
+
+    @Test
     fun `continue watching cap normalizes finite windows and all history`() {
         assertEquals(TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL, normalizeTraktContinueWatchingDaysCap(0))
         assertEquals(7, normalizeTraktContinueWatchingDaysCap(1))
@@ -62,6 +75,28 @@ class TraktSettingsRepositoryTest {
         assertEquals(
             LibrarySourceMode.TRAKT,
             effectiveLibrarySourceMode(isAuthenticated = true, source = LibrarySourceMode.TRAKT),
+        )
+    }
+
+    @Test
+    fun `Trakt more like this is active only when authenticated and selected`() {
+        assertFalse(
+            shouldUseTraktMoreLikeThis(
+                isAuthenticated = false,
+                source = MoreLikeThisSourcePreference.TRAKT,
+            ),
+        )
+        assertFalse(
+            shouldUseTraktMoreLikeThis(
+                isAuthenticated = true,
+                source = MoreLikeThisSourcePreference.TMDB,
+            ),
+        )
+        assertTrue(
+            shouldUseTraktMoreLikeThis(
+                isAuthenticated = true,
+                source = MoreLikeThisSourcePreference.TRAKT,
+            ),
         )
     }
 }

@@ -16,9 +16,10 @@ actual object StreamBadgeSettingsStorage {
     private const val legacyDebridPreferencesName = "nuvio_debrid_settings"
     private const val streamBadgeRulesKey = "stream_badge_rules"
     private const val showFileSizeBadgesKey = "show_file_size_badges"
+    private const val streamBadgePlacementKey = "stream_badge_placement"
     private const val legacyDebridStreamBadgeRulesKey = "debrid_stream_badge_rules"
 
-    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey)
+    private val syncKeys = listOf(streamBadgeRulesKey, showFileSizeBadgesKey, streamBadgePlacementKey)
 
     private var preferences: SharedPreferences? = null
     private var legacyDebridPreferences: SharedPreferences? = null
@@ -38,6 +39,12 @@ actual object StreamBadgeSettingsStorage {
 
     actual fun saveShowFileSizeBadges(enabled: Boolean) {
         saveBoolean(showFileSizeBadgesKey, enabled)
+    }
+
+    actual fun loadStreamBadgePlacement(): String? = loadString(streamBadgePlacementKey)
+
+    actual fun saveStreamBadgePlacement(placement: String) {
+        saveString(streamBadgePlacementKey, placement)
     }
 
     actual fun loadLegacyDebridStreamBadgeRules(): String? =
@@ -80,6 +87,7 @@ actual object StreamBadgeSettingsStorage {
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {
         loadStreamBadgeRules()?.let { put(streamBadgeRulesKey, encodeSyncString(it)) }
         loadShowFileSizeBadges()?.let { put(showFileSizeBadgesKey, encodeSyncBoolean(it)) }
+        loadStreamBadgePlacement()?.let { put(streamBadgePlacementKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -89,5 +97,6 @@ actual object StreamBadgeSettingsStorage {
 
         payload.decodeSyncString(streamBadgeRulesKey)?.let(::saveStreamBadgeRules)
         payload.decodeSyncBoolean(showFileSizeBadgesKey)?.let(::saveShowFileSizeBadges)
+        payload.decodeSyncString(streamBadgePlacementKey)?.let(::saveStreamBadgePlacement)
     }
 }

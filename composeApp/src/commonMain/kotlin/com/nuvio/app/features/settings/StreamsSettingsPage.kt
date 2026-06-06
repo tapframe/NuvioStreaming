@@ -53,6 +53,7 @@ import com.nuvio.app.features.streams.StreamBadgeChipSize
 import com.nuvio.app.features.streams.StreamBadgeFilter
 import com.nuvio.app.features.streams.StreamBadgeImport
 import com.nuvio.app.features.streams.StreamBadgeImportResult
+import com.nuvio.app.features.streams.StreamBadgePlacement
 import com.nuvio.app.features.streams.StreamBadgeRules
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
 import kotlinx.coroutines.launch
@@ -74,6 +75,12 @@ import nuvio.composeapp.generated.resources.settings_fusion_badge_url_status_sum
 import nuvio.composeapp.generated.resources.settings_fusion_badge_urls_imported
 import nuvio.composeapp.generated.resources.settings_fusion_badges_empty
 import nuvio.composeapp.generated.resources.settings_fusion_badges_summary
+import nuvio.composeapp.generated.resources.settings_stream_badge_position_bottom
+import nuvio.composeapp.generated.resources.settings_stream_badge_position_description
+import nuvio.composeapp.generated.resources.settings_stream_badge_position_dialog_description
+import nuvio.composeapp.generated.resources.settings_stream_badge_position_dialog_title
+import nuvio.composeapp.generated.resources.settings_stream_badge_position_title
+import nuvio.composeapp.generated.resources.settings_stream_badge_position_top
 import nuvio.composeapp.generated.resources.settings_stream_badge_urls_description
 import nuvio.composeapp.generated.resources.settings_stream_badge_urls_title
 import nuvio.composeapp.generated.resources.settings_stream_badges_section
@@ -89,6 +96,8 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
         }.collectAsStateWithLifecycle()
         val currentRules = currentSettings.rules
         var showBadgeImportDialog by rememberSaveable { mutableStateOf(false) }
+        var showBadgePositionDialog by rememberSaveable { mutableStateOf(false) }
+        val badgePlacementLabel = streamBadgePlacementLabel(currentSettings.badgePlacement)
 
         SettingsSection(
             title = stringResource(Res.string.settings_stream_badges_section),
@@ -101,6 +110,13 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                     checked = currentSettings.showFileSizeBadges,
                     isTablet = isTablet,
                     onCheckedChange = StreamBadgeSettingsRepository::setShowFileSizeBadges,
+                )
+                SettingsNavigationRow(
+                    title = stringResource(Res.string.settings_stream_badge_position_title),
+                    description = badgePlacementLabel,
+                    icon = Icons.Rounded.Style,
+                    isTablet = isTablet,
+                    onClick = { showBadgePositionDialog = true },
                 )
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_stream_badge_urls_title),
@@ -118,8 +134,26 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 onDismiss = { showBadgeImportDialog = false },
             )
         }
+
+        if (showBadgePositionDialog) {
+            StreamBadgePositionDialog(
+                selectedPlacement = currentSettings.badgePlacement,
+                onPlacementSelected = { placement ->
+                    StreamBadgeSettingsRepository.setBadgePlacement(placement)
+                    showBadgePositionDialog = false
+                },
+                onDismiss = { showBadgePositionDialog = false },
+            )
+        }
     }
 }
+
+@Composable
+private fun streamBadgePlacementLabel(placement: StreamBadgePlacement): String =
+    when (placement) {
+        StreamBadgePlacement.TOP -> stringResource(Res.string.settings_stream_badge_position_top)
+        StreamBadgePlacement.BOTTOM -> stringResource(Res.string.settings_stream_badge_position_bottom)
+    }
 
 @Composable
 private fun badgeRulesPreview(rules: StreamBadgeRules): String {
@@ -133,6 +167,49 @@ private fun badgeRulesPreview(rules: StreamBadgeRules): String {
         )
     } else {
         stringResource(Res.string.settings_fusion_badges_empty)
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun StreamBadgePositionDialog(
+    selectedPlacement: StreamBadgePlacement,
+    onPlacementSelected: (StreamBadgePlacement) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    BasicAlertDialog(onDismissRequest = onDismiss) {
+        SettingsDialogSurface(title = stringResource(Res.string.settings_stream_badge_position_dialog_title)) {
+            Text(
+                text = stringResource(Res.string.settings_stream_badge_position_dialog_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            StreamBadgePlacement.entries.forEach { placement ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RadioButton(
+                        selected = placement == selectedPlacement,
+                        onClick = { onPlacementSelected(placement) },
+                    )
+                    Text(
+                        text = streamBadgePlacementLabel(placement),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(text = stringResource(Res.string.action_cancel), maxLines = 1)
+                }
+            }
+        }
     }
 }
 

@@ -404,6 +404,7 @@
     <string name="compose_settings_category_general">General</string>
     <string name="compose_settings_page_account">Account</string>
     <string name="compose_settings_page_addons">Addons</string>
+    <string name="compose_settings_page_advanced">Advanced</string>
     <string name="compose_settings_page_appearance">Layout</string>
     <string name="compose_settings_page_content_discovery">Content &amp; Discovery</string>
     <string name="compose_settings_page_continue_watching">Continue Watching</string>
@@ -425,6 +426,8 @@
     <string name="compose_settings_root_about_section">ABOUT</string>
     <string name="compose_settings_root_account_description">Account and sync status</string>
     <string name="compose_settings_root_account_section">ACCOUNT</string>
+    <string name="compose_settings_root_advanced_description">Startup and profile behavior.</string>
+    <string name="compose_settings_root_advanced_section">ADVANCED</string>
     <string name="compose_settings_root_appearance_description">Home structure and poster styles</string>
     <string name="compose_settings_root_check_updates_description">Download latest release</string>
     <string name="compose_settings_root_check_updates_title">Check for updates</string>
@@ -441,6 +444,13 @@
     <string name="settings_search_empty">No settings found.</string>
     <string name="settings_search_placeholder">Search settings...</string>
     <string name="settings_search_results_section">RESULTS</string>
+    <string name="settings_advanced_section_startup">STARTUP</string>
+    <string name="settings_advanced_section_cache">CACHE</string>
+    <string name="settings_advanced_remember_last_profile">Remember Last Profile</string>
+    <string name="settings_advanced_remember_last_profile_description">Remember last selected profile at startup</string>
+    <string name="settings_advanced_clear_cw_cache">Clear Continue Watching Cache</string>
+    <string name="settings_advanced_clear_cw_cache_subtitle">Remove cached thumbnails, titles, and enrichment data for Continue Watching</string>
+    <string name="settings_advanced_clear_cw_cache_done">Cache cleared</string>
     <string name="settings_licenses_attributions_section_app">APP LICENSE</string>
     <string name="settings_licenses_attributions_section_data">DATA &amp; SERVICES</string>
     <string name="settings_licenses_attributions_section_playback">PLAYBACK LICENSE</string>
@@ -671,6 +681,12 @@
     <string name="settings_stream_badges_section">Fusion Style</string>
     <string name="settings_stream_size_badges_title">Size badges</string>
     <string name="settings_stream_size_badges_description">Show file size badges in stream results and player source panels.</string>
+    <string name="settings_stream_badge_position_title">Badge position</string>
+    <string name="settings_stream_badge_position_description">Choose whether Fusion and size badges appear above or below stream cards.</string>
+    <string name="settings_stream_badge_position_dialog_title">Badge position</string>
+    <string name="settings_stream_badge_position_dialog_description">Select where stream badges appear on stream cards.</string>
+    <string name="settings_stream_badge_position_top">Top</string>
+    <string name="settings_stream_badge_position_bottom">Bottom</string>
     <string name="settings_stream_badge_urls_title">Fusion badge URLs</string>
     <string name="settings_stream_badge_urls_description">Import up to %1$d Fusion-style stream badge JSON URLs. Each URL can be updated or deleted separately.</string>
     <string name="settings_stream_badge_urls_search_description">Manage imported Fusion-style stream badge JSON URLs.</string>
@@ -998,6 +1014,12 @@
     <string name="trakt_watch_progress_source_nuvio">Nuvio Sync</string>
     <string name="trakt_watch_progress_trakt_selected">Watch progress source set to Trakt</string>
     <string name="trakt_watch_progress_nuvio_selected">Watch progress source set to Nuvio Sync</string>
+    <string name="trakt_more_like_this_source_title">More Like This source</string>
+    <string name="trakt_more_like_this_source_subtitle">Choose where recommendations come from on detail pages</string>
+    <string name="trakt_more_like_this_source_dialog_title">More Like This source</string>
+    <string name="trakt_more_like_this_source_dialog_subtitle">Select the source for recommendations shown on detail pages.</string>
+    <string name="trakt_more_like_this_source_trakt">Trakt</string>
+    <string name="trakt_more_like_this_source_tmdb">TMDB</string>
     <string name="trakt_continue_watching_window">Continue Watching Window</string>
     <string name="trakt_continue_watching_subtitle">Trakt history considered for continue watching</string>
     <string name="trakt_cw_window_title">Continue Watching Window</string>
@@ -1123,6 +1145,8 @@
     <string name="details_director">Director</string>
     <string name="details_failed_to_load">Failed to load</string>
     <string name="details_more_like_this">More Like This</string>
+    <string name="detail_more_like_this_powered_by_tmdb">Powered by TMDB</string>
+    <string name="detail_more_like_this_powered_by_trakt">Powered by Trakt</string>
     <string name="details_seasons">Seasons</string>
     <string name="details_series_missing_numbers">This addon returned videos for the series, but none included season or episode numbers.</string>
     <string name="details_series_no_metadata">This addon did not provide episode metadata for this series.</string>
@@ -1560,6 +1584,12 @@
     <string name="settings_playback_ios_display_color_hint_desc">Let mpv target the active display color space by default.</string>
     <string name="settings_playback_ios_target_primaries">Target primaries</string>
     <string name="settings_playback_ios_target_transfer">Target transfer</string>
+    <!-- Playback settings iOS audio output -->
+    <string name="settings_playback_ios_audio_output_section">iOS audio output</string>
+    <string name="settings_playback_ios_audio_output">Audio output</string>
+    <string name="settings_playback_ios_audio_output_auto_desc">Try AVFoundation first, then fall back to AudioUnit.</string>
+    <string name="settings_playback_ios_audio_output_avfoundation_desc">Experimental support for Spatial Audio and multichannel output.</string>
+    <string name="settings_playback_ios_audio_output_audiounit_desc">Use the legacy AudioUnit output.</string>
     <!-- Debrid Result Management section -->
     <string name="settings_debrid_section_result_management">Result Management</string>
     <string name="settings_debrid_max_results">Max results</string>
@@ -1660,6 +1690,7 @@
     <string name="submit_intro_capture">Capture</string>
     <!-- iOS advanced playback -->
     <string name="settings_playback_ios_hw_decoder_dialog">Hardware decoder</string>
+    <string name="settings_playback_ios_audio_output_dialog">Audio output</string>
     <string name="settings_playback_ios_target_primaries_dialog">Target primaries</string>
     <string name="settings_playback_ios_target_transfer_dialog">Target transfer</string>
     <!-- Collection editor -->

@@ -146,6 +146,15 @@ enum class IosHardwareDecoderMode(
     Off("no", "Off"),
 }
 
+enum class IosAudioOutputMode(
+    val mpvValue: String,
+    val label: String,
+) {
+    Auto("avfoundation,audiounit,", "Auto"),
+    AvFoundation("avfoundation", "AVFoundation"),
+    AudioUnit("audiounit", "AudioUnit"),
+}
+
 @Composable
 fun IosVideoOutputPreset.localizedLabel(): String = when (this) {
     IosVideoOutputPreset.NativeEdr -> stringResource(Res.string.player_ios_preset_native_edr_label)
