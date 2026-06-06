@@ -1,122 +1,48 @@
-name: Build Nuvio Mobile iOS IPA
+name: iOS Build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - cmp-rewrite
+      - main
+      - master
+  pull_request:
 
 jobs:
-  build-ios-full:
-    name: Build iOS Full IPA
-    runs-on: macos-26-intel
-    timeout-minutes: 90
+  build:
+    runs-on: macos-latest
 
     steps:
-      - name: Checkout repository and submodules
+      - name: Checkout repo without broken recursive submodules
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          fetch-depth: 1
+          submodules: false
 
-      - name: Fix Git submodule URLs
+      - name: Clone MPVKit only
         run: |
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+          rm -rf MPVKit
+          git clone --depth=1 https://github.com/tapframe/MPVNuvio.git MPVKit
 
-      - name: Fetch iOS MPVKit submodule
-        run: git submodule update --init --recursive MPVKit
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
-      - name: Select latest stable Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Make Gradle executable
-        run: chmod +x ./gradlew
-
-      - name: Generate local.properties
+      - name: Show project files
         run: |
-          cat << 'EOF_PROPS' > local.properties
-          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
-          TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
-          TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
-          TRAKT_REDIRECT_URI=${{ secrets.TRAKT_REDIRECT_URI }}
-          TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}
-          INTRODB_API_URL=${{ secrets.INTRODB_API_URL }}
-          CONTRIBUTIONS_URL=${{ secrets.CONTRIBUTIONS_URL }}
-          DONATIONS_BASE_URL=${{ secrets.DONATIONS_BASE_URL }}
-          DONATIONS_DONATE_URL=${{ secrets.DONATIONS_DONATE_URL }}
-          DIRECT_DEBRID_API_BASE_URL=${{ secrets.DIRECT_DEBRID_API_BASE_URL }}
-          NUVIO_IOS_DISTRIBUTION=full
-          EOF_PROPS
+          echo "Repo root:"
+          ls -la
+          echo "iosApp folder:"
+          ls -la iosApp || true
 
-      - name: Force unsigned iOS build settings
-        run: |
-          PBXPROJ="iosApp/iosApp.xcodeproj/project.pbxproj"
-
-          echo "Patching Xcode signing settings..."
-
-          perl -0pi -e 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' "$PBXPROJ"
-          perl -0pi -e 's/CODE_SIGNING_ALLOWED = YES;/CODE_SIGNING_ALLOWED = NO;/g' "$PBXPROJ"
-          perl -0pi -e 's/CODE_SIGNING_REQUIRED = YES;/CODE_SIGNING_REQUIRED = NO;/g' "$PBXPROJ"
-          perl -0pi -e 's/DEVELOPMENT_TEAM = [A-Z0-9]+;/DEVELOPMENT_TEAM = "";/g' "$PBXPROJ"
-          perl -0pi -e 's/PROVISIONING_PROFILE_SPECIFIER = .*?;/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$PBXPROJ"
-          perl -0pi -e 's/PROVISIONING_PROFILE = .*?;/PROVISIONING_PROFILE = "";/g' "$PBXPROJ"
-
-      - name: Show Xcode schemes
+      - name: Build iOS app
         run: |
           cd iosApp
-          xcodebuild -list -project iosApp.xcodeproj
-
-      - name: Build iOS app with Xcode
-        run: |
-          cd iosApp
-
           xcodebuild \
             -project iosApp.xcodeproj \
             -scheme iosApp \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            -derivedDataPath build \
-            CODE_SIGN_STYLE=Manual \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            PROVISIONING_PROFILE="" \
-            PROVISIONING_PROFILE_SPECIFIER="" \
-            build
-
-      - name: Package app into IPA
-        run: |
-          cd iosApp/build/Build/Products/Release-iphoneos
-
-          APP_PATH=$(find . -maxdepth 1 -name "*.app" -type d | head -n 1)
-
-          if [ -z "$APP_PATH" ]; then
-            echo "No .app found"
-            find . -maxdepth 3 -print
-            exit 1
-          fi
-
-          APP_NAME=$(basename "$APP_PATH")
-          APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_PATH/Info.plist" || echo "1.0")
-
-          mkdir -p Payload
-          cp -R "$APP_PATH" Payload/
-
-          IPA_NAME="Nuvio-v${APP_VERSION}-Patched.ipa"
-          zip -q -r "$IPA_NAME" Payload
-
-          echo "IPA_FILENAME=$IPA_NAME" >> $GITHUB_ENV
-
-      - name: Upload iOS IPA artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Nuvio-iOS-Patched-IPA
-          path: iosApp/build/Build/Products/Release-iphoneos/${{ env.IPA_FILENAME }}
+            clean build
