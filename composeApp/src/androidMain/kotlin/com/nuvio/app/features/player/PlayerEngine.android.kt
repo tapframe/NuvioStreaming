@@ -940,18 +940,10 @@ private class SubtitleOffsetRenderersFactory(
         context: Context,
         enableFloatOutput: Boolean,
         enableAudioTrackPlaybackParams: Boolean,
-        enableOffload: Boolean,
     ): AudioSink? {
         return DefaultAudioSink.Builder(context)
             .setEnableFloatOutput(false)
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-            .setOffloadMode(
-                if (enableOffload) {
-                    DefaultAudioSink.OFFLOAD_MODE_ENABLED_GAPLESS_REQUIRED
-                } else {
-                    DefaultAudioSink.OFFLOAD_MODE_DISABLED
-                }
-            )
             .setAudioProcessors(arrayOf(volumeBoostAudioProcessor))
             .build()
     }
