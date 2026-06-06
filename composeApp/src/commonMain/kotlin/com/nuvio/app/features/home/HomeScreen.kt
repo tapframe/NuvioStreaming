@@ -341,12 +341,7 @@ fun HomeScreen(
                 return@mapNotNull null
             }
             val item = cached.toContinueWatchingItem() ?: return@mapNotNull null
-            val sortTimestamp = if (item.isReleaseAlert) {
-                com.nuvio.app.features.watchprogress.parseReleaseDateToEpochMs(item.released) ?: cached.lastWatched
-            } else {
-                cached.lastWatched
-            }
-            cached.contentId to (sortTimestamp to item)
+            cached.contentId to (cached.lastWatched to item)
         }.toMap()
     }
     val cachedInProgressItems = remember(cachedSnapshots.second, isTraktProgressActive) {
@@ -956,12 +951,7 @@ private suspend fun resolveHomeNextUpCandidate(
         return null
     }
 
-    val sortTimestamp = if (item.isReleaseAlert) {
-        com.nuvio.app.features.watchprogress.parseReleaseDateToEpochMs(item.released) ?: completedEntry.markedAtEpochMs
-    } else {
-        completedEntry.markedAtEpochMs
-    }
-    return contentId to (sortTimestamp to item)
+    return contentId to (completedEntry.markedAtEpochMs to item)
 }
 
 private fun MetaDetails.videoForSeriesAction(action: SeriesPrimaryAction): MetaVideo? {
@@ -1079,13 +1069,14 @@ internal fun buildHomeContinueWatchingItems(
     return when (sortMode) {
         ContinueWatchingSortMode.DEFAULT -> deduplicated.map(HomeContinueWatchingCandidate::item)
         ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED,
-        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED -> applyStreamingStyleSort(deduplicated, todayIsoDate)
+        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED -> applyStreamingStyleSort(deduplicated, todayIsoDate, sortMode)
     }
 }
 
 private fun applyStreamingStyleSort(
     candidates: List<HomeContinueWatchingCandidate>,
     todayIsoDate: String,
+    sortMode: ContinueWatchingSortMode,
 ): List<ContinueWatchingItem> {
     val (released, unreleased) = candidates.partition { candidate ->
         val item = candidate.item
@@ -1101,8 +1092,20 @@ private fun applyStreamingStyleSort(
         }
     }
 
-    // Released: most recently watched first (already sorted by dedup pass)
-    val sortedReleased = released.map(HomeContinueWatchingCandidate::item)
+    // Released: sorted by release date for RELEASED_UPCOMING_LAST_RELEASED (prioritize new episodes),
+    // or by last watched (default/raw candidates order) for RELEASED_UPCOMING_LAST_WATCHED.
+    val sortedReleased = if (sortMode == ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED) {
+        released.sortedByDescending { candidate ->
+            val item = candidate.item
+            if (item.isReleaseAlert && !item.released.isNullOrBlank()) {
+                com.nuvio.app.features.watchprogress.parseReleaseDateToEpochMs(item.released) ?: candidate.lastUpdatedEpochMs
+            } else {
+                candidate.lastUpdatedEpochMs
+            }
+        }.map(HomeContinueWatchingCandidate::item)
+    } else {
+        released.map(HomeContinueWatchingCandidate::item)
+    }
 
     // Unaired: soonest air date first; unknown dates go to the end
     val sortedUnreleased = unreleased
