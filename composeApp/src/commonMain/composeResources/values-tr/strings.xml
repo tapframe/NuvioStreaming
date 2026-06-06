@@ -568,8 +568,8 @@
     <string name="settings_continue_watching_sort_mode_title">Sıralama Düzeni</string>
     <string name="settings_continue_watching_sort_mode_default">Varsayılan</string>
     <string name="settings_continue_watching_sort_mode_default_desc">Tüm içerikleri son izleme zamanına göre sırala</string>
-    <string name="settings_continue_watching_sort_mode_streaming">Yayın Tarzı</string>
-    <string name="settings_continue_watching_sort_mode_streaming_desc">Yayınlanan içerikler önde, yakında çıkacaklar ise sonda yer alır</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released">Yayın Tarzı</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released_desc">Yayınlanan içerikler önde, yakında çıkacaklar ise sonda yer alır</string>
     <string name="settings_continue_watching_section_card_style">KART STİLİ</string>
     <string name="settings_continue_watching_section_on_launch">AÇILIŞTA</string>
     <string name="settings_continue_watching_section_up_next_behavior">SONRAKİ DAVRANIŞI</string>

@@ -568,10 +568,10 @@
     <string name="settings_continue_watching_sort_mode_title">Ordem de ordenação</string>
     <string name="settings_continue_watching_sort_mode_default">Predefinida</string>
     <string name="settings_continue_watching_sort_mode_default_desc">Ordena todos os itens pelos mais recentes</string>
-    <string name="settings_continue_watching_sort_mode_streaming">Lançados / Próximos (Últimos lançados)</string>
-    <string name="settings_continue_watching_sort_mode_streaming_desc">Itens lançados ordenados por data de lançamento, próximos itens por data de exibição</string>
-    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new">Lançados / Próximos (Últimos assistidos)</string>
-    <string name="settings_continue_watching_sort_mode_streaming_prioritize_new_desc">Itens lançados ordenados pelo último assistido, próximos itens por data de exibição</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released">Lançados / Próximos (Últimos lançados)</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released_desc">Itens lançados ordenados por data de lançamento, próximos itens por data de exibição</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_watched">Lançados / Próximos (Últimos assistidos)</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_watched_desc">Itens lançados ordenados pelo último assistido, próximos itens por data de exibição</string>
     <string name="settings_continue_watching_section_card_style">Estilo dos Cartões de Póster</string>
     <string name="settings_continue_watching_section_on_launch">AO INICIAR</string>
     <string name="settings_continue_watching_section_up_next_behavior">COMPORTAMENTO DO SEGUINTE</string>

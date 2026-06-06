@@ -562,8 +562,8 @@
     <string name="settings_continue_watching_sort_mode_title">Sorteringsrekkefølge</string>
     <string name="settings_continue_watching_sort_mode_default">Standard</string>
     <string name="settings_continue_watching_sort_mode_default_desc">Sorter alle etter nyhet</string>
-    <string name="settings_continue_watching_sort_mode_streaming">Streaming-stil</string>
-    <string name="settings_continue_watching_sort_mode_streaming_desc">Utgitt først, kommende til slutt</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released">Streaming-stil</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released_desc">Utgitt først, kommende til slutt</string>
     <string name="settings_continue_watching_section_card_style">Plakatstil</string>
     <string name="settings_continue_watching_section_on_launch">VED OPPSTART</string>
     <string name="settings_continue_watching_section_up_next_behavior">NESTE OPPFØRSEL</string>

@@ -52,10 +52,10 @@ import nuvio.composeapp.generated.resources.settings_continue_watching_show_desc
 import nuvio.composeapp.generated.resources.settings_continue_watching_show_title
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_default
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_default_desc
-import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming
-import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming_desc
-import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming_prioritize_new
-import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_streaming_prioritize_new_desc
+import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_released_upcoming_last_released
+import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_released_upcoming_last_released_desc
+import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_released_upcoming_last_watched
+import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_released_upcoming_last_watched_desc
 import nuvio.composeapp.generated.resources.settings_continue_watching_sort_mode_title
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_card
 import nuvio.composeapp.generated.resources.settings_continue_watching_style_card_description
@@ -177,8 +177,8 @@ internal fun LazyListScope.continueWatchingSettingsContent(
                 val currentModeLabel = stringResource(
                     when (sortMode) {
                         ContinueWatchingSortMode.DEFAULT -> Res.string.settings_continue_watching_sort_mode_default
-                        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED -> Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new
-                        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED -> Res.string.settings_continue_watching_sort_mode_streaming
+                        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED -> Res.string.settings_continue_watching_sort_mode_released_upcoming_last_watched
+                        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED -> Res.string.settings_continue_watching_sort_mode_released_upcoming_last_released
                     }
                 )
                 SettingsNavigationRow(
@@ -325,13 +325,13 @@ private fun ContinueWatchingSortModeDialog(
         ),
         Triple(
             ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED,
-            Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new,
-            Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new_desc,
+            Res.string.settings_continue_watching_sort_mode_released_upcoming_last_watched,
+            Res.string.settings_continue_watching_sort_mode_released_upcoming_last_watched_desc,
         ),
         Triple(
             ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED,
-            Res.string.settings_continue_watching_sort_mode_streaming,
-            Res.string.settings_continue_watching_sort_mode_streaming_desc,
+            Res.string.settings_continue_watching_sort_mode_released_upcoming_last_released,
+            Res.string.settings_continue_watching_sort_mode_released_upcoming_last_released_desc,
         ),
     )
 

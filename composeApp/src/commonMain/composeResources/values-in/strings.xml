@@ -578,8 +578,8 @@
     <string name="settings_continue_watching_sort_mode_title">Urutan Sortir</string>
     <string name="settings_continue_watching_sort_mode_default">Setelan Bawaan</string>
     <string name="settings_continue_watching_sort_mode_default_desc">Urutkan semua item berdasarkan yang terbaru</string>
-    <string name="settings_continue_watching_sort_mode_streaming">Gaya Streaming</string>
-    <string name="settings_continue_watching_sort_mode_streaming_desc">Item yang sudah rilis lebih dulu, yang mendatang di akhir</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released">Gaya Streaming</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released_desc">Item yang sudah rilis lebih dulu, yang mendatang di akhir</string>
     <string name="settings_continue_watching_section_card_style">Gaya Kartu Poster</string>
     <string name="settings_continue_watching_section_on_launch">SAAT DIBUKA</string>
     <string name="settings_continue_watching_section_up_next_behavior">PERILAKU BERIKUTNYA</string>

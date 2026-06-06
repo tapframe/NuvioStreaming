@@ -576,8 +576,8 @@
     <string name="settings_continue_watching_sort_mode_title">Ordre de tri</string>
     <string name="settings_continue_watching_sort_mode_default">Par défaut</string>
     <string name="settings_continue_watching_sort_mode_default_desc">Trier tous les éléments par récence</string>
-    <string name="settings_continue_watching_sort_mode_streaming">Style streaming</string>
-    <string name="settings_continue_watching_sort_mode_streaming_desc">Éléments sortis d’abord, à venir à la fin</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released">Style streaming</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released_desc">Éléments sortis d’abord, à venir à la fin</string>
     <string name="settings_continue_watching_section_card_style">STYLE DE CARTE D’AFFICHE</string>
     <string name="settings_continue_watching_section_on_launch">AU DÉMARRAGE</string>
     <string name="settings_continue_watching_section_up_next_behavior">COMPORTEMENT DE LA SUITE</string>

@@ -1255,8 +1255,8 @@
   <string name="settings_continue_watching_sort_mode_title">Ordine di ordinamento</string>
   <string name="settings_continue_watching_sort_mode_default">Predefinito</string>
   <string name="settings_continue_watching_sort_mode_default_desc">Ordina tutti gli elementi in base ai più recenti</string>
-  <string name="settings_continue_watching_sort_mode_streaming">Stile streaming</string>
-  <string name="settings_continue_watching_sort_mode_streaming_desc">Prima gli elementi rilasciati, i prossimi in arrivo alla fine</string>
+  <string name="settings_continue_watching_sort_mode_released_upcoming_last_released">Stile streaming</string>
+  <string name="settings_continue_watching_sort_mode_released_upcoming_last_released_desc">Prima gli elementi rilasciati, i prossimi in arrivo alla fine</string>
   <string name="settings_continue_watching_use_episode_thumbnails_description">Prediligi le miniature dell'episodio quando disponibili.</string>
   <string name="settings_continue_watching_use_episode_thumbnails_title">Prediligi miniature episodio in Inizia a guardare</string>
   <string name="settings_integrations_debrid_description">Connetti gli account per i link e l'accesso alla libreria</string>

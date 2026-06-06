@@ -578,8 +578,8 @@
     <string name="settings_continue_watching_sort_mode_title">Kolejność sortowania</string>
     <string name="settings_continue_watching_sort_mode_default">Domyślna</string>
     <string name="settings_continue_watching_sort_mode_default_desc">Sortuj wszystkie elementy według czasu</string>
-    <string name="settings_continue_watching_sort_mode_streaming">Styl streamingowy</string>
-    <string name="settings_continue_watching_sort_mode_streaming_desc">Wydane najpierw, nadchodzące na końcu</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released">Styl streamingowy</string>
+    <string name="settings_continue_watching_sort_mode_released_upcoming_last_released_desc">Wydane najpierw, nadchodzące na końcu</string>
     <string name="settings_continue_watching_section_card_style">STYL KARTY</string>
     <string name="settings_continue_watching_section_on_launch">PRZY URUCHOMIENIU</string>
     <string name="settings_continue_watching_section_up_next_behavior">ZACHOWANIE NASTĘPNEGO</string>
