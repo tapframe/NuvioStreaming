@@ -1078,8 +1078,8 @@ internal fun buildHomeContinueWatchingItems(
 
     return when (sortMode) {
         ContinueWatchingSortMode.DEFAULT -> deduplicated.map(HomeContinueWatchingCandidate::item)
-        ContinueWatchingSortMode.STREAMING_STYLE -> applyStreamingStyleSort(deduplicated, todayIsoDate)
-        ContinueWatchingSortMode.STREAMING_PRIORITIZE_NEW -> applyStreamingStylePrioritizeNewSort(deduplicated, todayIsoDate)
+        ContinueWatchingSortMode.STREAMING_STYLE,
+        ContinueWatchingSortMode.STREAMING_PRIORITIZE_NEW -> applyStreamingStyleSort(deduplicated, todayIsoDate)
     }
 }
 
@@ -1103,48 +1103,6 @@ private fun applyStreamingStyleSort(
 
     // Released: most recently watched first (already sorted by dedup pass)
     val sortedReleased = released.map(HomeContinueWatchingCandidate::item)
-
-    // Unaired: soonest air date first; unknown dates go to the end
-    val sortedUnreleased = unreleased
-        .sortedWith { a, b ->
-            val dateA = a.item.released?.takeIf { it.isNotBlank() }
-            val dateB = b.item.released?.takeIf { it.isNotBlank() }
-            when {
-                dateA == null && dateB == null -> 0
-                dateA == null -> 1
-                dateB == null -> -1
-                else -> dateA.compareTo(dateB)
-            }
-        }
-        .map(HomeContinueWatchingCandidate::item)
-
-    return sortedReleased + sortedUnreleased
-}
-
-private fun applyStreamingStylePrioritizeNewSort(
-    candidates: List<HomeContinueWatchingCandidate>,
-    todayIsoDate: String,
-): List<ContinueWatchingItem> {
-    val (released, unreleased) = candidates.partition { candidate ->
-        val item = candidate.item
-        if (!item.isNextUp) {
-            true // in-progress items are always "released"
-        } else {
-            val itemReleased = item.released
-            if (itemReleased.isNullOrBlank() || todayIsoDate.isBlank()) {
-                true // no date info → treat as released
-            } else {
-                isReleasedBy(todayIsoDate = todayIsoDate, releasedDate = itemReleased)
-            }
-        }
-    }
-
-    // Released: prioritize new episodes (isReleaseAlert == true) sorted by last updated epoch, then others
-    val sortedReleased = released
-        .sortedByDescending { candidate ->
-            candidate.lastUpdatedEpochMs
-        }
-        .map(HomeContinueWatchingCandidate::item)
 
     // Unaired: soonest air date first; unknown dates go to the end
     val sortedUnreleased = unreleased
