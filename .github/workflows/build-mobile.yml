@@ -16,17 +16,25 @@ jobs:
 
     steps:
 
-      - name: Checkout repository and submodules
+      - name: Checkout repository
 
         uses: actions/checkout@v4
 
-        with:
+      - name: Fix Git submodule URLs
 
-          submodules: recursive
+        run: |
+
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+          git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 
       - name: Fetch iOS MPVKit submodule
 
-        run: git submodule update --init --recursive MPVKit
+        run: |
+
+          git submodule sync --recursive MPVKit
+
+          git submodule update --init --recursive MPVKit
 
       - name: Select latest stable Xcode
 
