@@ -1,5 +1,4 @@
 package com.nuvio.app.features.profiles
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,10 +53,10 @@ import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
+import com.nuvio.app.features.home.components.CollectionCardRemoteImage
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProfileEditScreen(
@@ -75,7 +74,6 @@ fun ProfileEditScreen(
         }
     }
     val fallbackColorHex = currentProfile?.avatarColorHex ?: PROFILE_COLORS.first()
-
     var name by rememberSaveable { mutableStateOf(currentProfile?.name ?: "") }
     var selectedAvatarId by rememberSaveable { mutableStateOf(currentProfile?.avatarId) }
     var avatarUrl by rememberSaveable { mutableStateOf(currentProfile?.avatarUrl.orEmpty()) }
@@ -85,7 +83,6 @@ fun ProfileEditScreen(
     var showPinSetup by remember { mutableStateOf(false) }
     var showPinClear by remember { mutableStateOf(false) }
     val authState by AuthRepository.state.collectAsStateWithLifecycle()
-
     val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         AvatarRepository.fetchAvatars()
@@ -96,7 +93,6 @@ fun ProfileEditScreen(
             selectedAvatarId = avatars.first().id
         }
     }
-
     val customAvatarUrl = remember(avatarUrl) { normalizedAvatarUrl(avatarUrl) }
     val avatarUrlIsInvalid = avatarUrl.isNotBlank() && customAvatarUrl == null
     val selectedAvatarItem = remember(selectedAvatarId, avatars) {
@@ -106,7 +102,6 @@ fun ProfileEditScreen(
     val previewAccent = remember(visibleAvatarItem, fallbackColorHex) {
         parseHexColor(visibleAvatarItem?.bgColor ?: fallbackColorHex)
     }
-
     NuvioScreen(modifier = modifier) {
         stickyHeader {
             NuvioScreenHeader(
@@ -118,7 +113,6 @@ fun ProfileEditScreen(
                 onBack = onBack,
             )
         }
-
         item {
             ProfileIdentityCard(
                 name = name,
@@ -133,7 +127,6 @@ fun ProfileEditScreen(
                 hasAvatarChoices = avatars.isNotEmpty(),
             )
         }
-
         item {
             NuvioSurfaceCard {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -167,7 +160,6 @@ fun ProfileEditScreen(
                 }
             }
         }
-
         item {
             NuvioSurfaceCard {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -186,7 +178,6 @@ fun ProfileEditScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-
                     if (avatars.isNotEmpty()) {
                         val avatarSpacing = 10.dp
                         val minAvatarSize = 58.dp
@@ -194,7 +185,6 @@ fun ProfileEditScreen(
                             val columns = (((maxWidth + avatarSpacing) / (minAvatarSize + avatarSpacing)).toInt())
                                 .coerceAtLeast(1)
                             val avatarSize = (maxWidth - avatarSpacing * (columns - 1)) / columns
-
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(avatarSpacing),
                                 verticalArrangement = Arrangement.spacedBy(avatarSpacing),
@@ -217,7 +207,6 @@ fun ProfileEditScreen(
                 }
             }
         }
-
         if (!isNew) {
             item {
                 NuvioSurfaceCard {
@@ -251,7 +240,6 @@ fun ProfileEditScreen(
                 }
             }
         }
-
         item {
             Spacer(modifier = Modifier.height(8.dp))
             NuvioPrimaryButton(
@@ -291,7 +279,6 @@ fun ProfileEditScreen(
                 },
             )
         }
-
         if (!isNew && (currentProfile?.profileIndex ?: 0) > 1) {
             item {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -315,7 +302,6 @@ fun ProfileEditScreen(
             }
         }
     }
-
     NuvioStatusModal(
         title = stringResource(Res.string.profile_delete_title),
         message = stringResource(
@@ -334,7 +320,6 @@ fun ProfileEditScreen(
         },
         onDismiss = { showDeleteConfirm = false },
     )
-
     if (showPinSetup && currentProfile != null) {
         PinSetupDialog(
             profileIndex = currentProfile.profileIndex,
@@ -350,7 +335,6 @@ fun ProfileEditScreen(
             onDismiss = { showPinSetup = false },
         )
     }
-
     if (showPinClear && currentProfile != null) {
         PinEntryDialog(
             profileName = stringResource(Res.string.profile_remove_pin_for, currentProfile.name),
@@ -364,7 +348,6 @@ fun ProfileEditScreen(
         )
     }
 }
-
 @Composable
 private fun ProfileIdentityCard(
     name: String,
@@ -408,11 +391,12 @@ private fun ProfileIdentityCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     if (customAvatarUrl != null) {
-                        AsyncImage(
-                            model = customAvatarUrl,
+                        CollectionCardRemoteImage(
+                            imageUrl = customAvatarUrl,
                             contentDescription = name,
-                            modifier = Modifier.size(88.dp).clip(CircleShape),
+                            modifier = Modifier.fillMaxSize().clip(CircleShape),
                             contentScale = ContentScale.Crop,
+                            animateIfPossible = true,
                         )
                     } else if (selectedAvatar != null) {
                         AsyncImage(
@@ -437,7 +421,6 @@ private fun ProfileIdentityCard(
                         )
                     }
                 }
-
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -483,13 +466,11 @@ private fun ProfileIdentityCard(
                     )
                 }
             }
-
             NuvioInputField(
                 value = name,
                 onValueChange = onNameChange,
                 placeholder = stringResource(Res.string.profile_name_placeholder),
             )
-
             ProfileOptionRow(
                 title = stringResource(Res.string.profile_use_primary_addons),
                 description = stringResource(Res.string.profile_use_primary_addons_description),
@@ -499,7 +480,6 @@ private fun ProfileIdentityCard(
         }
     }
 }
-
 @Composable
 private fun AvatarChoiceItem(
     avatar: AvatarCatalogItem,
@@ -529,7 +509,6 @@ private fun AvatarChoiceItem(
             modifier = Modifier.fillMaxSize().clip(CircleShape),
             contentScale = ContentScale.Crop,
         )
-
         if (isSelected) {
             Box(
                 modifier = Modifier
@@ -549,7 +528,6 @@ private fun AvatarChoiceItem(
         }
     }
 }
-
 @Composable
 private fun ProfileOptionRow(
     title: String,
@@ -591,7 +569,6 @@ private fun ProfileOptionRow(
         )
     }
 }
-
 @Composable
 fun PinSetupDialog(
     profileIndex: Int,
@@ -602,7 +579,6 @@ fun PinSetupDialog(
     var step by remember { mutableStateOf(if (hasExistingPin) "current" else "new") }
     var currentPin by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-
     when (step) {
         "current" -> PinEntryDialog(
             profileName = stringResource(Res.string.profile_enter_current_pin),
@@ -613,7 +589,6 @@ fun PinSetupDialog(
             },
             onDismiss = onDismiss,
         )
-
         "new" -> PinEntryDialog(
             profileName = stringResource(Res.string.profile_enter_new_pin),
             onVerify = { pin ->
