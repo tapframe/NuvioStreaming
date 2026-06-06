@@ -1,191 +1,191 @@
 {
 
-"name": "iOS Build",
+  "name": "iOS Build",
 
-"on": {
+  "on": {
 
-"workflow_dispatch": {},
+    "workflow_dispatch": {},
 
-"push": {
+    "push": {
 
-"branches": [
+      "branches": [
 
-"main",
+        "main",
 
-"master",
+        "master",
 
-"cmp-rewrite"
+        "cmp-rewrite"
 
-]
+      ]
 
-},
+    },
 
-"pull_request": {}
+    "pull_request": {}
 
-},
+  },
 
-"env": {
+  "env": {
 
-"FORCE_JAVASCRIPT_ACTIONS_TO_NODE24": "true"
+    "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24": "true"
 
-},
+  },
 
-"jobs": {
+  "jobs": {
 
-"build": {
+    "build": {
 
-"runs-on": "macos-15",
+      "runs-on": "macos-15",
 
-"timeout-minutes": 60,
+      "timeout-minutes": 60,
 
-"steps": [
+      "steps": [
 
-{
+        {
 
-"name": "Checkout repo without submodules",
+          "name": "Checkout repo without submodules",
 
-"uses": "actions/checkout@v4",
+          "uses": "actions/checkout@v4",
 
-"with": {
+          "with": {
 
-"submodules": false
+            "submodules": false
 
-}
+          }
 
-},
+        },
 
-{
+        {
 
-"name": "Fix MPVKit dependency",
+          "name": "Fix MPVKit dependency",
 
-"run": "rm -rf MPVKit && git clone --depth=1 https://github.com/tapframe/MPVNuvio.git MPVKit && rm -rf MPVKit/.git MPVKit/.gitmodules"
+          "run": "rm -rf MPVKit && git clone --depth=1 https://github.com/tapframe/MPVNuvio.git MPVKit && rm -rf MPVKit/.git MPVKit/.gitmodules"
 
-},
+        },
 
-{
+        {
 
-"name": "Set up Java 17",
+          "name": "Set up Java 17",
 
-"uses": "actions/setup-java@v4",
+          "uses": "actions/setup-java@v4",
 
-"with": {
+          "with": {
 
-"distribution": "zulu",
+            "distribution": "zulu",
 
-"java-version": "17"
+            "java-version": "17"
 
-}
+          }
 
-},
+        },
 
-{
+        {
 
-"name": "Setup Gradle",
+          "name": "Setup Gradle",
 
-"uses": "gradle/actions/setup-gradle@v4"
+          "uses": "gradle/actions/setup-gradle@v4"
 
-},
+        },
 
-{
+        {
 
-"name": "Select Xcode",
+          "name": "Select Xcode",
 
-"run": "if [ -d /Applications/Xcode_16.4.app ]; then sudo xcode-select -s /Applications/Xcode_16.4.app; else sudo xcode-select -s /Applications/Xcode.app; fi; xcodebuild -version"
+          "run": "if [ -d /Applications/Xcode_16.4.app ]; then sudo xcode-select -s /Applications/Xcode_16.4.app; else sudo xcode-select -s /Applications/Xcode.app; fi; xcodebuild -version"
 
-},
+        },
 
-{
+        {
 
-"name": "Make Gradle wrapper executable",
+          "name": "Make Gradle wrapper executable",
 
-"run": "chmod +x gradlew"
+          "run": "chmod +x gradlew"
 
-},
+        },
 
-{
+        {
 
-"name": "Create empty local properties",
+          "name": "Create empty local properties",
 
-"run": "touch local.properties"
+          "run": "touch local.properties"
 
-},
+        },
 
-{
+        {
 
-"name": "Patch iOS signing for unsigned build",
+          "name": "Patch iOS signing for unsigned build",
 
-"run": "ruby -e 'p=\"iosApp/iosApp.xcodeproj/project.pbxproj\"; s=File.read(p); s=s.gsub(\"CODE_SIGNING_ALLOWED = YES;\",\"CODE_SIGNING_ALLOWED = NO;\").gsub(\"CODE_SIGNING_REQUIRED = YES;\",\"CODE_SIGNING_REQUIRED = NO;\").gsub(%q{CODE_SIGN_IDENTITY = \"Apple Development\";},%q{CODE_SIGN_IDENTITY = \"\";}).gsub(\"CODE_SIGN_STYLE = Automatic;\",\"CODE_SIGN_STYLE = Manual;\").lines.reject{|l| l.strip.start_with?(\"DEVELOPMENT_TEAM\",\"PROVISIONING_PROFILE\",\"PROVISIONING_PROFILE_SPECIFIER\")}.join; File.write(p,s)'"
+          "run": "ruby -e 'p=\"iosApp/iosApp.xcodeproj/project.pbxproj\"; s=File.read(p); s=s.gsub(\"CODE_SIGNING_ALLOWED = YES;\",\"CODE_SIGNING_ALLOWED = NO;\").gsub(\"CODE_SIGNING_REQUIRED = YES;\",\"CODE_SIGNING_REQUIRED = NO;\").gsub(%q{CODE_SIGN_IDENTITY = \"Apple Development\";},%q{CODE_SIGN_IDENTITY = \"\";}).gsub(\"CODE_SIGN_STYLE = Automatic;\",\"CODE_SIGN_STYLE = Manual;\").lines.reject{|l| l.strip.start_with?(\"DEVELOPMENT_TEAM\",\"PROVISIONING_PROFILE\",\"PROVISIONING_PROFILE_SPECIFIER\")}.join; File.write(p,s)'"
 
-},
+        },
 
-{
+        {
 
-"name": "Show Xcode project info",
+          "name": "Show Xcode project info",
 
-"run": "cd iosApp && xcodebuild -list -project iosApp.xcodeproj"
+          "run": "cd iosApp && xcodebuild -list"
 
-},
+        },
 
-{
+        {
 
-"name": "Build unsigned iOS app",
+          "name": "Build app using Xcode defaults",
 
-"run": "set -o pipefail; cd iosApp; xcodebuild -project iosApp.xcodeproj -scheme iosApp -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=\"\" clean build 2>&1 | tee ../xcodebuild.log"
+          "run": "set -o pipefail; cd iosApp; xcodebuild clean build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=\"\" 2>&1 | tee ../xcodebuild.log"
 
-},
+        },
 
-{
+        {
 
-"name": "Package unsigned IPA",
+          "name": "Package built app",
 
-"if": "success()",
+          "if": "success()",
 
-"run": "APP_PATH=$(find iosApp/build/DerivedData/Build/Products/Release-iphoneos -name 'Nuvio.app' -type d | head -n 1); if [ -z \"$APP_PATH\" ]; then echo 'No Nuvio.app found'; find iosApp/build/DerivedData -name '*.app' -type d || true; exit 1; fi; echo \"Found app at: $APP_PATH\"; rm -rf artifacts; mkdir -p artifacts/Payload; cp -R \"$APP_PATH\" artifacts/Payload/Nuvio.app; cd artifacts; zip -qry Nuvio-unsigned.ipa Payload"
+          "run": "APP_PATH=$(find iosApp/build -name 'Nuvio.app' -type d | head -n 1); if [ -z \"$APP_PATH\" ]; then echo 'No Nuvio.app found'; find iosApp -name '*.app' -type d || true; exit 1; fi; echo \"Found app at: $APP_PATH\"; rm -rf artifacts; mkdir -p artifacts/Payload; cp -R \"$APP_PATH\" artifacts/Payload/Nuvio.app; cd artifacts; zip -qry Nuvio-unsigned.ipa Payload"
 
-},
+        },
 
-{
+        {
 
-"name": "Upload unsigned IPA",
+          "name": "Upload unsigned IPA",
 
-"if": "success()",
+          "if": "success()",
 
-"uses": "actions/upload-artifact@v4",
+          "uses": "actions/upload-artifact@v4",
 
-"with": {
+          "with": {
 
-"name": "Nuvio-unsigned-IPA",
+            "name": "Nuvio-unsigned-IPA",
 
-"path": "artifacts/Nuvio-unsigned.ipa"
+            "path": "artifacts/Nuvio-unsigned.ipa"
 
-}
+          }
 
-},
+        },
 
-{
+        {
 
-"name": "Upload Xcode log",
+          "name": "Upload Xcode log",
 
-"if": "always()",
+          "if": "always()",
 
-"uses": "actions/upload-artifact@v4",
+          "uses": "actions/upload-artifact@v4",
 
-"with": {
+          "with": {
 
-"name": "xcodebuild-log",
+            "name": "xcodebuild-log",
 
-"path": "xcodebuild.log",
+            "path": "xcodebuild.log",
 
-"if-no-files-found": "ignore"
+            "if-no-files-found": "ignore"
 
-}
+          }
 
-}
+        }
 
-]
+      ]
 
-}
+    }
 
-}
+  }
 
 }
