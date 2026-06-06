@@ -140,61 +140,15 @@ jobs:
 
       - name: Build Kotlin iOS simulator code
 
-        run: |
-
-          ./gradlew :composeApp:compileKotlinIosSimulatorArm64 --no-daemon --stacktrace
+        run: ./gradlew :composeApp:compileKotlinIosSimulatorArm64 --no-daemon --stacktrace
 
       - name: Show Xcode project info
 
-        run: |
-
-          cd iosApp
-
-          xcodebuild -list -project iosApp.xcodeproj
-
-      - name: Resolve Swift packages
-
-        run: |
-
-          cd iosApp
-
-          xcodebuild \
-
-            -resolvePackageDependencies \
-
-            -project iosApp.xcodeproj \
-
-            -scheme iosApp
+        run: cd iosApp && xcodebuild -list -project iosApp.xcodeproj
 
       - name: Build iOS app for simulator
 
-        run: |
-
-          cd iosApp
-
-          xcodebuild \
-
-            -project iosApp.xcodeproj \
-
-            -scheme iosApp \
-
-            -configuration Debug \
-
-            -sdk iphonesimulator \
-
-            -destination 'generic/platform=iOS Simulator' \
-
-            -derivedDataPath build/DerivedData \
-
-            ONLY_ACTIVE_ARCH=YES \
-
-            CODE_SIGNING_ALLOWED=NO \
-
-            CODE_SIGNING_REQUIRED=NO \
-
-            CODE_SIGN_IDENTITY="" \
-
-            clean build
+        run: cd iosApp && xcodebuild -project iosApp.xcodeproj -scheme iosApp -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/DerivedData ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" clean build
 
       - name: Package app
 
