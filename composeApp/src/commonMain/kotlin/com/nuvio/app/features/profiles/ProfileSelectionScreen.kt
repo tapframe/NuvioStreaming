@@ -1,11 +1,11 @@
 package com.nuvio.app.features.profiles
-
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,14 +55,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.features.home.components.CollectionCardRemoteImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
-
 @Composable
 fun ProfileSelectionScreen(
     onProfileSelected: (NuvioProfile) -> Unit,
@@ -76,31 +74,25 @@ fun ProfileSelectionScreen(
     val scope = rememberCoroutineScope()
     var pinDialogProfile by remember { mutableStateOf<NuvioProfile?>(null) }
     var isEditMode by remember { mutableStateOf(false) }
-
     val titleAlpha = remember { Animatable(0f) }
     val titleOffset = remember { Animatable(20f) }
     val manageAlpha = remember { Animatable(0f) }
-
     LaunchedEffect(Unit) {
         AvatarRepository.fetchAvatars()
         AvatarRepository.refreshAvatars()
     }
-
     LaunchedEffect(authState) {
         if (authState is AuthState.Authenticated) {
             ProfileRepository.pullProfiles()
         }
     }
-
     LaunchedEffect(Unit) {
         launch { titleAlpha.animateTo(1f, tween(600, easing = FastOutSlowInEasing)) }
         launch { titleOffset.animateTo(0f, tween(600, easing = FastOutSlowInEasing)) }
         delay(300)
         manageAlpha.animateTo(1f, tween(500))
     }
-
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -116,7 +108,6 @@ fun ProfileSelectionScreen(
             .padding(top = statusBarTop),
     ) {
         val isTabletLayout = maxWidth >= 768.dp
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -132,7 +123,6 @@ fun ProfileSelectionScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.height(if (isTabletLayout) 0.dp else 60.dp))
-
             Text(
                 text = stringResource(Res.string.profile_who_is_watching),
                 style = MaterialTheme.typography.headlineLarge.copy(
@@ -146,12 +136,9 @@ fun ProfileSelectionScreen(
                     translationY = titleOffset.value
                 },
             )
-
             Spacer(modifier = Modifier.height(if (isTabletLayout) 28.dp else 48.dp))
-
             val profiles = profileState.profiles
             val items = profiles.size + if (profiles.size < 4) 1 else 0
-
             if (isTabletLayout) {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
@@ -239,9 +226,7 @@ fun ProfileSelectionScreen(
                     }
                 }
             }
-
             Spacer(modifier = Modifier.height(if (isTabletLayout) 28.dp else 48.dp))
-
             Box(
                 modifier = Modifier
                     .graphicsLayer { alpha = manageAlpha.value }
@@ -271,11 +256,9 @@ fun ProfileSelectionScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
             }
-
             Spacer(modifier = Modifier.height(if (isTabletLayout) 0.dp else 32.dp))
         }
     }
-
     pinDialogProfile?.let { profile ->
         PinEntryDialog(
             profileName = profile.name,
@@ -289,7 +272,6 @@ fun ProfileSelectionScreen(
         )
     }
 }
-
 @Composable
 private fun ProfileAvatarCard(
     profile: NuvioProfile,
@@ -307,22 +289,18 @@ private fun ProfileAvatarCard(
     val avatarImageUrl = remember(profile.avatarUrl, avatarItem) {
         profileAvatarImageUrl(profile, avatarItem)
     }
-
     val animAlpha = remember { Animatable(0f) }
     val animScale = remember { Animatable(0.85f) }
     val animOffset = remember { Animatable(30f) }
-
     LaunchedEffect(Unit) {
         delay(animDelay.toLong() + 150)
         launch { animAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
         launch { animScale.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
         launch { animOffset.animateTo(0f, tween(500, easing = FastOutSlowInEasing)) }
     }
-
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale = if (isPressed) 0.95f else 1f
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -354,7 +332,6 @@ private fun ProfileAvatarCard(
                         .background(bgColor.copy(alpha = 0.2f)),
                 )
             }
-
             Box(
                 modifier = Modifier
                     .size(100.dp)
@@ -373,11 +350,12 @@ private fun ProfileAvatarCard(
                 contentAlignment = Alignment.Center,
             ) {
                 if (avatarImageUrl != null) {
-                    AsyncImage(
-                        model = avatarImageUrl,
+                    CollectionCardRemoteImage(
+                        imageUrl = avatarImageUrl,
                         contentDescription = avatarItem?.displayName ?: profile.name,
-                        modifier = Modifier.size(100.dp).clip(CircleShape),
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
                         contentScale = ContentScale.Crop,
+                        animateIfPossible = true,
                     )
                 } else if (profile.name.isNotBlank()) {
                     Text(
@@ -395,7 +373,6 @@ private fun ProfileAvatarCard(
                     )
                 }
             }
-
             if (isEditMode) {
                 Box(
                     modifier = Modifier
@@ -414,7 +391,6 @@ private fun ProfileAvatarCard(
                     )
                 }
             }
-
             if (profile.pinEnabled && !isEditMode) {
                 Box(
                     modifier = Modifier
@@ -434,9 +410,7 @@ private fun ProfileAvatarCard(
                 }
             }
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-
         Text(
             text = profile.name.ifBlank {
                 stringResource(Res.string.profile_label_number, profile.profileIndex)
@@ -450,7 +424,6 @@ private fun ProfileAvatarCard(
         )
     }
 }
-
 @Composable
 private fun AddProfileCard(
     animDelay: Int,
@@ -459,18 +432,15 @@ private fun AddProfileCard(
     val animAlpha = remember { Animatable(0f) }
     val animScale = remember { Animatable(0.85f) }
     val animOffset = remember { Animatable(30f) }
-
     LaunchedEffect(Unit) {
         delay(animDelay.toLong() + 150)
         launch { animAlpha.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
         launch { animScale.animateTo(1f, tween(500, easing = FastOutSlowInEasing)) }
         launch { animOffset.animateTo(0f, tween(500, easing = FastOutSlowInEasing)) }
     }
-
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale = if (isPressed) 0.95f else 1f
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -513,9 +483,7 @@ private fun AddProfileCard(
                 )
             }
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-
         Text(
             text = stringResource(Res.string.compose_profile_add_profile),
             style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
