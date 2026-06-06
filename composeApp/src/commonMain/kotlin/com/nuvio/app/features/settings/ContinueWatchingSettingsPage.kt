@@ -177,8 +177,8 @@ internal fun LazyListScope.continueWatchingSettingsContent(
                 val currentModeLabel = stringResource(
                     when (sortMode) {
                         ContinueWatchingSortMode.DEFAULT -> Res.string.settings_continue_watching_sort_mode_default
-                        ContinueWatchingSortMode.STREAMING_STYLE -> Res.string.settings_continue_watching_sort_mode_streaming
-                        ContinueWatchingSortMode.STREAMING_PRIORITIZE_NEW -> Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new
+                        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED -> Res.string.settings_continue_watching_sort_mode_streaming
+                        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED -> Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new
                     }
                 )
                 SettingsNavigationRow(
@@ -324,12 +324,12 @@ private fun ContinueWatchingSortModeDialog(
             Res.string.settings_continue_watching_sort_mode_default_desc,
         ),
         Triple(
-            ContinueWatchingSortMode.STREAMING_STYLE,
+            ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED,
             Res.string.settings_continue_watching_sort_mode_streaming,
             Res.string.settings_continue_watching_sort_mode_streaming_desc,
         ),
         Triple(
-            ContinueWatchingSortMode.STREAMING_PRIORITIZE_NEW,
+            ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED,
             Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new,
             Res.string.settings_continue_watching_sort_mode_streaming_prioritize_new_desc,
         ),

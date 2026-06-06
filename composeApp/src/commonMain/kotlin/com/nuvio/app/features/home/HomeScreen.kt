@@ -1078,8 +1078,8 @@ internal fun buildHomeContinueWatchingItems(
 
     return when (sortMode) {
         ContinueWatchingSortMode.DEFAULT -> deduplicated.map(HomeContinueWatchingCandidate::item)
-        ContinueWatchingSortMode.STREAMING_STYLE,
-        ContinueWatchingSortMode.STREAMING_PRIORITIZE_NEW -> applyStreamingStyleSort(deduplicated, todayIsoDate)
+        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_RELEASED,
+        ContinueWatchingSortMode.RELEASED_UPCOMING_LAST_WATCHED -> applyStreamingStyleSort(deduplicated, todayIsoDate)
     }
 }
 

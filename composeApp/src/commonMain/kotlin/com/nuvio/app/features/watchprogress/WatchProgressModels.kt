@@ -23,8 +23,8 @@ enum class ContinueWatchingSectionStyle {
 @Serializable
 enum class ContinueWatchingSortMode {
     DEFAULT,
-    STREAMING_STYLE,
-    STREAMING_PRIORITIZE_NEW,
+    RELEASED_UPCOMING_LAST_RELEASED,
+    RELEASED_UPCOMING_LAST_WATCHED,
 }
 
 @Serializable
