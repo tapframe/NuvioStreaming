@@ -5,12 +5,14 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.ui.graphics.vector.ImageVector
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_settings_category_about
 import nuvio.composeapp.generated.resources.compose_settings_category_general
 import nuvio.composeapp.generated.resources.compose_settings_page_account
 import nuvio.composeapp.generated.resources.compose_settings_page_addons
+import nuvio.composeapp.generated.resources.compose_settings_page_advanced
 import nuvio.composeapp.generated.resources.compose_settings_page_appearance
 import nuvio.composeapp.generated.resources.compose_settings_page_content_discovery
 import nuvio.composeapp.generated.resources.compose_settings_page_debrid
@@ -39,6 +41,7 @@ internal enum class SettingsCategory(
     Account(Res.string.settings_account, Icons.Rounded.AccountCircle),
     General(Res.string.compose_settings_category_general, Icons.Rounded.Settings),
     About(Res.string.compose_settings_category_about, Icons.Rounded.Info),
+    Advanced(Res.string.compose_settings_page_advanced, Icons.Rounded.Tune),
 }
 
 internal enum class SettingsPage(
@@ -79,6 +82,11 @@ internal enum class SettingsPage(
     Appearance(
         titleRes = Res.string.compose_settings_page_appearance,
         category = SettingsCategory.General,
+        parentPage = Root,
+    ),
+    Advanced(
+        titleRes = Res.string.compose_settings_page_advanced,
+        category = SettingsCategory.Advanced,
         parentPage = Root,
     ),
     Notifications(

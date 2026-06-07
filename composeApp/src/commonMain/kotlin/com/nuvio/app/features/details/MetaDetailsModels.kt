@@ -31,12 +31,18 @@ data class MetaDetails(
     val website: String? = null,
     val hasScheduledVideos: Boolean = false,
     val moreLikeThis: List<MetaPreview> = emptyList(),
+    val moreLikeThisSource: MoreLikeThisSource? = null,
     val collectionName: String? = null,
     val collectionItems: List<MetaPreview> = emptyList(),
     val trailers: List<MetaTrailer> = emptyList(),
     val links: List<MetaLink> = emptyList(),
     val videos: List<MetaVideo> = emptyList(),
 )
+
+enum class MoreLikeThisSource {
+    TMDB,
+    TRAKT,
+}
 
 data class MetaExternalRating(
     val source: String,

@@ -15,7 +15,13 @@ import kotlinx.serialization.json.Json
 data class StreamBadgeSettingsUiState(
     val rules: StreamBadgeRules = StreamBadgeRules(),
     val showFileSizeBadges: Boolean = true,
+    val badgePlacement: StreamBadgePlacement = StreamBadgePlacement.BOTTOM,
 )
+
+enum class StreamBadgePlacement {
+    TOP,
+    BOTTOM,
+}
 
 object StreamBadgeSettingsRepository {
     private val _uiState = MutableStateFlow(StreamBadgeSettingsUiState())
@@ -30,6 +36,7 @@ object StreamBadgeSettingsRepository {
     private var hasLoaded = false
     private var streamBadgeRules = StreamBadgeRules()
     private var showFileSizeBadges = true
+    private var badgePlacement = StreamBadgePlacement.BOTTOM
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -44,6 +51,7 @@ object StreamBadgeSettingsRepository {
         hasLoaded = false
         streamBadgeRules = StreamBadgeRules()
         showFileSizeBadges = true
+        badgePlacement = StreamBadgePlacement.BOTTOM
         _uiState.value = StreamBadgeSettingsUiState()
     }
 
@@ -55,6 +63,11 @@ object StreamBadgeSettingsRepository {
     fun showFileSizeBadgesSnapshot(): Boolean {
         ensureLoaded()
         return _uiState.value.showFileSizeBadges
+    }
+
+    fun badgePlacementSnapshot(): StreamBadgePlacement {
+        ensureLoaded()
+        return _uiState.value.badgePlacement
     }
 
     suspend fun importStreamBadgeRulesFromUrl(url: String): StreamBadgeImportResult {
@@ -120,6 +133,14 @@ object StreamBadgeSettingsRepository {
         StreamBadgeSettingsStorage.saveShowFileSizeBadges(enabled)
     }
 
+    fun setBadgePlacement(placement: StreamBadgePlacement) {
+        ensureLoaded()
+        if (badgePlacement == placement) return
+        badgePlacement = placement
+        publish()
+        StreamBadgeSettingsStorage.saveStreamBadgePlacement(placement.name)
+    }
+
     private fun loadFromDisk() {
         hasLoaded = true
         val storedRules = parseStreamBadgeRules(StreamBadgeSettingsStorage.loadStreamBadgeRules())
@@ -130,6 +151,13 @@ object StreamBadgeSettingsRepository {
         }
         streamBadgeRules = storedRules ?: legacyRules ?: StreamBadgeRules()
         showFileSizeBadges = StreamBadgeSettingsStorage.loadShowFileSizeBadges() ?: true
+        badgePlacement = StreamBadgeSettingsStorage.loadStreamBadgePlacement()
+            ?.let { storedPlacement ->
+                StreamBadgePlacement.entries.firstOrNull { placement ->
+                    placement.name.equals(storedPlacement, ignoreCase = true)
+                }
+            }
+            ?: StreamBadgePlacement.BOTTOM
         if (legacyRules != null) {
             saveStreamBadgeRules()
             StreamBadgeSettingsStorage.clearLegacyDebridStreamBadgeRules()
@@ -141,6 +169,7 @@ object StreamBadgeSettingsRepository {
         _uiState.value = StreamBadgeSettingsUiState(
             rules = streamBadgeRules,
             showFileSizeBadges = showFileSizeBadges,
+            badgePlacement = badgePlacement,
         )
     }
 

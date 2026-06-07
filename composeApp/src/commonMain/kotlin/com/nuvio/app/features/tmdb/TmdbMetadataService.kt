@@ -7,6 +7,7 @@ import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaPerson
 import com.nuvio.app.features.details.MetaTrailer
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.details.MoreLikeThisSource
 import com.nuvio.app.features.details.PersonDetail
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.PosterShape
@@ -618,6 +619,7 @@ object TmdbMetadataService {
             country = enrichment.countries.takeIf { it.isNotEmpty() }?.joinToString(", "),
             language = enrichment.language,
             moreLikeThis = enrichment.moreLikeThis,
+            moreLikeThisSource = MoreLikeThisSource.TMDB.takeIf { enrichment.moreLikeThis.isNotEmpty() },
             collectionName = enrichment.collectionName,
             collectionItems = enrichment.collectionItems,
             trailers = enrichment.trailers,
@@ -726,7 +728,10 @@ object TmdbMetadataService {
         }
 
         if (enrichment != null && settings.useMoreLikeThis) {
-            updated = updated.copy(moreLikeThis = enrichment.moreLikeThis)
+            updated = updated.copy(
+                moreLikeThis = enrichment.moreLikeThis,
+                moreLikeThisSource = MoreLikeThisSource.TMDB.takeIf { enrichment.moreLikeThis.isNotEmpty() },
+            )
         }
 
         if (enrichment != null && settings.useCollections) {

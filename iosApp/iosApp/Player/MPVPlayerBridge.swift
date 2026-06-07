@@ -59,6 +59,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
             gamma: Int(gamma)
         )
     }
+    func configureAudioOutput(audioOutput: String) {
+        playerVC?.configureAudioOutput(audioOutput: audioOutput)
+    }
     func setPlaybackSpeed(speed: Float) { playerVC?.setSpeed(speed) }
     func setMuted(muted: Bool) { playerVC?.setMuted(muted) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
@@ -192,6 +195,8 @@ private struct PendingLoadRequest {
 
 final class MPVPlayerViewController: UIViewController {
 
+    private static let defaultAudioOutput = "avfoundation,audiounit,"
+
     private let errorStateLock = NSLock()
     private var metalLayer = MetalLayer()
     private var lastAppliedDrawableSize: CGSize = .zero
@@ -317,8 +322,9 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "vo", "gpu-next"))
         checkError(mpv_set_option_string(mpv, "gpu-api", "vulkan"))
         checkError(mpv_set_option_string(mpv, "gpu-context", "moltenvk"))
-        checkError(mpv_set_option_string(mpv, "hwdec", "auto"))
-        checkError(mpv_set_option_string(mpv, "audio-channels", "stereo"))
+        checkError(mpv_set_option_string(mpv, "hwdec", "videotoolbox"))
+        checkError(mpv_set_option_string(mpv, "ao", Self.defaultAudioOutput))
+        checkError(mpv_set_option_string(mpv, "audio-channels", "auto"))
         checkError(mpv_set_option_string(mpv, "audio-fallback-to-null", "yes"))
         checkError(mpv_set_option_string(mpv, "vulkan-swap-mode", "fifo"))
         checkError(mpv_set_option_string(mpv, "vulkan-queue-count", "1"))
@@ -510,6 +516,11 @@ final class MPVPlayerViewController: UIViewController {
         setVideoEqualizer("contrast", contrast)
         setVideoEqualizer("saturation", saturation)
         setVideoEqualizer("gamma", gamma)
+    }
+
+    func configureAudioOutput(audioOutput: String) {
+        guard mpv != nil else { return }
+        setStringProperty("ao", audioOutput)
     }
 
     func setSpeed(_ speed: Float) {
@@ -853,6 +864,7 @@ final class MPVPlayerViewController: UIViewController {
                         self.clearPlaybackError()
                         self.isPlayerLoading = false
                         self.updateState()
+                        self.logCurrentAudioOutput()
                     }
                 case MPV_EVENT_END_FILE:
                     if let data = eventPtr.pointee.data {
@@ -941,6 +953,19 @@ final class MPVPlayerViewController: UIViewController {
         var data = Int64()
         mpv_get_property(mpv, name, MPV_FORMAT_INT64, &data)
         return Int(data)
+    }
+
+    private func logCurrentAudioOutput() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self, self.mpv != nil else { return }
+            let currentAo = self.getString("current-ao") ?? "unknown"
+            let channels = self.getString("audio-out-params/hr-channels")
+                ?? self.getString("audio-params/hr-channels")
+                ?? "unknown"
+            let channelCount = self.getInt("audio-out-params/channel-count")
+            let codec = self.getString("audio-codec-name") ?? "unknown"
+            print("[MPV] Audio output: ao=\(currentAo), channels=\(channels), channelCount=\(channelCount), codec=\(codec)")
+        }
     }
 
     private func checkError(_ status: CInt) {

@@ -41,10 +41,24 @@ val DEFAULT_LIBRARY_SOURCE_MODE: LibrarySourceMode = LibrarySourceMode.TRAKT
 fun librarySourceModeFromStorage(value: String?): LibrarySourceMode =
     LibrarySourceMode.entries.firstOrNull { it.name == value } ?: DEFAULT_LIBRARY_SOURCE_MODE
 
+@Serializable
+enum class MoreLikeThisSourcePreference {
+    TRAKT,
+    TMDB;
+
+    companion object {
+        fun fromStorage(value: String?): MoreLikeThisSourcePreference =
+            entries.firstOrNull { it.name == value } ?: DEFAULT_MORE_LIKE_THIS_SOURCE
+    }
+}
+
+val DEFAULT_MORE_LIKE_THIS_SOURCE: MoreLikeThisSourcePreference = MoreLikeThisSourcePreference.TRAKT
+
 data class TraktSettingsUiState(
     val watchProgressSource: WatchProgressSource = DEFAULT_WATCH_PROGRESS_SOURCE,
     val continueWatchingDaysCap: Int = TRAKT_DEFAULT_CONTINUE_WATCHING_DAYS_CAP,
     val librarySourceMode: LibrarySourceMode = DEFAULT_LIBRARY_SOURCE_MODE,
+    val moreLikeThisSource: MoreLikeThisSourcePreference = DEFAULT_MORE_LIKE_THIS_SOURCE,
 )
 
 @Serializable
@@ -52,6 +66,7 @@ private data class StoredTraktSettings(
     val watchProgressSource: String? = null,
     val continueWatchingDaysCap: Int = TRAKT_DEFAULT_CONTINUE_WATCHING_DAYS_CAP,
     val librarySourceMode: String? = null,
+    val moreLikeThisSource: String? = null,
 )
 
 object TraktSettingsRepository {
@@ -101,6 +116,13 @@ object TraktSettingsRepository {
         persist()
     }
 
+    fun setMoreLikeThisSource(source: MoreLikeThisSourcePreference) {
+        ensureLoaded()
+        if (_uiState.value.moreLikeThisSource == source) return
+        _uiState.value = _uiState.value.copy(moreLikeThisSource = source)
+        persist()
+    }
+
     private fun loadFromDisk() {
         hasLoaded = true
 
@@ -119,6 +141,7 @@ object TraktSettingsRepository {
                 watchProgressSource = WatchProgressSource.fromStorage(stored.watchProgressSource),
                 continueWatchingDaysCap = normalizeTraktContinueWatchingDaysCap(stored.continueWatchingDaysCap),
                 librarySourceMode = librarySourceModeFromStorage(stored.librarySourceMode),
+                moreLikeThisSource = MoreLikeThisSourcePreference.fromStorage(stored.moreLikeThisSource),
             )
         } else {
             TraktSettingsUiState()
@@ -132,6 +155,7 @@ object TraktSettingsRepository {
                     watchProgressSource = _uiState.value.watchProgressSource.name,
                     continueWatchingDaysCap = _uiState.value.continueWatchingDaysCap,
                     librarySourceMode = _uiState.value.librarySourceMode.name,
+                    moreLikeThisSource = _uiState.value.moreLikeThisSource.name,
                 ),
             ),
         )
@@ -164,3 +188,8 @@ fun shouldUseTraktLibrary(
     isAuthenticated: Boolean,
     source: LibrarySourceMode,
 ): Boolean = effectiveLibrarySourceMode(isAuthenticated, source) == LibrarySourceMode.TRAKT
+
+fun shouldUseTraktMoreLikeThis(
+    isAuthenticated: Boolean,
+    source: MoreLikeThisSourcePreference,
+): Boolean = isAuthenticated && source == MoreLikeThisSourcePreference.TRAKT
