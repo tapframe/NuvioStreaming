@@ -94,7 +94,7 @@ internal class PlayerScreenRuntime(
     var playerControlsLocked by mutableStateOf(false)
     var activeSourceUrl by mutableStateOf(sourceUrl)
     var activeSourceAudioUrl by mutableStateOf(sourceAudioUrl)
-    var activeSourceHeaders by mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))
+    var activeSourceHeaders by mutableStateOf(playbackHeadersForStream(providerAddonId, sourceHeaders))
     var activeSourceResponseHeaders by mutableStateOf(sanitizePlaybackResponseHeaders(sourceResponseHeaders))
     var activeTorrentInfoHash by mutableStateOf(torrentInfoHash)
     var activeTorrentFileIdx by mutableStateOf(torrentFileIdx)

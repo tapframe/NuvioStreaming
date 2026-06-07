@@ -200,7 +200,7 @@ internal fun PlayerScreenRuntime.switchToSource(stream: StreamItem) {
     }
     activeSourceUrl = url
     activeSourceAudioUrl = null
-    activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
+    activeSourceHeaders = playbackHeadersForStream(stream.addonId, stream.behaviorHints.proxyHeaders?.request)
     activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
     activeStreamTitle = stream.streamLabel
     activeStreamSubtitle = stream.streamSubtitle
@@ -246,7 +246,7 @@ internal fun PlayerScreenRuntime.switchToEpisodeStream(stream: StreamItem, episo
     }
     activeSourceUrl = url
     activeSourceAudioUrl = null
-    activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
+    activeSourceHeaders = playbackHeadersForStream(stream.addonId, stream.behaviorHints.proxyHeaders?.request)
     activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
     applyEpisodeStreamMetadata(stream, episode, resume)
 }
@@ -415,7 +415,7 @@ private fun PlayerScreenRuntime.saveDirectStreamForReuse(
         streamName = stream.streamLabel,
         addonName = stream.addonName,
         addonId = stream.addonId,
-        requestHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request),
+        requestHeaders = playbackHeadersForStream(stream.addonId, stream.behaviorHints.proxyHeaders?.request),
         responseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response),
         filename = stream.behaviorHints.filename,
         videoSize = stream.behaviorHints.videoSize,
