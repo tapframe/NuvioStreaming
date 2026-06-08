@@ -48,6 +48,9 @@ data class DebridSettings(
     val canResolvePlayableLinks: Boolean
         get() = linkResolvingEnabled && hasResolverProvider
 
+    val instantPlaybackPreparationEnabled: Boolean
+        get() = canResolvePlayableLinks && instantPlaybackPreparationLimit > 0
+
     val hasCloudLibraryProvider: Boolean
         get() = DebridProviders.configuredServices(this)
             .any { credential -> credential.provider.supports(DebridProviderCapability.CloudLibrary) }

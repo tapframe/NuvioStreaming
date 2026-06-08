@@ -214,7 +214,7 @@ object AddonStreamWarmupRepository {
 
         DebridSettingsRepository.ensureLoaded()
         val settings = DebridSettingsRepository.snapshot()
-        if (!settings.canResolvePlayableLinks || settings.torboxApiKey.isBlank()) return null
+        if (!settings.instantPlaybackPreparationEnabled || settings.torboxApiKey.isBlank()) return null
         val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
 
         AddonRepository.initialize()
