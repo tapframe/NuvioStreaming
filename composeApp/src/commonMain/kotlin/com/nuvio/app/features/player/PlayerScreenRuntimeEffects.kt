@@ -13,6 +13,8 @@ import com.nuvio.app.features.player.skip.PlayerNextEpisodeRules
 import com.nuvio.app.features.player.skip.SkipIntroRepository
 import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
+import com.nuvio.app.features.streams.StreamItem
+import com.nuvio.app.features.streams.hasLikelyExpiringPlaybackCredentials
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -60,6 +62,9 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         liveGestureFeedback = null
         renderedGestureFeedback = null
         lockedOverlayVisible = false
+        credentialRefreshJob?.cancel()
+        credentialRefreshJob = null
+        credentialRefreshAttemptedSourceUrl = null
         initialLoadCompleted = false
         lastProgressPersistEpochMs = 0L
         previousIsPlaying = false
@@ -469,3 +474,124 @@ internal fun PlayerScreenRuntime.removeFailedStreamFromCache() {
     )
     StreamLinkCacheRepository.remove(cacheKey)
 }
+
+internal fun PlayerScreenRuntime.tryRefreshCredentialedSourceAfterError(message: String?): Boolean {
+    val failedUrl = activeSourceUrl
+    if (!failedUrl.hasLikelyExpiringPlaybackCredentials()) return false
+    if (credentialRefreshJob?.isActive == true) return true
+    if (credentialRefreshAttemptedSourceUrl == failedUrl) return false
+
+    val currentVideoId = activeVideoId ?: return false
+    credentialRefreshAttemptedSourceUrl = failedUrl
+    removeFailedStreamFromCache()
+
+    val savedPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
+    val expectedProviderAddonId = activeProviderAddonId
+    val expectedProviderName = activeProviderName
+    val expectedStreamTitle = activeStreamTitle
+    val expectedBingeGroup = currentStreamBingeGroup
+    val type = contentType ?: parentMetaType
+    val season = activeSeasonNumber
+    val episode = activeEpisodeNumber
+
+    errorMessage = null
+    controlsVisible = !playerControlsLocked
+
+    credentialRefreshJob = scope.launch {
+        PlayerStreamsRepository.loadSources(
+            type = type,
+            videoId = currentVideoId,
+            season = season,
+            episode = episode,
+            forceRefresh = true,
+        )
+
+        var refreshedStream: StreamItem? = null
+        var pollCount = 0
+        while (pollCount < CREDENTIAL_REFRESH_POLL_COUNT && refreshedStream == null) {
+            val state = PlayerStreamsRepository.sourceState.value
+            refreshedStream = findCredentialRefreshCandidate(
+                streams = state.groups.flatMap { it.streams },
+                failedUrl = failedUrl,
+                expectedProviderAddonId = expectedProviderAddonId,
+                expectedProviderName = expectedProviderName,
+                expectedStreamTitle = expectedStreamTitle,
+                expectedBingeGroup = expectedBingeGroup,
+            )
+            if (
+                refreshedStream != null ||
+                state.emptyStateReason != null ||
+                (!state.isAnyLoading && state.groups.isNotEmpty())
+            ) {
+                break
+            }
+            delay(CREDENTIAL_REFRESH_POLL_INTERVAL_MS)
+            pollCount++
+        }
+
+        val stream = refreshedStream
+        if (stream == null) {
+            errorMessage = message
+            controlsVisible = !playerControlsLocked
+            return@launch
+        }
+
+        val refreshedUrl = stream.playableDirectUrl
+        if (refreshedUrl.isNullOrBlank() || refreshedUrl == failedUrl) {
+            errorMessage = message
+            controlsVisible = !playerControlsLocked
+            return@launch
+        }
+
+        flushWatchProgress()
+        stopActiveP2pStream()
+        activeSourceUrl = refreshedUrl
+        activeSourceAudioUrl = null
+        activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
+        activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
+        activeStreamTitle = stream.streamLabel
+        activeStreamSubtitle = stream.streamSubtitle
+        activeProviderName = stream.addonName
+        activeProviderAddonId = stream.addonId
+        currentStreamBingeGroup = stream.behaviorHints.bingeGroup
+        activeInitialPositionMs = savedPositionMs
+        activeInitialProgressFraction = null
+        showSourcesPanel = false
+        controlsVisible = true
+    }
+    return true
+}
+
+private fun findCredentialRefreshCandidate(
+    streams: List<StreamItem>,
+    failedUrl: String,
+    expectedProviderAddonId: String?,
+    expectedProviderName: String,
+    expectedStreamTitle: String,
+    expectedBingeGroup: String?,
+): StreamItem? =
+    streams
+        .asSequence()
+        .mapNotNull { stream ->
+            val refreshedUrl = stream.playableDirectUrl?.takeIf { it.isNotBlank() && it != failedUrl }
+                ?: return@mapNotNull null
+            val providerMatches = if (!expectedProviderAddonId.isNullOrBlank()) {
+                stream.addonId == expectedProviderAddonId
+            } else {
+                stream.addonName == expectedProviderName
+            }
+            if (!providerMatches) return@mapNotNull null
+
+            var score = 100
+            if (stream.streamLabel == expectedStreamTitle) score += 40
+            if (!expectedBingeGroup.isNullOrBlank() && stream.behaviorHints.bingeGroup == expectedBingeGroup) {
+                score += 20
+            }
+            if (refreshedUrl.hasLikelyExpiringPlaybackCredentials()) score += 5
+            score to stream
+        }
+        .maxByOrNull { (score, _) -> score }
+        ?.second
+
+private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
+private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L

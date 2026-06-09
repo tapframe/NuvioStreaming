@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
@@ -78,24 +77,25 @@ import kotlinx.coroutines.flow.asStateFlow
 @Composable
 fun NuvioScreen(
     modifier: Modifier = Modifier,
-    horizontalPadding: Dp = 16.dp,
+    horizontalPadding: Dp = MaterialTheme.nuvio.spacing.screenHorizontal,
     topPadding: Dp? = null,
     listState: LazyListState = rememberLazyListState(),
     content: LazyListScope.() -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     LazyColumn(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(tokens.colors.background),
         contentPadding = PaddingValues(
             start = horizontalPadding,
-            top = topPadding ?: 10.dp + statusBarTop + nuvioPlatformExtraTopPadding,
+            top = topPadding ?: tokens.spacing.screenTop + statusBarTop + nuvioPlatformExtraTopPadding,
             end = horizontalPadding,
-            bottom = nuvioSafeBottomPadding(18.dp),
+            bottom = nuvioSafeBottomPadding(tokens.spacing.screenBottom),
         ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
         content = content,
     )
 }
@@ -117,15 +117,16 @@ fun NuvioSurfaceCard(
     tonalElevation: Int = 0,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(24.dp),
+        color = tokens.colors.surface,
+        shape = tokens.shapes.card,
         tonalElevation = tonalElevation.dp,
-        shadowElevation = 0.dp,
+        shadowElevation = tokens.elevation.flat,
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            modifier = Modifier.padding(tokens.spacing.cardPadding),
             content = content,
         )
     }
@@ -140,27 +141,28 @@ fun NuvioScreenHeader(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    val tokens = MaterialTheme.nuvio
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val resolvedTopPadding = topPadding ?: if (includeStatusBarPadding) statusBarTop else 0.dp
+    val resolvedTopPadding = topPadding ?: if (includeStatusBarPadding) statusBarTop else NuvioTokens.Space.none
     Row(
         modifier = modifier
             .fillMaxWidth()
             .nuvioBlockPointerPassthrough()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(top = resolvedTopPadding, bottom = 4.dp),
+            .background(tokens.colors.background)
+            .padding(top = resolvedTopPadding, bottom = NuvioTokens.Space.s4),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
         ) {
             if (onBack != null) {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = stringResource(Res.string.action_back),
-                        tint = MaterialTheme.colorScheme.onBackground,
+                        tint = tokens.colors.textPrimary,
                     )
                 }
             }
@@ -172,12 +174,12 @@ fun NuvioScreenHeader(
                 Text(
                     text = currentTitle,
                     style = MaterialTheme.typography.displayLarge,
-                    color = MaterialTheme.colorScheme.onBackground,
+                    color = tokens.colors.textPrimary,
                 )
             }
         }
         Row(
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
             verticalAlignment = Alignment.CenterVertically,
             content = actions,
         )
@@ -193,7 +195,7 @@ fun NuvioSectionLabel(
         text = text,
         modifier = modifier,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.nuvio.colors.textMuted,
         fontWeight = FontWeight.Bold,
     )
 }
@@ -214,7 +216,7 @@ fun NuvioActionLabel(
             }
         ),
         style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.nuvio.colors.accent,
     )
 }
 
@@ -223,14 +225,15 @@ fun NuvioIconActionButton(
     icon: ImageVector,
     contentDescription: String,
     modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.onSurface,
+    tint: Color = MaterialTheme.nuvio.colors.textPrimary,
     onClick: () -> Unit = {},
 ) {
+    val tokens = MaterialTheme.nuvio
     IconButton(
         modifier = modifier
             .background(
-                color = MaterialTheme.colorScheme.background.copy(alpha = 0.001f),
-                shape = CircleShape,
+                color = tokens.colors.background.copy(alpha = 0.001f),
+                shape = tokens.shapes.avatar,
             ),
         onClick = onClick,
     ) {
@@ -246,11 +249,11 @@ fun NuvioIconActionButton(
 fun NuvioBackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    shape: Shape = CircleShape,
-    containerColor: Color = MaterialTheme.colorScheme.surface,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    buttonSize: Dp = 40.dp,
-    iconSize: Dp = 22.dp,
+    shape: Shape = MaterialTheme.nuvio.shapes.avatar,
+    containerColor: Color = MaterialTheme.nuvio.colors.surface,
+    contentColor: Color = MaterialTheme.nuvio.colors.textPrimary,
+    buttonSize: Dp = NuvioTokens.Space.s40,
+    iconSize: Dp = NuvioTokens.Icon.md,
     contentDescription: String = stringResource(Res.string.action_back),
 ) {
     Box(
@@ -277,18 +280,19 @@ fun NuvioPrimaryButton(
     enabled: Boolean = true,
     onClick: () -> Unit = {},
 ) {
+    val tokens = MaterialTheme.nuvio
     Button(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp),
+            .height(NuvioTokens.Space.s48 + NuvioTokens.Space.s4),
         enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
+        shape = tokens.shapes.button,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
-            disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.65f),
+            containerColor = tokens.colors.accent,
+            contentColor = tokens.colors.onAccent,
+            disabledContainerColor = tokens.colors.accent.copy(alpha = tokens.opacity.disabled),
+            disabledContentColor = tokens.colors.onAccent.copy(alpha = tokens.opacity.disabled),
         ),
     ) {
         AnimatedContent(
@@ -313,27 +317,28 @@ fun NuvioInputField(
     modifier: Modifier = Modifier,
     trailingContent: (@Composable (() -> Unit))? = null,
 ) {
+    val tokens = MaterialTheme.nuvio
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(NuvioTokens.Radius.lg),
         placeholder = {
             Text(
                 text = placeholder,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
                 style = MaterialTheme.typography.bodyLarge,
             )
         },
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = tokens.colors.textPrimary),
         trailingIcon = trailingContent,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.outline,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedBorderColor = tokens.colors.borderFocus,
+            unfocusedBorderColor = tokens.colors.borderDefault,
+            focusedContainerColor = tokens.colors.surfaceCard,
+            unfocusedContainerColor = tokens.colors.surfaceCard,
+            cursorColor = tokens.colors.accent,
         ),
     )
 }
@@ -343,18 +348,19 @@ fun NuvioInfoBadge(
     text: String,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     Box(
         modifier = modifier
             .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(999.dp),
+                color = tokens.colors.surfaceCard,
+                shape = tokens.shapes.chip,
             )
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = NuvioTokens.Space.s10, vertical = NuvioTokens.Space.s6),
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -374,13 +380,13 @@ fun NuvioInlineMetadata(
         Text(
             text = title,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.nuvio.colors.textMuted,
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(NuvioTokens.Space.s6))
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MaterialTheme.nuvio.colors.textPrimary,
         )
     }
 }
@@ -399,6 +405,7 @@ fun NuvioStatusModal(
     onDismiss: (() -> Unit)? = null,
 ) {
     if (!isVisible) return
+    val tokens = MaterialTheme.nuvio
 
     BasicAlertDialog(
         onDismissRequest = {
@@ -409,31 +416,31 @@ fun NuvioStatusModal(
     ) {
         Surface(
             modifier = modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(24.dp),
+            color = tokens.colors.surfaceDialog,
+            shape = tokens.shapes.dialog,
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(tokens.spacing.dialogPadding),
             ) {
                 if (isBusy) {
                     CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2.5.dp,
+                        color = tokens.colors.accent,
+                        strokeWidth = NuvioTokens.Border.medium + NuvioTokens.Space.hairline,
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(NuvioTokens.Space.s16))
                 }
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(tokens.spacing.controlGap))
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                 )
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(NuvioTokens.Space.s18))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -441,20 +448,20 @@ fun NuvioStatusModal(
                     if (!isBusy && dismissText != null && onDismiss != null) {
                         Button(
                             onClick = onDismiss,
-                            shape = RoundedCornerShape(16.dp),
+                            shape = tokens.shapes.button,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                containerColor = tokens.colors.surfaceCard,
+                                contentColor = tokens.colors.textPrimary,
                             ),
                         ) {
                             Text(dismissText)
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(NuvioTokens.Space.s10))
                     }
                     Button(
                         onClick = onConfirm,
                         enabled = !isBusy,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = tokens.shapes.button,
                     ) {
                         Text(confirmText)
                     }
@@ -468,6 +475,7 @@ fun NuvioStatusModal(
 fun NuvioToastHost(
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     val toast by NuvioToastController.currentToast.collectAsState()
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val visibilityState = remember { MutableTransitionState(false) }
@@ -505,21 +513,21 @@ fun NuvioToastHost(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = statusBarTop + 12.dp)
-                .padding(horizontal = 16.dp),
+                .padding(top = statusBarTop + tokens.spacing.listGap)
+                .padding(horizontal = tokens.spacing.screenHorizontal),
             contentAlignment = Alignment.TopCenter,
         ) {
             Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 6.dp,
-                shadowElevation = 10.dp,
+                shape = RoundedCornerShape(NuvioTokens.Radius.xl),
+                color = tokens.colors.surfacePopover,
+                tonalElevation = tokens.elevation.raised,
+                shadowElevation = tokens.elevation.overlay,
             ) {
                 Text(
                     text = currentToast.message,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = NuvioTokens.Space.s16, vertical = NuvioTokens.Space.s12),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                 )
             }
         }

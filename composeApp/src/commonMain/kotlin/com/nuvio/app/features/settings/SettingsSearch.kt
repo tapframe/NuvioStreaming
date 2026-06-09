@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Close
@@ -43,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.isIos
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -974,12 +975,12 @@ private fun SettingsSearchRevealItem(
     AnimatedVisibility(
         visibleState = visibleState,
         enter = expandVertically(
-            animationSpec = tween(durationMillis = 220),
+            animationSpec = tween(durationMillis = NuvioTokens.Motion.normalMillis),
             expandFrom = Alignment.Top,
         ) + fadeIn(
-            animationSpec = tween(durationMillis = 180),
+            animationSpec = tween(durationMillis = NuvioTokens.Motion.fastMillis),
         ) + slideInVertically(
-            animationSpec = tween(durationMillis = 220),
+            animationSpec = tween(durationMillis = NuvioTokens.Motion.normalMillis),
             initialOffsetY = { -it / 4 },
         ),
     ) {
@@ -992,17 +993,18 @@ private fun SettingsSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        shape = RoundedCornerShape(14.dp),
+        shape = tokens.shapes.compactCard,
         leadingIcon = {
             Icon(
                 imageVector = Icons.Rounded.Search,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = tokens.colors.textMuted,
             )
         },
         trailingIcon = if (query.isNotBlank()) {
@@ -1011,7 +1013,7 @@ private fun SettingsSearchField(
                     Icon(
                         imageVector = Icons.Rounded.Close,
                         contentDescription = stringResource(Res.string.compose_search_clear),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = tokens.colors.textMuted,
                     )
                 }
             }
@@ -1021,23 +1023,24 @@ private fun SettingsSearchField(
         placeholder = {
             Text(
                 text = stringResource(Res.string.settings_search_placeholder),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = tokens.colors.textMuted,
                 style = MaterialTheme.typography.bodyLarge,
             )
         },
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = tokens.colors.textPrimary),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.outline,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedBorderColor = tokens.colors.borderFocus,
+            unfocusedBorderColor = tokens.colors.borderDefault,
+            focusedContainerColor = tokens.colors.surfaceCard,
+            unfocusedContainerColor = tokens.colors.surfaceCard,
+            cursorColor = tokens.colors.accent,
         ),
     )
 }
 
 @Composable
 private fun SettingsSearchEmptyState(isTablet: Boolean) {
+    val tokens = MaterialTheme.nuvio
     SettingsSection(
         title = stringResource(Res.string.settings_search_results_section),
         isTablet = isTablet,
@@ -1051,7 +1054,7 @@ private fun SettingsSearchEmptyState(isTablet: Boolean) {
                 Text(
                     text = stringResource(Res.string.settings_search_empty),
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                 )
             }

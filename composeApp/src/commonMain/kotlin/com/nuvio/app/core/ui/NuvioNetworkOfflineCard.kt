@@ -6,7 +6,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.messageForEmptyState
 import com.nuvio.app.core.network.titleForEmptyState
@@ -20,20 +19,21 @@ fun NuvioNetworkOfflineCard(
     modifier: Modifier = Modifier,
     onRetry: (() -> Unit)? = null,
 ) {
+    val tokens = MaterialTheme.nuvio
     NuvioSurfaceCard(modifier = modifier) {
         Text(
             text = condition.titleForEmptyState(),
             style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = tokens.colors.textPrimary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(tokens.spacing.controlGap))
         Text(
             text = condition.messageForEmptyState(),
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
         )
         if (onRetry != null) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(tokens.spacing.screenHorizontal))
             NuvioPrimaryButton(
                 text = stringResource(Res.string.action_retry),
                 onClick = onRetry,

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -73,6 +72,7 @@ fun NuvioFloatingPrompt(
     modifier: Modifier = Modifier,
     autoDismissMs: Long = AutoDismissDelayMs,
 ) {
+    val tokens = MaterialTheme.nuvio
     val visibilityState = remember { MutableTransitionState(false) }
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -98,12 +98,12 @@ fun NuvioFloatingPrompt(
         LaunchedEffect(Unit) {
             delay(autoDismissMs)
             val dismissDistance = maxOf(
-                promptHeightPx.toFloat() + with(density) { 24.dp.toPx() },
-                with(density) { 160.dp.toPx() },
+                promptHeightPx.toFloat() + with(density) { tokens.spacing.sectionGap.toPx() },
+                with(density) { (NuvioTokens.Space.s80 + NuvioTokens.Space.s80).toPx() },
             )
             dragOffsetY.animateTo(
                 targetValue = dismissDistance,
-                animationSpec = tween(durationMillis = 240),
+                animationSpec = tween(durationMillis = tokens.motion.normalMillis),
             )
             onDismiss()
         }
@@ -116,14 +116,14 @@ fun NuvioFloatingPrompt(
     AnimatedVisibility(
         visibleState = visibilityState,
         modifier = modifier,
-        enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it },
-        exit = fadeOut(tween(300)) + slideOutVertically(tween(300)) { it },
+        enter = fadeIn(tween(tokens.motion.slowMillis)) + slideInVertically(tween(tokens.motion.slowMillis)) { it },
+        exit = fadeOut(tween(tokens.motion.sheetEnterMillis)) + slideOutVertically(tween(tokens.motion.sheetEnterMillis)) { it },
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = navBarBottom + 72.dp)
-                .padding(horizontal = 16.dp)
+                .padding(bottom = navBarBottom + NuvioTokens.Space.s72)
+                .padding(horizontal = tokens.spacing.screenHorizontal)
                 .offset { IntOffset(0, dragOffsetY.value.roundToInt().coerceAtLeast(0)) }
                 .pointerInput(Unit) {
                     detectVerticalDragGestures(
@@ -133,18 +133,18 @@ fun NuvioFloatingPrompt(
                                 if (shouldDismiss) {
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     val dismissDistance = maxOf(
-                                        promptHeightPx.toFloat() + with(density) { 24.dp.toPx() },
-                                        with(density) { 160.dp.toPx() },
+                                        promptHeightPx.toFloat() + with(density) { tokens.spacing.sectionGap.toPx() },
+                                        with(density) { (NuvioTokens.Space.s80 + NuvioTokens.Space.s80).toPx() },
                                     )
                                     dragOffsetY.animateTo(
                                         targetValue = dismissDistance,
-                                        animationSpec = tween(durationMillis = 220),
+                                        animationSpec = tween(durationMillis = tokens.motion.normalMillis),
                                     )
                                     onDismiss()
                                 } else {
                                     dragOffsetY.animateTo(
                                         targetValue = 0f,
-                                        animationSpec = tween(durationMillis = 180),
+                                        animationSpec = tween(durationMillis = tokens.motion.fastMillis),
                                     )
                                 }
                             }
@@ -153,7 +153,7 @@ fun NuvioFloatingPrompt(
                             coroutineScope.launch {
                                 dragOffsetY.animateTo(
                                     targetValue = 0f,
-                                    animationSpec = tween(durationMillis = 180),
+                                    animationSpec = tween(durationMillis = tokens.motion.fastMillis),
                                 )
                             }
                         },
@@ -167,27 +167,27 @@ fun NuvioFloatingPrompt(
         ) {
             Surface(
                 modifier = Modifier.onSizeChanged { promptHeightPx = it.height },
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                tonalElevation = 4.dp,
-                shadowElevation = 8.dp,
+                shape = tokens.shapes.card,
+                color = tokens.colors.surfacePopover,
+                tonalElevation = tokens.elevation.playerControls,
+                shadowElevation = tokens.elevation.modal,
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(tokens.spacing.cardPaddingCompact),
+                    verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 2.dp),
+                            .padding(start = NuvioTokens.Space.s2),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(width = 54.dp, height = 78.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                .size(width = NuvioTokens.Space.s56 - NuvioTokens.Space.s2, height = NuvioTokens.Space.s80 - NuvioTokens.Space.s2)
+                                .clip(tokens.shapes.compactCard)
+                                .background(tokens.colors.surfaceCard),
                             contentAlignment = Alignment.Center,
                         ) {
                             if (imageUrl != null) {
@@ -207,37 +207,37 @@ fun NuvioFloatingPrompt(
                             Text(
                                 text = stringResource(Res.string.floating_prompt_continue_where_left_off),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = tokens.colors.textMuted,
                             )
                             Text(
                                 text = title,
                                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = tokens.colors.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = subtitle,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = tokens.colors.textMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
 
                         Box(
-                            modifier = Modifier.size(42.dp),
+                            modifier = Modifier.size(NuvioTokens.Space.s40 + NuvioTokens.Space.s2),
                             contentAlignment = Alignment.Center,
                         ) {
                             FilledIconButton(
                                 onClick = actionWithHaptic,
-                                modifier = Modifier.size(42.dp),
-                                shape = CircleShape,
+                                modifier = Modifier.size(NuvioTokens.Space.s40 + NuvioTokens.Space.s2),
+                                shape = tokens.shapes.avatar,
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.PlayArrow,
                                     contentDescription = actionLabel,
-                                    modifier = Modifier.size(22.dp),
+                                    modifier = Modifier.size(tokens.icons.md),
                                 )
                             }
                         }
@@ -246,21 +246,21 @@ fun NuvioFloatingPrompt(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-                            .height(8.dp)
-                            .padding(1.dp),
+                            .clip(tokens.shapes.chip)
+                            .background(tokens.colors.playerTimelineTrack)
+                            .height(NuvioTokens.Space.s8)
+                            .padding(tokens.borders.thin),
                     ) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(progressFraction.coerceIn(0f, 1f))
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(999.dp)),
+                                .height(NuvioTokens.Space.s6)
+                                .clip(tokens.shapes.chip),
                         ) {
                             Box(
                                 modifier = Modifier
                                     .matchParentSize()
-                                    .background(MaterialTheme.colorScheme.primary),
+                                    .background(tokens.colors.playerTimelineFill),
                             )
                         }
                     }

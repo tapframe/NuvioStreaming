@@ -27,8 +27,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Add
@@ -69,6 +67,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.isIos
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -87,6 +87,7 @@ fun ProfileSwitcherTab(
     triggerContent: (@Composable (selected: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val tokens = MaterialTheme.nuvio
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
     val activeProfile = profileState.activeProfile
     val profiles = profileState.profiles
@@ -243,7 +244,7 @@ fun ProfileSwitcherTab(
         if (popupVisible && profiles.isNotEmpty()) {
             Popup(
                 alignment = Alignment.BottomCenter,
-                offset = IntOffset(0, with(density) { -64.dp.roundToPx() }),
+                offset = IntOffset(0, with(density) { -NuvioTokens.Space.s64.roundToPx() }),
                 properties = PopupProperties(focusable = true),
                 onDismissRequest = { showPopup = false },
             ) {
@@ -256,17 +257,17 @@ fun ProfileSwitcherTab(
                             scaleY = popupScale.value
                             translationY = popupTranslateY.value
                         }
-                        .shadow(16.dp, RoundedCornerShape(28.dp))
+                        .shadow(tokens.elevation.overlay, tokens.shapes.sheet)
                         .background(
-                            MaterialTheme.colorScheme.surfaceContainerHigh,
-                            RoundedCornerShape(28.dp),
+                            tokens.colors.surfaceSheet,
+                            tokens.shapes.sheet,
                         )
-                        .padding(16.dp),
+                        .padding(tokens.spacing.sheetPadding),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         // Profile avatars row
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(tokens.spacing.cardPadding),
                             verticalAlignment = Alignment.Top,
                         ) {
                             profiles.forEachIndexed { index, profile ->
@@ -340,6 +341,7 @@ private fun PopupAddProfileBubble(
     delayMs: Int,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val itemAlpha = remember { Animatable(0f) }
     val itemScale = remember { Animatable(0.4f) }
 
@@ -365,36 +367,36 @@ private fun PopupAddProfileBubble(
                 scaleX = itemScale.value
                 scaleY = itemScale.value
             }
-            .clip(RoundedCornerShape(16.dp))
+            .clip(tokens.shapes.compactCard)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             )
-            .padding(4.dp),
+            .padding(NuvioTokens.Space.s4),
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(1.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape),
+                .size(tokens.components.avatarSize)
+                .clip(tokens.shapes.avatar)
+                .background(tokens.colors.surfaceCard)
+                .border(tokens.borders.thin + NuvioTokens.Space.hairline, tokens.colors.borderDefault.copy(alpha = tokens.opacity.medium), tokens.shapes.avatar),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Rounded.Add,
                 contentDescription = stringResource(Res.string.compose_profile_add_profile),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(22.dp),
+                tint = tokens.colors.textMuted,
+                modifier = Modifier.size(tokens.icons.md + NuvioTokens.Space.s2),
             )
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(NuvioTokens.Space.s4))
 
         Text(
             text = stringResource(Res.string.compose_profile_add_profile),
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = NuvioTokens.Type.labelXs),
+            color = tokens.colors.textMuted,
             fontWeight = FontWeight.Medium,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -413,6 +415,7 @@ private fun PopupProfileBubble(
     onBoundsChanged: (Rect) -> Unit,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val avatarColor = remember(profile.avatarColorHex) { parseHexColor(profile.avatarColorHex) }
     val avatarItem = remember(profile.avatarId, avatars) {
         profile.avatarId?.let { id -> avatars.find { it.id == id } }
@@ -458,13 +461,13 @@ private fun PopupProfileBubble(
                 scaleX = itemScale.value * pressScale
                 scaleY = itemScale.value * pressScale
             }
-            .clip(RoundedCornerShape(16.dp))
+            .clip(tokens.shapes.compactCard)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             )
-            .padding(4.dp),
+            .padding(NuvioTokens.Space.s4),
     ) {
         Box(
             modifier = Modifier.size(52.dp),
@@ -473,7 +476,7 @@ private fun PopupProfileBubble(
             Box(
                 modifier = Modifier
                     .size(48.dp)
-                    .clip(CircleShape)
+                    .clip(tokens.shapes.avatar)
                     .background(
                         if (avatarImageUrl != null) {
                             avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
@@ -484,19 +487,19 @@ private fun PopupProfileBubble(
                     .then(
                         when {
                             isSelected -> Modifier.border(
-                                2.5.dp,
-                                MaterialTheme.colorScheme.primary,
-                                CircleShape,
+                                tokens.borders.medium + NuvioTokens.Space.hairline,
+                                tokens.colors.borderSelected,
+                                tokens.shapes.avatar,
                             )
                             isActive -> Modifier.border(
-                                2.dp,
+                                tokens.borders.medium,
                                 avatarColor.copy(alpha = 0.6f),
-                                CircleShape,
+                                tokens.shapes.avatar,
                             )
                             avatarImageUrl == null -> Modifier.border(
-                                1.5.dp,
+                                tokens.borders.thin + NuvioTokens.Space.hairline,
                                 avatarColor.copy(alpha = 0.3f),
-                                CircleShape,
+                                tokens.shapes.avatar,
                             )
                             else -> Modifier
                         },
@@ -507,13 +510,13 @@ private fun PopupProfileBubble(
                     AsyncImage(
                         model = avatarImageUrl,
                         contentDescription = profile.name,
-                        modifier = Modifier.size(48.dp).clip(CircleShape),
+                        modifier = Modifier.size(48.dp).clip(tokens.shapes.avatar),
                         contentScale = ContentScale.Crop,
                     )
                 } else if (profile.name.isNotBlank()) {
                     Text(
                         text = profile.name.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = NuvioTokens.Type.titleSm),
                         color = avatarColor,
                         fontWeight = FontWeight.Bold,
                     )
@@ -522,7 +525,7 @@ private fun PopupProfileBubble(
                         imageVector = Icons.Rounded.Person,
                         contentDescription = null,
                         tint = avatarColor,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(tokens.icons.lg),
                     )
                 }
             }
@@ -533,30 +536,29 @@ private fun PopupProfileBubble(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .size(18.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(1.5.dp, MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+                        .clip(tokens.shapes.avatar)
+                        .background(tokens.colors.surfacePopover)
+                        .border(tokens.borders.thin + NuvioTokens.Space.hairline, tokens.colors.surfaceSheet, tokens.shapes.avatar),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.Lock,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = tokens.colors.textMuted,
                         modifier = Modifier.size(10.dp),
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(NuvioTokens.Space.s4))
 
         Text(
             text = profile.name.ifBlank {
                 stringResource(Res.string.profile_label_number, profile.profileIndex)
             },
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-            color = if (isSelected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = NuvioTokens.Type.labelXs),
+            color = if (isSelected) tokens.colors.accent else tokens.colors.textMuted,
             fontWeight = if (isActive || isSelected) FontWeight.Bold else FontWeight.Medium,
             textAlign = TextAlign.Center,
             maxLines = 1,
@@ -588,6 +590,7 @@ private fun InlinePinEntry(
     onCancel: () -> Unit,
     verifyPin: suspend (String) -> PinVerifyResult,
 ) {
+    val tokens = MaterialTheme.nuvio
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var isVerifying by remember { mutableStateOf(false) }
@@ -596,18 +599,18 @@ private fun InlinePinEntry(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(top = 16.dp),
+        modifier = Modifier.padding(top = tokens.spacing.cardPadding),
     ) {
         Text(
             text = stringResource(Res.string.pin_enter_for, profileName),
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = tokens.colors.textMuted,
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(NuvioTokens.Space.s14))
 
         // PIN dots with bounce animation
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap)) {
             repeat(4) { index ->
                 val filled = index < pin.length
                 val dotScale = remember { Animatable(1f) }
@@ -625,9 +628,9 @@ private fun InlinePinEntry(
                 }
 
                 val dotColor = when {
-                    error != null -> MaterialTheme.colorScheme.error
-                    filled -> MaterialTheme.colorScheme.primary
-                    else -> MaterialTheme.colorScheme.outline
+                    error != null -> tokens.colors.danger
+                    filled -> tokens.colors.accent
+                    else -> tokens.colors.borderDefault
                 }
                 Box(
                     modifier = Modifier
@@ -635,11 +638,11 @@ private fun InlinePinEntry(
                             scaleX = dotScale.value
                             scaleY = dotScale.value
                         }
-                        .size(14.dp)
-                        .clip(CircleShape)
+                        .size(NuvioTokens.Space.s14)
+                        .clip(tokens.shapes.avatar)
                         .then(
                             if (filled) Modifier.background(dotColor)
-                            else Modifier.border(2.dp, dotColor, CircleShape),
+                            else Modifier.border(tokens.borders.medium, dotColor, tokens.shapes.avatar),
                         ),
                 )
             }
@@ -654,12 +657,12 @@ private fun InlinePinEntry(
             Text(
                 text = error.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(top = 8.dp),
+                color = tokens.colors.danger,
+                modifier = Modifier.padding(top = tokens.spacing.controlGap),
             )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(NuvioTokens.Space.s14))
 
         // Compact number pad
         CompactPinKeypad(
@@ -696,17 +699,17 @@ private fun InlinePinEntry(
             },
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(tokens.spacing.controlGap))
 
         Text(
             text = stringResource(Res.string.pin_cancel),
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = tokens.colors.accent,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
+                .clip(tokens.shapes.compactCard)
                 .clickable(onClick = onCancel)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(horizontal = tokens.spacing.cardPadding, vertical = NuvioTokens.Space.s6),
         )
     }
 }
@@ -716,6 +719,7 @@ private fun CompactPinKeypad(
     onDigit: (String) -> Unit,
     onBackspace: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val rows = listOf(
         listOf("1", "2", "3"),
         listOf("4", "5", "6"),
@@ -723,45 +727,45 @@ private fun CompactPinKeypad(
         listOf("", "0", "⌫"),
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap)) {
         rows.forEach { row ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap, Alignment.CenterHorizontally),
             ) {
                 row.forEach { key ->
                     when (key) {
-                        "" -> Spacer(modifier = Modifier.size(48.dp))
+                        "" -> Spacer(modifier = Modifier.size(tokens.components.avatarSize))
                         "⌫" -> {
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .size(tokens.components.avatarSize)
+                                    .clip(tokens.shapes.avatar)
+                                    .background(tokens.colors.surfaceCard)
                                     .clickable(onClick = onBackspace),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.Backspace,
                                     contentDescription = stringResource(Res.string.pin_backspace),
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(20.dp),
+                                    tint = tokens.colors.textPrimary,
+                                    modifier = Modifier.size(tokens.icons.md),
                                 )
                             }
                         }
                         else -> {
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .size(tokens.components.avatarSize)
+                                    .clip(tokens.shapes.avatar)
+                                    .background(tokens.colors.surfaceCard)
                                     .clickable { onDigit(key) },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
                                     text = key,
                                     style = MaterialTheme.typography.titleLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = tokens.colors.textPrimary,
                                     fontWeight = FontWeight.Medium,
                                 )
                             }
@@ -780,6 +784,7 @@ fun ActiveProfileMiniAvatar(
     selected: Boolean,
     size: Int = 24,
 ) {
+    val tokens = MaterialTheme.nuvio
     if (profile == null) {
         Icon(
             imageVector = Icons.Rounded.Person,
@@ -798,7 +803,7 @@ fun ActiveProfileMiniAvatar(
     }
 
     val borderColor = if (selected) {
-        MaterialTheme.colorScheme.primary
+        tokens.colors.borderSelected
     } else {
         avatarColor.copy(alpha = 0.5f)
     }
@@ -806,7 +811,7 @@ fun ActiveProfileMiniAvatar(
     Box(
         modifier = Modifier
             .size(size.dp)
-            .clip(CircleShape)
+            .clip(tokens.shapes.avatar)
             .background(
                 if (avatarImageUrl != null) {
                     avatarItem?.bgColor?.let { parseHexColor(it) } ?: avatarColor
@@ -814,14 +819,14 @@ fun ActiveProfileMiniAvatar(
                     avatarColor.copy(alpha = 0.15f)
                 },
             )
-            .border(1.5.dp, borderColor, CircleShape),
+            .border(tokens.borders.thin + NuvioTokens.Space.hairline, borderColor, tokens.shapes.avatar),
         contentAlignment = Alignment.Center,
     ) {
         if (avatarImageUrl != null) {
             AsyncImage(
                 model = avatarImageUrl,
                 contentDescription = profile.name,
-                modifier = Modifier.size(size.dp).clip(CircleShape),
+                modifier = Modifier.size(size.dp).clip(tokens.shapes.avatar),
                 contentScale = ContentScale.Crop,
             )
         } else if (profile.name.isNotBlank()) {

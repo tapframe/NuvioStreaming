@@ -26,7 +26,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.trakt.TraktListTab
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
@@ -49,35 +48,36 @@ fun TraktListPickerDialog(
     onDismiss: () -> Unit,
 ) {
     if (!visible) return
+    val tokens = MaterialTheme.nuvio
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(20.dp),
+            color = tokens.colors.surfaceDialog,
+            shape = RoundedCornerShape(NuvioTokens.Radius.xl),
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(tokens.spacing.cardPadding),
+                verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
             ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                 )
                 Text(
                     text = stringResource(Res.string.compose_trakt_list_picker_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                 )
 
                 if (!errorMessage.isNullOrBlank()) {
                     Text(
                         text = errorMessage,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        color = tokens.colors.danger,
                     )
                 }
 
@@ -85,21 +85,21 @@ fun TraktListPickerDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp),
+                            .height(NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s40),
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
                         ) {
                             CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(24.dp),
+                                strokeWidth = tokens.borders.medium,
+                                modifier = Modifier.size(tokens.icons.lg),
                             )
                             Text(
                                 text = stringResource(Res.string.compose_trakt_list_picker_loading),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = tokens.colors.textMuted,
                             )
                         }
                     }
@@ -107,8 +107,8 @@ fun TraktListPickerDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                            .height(NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s80 + NuvioTokens.Space.s40),
+                        verticalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
                     ) {
                         items(items = tabs, key = { it.key }) { tab ->
                             val selected = membership[tab.key] == true
@@ -117,27 +117,27 @@ fun TraktListPickerDialog(
                                     .fillMaxWidth()
                                     .background(
                                         color = if (selected) {
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                            tokens.colors.accent.copy(alpha = tokens.opacity.selected)
                                         } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                            tokens.colors.surfaceCard.copy(alpha = tokens.opacity.medium)
                                         },
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = tokens.shapes.compactCard,
                                     )
                                     .clickable(enabled = !isPending) { onToggle(tab.key) }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    .padding(horizontal = NuvioTokens.Space.s14, vertical = tokens.spacing.listGap),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
                                     text = tab.title,
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = tokens.colors.textPrimary,
                                 )
                                 if (selected) {
                                     androidx.compose.material3.Icon(
                                         imageVector = Icons.Rounded.Check,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = tokens.colors.accent,
                                     )
                                 }
                             }
@@ -147,14 +147,14 @@ fun TraktListPickerDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10, Alignment.End),
                 ) {
                     Button(
                         onClick = onDismiss,
                         enabled = !isPending,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            containerColor = tokens.colors.surfaceCard,
+                            contentColor = tokens.colors.textPrimary,
                         ),
                     ) {
                         Text(stringResource(Res.string.action_cancel))
@@ -165,9 +165,9 @@ fun TraktListPickerDialog(
                     ) {
                         if (isPending) {
                             CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp),
+                                color = tokens.colors.onAccent,
+                                strokeWidth = tokens.borders.medium,
+                                modifier = Modifier.size(tokens.icons.sm),
                             )
                         } else {
                             Text(stringResource(Res.string.action_save))

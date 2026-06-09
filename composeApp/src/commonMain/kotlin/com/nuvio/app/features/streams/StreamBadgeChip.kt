@@ -19,20 +19,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.i18n.localizedByteUnit
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import kotlin.math.round
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.streams_size
 import org.jetbrains.compose.resources.stringResource
 
 internal object StreamBadgeChipDefaults {
-    val shape = RoundedCornerShape(6.dp)
-    val fileSizeHorizontalPadding = 6.dp
-    val fileSizeFontSize: TextUnit = 12.sp
-    val fileSizeLineHeight: TextUnit = 16.sp
-    val fileSizeLetterSpacing: TextUnit = 0.sp
+    val shape = RoundedCornerShape(NuvioTokens.Radius.sm)
+    val fileSizeHorizontalPadding = NuvioTokens.Space.s6
+    val fileSizeFontSize: TextUnit = NuvioTokens.Type.labelSm
+    val fileSizeLineHeight: TextUnit = NuvioTokens.LineHeight.bodySm
+    val fileSizeLetterSpacing: TextUnit = NuvioTokens.LetterSpacing.none
 }
 
 internal enum class StreamBadgeChipSize(
@@ -83,7 +84,7 @@ internal fun StreamBadgeChip(
         chipModifier = chipModifier.background(Color(backgroundColorArgb), shape)
     }
     if (outlineColorArgb != null) {
-        chipModifier = chipModifier.border(1.dp, Color(outlineColorArgb), shape)
+        chipModifier = chipModifier.border(NuvioTokens.Border.thin, Color(outlineColorArgb), shape)
     }
 
     Box(
@@ -117,6 +118,7 @@ internal fun StreamBadgeImage(badge: StreamBadge) {
 
 @Composable
 internal fun StreamFileSizeBadge(stream: StreamItem) {
+    val tokens = MaterialTheme.nuvio
     val bytes = stream.behaviorHints.videoSize ?: return
     val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
     val sizeLabel = if (gib >= 1.0) {
@@ -132,8 +134,8 @@ internal fun StreamFileSizeBadge(stream: StreamItem) {
         modifier = Modifier
             .height(StreamBadgeChipSize.STREAM.containerHeight)
             .clip(badgeShape)
-            .background(Color(0xFF0A0C0C))
-            .border(1.dp, Color(0xFF0A0C0C), badgeShape)
+            .background(tokens.colors.surfacePopover)
+            .border(tokens.borders.thin, tokens.colors.borderSubtle, badgeShape)
             .padding(horizontal = StreamBadgeChipDefaults.fileSizeHorizontalPadding),
         contentAlignment = Alignment.Center,
     ) {
@@ -145,7 +147,7 @@ internal fun StreamFileSizeBadge(stream: StreamItem) {
                 fontWeight = FontWeight.Bold,
                 letterSpacing = StreamBadgeChipDefaults.fileSizeLetterSpacing,
             ),
-            color = Color.White,
+            color = tokens.colors.textPrimary,
         )
     }
 }

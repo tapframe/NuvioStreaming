@@ -168,6 +168,8 @@ internal class PlayerScreenRuntime(
     var nextEpisodeAutoPlayCountdown by mutableStateOf<Int?>(null)
     var nextEpisodeAutoPlayJob by mutableStateOf<Job?>(null)
     var pendingP2pSwitch by mutableStateOf<PendingPlayerP2pSwitch?>(null)
+    var credentialRefreshJob by mutableStateOf<Job?>(null)
+    var credentialRefreshAttemptedSourceUrl by mutableStateOf<String?>(null)
 
     var showAudioModal by mutableStateOf(false)
     var showSubtitleModal by mutableStateOf(false)

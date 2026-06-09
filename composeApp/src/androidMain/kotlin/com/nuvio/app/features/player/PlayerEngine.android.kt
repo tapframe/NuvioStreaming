@@ -150,7 +150,7 @@ actual fun PlatformPlayerSurface(
         if (!sourceAudioUrl.isNullOrBlank()) {
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
             val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
-            val audioSource = mediaSourceFactory.createMediaSource(MediaItem.fromUri(sourceAudioUrl))
+            val audioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
             val mergedSource = MergingMediaSource(videoSource, audioSource)
             if (startPositionMs != null) {
                 setMediaSource(mergedSource, startPositionMs.coerceAtLeast(0L))
@@ -231,7 +231,10 @@ actual fun PlatformPlayerSurface(
 
         player.apply {
             setPlaybackMediaItem(
-                videoMediaItem = MediaItem.fromUri(sourceUrl),
+                videoMediaItem = playbackMediaItemFromUrl(
+                    url = sourceUrl,
+                    responseHeaders = sanitizedSourceResponseHeaders,
+                ),
                 startPositionMs = fallbackStartPositionMs,
             )
             prepare()

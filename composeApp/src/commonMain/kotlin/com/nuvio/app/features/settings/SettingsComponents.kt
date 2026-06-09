@@ -45,9 +45,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioSectionLabel
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioBlockPointerPassthrough
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import nuvio.composeapp.generated.resources.Res
@@ -69,15 +71,14 @@ private fun SettingsCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val isAmoled = colorScheme.background == Color.Black && colorScheme.surface == Color(0xFF050505)
+    val tokens = MaterialTheme.nuvio
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = if (isAmoled) Color(0xFF0B0B0B) else colorScheme.surface,
-        shape = RoundedCornerShape(if (isTablet) 20.dp else 16.dp),
+        color = tokens.colors.surface,
+        shape = if (isTablet) RoundedCornerShape(NuvioTokens.Radius.xl) else tokens.shapes.compactCard,
         border = BorderStroke(
-            0.5.dp,
-            colorScheme.outlineVariant.copy(alpha = if (isAmoled) 0.24f else 0.16f),
+            tokens.borders.hairline,
+            tokens.colors.borderSubtle,
         ),
     ) {
         Column(content = content)
@@ -100,10 +101,11 @@ internal fun SettingsGroup(
 
 @Composable
 internal fun SettingsGroupDivider(isTablet: Boolean) {
+    val tokens = MaterialTheme.nuvio
     HorizontalDivider(
-        modifier = Modifier.padding(start = if (isTablet) 78.dp else 66.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f),
+        modifier = Modifier.padding(start = if (isTablet) NuvioTokens.Space.s80 - NuvioTokens.Space.s2 else NuvioTokens.Space.s64 + NuvioTokens.Space.s2),
+        thickness = tokens.borders.hairline,
+        color = tokens.colors.borderSubtle,
     )
 }
 
@@ -113,29 +115,30 @@ internal fun TabletPageHeader(
     showBack: Boolean,
     onBack: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .nuvioBlockPointerPassthrough(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
     ) {
         if (showBack) {
             NuvioBackButton(
                 onClick = onBack,
                 modifier = Modifier
                     .size(36.dp),
-                shape = RoundedCornerShape(12.dp),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                buttonSize = 36.dp,
-                iconSize = 20.dp,
+                shape = tokens.shapes.compactCard,
+                containerColor = tokens.colors.surface,
+                contentColor = tokens.colors.textPrimary,
+                buttonSize = NuvioTokens.Space.s36,
+                iconSize = tokens.icons.md,
             )
         }
         Text(
             text = title,
             style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = tokens.colors.textPrimary,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -148,24 +151,25 @@ internal fun SettingsSidebarItem(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val primary = MaterialTheme.colorScheme.primary
-    val background = if (selected) primary.copy(alpha = 0.10f) else Color.Transparent
-    val iconChip = if (selected) primary.copy(alpha = 0.15f) else Color.Transparent
-    val contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    val tokens = MaterialTheme.nuvio
+    val primary = tokens.colors.accent
+    val background = if (selected) primary.copy(alpha = tokens.opacity.hover) else Color.Transparent
+    val iconChip = if (selected) primary.copy(alpha = tokens.opacity.selected) else Color.Transparent
+    val contentColor = if (selected) tokens.colors.textPrimary else tokens.colors.textMuted
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 2.dp)
-            .background(background, RoundedCornerShape(10.dp))
+            .padding(horizontal = tokens.spacing.listGap, vertical = NuvioTokens.Space.s2)
+            .background(background, RoundedCornerShape(NuvioTokens.Space.s10))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = tokens.spacing.screenHorizontal, vertical = tokens.spacing.listGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
-            modifier = Modifier.size(32.dp),
+            modifier = Modifier.size(tokens.icons.xl),
             color = iconChip,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(NuvioTokens.Radius.md),
         ) {
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -179,7 +183,7 @@ internal fun SettingsSidebarItem(
                 )
             }
         }
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(tokens.spacing.listGap))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
@@ -196,6 +200,7 @@ internal fun SettingsSection(
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -209,7 +214,7 @@ internal fun SettingsSection(
                 content = actions,
             )
         }
-        Spacer(modifier = Modifier.height(if (isTablet) 12.dp else 10.dp))
+        Spacer(modifier = Modifier.height(if (isTablet) tokens.spacing.listGap else NuvioTokens.Space.s10))
         content()
     }
 }
@@ -224,8 +229,8 @@ internal fun SettingsNavigationRow(
     isTablet: Boolean,
     onClick: () -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val iconSize = if (isTablet) 42.dp else 36.dp
-    val iconRadius = if (isTablet) 12.dp else 10.dp
     val verticalPadding = if (isTablet) 16.dp else 14.dp
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
 
@@ -234,7 +239,7 @@ internal fun SettingsNavigationRow(
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = horizontalPadding, vertical = verticalPadding)
-            .alpha(if (enabled) 1f else 0.55f),
+            .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -248,8 +253,8 @@ internal fun SettingsNavigationRow(
             if (icon != null || iconPainter != null) {
                 Surface(
                     modifier = Modifier.size(iconSize),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    shape = RoundedCornerShape(iconRadius),
+                    color = tokens.colors.accent.copy(alpha = tokens.opacity.pressed),
+                    shape = tokens.shapes.compactCard,
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
@@ -267,7 +272,7 @@ internal fun SettingsNavigationRow(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = tokens.colors.accent,
                             )
                         }
                     }
@@ -278,14 +283,14 @@ internal fun SettingsNavigationRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.Medium,
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                     modifier = Modifier.alpha(0.92f),
                 )
             }
@@ -302,6 +307,7 @@ internal fun SettingsSwitchRow(
     isTablet: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val tokens = MaterialTheme.nuvio
     val verticalPadding = if (isTablet) 16.dp else 14.dp
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
 
@@ -318,20 +324,20 @@ internal fun SettingsSwitchRow(
                 .weight(1f)
                 .padding(end = 12.dp)
                 .widthIn(max = if (isTablet) 560.dp else Dp.Unspecified)
-                .alpha(if (enabled) 1f else 0.55f),
+                .alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = tokens.colors.textPrimary,
                 fontWeight = FontWeight.Medium,
             )
             if (!description.isNullOrBlank()) {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                 )
             }
         }
@@ -341,10 +347,10 @@ internal fun SettingsSwitchRow(
             enabled = enabled,
             modifier = Modifier.padding(start = 4.dp),
             colors = SwitchDefaults.colors(
-                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                checkedThumbColor = tokens.colors.onAccent,
+                checkedTrackColor = tokens.colors.accent,
+                uncheckedThumbColor = tokens.colors.textMuted,
+                uncheckedTrackColor = tokens.colors.borderDefault,
             ),
         )
     }
@@ -361,6 +367,7 @@ internal fun HomescreenCatalogRow(
     dragHandleScope: ReorderableCollectionItemScope,
     onPinnedDragAttempt: () -> Unit = {},
 ) {
+    val tokens = MaterialTheme.nuvio
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
     val verticalPadding = if (isTablet) 18.dp else 16.dp
     val hapticFeedback = LocalHapticFeedback.current
@@ -387,7 +394,7 @@ internal fun HomescreenCatalogRow(
                 Text(
                     text = item.displayTitle,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -399,7 +406,7 @@ internal fun HomescreenCatalogRow(
                         item.addonName
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                 )
                 Text(
                     text = buildString {
@@ -427,7 +434,7 @@ internal fun HomescreenCatalogRow(
                         }
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = tokens.colors.textMuted,
                 )
             }
             Row(
@@ -438,10 +445,10 @@ internal fun HomescreenCatalogRow(
                     checked = item.enabled,
                     onCheckedChange = onEnabledChange,
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primary,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.outlineVariant,
+                        checkedThumbColor = tokens.colors.onAccent,
+                        checkedTrackColor = tokens.colors.accent,
+                        uncheckedThumbColor = tokens.colors.textMuted,
+                        uncheckedTrackColor = tokens.colors.borderDefault,
                     ),
                 )
                 if (item.isPinnedToTop) {
@@ -451,7 +458,7 @@ internal fun HomescreenCatalogRow(
                         Icon(
                             imageVector = Icons.Rounded.Lock,
                             contentDescription = stringResource(Res.string.settings_homescreen_pinned),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            tint = tokens.colors.textMuted.copy(alpha = tokens.opacity.medium),
                         )
                     }
                 } else {
@@ -471,7 +478,7 @@ internal fun HomescreenCatalogRow(
                         Icon(
                             imageVector = Icons.Rounded.Menu,
                             contentDescription = stringResource(Res.string.settings_homescreen_reorder),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = tokens.colors.textMuted,
                         )
                     }
                 }
@@ -490,11 +497,11 @@ internal fun HomescreenCatalogRow(
                     label = { Text(stringResource(Res.string.settings_homescreen_display_name)) },
                     placeholder = { Text(item.defaultTitle) },
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedBorderColor = tokens.colors.borderFocus.copy(alpha = tokens.opacity.strong),
+                        unfocusedBorderColor = tokens.colors.borderDefault.copy(alpha = tokens.opacity.medium),
+                        focusedContainerColor = tokens.colors.surface,
+                        unfocusedContainerColor = tokens.colors.surface,
+                        disabledContainerColor = tokens.colors.surface,
                     ),
                 )
             }

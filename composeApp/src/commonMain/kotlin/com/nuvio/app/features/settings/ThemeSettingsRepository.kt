@@ -2,6 +2,7 @@ package com.nuvio.app.features.settings
 
 import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.NativeTabBridge
+import com.nuvio.app.core.ui.ThemeColors
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -95,12 +96,5 @@ object ThemeSettingsRepository {
     }
 }
 
-private fun AppTheme.nativeTabAccentHex(): String = when (this) {
-    AppTheme.CRIMSON -> "#E53935"
-    AppTheme.OCEAN -> "#1E88E5"
-    AppTheme.VIOLET -> "#8E24AA"
-    AppTheme.EMERALD -> "#43A047"
-    AppTheme.AMBER -> "#FB8C00"
-    AppTheme.ROSE -> "#D81B60"
-    AppTheme.WHITE -> "#F5F5F5"
-}
+private fun AppTheme.nativeTabAccentHex(): String =
+    ThemeColors.getColorPalette(this).nativeAccentHex

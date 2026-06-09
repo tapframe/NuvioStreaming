@@ -23,13 +23,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,13 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.core.ui.NuvioTokens
+import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.streams.StreamBadge
 import com.nuvio.app.features.streams.StreamBadgeImage
@@ -74,7 +70,7 @@ fun PlayerSourcesPanel(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
+    val tokens = MaterialTheme.nuvio
     val debridSettings by remember {
         DebridSettingsRepository.ensureLoaded()
         DebridSettingsRepository.uiState
@@ -86,8 +82,8 @@ fun PlayerSourcesPanel(
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(200)),
-        exit = fadeOut(tween(200)),
+        enter = fadeIn(tween(NuvioTokens.Motion.normalMillis)),
+        exit = fadeOut(tween(NuvioTokens.Motion.normalMillis)),
     ) {
         Box(
             modifier = modifier
@@ -97,22 +93,24 @@ fun PlayerSourcesPanel(
                     interactionSource = remember { MutableInteractionSource() },
                     onClick = onDismiss,
                 )
-                .background(colorScheme.scrim.copy(alpha = 0.52f)),
+                .background(tokens.colors.overlayScrim.copy(alpha = tokens.opacity.medium)),
             contentAlignment = Alignment.Center,
         ) {
             AnimatedVisibility(
                 visible = visible,
-                enter = slideInVertically(tween(300)) { it / 3 } + fadeIn(tween(300)),
-                exit = slideOutVertically(tween(250)) { it / 3 } + fadeOut(tween(250)),
+                enter = slideInVertically(tween(NuvioTokens.Motion.sheetEnterMillis)) { it / 3 } +
+                    fadeIn(tween(NuvioTokens.Motion.sheetEnterMillis)),
+                exit = slideOutVertically(tween(NuvioTokens.Motion.sheetExitMillis)) { it / 3 } +
+                    fadeOut(tween(NuvioTokens.Motion.sheetExitMillis)),
             ) {
                 Box(
                     modifier = Modifier
-                        .widthIn(max = 520.dp)
+                        .widthIn(max = tokens.components.playerPanelMaxWidth)
                         .fillMaxWidth(0.92f)
-                        .heightIn(max = 600.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(colorScheme.surface)
-                        .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(24.dp))
+                        .heightIn(max = tokens.components.dialogMaxWidth + NuvioTokens.Space.s40)
+                        .clip(tokens.shapes.playerPanel)
+                        .background(tokens.colors.surfaceSheet)
+                        .border(tokens.borders.thin, tokens.colors.borderDefault, tokens.shapes.playerPanel)
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() },
@@ -124,17 +122,17 @@ fun PlayerSourcesPanel(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 16.dp),
+                                .padding(horizontal = tokens.spacing.sheetPadding, vertical = tokens.spacing.cardPadding),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = stringResource(Res.string.compose_player_panel_sources),
-                                color = colorScheme.onSurface,
-                                fontSize = 18.sp,
+                                color = tokens.colors.textPrimary,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap)) {
                                 PanelChipButton(
                                     label = stringResource(Res.string.compose_action_reload),
                                     icon = Icons.Rounded.Refresh,
@@ -156,9 +154,9 @@ fun PlayerSourcesPanel(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .horizontalScroll(rememberScrollState())
-                                    .padding(horizontal = 20.dp)
-                                    .padding(bottom = 12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    .padding(horizontal = tokens.spacing.sheetPadding)
+                                    .padding(bottom = tokens.spacing.listGap),
+                                horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
                             ) {
                                 AddonFilterChip(
                                     label = stringResource(Res.string.collections_tab_all),
@@ -184,13 +182,13 @@ fun PlayerSourcesPanel(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 40.dp),
+                                        .padding(vertical = NuvioTokens.Space.s40),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     CircularProgressIndicator(
-                                        color = colorScheme.primary,
-                                        strokeWidth = 2.dp,
-                                        modifier = Modifier.size(28.dp),
+                                        color = tokens.colors.accent,
+                                        strokeWidth = tokens.borders.medium,
+                                        modifier = Modifier.size(tokens.icons.lg + NuvioTokens.Space.s4),
                                     )
                                 }
                             }
@@ -199,13 +197,13 @@ fun PlayerSourcesPanel(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 40.dp),
+                                        .padding(vertical = NuvioTokens.Space.s40),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
                                         text = stringResource(Res.string.compose_player_no_streams_found),
-                                        color = colorScheme.onSurfaceVariant,
-                                        fontSize = 14.sp,
+                                        color = tokens.colors.textMuted,
+                                        style = MaterialTheme.typography.bodyMedium,
                                     )
                                 }
                             }
@@ -213,9 +211,9 @@ fun PlayerSourcesPanel(
                             else -> {
                                 val streams = streamsUiState.filteredGroups.flatMap { it.streams }
                                 LazyColumn(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp),
+                                    modifier = Modifier.padding(horizontal = tokens.spacing.cardPadding),
+                                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = tokens.spacing.cardPadding),
                                 ) {
                                     itemsIndexed(
                                         items = streams,
@@ -254,36 +252,36 @@ private fun SourceStreamRow(
     badgePlacement: StreamBadgePlacement,
     onClick: () -> Unit,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val cardShape = RoundedCornerShape(12.dp)
+    val tokens = MaterialTheme.nuvio
+    val cardShape = tokens.shapes.compactCard
     val badgeImages = stream.badges.filter { it.imageURL.isNotBlank() }
     val hasBadgeMetadata = badgeImages.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints.videoSize != null)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 68.dp)
+            .heightIn(min = NuvioTokens.Space.s64 + NuvioTokens.Space.s4)
             .shadow(
-                elevation = 2.dp,
+                elevation = tokens.elevation.raised,
                 shape = cardShape,
-                ambientColor = Color.Black.copy(alpha = 0.04f),
-                spotColor = Color.Black.copy(alpha = 0.04f),
+                ambientColor = tokens.colors.overlayScrim.copy(alpha = tokens.opacity.subtle),
+                spotColor = tokens.colors.overlayScrim.copy(alpha = tokens.opacity.subtle),
             )
             .clip(cardShape)
             .background(
-                if (isCurrent) colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.05f),
+                if (isCurrent) tokens.colors.overlaySelected else tokens.colors.surfaceCard,
             )
             .then(
                 if (isCurrent) {
-                    Modifier.border(1.dp, colorScheme.primary.copy(alpha = 0.45f), cardShape)
+                    Modifier.border(tokens.borders.thin, tokens.colors.borderSelected, cardShape)
                 } else {
                     Modifier
                 },
             )
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(14.dp),
+            .padding(tokens.spacing.cardPaddingCompact),
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             if (hasBadgeMetadata && badgePlacement == StreamBadgePlacement.TOP) {
@@ -292,35 +290,33 @@ private fun SourceStreamRow(
                     stream = stream,
                     showFileSizeBadges = showFileSizeBadges,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(NuvioTokens.Space.s6))
             }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
             ) {
                 Text(
                     text = stream.streamLabel,
-                    color = colorScheme.onSurface,
+                    color = tokens.colors.textPrimary,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        lineHeight = 20.sp,
-                        letterSpacing = 0.1.sp,
+                        letterSpacing = NuvioTokens.LetterSpacing.none,
                     ),
                     modifier = Modifier.weight(1f),
                 )
                 if (isCurrent) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(colorScheme.primaryContainer)
-                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                            .clip(tokens.shapes.chip)
+                            .background(tokens.colors.accent)
+                            .padding(horizontal = NuvioTokens.Space.s8, vertical = NuvioTokens.Space.s3),
                     ) {
                         Text(
                             text = stringResource(Res.string.compose_player_playing),
-                            color = colorScheme.onPrimaryContainer,
-                            fontSize = 10.sp,
+                            color = tokens.colors.onAccent,
+                            fontSize = NuvioTokens.Type.labelXs,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -329,18 +325,15 @@ private fun SourceStreamRow(
 
             val subtitle = stream.streamSubtitle
             if (!subtitle.isNullOrBlank() && subtitle != stream.streamLabel) {
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(NuvioTokens.Space.s2))
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                    ),
-                    color = colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tokens.colors.textSecondary,
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(NuvioTokens.Space.s6))
             if (badgePlacement == StreamBadgePlacement.BOTTOM) {
                 SourceStreamBadgeRow(
                     badgeImages = badgeImages,
@@ -349,9 +342,9 @@ private fun SourceStreamRow(
                 ) {
                     Text(
                         text = stream.addonName,
-                        modifier = if (hasBadgeMetadata) Modifier.padding(start = 4.dp) else Modifier,
-                        color = colorScheme.onSurfaceVariant,
-                        fontSize = 11.sp,
+                        modifier = if (hasBadgeMetadata) Modifier.padding(start = NuvioTokens.Space.s4) else Modifier,
+                        color = tokens.colors.textMuted,
+                        fontSize = NuvioTokens.Type.labelXs,
                         fontStyle = FontStyle.Italic,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -360,8 +353,8 @@ private fun SourceStreamRow(
             } else {
                 Text(
                     text = stream.addonName,
-                    color = colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp,
+                    color = tokens.colors.textMuted,
+                    fontSize = NuvioTokens.Type.labelXs,
                     fontStyle = FontStyle.Italic,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -382,7 +375,7 @@ private fun SourceStreamBadgeRow(
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
     ) {
         badgeImages.forEach { badge ->
             StreamBadgeImage(badge = badge)
@@ -402,46 +395,46 @@ internal fun AddonFilterChip(
     hasError: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
+    val tokens = MaterialTheme.nuvio
 
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(tokens.shapes.chip)
             .background(
                 when {
-                    isSelected -> colorScheme.primaryContainer
-                    else -> colorScheme.surfaceVariant.copy(alpha = 0.92f)
+                    isSelected -> tokens.colors.overlaySelected
+                    else -> tokens.colors.surfacePopover
                 },
             )
             .then(
                 if (isSelected) {
-                    Modifier.border(1.dp, colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                    Modifier.border(tokens.borders.thin, tokens.colors.borderSelected, tokens.shapes.chip)
                 } else {
-                    Modifier.border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
+                    Modifier.border(tokens.borders.thin, tokens.colors.borderSubtle, tokens.shapes.chip)
                 },
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .padding(horizontal = NuvioTokens.Space.s14, vertical = NuvioTokens.Space.s8),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    color = colorScheme.primary,
-                    strokeWidth = 1.5.dp,
-                    modifier = Modifier.size(12.dp),
+                    color = tokens.colors.accent,
+                    strokeWidth = tokens.borders.thin + NuvioTokens.Space.hairline,
+                    modifier = Modifier.size(NuvioTokens.Icon.xs),
                 )
             }
             Text(
                 text = label,
                 color = when {
-                    hasError -> colorScheme.error
-                    isSelected -> colorScheme.onPrimaryContainer
-                    else -> colorScheme.onSurfaceVariant
+                    hasError -> tokens.colors.danger
+                    isSelected -> tokens.colors.textPrimary
+                    else -> tokens.colors.textMuted
                 },
-                fontSize = 12.sp,
+                fontSize = NuvioTokens.Type.labelSm,
                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             )
         }
@@ -454,32 +447,32 @@ internal fun PanelChipButton(
     onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
+    val tokens = MaterialTheme.nuvio
 
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(colorScheme.surfaceVariant.copy(alpha = 0.9f))
-            .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(16.dp))
+            .clip(tokens.shapes.compactCard)
+            .background(tokens.colors.surfacePopover)
+            .border(tokens.borders.thin, tokens.colors.borderSubtle, tokens.shapes.compactCard)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = NuvioTokens.Space.s12, vertical = NuvioTokens.Space.s6),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
         ) {
             if (icon != null) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
+                    tint = tokens.colors.textMuted,
+                    modifier = Modifier.size(NuvioTokens.Space.s14),
                 )
             }
             Text(
                 text = label,
-                color = colorScheme.onSurfaceVariant,
-                fontSize = 12.sp,
+                color = tokens.colors.textMuted,
+                fontSize = NuvioTokens.Type.labelSm,
             )
         }
     }

@@ -1,3 +1,4 @@
 [submodule "MPVKit"]
 	path = MPVKit
-	url = https://github.com/tapframe/MPVNuvio.git
+	url = https://github.com/NuvioMedia/MPVKit.git
+	branch = Nuvio

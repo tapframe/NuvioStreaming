@@ -188,6 +188,17 @@ val iosDistributionSourceDir = if (iosDistribution == "full") {
 val iosFrameworkBundleId = "com.nuvio.media"
 val fullCommonSourceDir = project.file("src/fullCommonMain/kotlin")
 val generatedRuntimeConfigDir = layout.buildDirectory.dir("generated/runtime-config/kotlin")
+val requestedGradleTasks = gradle.startParameter.taskNames.map { taskName ->
+    taskName.substringAfterLast(':').lowercase()
+}
+val isAndroidAppBundleBuild = requestedGradleTasks.any { taskName ->
+    taskName == "bundle" ||
+        taskName == "bundlerelease" ||
+        taskName == "bundledebug" ||
+        taskName.startsWith("bundleplaystore") ||
+        taskName.startsWith("bundlefull") ||
+        taskName.endsWith("bundle")
+}
 
 val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generateRuntimeConfigs") {
     outputDir.set(generatedRuntimeConfigDir)
@@ -352,7 +363,7 @@ android {
     }
     splits {
         abi {
-            isEnable = true
+            isEnable = !isAndroidAppBundleBuild
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
             isUniversalApk = false
