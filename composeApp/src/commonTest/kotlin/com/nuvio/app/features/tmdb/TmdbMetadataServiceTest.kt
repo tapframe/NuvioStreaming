@@ -116,6 +116,96 @@ class TmdbMetadataServiceTest {
     }
 
     @Test
+    fun `applyEnrichment keeps addon imdb rating instead of tmdb vote average`() {
+        val base = MetaDetails(
+            id = "tt0468569",
+            type = "movie",
+            name = "The Dark Knight",
+            imdbRating = "9.1",
+            videos = listOf(
+                MetaVideo(
+                    id = "movie",
+                    title = "The Dark Knight",
+                ),
+            ),
+        )
+        val enrichment = TmdbEnrichment(
+            localizedTitle = "The Dark Knight",
+            description = "TMDB description",
+            genres = listOf("Action"),
+            backdrop = "backdrop",
+            logo = "logo",
+            poster = "poster",
+            people = emptyList(),
+            director = emptyList(),
+            writer = emptyList(),
+            releaseInfo = "2008-07-18",
+            rating = 8.531,
+            runtimeMinutes = 152,
+            ageRating = "PG-13",
+            status = "Released",
+            countries = listOf("US"),
+            language = "en",
+            productionCompanies = emptyList(),
+            networks = emptyList(),
+        )
+
+        val result = TmdbMetadataService.applyEnrichment(
+            meta = base,
+            enrichment = enrichment,
+            episodeMap = emptyMap(),
+            settings = TmdbSettings(enabled = true),
+        )
+
+        assertEquals("9.1", result.imdbRating)
+    }
+
+    @Test
+    fun `applyEnrichment falls back to tmdb rating when addon has none`() {
+        val base = MetaDetails(
+            id = "tt0468569",
+            type = "movie",
+            name = "The Dark Knight",
+            imdbRating = null,
+            videos = listOf(
+                MetaVideo(
+                    id = "movie",
+                    title = "The Dark Knight",
+                ),
+            ),
+        )
+        val enrichment = TmdbEnrichment(
+            localizedTitle = "The Dark Knight",
+            description = "TMDB description",
+            genres = listOf("Action"),
+            backdrop = "backdrop",
+            logo = "logo",
+            poster = "poster",
+            people = emptyList(),
+            director = emptyList(),
+            writer = emptyList(),
+            releaseInfo = "2008-07-18",
+            rating = 8.531,
+            runtimeMinutes = 152,
+            ageRating = "PG-13",
+            status = "Released",
+            countries = listOf("US"),
+            language = "en",
+            productionCompanies = emptyList(),
+            networks = emptyList(),
+        )
+
+        val result = TmdbMetadataService.applyEnrichment(
+            meta = base,
+            enrichment = enrichment,
+            episodeMap = emptyMap(),
+            settings = TmdbSettings(enabled = true),
+        )
+
+        assertEquals("8.5", result.imdbRating)
+    }
+
+    @Test
     fun `applyEnrichment preserves disabled groups`() {
         val base = MetaDetails(
             id = "tt7654321",

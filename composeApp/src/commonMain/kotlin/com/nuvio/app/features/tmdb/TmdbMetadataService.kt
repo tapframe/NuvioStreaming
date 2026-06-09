@@ -647,7 +647,7 @@ object TmdbMetadataService {
             updated = updated.copy(
                 name = enrichment.localizedTitle ?: updated.name,
                 description = enrichment.description ?: updated.description,
-                imdbRating = enrichment.rating?.formatRating() ?: updated.imdbRating,
+                imdbRating = updated.imdbRating ?: enrichment.rating?.formatRating(),
                 genres = enrichment.genres.ifEmpty { updated.genres },
             )
         }
