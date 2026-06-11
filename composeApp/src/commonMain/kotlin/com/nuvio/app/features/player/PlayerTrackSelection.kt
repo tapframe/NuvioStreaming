@@ -87,9 +87,23 @@ internal fun findPreferredSubtitleTrackIndex(
             )
         }
         if (matchIndex >= 0) return matchIndex
+
+        val labelMatchIndex = tracks.indexOfFirst { track ->
+            track.hasNoUsableLanguageTag() &&
+                languageMatchesPreference(
+                    trackLanguage = track.label,
+                    targetLanguage = normalizedTarget,
+                )
+        }
+        if (labelMatchIndex >= 0) return labelMatchIndex
     }
 
     return -1
+}
+
+private fun SubtitleTrack.hasNoUsableLanguageTag(): Boolean {
+    val normalized = normalizeLanguageCode(language)
+    return normalized == null || normalized == "und"
 }
 
 internal fun filterAddonSubtitlesForSettings(
