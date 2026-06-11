@@ -14,7 +14,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Initialize submodules manually
+        run: |
+          git submodule init MPVKit
+          git submodule update --depth=1 MPVKit
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -40,7 +45,7 @@ jobs:
 
       - name: Rename APK
         run: |
-          APK_PATH=$(find composeApp/build/outputs/apk -name "*.apk" | head -1)
+          APK_PATH=$(find composeApp/build/outputs/apk -name "*.apk" | head -1 )
           if [ -n "$APK_PATH" ]; then
             cp "$APK_PATH" composeApp/build/outputs/apk/NuvioMobile-custom-debug.apk
           fi
