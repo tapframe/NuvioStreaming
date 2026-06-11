@@ -11,6 +11,9 @@ import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.PlayerNextEpisodeRules
 import com.nuvio.app.features.player.skip.SkipIntroRepository
+import com.nuvio.app.features.player.dualsubtitle.DualSubtitleRepository
+import com.nuvio.app.features.player.sponsorblock.SponsorBlockRepository
+import com.nuvio.app.features.player.sponsorblock.SponsorBlockSettingsRepository
 import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamItem
@@ -369,16 +372,28 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
 
         launch {
             val imdbId = vid.split(":").firstOrNull()?.takeIf { it.startsWith("tt") }
-            val intervals = SkipIntroRepository.getSkipIntervals(
+            val introIntervals = SkipIntroRepository.getSkipIntervals(
                 imdbId = imdbId,
                 season = season,
                 episode = episode,
             )
-            skipIntervals = intervals
+
+            // SponsorBlock: fetch segments for YouTube-sourced content
+            val sponsorBlockSettings = SponsorBlockSettingsRepository.settings.value
+            val sponsorBlockIntervals = SponsorBlockRepository.getSkipIntervals(
+                videoId = vid,
+                settings = sponsorBlockSettings,
+            )
+
+            // Merge both sources, deduplicating overlapping intervals
+            skipIntervals = mergeSkipIntervals(introIntervals, sponsorBlockIntervals)
         }
     }
 
     LaunchedEffect(playbackSnapshot.positionMs, skipIntervals) {
+        // Update dual subtitle position
+        DualSubtitleRepository.updatePosition(playbackSnapshot.positionMs)
+
         if (skipIntervals.isEmpty()) {
             activeSkipInterval = null
             return@LaunchedEffect
@@ -597,3 +612,35 @@ private fun findCredentialRefreshCandidate(
 
 private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
 private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L
+
+
+/**
+ * Merges skip intervals from multiple sources (IntroDb/AniSkip + SponsorBlock),
+ * removing duplicates where intervals overlap significantly (>50% overlap).
+ * IntroDb intervals take priority over SponsorBlock when overlapping.
+ */
+private fun mergeSkipIntervals(
+    introIntervals: List<com.nuvio.app.features.player.skip.SkipInterval>,
+    sponsorBlockIntervals: List<com.nuvio.app.features.player.skip.SkipInterval>,
+): List<com.nuvio.app.features.player.skip.SkipInterval> {
+    if (sponsorBlockIntervals.isEmpty()) return introIntervals
+    if (introIntervals.isEmpty()) return sponsorBlockIntervals
+
+    val merged = introIntervals.toMutableList()
+    for (sbInterval in sponsorBlockIntervals) {
+        val overlaps = merged.any { existing ->
+            val overlapStart = maxOf(existing.startTime, sbInterval.startTime)
+            val overlapEnd = minOf(existing.endTime, sbInterval.endTime)
+            if (overlapEnd <= overlapStart) false
+            else {
+                val overlapDuration = overlapEnd - overlapStart
+                val sbDuration = sbInterval.endTime - sbInterval.startTime
+                sbDuration > 0 && (overlapDuration / sbDuration) > 0.5
+            }
+        }
+        if (!overlaps) {
+            merged.add(sbInterval)
+        }
+    }
+    return merged.sortedBy { it.startTime }
+}
