@@ -34,7 +34,16 @@ object PlayerNextEpisodeRules {
     ): Boolean {
         val outroInterval = skipIntervals.firstOrNull { it.type == "outro" }
         return if (outroInterval != null) {
-            positionMs / 1000.0 >= outroInterval.startTime
+            val outroStartMs = (outroInterval.startTime * 1000.0).toLong()
+            val outroEndMs = (outroInterval.endTime * 1000.0).toLong()
+            val hasPostCreditsTail = durationMs > 0L &&
+                outroEndMs > outroStartMs &&
+                (durationMs - outroEndMs) >= POST_CREDITS_THRESHOLD_MS
+            if (hasPostCreditsTail) {
+                false
+            } else {
+                positionMs >= outroStartMs
+            }
         } else {
             if (durationMs <= 0L) return false
             when (thresholdMode) {
@@ -50,6 +59,8 @@ object PlayerNextEpisodeRules {
             }
         }
     }
+
+    private const val POST_CREDITS_THRESHOLD_MS = 30_000L
 
     fun hasEpisodeAired(raw: String?): Boolean {
         val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return true
