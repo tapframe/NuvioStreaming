@@ -41,6 +41,7 @@ private data class PluginRow(
     val name: String? = null,
     val enabled: Boolean = true,
     @SerialName("sort_order") val sortOrder: Int = 0,
+    @SerialName("repo_type") val repoType: String? = null,
 )
 
 @Serializable
@@ -49,6 +50,7 @@ private data class PluginPushItem(
     val name: String = "",
     val enabled: Boolean = true,
     @SerialName("sort_order") val sortOrder: Int = 0,
+    @SerialName("repo_type") val repoType: String? = null,
 )
 
 actual object PluginRepository {
@@ -60,7 +62,6 @@ actual object PluginRepository {
     actual val uiState: StateFlow<PluginsUiState> = _uiState.asStateFlow()
 
     private var initialized = false
-    private var pulledFromServer = false
     private var currentProfileId = 1
     private val activeRefreshJobs = mutableMapOf<String, Job>()
 
@@ -82,7 +83,6 @@ actual object PluginRepository {
         cancelActiveRefreshes()
         currentProfileId = effectiveProfileId
         initialized = false
-        pulledFromServer = false
         _uiState.value = PluginsUiState()
     }
 
@@ -90,7 +90,6 @@ actual object PluginRepository {
         cancelActiveRefreshes()
         currentProfileId = 1
         initialized = false
-        pulledFromServer = false
         _uiState.value = PluginsUiState()
     }
 
@@ -106,25 +105,35 @@ actual object PluginRepository {
                 }
                 .decodeList<PluginRow>()
 
-            val urls = dedupeManifestUrls(rows.map { it.url })
-            if (urls.isEmpty() && !pulledFromServer) {
-                val localUrls = _uiState.value.repositories.map { it.manifestUrl }
-                if (localUrls.isNotEmpty()) {
-                    initialize()
-                    pulledFromServer = true
-                    pushToServer()
-                    return
+            val rowsByUrl = linkedMapOf<String, PluginRow>()
+            rows.forEach { row ->
+                val manifestUrl = ensureManifestSuffix(row.url)
+                if (!rowsByUrl.containsKey(manifestUrl)) {
+                    rowsByUrl[manifestUrl] = row
                 }
+            }
+            val urls = rowsByUrl.keys.toList()
+
+            if (shouldPreserveLocalPluginRepositories(urls, _uiState.value.repositories)) {
+                log.w { "pullFromServer — remote empty while local has repositories; preserving local" }
+                initialized = true
+                return
             }
 
             val existingReposByUrl = _uiState.value.repositories.associateBy { it.manifestUrl }
             val nextRepos = urls.map { url ->
-                existingReposByUrl[url]?.copy(isRefreshing = true, errorMessage = null)
+                val row = rowsByUrl.getValue(url)
+                val base = existingReposByUrl[url]?.copy(isRefreshing = true, errorMessage = null)
                     ?: PluginRepositoryItem(
                         manifestUrl = url,
                         name = url.substringBefore("?").substringAfterLast('/'),
                         isRefreshing = true,
                     )
+                base.copy(
+                    serverUrl = row.url,
+                    serverRepoType = row.repoType,
+                    serverEnabled = row.enabled,
+                )
             }
             val nextScrapers = _uiState.value.scrapers.filter { scraper ->
                 urls.contains(scraper.repositoryUrl)
@@ -142,7 +151,6 @@ actual object PluginRepository {
                 refreshRepository(url, pushAfterRefresh = false)
             }
 
-            pulledFromServer = true
             initialized = true
         }.onFailure { error ->
             log.e(error) { "pullFromServer failed" }
@@ -228,7 +236,15 @@ actual object PluginRepository {
                     result.fold(
                         onSuccess = { (repo, scrapers) ->
                             val updatedRepos = state.repositories.map { existing ->
-                                if (existing.manifestUrl == manifestUrl) repo else existing
+                                if (existing.manifestUrl == manifestUrl) {
+                                    repo.copy(
+                                        serverUrl = existing.serverUrl,
+                                        serverRepoType = existing.serverRepoType,
+                                        serverEnabled = existing.serverEnabled,
+                                    )
+                                } else {
+                                    existing
+                                }
                             }
                             state.copy(
                                 repositories = updatedRepos,
@@ -438,12 +454,13 @@ actual object PluginRepository {
     private fun pushToServer() {
         scope.launch {
             runCatching {
-                val repos = _uiState.value.repositories.mapIndexed { index, repo ->
+                val repos = buildPluginPushEntries(_uiState.value.repositories).map { entry ->
                     PluginPushItem(
-                        url = repo.manifestUrl,
-                        name = repo.name,
-                        enabled = true,
-                        sortOrder = index,
+                        url = entry.url,
+                        name = entry.name,
+                        enabled = entry.enabled,
+                        sortOrder = entry.sortOrder,
+                        repoType = entry.repoType,
                     )
                 }
 
@@ -471,6 +488,9 @@ actual object PluginRepository {
                     version = repo.version,
                     scraperCount = repo.scraperCount,
                     lastUpdated = repo.lastUpdated,
+                    serverUrl = repo.serverUrl,
+                    serverRepoType = repo.serverRepoType,
+                    serverEnabled = repo.serverEnabled,
                 )
             },
             scrapers = state.scrapers.map { scraper ->
@@ -512,7 +532,6 @@ actual object PluginRepository {
 
         if (currentProfileId != profileId) {
             cancelActiveRefreshes()
-            pulledFromServer = false
         }
 
         currentProfileId = profileId
@@ -536,6 +555,9 @@ actual object PluginRepository {
                         lastUpdated = it.lastUpdated,
                         isRefreshing = false,
                         errorMessage = null,
+                        serverUrl = it.serverUrl,
+                        serverRepoType = it.serverRepoType,
+                        serverEnabled = it.serverEnabled,
                     )
                 }
                 ?: emptyList(),
@@ -560,9 +582,6 @@ actual object PluginRepository {
                 ?: emptyList(),
         )
     }
-
-    private fun dedupeManifestUrls(urls: List<String>): List<String> =
-        urls.map(::ensureManifestSuffix).distinct()
 
     private fun ensureManifestSuffix(url: String): String {
         val path = url.substringBefore("?").trimEnd('/')
