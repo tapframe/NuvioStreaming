@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -64,6 +65,30 @@ object WatchedRepository {
     private var deltaCursorEventId: Long = 0L
     private var deltaInitialized: Boolean = false
     internal var syncAdapter: WatchedSyncAdapter = SupabaseWatchedSyncAdapter
+
+    init {
+        syncScope.launch {
+            var wasTraktWatchedSyncActive = false
+            combine(
+                TraktAuthRepository.isAuthenticated,
+                TraktSettingsRepository.uiState,
+            ) { isAuthenticated, settings ->
+                shouldUseTraktWatchedSync(
+                    isAuthenticated = isAuthenticated,
+                    source = settings.watchProgressSource,
+                )
+            }.collect { isActive ->
+                val shouldPull = shouldPullTraktWatchedHistoryOnActivation(
+                    wasActive = wasTraktWatchedSyncActive,
+                    isActive = isActive,
+                )
+                wasTraktWatchedSyncActive = isActive
+                if (shouldPull) {
+                    pullFromServer(ProfileRepository.activeProfileId)
+                }
+            }
+        }
+    }
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -533,6 +558,11 @@ internal fun shouldUseTraktWatchedSync(
     isAuthenticated = isAuthenticated,
     source = source,
 )
+
+internal fun shouldPullTraktWatchedHistoryOnActivation(
+    wasActive: Boolean,
+    isActive: Boolean,
+): Boolean = isActive && !wasActive
 
 private fun String.isSeriesLikeWatchedType(): Boolean =
     trim().lowercase() in setOf("series", "show", "tv", "tvshow")

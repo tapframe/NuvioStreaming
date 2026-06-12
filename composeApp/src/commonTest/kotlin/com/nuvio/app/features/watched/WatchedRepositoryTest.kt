@@ -100,6 +100,34 @@ class WatchedRepositoryTest {
     }
 
     @Test
+    fun traktWatchedHistoryPull_triggers_only_when_sync_becomes_active() {
+        assertTrue(
+            shouldPullTraktWatchedHistoryOnActivation(
+                wasActive = false,
+                isActive = true,
+            ),
+        )
+        assertFalse(
+            shouldPullTraktWatchedHistoryOnActivation(
+                wasActive = true,
+                isActive = true,
+            ),
+        )
+        assertFalse(
+            shouldPullTraktWatchedHistoryOnActivation(
+                wasActive = true,
+                isActive = false,
+            ),
+        )
+        assertFalse(
+            shouldPullTraktWatchedHistoryOnActivation(
+                wasActive = false,
+                isActive = false,
+            ),
+        )
+    }
+
+    @Test
     fun playbackCompletionWatchedMarks_doNotMirrorToTraktHistory() {
         assertFalse(
             shouldMirrorWatchedMarkToTraktHistory(
