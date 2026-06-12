@@ -57,6 +57,9 @@ data class PlayerSettingsUiState(
     val streamAutoPlayRegex: String = "",
     val streamAutoPlayTimeoutSeconds: Int = 3,
     val skipIntroEnabled: Boolean = true,
+    val autoSkipIntroEnabled: Boolean = false,
+    val autoSkipRecapEnabled: Boolean = false,
+    val autoSkipOutroEnabled: Boolean = false,
     val animeSkipEnabled: Boolean = false,
     val animeSkipClientId: String = "",
     val introDbApiKey: String = "",
@@ -116,6 +119,9 @@ object PlayerSettingsRepository {
     private var streamAutoPlayRegex = ""
     private var streamAutoPlayTimeoutSeconds = 3
     private var skipIntroEnabled = true
+    private var autoSkipIntroEnabled = false
+    private var autoSkipRecapEnabled = false
+    private var autoSkipOutroEnabled = false
     private var animeSkipEnabled = false
     private var animeSkipClientId = ""
     private var introDbApiKey = ""
@@ -180,6 +186,9 @@ object PlayerSettingsRepository {
         streamAutoPlayRegex = ""
         streamAutoPlayTimeoutSeconds = 3
         skipIntroEnabled = true
+        autoSkipIntroEnabled = false
+        autoSkipRecapEnabled = false
+        autoSkipOutroEnabled = false
         animeSkipEnabled = false
         animeSkipClientId = ""
         introDbApiKey = ""
@@ -292,6 +301,9 @@ object PlayerSettingsRepository {
             PlayerSettingsStorage.saveStreamAutoPlayTimeoutSeconds(streamAutoPlayTimeoutSeconds)
         }
         skipIntroEnabled = PlayerSettingsStorage.loadSkipIntroEnabled() ?: true
+        autoSkipIntroEnabled = PlayerSettingsStorage.loadAutoSkipIntroEnabled() ?: false
+        autoSkipRecapEnabled = PlayerSettingsStorage.loadAutoSkipRecapEnabled() ?: false
+        autoSkipOutroEnabled = PlayerSettingsStorage.loadAutoSkipOutroEnabled() ?: false
         animeSkipEnabled = PlayerSettingsStorage.loadAnimeSkipEnabled() ?: false
         animeSkipClientId = PlayerSettingsStorage.loadAnimeSkipClientId() ?: ""
         introDbApiKey = PlayerSettingsStorage.loadIntroDbApiKey() ?: ""
@@ -559,6 +571,30 @@ object PlayerSettingsRepository {
         skipIntroEnabled = enabled
         publish()
         PlayerSettingsStorage.saveSkipIntroEnabled(enabled)
+    }
+
+    fun setAutoSkipIntroEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (autoSkipIntroEnabled == enabled) return
+        autoSkipIntroEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveAutoSkipIntroEnabled(enabled)
+    }
+
+    fun setAutoSkipRecapEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (autoSkipRecapEnabled == enabled) return
+        autoSkipRecapEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveAutoSkipRecapEnabled(enabled)
+    }
+
+    fun setAutoSkipOutroEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (autoSkipOutroEnabled == enabled) return
+        autoSkipOutroEnabled = enabled
+        publish()
+        PlayerSettingsStorage.saveAutoSkipOutroEnabled(enabled)
     }
 
     fun setAnimeSkipEnabled(enabled: Boolean) {
@@ -849,6 +885,9 @@ object PlayerSettingsRepository {
             streamAutoPlayRegex = streamAutoPlayRegex,
             streamAutoPlayTimeoutSeconds = streamAutoPlayTimeoutSeconds,
             skipIntroEnabled = skipIntroEnabled,
+            autoSkipIntroEnabled = autoSkipIntroEnabled,
+            autoSkipRecapEnabled = autoSkipRecapEnabled,
+            autoSkipOutroEnabled = autoSkipOutroEnabled,
             animeSkipEnabled = animeSkipEnabled,
             animeSkipClientId = animeSkipClientId,
             introDbApiKey = introDbApiKey,
