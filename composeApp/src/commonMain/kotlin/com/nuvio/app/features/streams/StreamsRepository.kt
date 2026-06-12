@@ -456,6 +456,7 @@ object StreamsRepository {
                             payload = payload,
                             addonName = displayName,
                             addonId = addon.addonId,
+                            addonLogo = addon.manifest.logoUrl,
                         )
                     }.fold(
                         onSuccess = { streams ->

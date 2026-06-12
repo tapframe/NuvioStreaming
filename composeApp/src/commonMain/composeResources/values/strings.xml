@@ -300,6 +300,7 @@
     <string name="collections_pinned">Pinned</string>
     <string name="collections_tab_all">All</string>
     <string name="collections_your_collections">Your Collections</string>
+    <string name="compose_about_based_on_version_format">Based on Nuvio %1$s</string>
     <string name="compose_about_made_with">Made with ❤️ by Tapframe and friends</string>
     <string name="compose_about_version_format">Version %1$s (%2$s)</string>
     <string name="compose_action_off">Off</string>
@@ -535,6 +536,10 @@
     <string name="settings_appearance_app_language">App Language</string>
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
+    <string name="settings_appearance_desktop_navigation">Desktop Navigation</string>
+    <string name="settings_appearance_desktop_navigation_sheet_title">Choose Desktop Navigation</string>
+    <string name="settings_appearance_desktop_navigation_sidebar">Sidebar</string>
+    <string name="settings_appearance_desktop_navigation_top_bar">Top Bar</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
     <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later. Instant profile switching from the tab bar is unavailable while this is on.</string>
     <string name="settings_appearance_poster_customization_description">Tune card width and corner radius.</string>
@@ -681,6 +686,9 @@
     <string name="settings_stream_badges_section">Fusion Style</string>
     <string name="settings_stream_size_badges_title">Size badges</string>
     <string name="settings_stream_size_badges_description">Show file size badges in stream results and player source panels.</string>
+    <string name="settings_stream_addon_logo_title">Addon logo</string>
+    <string name="settings_stream_addon_logo_description">Show addon logo and name next to stream sources.</string>
+    <string name="settings_stream_display_section">Display</string>
     <string name="settings_stream_badge_position_title">Badge position</string>
     <string name="settings_stream_badge_position_description">Choose whether Fusion and size badges appear above or below stream cards.</string>
     <string name="settings_stream_badge_position_dialog_title">Badge position</string>

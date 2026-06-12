@@ -45,9 +45,6 @@ object P2pSettingsRepository {
         if (p2pEnabled == enabled) return
         p2pEnabled = enabled
         P2pSettingsStorage.saveP2pEnabled(enabled)
-        if (!enabled) {
-            P2pStreamingEngine.shutdown()
-        }
         publish()
     }
 
@@ -97,7 +94,6 @@ data class P2pStreamRequest(
     val infoHash: String,
     val fileIdx: Int?,
     val filename: String? = null,
-    val magnetUri: String? = null,
     val trackers: List<String> = emptyList(),
 )
 
@@ -123,8 +119,6 @@ class P2pStreamingException(message: String) : Exception(message)
 
 expect object P2pStreamingEngine {
     val state: StateFlow<P2pStreamingState>
-    fun warmup()
-    fun cooldownWarmup()
     suspend fun startStream(request: P2pStreamRequest): String
     fun stopStream()
     fun shutdown()

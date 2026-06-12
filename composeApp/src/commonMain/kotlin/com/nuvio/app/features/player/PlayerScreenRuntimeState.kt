@@ -52,7 +52,6 @@ internal class PlayerScreenRuntime(
     val torrentInfoHash: String? get() = args.torrentInfoHash
     val torrentFileIdx: Int? get() = args.torrentFileIdx
     val torrentFilename: String? get() = args.torrentFilename
-    val torrentMagnetUri: String? get() = args.torrentMagnetUri
     val torrentTrackers: List<String> get() = args.torrentTrackers
     val initialPositionMs: Long get() = args.initialPositionMs
     val initialProgressFraction: Float? get() = args.initialProgressFraction
@@ -67,8 +66,8 @@ internal class PlayerScreenRuntime(
     var metaScreenSettingsUiState: MetaScreenSettingsUiState = MetaScreenSettingsUiState()
     var watchedUiState: WatchedUiState = WatchedUiState()
     var watchProgressUiState: WatchProgressUiState = WatchProgressUiState()
-    var sourceStreamsState: StreamsUiState = StreamsUiState()
-    var episodeStreamsRepoState: StreamsUiState = StreamsUiState()
+    var sourceStreamsState by mutableStateOf(StreamsUiState())
+    var episodeStreamsRepoState by mutableStateOf(StreamsUiState())
     var metaUiState: MetaDetailsUiState = MetaDetailsUiState()
     var addonsUiState: AddonsUiState = AddonsUiState()
     var addonSubtitles: List<AddonSubtitle> = emptyList()
@@ -99,9 +98,13 @@ internal class PlayerScreenRuntime(
     var activeTorrentInfoHash by mutableStateOf(torrentInfoHash)
     var activeTorrentFileIdx by mutableStateOf(torrentFileIdx)
     var activeTorrentFilename by mutableStateOf(torrentFilename)
-    var activeTorrentMagnetUri by mutableStateOf(torrentMagnetUri)
     var activeTorrentTrackers by mutableStateOf(torrentTrackers)
     var p2pResolvedSourceUrl by mutableStateOf<String?>(null)
+    var activeSourceIdentityKey by mutableStateOf(
+        torrentInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
+            "torrent:$hash:${torrentFileIdx ?: -1}"
+        } ?: sourceUrl.trim().takeIf { it.isNotBlank() }?.let { url -> "url:$url" },
+    )
     var activeStreamTitle by mutableStateOf(streamTitle)
     var activeStreamSubtitle by mutableStateOf(streamSubtitle)
     var activeProviderName by mutableStateOf(providerName)
@@ -152,6 +155,12 @@ internal class PlayerScreenRuntime(
     var submitIntroSegmentType by mutableStateOf("intro")
     var submitIntroStartTimeStr by mutableStateOf("00:00")
     var submitIntroEndTimeStr by mutableStateOf("00:00")
+    var submitIntroStartTimeSec by mutableStateOf<Double?>(0.0)
+    var submitIntroEndTimeSec by mutableStateOf<Double?>(0.0)
+    var isSubmitIntroSubmitting by mutableStateOf(false)
+    var submitIntroStatusMessage by mutableStateOf<String?>(null)
+    var playerControlsPendingP2pSwitch by mutableStateOf<PendingPlayerP2pSwitch?>(null)
+    var playerControlsCloseModalsToken by mutableStateOf(0L)
     var episodeStreamsPanelState by mutableStateOf(EpisodeStreamsPanelState())
     var playerMetaVideos by mutableStateOf<List<MetaVideo>>(emptyList())
     var skipIntervals by mutableStateOf<List<SkipInterval>>(emptyList())

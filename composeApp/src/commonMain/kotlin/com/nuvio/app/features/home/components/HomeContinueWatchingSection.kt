@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioProgressBar
 import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.PosterLandscapeAspectRatio
@@ -53,6 +53,7 @@ import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
+import com.nuvio.app.core.ui.secondaryClick
 import com.nuvio.app.features.cloud.CloudLibraryContentType
 import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
@@ -803,7 +804,8 @@ private fun ContinueWatchingWideCard(
                 enabled = onClick != null || onLongClick != null,
                 onClick = { onClick?.invoke() },
                 onLongClick = onLongClick,
-            ),
+            )
+            .secondaryClick(onLongClick),
     ) {
         val shouldBlurArtwork = blurNextUp && useEpisodeThumbnails && item.isNextUp
         val artworkUrl = item.continueWatchingArtworkUrl(useEpisodeThumbnails)

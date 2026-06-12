@@ -18,7 +18,25 @@ data class ExternalPlayerPlaybackRequest(
     val sourceHeaders: Map<String, String> = emptyMap(),
     val resumePositionMs: Long = 0L,
     val subtitles: List<SubtitleInput>? = null,
-)
+    val season: Int? = null,
+    val episode: Int? = null,
+    val episodeTitle: String? = null,
+) {
+    /**
+     * Builds a display title for external players.
+     * For series: "Show Name - S02E05" or "Show Name - S02E05 - Episode Title"
+     * For movies: just the content name (title).
+     */
+    fun buildPlayerTitle(includeEpisodeTitle: Boolean = false): String {
+        if (season == null || episode == null) return title
+        val seasonEp = "S${season.toString().padStart(2, '0')}E${episode.toString().padStart(2, '0')}"
+        return if (includeEpisodeTitle && !episodeTitle.isNullOrBlank()) {
+            "$title - $seasonEp - $episodeTitle"
+        } else {
+            "$title - $seasonEp"
+        }
+    }
+}
 
 enum class ExternalPlayerOpenResult {
     Opened,

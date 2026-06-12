@@ -33,7 +33,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.launch
@@ -189,7 +188,7 @@ private fun PosterSheetHeader(
             contentAlignment = Alignment.Center,
         ) {
             if (item.poster != null) {
-                AsyncImage(
+                NuvioAsyncImage(
                     model = item.poster,
                     contentDescription = item.name,
                     modifier = Modifier.matchParentSize(),

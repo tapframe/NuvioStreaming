@@ -100,7 +100,7 @@ fun NuvioScreen(
     )
 }
 
-internal fun Modifier.nuvioBlockPointerPassthrough(): Modifier =
+internal fun Modifier.nuvioConsumePointerEvents(): Modifier =
     pointerInput(Unit) {
         awaitPointerEventScope {
             while (true) {
@@ -144,45 +144,53 @@ fun NuvioScreenHeader(
     val tokens = MaterialTheme.nuvio
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val resolvedTopPadding = topPadding ?: if (includeStatusBarPadding) statusBarTop else NuvioTokens.Space.none
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .nuvioBlockPointerPassthrough()
-            .background(tokens.colors.background)
-            .padding(top = resolvedTopPadding, bottom = NuvioTokens.Space.s4),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom,
+    Box(
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
+            modifier = Modifier
+                .matchParentSize()
+                .background(tokens.colors.background)
+                .nuvioConsumePointerEvents(),
+        ) {}
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = resolvedTopPadding, bottom = NuvioTokens.Space.s4),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom,
         ) {
-            if (onBack != null) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                        contentDescription = stringResource(Res.string.action_back),
-                        tint = tokens.colors.textPrimary,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = stringResource(Res.string.action_back),
+                            tint = tokens.colors.textPrimary,
+                        )
+                    }
+                }
+                AnimatedContent(
+                    targetState = title,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "screen_header_title",
+                ) { currentTitle ->
+                    Text(
+                        text = currentTitle,
+                        style = MaterialTheme.typography.displayLarge,
+                        color = tokens.colors.textPrimary,
                     )
                 }
             }
-            AnimatedContent(
-                targetState = title,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "screen_header_title",
-            ) { currentTitle ->
-                Text(
-                    text = currentTitle,
-                    style = MaterialTheme.typography.displayLarge,
-                    color = tokens.colors.textPrimary,
-                )
-            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions,
+            )
         }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s2),
-            verticalAlignment = Alignment.CenterVertically,
-            content = actions,
-        )
     }
 }
 

@@ -66,7 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.isIos
@@ -85,6 +85,7 @@ fun ProfileSwitcherTab(
     onProfileSelected: (NuvioProfile) -> Unit,
     onAddProfileRequested: () -> Unit,
     triggerContent: (@Composable (selected: Boolean) -> Unit)? = null,
+    openPopupOnClick: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -201,7 +202,13 @@ fun ProfileSwitcherTab(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = onClick,
+                onClick = {
+                    if (openPopupOnClick && profiles.isNotEmpty()) {
+                        showPopup = true
+                    } else {
+                        onClick()
+                    }
+                },
             )
             .pointerInput(profiles) {
                 detectDragGesturesAfterLongPress(
@@ -326,6 +333,358 @@ fun ProfileSwitcherTab(
                                     verifyPin = { pin ->
                                         ProfileRepository.verifyPin(profile.profileIndex, pin)
                                     },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SidebarProfileSwitcherStack(
+    onProfileSelected: (NuvioProfile) -> Unit,
+    onAddProfileRequested: () -> Unit,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
+    val activeProfile = profileState.activeProfile
+    val profiles = profileState.profiles
+    val avatars by AvatarRepository.avatars.collectAsStateWithLifecycle()
+    var pinProfile by remember { mutableStateOf<NuvioProfile?>(null) }
+
+    LaunchedEffect(Unit) {
+        AvatarRepository.fetchAvatars()
+        AvatarRepository.refreshAvatars()
+    }
+
+    fun chooseProfile(profile: NuvioProfile) {
+        if (profile.profileIndex == activeProfile?.profileIndex) {
+            onDismissRequest()
+            return
+        }
+        if (profile.pinEnabled) {
+            pinProfile = profile
+        } else {
+            onProfileSelected(profile)
+            onDismissRequest()
+        }
+    }
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        profiles.forEach { profile ->
+            SidebarProfileSwitcherRow(
+                profile = profile,
+                avatars = avatars,
+                isActive = profile.profileIndex == activeProfile?.profileIndex,
+                onClick = { chooseProfile(profile) },
+            )
+        }
+
+        if (profiles.size < 4) {
+            SidebarAddProfileRow(
+                onClick = {
+                    onDismissRequest()
+                    onAddProfileRequested()
+                },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = pinProfile != null,
+            enter = expandVertically() + fadeIn(tween(160)),
+            exit = shrinkVertically(tween(120)) + fadeOut(tween(90)),
+        ) {
+            pinProfile?.let { profile ->
+                SidebarCompactPinEntry(
+                    profileName = profile.name,
+                    onVerified = {
+                        onProfileSelected(profile)
+                        pinProfile = null
+                        onDismissRequest()
+                    },
+                    onCancel = { pinProfile = null },
+                    verifyPin = { pin ->
+                        ProfileRepository.verifyPin(profile.profileIndex, pin)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SidebarProfileSwitcherRow(
+    profile: NuvioProfile,
+    avatars: List<AvatarCatalogItem>,
+    isActive: Boolean,
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .clip(tokens.shapes.compactCard)
+            .background(
+                if (isActive) {
+                    tokens.colors.overlaySelected
+                } else {
+                    tokens.colors.surface.copy(alpha = 0f)
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(30.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            ActiveProfileMiniAvatar(
+                profile = profile,
+                avatars = avatars,
+                selected = isActive,
+                size = 26,
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = profile.name.ifBlank {
+                stringResource(Res.string.profile_label_number, profile.profileIndex)
+            },
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isActive) tokens.colors.textPrimary else tokens.colors.textMuted,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (profile.pinEnabled) {
+            Icon(
+                imageVector = Icons.Rounded.Lock,
+                contentDescription = null,
+                tint = tokens.colors.textMuted,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SidebarAddProfileRow(
+    onClick: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(40.dp)
+            .clip(tokens.shapes.compactCard)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(tokens.shapes.avatar)
+                .background(tokens.colors.surfaceCard),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = stringResource(Res.string.compose_profile_add_profile),
+                tint = tokens.colors.textMuted,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = stringResource(Res.string.compose_profile_add_profile),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelMedium,
+            color = tokens.colors.textMuted,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun SidebarCompactPinEntry(
+    profileName: String,
+    onVerified: () -> Unit,
+    onCancel: () -> Unit,
+    verifyPin: suspend (String) -> PinVerifyResult,
+) {
+    val tokens = MaterialTheme.nuvio
+    var pin by remember(profileName) { mutableStateOf("") }
+    var error by remember(profileName) { mutableStateOf<String?>(null) }
+    var isVerifying by remember(profileName) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(tokens.shapes.compactCard)
+            .background(tokens.colors.surfaceCard.copy(alpha = 0.72f))
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(Res.string.pin_enter_for, profileName),
+            style = MaterialTheme.typography.labelSmall,
+            color = tokens.colors.textMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            repeat(4) { index ->
+                val filled = index < pin.length
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(tokens.shapes.avatar)
+                        .then(
+                            if (filled) {
+                                Modifier.background(tokens.colors.accent)
+                            } else {
+                                Modifier.border(tokens.borders.thin, tokens.colors.borderDefault, tokens.shapes.avatar)
+                            },
+                        ),
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = error != null,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Text(
+                text = error.orEmpty(),
+                style = MaterialTheme.typography.labelSmall,
+                color = tokens.colors.danger,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        SidebarCompactPinKeypad(
+            onDigit = { digit ->
+                if (pin.length < 4 && !isVerifying) {
+                    error = null
+                    pin += digit
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    if (pin.length == 4) {
+                        isVerifying = true
+                        scope.launch {
+                            val result = verifyPin(pin)
+                            if (result.unlocked) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onVerified()
+                            } else {
+                                error = if (result.retryAfterSeconds > 0) {
+                                    getString(Res.string.pin_locked_try_again, result.retryAfterSeconds)
+                                } else {
+                                    getString(Res.string.pin_incorrect)
+                                }
+                                pin = ""
+                            }
+                            isVerifying = false
+                        }
+                    }
+                }
+            },
+            onBackspace = {
+                if (pin.isNotEmpty() && !isVerifying) {
+                    pin = pin.dropLast(1)
+                    error = null
+                }
+            },
+        )
+
+        Text(
+            text = stringResource(Res.string.pin_cancel),
+            style = MaterialTheme.typography.labelSmall,
+            color = tokens.colors.accent,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clip(tokens.shapes.compactCard)
+                .clickable(onClick = onCancel)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun SidebarCompactPinKeypad(
+    onDigit: (String) -> Unit,
+    onBackspace: () -> Unit,
+) {
+    val tokens = MaterialTheme.nuvio
+    val rows = listOf(
+        listOf("1", "2", "3"),
+        listOf("4", "5", "6"),
+        listOf("7", "8", "9"),
+        listOf("", "0", "⌫"),
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        rows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+            ) {
+                row.forEach { key ->
+                    when (key) {
+                        "" -> Spacer(modifier = Modifier.size(30.dp))
+                        "⌫" -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(tokens.shapes.avatar)
+                                    .background(tokens.colors.surface)
+                                    .clickable(onClick = onBackspace),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.Backspace,
+                                    contentDescription = stringResource(Res.string.pin_backspace),
+                                    tint = tokens.colors.textPrimary,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
+                        else -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(tokens.shapes.avatar)
+                                    .background(tokens.colors.surface)
+                                    .clickable { onDigit(key) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = key,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = tokens.colors.textPrimary,
+                                    fontWeight = FontWeight.Medium,
                                 )
                             }
                         }

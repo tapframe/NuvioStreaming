@@ -8,7 +8,6 @@ import com.nuvio.app.features.trakt.parseTraktIsoDateTimeToEpochMs
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
-import co.touchlab.kermit.Logger
 
 @Composable
 fun computeAirDateBadgeText(
@@ -67,46 +66,32 @@ class ReleaseAlertState(
     val isNewSeasonRelease: Boolean,
 )
 
+private const val ReleaseAlertWindowMs = 60L * 24 * 60 * 60 * 1000
+private val NoReleaseAlertState = ReleaseAlertState(false, false)
+
 fun calculateReleaseAlertState(
     seedLastUpdatedEpochMs: Long,
     seedSeasonNumber: Int?,
     nextSeasonNumber: Int?,
     releasedIso: String?,
 ): ReleaseAlertState {
+    if (releasedIso.isNullOrBlank()) return NoReleaseAlertState
+
     val releaseEpoch = parseReleaseDateToEpochMs(releasedIso)
+        ?: return NoReleaseAlertState
+
     val nowMs = WatchProgressClock.nowEpochMs()
+    if (nowMs < releaseEpoch) return NoReleaseAlertState
+    if (releaseEpoch <= seedLastUpdatedEpochMs) return NoReleaseAlertState
+    if (nowMs - releaseEpoch >= ReleaseAlertWindowMs) return NoReleaseAlertState
 
-    val log = Logger.withTag("ReleaseAlert")
-    log.d {
-        "calculateReleaseAlertState inputs: releasedIso=$releasedIso, " +
-        "releaseEpoch=$releaseEpoch, seedLastUpdatedEpochMs=$seedLastUpdatedEpochMs, " +
-        "seedSeasonNumber=$seedSeasonNumber, nextSeasonNumber=$nextSeasonNumber, nowMs=$nowMs"
-    }
-
-    if (releaseEpoch == null) {
-        log.d { "calculateReleaseAlertState failed: releaseEpoch is null" }
-        return ReleaseAlertState(false, false)
-    }
-
-    val hasAired = nowMs >= releaseEpoch
-    val sixtyDaysMs = 60L * 24 * 60 * 60 * 1000
-    val isReleaseAlert = hasAired &&
-        releaseEpoch > seedLastUpdatedEpochMs &&
-        (nowMs - releaseEpoch) < sixtyDaysMs
-
-    val isNewSeasonRelease = isReleaseAlert &&
+    val isNewSeasonRelease =
         seedSeasonNumber != null &&
         nextSeasonNumber != null &&
         nextSeasonNumber != seedSeasonNumber
 
-    log.d {
-        "calculateReleaseAlertState result: isReleaseAlert=$isReleaseAlert (hasAired=$hasAired, " +
-        "epoch>seed=${releaseEpoch > seedLastUpdatedEpochMs}, ageMs=${nowMs - releaseEpoch}), " +
-        "isNewSeasonRelease=$isNewSeasonRelease"
-    }
-
     return ReleaseAlertState(
-        isReleaseAlert = isReleaseAlert,
+        isReleaseAlert = true,
         isNewSeasonRelease = isNewSeasonRelease
     )
 }

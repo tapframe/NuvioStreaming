@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -50,7 +51,7 @@ import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioSectionLabel
 import com.nuvio.app.core.ui.nuvio
-import com.nuvio.app.core.ui.nuvioBlockPointerPassthrough
+import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_homescreen_collection_with_addon
@@ -116,31 +117,38 @@ internal fun TabletPageHeader(
     onBack: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .nuvioBlockPointerPassthrough(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
+    Box(
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        if (showBack) {
-            NuvioBackButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .size(36.dp),
-                shape = tokens.shapes.compactCard,
-                containerColor = tokens.colors.surface,
-                contentColor = tokens.colors.textPrimary,
-                buttonSize = NuvioTokens.Space.s36,
-                iconSize = tokens.icons.md,
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .nuvioConsumePointerEvents(),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
+        ) {
+            if (showBack) {
+                NuvioBackButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .size(36.dp),
+                    shape = tokens.shapes.compactCard,
+                    containerColor = tokens.colors.surface,
+                    contentColor = tokens.colors.textPrimary,
+                    buttonSize = NuvioTokens.Space.s36,
+                    iconSize = tokens.icons.md,
+                )
+            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineLarge,
+                color = tokens.colors.textPrimary,
+                fontWeight = FontWeight.SemiBold,
             )
         }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineLarge,
-            color = tokens.colors.textPrimary,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 

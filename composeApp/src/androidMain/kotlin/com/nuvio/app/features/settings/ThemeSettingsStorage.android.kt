@@ -18,11 +18,13 @@ actual object ThemeSettingsStorage {
     private const val selectedThemeKey = "selected_theme"
     private const val amoledEnabledKey = "amoled_enabled"
     private const val liquidGlassNativeTabBarEnabledKey = "liquid_glass_native_tab_bar_enabled"
+    private const val desktopNavigationLayoutKey = "desktop_navigation_layout"
     private const val selectedAppLanguageKey = "selected_app_language"
     private val profileScopedSyncKeys = listOf(
         selectedThemeKey,
         amoledEnabledKey,
         liquidGlassNativeTabBarEnabledKey,
+        desktopNavigationLayoutKey,
     )
 
     private var preferences: SharedPreferences? = null
@@ -68,6 +70,16 @@ actual object ThemeSettingsStorage {
             ?.apply()
     }
 
+    actual fun loadDesktopNavigationLayout(): String? =
+        preferences?.getString(ProfileScopedKey.of(desktopNavigationLayoutKey), null)
+
+    actual fun saveDesktopNavigationLayout(layoutName: String) {
+        preferences
+            ?.edit()
+            ?.putString(ProfileScopedKey.of(desktopNavigationLayoutKey), layoutName)
+            ?.apply()
+    }
+
     actual fun loadSelectedAppLanguage(): String? {
         val value = preferences?.getString(selectedAppLanguageKey, null)
         if (value != null) return value
@@ -93,6 +105,7 @@ actual object ThemeSettingsStorage {
         loadSelectedTheme()?.let { put(selectedThemeKey, encodeSyncString(it)) }
         loadAmoledEnabled()?.let { put(amoledEnabledKey, encodeSyncBoolean(it)) }
         loadLiquidGlassNativeTabBarEnabled()?.let { put(liquidGlassNativeTabBarEnabledKey, encodeSyncBoolean(it)) }
+        loadDesktopNavigationLayout()?.let { put(desktopNavigationLayoutKey, encodeSyncString(it)) }
     }
 
     actual fun replaceFromSyncPayload(payload: JsonObject) {
@@ -103,6 +116,7 @@ actual object ThemeSettingsStorage {
         payload.decodeSyncString(selectedThemeKey)?.let(::saveSelectedTheme)
         payload.decodeSyncBoolean(amoledEnabledKey)?.let(::saveAmoledEnabled)
         payload.decodeSyncBoolean(liquidGlassNativeTabBarEnabledKey)?.let(::saveLiquidGlassNativeTabBarEnabled)
+        payload.decodeSyncString(desktopNavigationLayoutKey)?.let(::saveDesktopNavigationLayout)
         applySelectedAppLanguage(loadSelectedAppLanguage() ?: AppLanguage.ENGLISH.code)
     }
 }

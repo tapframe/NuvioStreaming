@@ -14,6 +14,8 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktProgressRepository
 import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.trakt.isTraktCompatibleId
+import com.nuvio.app.features.trakt.resolveEffectiveContentId
 import com.nuvio.app.features.trakt.shouldUseTraktProgress as shouldUseTraktProgressSource
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.sync.ProgressDeltaEvent
@@ -806,9 +808,20 @@ object WatchProgressRepository {
             return
         }
 
+        val useTraktProgress = shouldUseTraktProgress()
+
+        // If Trakt is the active CW source and parentMetaId is not Trakt-resolvable
+        // but videoId contains a valid IMDB/TMDB, use the resolved ID to avoid
+        // duplicate CW entries (one local with garbage ID, one from Trakt with real ID).
+        val effectiveParentMetaId = if (useTraktProgress) {
+            resolveEffectiveContentId(session.parentMetaId, session.videoId)
+        } else {
+            session.parentMetaId
+        }
+
         val entry = WatchProgressEntry(
             contentType = session.contentType,
-            parentMetaId = session.parentMetaId,
+            parentMetaId = effectiveParentMetaId,
             parentMetaType = session.parentMetaType,
             videoId = session.videoId,
             title = session.title,
@@ -834,8 +847,6 @@ object WatchProgressRepository {
         if (entry.parentMetaType.equals("series", ignoreCase = true)) {
             ContinueWatchingPreferencesRepository.removeDismissedNextUpKeysForContent(entry.parentMetaId)
         }
-
-        val useTraktProgress = shouldUseTraktProgress()
 
         entriesByVideoId[session.videoId] = entry
         if (useTraktProgress) {
@@ -925,7 +936,25 @@ object WatchProgressRepository {
 
     private fun currentEntries(): List<WatchProgressEntry> {
         return if (shouldUseTraktProgress()) {
-            TraktProgressRepository.uiState.value.entries
+            // Merge Trakt remote progress with local-only entries that use
+            // non-Trakt-compatible IDs (kitsu:, mal:, anilist:, etc.).
+            // Trakt will never return these IDs, so they must come from local storage.
+            val traktItems = TraktProgressRepository.uiState.value.entries
+            val localNonTraktItems = entriesByVideoId.values.filter {
+                !isTraktCompatibleId(it.parentMetaId)
+            }
+            if (localNonTraktItems.isEmpty()) {
+                traktItems
+            } else {
+                val traktKeys = traktItems.map { it.videoId }.toSet()
+                val merged = traktItems.toMutableList()
+                localNonTraktItems.forEach { localItem ->
+                    if (localItem.videoId !in traktKeys) {
+                        merged.add(localItem)
+                    }
+                }
+                merged
+            }
         } else {
             entriesByVideoId.values.toList()
         }

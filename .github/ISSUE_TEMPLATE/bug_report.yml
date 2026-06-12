@@ -9,10 +9,11 @@ body:
       value: |
         Thanks for reporting a bug.
 
-        If we can reproduce it, we can usually fix it. This form is just to get the basics in one place.
+        If we can reproduce it, we can usually fix it. Please describe the bug in enough detail that someone else can understand what failed without watching a video or guessing from the title.
         Please replace the default title with a short summary of the actual problem.
 
-        If the app crashes, logs are required. Crash reports without logs may be labeled `needs-info`.
+        Vague reports such as "not working", "broken", or "same issue" may be labeled `needs-info` and closed if the missing details are not added.
+        If the app crashes or force closes, logs are required. Crash reports without logs will be closed.
 
   - type: markdown
     attributes:
@@ -122,10 +123,25 @@ body:
       required: true
 
   - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: |
+        Explain the problem in detail. Do not only write "not working" or "same issue".
+        Include what screen/flow you were using, what you tapped or tried to do, what changed on screen, and any visible error text.
+      placeholder: |
+        I was trying to ...
+        The app ...
+        I saw ...
+        This happens on ...
+    validations:
+      required: true
+
+  - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Exact steps. If it depends on specific content, describe it (movie/series, season/episode, source/addon name) without sharing private links.
+      description: Exact steps, one action per line. If it depends on specific content, describe it (movie/series, season/episode, source/addon name) without sharing private links.
       placeholder: |
         1. Open ...
         2. Navigate to ...
@@ -146,7 +162,7 @@ body:
     id: actual
     attributes:
       label: Actual behavior
-      placeholder: "What actually happened (include any on-screen error text/codes)."
+      placeholder: "What actually happened? Include any on-screen error text/codes and whether the app froze, crashed, ignored input, showed the wrong content, etc."
     validations:
       required: true
 
@@ -197,7 +213,7 @@ body:
     attributes:
       label: Logs (required for crash reports)
       description: |
-        Required if the app crashes or force closes.
+        Required if the app crashes or force closes. Crash reports without logs will be closed.
         For other bug reports, logs are optional but still helpful.
 
         **Android:** `adb logcat -d | tail -n 300`

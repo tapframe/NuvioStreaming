@@ -54,3 +54,49 @@ internal fun extractTraktYear(value: String?): Int? {
 
 internal fun TraktExternalIds.hasAnyId(): Boolean =
     trakt != null || !imdb.isNullOrBlank() || tmdb != null || !slug.isNullOrBlank()
+
+/**
+ * Returns true if the given contentId uses a Trakt-compatible prefix
+ * (IMDB, TMDB, or Trakt numeric). IDs from other sources (kitsu:, mal:,
+ * anilist:, anidb:, tvdb:, etc.) are NOT Trakt-resolvable and should be
+ * preserved locally rather than being discarded when absent from Trakt
+ * remote responses.
+ */
+internal fun isTraktCompatibleId(contentId: String?): Boolean {
+    if (contentId.isNullOrBlank()) return false
+    val raw = contentId.trim()
+    if (raw.startsWith("tt")) return true
+    if (raw.startsWith("tmdb:", ignoreCase = true)) return true
+    if (raw.startsWith("trakt:", ignoreCase = true)) return true
+    // Pure numeric IDs are treated as Trakt IDs
+    val beforeColon = raw.substringBefore(':')
+    if (beforeColon.toIntOrNull() != null) return true
+    return false
+}
+
+/**
+ * If [contentId] is not Trakt-resolvable but [videoId] contains a valid
+ * IMDB or TMDB prefix, extract and return the resolved ID from videoId.
+ * This handles addons that wrap real IDs in non-standard content IDs
+ * (e.g. contentId = "tun_tt7821582", videoId = "tt7821582:3:7").
+ *
+ * Returns the original [contentId] if it's already valid or if no
+ * better ID can be extracted from [videoId].
+ */
+internal fun resolveEffectiveContentId(contentId: String, videoId: String?): String {
+    val parsedContent = parseTraktContentIds(contentId)
+    if (parsedContent.hasAnyId()) return contentId
+
+    if (videoId.isNullOrBlank() || videoId == contentId) return contentId
+
+    val parsedVideo = parseTraktContentIds(videoId)
+    if (!parsedVideo.hasAnyId()) return contentId
+
+    // Rebuild a canonical content ID from the resolved video IDs
+    return when {
+        !parsedVideo.imdb.isNullOrBlank() -> parsedVideo.imdb
+        parsedVideo.tmdb != null -> "tmdb:${parsedVideo.tmdb}"
+        parsedVideo.trakt != null -> parsedVideo.trakt.toString()
+        else -> contentId
+    }
+}

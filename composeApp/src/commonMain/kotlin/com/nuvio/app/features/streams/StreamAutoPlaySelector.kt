@@ -198,7 +198,12 @@ object StreamAutoPlaySelector {
         activeResolverProviderId: String?,
     ): Boolean =
         playableDirectUrl != null ||
-            (AppFeaturePolicy.p2pEnabled && needsLocalDebridResolve && p2pInfoHash != null) ||
+            (
+                AppFeaturePolicy.p2pEnabled &&
+                    needsLocalDebridResolve &&
+                    p2pInfoHash != null &&
+                    !isPendingDebridAutoPlay(debridEnabled, activeResolverProviderId)
+            ) ||
             (debridEnabled && isAddonDebridCandidate && isReadyDebridAutoPlay(activeResolverProviderId))
 
     private fun StreamItem.isReadyDebridAutoPlay(activeResolverProviderId: String?): Boolean =

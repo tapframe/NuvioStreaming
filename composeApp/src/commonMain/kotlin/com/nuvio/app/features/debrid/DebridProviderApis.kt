@@ -3,6 +3,7 @@ package com.nuvio.app.features.debrid
 import com.nuvio.app.features.streams.StreamClientResolve
 import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.Serializable
 
 internal interface DebridProviderApi {
     val provider: DebridProvider
@@ -35,6 +36,7 @@ internal object DebridProviderApis {
     }
 }
 
+@Serializable
 internal data class DebridDeviceAuthorization(
     val providerId: String,
     val deviceCode: String,

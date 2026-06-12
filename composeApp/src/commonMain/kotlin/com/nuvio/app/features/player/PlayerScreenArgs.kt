@@ -31,7 +31,6 @@ internal data class PlayerScreenArgs(
     val torrentInfoHash: String?,
     val torrentFileIdx: Int?,
     val torrentFilename: String?,
-    val torrentMagnetUri: String?,
     val torrentTrackers: List<String>,
     val initialPositionMs: Long,
     val initialProgressFraction: Float?,

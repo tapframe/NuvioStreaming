@@ -79,6 +79,8 @@ internal data class SettingsSearchEntry(
 @Composable
 internal fun settingsSearchEntries(
     pluginsEnabled: Boolean,
+    downloadsEnabled: Boolean,
+    notificationsEnabled: Boolean,
     liquidGlassNativeTabBarSupported: Boolean,
     switchProfileAvailable: Boolean,
     checkForUpdatesAvailable: Boolean,
@@ -225,14 +227,16 @@ internal fun settingsSearchEntries(
         description = stringResource(Res.string.compose_settings_root_content_discovery_description),
         icon = Icons.Rounded.Extension,
     )
-    add(
-        key = "downloads",
-        title = downloadsPage,
-        description = stringResource(Res.string.compose_settings_root_downloads_description),
-        category = generalCategory,
-        icon = Icons.Rounded.CloudDownload,
-        target = SettingsSearchTarget.Downloads,
-    )
+    if (downloadsEnabled) {
+        add(
+            key = "downloads",
+            title = downloadsPage,
+            description = stringResource(Res.string.compose_settings_root_downloads_description),
+            category = generalCategory,
+            icon = Icons.Rounded.CloudDownload,
+            target = SettingsSearchTarget.Downloads,
+        )
+    }
     addPage(
         page = SettingsPage.Playback,
         key = "playback",
@@ -254,13 +258,15 @@ internal fun settingsSearchEntries(
         description = stringResource(Res.string.compose_settings_root_integrations_description),
         icon = Icons.Rounded.Link,
     )
-    addPage(
-        page = SettingsPage.Notifications,
-        key = "notifications",
-        title = notificationsPage,
-        description = stringResource(Res.string.compose_settings_root_notifications_description),
-        icon = Icons.Rounded.Notifications,
-    )
+    if (notificationsEnabled) {
+        addPage(
+            page = SettingsPage.Notifications,
+            key = "notifications",
+            title = notificationsPage,
+            description = stringResource(Res.string.compose_settings_root_notifications_description),
+            icon = Icons.Rounded.Notifications,
+        )
+    }
     addPage(
         page = SettingsPage.SupportersContributors,
         key = "supporters",
@@ -463,6 +469,15 @@ internal fun settingsSearchEntries(
     val playbackSubtitleRendering = stringResource(Res.string.settings_playback_section_subtitle_rendering)
     val playbackSkipSegments = stringResource(Res.string.settings_playback_section_skip_segments)
     val playbackNextEpisode = stringResource(Res.string.settings_playback_section_next_episode)
+    addRow(
+        page = SettingsPage.Streams,
+        key = "stream-addon-logo",
+        title = stringResource(Res.string.settings_stream_addon_logo_title),
+        description = stringResource(Res.string.settings_stream_addon_logo_description),
+        pageLabel = streamsPage,
+        section = stringResource(Res.string.settings_stream_display_section),
+        icon = Icons.Rounded.Style,
+    )
     addRow(
         page = SettingsPage.Streams,
         key = "stream-size-badges",
@@ -785,24 +800,26 @@ internal fun settingsSearchEntries(
         )
     }
 
-    val notificationsAlerts = stringResource(Res.string.settings_notifications_section_alerts)
-    addRow(
-        page = SettingsPage.Notifications,
-        key = "episode-release-alerts",
-        title = stringResource(Res.string.settings_notifications_episode_release_alerts),
-        description = stringResource(Res.string.settings_notifications_episode_release_alerts_description),
-        pageLabel = notificationsPage,
-        section = notificationsAlerts,
-        icon = Icons.Rounded.Notifications,
-    )
-    addRow(
-        page = SettingsPage.Notifications,
-        key = "notification-test",
-        title = stringResource(Res.string.settings_notifications_test_title),
-        pageLabel = notificationsPage,
-        section = stringResource(Res.string.settings_notifications_section_test),
-        icon = Icons.Rounded.Notifications,
-    )
+    if (notificationsEnabled) {
+        val notificationsAlerts = stringResource(Res.string.settings_notifications_section_alerts)
+        addRow(
+            page = SettingsPage.Notifications,
+            key = "episode-release-alerts",
+            title = stringResource(Res.string.settings_notifications_episode_release_alerts),
+            description = stringResource(Res.string.settings_notifications_episode_release_alerts_description),
+            pageLabel = notificationsPage,
+            section = notificationsAlerts,
+            icon = Icons.Rounded.Notifications,
+        )
+        addRow(
+            page = SettingsPage.Notifications,
+            key = "notification-test",
+            title = stringResource(Res.string.settings_notifications_test_title),
+            pageLabel = notificationsPage,
+            section = stringResource(Res.string.settings_notifications_section_test),
+            icon = Icons.Rounded.Notifications,
+        )
+    }
 
     addRow(
         page = SettingsPage.TraktAuthentication,

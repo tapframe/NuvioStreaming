@@ -2,8 +2,8 @@ package com.nuvio.app.features.player
 
 /**
  * Orchestrates the full external player launch flow:
- * fetches subtitles if forwarding is enabled, then returns an enriched request
- * for the caller to dispatch.
+ * fetches subtitles if forwarding is enabled, downloads them to local cache,
+ * then returns an enriched request for the caller to dispatch.
  */
 suspend fun prepareExternalPlayerLaunch(
     request: ExternalPlayerPlaybackRequest,
@@ -25,6 +25,12 @@ suspend fun prepareExternalPlayerLaunch(
         )
 
         if (subtitles != null) {
+            onOverlayMessage("Downloading subtitles...")
+            val cachedSubtitles = SubtitleCacheProvider.cacheForExternalPlayer(subtitles)
+            if (cachedSubtitles != null) {
+                return request.copy(subtitles = cachedSubtitles)
+            }
+            // Fallback: use original URLs if caching fails
             return request.copy(subtitles = subtitles)
         }
     }

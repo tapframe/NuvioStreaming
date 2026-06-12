@@ -76,7 +76,7 @@ internal actual object ExternalPlayerPlatform {
         }
 
         // Title extras
-        val displayTitle = request.streamTitle ?: request.title
+        val displayTitle = request.buildPlayerTitle(includeEpisodeTitle = true)
         putExtra(Intent.EXTRA_TITLE, displayTitle)
         putExtra("title", displayTitle)
         putExtra("forcename", displayTitle) // Vimu Player
@@ -85,6 +85,7 @@ internal actual object ExternalPlayerPlatform {
         if (request.resumePositionMs > 0L) {
             putExtra("position", request.resumePositionMs.toInt())   // MX Player / Just Player / mpv
             putExtra("startfrom", request.resumePositionMs.toInt()) // Vimu Player
+            putExtra("forceresume", true)                           // Vimu: enable resume for network streams
             putExtra("from_start", false)                           // VLC: don't force start from beginning
         }
 
@@ -107,18 +108,33 @@ internal actual object ExternalPlayerPlatform {
             val subtitleNames = subtitles.map { it.name }.toTypedArray()
             val subtitleFilenames = subtitles.map { "${it.lang}_${it.name}.srt" }.toTypedArray()
 
+            // Grant read permission for content:// URIs via ClipData.
+            // FLAG_GRANT_READ_URI_PERMISSION only covers intent.data, not extras.
+            // Adding all subtitle URIs to ClipData ensures the receiving player
+            // gets read access to all of them.
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val clipData = android.content.ClipData(
+                "subtitles",
+                arrayOf("application/x-subrip", "text/vtt"),
+                android.content.ClipData.Item(subtitleUris.first())
+            )
+            subtitleUris.drop(1).forEach { subtitleUri ->
+                clipData.addItem(android.content.ClipData.Item(subtitleUri))
+            }
+            setClipData(clipData)
+
             // MX Player / mpv-android / Nova
             putExtra("subs", subtitleUris)
             putExtra("subs.name", subtitleNames)
             putExtra("subs.filename", subtitleFilenames)
-            putExtra("subs.enable", arrayOf(Uri.parse(subtitles.first().url)))
+            putExtra("subs.enable", arrayOf(subtitleUris.first()))
 
             // Just Player
             putExtra("subtitle_uri", subtitleUris)
             putExtra("subtitle_name", subtitleNames)
 
             // VLC (single subtitle — use first one)
-            putExtra("subtitles_location", Uri.parse(subtitles.first().url))
+            putExtra("subtitles_location", subtitleUris.first())
 
             // Vimu Player
             putExtra("forcedsrt", subtitles.first().url)

@@ -20,7 +20,11 @@ private val iosExternalPlayerSpecs = listOf(
                 append("infuse://x-callback-url/play?url=")
                 append(request.sourceUrl.urlQueryEncode())
                 append("&filename=")
-                append((request.streamTitle ?: request.title).urlQueryEncode())
+                append(request.buildPlayerTitle(includeEpisodeTitle = true).urlQueryEncode())
+                request.subtitles?.forEach { subtitle ->
+                    append("&sub=")
+                    append(subtitle.url.urlQueryEncode())
+                }
             }
         },
     ),
@@ -29,7 +33,14 @@ private val iosExternalPlayerSpecs = listOf(
         name = "VLC",
         scheme = "vlc-x-callback",
         buildUrl = { request ->
-            "vlc-x-callback://x-callback-url/stream?url=${request.sourceUrl.urlQueryEncode()}"
+            buildString {
+                append("vlc-x-callback://x-callback-url/stream?url=")
+                append(request.sourceUrl.urlQueryEncode())
+                request.subtitles?.firstOrNull()?.let { subtitle ->
+                    append("&sub=")
+                    append(subtitle.url.urlQueryEncode())
+                }
+            }
         },
     ),
     IosExternalPlayerSpec(
@@ -41,7 +52,7 @@ private val iosExternalPlayerSpecs = listOf(
                 append("outplayer://x-callback-url/play?url=")
                 append(request.sourceUrl.urlQueryEncode())
                 append("&filename=")
-                append((request.streamTitle ?: request.title).urlQueryEncode())
+                append(request.buildPlayerTitle(includeEpisodeTitle = true).urlQueryEncode())
             }
         },
     ),

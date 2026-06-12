@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,7 +48,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import com.nuvio.app.isDesktop
+import com.nuvio.app.core.ui.NuvioDesktopImageScaling
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.CoroutineScope
@@ -86,6 +89,7 @@ fun HomeHeroSection(
     modifier: Modifier = Modifier,
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
+    sectionPadding: Dp? = null,
     listState: LazyListState? = null,
     onItemClick: ((MetaPreview) -> Unit)? = null,
 ) {
@@ -108,6 +112,7 @@ fun HomeHeroSection(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+            preferDesktopLayout = isDesktop,
         )
         val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
@@ -163,136 +168,32 @@ fun HomeHeroSection(
                 Box(modifier = Modifier.fillMaxSize())
             }
 
-            Box(
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                visiblePages.forEach { layer ->
-                    AsyncImage(
-                        model = items[layer.page].banner ?: items[layer.page].poster,
-                        contentDescription = items[layer.page].name,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                alpha = layer.visibility
-                                translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                                translationY = heroScrollTranslationY
-                                scaleX = HERO_BACKGROUND_SCALE * heroScrollScale
-                                scaleY = HERO_BACKGROUND_SCALE * heroScrollScale
-                            },
-                        alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.02f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.78f),
-                                ),
-                            ),
-                        ),
+            if (isDesktop) {
+                DesktopHomeHeroFrame(
+                    items = items,
+                    visiblePages = visiblePages,
+                    layout = layout,
+                    heroWidthPx = heroWidthPx,
+                    heroScrollScale = heroScrollScale,
+                    heroScrollTranslationY = heroScrollTranslationY,
+                    contentHorizontalPadding = sectionPadding ?: layout.contentHorizontalPadding,
+                    pagerState = pagerState,
+                    coroutineScope = coroutineScope,
+                    onItemClick = onItemClick,
                 )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(layout.bottomFadeHeight)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0f),
-                                    MaterialTheme.colorScheme.background,
-                                ),
-                            ),
-                        ),
+            } else {
+                DefaultHomeHeroFrame(
+                    items = items,
+                    visiblePages = visiblePages,
+                    currentItem = currentItem,
+                    layout = layout,
+                    heroWidthPx = heroWidthPx,
+                    heroScrollScale = heroScrollScale,
+                    heroScrollTranslationY = heroScrollTranslationY,
+                    pagerState = pagerState,
+                    coroutineScope = coroutineScope,
+                    onItemClick = onItemClick,
                 )
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = layout.contentHorizontalPadding,
-                            vertical = layout.contentVerticalPadding,
-                        ),
-                    horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(layout.contentWidthFraction)
-                            .widthIn(max = layout.contentMaxWidth),
-                        contentAlignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
-                    ) {
-                        visiblePages.forEach { layer ->
-                            Box(
-                                modifier = Modifier.graphicsLayer {
-                                    alpha = layer.visibility
-                                    translationX = -layer.offset * heroWidthPx * HERO_CONTENT_PARALLAX
-                                },
-                            ) {
-                                HeroContentBlock(
-                                    item = items[layer.page],
-                                    layout = layout,
-                                    onItemClick = onItemClick,
-                                )
-                            }
-                        }
-                    }
-
-                    if (!layout.isTablet) {
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Surface(
-                            modifier = Modifier
-                                .clickable(enabled = onItemClick != null) {
-                                    onItemClick?.invoke(currentItem)
-                                },
-                            color = MaterialTheme.colorScheme.onBackground,
-                            contentColor = MaterialTheme.colorScheme.background,
-                            shape = RoundedCornerShape(40.dp),
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.home_view_details),
-                                modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
-
-                    if (items.size > 1) {
-                        Spacer(modifier = Modifier.height(if (layout.isTablet) 14.dp else 12.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            items.forEachIndexed { index, _ ->
-                                val activeFraction = heroPageVisibility(pagerState, index)
-                                Box(
-                                    modifier = Modifier
-                                        .clickable {
-                                            coroutineScope.launch {
-                                                pagerState.animateScrollToPage(index)
-                                            }
-                                        }
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.onBackground)
-                                        .graphicsLayer {
-                                            alpha = 0.35f + (0.57f * activeFraction)
-                                        }
-                                        .width(8.dp + (24.dp * activeFraction))
-                                        .height(8.dp),
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -303,6 +204,284 @@ private data class HeroPageLayer(
     val visibility: Float,
     val offset: Float,
 )
+
+@Composable
+private fun DefaultHomeHeroFrame(
+    items: List<MetaPreview>,
+    visiblePages: List<HeroPageLayer>,
+    currentItem: MetaPreview,
+    layout: HomeHeroLayout,
+    heroWidthPx: Float,
+    heroScrollScale: Float,
+    heroScrollTranslationY: Float,
+    pagerState: PagerState,
+    coroutineScope: CoroutineScope,
+    onItemClick: ((MetaPreview) -> Unit)?,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        visiblePages.forEach { layer ->
+            AsyncImage(
+                model = items[layer.page].banner ?: items[layer.page].poster,
+                contentDescription = items[layer.page].name,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = layer.visibility
+                        translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                        translationY = heroScrollTranslationY
+                        scaleX = HERO_BACKGROUND_SCALE * heroScrollScale
+                        scaleY = HERO_BACKGROUND_SCALE * heroScrollScale
+                    },
+                alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
+                contentScale = ContentScale.Crop,
+                desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.02f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.78f),
+                        ),
+                    ),
+                ),
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(layout.bottomFadeHeight)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.background.copy(alpha = 0f),
+                            MaterialTheme.colorScheme.background,
+                        ),
+                    ),
+                ),
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(
+                    horizontal = layout.contentHorizontalPadding,
+                    vertical = layout.contentVerticalPadding,
+                ),
+            horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(layout.contentWidthFraction)
+                    .widthIn(max = layout.contentMaxWidth),
+                contentAlignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
+            ) {
+                visiblePages.forEach { layer ->
+                    Box(
+                        modifier = Modifier.graphicsLayer {
+                            alpha = layer.visibility
+                            translationX = -layer.offset * heroWidthPx * HERO_CONTENT_PARALLAX
+                        },
+                    ) {
+                        HeroContentBlock(
+                            item = items[layer.page],
+                            layout = layout,
+                            onItemClick = onItemClick,
+                        )
+                    }
+                }
+            }
+
+            if (!layout.isTablet) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Surface(
+                    modifier = Modifier
+                        .clickable(enabled = onItemClick != null) {
+                            onItemClick?.invoke(currentItem)
+                        },
+                    color = MaterialTheme.colorScheme.onBackground,
+                    contentColor = MaterialTheme.colorScheme.background,
+                    shape = RoundedCornerShape(40.dp),
+                ) {
+                    Text(
+                        text = stringResource(Res.string.home_view_details),
+                        modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
+            HeroPageIndicatorRow(
+                itemCount = items.size,
+                pagerState = pagerState,
+                coroutineScope = coroutineScope,
+                modifier = Modifier.padding(top = if (layout.isTablet) 14.dp else 12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DesktopHomeHeroFrame(
+    items: List<MetaPreview>,
+    visiblePages: List<HeroPageLayer>,
+    layout: HomeHeroLayout,
+    heroWidthPx: Float,
+    heroScrollScale: Float,
+    heroScrollTranslationY: Float,
+    contentHorizontalPadding: Dp,
+    pagerState: PagerState,
+    coroutineScope: CoroutineScope,
+    onItemClick: ((MetaPreview) -> Unit)?,
+) {
+    val backgroundColor = MaterialTheme.colorScheme.background
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor),
+    ) {
+        visiblePages.forEach { layer ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .fillMaxWidth(0.64f)
+                    .graphicsLayer {
+                        alpha = layer.visibility
+                        translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                        translationY = heroScrollTranslationY
+                        scaleX = 1.02f * heroScrollScale
+                        scaleY = 1.02f * heroScrollScale
+                    },
+            ) {
+                AsyncImage(
+                    model = items[layer.page].banner ?: items[layer.page].poster,
+                    contentDescription = items[layer.page].name,
+                    modifier = Modifier.fillMaxSize(),
+                    alignment = Alignment.Center,
+                    contentScale = ContentScale.Crop,
+                    desktopImageScaling = NuvioDesktopImageScaling.Disabled,
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colorStops = arrayOf(
+                            0f to backgroundColor,
+                            0.34f to backgroundColor,
+                            0.58f to backgroundColor.copy(alpha = 0.78f),
+                            0.78f to backgroundColor.copy(alpha = 0.18f),
+                            1f to backgroundColor.copy(alpha = 0f),
+                        ),
+                    ),
+                ),
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(layout.bottomFadeHeight)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            backgroundColor.copy(alpha = 0f),
+                            backgroundColor,
+                        ),
+                    ),
+                ),
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = contentHorizontalPadding, end = contentHorizontalPadding)
+                .fillMaxWidth(layout.contentWidthFraction)
+                .widthIn(max = layout.contentMaxWidth),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            visiblePages.forEach { layer ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            alpha = layer.visibility
+                            translationX = -layer.offset * heroWidthPx * HERO_CONTENT_PARALLAX
+                        },
+                ) {
+                    DesktopHeroContentBlock(
+                        item = items[layer.page],
+                        layout = layout,
+                        onItemClick = onItemClick,
+                    )
+                }
+            }
+        }
+
+        HeroPageIndicatorRow(
+            itemCount = items.size,
+            pagerState = pagerState,
+            coroutineScope = coroutineScope,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(
+                    start = contentHorizontalPadding,
+                    bottom = layout.contentVerticalPadding,
+                ),
+        )
+    }
+}
+
+@Composable
+private fun HeroPageIndicatorRow(
+    itemCount: Int,
+    pagerState: PagerState,
+    coroutineScope: CoroutineScope,
+    modifier: Modifier = Modifier,
+) {
+    if (itemCount <= 1) return
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(itemCount) { index ->
+            val activeFraction = heroPageVisibility(pagerState, index)
+            Box(
+                modifier = Modifier
+                    .clickable {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    }
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.onBackground)
+                    .graphicsLayer {
+                        alpha = 0.35f + (0.57f * activeFraction)
+                    }
+                    .width(8.dp + (24.dp * activeFraction))
+                    .height(8.dp),
+            )
+        }
+    }
+}
 
 private fun heroPageOffset(
     pagerState: PagerState,
@@ -331,6 +510,7 @@ fun HomeHeroReservedSpace(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
+            preferDesktopLayout = isDesktop,
         )
 
         Spacer(
@@ -409,6 +589,97 @@ private fun HeroContentBlock(
 }
 
 @Composable
+private fun DesktopHeroContentBlock(
+    item: MetaPreview,
+    layout: HomeHeroLayout,
+    onItemClick: ((MetaPreview) -> Unit)?,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = onItemClick != null) {
+                onItemClick?.invoke(item)
+            },
+        horizontalAlignment = Alignment.Start,
+    ) {
+        if (item.logo != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(desktopHeroLogoSlotHeight(layout)),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                AsyncImage(
+                    model = item.logo,
+                    contentDescription = item.name,
+                    modifier = Modifier
+                        .fillMaxWidth(desktopHeroLogoWidthFraction(layout))
+                        .fillMaxHeight(),
+                    alignment = Alignment.CenterStart,
+                    contentScale = ContentScale.Fit,
+                    clipToBounds = false,
+                )
+            }
+        } else {
+            Text(
+                text = item.name,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.displayMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Black,
+                textAlign = TextAlign.Start,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        val genreText = desktopHeroGenreText(item)
+        if (genreText.isNotBlank()) {
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = genreText,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.76f),
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        item.description?.takeIf { it.isNotBlank() }?.let { description ->
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.82f),
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun desktopHeroLogoWidthFraction(layout: HomeHeroLayout): Float =
+    when {
+        layout.contentMaxWidth >= 640.dp -> 0.74f
+        layout.contentMaxWidth >= 520.dp -> 0.74f
+        else -> 0.8f
+    }
+
+private fun desktopHeroLogoSlotHeight(layout: HomeHeroLayout): Dp =
+    when {
+        layout.contentMaxWidth >= 640.dp -> 156.dp
+        layout.contentMaxWidth >= 520.dp -> 136.dp
+        else -> 104.dp
+    }
+
+private fun desktopHeroGenreText(item: MetaPreview): String =
+    item.genres
+        .take(3)
+        .joinToString(" • ")
+        .ifBlank { item.type.replaceFirstChar(Char::uppercase) }
+
+@Composable
 private fun HeroMetaText(text: String) {
     Text(
         text = text,
@@ -424,6 +695,7 @@ internal fun homeHeroLayout(
     maxWidthDp: Float,
     viewportHeightDp: Float? = null,
     mobileBelowSectionHeightHintDp: Float? = null,
+    preferDesktopLayout: Boolean = false,
 ): HomeHeroLayout =
     when {
         maxWidthDp >= 1200f -> HomeHeroLayout(
@@ -455,6 +727,16 @@ internal fun homeHeroLayout(
             contentVerticalPadding = 18.dp,
             bottomFadeHeight = 170.dp,
             logoWidthFraction = 0.54f,
+        )
+        preferDesktopLayout -> HomeHeroLayout(
+            isTablet = true,
+            heroHeight = (maxWidthDp * 0.68f).dp.coerceIn(300.dp, 360.dp),
+            contentMaxWidth = 360.dp,
+            contentWidthFraction = 0.56f,
+            contentHorizontalPadding = 16.dp,
+            contentVerticalPadding = 18.dp,
+            bottomFadeHeight = 150.dp,
+            logoWidthFraction = 0.64f,
         )
         else -> HomeHeroLayout(
             isTablet = false,

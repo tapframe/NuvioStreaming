@@ -538,10 +538,7 @@ object TraktLibraryRepository {
         }
         return (movieItems + showItems)
             .mapNotNull(::mapToLibraryItem)
-            .sortedWith(
-                compareBy<LibraryItem> { it.traktRank ?: Int.MAX_VALUE }
-                    .thenByDescending { it.savedAtEpochMs },
-            )
+            .sortedByDescending { it.savedAtEpochMs }
     }
 
     private suspend fun fetchPersonalListItems(

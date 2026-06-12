@@ -59,6 +59,7 @@ import com.nuvio.app.features.debrid.DebridProviderAuthMethod
 import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.debrid.DebridSettings
 import com.nuvio.app.features.debrid.DebridSettingsRepository
+import com.nuvio.app.features.debrid.DebridSettingsStorage
 import com.nuvio.app.features.debrid.DebridStreamFormatterDefaults
 import com.nuvio.app.features.debrid.DebridStreamAudioChannel
 import com.nuvio.app.features.debrid.DebridStreamAudioTag
@@ -74,6 +75,9 @@ import com.nuvio.app.features.debrid.DebridStreamVisualTag
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.action_clear
@@ -1467,12 +1471,21 @@ private fun DebridDeviceAuthDialog(
         isStarting = true
         isPolling = false
         statusMessage = null
+        if (restartNonce == 0) {
+            loadPendingDeviceAuthorization(provider.id)?.let { pendingSession ->
+                session = pendingSession
+                isStarting = false
+                statusMessage = waitingMessage
+                return@LaunchedEffect
+            }
+        }
         val startResult = runCatching {
             DebridProviderApis.apiFor(provider.id)?.startDeviceAuthorization("Nuvio")
         }.onFailure { error ->
             if (error is CancellationException) throw error
         }
         session = startResult.getOrNull()
+        session?.let(::savePendingDeviceAuthorization)
         isStarting = false
         statusMessage = if (session == null) {
             startResult.exceptionOrNull()?.message?.takeIf { it.contains("PREMIUMIZE_CLIENT_ID") }
@@ -1504,6 +1517,7 @@ private fun DebridDeviceAuthDialog(
             isPolling = false
             when (result) {
                 is DebridDeviceAuthorizationTokenResult.Authorized -> {
+                    clearPendingDeviceAuthorization(provider.id)
                     onConnected(result.accessToken)
                     onDismiss()
                     return@LaunchedEffect
@@ -1514,16 +1528,19 @@ private fun DebridDeviceAuthDialog(
                 }
 
                 DebridDeviceAuthorizationTokenResult.Expired -> {
+                    clearPendingDeviceAuthorization(provider.id)
                     statusMessage = expiredMessage
                     return@LaunchedEffect
                 }
 
                 is DebridDeviceAuthorizationTokenResult.Failed -> {
+                    clearPendingDeviceAuthorization(provider.id)
                     statusMessage = result.message.toDeviceAuthStatusMessage(failedMessage)
                     return@LaunchedEffect
                 }
 
                 DebridDeviceAuthorizationTokenResult.Unsupported -> {
+                    clearPendingDeviceAuthorization(provider.id)
                     statusMessage = failedMessage
                     return@LaunchedEffect
                 }
@@ -1621,6 +1638,7 @@ private fun DebridDeviceAuthDialog(
                 if (isConnected) {
                     Button(
                         onClick = {
+                            clearPendingDeviceAuthorization(provider.id)
                             onDisconnect()
                             onDismiss()
                         },
@@ -1629,7 +1647,12 @@ private fun DebridDeviceAuthDialog(
                     }
                 }
                 if (!isConnected && !isStarting && session == null) {
-                    TextButton(onClick = { restartNonce += 1 }) {
+                    TextButton(
+                        onClick = {
+                            clearPendingDeviceAuthorization(provider.id)
+                            restartNonce += 1
+                        },
+                    ) {
                         Text(stringResource(Res.string.action_retry))
                     }
                 }
@@ -1647,6 +1670,34 @@ private fun DebridDeviceAuthDialog(
             }
         }
     }
+}
+
+private val debridDeviceAuthorizationJson = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+}
+
+private fun loadPendingDeviceAuthorization(providerId: String): DebridDeviceAuthorization? =
+    DebridSettingsStorage.loadPendingDeviceAuthorization(providerId)
+        .orEmpty()
+        .trim()
+        .takeIf { it.isNotBlank() }
+        ?.let { payload ->
+            runCatching {
+                debridDeviceAuthorizationJson.decodeFromString<DebridDeviceAuthorization>(payload)
+            }.getOrNull()
+        }
+        ?.takeIf { it.providerId == providerId }
+
+private fun savePendingDeviceAuthorization(session: DebridDeviceAuthorization) {
+    DebridSettingsStorage.savePendingDeviceAuthorization(
+        providerId = session.providerId,
+        payload = debridDeviceAuthorizationJson.encodeToString(session),
+    )
+}
+
+private fun clearPendingDeviceAuthorization(providerId: String) {
+    DebridSettingsStorage.clearPendingDeviceAuthorization(providerId)
 }
 
 private fun Throwable.isCancelledHttpRequest(): Boolean {

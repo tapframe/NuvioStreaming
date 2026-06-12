@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.isDesktop
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
@@ -104,19 +105,21 @@ fun HomeScreen(
     onFirstCatalogRendered: (() -> Unit)? = null,
 ) {
     LaunchedEffect(Unit) {
-        AddonRepository.initialize()
-        CollectionRepository.initialize()
-        ContinueWatchingPreferencesRepository.ensureLoaded()
-        WatchedRepository.ensureLoaded()
-        WatchProgressRepository.ensureLoaded()
+        withContext(Dispatchers.Default) {
+            AddonRepository.initialize()
+            CollectionRepository.initialize()
+            ContinueWatchingPreferencesRepository.ensureLoaded()
+            HomeCatalogSettingsRepository.snapshot()
+            TraktSettingsRepository.ensureLoaded()
+            TraktAuthRepository.ensureLoaded()
+            WatchedRepository.ensureLoaded()
+            WatchProgressRepository.ensureLoaded()
+        }
     }
 
     val addonsUiState by AddonRepository.uiState.collectAsStateWithLifecycle()
     val homeUiState by HomeRepository.uiState.collectAsStateWithLifecycle()
-    val homeSettingsUiState by remember {
-        HomeCatalogSettingsRepository.snapshot()
-        HomeCatalogSettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
+    val homeSettingsUiState by HomeCatalogSettingsRepository.uiState.collectAsStateWithLifecycle()
     val homeListState = rememberLazyListState()
     val collections by CollectionRepository.collections.collectAsStateWithLifecycle()
     val continueWatchingPreferences by ContinueWatchingPreferencesRepository.uiState.collectAsStateWithLifecycle()
@@ -124,14 +127,8 @@ fun HomeScreen(
     val watchProgressUiState by WatchProgressRepository.uiState.collectAsStateWithLifecycle()
     val cloudLibraryUiState by CloudLibraryRepository.uiState.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
-    val traktSettingsUiState by remember {
-        TraktSettingsRepository.ensureLoaded()
-        TraktSettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
-    val isTraktAuthenticated by remember {
-        TraktAuthRepository.ensureLoaded()
-        TraktAuthRepository.isAuthenticated
-    }.collectAsStateWithLifecycle()
+    val traktSettingsUiState by TraktSettingsRepository.uiState.collectAsStateWithLifecycle()
+    val isTraktAuthenticated by TraktAuthRepository.isAuthenticated.collectAsStateWithLifecycle()
     var observedOfflineState by remember { mutableStateOf(false) }
 
     LaunchedEffect(scrollToTopRequests) {
@@ -650,6 +647,7 @@ fun HomeScreen(
                             modifier = Modifier,
                             viewportHeight = maxHeight,
                             mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                            sectionPadding = if (isDesktop) homeSectionPadding else null,
                         )
 
                         homeUiState.heroItems.isNotEmpty() -> HomeHeroSection(
@@ -657,6 +655,7 @@ fun HomeScreen(
                             modifier = Modifier,
                             viewportHeight = maxHeight,
                             mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                            sectionPadding = if (isDesktop) homeSectionPadding else null,
                             listState = homeListState,
                             onItemClick = onPosterClick,
                         )

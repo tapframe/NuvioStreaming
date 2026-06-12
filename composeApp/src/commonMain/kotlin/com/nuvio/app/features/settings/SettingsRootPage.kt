@@ -21,8 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.nuvio.app.core.build.AppVersionConfig
+import com.nuvio.app.core.build.AppVersionPolicy
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.compose_about_based_on_version_format
 import nuvio.composeapp.generated.resources.compose_about_made_with
 import nuvio.composeapp.generated.resources.compose_about_version_format
 import nuvio.composeapp.generated.resources.compose_settings_page_account
@@ -75,6 +76,8 @@ internal fun LazyListScope.settingsRootContent(
     onDownloadsClick: () -> Unit,
     onAccountClick: () -> Unit,
     onSwitchProfileClick: (() -> Unit)? = null,
+    showDownloadsEntry: Boolean = true,
+    showNotificationsEntry: Boolean = true,
     showAccountSection: Boolean = true,
     showGeneralSection: Boolean = true,
     showAboutSection: Boolean = true,
@@ -138,14 +141,16 @@ internal fun LazyListScope.settingsRootContent(
                         isTablet = isTablet,
                         onClick = onContentDiscoveryClick,
                     )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.compose_settings_root_downloads_title),
-                        description = stringResource(Res.string.compose_settings_root_downloads_description),
-                        icon = Icons.Rounded.CloudDownload,
-                        isTablet = isTablet,
-                        onClick = onDownloadsClick,
-                    )
+                    if (showDownloadsEntry) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.compose_settings_root_downloads_title),
+                            description = stringResource(Res.string.compose_settings_root_downloads_description),
+                            icon = Icons.Rounded.CloudDownload,
+                            isTablet = isTablet,
+                            onClick = onDownloadsClick,
+                        )
+                    }
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
                         title = stringResource(Res.string.compose_settings_page_playback),
@@ -170,14 +175,16 @@ internal fun LazyListScope.settingsRootContent(
                         isTablet = isTablet,
                         onClick = onIntegrationsClick,
                     )
-                    SettingsGroupDivider(isTablet = isTablet)
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.compose_settings_page_notifications),
-                        description = stringResource(Res.string.compose_settings_root_notifications_description),
-                        icon = Icons.Rounded.Notifications,
-                        isTablet = isTablet,
-                        onClick = onNotificationsClick,
-                    )
+                    if (showNotificationsEntry) {
+                        SettingsGroupDivider(isTablet = isTablet)
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.compose_settings_page_notifications),
+                            description = stringResource(Res.string.compose_settings_root_notifications_description),
+                            icon = Icons.Rounded.Notifications,
+                            isTablet = isTablet,
+                            onClick = onNotificationsClick,
+                        )
+                    }
                 }
             }
         }
@@ -252,14 +259,26 @@ internal fun LazyListScope.settingsRootContent(
             Text(
                 text = stringResource(
                     Res.string.compose_about_version_format,
-                    AppVersionConfig.VERSION_NAME,
-                    AppVersionConfig.VERSION_CODE,
+                    AppVersionPolicy.displayVersionName,
+                    AppVersionPolicy.displayVersionCode,
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            AppVersionPolicy.basedOnVersionName?.let { basedOnVersionName ->
+                Text(
+                    text = stringResource(
+                        Res.string.compose_about_based_on_version_format,
+                        basedOnVersionName,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

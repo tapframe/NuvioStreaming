@@ -5,9 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,7 +38,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.AppTheme
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
@@ -56,6 +59,8 @@ import nuvio.composeapp.generated.resources.settings_appearance_app_language_she
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_black
 import nuvio.composeapp.generated.resources.settings_appearance_amoled_description
 import nuvio.composeapp.generated.resources.settings_appearance_continue_watching_description
+import nuvio.composeapp.generated.resources.settings_appearance_desktop_navigation
+import nuvio.composeapp.generated.resources.settings_appearance_desktop_navigation_sheet_title
 import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass
 import nuvio.composeapp.generated.resources.settings_appearance_liquid_glass_description
 import nuvio.composeapp.generated.resources.settings_appearance_poster_customization_description
@@ -67,7 +72,6 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
 
-@OptIn(ExperimentalLayoutApi::class)
 internal fun LazyListScope.appearanceSettingsContent(
     isTablet: Boolean,
     selectedTheme: AppTheme,
@@ -89,30 +93,57 @@ internal fun LazyListScope.appearanceSettingsContent(
         ) {
             SettingsGroup(isTablet = isTablet) {
                 val themes = listOf(AppTheme.WHITE) + AppTheme.entries.filterNot { it == AppTheme.WHITE }
-                FlowRow(
+                val horizontalPadding = if (isTablet) 20.dp else 16.dp
+                val verticalPadding = if (isTablet) 18.dp else 14.dp
+                val themeSpacing = if (isTablet) 16.dp else 12.dp
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(
-                            horizontal = if (isTablet) 20.dp else 16.dp,
-                            vertical = if (isTablet) 18.dp else 14.dp,
+                            horizontal = horizontalPadding,
+                            vertical = verticalPadding,
                         ),
-                    horizontalArrangement = Arrangement.spacedBy(if (isTablet) 16.dp else 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(if (isTablet) 16.dp else 12.dp),
                 ) {
-                    themes.forEach { theme ->
-                        ThemeChip(
-                            theme = theme,
-                            isSelected = theme == selectedTheme,
-                            onClick = { onThemeSelected(theme) },
-                        )
+                    val preferredColumns = if (isTablet) 4 else 3
+                    val minThemeCellWidth = if (isTablet) 92.dp else 78.dp
+                    val themeColumns = ((maxWidth + themeSpacing) / (minThemeCellWidth + themeSpacing))
+                        .toInt()
+                        .coerceAtLeast(1)
+                        .coerceAtMost(preferredColumns)
+
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(themeSpacing),
+                    ) {
+                        themes.chunked(themeColumns).forEach { rowThemes ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(themeSpacing),
+                            ) {
+                                rowThemes.forEach { theme ->
+                                    ThemeChip(
+                                        theme = theme,
+                                        isSelected = theme == selectedTheme,
+                                        onClick = { onThemeSelected(theme) },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                repeat(themeColumns - rowThemes.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
-
     item {
         var showLanguageSheet by remember { mutableStateOf(false) }
+        var showDesktopNavigationSheet by remember { mutableStateOf(false) }
+        val desktopNavigationLayout by remember {
+            ThemeSettingsRepository.ensureLoaded()
+            ThemeSettingsRepository.desktopNavigationLayout
+        }.collectAsStateWithLifecycle()
         SettingsSection(
             title = stringResource(Res.string.settings_appearance_section_display),
             isTablet = isTablet,
@@ -135,6 +166,16 @@ internal fun LazyListScope.appearanceSettingsContent(
                         onCheckedChange = onLiquidGlassNativeTabBarToggle,
                     )
                 }
+                if (isDesktop) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_appearance_desktop_navigation),
+                        description = stringResource(desktopNavigationLayout.labelRes),
+                        icon = Icons.Rounded.Style,
+                        isTablet = isTablet,
+                        onClick = { showDesktopNavigationSheet = true },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_language),
@@ -144,6 +185,17 @@ internal fun LazyListScope.appearanceSettingsContent(
                     onClick = { showLanguageSheet = true },
                 )
             }
+        }
+
+        if (showDesktopNavigationSheet) {
+            DesktopNavigationLayoutBottomSheet(
+                selectedLayout = desktopNavigationLayout,
+                onLayoutSelected = {
+                    ThemeSettingsRepository.setDesktopNavigationLayout(it)
+                    showDesktopNavigationSheet = false
+                },
+                onDismiss = { showDesktopNavigationSheet = false },
+            )
         }
 
         if (showLanguageSheet) {
@@ -178,6 +230,66 @@ internal fun LazyListScope.appearanceSettingsContent(
                     icon = Icons.Rounded.Tune,
                     isTablet = isTablet,
                     onClick = onPosterCustomizationClick,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DesktopNavigationLayoutBottomSheet(
+    selectedLayout: DesktopNavigationLayout,
+    onLayoutSelected: (DesktopNavigationLayout) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    NuvioModalBottomSheet(
+        onDismissRequest = {
+            coroutineScope.launch {
+                dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+            }
+        },
+        sheetState = sheetState,
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+        ) {
+            item {
+                Text(
+                    text = stringResource(Res.string.settings_appearance_desktop_navigation_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                )
+            }
+
+            itemsIndexed(DesktopNavigationLayout.entries) { index, layout ->
+                if (index > 0) {
+                    NuvioBottomSheetDivider()
+                }
+                NuvioBottomSheetActionRow(
+                    title = stringResource(layout.labelRes),
+                    onClick = {
+                        onLayoutSelected(layout)
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                    trailingContent = {
+                        if (layout == selectedLayout) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = stringResource(Res.string.cd_selected),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    },
                 )
             }
         }
@@ -262,41 +374,48 @@ private fun ThemeChip(
     theme: AppTheme,
     isSelected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val palette = ThemeColors.getColorPalette(theme)
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .then(
-                if (isSelected) {
-                    Modifier.border(
-                        width = 1.5.dp,
-                        color = palette.focusRing,
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(palette.secondary),
+                .size(56.dp)
+                .then(
+                    if (isSelected) {
+                        Modifier.border(
+                            width = 1.5.dp,
+                            color = palette.focusRing,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = stringResource(Res.string.cd_selected),
-                    tint = palette.onSecondary,
-                    modifier = Modifier.size(22.dp),
-                )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(palette.secondary),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = stringResource(Res.string.cd_selected),
+                        tint = palette.onSecondary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
             }
         }
 
@@ -312,6 +431,9 @@ private fun ThemeChip(
             },
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
             textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(modifier = Modifier.height(4.dp))

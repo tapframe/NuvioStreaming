@@ -53,7 +53,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,22 +77,22 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioBottomSheetActionRow
 import com.nuvio.app.core.ui.NuvioBottomSheetDivider
 import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.dismissNuvioBottomSheet
+import com.nuvio.app.core.ui.secondaryClick
 import com.nuvio.app.features.downloads.DownloadsRepository
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.rememberModalBottomSheetState
-import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.features.debrid.DebridProviders
 import com.nuvio.app.features.debrid.DebridSettingsRepository
-import com.nuvio.app.features.p2p.P2pSettingsRepository
-import com.nuvio.app.features.p2p.P2pStreamingEngine
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.launch
@@ -142,16 +141,14 @@ fun StreamsScreen(
         DebridSettingsRepository.ensureLoaded()
         DebridSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
-    val p2pSettings by remember {
-        P2pSettingsRepository.ensureLoaded()
-        P2pSettingsRepository.uiState
-    }.collectAsStateWithLifecycle()
     val watchProgressUiState by remember {
         WatchProgressRepository.ensureLoaded()
         WatchProgressRepository.uiState
     }.collectAsStateWithLifecycle()
     remember {
-        DownloadsRepository.ensureLoaded()
+        if (AppFeaturePolicy.downloadsEnabled) {
+            DownloadsRepository.ensureLoaded()
+        }
     }
     val isEpisode = seasonNumber != null && episodeNumber != null
     val clipboardManager = LocalClipboardManager.current
@@ -184,15 +181,6 @@ fun StreamsScreen(
             null
         } else {
             (resumePositionMs ?: storedProgress?.takeIf { it.isResumable }?.lastPositionMs)?.takeIf { it > 0L }
-        }
-    }
-
-    DisposableEffect(P2pSettingsRepository.isVisible, p2pSettings.p2pEnabled) {
-        if (P2pSettingsRepository.isVisible && p2pSettings.p2pEnabled) {
-            P2pStreamingEngine.warmup()
-        }
-        onDispose {
-            P2pStreamingEngine.cooldownWarmup()
         }
     }
 
@@ -359,6 +347,7 @@ fun StreamsScreen(
         StreamActionsSheet(
             stream = streamActionsTarget,
             externalPlayerEnabled = playerSettings.externalPlayerEnabled,
+            showDownloadAction = AppFeaturePolicy.downloadsEnabled,
             onDismiss = { streamActionsTarget = null },
             onCopyLink = { stream ->
                 val directUrl = stream.playableDirectUrl
@@ -833,6 +822,7 @@ internal fun StreamList(
                         debridEnabled = debridEnabled,
                         appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
                         showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                        showAddonLogo = streamBadgeSettings.showAddonLogo,
                         badgePlacement = streamBadgeSettings.badgePlacement,
                         onStreamSelected = onStreamSelected,
                         onStreamLongPress = onStreamLongPress,
@@ -860,6 +850,7 @@ private fun LazyListScope.streamSection(
     debridEnabled: Boolean,
     appendInstantServiceToDefaultName: Boolean,
     showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
     badgePlacement: StreamBadgePlacement,
     onStreamSelected: (stream: StreamItem, resumePositionMs: Long?, resumeProgressFraction: Float?) -> Unit,
     onStreamLongPress: (StreamItem) -> Unit,
@@ -907,6 +898,7 @@ private fun LazyListScope.streamSection(
                 enabled = stream.isSelectableForPlayback(debridEnabled),
                 appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
                 showFileSizeBadges = showFileSizeBadges,
+                showAddonLogo = showAddonLogo,
                 badgePlacement = badgePlacement,
                 onClick = {
                     if (stream.isSelectableForPlayback(debridEnabled)) {
@@ -1014,6 +1006,7 @@ private fun StreamCard(
     enabled: Boolean,
     appendInstantServiceToDefaultName: Boolean,
     showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
     badgePlacement: StreamBadgePlacement,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -1039,8 +1032,9 @@ private fun StreamCard(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
+            .secondaryClick(if (enabled) onLongClick else null)
             .padding(14.dp),
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
@@ -1076,6 +1070,31 @@ private fun StreamCard(
                     badgeImages = badgeImages,
                     stream = stream,
                     showFileSizeBadges = showFileSizeBadges,
+                )
+            }
+        }
+
+        if (showAddonLogo) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (!stream.addonLogo.isNullOrBlank()) {
+                    AsyncImage(
+                        model = stream.addonLogo,
+                        contentDescription = stream.addonName,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(6.dp)),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stream.addonName,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
         }
@@ -1163,6 +1182,7 @@ private fun StreamNameWithInstantService(
 private fun StreamActionsSheet(
     stream: StreamItem?,
     externalPlayerEnabled: Boolean,
+    showDownloadAction: Boolean,
     onDismiss: () -> Unit,
     onCopyLink: (StreamItem) -> Unit,
     onDownload: (StreamItem) -> Unit,
@@ -1241,17 +1261,19 @@ private fun StreamActionsSheet(
                     }
                 },
             )
-            NuvioBottomSheetDivider()
-            NuvioBottomSheetActionRow(
-                icon = Icons.Rounded.Download,
-                title = stringResource(Res.string.streams_download_file),
-                onClick = {
-                    onDownload(stream)
-                    coroutineScope.launch {
-                        dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
-                    }
-                },
-            )
+            if (showDownloadAction) {
+                NuvioBottomSheetDivider()
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Rounded.Download,
+                    title = stringResource(Res.string.streams_download_file),
+                    onClick = {
+                        onDownload(stream)
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
+            }
         }
     }
 }

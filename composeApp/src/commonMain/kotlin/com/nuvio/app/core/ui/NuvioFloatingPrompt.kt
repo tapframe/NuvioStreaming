@@ -48,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
@@ -191,7 +190,7 @@ fun NuvioFloatingPrompt(
                             contentAlignment = Alignment.Center,
                         ) {
                             if (imageUrl != null) {
-                                AsyncImage(
+                                NuvioAsyncImage(
                                     model = imageUrl,
                                     contentDescription = null,
                                     modifier = Modifier.matchParentSize(),

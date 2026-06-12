@@ -165,10 +165,33 @@ internal fun PlayerScreenRuntime.togglePlayback() {
     controlsVisible = true
 }
 
+internal fun PlayerScreenRuntime.prepareTogglePlaybackForNativeFallback(revealControls: Boolean = true) {
+    shouldPlay = !playbackSnapshot.isPlaying
+    if (revealControls) {
+        controlsVisible = true
+    }
+}
+
 internal fun PlayerScreenRuntime.seekBy(offsetMs: Long) {
     playerController?.seekBy(offsetMs)
+    applySeekByControlFeedback(offsetMs)
+}
+
+internal fun PlayerScreenRuntime.prepareSeekByForNativeFallback(
+    offsetMs: Long,
+    revealControls: Boolean = true,
+) {
+    applySeekByControlFeedback(offsetMs, revealControls)
+}
+
+private fun PlayerScreenRuntime.applySeekByControlFeedback(
+    offsetMs: Long,
+    revealControls: Boolean = true,
+) {
     scheduleProgressSyncAfterSeek()
-    controlsVisible = true
+    if (revealControls) {
+        controlsVisible = true
+    }
     when {
         offsetMs > 0L -> showSeekFeedback(PlayerSeekDirection.Forward, offsetMs)
         offsetMs < 0L -> showSeekFeedback(PlayerSeekDirection.Backward, abs(offsetMs))
@@ -176,6 +199,17 @@ internal fun PlayerScreenRuntime.seekBy(offsetMs: Long) {
 }
 
 internal fun PlayerScreenRuntime.handleDoubleTapSeek(direction: PlayerSeekDirection) {
+    handleDoubleTapSeek(direction, sendToController = true)
+}
+
+internal fun PlayerScreenRuntime.prepareDoubleTapSeekForNativeFallback(direction: PlayerSeekDirection) {
+    handleDoubleTapSeek(direction, sendToController = false)
+}
+
+private fun PlayerScreenRuntime.handleDoubleTapSeek(
+    direction: PlayerSeekDirection,
+    sendToController: Boolean,
+) {
     val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
     val currentSeekState = accumulatedSeekState
     val nextState = if (currentSeekState?.direction == direction) {
@@ -199,7 +233,9 @@ internal fun PlayerScreenRuntime.handleDoubleTapSeek(direction: PlayerSeekDirect
             maxDurationMs?.let { unclamped.coerceAtMost(it) } ?: unclamped
         }
     }
-    playerController?.seekTo(targetPositionMs)
+    if (sendToController) {
+        playerController?.seekTo(targetPositionMs)
+    }
     scheduleProgressSyncAfterSeek()
     showSeekFeedback(direction, nextState.amountMs)
 

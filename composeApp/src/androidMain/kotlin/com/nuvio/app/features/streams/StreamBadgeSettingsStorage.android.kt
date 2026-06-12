@@ -16,6 +16,7 @@ actual object StreamBadgeSettingsStorage {
     private const val legacyDebridPreferencesName = "nuvio_debrid_settings"
     private const val streamBadgeRulesKey = "stream_badge_rules"
     private const val showFileSizeBadgesKey = "show_file_size_badges"
+    private const val showAddonLogoKey = "show_addon_logo"
     private const val streamBadgePlacementKey = "stream_badge_placement"
     private const val legacyDebridStreamBadgeRulesKey = "debrid_stream_badge_rules"
 
@@ -39,6 +40,12 @@ actual object StreamBadgeSettingsStorage {
 
     actual fun saveShowFileSizeBadges(enabled: Boolean) {
         saveBoolean(showFileSizeBadgesKey, enabled)
+    }
+
+    actual fun loadShowAddonLogo(): Boolean? = loadBoolean(showAddonLogoKey)
+
+    actual fun saveShowAddonLogo(enabled: Boolean) {
+        saveBoolean(showAddonLogoKey, enabled)
     }
 
     actual fun loadStreamBadgePlacement(): String? = loadString(streamBadgePlacementKey)

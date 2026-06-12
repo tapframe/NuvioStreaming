@@ -1456,4 +1456,7 @@
     <string name="cloud_library_type_torrents">Torrenty</string>
     <string name="cloud_library_type_usenet">Usenet</string>
     <string name="cloud_library_type_web">Web</string>
+    <string name="settings_stream_addon_logo_title">Logo dodatku</string>
+    <string name="settings_stream_addon_logo_description">Pokazuj logo i nazwę dodatku obok źródeł.</string>
+    <string name="settings_stream_display_section">Wyświetlanie</string>
 </resources>

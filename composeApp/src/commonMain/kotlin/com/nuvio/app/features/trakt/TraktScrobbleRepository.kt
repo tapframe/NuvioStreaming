@@ -1,7 +1,7 @@
 package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
-import com.nuvio.app.core.build.AppVersionConfig
+import com.nuvio.app.core.build.AppVersionPolicy
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.CancellationException
@@ -81,7 +81,19 @@ internal object TraktScrobbleRepository {
         releaseInfo: String? = null,
     ): TraktScrobbleItem? {
         val normalizedType = contentType.trim().lowercase()
-        val ids = parseTraktContentIds(parentMetaId)
+        var ids = parseTraktContentIds(parentMetaId)
+
+        // Fallback: if parentMetaId doesn't resolve to valid Trakt IDs, try videoId.
+        // Some addons use non-standard contentId (e.g. "tun_tt7821582") but set a
+        // valid IMDB/TMDB videoId (e.g. "tt7821582:3:7").
+        if (!ids.hasAnyId() && !videoId.isNullOrBlank() && videoId != parentMetaId) {
+            ids = parseTraktContentIds(videoId)
+        }
+
+        // Don't send scrobble if we still have no valid Trakt IDs — would cause
+        // title-based fuzzy match on Trakt API resulting in wrong show matched.
+        if (!ids.hasAnyId()) return null
+
         val parsedYear = extractTraktYear(releaseInfo)
 
         return if (
@@ -243,7 +255,7 @@ internal object TraktScrobbleRepository {
                     ids = item.ids.toRequestBodyOrNull(),
                 ),
                 progress = clampedProgress,
-                appVersion = AppVersionConfig.VERSION_NAME,
+                appVersion = AppVersionPolicy.displayVersionName,
             )
 
             is TraktScrobbleItem.Episode -> TraktScrobbleRequest(
@@ -258,7 +270,7 @@ internal object TraktScrobbleRepository {
                     number = item.number,
                 ),
                 progress = clampedProgress,
-                appVersion = AppVersionConfig.VERSION_NAME,
+                appVersion = AppVersionPolicy.displayVersionName,
             )
         }
     }
