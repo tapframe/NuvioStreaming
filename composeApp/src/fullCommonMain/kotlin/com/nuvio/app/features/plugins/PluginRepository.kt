@@ -116,6 +116,9 @@ actual object PluginRepository {
 
             if (shouldPreserveLocalPluginRepositories(urls, _uiState.value.repositories)) {
                 log.w { "pullFromServer — remote empty while local has repositories; preserving local" }
+                _uiState.value.repositories.forEach { repo ->
+                    refreshRepository(repo.manifestUrl, pushAfterRefresh = false)
+                }
                 initialized = true
                 return
             }
