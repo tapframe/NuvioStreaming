@@ -60,10 +60,21 @@ class PlayerNextEpisodeRulesTest {
                 thresholdMinutesBeforeEnd = 0f,
             ),
         )
-        // Mid post-credits scene
+        // Mid post-credits scene, outside the end window
         assertFalse(
             PlayerNextEpisodeRules.shouldShowNextEpisodeCard(
                 positionMs = 1320_000L,
+                durationMs = durationMs,
+                skipIntervals = intervals,
+                thresholdMode = NextEpisodeThresholdMode.PERCENTAGE,
+                thresholdPercent = 100f,
+                thresholdMinutesBeforeEnd = 0f,
+            ),
+        )
+        // Final stretch of the episode
+        assertTrue(
+            PlayerNextEpisodeRules.shouldShowNextEpisodeCard(
+                positionMs = 1326_000L,
                 durationMs = durationMs,
                 skipIntervals = intervals,
                 thresholdMode = NextEpisodeThresholdMode.PERCENTAGE,

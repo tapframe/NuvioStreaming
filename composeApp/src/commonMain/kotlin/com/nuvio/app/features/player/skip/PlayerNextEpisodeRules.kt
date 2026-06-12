@@ -38,9 +38,9 @@ object PlayerNextEpisodeRules {
             val outroEndMs = (outroInterval.endTime * 1000.0).toLong()
             val hasPostCreditsTail = durationMs > 0L &&
                 outroEndMs > outroStartMs &&
-                (durationMs - outroEndMs) >= POST_CREDITS_THRESHOLD_MS
+                (durationMs - outroEndMs) >= POST_CREDITS_TAIL_MIN_MS
             if (hasPostCreditsTail) {
-                false
+                positionMs >= durationMs - POST_CREDITS_END_WINDOW_MS
             } else {
                 positionMs >= outroStartMs
             }
@@ -60,7 +60,14 @@ object PlayerNextEpisodeRules {
         }
     }
 
-    private const val POST_CREDITS_THRESHOLD_MS = 30_000L
+    // Content after the outro end counts as a post-credits scene only when it is at
+    // least this long; shorter tails are treated as trailing logos/silence and keep
+    // the fire-at-outro-start behavior.
+    private const val POST_CREDITS_TAIL_MIN_MS = 30_000L
+
+    // When a post-credits scene exists, the card is held until playback reaches the
+    // final stretch of the episode instead of firing at the outro.
+    private const val POST_CREDITS_END_WINDOW_MS = 5_000L
 
     fun hasEpisodeAired(raw: String?): Boolean {
         val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return true
