@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -77,14 +78,15 @@ object WatchedRepository {
                     isAuthenticated = isAuthenticated,
                     source = settings.watchProgressSource,
                 )
-            }.collect { isActive ->
+            }.distinctUntilChanged().collect { isActive ->
                 val shouldPull = shouldPullTraktWatchedHistoryOnActivation(
                     wasActive = wasTraktWatchedSyncActive,
                     isActive = isActive,
                 )
                 wasTraktWatchedSyncActive = isActive
                 if (shouldPull) {
-                    pullFromServer(ProfileRepository.activeProfileId)
+                    runCatching { pullFromServer(ProfileRepository.activeProfileId) }
+                        .onFailure { e -> log.e(e) { "Trakt watched history pull on activation failed" } }
                 }
             }
         }
