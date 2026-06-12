@@ -393,7 +393,7 @@ fun normalizeLanguageCode(language: String?): String? {
     fun containsAny(vararg values: String): Boolean =
         values.any { value -> tokenized.contains(value) }
 
-    if (containsAny("portuguese", "portugues")) {
+    if (containsAny("portuguese", "portugues", "português")) {
         return when {
             containsAny("brazil", "brasil", "brazilian", "brasileiro", "pt br", "ptbr", "pob", "(br)") ->
                 "pt-br"
@@ -403,7 +403,7 @@ fun normalizeLanguageCode(language: String?): String? {
         }
     }
 
-    if (containsAny("spanish", "espanol", "castellano")) {
+    if (containsAny("spanish", "espanol", "español", "castellano")) {
         return if (containsAny("latin", "latino", "latinoamerica", "latinoamericano", "lat am", "latam", "es 419", "es419", "(419)")) {
             "es-419"
         } else {

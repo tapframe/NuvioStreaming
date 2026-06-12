@@ -65,6 +65,48 @@ class PlayerTrackSelectionTest {
         assertEquals(1, findPreferredSubtitleTrackIndex(tracks, listOf("en", "es")))
     }
 
+    @Test
+    fun `pt tagged track with brazilian label matches pt-BR preference`() {
+        val tracks = listOf(track(0, "pt", "Português (Portugal)"), track(1, "pt", "Português (Brasil)"))
+        assertEquals(1, findPreferredSubtitleTrackIndex(tracks, listOf("pt-BR")))
+    }
+
+    @Test
+    fun `pt preference does not select a brazilian variant track`() {
+        val tracks = listOf(track(0, "pt", "Português (Brasil)"))
+        assertEquals(-1, findPreferredSubtitleTrackIndex(tracks, listOf("pt")))
+    }
+
+    @Test
+    fun `pt-BR preference does not select a plain european pt track`() {
+        val tracks = listOf(track(0, "pt", "Português (Portugal)"))
+        assertEquals(-1, findPreferredSubtitleTrackIndex(tracks, listOf("pt-BR")))
+    }
+
+    @Test
+    fun `pob tagged track matches pt-BR preference`() {
+        val tracks = listOf(track(0, "pob", "Portuguese"))
+        assertEquals(0, findPreferredSubtitleTrackIndex(tracks, listOf("pt-BR")))
+    }
+
+    @Test
+    fun `es tagged track with latino label matches es-419 preference`() {
+        val tracks = listOf(track(0, "es", "Español (España)"), track(1, "es", "Español (Latinoamérica)"))
+        assertEquals(1, findPreferredSubtitleTrackIndex(tracks, listOf("es-419")))
+    }
+
+    @Test
+    fun `es preference does not select a latino variant track`() {
+        val tracks = listOf(track(0, "es", "Español (Latinoamérica)"))
+        assertEquals(-1, findPreferredSubtitleTrackIndex(tracks, listOf("es")))
+    }
+
+    @Test
+    fun `untagged brazilian label matches pt-BR preference via label fallback`() {
+        val tracks = listOf(track(0, null, "Português (Brasil)"))
+        assertEquals(0, findPreferredSubtitleTrackIndex(tracks, listOf("pt-BR")))
+    }
+
     private fun track(index: Int, language: String?, label: String) = SubtitleTrack(
         index = index,
         id = index.toString(),
