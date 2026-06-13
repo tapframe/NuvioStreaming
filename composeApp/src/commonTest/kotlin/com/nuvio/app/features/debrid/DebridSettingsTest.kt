@@ -53,6 +53,31 @@ class DebridSettingsTest {
     }
 
     @Test
+    fun `instant playback preparation stays disabled when the prepare links count is zero`() {
+        val settings = DebridSettings(
+            enabled = true,
+            providerApiKeys = mapOf(DebridProviders.TORBOX_ID to "tb_key"),
+            instantPlaybackPreparationLimit = 0,
+        )
+
+        assertTrue(settings.canResolvePlayableLinks)
+        assertFalse(settings.instantPlaybackPreparationEnabled)
+    }
+
+    @Test
+    fun `instant playback preparation requires a positive prepare links count and a resolver`() {
+        val prepared = DebridSettings(
+            enabled = true,
+            providerApiKeys = mapOf(DebridProviders.TORBOX_ID to "tb_key"),
+            instantPlaybackPreparationLimit = 2,
+        )
+
+        assertTrue(prepared.instantPlaybackPreparationEnabled)
+        assertFalse(prepared.copy(enabled = false).instantPlaybackPreparationEnabled)
+        assertFalse(prepared.copy(providerApiKeys = emptyMap()).instantPlaybackPreparationEnabled)
+    }
+
+    @Test
     fun `cloud library and link resolving capabilities are independent`() {
         val settings = DebridSettings(
             enabled = false,
