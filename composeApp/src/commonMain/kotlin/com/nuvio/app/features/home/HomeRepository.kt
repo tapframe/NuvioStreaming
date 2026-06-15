@@ -3,11 +3,13 @@ package com.nuvio.app.features.home
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.catalog.fetchCatalogPage
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.collection.CollectionSource
 import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
+import com.nuvio.app.features.collection.catalogRouteKey
 import com.nuvio.app.features.collection.findCollectionCatalog
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
@@ -238,12 +240,15 @@ object HomeRepository {
                 title = defaultTitle,
                 subtitle = addonName,
                 addonName = addonName,
-                type = type,
-                manifestUrl = manifestUrl,
-                catalogId = catalogId,
+                target = CatalogTarget.Addon(
+                    manifestUrl = manifestUrl,
+                    contentType = type,
+                    catalogId = catalogId,
+                    supportsPagination = supportsPagination,
+                ),
                 items = emptyList(),
                 availableItemCount = 0,
-                supportsPagination = supportsPagination,
+                hasMore = false,
             )
         }
 
@@ -252,12 +257,15 @@ object HomeRepository {
             title = defaultTitle,
             subtitle = addonName,
             addonName = addonName,
-            type = type,
-            manifestUrl = manifestUrl,
-            catalogId = catalogId,
+            target = CatalogTarget.Addon(
+                manifestUrl = manifestUrl,
+                contentType = type,
+                catalogId = catalogId,
+                supportsPagination = supportsPagination,
+            ),
             items = items,
             availableItemCount = page.rawItemCount,
-            supportsPagination = supportsPagination,
+            hasMore = supportsPagination && page.nextSkip != null,
         )
     }
 
@@ -411,19 +419,7 @@ object HomeRepository {
     }
 
     private fun collectionSourceKey(source: CollectionSource): String =
-        listOf(
-            source.provider,
-            source.addonId,
-            source.type,
-            source.catalogId,
-            source.genre,
-            source.tmdbSourceType,
-            source.tmdbId?.toString(),
-            source.traktListId?.toString(),
-            source.mediaType,
-            source.sortBy,
-            source.sortHow,
-        ).joinToString(":") { it.orEmpty() }
+        source.catalogRouteKey()
 }
 
 private const val HOME_HERO_ITEM_LIMIT = 8

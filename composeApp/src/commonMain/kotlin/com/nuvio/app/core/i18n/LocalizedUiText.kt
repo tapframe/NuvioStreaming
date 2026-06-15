@@ -8,6 +8,8 @@ import nuvio.composeapp.generated.resources.action_resume
 import nuvio.composeapp.generated.resources.action_resume_episode
 import nuvio.composeapp.generated.resources.compose_player_episode_code_episode_only
 import nuvio.composeapp.generated.resources.compose_player_episode_code_full
+import nuvio.composeapp.generated.resources.compose_player_no_subtitle_lines_found
+import nuvio.composeapp.generated.resources.compose_player_subtitle_lines_load_error
 import nuvio.composeapp.generated.resources.continue_watching_up_next
 import nuvio.composeapp.generated.resources.continue_watching_up_next_episode
 import nuvio.composeapp.generated.resources.date_month_april
@@ -40,6 +42,11 @@ import nuvio.composeapp.generated.resources.media_movie
 import nuvio.composeapp.generated.resources.media_movies
 import nuvio.composeapp.generated.resources.media_series
 import nuvio.composeapp.generated.resources.media_tv
+import nuvio.composeapp.generated.resources.p2p_error_unknown
+import nuvio.composeapp.generated.resources.settings_stream_badge_enter_url
+import nuvio.composeapp.generated.resources.settings_stream_badge_import_failed
+import nuvio.composeapp.generated.resources.settings_stream_badge_import_limit
+import nuvio.composeapp.generated.resources.settings_stream_badge_url_scheme_invalid
 import nuvio.composeapp.generated.resources.unit_bytes_b
 import nuvio.composeapp.generated.resources.unit_bytes_gb
 import nuvio.composeapp.generated.resources.unit_bytes_kb
@@ -133,6 +140,27 @@ fun localizedShortMonthName(month: Int): String =
         12 -> resourceString("Dec") { getString(Res.string.date_month_short_dec) }
         else -> month.toString()
     }
+
+fun localizedNoSubtitleLinesFound(): String =
+    resourceString("No subtitle lines found") { getString(Res.string.compose_player_no_subtitle_lines_found) }
+
+fun localizedSubtitleLinesLoadError(): String =
+    resourceString("Unable to load subtitle lines") { getString(Res.string.compose_player_subtitle_lines_load_error) }
+
+fun localizedBadgeImportFailed(): String =
+    resourceString("Badge import failed.") { getString(Res.string.settings_stream_badge_import_failed) }
+
+fun localizedBadgeEnterUrl(): String =
+    resourceString("Enter a badge JSON URL.") { getString(Res.string.settings_stream_badge_enter_url) }
+
+fun localizedBadgeUrlSchemeInvalid(): String =
+    resourceString("Badge URL must start with http:// or https://.") { getString(Res.string.settings_stream_badge_url_scheme_invalid) }
+
+fun localizedBadgeImportLimit(limit: Int): String =
+    resourceString("You can import up to $limit badge URLs.") { getString(Res.string.settings_stream_badge_import_limit, limit) }
+
+fun localizedP2pUnknownTorrentError(): String =
+    resourceString("Unknown torrent error") { getString(Res.string.p2p_error_unknown) }
 
 fun localizedByteUnit(unit: String): String =
     when (unit) {

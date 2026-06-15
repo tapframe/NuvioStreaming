@@ -1,9 +1,13 @@
 package com.nuvio.app.features.catalog
 
+import com.nuvio.app.features.collection.CollectionRepository
+import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
+import com.nuvio.app.features.collection.catalogRouteKey
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toMetaPreview
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
 import com.nuvio.app.features.home.filterReleasedItems
+import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,8 +20,6 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
-const val INTERNAL_LIBRARY_MANIFEST_URL = "nuvio://library"
-
 object CatalogRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _uiState = MutableStateFlow(CatalogUiState())
@@ -28,25 +30,15 @@ object CatalogRepository {
     private val scrollPositions = linkedMapOf<CatalogRequest, CatalogScrollPosition>()
 
     fun load(
-        manifestUrl: String,
-        type: String,
-        catalogId: String,
-        genre: String? = null,
-        supportsPagination: Boolean = false,
+        target: CatalogTarget,
         force: Boolean = false,
     ) {
-        val request = catalogRequest(
-            manifestUrl = manifestUrl,
-            type = type,
-            catalogId = catalogId,
-            genre = genre,
-            supportsPagination = supportsPagination,
-        )
+        val request = catalogRequest(target)
         if (!force && activeRequest == request && (_uiState.value.items.isNotEmpty() || _uiState.value.isLoading)) {
             return
         }
         activeRequest = request
-        if (manifestUrl == INTERNAL_LIBRARY_MANIFEST_URL) {
+        if (target is CatalogTarget.Library) {
             fetchInternalLibrary(request)
             return
         }
@@ -68,25 +60,17 @@ object CatalogRepository {
     }
 
     fun scrollPosition(
-        manifestUrl: String,
-        type: String,
-        catalogId: String,
-        genre: String? = null,
-        supportsPagination: Boolean = false,
+        target: CatalogTarget,
     ): CatalogScrollPosition =
-        scrollPositions[catalogRequest(manifestUrl, type, catalogId, genre, supportsPagination)]
+        scrollPositions[catalogRequest(target)]
             ?: CatalogScrollPosition()
 
     fun saveScrollPosition(
-        manifestUrl: String,
-        type: String,
-        catalogId: String,
-        genre: String? = null,
-        supportsPagination: Boolean = false,
+        target: CatalogTarget,
         firstVisibleItemIndex: Int,
         firstVisibleItemScrollOffset: Int,
     ) {
-        val request = catalogRequest(manifestUrl, type, catalogId, genre, supportsPagination)
+        val request = catalogRequest(target)
         scrollPositions[request] = CatalogScrollPosition(
             firstVisibleItemIndex = firstVisibleItemIndex,
             firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
@@ -102,9 +86,10 @@ object CatalogRepository {
 
         activeJob = scope.launch {
             runCatching {
+                val target = request.target as CatalogTarget.Library
                 LibraryRepository.ensureLoaded()
                 LibraryRepository.uiState.value.sections
-                    .firstOrNull { it.type == request.catalogId }
+                    .firstOrNull { it.type == target.sectionType }
                     ?.items
                     .orEmpty()
                     .map { it.toMetaPreview() }
@@ -149,13 +134,22 @@ object CatalogRepository {
 
         activeJob = scope.launch {
             runCatching {
-                fetchCatalogPage(
-                    manifestUrl = request.manifestUrl,
-                    type = request.type,
-                    catalogId = request.catalogId,
-                    genre = request.genre,
-                    skip = requestedSkip.takeIf { it > 0 },
-                ).withUnreleasedFilter(request.hideUnreleasedContent)
+                when (val target = request.target) {
+                    is CatalogTarget.Addon -> fetchCatalogPage(
+                        manifestUrl = target.manifestUrl,
+                        type = target.contentType,
+                        catalogId = target.catalogId,
+                        genre = target.genre,
+                        skip = requestedSkip.takeIf { it > 0 },
+                    )
+
+                    is CatalogTarget.CollectionSource -> fetchCollectionSourcePage(
+                        target = target,
+                        page = requestedSkip.takeIf { it > 0 } ?: 1,
+                    )
+
+                    is CatalogTarget.Library -> error(getString(Res.string.catalog_load_failed))
+                }.withUnreleasedFilter(request.hideUnreleasedContent)
             }.fold(
                 onSuccess = { page ->
                     if (activeRequest != request) return@fold
@@ -165,12 +159,20 @@ object CatalogRepository {
                     } else {
                         mergeCatalogItems(_uiState.value.items, page.items)
                     }
-                    val supportsPagination = request.supportsPagination || page.rawItemCount >= CATALOG_PAGE_SIZE
+                    val supportsPagination = request.target.supportsPagination || page.rawItemCount >= CATALOG_PAGE_SIZE
                     val loadedNewItems = reset || mergedItems.size > current.items.size
+                    val paginationState = nextCatalogPaginationState(
+                        supportsPagination = supportsPagination,
+                        requestedSkip = requestedSkip,
+                        page = page,
+                        loadedNewItems = loadedNewItems,
+                        consecutiveDuplicatePages = if (reset) 0 else current.consecutiveDuplicatePages,
+                    )
                     _uiState.value = CatalogUiState(
                         items = mergedItems,
                         isLoading = false,
-                        nextSkip = if (supportsPagination && loadedNewItems) page.nextSkip else null,
+                        nextSkip = paginationState.nextSkip,
+                        consecutiveDuplicatePages = paginationState.consecutiveDuplicatePages,
                         errorMessage = null,
                     )
                 },
@@ -188,19 +190,9 @@ object CatalogRepository {
         }
     }
 
-    private fun catalogRequest(
-        manifestUrl: String,
-        type: String,
-        catalogId: String,
-        genre: String? = null,
-        supportsPagination: Boolean = false,
-    ): CatalogRequest =
+    private fun catalogRequest(target: CatalogTarget): CatalogRequest =
         CatalogRequest(
-            manifestUrl = manifestUrl,
-            type = type,
-            catalogId = catalogId,
-            genre = genre,
-            supportsPagination = supportsPagination,
+            target = target,
             hideUnreleasedContent = HomeCatalogSettingsRepository.snapshot().hideUnreleasedContent,
         )
 }
@@ -211,11 +203,26 @@ private fun CatalogPage.withUnreleasedFilter(hideUnreleasedContent: Boolean): Ca
     return if (filteredItems.size == items.size) this else copy(items = filteredItems)
 }
 
+private suspend fun fetchCollectionSourcePage(
+    target: CatalogTarget.CollectionSource,
+    page: Int,
+): CatalogPage {
+    CollectionRepository.initialize()
+    val source = CollectionRepository.getCollection(target.collectionId)
+        ?.folders
+        ?.firstOrNull { it.id == target.folderId }
+        ?.resolvedSources
+        ?.firstOrNull { it.catalogRouteKey() == target.sourceKey }
+        ?: error(getString(Res.string.catalog_load_failed))
+
+    return when {
+        source.isTmdb -> TmdbCollectionSourceResolver.resolve(source = source, page = page)
+        source.isTrakt -> TraktPublicListSourceResolver.resolve(source = source, page = page)
+        else -> error(getString(Res.string.catalog_load_failed))
+    }
+}
+
 private data class CatalogRequest(
-    val manifestUrl: String,
-    val type: String,
-    val catalogId: String,
-    val genre: String?,
-    val supportsPagination: Boolean,
+    val target: CatalogTarget,
     val hideUnreleasedContent: Boolean,
 )

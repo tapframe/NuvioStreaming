@@ -885,19 +885,7 @@ private fun CollectionFolder.withSources(nextSources: List<CollectionSource>): C
     )
 
 private fun collectionSourceKey(source: CollectionSource): String =
-    when {
-        source.isTmdb -> {
-            "tmdb_${source.tmdbSourceType}_${source.tmdbId}_${source.mediaType}_${source.sortBy}_${source.filters.hashCode()}"
-        }
-
-        source.isTrakt -> {
-            "trakt_${source.traktListId}_${source.mediaType}_${TraktListSort.normalize(source.sortBy)}_${TraktSortHow.normalize(source.sortHow)}"
-        }
-
-        else -> {
-            "addon_${source.addonId}_${source.type}_${source.catalogId}_${source.genre.orEmpty()}"
-        }
-    }
+    source.catalogRouteKey()
 
 private fun selectedMediaTypes(
     state: CollectionEditorUiState,

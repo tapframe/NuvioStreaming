@@ -344,6 +344,8 @@
     <string name="compose_player_font_size_value">%1$dsp</string>
     <string name="compose_player_lock_controls">Lock player controls</string>
     <string name="compose_player_loading_lines">Loading subtitle lines...</string>
+    <string name="compose_player_no_subtitle_lines_found">No subtitle lines found</string>
+    <string name="compose_player_subtitle_lines_load_error">Unable to load subtitle lines</string>
     <string name="compose_player_no_audio_tracks_available">No audio tracks available</string>
     <string name="compose_player_no_episodes_available">No episodes available</string>
     <string name="compose_player_no_streams_found">No streams found</string>
@@ -693,6 +695,10 @@
     <string name="settings_stream_badge_urls_title">Fusion badge URLs</string>
     <string name="settings_stream_badge_urls_description">Import up to %1$d Fusion-style stream badge JSON URLs. Each URL can be updated or deleted separately.</string>
     <string name="settings_stream_badge_urls_search_description">Manage imported Fusion-style stream badge JSON URLs.</string>
+    <string name="settings_stream_badge_import_failed">Badge import failed.</string>
+    <string name="settings_stream_badge_enter_url">Enter a badge JSON URL.</string>
+    <string name="settings_stream_badge_url_scheme_invalid">Badge URL must start with http:// or https://.</string>
+    <string name="settings_stream_badge_import_limit">You can import up to %1$d badge URLs.</string>
     <string name="settings_fusion_badges_summary">%1$d/%2$d URLs, %3$d active Fusion badges</string>
     <string name="settings_fusion_badges_empty">No Fusion badge URLs imported.</string>
     <string name="settings_fusion_badge_url_label">Fusion badge JSON URL</string>
@@ -1146,6 +1152,7 @@
     <string name="app_exit_title">Exit app</string>
     <string name="catalog_empty_message">This catalog did not return any items.</string>
     <string name="catalog_empty_title">No titles found</string>
+    <string name="details_actions_menu_label">More actions</string>
     <string name="details_check_connection">Check your Wi-Fi or mobile data connection and try again.</string>
     <string name="details_director">Director</string>
     <string name="details_failed_to_load">Failed to load</string>
@@ -1389,6 +1396,16 @@
     <string name="trakt_sign_in_complete_failed">Failed to complete Trakt sign in</string>
     <string name="trakt_user_fallback">Trakt user</string>
     <string name="trakt_watchlist">Watchlist</string>
+    <!-- Trakt library sync errors -->
+    <string name="trakt_error_authorization_expired">Trakt authorization expired</string>
+    <string name="trakt_error_list_not_found">Trakt list not found</string>
+    <string name="trakt_error_list_limit_reached">Trakt list limit reached</string>
+    <string name="trakt_error_rate_limit_reached">Trakt rate limit reached</string>
+    <string name="trakt_error_request_failed">Trakt request failed</string>
+    <string name="trakt_error_add_watchlist_failed">Failed to add to Trakt watchlist</string>
+    <string name="trakt_error_add_list_failed">Failed to add to Trakt list</string>
+    <string name="trakt_error_missing_ids">Missing compatible Trakt IDs</string>
+    <string name="trakt_error_empty_response">Empty response body</string>
     <string name="tmdb_sources_api_key_required">Add a TMDB API key in Settings to use TMDB sources.</string>
     <string name="tmdb_sources_collection_fallback_title">TMDB Collection %1$d</string>
     <string name="tmdb_sources_collection_not_found">TMDB collection not found</string>
@@ -1862,6 +1879,7 @@
     <string name="p2p_consent_body">This stream uses peer-to-peer (P2P) technology. By enabling P2P, you acknowledge and agree that:\n\n• Your IP address will be visible to other peers in the network\n• You are solely responsible for the content you access\n• You confirm you have the legal right to stream this content in your jurisdiction\n• Nuvio does not host, distribute, or control any P2P content\n• Nuvio bears no liability for any legal consequences arising from your use of P2P streaming\n\nYou use this feature entirely at your own risk. P2P can be disabled anytime in Settings.</string>
     <string name="p2p_consent_enable">Enable P2P</string>
     <string name="p2p_consent_cancel">Cancel</string>
+    <string name="p2p_error_unknown">Unknown torrent error</string>
     <string name="settings_p2p_title">P2P Streaming</string>
     <string name="settings_p2p_subtitle">Allow peer-to-peer (torrent) streams</string>
     <string name="settings_p2p_hide_stats_title">Hide torrent stats</string>

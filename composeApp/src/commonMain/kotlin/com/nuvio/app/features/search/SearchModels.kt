@@ -45,6 +45,7 @@ data class DiscoverUiState(
     val items: List<MetaPreview> = emptyList(),
     val isLoading: Boolean = false,
     val nextSkip: Int? = null,
+    val consecutiveDuplicatePages: Int = 0,
     val emptyStateReason: DiscoverEmptyStateReason? = null,
     val errorMessage: String? = null,
 ) {

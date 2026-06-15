@@ -68,6 +68,21 @@ data class CollectionSource(
     }
 }
 
+internal fun CollectionSource.catalogRouteKey(): String =
+    when {
+        isTmdb -> {
+            "tmdb_${tmdbSourceType}_${tmdbId}_${mediaType}_${sortBy}_${filters.hashCode()}"
+        }
+
+        isTrakt -> {
+            "trakt_${traktListId}_${mediaType}_${TraktListSort.normalize(sortBy)}_${TraktSortHow.normalize(sortHow)}"
+        }
+
+        else -> {
+            "addon_${addonId}_${type}_${catalogId}_${genre.orEmpty()}"
+        }
+    }
+
 internal fun CollectionSource.hasInvalidTraktListId(): Boolean =
     isTrakt && (traktListId == null || traktListId <= 0L)
 

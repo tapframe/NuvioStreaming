@@ -126,6 +126,17 @@ actual fun PlatformPlayerSurface(
     var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
     val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
 
+    val initialMediaItem = remember(playerSourceKey) {
+        playbackMediaItemFromUrl(
+            url = sourceUrl,
+            responseHeaders = sanitizedSourceResponseHeaders,
+            streamType = normalizedStreamType,
+        )
+    }
+
+    var resolvedMediaItem by remember(playerSourceKey) { mutableStateOf(initialMediaItem) }
+    var probeAttempted by remember(playerSourceKey) { mutableStateOf(false) }
+
     val extractorsFactory = remember {
         DefaultExtractorsFactory()
             .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
@@ -228,18 +239,13 @@ actual fun PlatformPlayerSurface(
                 .build()
         }
 
-        player.apply {
-            setPlaybackMediaItem(
-                videoMediaItem = playbackMediaItemFromUrl(
-                    url = sourceUrl,
-                    responseHeaders = sanitizedSourceResponseHeaders,
-                    streamType = normalizedStreamType,
-                ),
-                startPositionMs = fallbackStartPositionMs,
-            )
-            prepare()
-            this.playWhenReady = playWhenReady
-        }
+        player
+    }
+
+    LaunchedEffect(exoPlayer, resolvedMediaItem) {
+        val mediaItem = resolvedMediaItem ?: return@LaunchedEffect
+        exoPlayer.setPlaybackMediaItem(mediaItem, fallbackStartPositionMs)
+        exoPlayer.prepare()
     }
 
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
@@ -264,25 +270,54 @@ actual fun PlatformPlayerSurface(
             exoPlayer.pause()
         }
 
+        fun reportPlayerError(error: PlaybackException) {
+            if (
+                playerSettings.decoderPriority == DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON &&
+                effectiveDecoderPriority != DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER &&
+                error.isDecoderFailure()
+            ) {
+                Log.w(
+                    TAG,
+                    "Decoder failure (${error.errorCodeName}); retrying with app decoders",
+                    error,
+                )
+                fallbackStartPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
+                decoderPriorityOverride = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                latestOnError.value(null)
+                return
+            }
+            latestOnError.value(error.localizedMessage ?: runBlocking { getString(Res.string.player_unable_to_play_stream) })
+        }
+
         val listener = object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 syncPlayerViewKeepScreenOn()
-                if (
-                    playerSettings.decoderPriority == DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON &&
-                    effectiveDecoderPriority != DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER &&
-                    error.isDecoderFailure()
-                ) {
-                    Log.w(
-                        TAG,
-                        "Decoder failure (${error.errorCodeName}); retrying with app decoders",
-                        error,
-                    )
-                    fallbackStartPositionMs = exoPlayer.currentPosition.coerceAtLeast(0L)
-                    decoderPriorityOverride = DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                    latestOnError.value(null)
+
+                val isSourceError = error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW ||
+                        error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+                        error.cause?.toString()?.contains("UnrecognizedInputFormatException") == true
+
+                if (isSourceError && !probeAttempted) {
+                    probeAttempted = true
+                    coroutineScope.launch {
+                        val probedMime = withContext(Dispatchers.IO) {
+                            probeMimeType(sourceUrl, sanitizedSourceHeaders)
+                        }
+                        if (probedMime != null) {
+                            Log.d(TAG, "Playback failed with source error. Probed MIME type: $probedMime. Retrying...")
+                            resolvedMediaItem = MediaItem.Builder()
+                                .setUri(sourceUrl)
+                                .setMimeType(probedMime)
+                                .build()
+                            latestOnError.value(null)
+                            return@launch
+                        }
+                        reportPlayerError(error)
+                    }
                     return
                 }
-                latestOnError.value(error.localizedMessage ?: runBlocking { getString(Res.string.player_unable_to_play_stream) })
+
+                reportPlayerError(error)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
