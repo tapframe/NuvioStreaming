@@ -96,6 +96,43 @@ object ThemeColors {
         backgroundCard = Color(0xFF222222),
     )
 
+    val NeonYellow = ThemeColorPalette(
+        secondary = Color(0xFFE7FE00),
+        secondaryVariant = Color(0xFFB5C600),
+        nativeAccentHex = "#E7FE00",
+        onSecondary = Color(0xFF000000),
+        onSecondaryVariant = Color(0xFF000000),
+        focusRing = Color(0xFFE7FE00),
+        focusBackground = Color(0xFF262900),
+        background = Color(0xFF0D0D0D),
+        backgroundElevated = Color(0xFF1A1A1A),
+        backgroundCard = Color(0xFF24241A),
+    )
+
+    val AnthraciteGrey = ThemeColorPalette(
+        secondary = Color(0xFF708090),
+        secondaryVariant = Color(0xFF4F5D65),
+        nativeAccentHex = "#708090",
+        focusRing = Color(0xFF90A4AE),
+        focusBackground = Color(0xFF232D33),
+        background = Color(0xFF12161A),
+        backgroundElevated = Color(0xFF1C2227),
+        backgroundCard = Color(0xFF252D34),
+    )
+
+    val PastelPink = ThemeColorPalette(
+        secondary = Color(0xFFFFB7B2),
+        secondaryVariant = Color(0xFFE09893),
+        nativeAccentHex = "#FFB7B2",
+        onSecondary = Color(0xFF111111),
+        onSecondaryVariant = Color(0xFF111111),
+        focusRing = Color(0xFFECB6C1),
+        focusBackground = Color(0xFF3D2224),
+        background = Color(0xFF0F0D0E),
+        backgroundElevated = Color(0xFF1E1A1C),
+        backgroundCard = Color(0xFF241A1C),
+    )
+
     fun getColorPalette(theme: AppTheme): ThemeColorPalette = when (theme) {
         AppTheme.CRIMSON -> Crimson
         AppTheme.OCEAN -> Ocean
@@ -104,5 +141,8 @@ object ThemeColors {
         AppTheme.AMBER -> Amber
         AppTheme.ROSE -> Rose
         AppTheme.WHITE -> White
+        AppTheme.NEON_YELLOW -> NeonYellow
+        AppTheme.ANTHRACITE_GREY -> AnthraciteGrey
+        AppTheme.PASTEL_PINK -> PastelPink
     }
 }
