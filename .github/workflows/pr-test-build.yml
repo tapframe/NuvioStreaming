@@ -1,0 +1,247 @@
+name: PR test build
+
+# Two flows in one workflow:
+#   1. When a PR is opened, the bot drops a greeting that tells the author
+#      how to request a testable APK.
+#   2. When anyone comments `!test-build` on a PR, build the Android APK from
+#      the PR head and reply with a download link. Maintainer comments get a
+#      fully-configured build (runtime secrets injected); everyone else gets
+#      an APK built with empty runtime config, so the binary can be installed
+#      but cannot exfiltrate secrets.
+
+on:
+  pull_request:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  greet:
+    name: Greet new PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post greeting comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              `### Thanks for the PR! :tada:`,
+              ``,
+              `If you'd like a **testable Android APK** built from this branch, post a comment containing:`,
+              ``,
+              '```',
+              '!test-build',
+              '```',
+              ``,
+              `A maintainer triggering the build will produce a fully-configured APK. Builds triggered by non-maintainers run **without runtime config** (Supabase, Trakt, IntroDB, IMDB, community URLs are empty) so the binary is installable but cannot reach those services.`,
+            ].join('\n')
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            })
+
+  test-build:
+    name: Build APK for PR
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      startsWith(github.event.comment.body, '!test-build')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Acknowledge command (rocket reaction)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'rocket',
+            })
+
+      # author_association reflects the commenter's relationship to the BASE
+      # repo (not the fork), which is exactly what we want for trust gating.
+      # Trusted associations: repo owner, org member, or explicit collaborator.
+      - name: Resolve PR metadata and trust level
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            })
+            const trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR']
+            const trusted = trustedAssociations.includes(
+              context.payload.comment.author_association
+            )
+            core.setOutput('sha', pr.data.head.sha)
+            core.setOutput('short_sha', pr.data.head.sha.slice(0, 7))
+            core.setOutput('repo_full_name', pr.data.head.repo.full_name)
+            core.setOutput('trusted', trusted ? 'true' : 'false')
+            core.info(`PR #${context.issue.number} head: ${pr.data.head.sha}`)
+            core.info(`Commenter association: ${context.payload.comment.author_association} (trusted=${trusted})`)
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pr.outputs.repo_full_name }}
+          ref: ${{ steps.pr.outputs.sha }}
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # Runtime config only flows in for trusted commenters. Untrusted builds
+      # configure the build script with no local.properties, so the generated
+      # config classes hold empty strings — same behavior as a fresh clone.
+      - name: Write runtime config to local.properties (trusted only)
+        if: steps.pr.outputs.trusted == 'true'
+        uses: ./.github/actions/write-runtime-config
+        with:
+          supabase-url: ${{ secrets.SUPABASE_URL }}
+          supabase-anon-key: ${{ secrets.SUPABASE_ANON_KEY }}
+          trakt-client-id: ${{ secrets.TRAKT_CLIENT_ID }}
+          trakt-client-secret: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          trakt-redirect-uri: ${{ secrets.TRAKT_REDIRECT_URI }}
+          introdb-api-url: ${{ secrets.INTRODB_API_URL }}
+          imdb-ratings-api-base-url: ${{ secrets.IMDB_RATINGS_API_BASE_URL }}
+          imdb-tapframe-api-base-url: ${{ secrets.IMDB_TAPFRAME_API_BASE_URL }}
+          contributions-url: ${{ secrets.CONTRIBUTIONS_URL }}
+          donations-base-url: ${{ secrets.DONATIONS_BASE_URL }}
+          donations-donate-url: ${{ secrets.DONATIONS_DONATE_URL }}
+
+      - name: Build Android APK (full, debug)
+        run: ./gradlew :composeApp:assembleFullDebug --stacktrace
+
+      - name: Stage APK with descriptive name
+        id: stage
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          src=$(ls composeApp/build/outputs/apk/full/debug/composeApp-full-debug*.apk 2>/dev/null | head -n1 || true)
+          if [[ -z "$src" ]]; then
+            echo "::error::Built APK not found under composeApp/build/outputs/apk/full/debug/"
+            ls -la composeApp/build/outputs/apk/full/debug/ || true
+            exit 1
+          fi
+          apk_name="Nuvio-pr${PR_NUMBER}-${SHORT_SHA}-full-debug.apk"
+          cp "$src" "artifacts/$apk_name"
+          echo "apk_name=$apk_name" >> "$GITHUB_OUTPUT"
+          ls -la artifacts/
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
+          SHORT_SHA: ${{ steps.pr.outputs.short_sha }}
+
+      - name: Upload APK artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.stage.outputs.apk_name }}
+          path: artifacts/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Post download comment
+        if: success()
+        uses: actions/github-script@v7
+        env:
+          TRUSTED: ${{ steps.pr.outputs.trusted }}
+          APK_NAME: ${{ steps.stage.outputs.apk_name }}
+          ARTIFACT_NAME: ${{ steps.stage.outputs.apk_name }}
+          PR_SHORT_SHA: ${{ steps.pr.outputs.short_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const trusted = process.env.TRUSTED === 'true'
+            const apkName = process.env.APK_NAME
+            const artifactName = process.env.ARTIFACT_NAME
+            const runUrl = process.env.RUN_URL
+            const prShortSha = process.env.PR_SHORT_SHA
+
+            const cfgBanner = trusted
+              ? ':white_check_mark: Built **with** runtime config — fully functional.'
+              : ':warning: Built **without** runtime config — Supabase, Trakt, IntroDB, IMDB, and community URLs are empty. The app installs and runs but cannot reach those services. A maintainer can re-trigger by commenting `!test-build` for a fully-configured build.'
+
+            // --- Download section: GitHub workflow artifact (requires login) ---
+            const downloadSection = [
+              '### Download',
+              '',
+              `[**Open workflow run**](${runUrl}) → scroll to the **Artifacts** section → \`${artifactName}\``,
+              '',
+              '_Downloading workflow artifacts requires being signed in to GitHub._',
+            ].join('\n')
+
+            // --- Alternative: nightly.link (public, no GitHub login required) ---
+            // To swap the download mechanism, delete `downloadSection` above and
+            // uncomment the block below. nightly.link is a third-party rewriter
+            // (https://nightly.link) that exposes workflow artifacts as
+            // unauthenticated download URLs.
+            //
+            // const nightlyUrl =
+            //   `https://nightly.link/${context.repo.owner}/${context.repo.repo}` +
+            //   `/actions/runs/${context.runId}/${artifactName}.zip`
+            // const downloadSection = [
+            //   '### Download',
+            //   '',
+            //   `[**\`${apkName}\` (zip)**](${nightlyUrl}) — public link via [nightly.link](https://nightly.link), no GitHub login required.`,
+            //   '',
+            //   `Alternative: [open workflow run](${runUrl}) and grab the artifact directly (login required).`,
+            // ].join('\n')
+
+            const body = [
+              '### Test build ready',
+              '',
+              cfgBanner,
+              '',
+              `Built from PR head \`${prShortSha}\`. Artifact retained for 14 days.`,
+              '',
+              downloadSection,
+            ].join('\n')
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            })
+
+      - name: Post failure comment
+        if: failure()
+        uses: actions/github-script@v7
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const body = [
+              '### Test build failed :x:',
+              '',
+              `The Android build for this PR did not complete. See [workflow run](${process.env.RUN_URL}) for logs.`,
+            ].join('\n')
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            })
