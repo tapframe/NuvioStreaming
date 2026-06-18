@@ -291,6 +291,8 @@ object DownloadsRepository {
 
     private fun startDownload(item: DownloadItem) {
         val request = DownloadPlatformRequest(
+            downloadId = item.id,
+            displayTitle = item.title,
             sourceUrl = item.sourceUrl,
             sourceHeaders = item.sourceHeaders,
             destinationFileName = item.fileName,
