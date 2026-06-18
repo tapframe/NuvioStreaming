@@ -394,6 +394,8 @@
   <string name="settings_meta_collection_description">Riga dedicata a collezioni o franchise correlati.</string>
   <string name="settings_meta_comments">Commenti</string>
   <string name="settings_meta_comments_description">Sezione commenti di Trakt.</string>
+  <string name="settings_meta_hero_trailer_playback">Riproduzione trailer nell'area Hero</string>
+  <string name="settings_meta_hero_trailer_playback_description">Mostra l'anteprima del trailer nella "hero area" dei metadati quando disponibile.</string>
   <string name="settings_meta_details">Dettagli</string>
   <string name="settings_meta_details_description">Durata, stato, uscita, lingua e info correlate.</string>
   <string name="settings_meta_episode_cards">Schede episodi</string>
@@ -1400,6 +1402,21 @@
   <string name="parental_severity_moderate">Moderata</string>
   <string name="parental_severity_severe">Grave</string>
   <string name="parental_violence">Violenza</string>
+  <!--PLUGIN PAGE ITA-->
+  <string name="plugins_badge_disabled">Plugins disabilitati</string>
+  <string name="plugins_badge_enabled">Plugins abilitati</string>
+  <string name="plugins_button_install_repo">Installa Repository Plugin</string>
+  <string name="plugins_button_installing">Installazione…</string>
+  <string name="plugins_cd_delete_repo">Elimina plugin repository</string>
+  <string name="plugins_cd_refresh_repo">Aggiorna repository plugin</string>
+  <string name="plugins_empty_providers">Nessun fornitore disponibile.</string>
+  <string name="plugins_empty_repos_subtitle">Aggiungi l'URL di una repository per installare i plugin del provider per il rilevamento dei flussi.</string>
+  <string name="plugins_empty_repos_title">Nessun repository di plugin installata.</string>
+  <string name="plugins_section_add_repo">AGGIUNGI REPOSITORY</string>
+  <string name="plugins_section_installed_repos">REPOSITORI INSTALLATE</string>
+  <string name="plugins_section_overview">PANORAMICA</string>
+  <string name="plugins_section_providers">FORNITORI</string>
+
   <string name="cw_airs_date">In onda il %1$s</string>
   <string name="cw_airs_today">In onda oggi</string>
   <string name="cw_airs_tomorrow">In onda domani</string>
