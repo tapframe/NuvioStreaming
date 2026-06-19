@@ -1166,6 +1166,7 @@ private fun VlcPlayerSurface(
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
     val playerSettings by PlayerSettingsRepository.uiState.collectAsState()
+    val videoLayoutRef = remember { arrayOfNulls<VLCVideoLayout>(1) }
 
     val libVLC = remember {
         val options = ArrayList<String>()
@@ -1327,10 +1328,15 @@ private fun VlcPlayerSurface(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_START -> {
+                    videoLayoutRef[0]?.let {
+                        mediaPlayer.detachViews()
+                        mediaPlayer.attachViews(it, null, true, false)
+                    }
                     if (playWhenReady) mediaPlayer.play()
                 }
                 Lifecycle.Event.ON_STOP -> {
                     mediaPlayer.pause()
+                    mediaPlayer.detachViews()
                 }
                 else -> Unit
             }
@@ -1339,6 +1345,7 @@ private fun VlcPlayerSurface(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             mediaPlayer.stop()
+            mediaPlayer.detachViews()
             mediaPlayer.release()
             libVLC.release()
         }
@@ -1451,6 +1458,8 @@ private fun VlcPlayerSurface(
         factory = { viewContext ->
             VLCVideoLayout(viewContext).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+                videoLayoutRef[0] = this
+                mediaPlayer.detachViews()
                 mediaPlayer.attachViews(this, null, true, false)
             }
         },
