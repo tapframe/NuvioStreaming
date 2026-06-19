@@ -145,7 +145,20 @@ internal class FetchBridge(private val pluginId: String) : HostModule {
                 }
 
                 if (isCloudflareBlocked(retryResponse.status, retryResponse.headers)) {
-                    log.w { "CF: retry still blocked (${retryResponse.status}) at $retryUrl; evicting session" }
+                    log.w { "CF: retry still blocked (${retryResponse.status}) at $retryUrl; trying WebView fetch fallback" }
+                    val renderedResponse = runBlocking {
+                        cfSolver.fetchRenderedPage(
+                            url = retryUrl,
+                            headers = webViewHeaders(retryHeaders),
+                        )
+                    }
+
+                    if (renderedResponse != null && !isRenderedCloudflareBlocked(renderedResponse)) {
+                        log.i { "CF: WebView fetch fallback success for ${renderedResponse.url}" }
+                        return buildResponseJson(renderedResponse)
+                    }
+
+                    log.w { "CF: WebView fetch fallback failed for $retryUrl; evicting session" }
                     CfSessionCache.evict(host, pluginId)
                     solveResult.redirectUrl?.let { CfSessionCache.evict(extractHost(it), pluginId) }
                 } else {
@@ -162,6 +175,22 @@ internal class FetchBridge(private val pluginId: String) : HostModule {
     }
 
     private fun buildResponseJson(response: com.nuvio.app.features.addons.RawHttpResponse): String {
+        val responseHeaders = response.headers.mapKeys { (key, _) -> key.lowercase() }
+            .mapValues { (_, value) -> truncateString(value, MAX_FETCH_HEADER_VALUE_CHARS) }
+        val result = JsonObject(
+            mapOf(
+                "ok" to JsonPrimitive(response.status in 200..299),
+                "status" to JsonPrimitive(response.status),
+                "statusText" to JsonPrimitive(response.statusText),
+                "url" to JsonPrimitive(response.url),
+                "body" to JsonPrimitive(response.body),
+                "headers" to JsonObject(responseHeaders.mapValues { JsonPrimitive(it.value) }),
+            ),
+        )
+        return result.toString()
+    }
+
+    private fun buildResponseJson(response: WebViewFetchResult): String {
         val responseHeaders = response.headers.mapKeys { (key, _) -> key.lowercase() }
             .mapValues { (_, value) -> truncateString(value, MAX_FETCH_HEADER_VALUE_CHARS) }
         val result = JsonObject(
@@ -194,6 +223,16 @@ internal class FetchBridge(private val pluginId: String) : HostModule {
         val hasCfServer = CF_SERVER_MARKERS.any { marker -> server.contains(marker) }
         val hasCfHeaders = headers.keys.any { key -> key.lowercase().startsWith("cf-") }
         return hasCfServer || hasCfHeaders
+    }
+
+    private fun isRenderedCloudflareBlocked(response: WebViewFetchResult): Boolean {
+        if (isCloudflareBlocked(response.status, response.headers)) return true
+        val body = response.body.lowercase()
+        return body.contains("cf-browser-verification") ||
+            body.contains("challenge-platform") ||
+            body.contains("cf-challenge-running") ||
+            body.contains("turnstile-wrapper") ||
+            body.contains("just a moment")
     }
 
     private fun mergeCookies(existing: String, extra: String): String {

@@ -13,6 +13,14 @@ internal data class CfSolveResult(
     val redirectUrl: String? = null,
 )
 
+internal data class WebViewFetchResult(
+    val status: Int,
+    val statusText: String,
+    val url: String,
+    val body: String,
+    val headers: Map<String, String> = emptyMap(),
+)
+
 internal interface WebViewSolver {
     suspend fun solve(
         url: String,
@@ -20,6 +28,12 @@ internal interface WebViewSolver {
         forceFresh: Boolean = false,
         timeoutMs: Long = 60_000L,
     ): CfSolveResult?
+
+    suspend fun fetchRenderedPage(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        timeoutMs: Long = 60_000L,
+    ): WebViewFetchResult? = null
 }
 
 internal fun createPlatformWebViewSolver(): WebViewSolver = platformWebViewSolverImpl()
