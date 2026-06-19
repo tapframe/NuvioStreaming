@@ -3,6 +3,8 @@ package com.nuvio.app.features.player
 import kotlinx.serialization.json.JsonObject
 
 internal expect object PlayerSettingsStorage {
+    fun loadAndroidInternalPlayerMode(): String?
+    fun saveAndroidInternalPlayerMode(mode: String)
     fun loadShowLoadingOverlay(): Boolean?
     fun saveShowLoadingOverlay(enabled: Boolean)
     fun loadResizeMode(): String?

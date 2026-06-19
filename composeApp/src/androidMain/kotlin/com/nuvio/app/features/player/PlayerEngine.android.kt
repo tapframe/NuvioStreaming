@@ -10,6 +10,7 @@ import android.util.TypedValue
 import android.graphics.Typeface
 import android.os.Build
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Composable
@@ -66,8 +67,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.util.VLCVideoLayout
+import org.videolan.libvlc.interfaces.IMedia
+
+
 
 private const val TAG = "NuvioPlayer"
+
+
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
@@ -92,10 +102,29 @@ actual fun PlatformPlayerSurface(
     val latestOnError = rememberUpdatedState(onError)
     val coroutineScope = rememberCoroutineScope()
 
-    val playerSettings = remember {
+    LaunchedEffect(Unit) {
         PlayerSettingsRepository.ensureLoaded()
-        PlayerSettingsRepository.uiState.value
     }
+    val playerSettings by PlayerSettingsRepository.uiState.collectAsState()
+
+    val internalPlayerMode = playerSettings.androidInternalPlayerMode
+
+
+    if (internalPlayerMode == InternalPlayerMode.LIBVLC) {
+        VlcPlayerSurface(
+            sourceUrl = sourceUrl,
+            sourceAudioUrl = sourceAudioUrl,
+            sourceHeaders = sourceHeaders,
+            playWhenReady = playWhenReady,
+            resizeMode = resizeMode,
+            onControllerReady = onControllerReady,
+            onSnapshot = onSnapshot,
+            onError = onError,
+            modifier = modifier,
+        )
+        return
+    }
+
 
     val sanitizedSourceHeaders = remember(sourceHeaders) {
         sanitizePlaybackHeaders(sourceHeaders)
@@ -246,6 +275,33 @@ actual fun PlatformPlayerSurface(
         val mediaItem = resolvedMediaItem ?: return@LaunchedEffect
         exoPlayer.setPlaybackMediaItem(mediaItem, fallbackStartPositionMs)
         exoPlayer.prepare()
+    }
+
+    val audioLanguages = remember(playerSettings.preferredAudioLanguage, playerSettings.secondaryPreferredAudioLanguage) {
+        resolvePreferredAudioLanguageTargets(
+            playerSettings.preferredAudioLanguage,
+            playerSettings.secondaryPreferredAudioLanguage,
+            DeviceLanguagePreferences.preferredLanguageCodes()
+        )
+    }
+    
+    val subtitleLanguages = remember(playerSettings.preferredSubtitleLanguage, playerSettings.secondaryPreferredSubtitleLanguage) {
+        resolvePreferredSubtitleLanguageTargets(
+            playerSettings.preferredSubtitleLanguage,
+            playerSettings.secondaryPreferredSubtitleLanguage,
+            DeviceLanguagePreferences.preferredLanguageCodes()
+        )
+    }
+
+    val preferredSubtitleLanguage = playerSettings.preferredSubtitleLanguage
+    LaunchedEffect(exoPlayer, audioLanguages, subtitleLanguages, preferredSubtitleLanguage) {
+        val disableSubtitles = preferredSubtitleLanguage == SubtitleLanguageOption.NONE
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            .buildUpon()
+            .setPreferredAudioLanguages(*audioLanguages.toTypedArray())
+            .setPreferredTextLanguages(*subtitleLanguages.toTypedArray())
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, disableSubtitles)
+            .build()
     }
 
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
@@ -1092,3 +1148,316 @@ private fun guessSubtitleMime(url: String): String {
         else -> MimeTypes.TEXT_VTT
     }
 }
+
+@Composable
+private fun VlcPlayerSurface(
+    sourceUrl: String,
+    sourceAudioUrl: String?,
+    sourceHeaders: Map<String, String>,
+    playWhenReady: Boolean,
+    resizeMode: PlayerResizeMode,
+    onControllerReady: (PlayerEngineController) -> Unit,
+    onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
+    onError: (String?) -> Unit,
+    modifier: Modifier,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val latestOnSnapshot = rememberUpdatedState(onSnapshot)
+    val latestOnError = rememberUpdatedState(onError)
+    val playerSettings by PlayerSettingsRepository.uiState.collectAsState()
+
+    val libVLC = remember {
+        val options = ArrayList<String>()
+        options.add("--http-reconnect")
+        options.add("--network-caching=3000")
+        LibVLC(context, options)
+    }
+
+    val mediaPlayer = remember(libVLC) {
+        MediaPlayer(libVLC)
+    }
+
+    LaunchedEffect(mediaPlayer) {
+        latestOnSnapshot.value(
+            PlayerPlaybackSnapshot(
+                isLoading = true,
+                isPlaying = playWhenReady,
+                isEnded = false,
+                durationMs = 0L,
+                positionMs = 0L,
+                bufferedPositionMs = 0L,
+                playbackSpeed = 1f,
+            )
+        )
+    }
+
+    LaunchedEffect(mediaPlayer, sourceUrl) {
+        val audioLanguages = resolvePreferredAudioLanguageTargets(
+            playerSettings.preferredAudioLanguage,
+            playerSettings.secondaryPreferredAudioLanguage,
+            DeviceLanguagePreferences.preferredLanguageCodes()
+        )
+        val subtitleLanguages = resolvePreferredSubtitleLanguageTargets(
+            playerSettings.preferredSubtitleLanguage,
+            playerSettings.secondaryPreferredSubtitleLanguage,
+            DeviceLanguagePreferences.preferredLanguageCodes()
+        )
+
+        val media = Media(libVLC, Uri.parse(sourceUrl))
+        sourceHeaders.forEach { (key, value) ->
+            if (key.equals("User-Agent", ignoreCase = true)) {
+                media.addOption(":http-user-agent=$value")
+            } else if (key.equals("Referer", ignoreCase = true)) {
+                media.addOption(":http-referrer=$value")
+            }
+        }
+        if (audioLanguages.isNotEmpty()) {
+            media.addOption(":audio-language=${audioLanguages.joinToString(",")}")
+        }
+        if (subtitleLanguages.isNotEmpty()) {
+            media.addOption(":sub-language=${subtitleLanguages.joinToString(",")}")
+        }
+        val preferSoftwareDecoding = playerSettings.decoderPriority == DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+        media.setHWDecoderEnabled(!preferSoftwareDecoding, false)
+        mediaPlayer.media = media
+        media.release()
+        if (playWhenReady) {
+            mediaPlayer.play()
+        }
+    }
+
+    LaunchedEffect(mediaPlayer, playWhenReady) {
+        if (playWhenReady) {
+            mediaPlayer.play()
+        } else {
+            mediaPlayer.pause()
+        }
+    }
+
+    LaunchedEffect(mediaPlayer, resizeMode) {
+        when (resizeMode) {
+            PlayerResizeMode.Fit -> mediaPlayer.videoScale = MediaPlayer.ScaleType.SURFACE_BEST_FIT
+            PlayerResizeMode.Fill -> mediaPlayer.videoScale = MediaPlayer.ScaleType.SURFACE_FILL
+            PlayerResizeMode.Zoom -> mediaPlayer.videoScale = MediaPlayer.ScaleType.SURFACE_16_9
+        }
+    }
+
+    DisposableEffect(mediaPlayer) {
+        var isCurrentlyBuffering = true
+        var hasVout = false
+        var lastBufferedPositionMs = 0L
+
+        val listener = MediaPlayer.EventListener { event ->
+            when (event.type) {
+                MediaPlayer.Event.Vout -> {
+                    hasVout = event.voutCount > 0
+                }
+                MediaPlayer.Event.Buffering -> {
+                    isCurrentlyBuffering = event.buffering < 100f
+                    lastBufferedPositionMs = mediaPlayer.time + (mediaPlayer.length * (event.buffering / 100f)).toLong()
+                }
+            }
+
+            val hasVideo = mediaPlayer.videoTracksCount > 0
+            val isLoading = if (hasVideo) {
+                isCurrentlyBuffering || !hasVout
+            } else {
+                isCurrentlyBuffering && mediaPlayer.time == 0L
+            }
+
+            when (event.type) {
+                MediaPlayer.Event.Vout,
+                MediaPlayer.Event.Buffering,
+                MediaPlayer.Event.Playing,
+                MediaPlayer.Event.TimeChanged -> {
+                    if (event.type == MediaPlayer.Event.Playing) {
+                        latestOnError.value(null)
+                    }
+                    latestOnSnapshot.value(
+                        PlayerPlaybackSnapshot(
+                            isLoading = isLoading,
+                            isPlaying = mediaPlayer.isPlaying,
+                            isEnded = false,
+                            durationMs = mediaPlayer.length,
+                            positionMs = mediaPlayer.time,
+                            bufferedPositionMs = lastBufferedPositionMs.coerceAtLeast(mediaPlayer.time),
+                            playbackSpeed = mediaPlayer.rate,
+                        )
+                    )
+                }
+                MediaPlayer.Event.Paused -> {
+                    latestOnSnapshot.value(
+                        PlayerPlaybackSnapshot(
+                            isLoading = isLoading,
+                            isPlaying = false,
+                            isEnded = false,
+                            durationMs = mediaPlayer.length,
+                            positionMs = mediaPlayer.time,
+                            bufferedPositionMs = lastBufferedPositionMs.coerceAtLeast(mediaPlayer.time),
+                            playbackSpeed = mediaPlayer.rate,
+                        )
+                    )
+                }
+                MediaPlayer.Event.EndReached -> {
+                    latestOnSnapshot.value(
+                        PlayerPlaybackSnapshot(
+                            isLoading = false,
+                            isPlaying = false,
+                            isEnded = true,
+                            durationMs = mediaPlayer.length,
+                            positionMs = mediaPlayer.time,
+                            bufferedPositionMs = mediaPlayer.length,
+                            playbackSpeed = mediaPlayer.rate,
+                        )
+                    )
+                }
+                MediaPlayer.Event.EncounteredError -> {
+                    latestOnError.value("VLC playback error")
+                }
+            }
+        }
+        mediaPlayer.setEventListener(listener)
+        onDispose {
+            mediaPlayer.setEventListener(null)
+        }
+    }
+
+    DisposableEffect(mediaPlayer, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> {
+                    if (playWhenReady) mediaPlayer.play()
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    mediaPlayer.pause()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            mediaPlayer.stop()
+            mediaPlayer.release()
+            libVLC.release()
+        }
+    }
+
+    LaunchedEffect(mediaPlayer) {
+        onControllerReady(
+            object : PlayerEngineController {
+                override fun play() {
+                    mediaPlayer.play()
+                }
+
+                override fun pause() {
+                    mediaPlayer.pause()
+                }
+
+                override fun seekTo(positionMs: Long) {
+                    mediaPlayer.time = positionMs
+                }
+
+                override fun seekBy(offsetMs: Long) {
+                    mediaPlayer.time = (mediaPlayer.time + offsetMs).coerceAtLeast(0)
+                }
+
+                override fun retry() {
+                    mediaPlayer.play()
+                }
+
+                override fun setPlaybackSpeed(speed: Float) {
+                    mediaPlayer.rate = speed
+                }
+
+                override fun getAudioTracks(): List<AudioTrack> {
+                    val tracks = mutableListOf<AudioTrack>()
+                    mediaPlayer.audioTracks?.forEach { t ->
+                        tracks.add(
+                            AudioTrack(
+                                index = t.id,
+                                id = t.id.toString(),
+                                label = t.name,
+                                language = "",
+                                isSelected = t.id == mediaPlayer.audioTrack
+                            )
+                        )
+                    }
+                    return tracks
+                }
+
+                override fun getSubtitleTracks(): List<SubtitleTrack> {
+                    val tracks = mutableListOf<SubtitleTrack>()
+                    mediaPlayer.spuTracks?.forEach { t ->
+                        tracks.add(
+                            SubtitleTrack(
+                                index = t.id,
+                                id = t.id.toString(),
+                                label = t.name,
+                                language = "",
+                                isSelected = t.id == mediaPlayer.spuTrack,
+                                isForced = false
+                            )
+                        )
+                    }
+                    return tracks
+                }
+
+                override fun selectAudioTrack(index: Int) {
+                    mediaPlayer.audioTrack = index
+                }
+
+                override fun selectSubtitleTrack(index: Int) {
+                    mediaPlayer.spuTrack = index
+                }
+
+                override fun setSubtitleUri(url: String) {
+                    mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.parse(url), true)
+                }
+
+                override fun clearExternalSubtitle() {
+                    mediaPlayer.spuTrack = -1
+                }
+
+                override fun clearExternalSubtitleAndSelect(trackIndex: Int) {
+                    mediaPlayer.spuTrack = trackIndex
+                }
+            }
+        )
+    }
+
+    LaunchedEffect(mediaPlayer) {
+        while (isActive) {
+            if (mediaPlayer.isPlaying) {
+                latestOnSnapshot.value(
+                    PlayerPlaybackSnapshot(
+                        isLoading = false,
+                        isPlaying = true,
+                        isEnded = false,
+                        durationMs = mediaPlayer.length,
+                        positionMs = mediaPlayer.time,
+                        bufferedPositionMs = mediaPlayer.time,
+                        playbackSpeed = mediaPlayer.rate,
+                    )
+                )
+            }
+            delay(500L)
+        }
+    }
+
+    AndroidView(
+        modifier = modifier,
+        factory = { viewContext ->
+            VLCVideoLayout(viewContext).apply {
+                layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+                mediaPlayer.attachViews(this, null, true, false)
+            }
+        },
+        update = {
+            it.keepScreenOn = mediaPlayer.isPlaying
+        }
+    )
+}
+
+

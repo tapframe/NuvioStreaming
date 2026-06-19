@@ -77,6 +77,7 @@ quickjs-kt = { module = "io.github.dokar3:quickjs-kt", version.ref = "quickjsKt"
 ksoup = { module = "com.fleeksoft.ksoup:ksoup", version.ref = "ksoup" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugarJdkLibs" }
+libvlc = { module = "org.videolan.android:libvlc-all", version = "3.6.5" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -65,6 +65,7 @@ import com.nuvio.app.features.player.localizedLabel
 import com.nuvio.app.features.player.IosTargetPrimaries
 import com.nuvio.app.features.player.IosTargetTransfer
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.InternalPlayerMode
 import com.nuvio.app.features.player.STREAM_AUTO_PLAY_TIMEOUT_VALUES
 import com.nuvio.app.features.player.SubtitleBackgroundColorSwatches
 import com.nuvio.app.features.player.SubtitleColorSwatches
@@ -270,6 +271,7 @@ private fun PlaybackSettingsSection(
     var showExternalPlayerAppDialog by remember { mutableStateOf(false) }
     var showReuseCacheDurationDialog by remember { mutableStateOf(false) }
     var showDecoderPriorityDialog by remember { mutableStateOf(false) }
+    var showAndroidInternalPlayerModeDialog by remember { mutableStateOf(false) }
     var showHoldToSpeedValueDialog by remember { mutableStateOf(false) }
     var showIosAudioOutputDialog by remember { mutableStateOf(false) }
     var showIosHardwareDecoderDialog by remember { mutableStateOf(false) }
@@ -329,6 +331,18 @@ private fun PlaybackSettingsSection(
                     isTablet = isTablet,
                     onClick = { showExternalPlayerDialog = true },
                 )
+                if (!isIos && !autoPlayPlayerSettings.externalPlayerEnabled) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_playback_android_internal_player),
+                        description = when (autoPlayPlayerSettings.androidInternalPlayerMode) {
+                            InternalPlayerMode.EXOPLAYER -> "ExoPlayer (Default)"
+                            InternalPlayerMode.LIBVLC -> "libvlc"
+                        },
+                        isTablet = isTablet,
+                        onClick = { showAndroidInternalPlayerModeDialog = true },
+                    )
+                }
                 if (isIos && autoPlayPlayerSettings.externalPlayerEnabled) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsNavigationRow(
@@ -1263,6 +1277,25 @@ private fun PlaybackSettingsSection(
                 showDecoderPriorityDialog = false
             },
             onDismiss = { showDecoderPriorityDialog = false },
+        )
+    }
+
+    if (showAndroidInternalPlayerModeDialog) {
+        IosEnumSelectionDialog(
+            title = stringResource(Res.string.settings_playback_android_internal_player_dialog_title),
+            options = InternalPlayerMode.entries,
+            selected = autoPlayPlayerSettings.androidInternalPlayerMode,
+            label = {
+                when (it) {
+                    InternalPlayerMode.EXOPLAYER -> "ExoPlayer (Default)"
+                    InternalPlayerMode.LIBVLC -> "libvlc"
+                }
+            },
+            onSelect = { mode ->
+                PlayerSettingsRepository.setAndroidInternalPlayerMode(mode)
+                showAndroidInternalPlayerModeDialog = false
+            },
+            onDismiss = { showAndroidInternalPlayerModeDialog = false },
         )
     }
 

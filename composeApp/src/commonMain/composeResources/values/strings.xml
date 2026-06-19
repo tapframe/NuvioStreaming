@@ -829,6 +829,9 @@
     <string name="settings_playback_decoder_prefer_app">Prefer app decoders (FFmpeg)</string>
     <string name="settings_playback_decoder_prefer_device">Prefer device decoders</string>
     <string name="settings_playback_decoder_priority">Decoder Priority</string>
+    <string name="settings_playback_android_internal_player">Internal Player Engine</string>
+    <string name="settings_playback_android_internal_player_description">Choose the backend engine to use for internal playback on Android</string>
+    <string name="settings_playback_android_internal_player_dialog_title">Internal Player Engine</string>
     <string name="settings_playback_dialog_close">Tap outside to close</string>
     <string name="settings_playback_dialog_save_close">Tap outside to save &amp; close</string>
     <string name="settings_playback_duration_day_one">%1$d day</string>
