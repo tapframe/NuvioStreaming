@@ -25,6 +25,20 @@ internal object PluginStorage {
             forKey = "settings_${scraperId}",
         )
     }
+
+    fun loadCfSession(host: String): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey("cf_session_${host}")
+
+    fun saveCfSession(host: String, payload: String) {
+        NSUserDefaults.standardUserDefaults.setObject(
+            payload,
+            forKey = "cf_session_${host}",
+        )
+    }
+
+    fun removeCfSession(host: String) {
+        NSUserDefaults.standardUserDefaults.removeObjectForKey("cf_session_${host}")
+    }
 }
 
 internal fun currentPluginPlatform(): String = "ios"
