@@ -26,6 +26,4 @@ internal object PluginStorage {
 
 internal fun currentPluginPlatform(): String = "android"
 
-internal fun currentPluginPlatformTags(): Set<String> = setOf(currentPluginPlatform())
-
 internal fun currentEpochMillis(): Long = System.currentTimeMillis()

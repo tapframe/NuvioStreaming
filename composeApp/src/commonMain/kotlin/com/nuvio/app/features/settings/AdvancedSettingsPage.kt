@@ -3,10 +3,13 @@ package com.nuvio.app.features.settings
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache
+import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache
 import nuvio.composeapp.generated.resources.settings_advanced_clear_cw_cache_done
@@ -43,6 +46,7 @@ internal fun LazyListScope.advancedSettingsContent(
             isTablet = isTablet,
         ) {
             SettingsGroup(isTablet = isTablet) {
+                val scope = rememberCoroutineScope()
                 var cleared by rememberSaveable { mutableStateOf(false) }
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_advanced_clear_cw_cache),
@@ -54,8 +58,13 @@ internal fun LazyListScope.advancedSettingsContent(
                     isTablet = isTablet,
                     onClick = {
                         if (!cleared) {
-                            ContinueWatchingEnrichmentCache.clearAll()
+                            ContinueWatchingEnrichmentCache.clearAll(ProfileRepository.activeProfileId)
                             cleared = true
+                            scope.launch {
+                                WatchProgressRepository.forceSnapshotRefreshFromServer(
+                                    ProfileRepository.activeProfileId,
+                                )
+                            }
                         }
                     },
                 )

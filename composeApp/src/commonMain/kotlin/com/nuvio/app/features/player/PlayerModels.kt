@@ -20,11 +20,13 @@ data class PlayerRoute(
 )
 
 data class PlayerLaunch(
+    val profileId: Int,
     val title: String,
     val sourceUrl: String,
     val sourceAudioUrl: String? = null,
     val sourceHeaders: Map<String, String> = emptyMap(),
     val sourceResponseHeaders: Map<String, String> = emptyMap(),
+    val streamType: String? = null,
     val logo: String? = null,
     val poster: String? = null,
     val background: String? = null,

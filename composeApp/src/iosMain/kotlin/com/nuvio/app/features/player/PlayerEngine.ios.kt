@@ -4,9 +4,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitViewController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,17 +41,12 @@ actual fun PlatformPlayerSurface(
     sourceAudioUrl: String?,
     sourceHeaders: Map<String, String>,
     sourceResponseHeaders: Map<String, String>,
+    streamType: String?,
     useYoutubeChunkedPlayback: Boolean,
     modifier: Modifier,
     playWhenReady: Boolean,
     resizeMode: PlayerResizeMode,
-    initialPositionMs: Long,
     useNativeController: Boolean,
-    playerControlsState: PlayerControlsState,
-    onPlayerControlsAction: (PlayerControlsAction) -> Boolean,
-    onPlayerControlsEvent: (String, Double) -> Boolean,
-    onPlayerControlsScrubChange: (Long) -> Boolean,
-    onPlayerControlsScrubFinished: (Long) -> Boolean,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
@@ -324,11 +331,42 @@ actual fun PlatformPlayerSurface(
     }
 
     // Render the player view
-    UIKitViewController(
-        factory = { bridge.createPlayerViewController() },
-        modifier = modifier,
-        interactive = false,
-    )
+    Box(modifier = modifier) {
+        UIKitViewController(
+            factory = { bridge.createPlayerViewController() },
+            modifier = Modifier.fillMaxSize(),
+            interactive = false,
+        )
+        
+        if (useNativeController) {
+            var isPlayingLocal by remember { mutableStateOf(playWhenReady) }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(if (!isPlayingLocal) Color.Black.copy(alpha = 0.4f) else Color.Transparent)
+                    .clickable {
+                        if (isPlayingLocal) {
+                            bridge.pause()
+                            isPlayingLocal = false
+                        } else {
+                            bridge.play()
+                            isPlayingLocal = true
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (!isPlayingLocal) {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(64.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun NuvioPlayerBridge.applyIosVideoOutputSettings(settings: PlayerSettingsUiState) {

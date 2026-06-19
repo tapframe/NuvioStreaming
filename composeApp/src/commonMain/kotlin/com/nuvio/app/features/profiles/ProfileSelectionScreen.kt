@@ -56,7 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import coil3.compose.AsyncImage
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import kotlinx.coroutines.delay
@@ -176,6 +176,7 @@ fun ProfileSelectionScreen(
                                         } else if (profile.pinEnabled) {
                                             pinDialogProfile = profile
                                         } else {
+                                            ProfileRepository.selectProfile(profile.profileIndex)
                                             onProfileSelected(profile)
                                         }
                                     },
@@ -216,6 +217,7 @@ fun ProfileSelectionScreen(
                                                 } else if (profile.pinEnabled) {
                                                     pinDialogProfile = profile
                                                 } else {
+                                                    ProfileRepository.selectProfile(profile.profileIndex)
                                                     onProfileSelected(profile)
                                                 }
                                             },
@@ -280,6 +282,7 @@ fun ProfileSelectionScreen(
             onVerify = { pin -> ProfileRepository.verifyPin(profile.profileIndex, pin) },
             onVerified = {
                 pinDialogProfile = null
+                ProfileRepository.selectProfile(profile.profileIndex)
                 onProfileSelected(profile)
             },
             onDismiss = { pinDialogProfile = null },

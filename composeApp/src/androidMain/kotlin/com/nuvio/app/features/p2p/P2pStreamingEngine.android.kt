@@ -2,6 +2,7 @@ package com.nuvio.app.features.p2p
 
 import android.content.Context
 import android.util.Log
+import com.nuvio.app.core.i18n.localizedP2pUnknownTorrentError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -93,7 +94,7 @@ actual object P2pStreamingEngine {
             throw e
         } catch (e: Exception) {
             if (isCurrentGeneration(generation)) {
-                _state.value = P2pStreamingState.Error(e.message ?: "Unknown torrent error")
+                _state.value = P2pStreamingState.Error(e.message ?: localizedP2pUnknownTorrentError())
             }
             throw e
         }

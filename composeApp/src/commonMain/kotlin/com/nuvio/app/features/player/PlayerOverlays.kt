@@ -47,6 +47,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,7 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.nuvioTypeScale
 import nuvio.composeapp.generated.resources.Res
@@ -122,6 +125,8 @@ internal fun OpeningOverlay(
         ),
         label = "openingOverlayContentScale",
     )
+    var logoLoadError by remember(logo) { mutableStateOf(false) }
+    val logoUrl = logo?.takeIf { it.isNotBlank() }
 
     Box(
         modifier = modifier
@@ -178,14 +183,14 @@ internal fun OpeningOverlay(
                 label = "openingOverlayP2pProgress",
             )
             val progressActive = targetProgress != null
-            if (logo != null) {
+            if (logoUrl != null && !logoLoadError) {
                 Box(
                     modifier = Modifier
                         .width(300.dp)
                         .height(180.dp),
                 ) {
                     AsyncImage(
-                        model = logo,
+                        model = logoUrl,
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxSize()
@@ -197,10 +202,11 @@ internal fun OpeningOverlay(
                                 }
                             },
                         contentScale = ContentScale.Fit,
+                        onError = { logoLoadError = true },
                     )
                     if (progressActive) {
                         AsyncImage(
-                            model = logo,
+                            model = logoUrl,
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxSize()
@@ -377,6 +383,9 @@ internal fun PauseMetadataOverlay(
     horizontalSafePadding: Dp,
     modifier: Modifier = Modifier,
 ) {
+    var logoLoadError by remember(logo) { mutableStateOf(false) }
+    val logoUrl = logo?.takeIf { it.isNotBlank() }
+
     BoxWithConstraints(
         modifier = modifier
             .background(
@@ -429,13 +438,14 @@ internal fun PauseMetadataOverlay(
             )
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(if (compactHeight) 8.dp else 12.dp))
 
-            if (!logo.isNullOrBlank()) {
+            if (logoUrl != null && !logoLoadError) {
                 AsyncImage(
-                    model = logo,
+                    model = logoUrl,
                     contentDescription = title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.BottomStart,
                     modifier = Modifier.height(logoHeight),
+                    onError = { logoLoadError = true },
                 )
             } else {
                 Text(

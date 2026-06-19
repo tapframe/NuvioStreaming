@@ -17,9 +17,6 @@ object ThemeSettingsRepository {
     private val _liquidGlassNativeTabBarEnabled = MutableStateFlow(false)
     val liquidGlassNativeTabBarEnabled: StateFlow<Boolean> = _liquidGlassNativeTabBarEnabled.asStateFlow()
 
-    private val _desktopNavigationLayout = MutableStateFlow(DesktopNavigationLayout.Default)
-    val desktopNavigationLayout: StateFlow<DesktopNavigationLayout> = _desktopNavigationLayout.asStateFlow()
-
     private val _selectedAppLanguage = MutableStateFlow(AppLanguage.ENGLISH)
     val selectedAppLanguage: StateFlow<AppLanguage> = _selectedAppLanguage.asStateFlow()
 
@@ -39,7 +36,6 @@ object ThemeSettingsRepository {
         _selectedTheme.value = AppTheme.WHITE
         _amoledEnabled.value = false
         _liquidGlassNativeTabBarEnabled.value = false
-        _desktopNavigationLayout.value = DesktopNavigationLayout.Default
         NativeTabBridge.publishAccentColor(AppTheme.WHITE.nativeTabAccentHex())
         NativeTabBridge.publishLiquidGlassEnabled(false)
         _selectedAppLanguage.value = AppLanguage.ENGLISH
@@ -63,9 +59,6 @@ object ThemeSettingsRepository {
         val liquidGlassEnabled = ThemeSettingsStorage.loadLiquidGlassNativeTabBarEnabled() ?: false
         _liquidGlassNativeTabBarEnabled.value = liquidGlassEnabled
         NativeTabBridge.publishLiquidGlassEnabled(liquidGlassEnabled)
-        _desktopNavigationLayout.value = DesktopNavigationLayout.fromName(
-            ThemeSettingsStorage.loadDesktopNavigationLayout(),
-        )
         val appLanguage = AppLanguage.fromCode(ThemeSettingsStorage.loadSelectedAppLanguage())
         ThemeSettingsStorage.applySelectedAppLanguage(appLanguage.code)
         _selectedAppLanguage.value = appLanguage
@@ -92,13 +85,6 @@ object ThemeSettingsRepository {
         _liquidGlassNativeTabBarEnabled.value = enabled
         ThemeSettingsStorage.saveLiquidGlassNativeTabBarEnabled(enabled)
         NativeTabBridge.publishLiquidGlassEnabled(enabled)
-    }
-
-    fun setDesktopNavigationLayout(layout: DesktopNavigationLayout) {
-        ensureLoaded()
-        if (_desktopNavigationLayout.value == layout) return
-        _desktopNavigationLayout.value = layout
-        ThemeSettingsStorage.saveDesktopNavigationLayout(layout.name)
     }
 
     fun setAppLanguage(language: AppLanguage) {

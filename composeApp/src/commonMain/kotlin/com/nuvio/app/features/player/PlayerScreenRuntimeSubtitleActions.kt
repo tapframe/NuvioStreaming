@@ -1,5 +1,7 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.core.i18n.localizedNoSubtitleLinesFound
+import com.nuvio.app.core.i18n.localizedSubtitleLinesLoadError
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 import kotlinx.coroutines.launch
 
@@ -33,13 +35,13 @@ internal fun PlayerScreenRuntime.loadSubtitleAutoSyncCues(force: Boolean = false
                 subtitleAutoSyncState = subtitleAutoSyncState.copy(
                     cues = cues,
                     isLoading = false,
-                    errorMessage = if (cues.isEmpty()) "No subtitle lines found" else null,
+                    errorMessage = if (cues.isEmpty()) localizedNoSubtitleLinesFound() else null,
                 )
             },
             onFailure = { error ->
                 subtitleAutoSyncState = subtitleAutoSyncState.copy(
                     isLoading = false,
-                    errorMessage = error.message ?: "Unable to load subtitle lines",
+                    errorMessage = error.message ?: localizedSubtitleLinesLoadError(),
                 )
             },
         )

@@ -21,6 +21,8 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
+-keep class com.nuvio.app.features.catalog.CatalogTargetKind { *; }
+
 # Avoid R8 merging/optimizing the stream badge chip used in lazy stream rows.
 -keep class com.nuvio.app.features.streams.StreamBadgeChipKt { *; }
 -keep class com.nuvio.app.features.streams.StreamBadgeChipSize { *; }

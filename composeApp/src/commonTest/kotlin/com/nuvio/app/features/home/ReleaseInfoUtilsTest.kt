@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home
 
+import com.nuvio.app.features.catalog.CatalogTarget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -42,9 +43,11 @@ class ReleaseInfoUtilsTest {
             title = "Popular",
             subtitle = "Addon",
             addonName = "Addon",
-            type = "movie",
-            manifestUrl = "https://example.com/manifest.json",
-            catalogId = "popular",
+            target = CatalogTarget.Addon(
+                manifestUrl = "https://example.com/manifest.json",
+                contentType = "movie",
+                catalogId = "popular",
+            ),
             items = listOf(
                 preview(id = "released", rawReleaseDate = "2026-05-01", releaseInfo = "2026"),
                 preview(id = "future", rawReleaseDate = "2026-07-01", releaseInfo = "2026"),

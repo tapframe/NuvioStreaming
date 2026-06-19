@@ -32,8 +32,12 @@ jobs:
               return labels.includes(name.toLowerCase());
             }
 
+            function escapeRegExp(value) {
+              return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            }
+
             function extractSection(title) {
-              const re = new RegExp(`^###\\s+${title.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}\\s*$`, "m");
+              const re = new RegExp(`^###\\s+${escapeRegExp(title)}\\s*$`, "m");
               const match = body.match(re);
               if (!match) return "";
               const start = match.index + match[0].length;

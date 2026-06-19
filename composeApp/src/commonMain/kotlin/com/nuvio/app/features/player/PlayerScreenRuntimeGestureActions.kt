@@ -23,6 +23,7 @@ internal data class PlayerSurfaceGestureCallbacks(
     val clearLiveGestureFeedback: State<() -> Unit>,
     val revealLockedOverlay: State<() -> Unit>,
     val isHoldToSpeedGestureActive: State<Boolean>,
+    val touchGesturesEnabled: State<Boolean>,
     val playerControlsLocked: State<Boolean>,
     val currentPositionMs: State<Long>,
     val currentDurationMs: State<Long>,
@@ -165,33 +166,10 @@ internal fun PlayerScreenRuntime.togglePlayback() {
     controlsVisible = true
 }
 
-internal fun PlayerScreenRuntime.prepareTogglePlaybackForNativeFallback(revealControls: Boolean = true) {
-    shouldPlay = !playbackSnapshot.isPlaying
-    if (revealControls) {
-        controlsVisible = true
-    }
-}
-
 internal fun PlayerScreenRuntime.seekBy(offsetMs: Long) {
     playerController?.seekBy(offsetMs)
-    applySeekByControlFeedback(offsetMs)
-}
-
-internal fun PlayerScreenRuntime.prepareSeekByForNativeFallback(
-    offsetMs: Long,
-    revealControls: Boolean = true,
-) {
-    applySeekByControlFeedback(offsetMs, revealControls)
-}
-
-private fun PlayerScreenRuntime.applySeekByControlFeedback(
-    offsetMs: Long,
-    revealControls: Boolean = true,
-) {
     scheduleProgressSyncAfterSeek()
-    if (revealControls) {
-        controlsVisible = true
-    }
+    controlsVisible = true
     when {
         offsetMs > 0L -> showSeekFeedback(PlayerSeekDirection.Forward, offsetMs)
         offsetMs < 0L -> showSeekFeedback(PlayerSeekDirection.Backward, abs(offsetMs))
@@ -199,17 +177,6 @@ private fun PlayerScreenRuntime.applySeekByControlFeedback(
 }
 
 internal fun PlayerScreenRuntime.handleDoubleTapSeek(direction: PlayerSeekDirection) {
-    handleDoubleTapSeek(direction, sendToController = true)
-}
-
-internal fun PlayerScreenRuntime.prepareDoubleTapSeekForNativeFallback(direction: PlayerSeekDirection) {
-    handleDoubleTapSeek(direction, sendToController = false)
-}
-
-private fun PlayerScreenRuntime.handleDoubleTapSeek(
-    direction: PlayerSeekDirection,
-    sendToController: Boolean,
-) {
     val currentPositionMs = playbackSnapshot.positionMs.coerceAtLeast(0L)
     val currentSeekState = accumulatedSeekState
     val nextState = if (currentSeekState?.direction == direction) {
@@ -233,9 +200,7 @@ private fun PlayerScreenRuntime.handleDoubleTapSeek(
             maxDurationMs?.let { unclamped.coerceAtMost(it) } ?: unclamped
         }
     }
-    if (sendToController) {
-        playerController?.seekTo(targetPositionMs)
-    }
+    playerController?.seekTo(targetPositionMs)
     scheduleProgressSyncAfterSeek()
     showSeekFeedback(direction, nextState.amountMs)
 
@@ -317,6 +282,10 @@ internal fun PlayerScreenRuntime.rememberSurfaceGestureCallbacks(): PlayerSurfac
             revealLockedOverlay()
             return@rememberUpdatedState
         }
+        if (!playerSettingsUiState.touchGesturesEnabled) {
+            controlsVisible = !controlsVisible
+            return@rememberUpdatedState
+        }
         when {
             offset.x < layoutSize.width * PlayerLeftGestureBoundary -> {
                 handleDoubleTapSeek(PlayerSeekDirection.Backward)
@@ -338,6 +307,7 @@ internal fun PlayerScreenRuntime.rememberSurfaceGestureCallbacks(): PlayerSurfac
         clearLiveGestureFeedback = rememberUpdatedState(::clearLiveGestureFeedback),
         revealLockedOverlay = rememberUpdatedState(::revealLockedOverlay),
         isHoldToSpeedGestureActive = rememberUpdatedState(isHoldToSpeedGestureActive),
+        touchGesturesEnabled = rememberUpdatedState(playerSettingsUiState.touchGesturesEnabled),
         playerControlsLocked = rememberUpdatedState(playerControlsLocked),
         currentPositionMs = rememberUpdatedState(playbackSnapshot.positionMs.coerceAtLeast(0L)),
         currentDurationMs = rememberUpdatedState(playbackSnapshot.durationMs),

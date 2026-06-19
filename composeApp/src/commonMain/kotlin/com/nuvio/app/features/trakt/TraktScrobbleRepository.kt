@@ -1,7 +1,7 @@
 package com.nuvio.app.features.trakt
 
 import co.touchlab.kermit.Logger
-import com.nuvio.app.core.build.AppVersionPolicy
+import com.nuvio.app.core.build.AppVersionConfig
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.profiles.ProfileRepository
 import kotlinx.coroutines.CancellationException
@@ -62,12 +62,12 @@ internal object TraktScrobbleRepository {
     private val retryDelayMs = 1_500L
     private val serverOverloadedRetryDelayMs = 5_000L
 
-    suspend fun scrobbleStart(item: TraktScrobbleItem, progressPercent: Float) {
-        sendScrobble(action = "start", item = item, progressPercent = progressPercent)
+    suspend fun scrobbleStart(profileId: Int, item: TraktScrobbleItem, progressPercent: Float) {
+        sendScrobble(profileId = profileId, action = "start", item = item, progressPercent = progressPercent)
     }
 
-    suspend fun scrobbleStop(item: TraktScrobbleItem, progressPercent: Float) {
-        sendScrobble(action = "stop", item = item, progressPercent = progressPercent)
+    suspend fun scrobbleStop(profileId: Int, item: TraktScrobbleItem, progressPercent: Float) {
+        sendScrobble(profileId = profileId, action = "stop", item = item, progressPercent = progressPercent)
     }
 
     suspend fun buildItem(
@@ -127,14 +127,16 @@ internal object TraktScrobbleRepository {
     }
 
     private suspend fun sendScrobble(
+        profileId: Int,
         action: String,
         item: TraktScrobbleItem,
         progressPercent: Float,
     ) {
+        if (ProfileRepository.activeProfileId != profileId) return
         val headers = TraktAuthRepository.authorizedHeaders() ?: return
-        val activeProfileId = ProfileRepository.activeProfileId
+        if (ProfileRepository.activeProfileId != profileId) return
         val clampedProgress = progressPercent.coerceIn(0f, 100f)
-        if (shouldSkip(activeProfileId, action, item.itemKey, clampedProgress)) return
+        if (shouldSkip(profileId, action, item.itemKey, clampedProgress)) return
 
         val url = "$BASE_URL/scrobble/$action"
         val requestBody = json.encodeToString(buildRequestBody(item, clampedProgress))
@@ -227,7 +229,7 @@ internal object TraktScrobbleRepository {
         if (!wasSent) return
 
         lastScrobbleStamp = ScrobbleStamp(
-            profileId = activeProfileId,
+            profileId = profileId,
             action = action,
             itemKey = item.itemKey,
             progress = clampedProgress,
@@ -255,7 +257,7 @@ internal object TraktScrobbleRepository {
                     ids = item.ids.toRequestBodyOrNull(),
                 ),
                 progress = clampedProgress,
-                appVersion = AppVersionPolicy.displayVersionName,
+                appVersion = AppVersionConfig.VERSION_NAME,
             )
 
             is TraktScrobbleItem.Episode -> TraktScrobbleRequest(
@@ -270,7 +272,7 @@ internal object TraktScrobbleRepository {
                     number = item.number,
                 ),
                 progress = clampedProgress,
-                appVersion = AppVersionPolicy.displayVersionName,
+                appVersion = AppVersionConfig.VERSION_NAME,
             )
         }
     }

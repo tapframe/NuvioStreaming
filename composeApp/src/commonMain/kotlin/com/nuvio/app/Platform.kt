@@ -7,4 +7,3 @@ interface Platform {
 expect fun getPlatform(): Platform
 
 internal expect val isIos: Boolean
-internal expect val isDesktop: Boolean

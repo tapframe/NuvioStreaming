@@ -32,21 +32,54 @@ object PlayerNextEpisodeRules {
         thresholdPercent: Float,
         thresholdMinutesBeforeEnd: Float,
     ): Boolean {
-        val outroInterval = skipIntervals.firstOrNull { it.type == "outro" }
-        return if (outroInterval != null) {
-            positionMs / 1000.0 >= outroInterval.startTime
-        } else {
+        val outroSegments = skipIntervals.filter { it.type in OUTRO_SEGMENT_TYPES }
+
+        if (outroSegments.isNotEmpty()) {
             if (durationMs <= 0L) return false
-            when (thresholdMode) {
+            val latestOutroEndMs = (outroSegments.maxOf { it.endTime } * 1_000.0).toLong()
+            val postOutroGapMs = durationMs - latestOutroEndMs
+
+            // Calculate the user's configured threshold as milliseconds from end.
+            val userThresholdMs = when (thresholdMode) {
                 NextEpisodeThresholdMode.PERCENTAGE -> {
                     val clampedPercent = thresholdPercent.coerceIn(97f, 100f)
-                    (positionMs.toDouble() / durationMs.toDouble()) >= (clampedPercent / 100.0)
+                    ((1.0 - clampedPercent / 100.0) * durationMs).toLong()
                 }
                 NextEpisodeThresholdMode.MINUTES_BEFORE_END -> {
                     val clampedMinutes = thresholdMinutesBeforeEnd.coerceIn(0f, 3.5f)
-                    val remainingMs = durationMs - positionMs
-                    remainingMs <= (clampedMinutes * 60_000f).toLong()
+                    (clampedMinutes * 60_000f).toLong()
                 }
+            }
+
+            return if (postOutroGapMs > userThresholdMs) {
+                when (thresholdMode) {
+                    NextEpisodeThresholdMode.PERCENTAGE -> {
+                        val clampedPercent = thresholdPercent.coerceIn(97f, 100f)
+                        (positionMs.toDouble() / durationMs.toDouble()) >= (clampedPercent / 100.0)
+                    }
+                    NextEpisodeThresholdMode.MINUTES_BEFORE_END -> {
+                        val clampedMinutes = thresholdMinutesBeforeEnd.coerceIn(0f, 3.5f)
+                        val remainingMs = durationMs - positionMs
+                        remainingMs <= (clampedMinutes * 60_000f).toLong()
+                    }
+                }
+            } else {
+                // Outro ends close to the file end — fire at earliest outro start.
+                positionMs / 1_000.0 >= outroSegments.minOf { it.startTime }
+            }
+        }
+
+        // Fallback to the settings threshold when no outro data exists.
+        if (durationMs <= 0L) return false
+        return when (thresholdMode) {
+            NextEpisodeThresholdMode.PERCENTAGE -> {
+                val clampedPercent = thresholdPercent.coerceIn(97f, 100f)
+                (positionMs.toDouble() / durationMs.toDouble()) >= (clampedPercent / 100.0)
+            }
+            NextEpisodeThresholdMode.MINUTES_BEFORE_END -> {
+                val clampedMinutes = thresholdMinutesBeforeEnd.coerceIn(0f, 3.5f)
+                val remainingMs = durationMs - positionMs
+                remainingMs <= (clampedMinutes * 60_000f).toLong()
             }
         }
     }
@@ -76,6 +109,8 @@ object PlayerNextEpisodeRules {
         if (m1 != m2) return m1.compareTo(m2)
         return d1.compareTo(d2)
     }
+
+    val OUTRO_SEGMENT_TYPES = setOf("outro", "ed", "mixed-ed")
 }
 
 internal expect fun currentDateComponents(): DateComponents

@@ -101,7 +101,7 @@ object SubtitleRepository {
             }
 
             _addonSubtitles.value = allSubs
-            if (allSubs.isEmpty() && addons.any { it.manifest?.resources?.any { r -> r.name == "subtitles" } == true }) {
+            if (allSubs.isEmpty() && addons.any { it.manifest?.resources?.any { r -> r.name.isSubtitleResourceName() } == true }) {
                 _error.value = getString(Res.string.compose_player_no_subtitles_found)
             }
             _isLoading.value = false
@@ -123,7 +123,8 @@ private fun String.isSubtitleResourceName(): Boolean =
     equals("subtitles", ignoreCase = true) || equals("subtitle", ignoreCase = true)
 
 private fun AddonResource.supportsSubtitleType(type: String, videoId: String): Boolean {
-    val typeMatches = types.isEmpty() || types.any { it.equals(type, ignoreCase = true) }
+    val canonical = canonicalSubtitleType(type)
+    val typeMatches = types.isEmpty() || types.any { canonicalSubtitleType(it).equals(canonical, ignoreCase = true) }
     if (!typeMatches) return false
     return idPrefixes.isEmpty() || idPrefixes.any { prefix -> videoId.startsWith(prefix) }
 }

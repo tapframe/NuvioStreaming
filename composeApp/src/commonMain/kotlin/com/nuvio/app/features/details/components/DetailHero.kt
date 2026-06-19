@@ -32,7 +32,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -43,8 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
-import com.nuvio.app.core.ui.NuvioDesktopImageScaling
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import coil3.compose.AsyncImage
 import com.nuvio.app.features.details.MetaDetails
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -55,7 +56,6 @@ fun DetailHero(
     isTablet: Boolean = false,
     scrollOffset: Int = 0,
     contentMaxWidth: Dp = 560.dp,
-    viewportHeight: Dp = 0.dp,
     onHeightChanged: (Int) -> Unit = {},
     heroTrailerSourceUrl: String? = null,
     heroTrailerSourceAudioUrl: String? = null,
@@ -71,7 +71,7 @@ fun DetailHero(
     BoxWithConstraints(
         modifier = modifier.fillMaxWidth(),
     ) {
-        val heroHeight = detailHeroHeight(maxWidth, viewportHeight, isTablet)
+        val heroHeight = detailHeroHeight(maxWidth, isTablet)
         val trailerAlpha by animateFloatAsState(
             targetValue = if (heroTrailerReady) 1f else 0f,
             animationSpec = tween(durationMillis = 300),
@@ -81,6 +81,10 @@ fun DetailHero(
         val heroChromeTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
             8.dp +
             ((40.dp - muteIconSize) / 2)
+        var logoLoadError by remember(meta.id, meta.logo) {
+            mutableStateOf(false)
+        }
+        val logoUrl = meta.logo?.takeIf { it.isNotBlank() }
 
         Box(
             modifier = Modifier
@@ -97,7 +101,6 @@ fun DetailHero(
                 contentAlignment = Alignment.BottomCenter,
             ) {
                 val imageUrl = meta.background ?: meta.poster
-                val backdropScale = if (isTablet) 1f else 1.08f
                 if (imageUrl != null) {
                     AsyncImage(
                         model = imageUrl,
@@ -106,12 +109,11 @@ fun DetailHero(
                             .fillMaxSize()
                             .graphicsLayer {
                                 translationY = scrollOffset * 0.5f
-                                scaleX = backdropScale
-                                scaleY = backdropScale
+                                scaleX = 1.08f
+                                scaleY = 1.08f
                             },
-                        alignment = Alignment.Center,
+                        alignment = if (isTablet) Alignment.TopCenter else Alignment.Center,
                         contentScale = ContentScale.Crop,
-                        desktopImageScaling = NuvioDesktopImageScaling.Disabled,
                     )
                 } else {
                     Box(
@@ -131,8 +133,8 @@ fun DetailHero(
                             .graphicsLayer {
                                 alpha = trailerAlpha
                                 translationY = scrollOffset * 0.5f
-                                scaleX = backdropScale
-                                scaleY = backdropScale
+                                scaleX = 1.08f
+                                scaleY = 1.08f
                             },
                         onReady = onHeroTrailerReady,
                         onEnded = onHeroTrailerEnded,
@@ -202,9 +204,9 @@ fun DetailHero(
                         .padding(bottom = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (meta.logo != null) {
+                    if (logoUrl != null && !logoLoadError) {
                         AsyncImage(
-                            model = meta.logo,
+                            model = logoUrl,
                             contentDescription = stringResource(Res.string.detail_logo_content_description, meta.name),
                             modifier = Modifier
                                 .fillMaxWidth(if (isTablet) 0.56f else 0.6f)
@@ -212,6 +214,7 @@ fun DetailHero(
                                 .height(if (isTablet) 72.dp else 80.dp),
                             alignment = Alignment.Center,
                             contentScale = ContentScale.Fit,
+                            onError = { logoLoadError = true },
                         )
                     } else {
                         Text(
@@ -237,13 +240,9 @@ fun DetailHero(
     }
 }
 
-private fun detailHeroHeight(maxWidth: Dp, viewportHeight: Dp, isTablet: Boolean): Dp =
+private fun detailHeroHeight(maxWidth: Dp, isTablet: Boolean): Dp =
     if (!isTablet) {
         (maxWidth * 1.33f).coerceIn(420.dp, 760.dp)
     } else {
-        val viewportLimit = viewportHeight
-            .takeIf { it > 0.dp }
-            ?.let { it * 0.72f }
-            ?: 1080.dp
-        minOf(maxWidth * 9f / 16f, viewportLimit).coerceIn(420.dp, 1080.dp)
+        (maxWidth * 0.42f).coerceIn(300.dp, 420.dp)
     }

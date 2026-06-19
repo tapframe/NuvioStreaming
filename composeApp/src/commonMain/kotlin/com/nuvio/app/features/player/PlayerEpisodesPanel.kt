@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,15 +49,16 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
+import com.nuvio.app.features.streams.StreamCard
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.streams.isSelectableForPlayback
@@ -467,6 +467,10 @@ private fun EpisodeStreamsSubView(
         DebridSettingsRepository.ensureLoaded()
         DebridSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
+    val streamBadgeSettings by remember {
+        StreamBadgeSettingsRepository.ensureLoaded()
+        StreamBadgeSettingsRepository.uiState
+    }.collectAsStateWithLifecycle()
 
     val episode = state.selectedEpisode ?: return
     val streamsUiState = state.streamsUiState
@@ -606,64 +610,19 @@ private fun EpisodeStreamsSubView(
                         items = streams,
                         key = { index, stream -> "${stream.addonId}::${index}::${stream.url ?: stream.infoHash ?: stream.clientResolve?.infoHash ?: stream.name}" },
                     ) { _, stream ->
-                        EpisodeSourceStreamRow(
+                        StreamCard(
                             stream = stream,
                             enabled = stream.isSelectableForPlayback(debridSettings.canResolvePlayableLinks),
+                            appendInstantServiceToDefaultName = debridSettings.canResolvePlayableLinks &&
+                                !debridSettings.hasCustomStreamFormatting,
+                            showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                            showAddonLogo = streamBadgeSettings.showAddonLogo,
+                            badgePlacement = streamBadgeSettings.badgePlacement,
                             onClick = { onStreamSelected(stream, episode) },
                         )
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EpisodeSourceStreamRow(
-    stream: StreamItem,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val tokens = MaterialTheme.nuvio
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(tokens.shapes.compactCard)
-            .background(tokens.colors.surfaceCard)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = tokens.spacing.cardPadding, vertical = tokens.spacing.listGap),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stream.streamLabel,
-                color = tokens.colors.textPrimary,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            stream.streamSubtitle?.let { subtitle ->
-                if (subtitle != stream.streamLabel) {
-                    Text(
-                        text = subtitle,
-                        color = tokens.colors.textSecondary,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Text(
-                text = stream.addonName,
-                color = tokens.colors.textMuted,
-                fontSize = NuvioTokens.Type.labelXs,
-                fontStyle = FontStyle.Italic,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }

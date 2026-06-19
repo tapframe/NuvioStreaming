@@ -15,11 +15,7 @@ import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.plugins.pluginContentId
 import com.nuvio.app.features.plugins.PluginsUiState
-import com.nuvio.app.features.plugins.PluginRepositoryItem
-import com.nuvio.app.features.plugins.PluginRuntimeResult
-import com.nuvio.app.features.plugins.PluginScraper
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -29,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.launch
@@ -210,13 +205,8 @@ object StreamsRepository {
 
         // Initialise loading placeholders
         val installedAddonOrder = streamAddons.map { it.addonName }
-        val warmedAddonGroups = AddonStreamWarmupRepository
-            .cachedGroups(type = type, videoId = videoId, season = season, episode = episode)
-            .orEmpty()
-            .associateBy { it.addonId }
-        val warmedAddonIds = warmedAddonGroups.keys
         val initialGroups = StreamAutoPlaySelector.orderAddonStreams(streamAddons.map { addon ->
-            warmedAddonGroups[addon.addonId] ?: AddonStreamGroup(
+            AddonStreamGroup(
                 addonName = addon.addonName,
                 addonId = addon.addonId,
                 streams = emptyList(),
@@ -242,13 +232,12 @@ object StreamsRepository {
         )
 
         activeJob = scope.launch {
-            val pendingStreamAddons = streamAddons.filterNot { it.addonId in warmedAddonIds }
             val completions = Channel<StreamLoadCompletion>(capacity = Channel.BUFFERED)
             val pluginRemainingByAddonId = pluginProviderGroups
                 .associate { it.addonId to it.scrapers.size }
                 .toMutableMap()
             val pluginFirstErrorByAddonId = mutableMapOf<String, String>()
-            val totalTasks = pendingStreamAddons.size +
+            val totalTasks = streamAddons.size +
                 pluginProviderGroups.sumOf { it.scrapers.size }
 
             val installedAddonNames = installedAddonOrder.toSet()
@@ -439,7 +428,7 @@ object StreamsRepository {
                 null
             }
 
-            pendingStreamAddons.forEach { addon ->
+            streamAddons.forEach { addon ->
                 launch {
                     val url = buildAddonResourceUrl(
                         manifestUrl = addon.manifest.transportUrl,
@@ -808,140 +797,5 @@ object StreamsRepository {
 
     fun setOverlayVisible(visible: Boolean, message: String? = null) {
         _uiState.update { it.copy(showDirectAutoPlayOverlay = visible, overlayMessage = message) }
-    }
-}
-
-private data class InstalledStreamAddonTarget(
-    val addonName: String,
-    val addonId: String,
-    val manifest: com.nuvio.app.features.addons.AddonManifest,
-)
-
-private fun com.nuvio.app.features.addons.ManagedAddon.streamAddonInstanceId(manifestId: String): String =
-    "addon:$manifestId:$manifestUrl"
-
-private data class PluginProviderGroup(
-    val addonId: String,
-    val addonName: String,
-    val scrapers: List<PluginScraper>,
-)
-
-private sealed interface StreamLoadCompletion {
-    data class Addon(val group: AddonStreamGroup) : StreamLoadCompletion
-    data class PluginScraper(
-        val addonId: String,
-        val streams: List<StreamItem>,
-        val error: String?,
-    ) : StreamLoadCompletion
-}
-
-private fun List<PluginScraper>.toPluginProviderGroups(
-    repositories: List<PluginRepositoryItem>,
-    groupByRepository: Boolean,
-): List<PluginProviderGroup> {
-    if (!groupByRepository) {
-        return map { scraper ->
-            PluginProviderGroup(
-                addonId = "plugin:${scraper.id}",
-                addonName = scraper.name,
-                scrapers = listOf(scraper),
-            )
-        }
-    }
-
-    val repoNameByUrl = repositories.associate { it.manifestUrl to it.name }
-    return groupBy { it.repositoryUrl }
-        .map { (repositoryUrl, scrapers) ->
-            PluginProviderGroup(
-                addonId = "plugin-repo:${repositoryUrl.lowercase()}",
-                addonName = repoNameByUrl[repositoryUrl].orEmpty().ifBlank { repositoryUrl.fallbackRepositoryLabel() },
-                scrapers = scrapers.sortedBy { it.name.lowercase() },
-            )
-        }
-        .sortedBy { it.addonName.lowercase() }
-}
-
-private fun List<AddonStreamGroup>.toEmptyStateReason(anyLoading: Boolean): StreamsEmptyStateReason? {
-    if (anyLoading || any { it.streams.isNotEmpty() }) {
-        return null
-    }
-
-    return if (isNotEmpty() && all { !it.error.isNullOrBlank() }) {
-        StreamsEmptyStateReason.StreamFetchFailed
-    } else {
-        StreamsEmptyStateReason.NoStreamsFound
-    }
-}
-
-private suspend fun <T> runCatchingUnlessCancelled(block: suspend () -> T): Result<T> =
-    try {
-        Result.success(block())
-    } catch (error: CancellationException) {
-        throw error
-    } catch (error: Throwable) {
-        Result.failure(error)
-    }
-
-private fun PluginRuntimeResult.toStreamItem(
-    scraper: PluginScraper,
-    addonName: String = scraper.name,
-    addonId: String = "plugin:${scraper.id}",
-    includeScraperNameInSubtitle: Boolean = false,
-): StreamItem {
-    val subtitleParts = listOfNotNull(
-        scraper.name.takeIf { includeScraperNameInSubtitle && it.isNotBlank() },
-        quality?.takeIf { it.isNotBlank() },
-        size?.takeIf { it.isNotBlank() },
-        language?.takeIf { it.isNotBlank() },
-    )
-    val requestHeaders = headers
-        .orEmpty()
-        .mapNotNull { (key, value) ->
-            val headerName = key.trim()
-            val headerValue = value.trim()
-            if (headerName.isBlank() || headerValue.isBlank() || headerName.equals("Range", ignoreCase = true)) {
-                null
-            } else {
-                headerName to headerValue
-            }
-        }
-        .toMap()
-
-    return StreamItem(
-        name = name ?: title,
-        description = subtitleParts.joinToString(" • ").ifBlank { null },
-        url = url,
-        infoHash = infoHash,
-        sourceName = scraper.name,
-        addonName = addonName,
-        addonId = addonId,
-        behaviorHints = if (requestHeaders.isEmpty()) {
-            StreamBehaviorHints()
-        } else {
-            StreamBehaviorHints(
-                notWebReady = true,
-                proxyHeaders = StreamProxyHeaders(request = requestHeaders),
-            )
-        },
-    )
-}
-
-private fun List<StreamItem>.sortedForGroupedDisplay(): List<StreamItem> =
-    sortedWith(
-        compareBy<StreamItem>(
-            { it.sourceName.orEmpty().lowercase() },
-            { it.streamLabel.lowercase() },
-            { it.streamSubtitle.orEmpty().lowercase() },
-        ),
-    )
-
-private fun String.fallbackRepositoryLabel(): String {
-    val withoutQuery = substringBefore("?")
-    val withoutManifest = withoutQuery.removeSuffix("/manifest.json")
-    val host = withoutManifest.substringAfter("://", withoutManifest).substringBefore('/')
-    return host.ifBlank {
-        withoutManifest.substringAfterLast('/').ifBlank {
-            runBlocking { getString(Res.string.streams_plugin_repository_fallback) }
-        }
     }
 }

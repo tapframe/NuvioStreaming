@@ -317,12 +317,14 @@ object TraktProgressRepository {
         }.getOrNull()
 
         if (playbackEntries == null) {
+            if (!isLatestRefreshRequest(requestId)) return
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 errorMessage = getString(Res.string.trakt_progress_load_failed),
             )
             return
         }
+        if (!isLatestRefreshRequest(requestId)) return
 
         // Merge new playback entries into the existing state rather than replacing it wholesale.
         // This prevents the CW list from briefly losing "next up" seeds (like One Piece) for the
@@ -356,6 +358,7 @@ object TraktProgressRepository {
         }.getOrNull()
 
         if (completedEntries == null) {
+            if (!isLatestRefreshRequest(requestId)) return
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 errorMessage = null,

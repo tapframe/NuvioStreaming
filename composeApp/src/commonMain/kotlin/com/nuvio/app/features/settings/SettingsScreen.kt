@@ -217,12 +217,6 @@ fun SettingsScreen(
         val page = remember(currentPage) { SettingsPage.valueOf(currentPage) }
         val previousPage = page.previousPage()
 
-        LaunchedEffect(page) {
-            if (!page.isEnabledByFeaturePolicy()) {
-                currentPage = SettingsPage.Root.name
-            }
-        }
-
         LaunchedEffect(rootActionRequests, rootActionsEnabled, page) {
             rootActionRequests.collect {
                 if (!rootActionsEnabled) return@collect
@@ -240,9 +234,7 @@ fun SettingsScreen(
                 ?.let { runCatching { SettingsPage.valueOf(it) }.getOrNull() }
                 ?: return@LaunchedEffect
             if (!rootActionsEnabled) return@LaunchedEffect
-            if (targetPage.isEnabledByFeaturePolicy()) {
-                currentPage = targetPage.name
-            }
+            currentPage = targetPage.name
             onRequestedPageConsumed()
         }
 
@@ -259,6 +251,7 @@ fun SettingsScreen(
                 showLoadingOverlay = playerSettingsUiState.showLoadingOverlay,
                 holdToSpeedEnabled = playerSettingsUiState.holdToSpeedEnabled,
                 holdToSpeedValue = playerSettingsUiState.holdToSpeedValue,
+                touchGesturesEnabled = playerSettingsUiState.touchGesturesEnabled,
                 preferredAudioLanguage = playerSettingsUiState.preferredAudioLanguage,
                 secondaryPreferredAudioLanguage = playerSettingsUiState.secondaryPreferredAudioLanguage,
                 preferredSubtitleLanguage = playerSettingsUiState.preferredSubtitleLanguage,
@@ -309,6 +302,7 @@ fun SettingsScreen(
                 showLoadingOverlay = playerSettingsUiState.showLoadingOverlay,
                 holdToSpeedEnabled = playerSettingsUiState.holdToSpeedEnabled,
                 holdToSpeedValue = playerSettingsUiState.holdToSpeedValue,
+                touchGesturesEnabled = playerSettingsUiState.touchGesturesEnabled,
                 preferredAudioLanguage = playerSettingsUiState.preferredAudioLanguage,
                 secondaryPreferredAudioLanguage = playerSettingsUiState.secondaryPreferredAudioLanguage,
                 preferredSubtitleLanguage = playerSettingsUiState.preferredSubtitleLanguage,
@@ -369,6 +363,7 @@ private fun MobileSettingsScreen(
     showLoadingOverlay: Boolean,
     holdToSpeedEnabled: Boolean,
     holdToSpeedValue: Float,
+    touchGesturesEnabled: Boolean,
     preferredAudioLanguage: String,
     secondaryPreferredAudioLanguage: String?,
     preferredSubtitleLanguage: String,
@@ -440,8 +435,6 @@ private fun MobileSettingsScreen(
         }
         val searchEntries = settingsSearchEntries(
             pluginsEnabled = AppFeaturePolicy.pluginsEnabled,
-            downloadsEnabled = AppFeaturePolicy.downloadsEnabled,
-            notificationsEnabled = AppFeaturePolicy.notificationsEnabled,
             liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
             switchProfileAvailable = onSwitchProfile != null,
             checkForUpdatesAvailable = onCheckForUpdatesClick != null,
@@ -464,11 +457,7 @@ private fun MobileSettingsScreen(
                     SettingsPage.MetaScreen -> onMetaScreenClick()
                     else -> onPageChange(target.page)
                 }
-                SettingsSearchTarget.Downloads -> {
-                    if (AppFeaturePolicy.downloadsEnabled) {
-                        onDownloadsClick()
-                    }
-                }
+                SettingsSearchTarget.Downloads -> onDownloadsClick()
                 SettingsSearchTarget.Collections -> onCollectionsClick()
                 SettingsSearchTarget.SwitchProfile -> onSwitchProfile?.invoke()
                 SettingsSearchTarget.CheckForUpdates -> onCheckForUpdatesClick?.invoke()
@@ -528,8 +517,6 @@ private fun MobileSettingsScreen(
                             onDownloadsClick = onDownloadsClick,
                             onAccountClick = onAccountClick,
                             onSwitchProfileClick = onSwitchProfile,
-                            showDownloadsEntry = AppFeaturePolicy.downloadsEnabled,
-                            showNotificationsEntry = AppFeaturePolicy.notificationsEnabled,
                         )
                     }
                 }
@@ -547,6 +534,7 @@ private fun MobileSettingsScreen(
                     showLoadingOverlay = showLoadingOverlay,
                     holdToSpeedEnabled = holdToSpeedEnabled,
                     holdToSpeedValue = holdToSpeedValue,
+                    touchGesturesEnabled = touchGesturesEnabled,
                     preferredAudioLanguage = preferredAudioLanguage,
                     secondaryPreferredAudioLanguage = secondaryPreferredAudioLanguage,
                     preferredSubtitleLanguage = preferredSubtitleLanguage,
@@ -580,12 +568,10 @@ private fun MobileSettingsScreen(
                     isTablet = false,
                     rememberLastProfileEnabled = rememberLastProfileEnabled,
                 )
-                SettingsPage.Notifications -> if (AppFeaturePolicy.notificationsEnabled) {
-                    notificationsSettingsContent(
-                        isTablet = false,
-                        uiState = episodeReleaseNotificationsUiState,
-                    )
-                }
+                SettingsPage.Notifications -> notificationsSettingsContent(
+                    isTablet = false,
+                    uiState = episodeReleaseNotificationsUiState,
+                )
                 SettingsPage.ContinueWatching -> continueWatchingSettingsContent(
                     isTablet = false,
                     isVisible = continueWatchingPreferencesUiState.isVisible,
@@ -653,13 +639,6 @@ private fun MobileSettingsScreen(
     }
 }
 
-private fun SettingsPage.isEnabledByFeaturePolicy(): Boolean =
-    when (this) {
-        SettingsPage.Notifications -> AppFeaturePolicy.notificationsEnabled
-        SettingsPage.Plugins -> AppFeaturePolicy.pluginsEnabled
-        else -> true
-    }
-
 @Composable
 private fun rememberSettingsRootSearchRevealConnection(
     page: SettingsPage,
@@ -710,6 +689,7 @@ private fun TabletSettingsScreen(
     showLoadingOverlay: Boolean,
     holdToSpeedEnabled: Boolean,
     holdToSpeedValue: Float,
+    touchGesturesEnabled: Boolean,
     preferredAudioLanguage: String,
     secondaryPreferredAudioLanguage: String?,
     preferredSubtitleLanguage: String,
@@ -820,8 +800,6 @@ private fun TabletSettingsScreen(
             val hapticScope = rememberCoroutineScope()
             val searchEntries = settingsSearchEntries(
                 pluginsEnabled = AppFeaturePolicy.pluginsEnabled,
-                downloadsEnabled = AppFeaturePolicy.downloadsEnabled,
-                notificationsEnabled = AppFeaturePolicy.notificationsEnabled,
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                 switchProfileAvailable = onSwitchProfile != null,
                 checkForUpdatesAvailable = onCheckForUpdatesClick != null,
@@ -829,16 +807,8 @@ private fun TabletSettingsScreen(
 
             fun openSearchTarget(target: SettingsSearchTarget) {
                 when (target) {
-                    is SettingsSearchTarget.Page -> {
-                        if (target.page.isEnabledByFeaturePolicy()) {
-                            openInlinePage(target.page)
-                        }
-                    }
-                    SettingsSearchTarget.Downloads -> {
-                        if (AppFeaturePolicy.downloadsEnabled) {
-                            onDownloadsClick()
-                        }
-                    }
+                    is SettingsSearchTarget.Page -> openInlinePage(target.page)
+                    SettingsSearchTarget.Downloads -> onDownloadsClick()
                     SettingsSearchTarget.Collections -> onCollectionsClick()
                     SettingsSearchTarget.SwitchProfile -> onSwitchProfile?.invoke()
                     SettingsSearchTarget.CheckForUpdates -> onCheckForUpdatesClick?.invoke()
@@ -928,8 +898,6 @@ private fun TabletSettingsScreen(
                                 onDownloadsClick = onDownloadsClick,
                                 onAccountClick = { openInlinePage(SettingsPage.Account) },
                                 onSwitchProfileClick = onSwitchProfile,
-                                showDownloadsEntry = AppFeaturePolicy.downloadsEnabled,
-                                showNotificationsEntry = AppFeaturePolicy.notificationsEnabled,
                                 showAccountSection = activeCategory == SettingsCategory.Account,
                                 showGeneralSection = activeCategory == SettingsCategory.General,
                                 showAboutSection = activeCategory == SettingsCategory.About,
@@ -951,6 +919,7 @@ private fun TabletSettingsScreen(
                         showLoadingOverlay = showLoadingOverlay,
                         holdToSpeedEnabled = holdToSpeedEnabled,
                         holdToSpeedValue = holdToSpeedValue,
+                        touchGesturesEnabled = touchGesturesEnabled,
                         preferredAudioLanguage = preferredAudioLanguage,
                         secondaryPreferredAudioLanguage = secondaryPreferredAudioLanguage,
                         preferredSubtitleLanguage = preferredSubtitleLanguage,
@@ -984,12 +953,10 @@ private fun TabletSettingsScreen(
                         isTablet = true,
                         rememberLastProfileEnabled = rememberLastProfileEnabled,
                     )
-                    SettingsPage.Notifications -> if (AppFeaturePolicy.notificationsEnabled) {
-                        notificationsSettingsContent(
-                            isTablet = true,
-                            uiState = episodeReleaseNotificationsUiState,
-                        )
-                    }
+                    SettingsPage.Notifications -> notificationsSettingsContent(
+                        isTablet = true,
+                        uiState = episodeReleaseNotificationsUiState,
+                    )
                     SettingsPage.ContinueWatching -> continueWatchingSettingsContent(
                         isTablet = true,
                         isVisible = continueWatchingPreferencesUiState.isVisible,

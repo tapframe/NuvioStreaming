@@ -2,6 +2,7 @@ package com.nuvio.app.core.auth
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.network.SyncBackendRepository
 import com.nuvio.app.core.storage.LocalAccountDataCleaner
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -15,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -35,35 +37,42 @@ object AuthRepository {
         if (initialized) return
         initialized = true
 
-        val savedAnonId = AuthStorage.loadAnonymousUserId()
-        if (savedAnonId != null) {
-            _state.value = AuthState.Authenticated(
-                userId = savedAnonId,
-                email = null,
-                isAnonymous = true,
-            )
-        }
-
         scope.launch {
-            SupabaseProvider.client.auth.sessionStatus.collect { status ->
-                if (AuthStorage.loadAnonymousUserId() != null) return@collect
-                when (status) {
-                    is SessionStatus.Authenticated -> {
-                        val user = status.session.user
-                        _state.value = AuthState.Authenticated(
-                            userId = user?.id ?: "",
-                            email = user?.email,
-                            isAnonymous = false,
-                        )
-                    }
-                    is SessionStatus.NotAuthenticated -> {
-                        _state.value = AuthState.Unauthenticated
-                    }
-                    is SessionStatus.Initializing -> {
-                        if (savedAnonId == null) _state.value = AuthState.Loading
-                    }
-                    is SessionStatus.RefreshFailure -> {
-                        _state.value = AuthState.Unauthenticated
+            SyncBackendRepository.state.collectLatest { backendState ->
+                if (!backendState.isLoaded) return@collectLatest
+
+                AuthStorage.loadAnonymousUserId()?.let { savedAnonId ->
+                    _state.value = AuthState.Authenticated(
+                        userId = savedAnonId,
+                        email = null,
+                        isAnonymous = true,
+                    )
+                } ?: run {
+                    _state.value = AuthState.Loading
+                }
+
+                SupabaseProvider.client.auth.sessionStatus.collect { status ->
+                    if (AuthStorage.loadAnonymousUserId() != null) return@collect
+                    when (status) {
+                        is SessionStatus.Authenticated -> {
+                            val user = status.session.user
+                            _state.value = AuthState.Authenticated(
+                                userId = user?.id ?: "",
+                                email = user?.email,
+                                isAnonymous = false,
+                            )
+                        }
+                        is SessionStatus.NotAuthenticated -> {
+                            _state.value = AuthState.Unauthenticated
+                        }
+                        is SessionStatus.Initializing -> {
+                            if (AuthStorage.loadAnonymousUserId() == null) {
+                                _state.value = AuthState.Loading
+                            }
+                        }
+                        is SessionStatus.RefreshFailure -> {
+                            _state.value = AuthState.Unauthenticated
+                        }
                     }
                 }
             }
@@ -116,6 +125,26 @@ object AuthRepository {
         LocalAccountDataCleaner.wipe()
     }.onFailure { e ->
         log.e(e) { "Sign-out failed" }
+        _error.value = e.message ?: getString(Res.string.auth_sign_out_failed)
+    }
+
+    suspend fun resetForSyncBackendChange(): Result<Unit> = runCatching {
+        _error.value = null
+        val wasAnonymous = AuthStorage.loadAnonymousUserId() != null
+        AuthStorage.clearAnonymousUserId()
+
+        if (!wasAnonymous) {
+            runCatching {
+                SupabaseProvider.client.auth.signOut()
+            }.onFailure { e ->
+                log.w(e) { "Supabase sign-out failed during sync backend reset; continuing local reset" }
+            }
+        }
+
+        _state.value = AuthState.Unauthenticated
+        LocalAccountDataCleaner.wipe()
+    }.onFailure { e ->
+        log.e(e) { "Sync backend auth reset failed" }
         _error.value = e.message ?: getString(Res.string.auth_sign_out_failed)
     }
 

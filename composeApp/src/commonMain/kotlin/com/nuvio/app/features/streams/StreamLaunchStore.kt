@@ -1,6 +1,7 @@
 package com.nuvio.app.features.streams
 
 data class StreamLaunch(
+    val profileId: Int,
     val type: String,
     val videoId: String,
     val parentMetaId: String? = null,

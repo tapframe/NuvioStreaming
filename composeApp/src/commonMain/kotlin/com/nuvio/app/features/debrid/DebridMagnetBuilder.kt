@@ -5,7 +5,7 @@ import com.nuvio.app.features.streams.StreamItem
 internal object DebridMagnetBuilder {
     fun fromStream(stream: StreamItem): String? {
         stream.torrentMagnetUri?.takeIf { it.isNotBlank() }?.let { return it }
-        val hash = stream.infoHash?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val hash = stream.p2pInfoHash ?: return null
         return buildString {
             append("magnet:?xt=urn:btih:")
             append(hash)

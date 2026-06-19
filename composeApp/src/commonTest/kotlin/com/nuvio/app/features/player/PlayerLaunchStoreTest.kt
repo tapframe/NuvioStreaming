@@ -9,6 +9,7 @@ class PlayerLaunchStoreTest {
     @Test
     fun storesAndRemovesLaunchesById() {
         val launch = PlayerLaunch(
+            profileId = 1,
             title = "Title",
             sourceUrl = "https://example.com/video.m3u8?token=a/b:c",
             streamTitle = "Source",

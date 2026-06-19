@@ -32,7 +32,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.nuvio.app.isDesktop
 import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
@@ -66,7 +65,6 @@ fun HomeSkeletonHero(
     modifier: Modifier = Modifier,
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
-    sectionPadding: Dp? = null,
 ) {
     val brush = rememberHomeSkeletonBrush()
 
@@ -79,10 +77,8 @@ fun HomeSkeletonHero(
             maxWidthDp = maxWidth.value,
             viewportHeightDp = viewportHeight?.value,
             mobileBelowSectionHeightHintDp = mobileBelowSectionHeightHint?.value,
-            preferDesktopLayout = isDesktop,
         )
         val containerWidth = maxWidth
-        val contentHorizontalPadding = sectionPadding ?: layout.contentHorizontalPadding
 
         Box(
             modifier = Modifier
@@ -125,7 +121,7 @@ fun HomeSkeletonHero(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(
-                        horizontal = contentHorizontalPadding,
+                        horizontal = layout.contentHorizontalPadding,
                         vertical = layout.contentVerticalPadding,
                     ),
                 horizontalAlignment = if (layout.isTablet) Alignment.Start else Alignment.CenterHorizontally,

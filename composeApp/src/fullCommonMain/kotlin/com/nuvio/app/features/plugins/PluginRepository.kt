@@ -413,11 +413,11 @@ actual object PluginRepository {
     }
 
     private fun PluginManifestScraper.isSupportedOnCurrentPlatform(): Boolean {
-        val platformTags = currentPluginPlatformTags().map { it.lowercase() }.toSet()
+        val platform = currentPluginPlatform().lowercase()
         val supported = supportedPlatforms?.map { it.lowercase() }?.toSet().orEmpty()
         val disabled = disabledPlatforms?.map { it.lowercase() }?.toSet().orEmpty()
-        if (supported.isNotEmpty() && platformTags.none { it in supported }) return false
-        if (platformTags.any { it in disabled }) return false
+        if (supported.isNotEmpty() && platform !in supported) return false
+        if (platform in disabled) return false
         return true
     }
 

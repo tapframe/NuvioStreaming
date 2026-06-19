@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import coil3.compose.AsyncImage
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.network.NetworkCondition
@@ -88,7 +88,6 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.player.PlayerSettingsRepository
-import com.nuvio.app.features.streams.AddonStreamWarmupRepository
 import com.nuvio.app.features.streams.StreamAutoPlayPolicy
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.TmdbService
@@ -460,30 +459,6 @@ fun MetaDetailsScreen(
                     seriesActionVideo?.id?.takeIf { it.isNotBlank() } ?: action.videoId
                 }
                 val hasEpisodes = meta.videos.any { it.season != null || it.episode != null }
-                val debridWarmupTarget = remember(meta.id, meta.type, hasEpisodes, seriesStreamVideoId, seriesAction) {
-                    if (meta.isSeriesLikeForDebridWarmup(hasEpisodes)) {
-                        DetailDebridWarmupTarget(
-                            videoId = seriesStreamVideoId ?: seriesAction?.videoId ?: meta.id,
-                            season = seriesAction?.seasonNumber,
-                            episode = seriesAction?.episodeNumber,
-                        )
-                    } else {
-                        DetailDebridWarmupTarget(
-                            videoId = meta.id,
-                            season = null,
-                            episode = null,
-                        )
-                    }
-                }
-                LaunchedEffect(meta.type, debridWarmupTarget, deferredMetaWorkAllowed) {
-                    if (!deferredMetaWorkAllowed) return@LaunchedEffect
-                    AddonStreamWarmupRepository.preload(
-                        type = meta.type,
-                        videoId = debridWarmupTarget.videoId,
-                        season = debridWarmupTarget.season,
-                        episode = debridWarmupTarget.episode,
-                    )
-                }
                 val hasProductionSection = remember(meta) {
                     meta.productionCompanies.isNotEmpty() || meta.networks.isNotEmpty()
                 }
@@ -781,7 +756,6 @@ fun MetaDetailsScreen(
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val isTablet = maxWidth >= 720.dp
-                    val viewportHeight = maxHeight
                     val contentHorizontalPadding = if (isTablet) 32.dp else 18.dp
                     val contentMaxWidth = detailTabletContentMaxWidth(maxWidth, isTablet)
                     val cinematicEnabled = metaScreenSettingsUiState.cinematicBackground && deferredMetaWorkAllowed
@@ -816,7 +790,6 @@ fun MetaDetailsScreen(
                                     meta = meta,
                                     isTablet = isTablet,
                                     contentMaxWidth = contentMaxWidth,
-                                    viewportHeight = viewportHeight,
                                     scrollOffset = heroScrollOffset,
                                     onHeightChanged = { heroHeightPx = it },
                                     heroTrailerSourceUrl = heroTrailerSourceUrl,
@@ -1483,6 +1456,7 @@ private fun DetailSectionContainer(
                         Modifier.widthIn(max = contentMaxWidth)
                     },
                 ),
+            contentAlignment = Alignment.Center,
         ) {
             content()
         }
@@ -1820,14 +1794,3 @@ private fun detailTabletContentMaxWidth(maxWidth: Dp, isTablet: Boolean): Dp =
     } else {
         (maxWidth * 0.6f).coerceIn(520.dp, 680.dp)
     }
-
-private data class DetailDebridWarmupTarget(
-    val videoId: String,
-    val season: Int?,
-    val episode: Int?,
-)
-
-private fun MetaDetails.isSeriesLikeForDebridWarmup(hasEpisodes: Boolean): Boolean =
-    hasEpisodes || type.equals("series", ignoreCase = true) ||
-        type.equals("show", ignoreCase = true) ||
-        type.equals("tv", ignoreCase = true)

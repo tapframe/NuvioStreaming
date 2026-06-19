@@ -40,9 +40,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.AppIconResource
 import com.nuvio.app.core.ui.appIconPainter
-import com.nuvio.app.core.ui.secondaryClick
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_play
+import nuvio.composeapp.generated.resources.details_actions_menu_label
 import org.jetbrains.compose.resources.stringResource
 
 data class DetailSecondaryAction(
@@ -59,7 +59,7 @@ fun DetailActionButtons(
     modifier: Modifier = Modifier,
     playLabel: String = stringResource(Res.string.action_play),
     secondaryActions: List<DetailSecondaryAction> = emptyList(),
-    actionsMenuLabel: String = "More actions",
+    actionsMenuLabel: String = stringResource(Res.string.details_actions_menu_label),
     isTablet: Boolean = false,
     onPlayClick: () -> Unit = {},
     onPlayLongClick: (() -> Unit)? = null,
@@ -108,7 +108,6 @@ fun DetailActionButtons(
                             onLongClick = onPlayLongClick,
                             role = Role.Button,
                         )
-                        .secondaryClick(onPlayLongClick)
                         .height(buttonHeight),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
@@ -251,8 +250,7 @@ private fun DetailIconAction(
                     onClick = onClick,
                     onLongClick = onLongClick,
                     role = Role.Button,
-                )
-                .secondaryClick(onLongClick),
+                ),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

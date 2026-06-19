@@ -44,7 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
-import com.nuvio.app.core.ui.NuvioAsyncImage as AsyncImage
+import coil3.compose.AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioBackButton
 import com.nuvio.app.core.ui.NuvioPosterWatchedOverlay
@@ -68,11 +68,7 @@ import org.jetbrains.compose.resources.stringResource
 fun CatalogScreen(
     title: String,
     subtitle: String,
-    manifestUrl: String,
-    type: String,
-    catalogId: String,
-    supportsPagination: Boolean,
-    genre: String? = null,
+    target: CatalogTarget,
     onBack: () -> Unit,
     onPosterClick: ((MetaPreview) -> Unit)? = null,
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
@@ -87,19 +83,11 @@ fun CatalogScreen(
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
     val initialScrollPosition = remember(
-        manifestUrl,
-        type,
-        catalogId,
-        genre,
-        supportsPagination,
+        target,
         homeCatalogSettingsUiState.hideUnreleasedContent,
     ) {
         CatalogRepository.scrollPosition(
-            manifestUrl = manifestUrl,
-            type = type,
-            catalogId = catalogId,
-            genre = genre,
-            supportsPagination = supportsPagination,
+            target = target,
         )
     }
     val gridState = rememberLazyGridState(
@@ -109,26 +97,18 @@ fun CatalogScreen(
     var headerHeightPx by remember { mutableIntStateOf(0) }
     var observedOfflineState by remember { mutableStateOf(false) }
 
-    LaunchedEffect(manifestUrl, type, catalogId, genre, supportsPagination, homeCatalogSettingsUiState.hideUnreleasedContent) {
+    LaunchedEffect(target, homeCatalogSettingsUiState.hideUnreleasedContent) {
         CatalogRepository.load(
-            manifestUrl = manifestUrl,
-            type = type,
-            catalogId = catalogId,
-            genre = genre,
-            supportsPagination = supportsPagination,
+            target = target,
         )
     }
 
-    LaunchedEffect(gridState, manifestUrl, type, catalogId, genre, supportsPagination, homeCatalogSettingsUiState.hideUnreleasedContent) {
+    LaunchedEffect(gridState, target, homeCatalogSettingsUiState.hideUnreleasedContent) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
             .distinctUntilChanged()
             .collect { (index, offset) ->
                 CatalogRepository.saveScrollPosition(
-                    manifestUrl = manifestUrl,
-                    type = type,
-                    catalogId = catalogId,
-                    genre = genre,
-                    supportsPagination = supportsPagination,
+                    target = target,
                     firstVisibleItemIndex = index,
                     firstVisibleItemScrollOffset = offset,
                 )
@@ -148,7 +128,7 @@ fun CatalogScreen(
             }
     }
 
-    LaunchedEffect(networkStatusUiState.condition, manifestUrl, type, catalogId, genre, supportsPagination) {
+    LaunchedEffect(networkStatusUiState.condition, target) {
         when (networkStatusUiState.condition) {
             NetworkCondition.NoInternet,
             NetworkCondition.ServersUnreachable,
@@ -160,11 +140,7 @@ fun CatalogScreen(
                 if (!observedOfflineState) return@LaunchedEffect
                 observedOfflineState = false
                 CatalogRepository.load(
-                    manifestUrl = manifestUrl,
-                    type = type,
-                    catalogId = catalogId,
-                    genre = genre,
-                    supportsPagination = supportsPagination,
+                    target = target,
                     force = true,
                 )
             }
@@ -208,11 +184,7 @@ fun CatalogScreen(
                             onRetry = {
                                 NetworkStatusRepository.requestRefresh(force = true)
                                 CatalogRepository.load(
-                                    manifestUrl = manifestUrl,
-                                    type = type,
-                                    catalogId = catalogId,
-                                    genre = genre,
-                                    supportsPagination = supportsPagination,
+                                    target = target,
                                     force = true,
                                 )
                             },

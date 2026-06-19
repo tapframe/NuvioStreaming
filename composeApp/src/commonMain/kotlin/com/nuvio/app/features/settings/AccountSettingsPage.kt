@@ -15,12 +15,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.core.network.SyncBackendRepository
 import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
@@ -36,6 +41,7 @@ import nuvio.composeapp.generated.resources.settings_account_sign_out_confirm_ti
 import nuvio.composeapp.generated.resources.settings_account_status
 import nuvio.composeapp.generated.resources.settings_account_status_anonymous
 import nuvio.composeapp.generated.resources.settings_account_status_signed_in
+import nuvio.composeapp.generated.resources.settings_account_sync_backend
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.accountSettingsContent(
@@ -51,8 +57,10 @@ private fun AccountSettingsBody(
     isTablet: Boolean,
 ) {
     val authState by AuthRepository.state.collectAsStateWithLifecycle()
+    val syncBackendState by SyncBackendRepository.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var showSignOutConfirm by remember { mutableStateOf(false) }
+    val syncBackendLabel = syncBackendState.selectedBackend.displayName
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         NuvioSurfaceCard {
@@ -66,44 +74,21 @@ private fun AccountSettingsBody(
 
             when (val state = authState) {
                 is AuthState.Authenticated -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.settings_account_status),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = if (state.isAnonymous) {
-                                stringResource(Res.string.settings_account_status_anonymous)
-                            } else {
-                                stringResource(Res.string.settings_account_status_signed_in)
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                    if (!state.isAnonymous && state.email != null) {
+                    AccountInfoRow(
+                        label = stringResource(Res.string.settings_account_status),
+                        value = if (state.isAnonymous) {
+                            stringResource(Res.string.settings_account_status_anonymous)
+                        } else {
+                            stringResource(Res.string.settings_account_status_signed_in)
+                        },
+                        valueColor = MaterialTheme.colorScheme.primary,
+                    )
+                    state.email?.takeUnless { state.isAnonymous }?.let { email ->
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = stringResource(Res.string.settings_account_email),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = state.email,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontWeight = FontWeight.Medium,
-                            )
-                        }
+                        AccountInfoRow(
+                            label = stringResource(Res.string.settings_account_email),
+                            value = email,
+                        )
                     }
                 }
                 else -> {
@@ -114,6 +99,12 @@ private fun AccountSettingsBody(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            AccountInfoRow(
+                label = stringResource(Res.string.settings_account_sync_backend),
+                value = syncBackendLabel,
+            )
         }
 
         NuvioPrimaryButton(
@@ -134,4 +125,33 @@ private fun AccountSettingsBody(
         },
         onDismiss = { showSignOutConfirm = false },
     )
+}
+
+@Composable
+private fun AccountInfoRow(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            modifier = Modifier.weight(1f),
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            color = valueColor,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.End,
+        )
+    }
 }

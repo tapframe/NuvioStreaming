@@ -44,6 +44,7 @@ internal fun Modifier.playerSurfaceDragGestures(
     layoutSize: IntSize,
     sideGestureSystemEdgeExclusionPx: Float,
     playerControlsLockedState: State<Boolean>,
+    touchGesturesEnabledState: State<Boolean>,
     isHoldToSpeedGestureActiveState: State<Boolean>,
     currentPositionMsState: State<Long>,
     currentDurationMsState: State<Long>,
@@ -65,6 +66,9 @@ internal fun Modifier.playerSurfaceDragGestures(
                     if (!change.pressed) break
                     change.consume()
                 }
+                return@awaitEachGesture
+            }
+            if (!touchGesturesEnabledState.value) {
                 return@awaitEachGesture
             }
             val controller = gestureController
