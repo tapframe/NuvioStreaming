@@ -124,6 +124,8 @@ actual fun PlatformPlayerSurface(
     val latestExternalSubtitleMimeType = rememberUpdatedState(selectedExternalSubtitleMimeType)
     var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
     var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
+    var initializedVideoDecoderName by remember(playerSourceKey) { mutableStateOf<String?>(null) }
+    var initializedAudioDecoderName by remember(playerSourceKey) { mutableStateOf<String?>(null) }
     val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
 
     val initialMediaItem = remember(playerSourceKey) {
@@ -335,16 +337,16 @@ actual fun PlatformPlayerSurface(
                     exoPlayer.logCurrentTracks("STATE_READY")
                 }
                 syncPlayerViewKeepScreenOn()
-                latestOnSnapshot.value(exoPlayer.snapshot())
+                latestOnSnapshot.value(exoPlayer.snapshot(initializedVideoDecoderName, initializedAudioDecoderName))
             }
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 syncPlayerViewKeepScreenOn()
-                latestOnSnapshot.value(exoPlayer.snapshot())
+                latestOnSnapshot.value(exoPlayer.snapshot(initializedVideoDecoderName, initializedAudioDecoderName))
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
-                latestOnSnapshot.value(exoPlayer.snapshot())
+                latestOnSnapshot.value(exoPlayer.snapshot(initializedVideoDecoderName, initializedAudioDecoderName))
             }
 
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
@@ -368,14 +370,40 @@ actual fun PlatformPlayerSurface(
                         exoPlayer.selectTrackByIndex(C.TRACK_TYPE_TEXT, idx)
                     }
                 }
-                latestOnSnapshot.value(exoPlayer.snapshot())
+                latestOnSnapshot.value(exoPlayer.snapshot(initializedVideoDecoderName, initializedAudioDecoderName))
             }
 
         }
+
+        val analyticsListener = object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onVideoDecoderInitialized(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedMs: Long,
+                initializationDurationMs: Long
+            ) {
+                initializedVideoDecoderName = decoderName
+                latestOnSnapshot.value(exoPlayer.snapshot(decoderName, initializedAudioDecoderName))
+            }
+
+            override fun onAudioDecoderInitialized(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                decoderName: String,
+                initializedMs: Long,
+                initializationDurationMs: Long
+            ) {
+                initializedAudioDecoderName = decoderName
+                latestOnSnapshot.value(exoPlayer.snapshot(initializedVideoDecoderName, decoderName))
+            }
+        }
+
         exoPlayer.addListener(listener)
+        exoPlayer.addAnalyticsListener(analyticsListener)
+
         onDispose {
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
             exoPlayer.removeListener(listener)
+            exoPlayer.removeAnalyticsListener(analyticsListener)
             playerViewRef?.keepScreenOn = false
             subtitleSelectionJob?.cancel()
         }
@@ -407,7 +435,7 @@ actual fun PlatformPlayerSurface(
     LaunchedEffect(exoPlayer, playWhenReady) {
         exoPlayer.playWhenReady = playWhenReady
         syncPlayerViewKeepScreenOn()
-        latestOnSnapshot.value(exoPlayer.snapshot())
+        latestOnSnapshot.value(exoPlayer.snapshot(initializedVideoDecoderName, initializedAudioDecoderName))
     }
 
     LaunchedEffect(exoPlayer) {
@@ -567,7 +595,7 @@ actual fun PlatformPlayerSurface(
 
     LaunchedEffect(exoPlayer) {
         while (isActive) {
-            latestOnSnapshot.value(exoPlayer.snapshot())
+            latestOnSnapshot.value(exoPlayer.snapshot(initializedVideoDecoderName, initializedAudioDecoderName))
             delay(250L)
         }
     }
@@ -614,7 +642,7 @@ private tailrec fun Context.findActivity(): Activity? =
         else -> null
     }
 
-private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot =
+private fun ExoPlayer.snapshot(videoDecoder: String?, audioDecoder: String?): PlayerPlaybackSnapshot =
     PlayerPlaybackSnapshot(
         isLoading = playbackState == Player.STATE_IDLE || playbackState == Player.STATE_BUFFERING,
         isPlaying = isPlaying,
@@ -623,7 +651,158 @@ private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot =
         positionMs = currentPosition.coerceAtLeast(0L),
         bufferedPositionMs = bufferedPosition.coerceAtLeast(0L),
         playbackSpeed = playbackParameters.speed,
+        mediaInfoJson = buildMediaInfoJson(videoDecoder, audioDecoder),
     )
+
+private fun ExoPlayer.buildMediaInfoJson(videoDecoder: String?, audioDecoder: String?): String {
+    try {
+        val json = StringBuilder().append("{")
+
+        val filename = currentMediaItem?.localConfiguration?.uri?.toString()?.substringAfterLast('/') ?: ""
+        json.append("\"filename\":\"").append(escapeJson(filename)).append("\",")
+
+        // Find active video format
+        var videoFormat: Format? = null
+        for (group in currentTracks.groups) {
+            if (group.type == C.TRACK_TYPE_VIDEO && group.isSelected) {
+                for (i in 0 until group.length) {
+                    if (group.isTrackSelected(i)) {
+                        videoFormat = group.mediaTrackGroup.getFormat(i)
+                        break
+                    }
+                }
+                if (videoFormat != null) break
+            }
+        }
+
+        // Find active audio format
+        var audioFormat: Format? = null
+        for (group in currentTracks.groups) {
+            if (group.type == C.TRACK_TYPE_AUDIO && group.isSelected) {
+                for (i in 0 until group.length) {
+                    if (group.isTrackSelected(i)) {
+                        audioFormat = group.mediaTrackGroup.getFormat(i)
+                        break
+                    }
+                }
+                if (audioFormat != null) break
+            }
+        }
+
+        if (videoFormat != null) {
+            val vFormat = videoFormat
+            val vCodec = vFormat.codecs ?: vFormat.sampleMimeType ?: ""
+            json.append("\"videoCodec\":\"").append(escapeJson(vCodec)).append("\",")
+            json.append("\"videoWidth\":").append(vFormat.width).append(",")
+            json.append("\"videoHeight\":").append(vFormat.height).append(",")
+            json.append("\"fps\":").append(if (vFormat.frameRate > 0) vFormat.frameRate else 0.0).append(",")
+
+            val vBitrateKbps = if (vFormat.bitrate > 0) vFormat.bitrate / 1000 else 0
+            json.append("\"videoBitrateKbps\":").append(vBitrateKbps).append(",")
+
+            if (videoDecoder != null) {
+                json.append("\"videoDecoder\":\"").append(escapeJson(videoDecoder)).append("\",")
+                val isSw = videoDecoder.startsWith("OMX.google.") ||
+                           videoDecoder.startsWith("c2.android.") ||
+                           videoDecoder.contains(".sw.", ignoreCase = true) ||
+                           videoDecoder.contains("google", ignoreCase = true)
+                val hwdec = if (isSw) "" else "mediacodec"
+                json.append("\"hwdecCurrent\":\"").append(hwdec).append("\",")
+            } else {
+                json.append("\"videoDecoder\":\"\",")
+                json.append("\"hwdecCurrent\":\"\",")
+            }
+
+            // HDR & Colorspace Detection
+            var hdrFormat = ""
+            var gamma = ""
+            var primaries = ""
+            val colorInfo = vFormat.colorInfo
+            if (colorInfo != null) {
+                when (colorInfo.colorTransfer) {
+                    C.COLOR_TRANSFER_ST2084 -> {
+                        hdrFormat = "hdr"
+                        gamma = "pq"
+                    }
+                    C.COLOR_TRANSFER_HLG -> {
+                        hdrFormat = "hdr"
+                        gamma = "hlg"
+                    }
+                    C.COLOR_TRANSFER_SDR -> {
+                        gamma = "sdr"
+                    }
+                }
+                when (colorInfo.colorSpace) {
+                    C.COLOR_SPACE_BT2020 -> {
+                        primaries = "bt.2020"
+                    }
+                    C.COLOR_SPACE_BT709 -> {
+                        primaries = "bt.709"
+                    }
+                    C.COLOR_SPACE_BT601 -> {
+                        primaries = "bt.601"
+                    }
+                }
+            }
+
+            // Dolby Vision check via MIME/Codecs
+            var dvProfile = ""
+            val isDv = vCodec.contains("dvhe") || vCodec.contains("dvh1") || vCodec.contains("dvav")
+            if (isDv) {
+                hdrFormat = "dolby_vision"
+                val parts = vCodec.split('.')
+                if (parts.size >= 2) {
+                    val p = parts[1].toIntOrNull()
+                    if (p != null) {
+                        dvProfile = "Profile $p"
+                    } else {
+                        dvProfile = parts[1]
+                    }
+                }
+            }
+
+            json.append("\"hdrFormat\":\"").append(hdrFormat).append("\",")
+            json.append("\"dvProfile\":\"").append(dvProfile).append("\",")
+            json.append("\"gamma\":\"").append(gamma).append("\",")
+            json.append("\"primaries\":\"").append(primaries).append("\",")
+        } else {
+            json.append("\"videoCodec\":\"\",\"videoWidth\":0,\"videoHeight\":0,\"fps\":0.0,\"videoBitrateKbps\":0,\"videoDecoder\":\"\",\"hwdecCurrent\":\"\",\"hdrFormat\":\"\",\"dvProfile\":\"\",\"gamma\":\"\",\"primaries\":\"\",")
+        }
+
+        if (audioFormat != null) {
+            val aFormat = audioFormat
+            val aCodec = aFormat.codecs ?: aFormat.sampleMimeType ?: ""
+            json.append("\"audioCodec\":\"").append(escapeJson(aCodec)).append("\",")
+            if (audioDecoder != null) {
+                json.append("\"audioDecoder\":\"").append(escapeJson(audioDecoder)).append("\",")
+            } else {
+                json.append("\"audioDecoder\":\"\",")
+            }
+            json.append("\"audioChannels\":\"").append(aFormat.channelCount).append("\",")
+            json.append("\"audioSampleRate\":\"").append(if (aFormat.sampleRate > 0) aFormat.sampleRate else "").append("\",")
+            json.append("\"audioLang\":\"").append(escapeJson(aFormat.language ?: "")).append("\",")
+
+            val aBitrateKbps = if (aFormat.bitrate > 0) aFormat.bitrate / 1000 else 0
+            json.append("\"audioBitrateKbps\":").append(aBitrateKbps)
+        } else {
+            json.append("\"audioCodec\":\"\",\"audioDecoder\":\"\",\"audioChannels\":\"\",\"audioSampleRate\":\"\",\"audioLang\":\"\",\"audioBitrateKbps\":0")
+        }
+
+        json.append("}")
+        return json.toString()
+    } catch (e: Exception) {
+        Log.e("NuvioPlayer", "Error building media info json", e)
+        return "{}"
+    }
+}
+
+private fun escapeJson(str: String): String {
+    return str.replace("\\", "\\\\")
+              .replace("\"", "\\\"")
+              .replace("\n", "\\n")
+              .replace("\r", "\\r")
+              .replace("\t", "\\t")
+}
 
 private fun ExoPlayer.shouldKeepPlayerScreenOn(): Boolean =
     playerError == null &&

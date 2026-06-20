@@ -225,6 +225,9 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
                 refreshTracks()
                 showAudioModal = true
             },
+            onInfoClick = {
+                showStreamInfoModal = true
+            },
             onVideoSettingsClick = if (isIos) {
                 {
                     showVideoSettingsModal = true
@@ -527,5 +530,8 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             submitIntroSegmentType = "intro"
             showSubmitIntroModal = false
         },
+        showStreamInfoModal = showStreamInfoModal,
+        mediaInfoJson = playbackSnapshot.mediaInfoJson,
+        onStreamInfoModalDismissed = { showStreamInfoModal = false },
     )
 }

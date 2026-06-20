@@ -89,6 +89,9 @@ internal fun PlayerScreenModalHosts(
     onSubmitIntroEndTimeChanged: (String) -> Unit,
     onSubmitIntroDismissed: () -> Unit,
     onSubmitIntroSuccess: () -> Unit,
+    showStreamInfoModal: Boolean,
+    mediaInfoJson: String,
+    onStreamInfoModalDismissed: () -> Unit,
 ) {
     if (pendingP2pSwitch != null) {
         P2pConsentDialog(
@@ -215,6 +218,12 @@ internal fun PlayerScreenModalHosts(
             onSuccess = onSubmitIntroSuccess,
         )
     }
+
+    PlaybackInfoModal(
+        visible = showStreamInfoModal,
+        mediaInfoJson = mediaInfoJson,
+        onDismiss = onStreamInfoModalDismissed,
+    )
 }
 
 internal fun selectDownloadedEpisodeForPlayback(
