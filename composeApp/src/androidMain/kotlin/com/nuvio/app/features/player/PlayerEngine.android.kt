@@ -215,7 +215,7 @@ actual fun PlatformPlayerSurface(
         val loadControl = DefaultLoadControl.Builder()
             .setTargetBufferBytes(100 * 1024 * 1024)
             .setBufferDurationsMs(
-                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                15_000,
                 70_000,
                 DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
                 5_000

@@ -404,6 +404,7 @@ private fun PlaybackSettingsSection(
                     description = when (preferredAudioLanguage) {
                         AudioLanguageOption.DEFAULT -> stringResource(Res.string.settings_playback_option_default)
                         AudioLanguageOption.DEVICE -> stringResource(Res.string.settings_playback_option_device_language)
+                        AudioLanguageOption.ORIGINAL -> stringResource(Res.string.settings_playback_option_original)
                         else -> languageLabelForCode(preferredAudioLanguage)
                     },
                     enabled = audioLanguageEnabled,
@@ -1090,11 +1091,13 @@ private fun PlaybackSettingsSection(
     }
 
     if (showPreferredAudioDialog) {
+        val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
         LanguageSelectionDialog(
             title = stringResource(Res.string.settings_playback_preferred_audio_language),
             options = listOf(
                 LanguageSelectionOption(AudioLanguageOption.DEFAULT, stringResource(Res.string.settings_playback_option_default)),
                 LanguageSelectionOption(AudioLanguageOption.DEVICE, stringResource(Res.string.settings_playback_option_device_language)),
+                LanguageSelectionOption(AudioLanguageOption.ORIGINAL, stringResource(Res.string.settings_playback_option_original), description = originalHint),
             ) + AvailableLanguageOptions.map { option ->
                 LanguageSelectionOption(option.code, stringResource(option.labelRes))
             },
@@ -1108,10 +1111,12 @@ private fun PlaybackSettingsSection(
     }
 
     if (showSecondaryAudioDialog) {
+        val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
         LanguageSelectionDialog(
             title = stringResource(Res.string.settings_playback_secondary_audio_language),
             options = listOf(
                 LanguageSelectionOption(null, stringResource(Res.string.settings_playback_option_none)),
+                LanguageSelectionOption(AudioLanguageOption.ORIGINAL, stringResource(Res.string.settings_playback_option_original), description = originalHint),
             ) + AvailableLanguageOptions.map { option ->
                 LanguageSelectionOption(option.code, stringResource(option.labelRes))
             },
@@ -1441,6 +1446,7 @@ private fun formatReuseCacheDuration(hours: Int): String = when {
 private data class LanguageSelectionOption(
     val value: String?,
     val label: String,
+    val description: String? = null,
 )
 
 @Composable
@@ -1720,12 +1726,20 @@ private fun LanguageSelectionDialog(
                                     .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    text = option.label,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = option.label,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                    if (!option.description.isNullOrBlank()) {
+                                        Text(
+                                            text = option.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
                                 Box(
                                     modifier = Modifier.size(24.dp),
                                     contentAlignment = Alignment.Center,

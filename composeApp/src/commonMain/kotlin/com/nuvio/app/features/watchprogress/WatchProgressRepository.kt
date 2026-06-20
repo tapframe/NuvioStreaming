@@ -741,13 +741,19 @@ object WatchProgressRepository {
         ensureLoaded()
         if (videoIds.isEmpty()) return
 
-        if (shouldUseTraktProgress()) {
+        val useTraktProgress = shouldUseTraktProgress()
+        if (useTraktProgress) {
             val entriesToRemove = currentEntries().filter { entry -> entry.videoId in videoIds }
+            val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
             videoIds.forEach(TraktProgressRepository::applyOptimisticRemoval)
+            if (locallyRemovedEntries.isNotEmpty()) {
+                persist()
+            }
             publish()
-            if (entriesToRemove.isNotEmpty()) {
+            val traktEntriesToRemove = entriesToRemove.filter { entry -> entry.shouldAttemptTraktPlaybackDelete() }
+            if (traktEntriesToRemove.isNotEmpty()) {
                 syncScope.launch {
-                    entriesToRemove.forEach { entry ->
+                    traktEntriesToRemove.forEach { entry ->
                         runCatching {
                             TraktProgressRepository.removeProgress(
                                 contentId = entry.parentMetaId,
@@ -783,6 +789,7 @@ object WatchProgressRepository {
         val normalizedContentId = contentId.trim()
         if (normalizedContentId.isBlank()) return
 
+        val useTraktProgress = shouldUseTraktProgress()
         val entriesToRemove = currentEntries().filter { entry ->
             if (entry.parentMetaId != normalizedContentId) {
                 false
@@ -794,13 +801,21 @@ object WatchProgressRepository {
         }
         if (entriesToRemove.isEmpty()) return
 
-        if (shouldUseTraktProgress()) {
+        if (useTraktProgress) {
+            val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
             TraktProgressRepository.applyOptimisticRemoval(
                 contentId = normalizedContentId,
                 seasonNumber = seasonNumber,
                 episodeNumber = episodeNumber,
             )
+            if (locallyRemovedEntries.isNotEmpty()) {
+                persist()
+            }
             publish()
+            val shouldAttemptTraktDelete = entriesToRemove.any { entry -> entry.shouldAttemptTraktPlaybackDelete() }
+            if (!shouldAttemptTraktDelete) {
+                return
+            }
             syncScope.launch {
                 runCatching {
                     TraktProgressRepository.removeProgress(
@@ -809,6 +824,7 @@ object WatchProgressRepository {
                         episodeNumber = episodeNumber,
                     )
                 }.onFailure { error ->
+                    if (error is CancellationException) throw error
                     log.e(error) { "Failed to remove Trakt watch progress" }
                 }
             }
@@ -1030,6 +1046,14 @@ object WatchProgressRepository {
             isAuthenticated = TraktAuthRepository.isAuthenticated.value,
             source = TraktSettingsRepository.uiState.value.watchProgressSource,
         )
+
+    private fun WatchProgressEntry.shouldAttemptTraktPlaybackDelete(): Boolean =
+        isTraktCompatibleId(parentMetaId)
+
+    private fun removeStoredLocalEntries(entries: Collection<WatchProgressEntry>): List<WatchProgressEntry> =
+        entries.mapNotNull { entry ->
+            entriesByVideoId.remove(entry.videoId)
+        }
 
     private fun currentEntries(): List<WatchProgressEntry> {
         return if (shouldUseTraktProgress()) {

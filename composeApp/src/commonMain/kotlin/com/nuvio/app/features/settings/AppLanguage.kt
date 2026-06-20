@@ -13,12 +13,14 @@ import nuvio.composeapp.generated.resources.lang_portuguese_portugal
 import nuvio.composeapp.generated.resources.lang_spanish
 import nuvio.composeapp.generated.resources.lang_turkish
 import nuvio.composeapp.generated.resources.lang_norwegian
+import nuvio.composeapp.generated.resources.settings_appearance_app_language_device
 import org.jetbrains.compose.resources.StringResource
 
 enum class AppLanguage(
     val code: String,
     val labelRes: StringResource,
 ) {
+    DEVICE("device", Res.string.settings_appearance_app_language_device),
     CZECH("cs", Res.string.lang_czech),
     ENGLISH("en", Res.string.lang_english),
     FRENCH("fr", Res.string.lang_french),
@@ -35,6 +37,6 @@ enum class AppLanguage(
 
     companion object {
         fun fromCode(code: String?): AppLanguage =
-            entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: ENGLISH
+            entries.firstOrNull { it.code.equals(code, ignoreCase = true) } ?: DEVICE
     }
 }

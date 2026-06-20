@@ -42,6 +42,8 @@
 # TorrServer based P2P streaming.
 -keep class com.nuvio.app.features.p2p.** { *; }
 
+-keep class androidx.work.impl.WorkDatabase_Impl { *; }
+
 # Media3 / ExoPlayer classes from local AAR decoders and stock modules.
 -dontwarn androidx.media3.**
 -keep class androidx.media3.** { *; }

@@ -184,14 +184,18 @@ fun DetailHero(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .height(if (isTablet) 360.dp else 320.dp)
                         .align(Alignment.BottomCenter)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
-                                    MaterialTheme.colorScheme.background,
+                                colorStops = arrayOf(
+                                    0.00f to Color.Transparent,
+                                    0.16f to MaterialTheme.colorScheme.background.copy(alpha = 0.04f),
+                                    0.32f to MaterialTheme.colorScheme.background.copy(alpha = 0.14f),
+                                    0.50f to MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
+                                    0.68f to MaterialTheme.colorScheme.background.copy(alpha = 0.62f),
+                                    0.84f to MaterialTheme.colorScheme.background.copy(alpha = 0.84f),
+                                    1.00f to MaterialTheme.colorScheme.background,
                                 ),
                             ),
                         ),

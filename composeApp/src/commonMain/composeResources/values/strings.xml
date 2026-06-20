@@ -536,6 +536,7 @@
     <string name="settings_appearance_amoled_black">AMOLED Black</string>
     <string name="settings_appearance_amoled_description">Use pure black backgrounds for OLED screens.</string>
     <string name="settings_appearance_app_language">App Language</string>
+    <string name="settings_appearance_app_language_device">Device language</string>
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
@@ -864,6 +865,8 @@
     <string name="settings_playback_not_set">Not set</string>
     <string name="settings_playback_option_default">Default (media file)</string>
     <string name="settings_playback_option_device_language">Device language</string>
+    <string name="settings_playback_option_original">Original language</string>
+    <string name="settings_playback_option_original_hint">Requires TMDB enrichment to be enabled</string>
     <string name="settings_playback_option_forced">Forced</string>
     <string name="settings_playback_option_none">None</string>
     <string name="settings_playback_addon_subtitle_startup_all">All subtitles</string>
