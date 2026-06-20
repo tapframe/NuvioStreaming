@@ -1205,7 +1205,18 @@ private fun VlcPlayerSurface(
             DeviceLanguagePreferences.preferredLanguageCodes()
         )
 
-        val media = Media(libVLC, Uri.parse(sourceUrl))
+        val media = if (sourceUrl.startsWith("file:", ignoreCase = true)) {
+            val path = Uri.parse(sourceUrl).path
+            if (path != null) {
+                Media(libVLC, path)
+            } else {
+                Media(libVLC, Uri.parse(sourceUrl))
+            }
+        } else if (sourceUrl.startsWith("/")) {
+            Media(libVLC, sourceUrl)
+        } else {
+            Media(libVLC, Uri.parse(sourceUrl))
+        }
         sourceHeaders.forEach { (key, value) ->
             if (key.equals("User-Agent", ignoreCase = true)) {
                 media.addOption(":http-user-agent=$value")
