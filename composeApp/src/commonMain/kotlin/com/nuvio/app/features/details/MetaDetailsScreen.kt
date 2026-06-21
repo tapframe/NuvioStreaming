@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckCircleOutline
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.CircularProgressIndicator
@@ -114,6 +115,7 @@ import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
+import nuvio.composeapp.generated.resources.action_download
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 
@@ -125,6 +127,7 @@ fun MetaDetailsScreen(
     onBack: () -> Unit,
     onPlay: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onPlayManually: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
+    onDownload: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onOpenMeta: ((MetaPreview) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)? = null,
     onCompanyClick: ((MetaCompany, String) -> Unit)? = null,
@@ -607,6 +610,47 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
+                val onPrimaryDownloadClick: () -> Unit = {
+                    when {
+                        (meta.type == "series" || hasEpisodes) && seriesAction != null -> {
+                            onDownload?.invoke(
+                                meta.type,
+                                seriesStreamVideoId ?: seriesAction.videoId,
+                                meta.id,
+                                meta.type,
+                                meta.name,
+                                meta.logo,
+                                meta.poster,
+                                meta.background,
+                                seriesAction.seasonNumber,
+                                seriesAction.episodeNumber,
+                                seriesAction.episodeTitle,
+                                seriesAction.episodeThumbnail,
+                                seriesPauseDescription,
+                                seriesAction.resumePositionMs,
+                            )
+                        }
+
+                        else -> {
+                            onDownload?.invoke(
+                                meta.type,
+                                meta.id,
+                                meta.id,
+                                meta.type,
+                                meta.name,
+                                meta.logo,
+                                meta.poster,
+                                meta.background,
+                                null,
+                                null,
+                                null,
+                                null,
+                                meta.description,
+                                movieProgress?.lastPositionMs,
+                            )
+                        }
+                    }
+                }
                 val manualPlayHandler = onPlayManually
                 val showManualPlayOption = manualPlayHandler != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
                 val onPrimaryPlayLongClick: (() -> Unit)? = manualPlayHandler
@@ -696,6 +740,35 @@ fun MetaDetailsScreen(
                     val savedProgress = watchProgressUiState.byVideoId[streamVideoId]
                         ?.takeUnless { it.isCompleted }
                     onPlayManually?.invoke(
+                        meta.type,
+                        streamVideoId,
+                        meta.id,
+                        meta.type,
+                        meta.name,
+                        meta.logo,
+                        meta.poster,
+                        meta.background,
+                        season,
+                        episode,
+                        video.title,
+                        video.thumbnail,
+                        video.overview,
+                        savedProgress?.lastPositionMs,
+                    )
+                }
+                val onEpisodeDownloadClick: (MetaVideo) -> Unit = { video ->
+                    val season = video.season
+                    val episode = video.episode
+                    val playbackVideoId = buildPlaybackVideoId(
+                        parentMetaId = meta.id,
+                        seasonNumber = season,
+                        episodeNumber = episode,
+                        fallbackVideoId = video.id,
+                    )
+                    val streamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                    val savedProgress = watchProgressUiState.byVideoId[streamVideoId]
+                        ?.takeUnless { it.isCompleted }
+                    onDownload?.invoke(
                         meta.type,
                         streamVideoId,
                         meta.id,
@@ -826,6 +899,7 @@ fun MetaDetailsScreen(
                                 isSaved = isSaved,
                                 isWatched = isWatched,
                                 onPrimaryPlayClick = onPrimaryPlayClick,
+                                onPrimaryDownloadClick = onPrimaryDownloadClick,
                                 onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                                 onSaveClick = toggleSaved,
                                 onSaveLongClick = openLibraryListPicker,
@@ -1012,6 +1086,10 @@ fun MetaDetailsScreen(
                                 showPlayManually = showManualPlayOption,
                                 onPlayManually = {
                                     onEpisodeManualPlayClick(selectedEpisode)
+                                },
+                                showDownload = true,
+                                onDownload = {
+                                    onEpisodeDownloadClick(selectedEpisode)
                                 },
                             )
                         }
@@ -1277,6 +1355,7 @@ private fun LazyListScope.configuredMetaSectionItems(
     isSaved: Boolean,
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
+    onPrimaryDownloadClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
@@ -1352,6 +1431,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     isSaved = isSaved,
                     isWatched = isWatched,
                     onPrimaryPlayClick = onPrimaryPlayClick,
+                    onPrimaryDownloadClick = onPrimaryDownloadClick,
                     onPrimaryPlayLongClick = onPrimaryPlayLongClick,
                     onSaveClick = onSaveClick,
                     onSaveLongClick = onSaveLongClick,
@@ -1500,6 +1580,7 @@ private fun ConfiguredMetaSections(
     isSaved: Boolean,
     isWatched: Boolean,
     onPrimaryPlayClick: () -> Unit,
+    onPrimaryDownloadClick: () -> Unit,
     onPrimaryPlayLongClick: (() -> Unit)?,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
@@ -1590,6 +1671,12 @@ private fun ConfiguredMetaSections(
                             isActive = isSaved,
                             onClick = onSaveClick,
                             onLongClick = onSaveLongClick,
+                        ),
+                        DetailSecondaryAction(
+                            label = stringResource(Res.string.action_download),
+                            icon = Icons.Default.Download,
+                            isActive = false,
+                            onClick = onPrimaryDownloadClick,
                         ),
                     ),
                     isTablet = isTablet,

@@ -1182,11 +1182,12 @@ private fun MainAppContent(
             resumeProgressFraction: Float?,
             manualSelection: Boolean,
             startFromBeginning: Boolean,
+            isDownloadMode: Boolean = false,
         ) {
             val targetResumePositionMs = if (startFromBeginning) 0L else (resumePositionMs ?: 0L)
             val targetResumeProgressFraction = if (startFromBeginning) null else resumeProgressFraction
 
-            if (!manualSelection) {
+            if (!manualSelection && !isDownloadMode) {
                 val downloadedItem = DownloadsRepository.findPlayableDownload(
                     parentMetaId = parentMetaId,
                     seasonNumber = seasonNumber,
@@ -1251,6 +1252,7 @@ private fun MainAppContent(
                     resumeProgressFraction = targetResumeProgressFraction,
                     manualSelection = manualSelection,
                     startFromBeginning = startFromBeginning,
+                    isDownloadMode = isDownloadMode,
                 ),
             )
             navController.navigate(
@@ -1301,6 +1303,30 @@ private fun MainAppContent(
                     resumeProgressFraction = null,
                     manualSelection = true,
                     startFromBeginning = false,
+                )
+            }
+
+        val onDownload: (String, String, String, String, String, String?, String?, String?, Int?, Int?, String?, String?, String?, Long?) -> Unit =
+            { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail, pauseDescription, resumePositionMs ->
+                launchPlaybackWithDownloadPreference(
+                    type = type,
+                    videoId = videoId,
+                    parentMetaId = parentMetaId,
+                    parentMetaType = parentMetaType,
+                    title = title,
+                    logo = logo,
+                    poster = poster,
+                    background = background,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                    episodeTitle = episodeTitle,
+                    episodeThumbnail = episodeThumbnail,
+                    pauseDescription = pauseDescription,
+                    resumePositionMs = resumePositionMs,
+                    resumeProgressFraction = null,
+                    manualSelection = false,
+                    startFromBeginning = false,
+                    isDownloadMode = true,
                 )
             }
 
@@ -1653,6 +1679,7 @@ private fun MainAppContent(
                         },
                         onPlay = onPlay,
                         onPlayManually = onPlayManually,
+                        onDownload = onDownload,
                         onOpenMeta = { preview ->
                             coroutineScope.launch {
                                 val resolvedId = if (preview.id.startsWith("tmdb:")) {
@@ -2119,6 +2146,30 @@ private fun MainAppContent(
                             selectedStream
                         }
                         val sourceUrl = stream.playableDirectUrl
+
+                        if (launch.isDownloadMode) {
+                            val result = DownloadsRepository.enqueueFromStream(
+                                contentType = launch.type,
+                                videoId = effectiveVideoId,
+                                parentMetaId = launch.parentMetaId ?: effectiveVideoId,
+                                parentMetaType = launch.parentMetaType ?: launch.type,
+                                title = launch.title,
+                                logo = launch.logo,
+                                poster = launch.poster,
+                                background = launch.background,
+                                seasonNumber = launch.seasonNumber,
+                                episodeNumber = launch.episodeNumber,
+                                episodeTitle = launch.episodeTitle,
+                                episodeThumbnail = launch.episodeThumbnail,
+                                stream = stream,
+                            )
+                            NuvioToastController.show(result.toastMessage())
+                            StreamsRepository.consumeAutoPlay()
+                            StreamsRepository.cancelLoading()
+                            navController.popBackStack()
+                            return@LaunchedEffect
+                        }
+
                         if (sourceUrl == null && stream.needsLocalDebridResolve && stream.p2pInfoHash != null) {
                             autoPlayHandled = true
                             requestOrOpenP2pStream(
@@ -2265,6 +2316,29 @@ private fun MainAppContent(
                             return
                         }
                         val sourceUrl = stream.playableDirectUrl ?: return
+
+                        if (launch.isDownloadMode) {
+                            val result = DownloadsRepository.enqueueFromStream(
+                                contentType = launch.type,
+                                videoId = effectiveVideoId,
+                                parentMetaId = launch.parentMetaId ?: effectiveVideoId,
+                                parentMetaType = launch.parentMetaType ?: launch.type,
+                                title = launch.title,
+                                logo = launch.logo,
+                                poster = launch.poster,
+                                background = launch.background,
+                                seasonNumber = launch.seasonNumber,
+                                episodeNumber = launch.episodeNumber,
+                                episodeTitle = launch.episodeTitle,
+                                episodeThumbnail = launch.episodeThumbnail,
+                                stream = stream,
+                            )
+                            NuvioToastController.show(result.toastMessage())
+                            StreamsRepository.cancelLoading()
+                            navController.popBackStack()
+                            return
+                        }
+
                         if (playerSettings.streamReuseLastLinkEnabled) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
                                 type = launch.type,

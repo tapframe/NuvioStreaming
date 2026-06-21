@@ -6,6 +6,7 @@
     <string name="action_close">Close</string>
     <string name="action_delete">Delete</string>
     <string name="action_done">Done</string>
+    <string name="action_download">Download</string>
     <string name="action_edit">Edit</string>
     <string name="action_import">Import</string>
     <string name="action_next">Next</string>
