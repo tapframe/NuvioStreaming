@@ -3,7 +3,6 @@ package com.nuvio.app.features.home
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionRepository
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -124,7 +123,7 @@ object HomeCatalogSettingsRepository {
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
-    fun syncCatalogs(addons: List<ManagedAddon>) {
+    suspend fun syncCatalogs(addons: List<ManagedAddon>) {
         ensureLoaded()
         definitions = buildHomeCatalogDefinitions(addons)
         collectionDefinitions = buildCollectionDefinitions(CollectionRepository.collections.value)
@@ -138,7 +137,7 @@ object HomeCatalogSettingsRepository {
         persist()
     }
 
-    fun syncCollections(collections: List<Collection>) {
+    suspend fun syncCollections(collections: List<Collection>) {
         ensureLoaded()
         collectionDefinitions = buildCollectionDefinitions(collections)
         normalizePreferences()
@@ -531,13 +530,19 @@ internal data class CollectionCatalogDefinition(
     val isPinnedToTop: Boolean,
 )
 
-internal fun buildCollectionDefinitions(collections: List<Collection>): List<CollectionCatalogDefinition> =
-    collections.filter { it.folders.isNotEmpty() }.map { collection ->
-        CollectionCatalogDefinition(
-            key = "collection_${collection.id}",
-            collectionId = collection.id,
-            title = collection.title,
-            subtitle = runBlocking { getString(Res.string.collections_folder_count, collection.folders.size) },
-            isPinnedToTop = collection.pinToTop,
+internal suspend fun buildCollectionDefinitions(collections: List<Collection>): List<CollectionCatalogDefinition> {
+    val result = mutableListOf<CollectionCatalogDefinition>()
+    for (collection in collections) {
+        if (collection.folders.isEmpty()) continue
+        result.add(
+            CollectionCatalogDefinition(
+                key = "collection_${collection.id}",
+                collectionId = collection.id,
+                title = collection.title,
+                subtitle = getString(Res.string.collections_folder_count, collection.folders.size),
+                isPinnedToTop = collection.pinToTop,
+            ),
         )
     }
+    return result
+}

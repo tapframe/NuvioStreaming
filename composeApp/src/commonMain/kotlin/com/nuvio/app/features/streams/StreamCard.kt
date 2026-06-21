@@ -41,6 +41,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.features.debrid.DebridProviders
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.stream_default_name
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun StreamCard(
@@ -216,7 +219,7 @@ private fun StreamNameWithInstantService(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stream.streamLabel,
+            text = stream.streamLabel.ifBlank { stringResource(Res.string.stream_default_name) },
             modifier = Modifier.weight(1f, fill = false),
             style = nameStyle,
             color = MaterialTheme.colorScheme.onSurface,

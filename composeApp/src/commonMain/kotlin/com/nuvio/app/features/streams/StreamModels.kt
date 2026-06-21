@@ -1,9 +1,6 @@
 package com.nuvio.app.features.streams
 
 import com.nuvio.app.core.build.AppFeaturePolicy
-import kotlinx.coroutines.runBlocking
-import nuvio.composeapp.generated.resources.*
-import org.jetbrains.compose.resources.getString
 
 data class StreamItem(
     val name: String? = null,
@@ -25,7 +22,7 @@ data class StreamItem(
     val badges: List<StreamBadge> = emptyList(),
 ) {
     val streamLabel: String
-        get() = name ?: runBlocking { getString(Res.string.stream_default_name) }
+        get() = name.orEmpty()
 
     val streamSubtitle: String?
         get() = description

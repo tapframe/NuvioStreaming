@@ -3,7 +3,6 @@ package com.nuvio.app.features.details
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -11,7 +10,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
-import org.jetbrains.compose.resources.getString
 
 enum class MetaScreenSectionKey {
     ACTIONS,
@@ -33,8 +31,6 @@ enum class MetaScreenSectionKey {
 
 data class MetaScreenSectionItem(
     val key: MetaScreenSectionKey,
-    val title: String,
-    val description: String,
     val enabled: Boolean,
     val order: Int,
     val tabGroup: Int? = null,
@@ -164,7 +160,6 @@ object MetaScreenSettingsRepository {
     private var tabLayout: Boolean = false
     private var episodeCardStyle: MetaEpisodeCardStyle = MetaEpisodeCardStyle.Horizontal
     private var blurUnwatchedEpisodes: Boolean = false
-    private fun localizedString(resource: StringResource): String = runBlocking { getString(resource) }
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -362,8 +357,6 @@ object MetaScreenSettingsRepository {
                     val preference = preferences[definition.key]
                     MetaScreenSectionItem(
                         key = definition.key,
-                        title = localizedString(definition.titleRes),
-                        description = localizedString(definition.descriptionRes),
                         enabled = preference?.enabled ?: true,
                         order = preference?.order ?: 0,
                         tabGroup = preference?.tabGroup,
