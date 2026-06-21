@@ -125,7 +125,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
         outlineSize: Float,
         bold: Bool,
         fontSize: Float,
-        subPos: Int32
+        subPos: Int32,
+        shadowEnabled: Bool,
+        shadowDensity: Float
     ) {
         playerVC?.applySubtitleStyle(
             textColor: textColor,
@@ -134,7 +136,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
             outlineSize: outlineSize,
             bold: bold,
             fontSize: fontSize,
-            subPos: Int(subPos)
+            subPos: Int(subPos),
+            shadowEnabled: shadowEnabled,
+            shadowDensity: shadowDensity
         )
     }
 
@@ -617,7 +621,9 @@ final class MPVPlayerViewController: UIViewController {
         outlineSize: Float,
         bold: Bool,
         fontSize: Float,
-        subPos: Int
+        subPos: Int,
+        shadowEnabled: Bool,
+        shadowDensity: Float
     ) {
         guard mpv != nil else { return }
 
@@ -636,6 +642,12 @@ final class MPVPlayerViewController: UIViewController {
 
         var position = Int64(subPos)
         checkError(mpv_set_property(mpv, "sub-pos", MPV_FORMAT_INT64, &position))
+
+        var shadowOffset = shadowEnabled ? Double(shadowDensity) : 0.0
+        checkError(mpv_set_property(mpv, "sub-shadow-offset", MPV_FORMAT_DOUBLE, &shadowOffset))
+        if shadowEnabled {
+            checkError(mpv_set_property_string(mpv, "sub-shadow-color", "#FF000000"))
+        }
     }
 
     func destroyPlayer() {

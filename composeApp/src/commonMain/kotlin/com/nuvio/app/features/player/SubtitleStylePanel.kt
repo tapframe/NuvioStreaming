@@ -208,6 +208,65 @@ private fun StyleControlsCard(
             }
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_player_shadow),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (style.shadowEnabled) colorScheme.primaryContainer
+                        else colorScheme.surface.copy(alpha = 0.8f)
+                    )
+                    .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
+                    .clickable { onStyleChanged(style.copy(shadowEnabled = !style.shadowEnabled)) }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = if (style.shadowEnabled) stringResource(Res.string.compose_action_on)
+                    else stringResource(Res.string.compose_action_off),
+                    color = if (style.shadowEnabled) colorScheme.onPrimaryContainer else colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_player_shadow_density),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            StepperControl(
+                value = ((style.shadowDensity * 10f).roundToInt() / 10f).toString(),
+                onMinus = {
+                    onStyleChanged(style.copy(shadowDensity = (style.shadowDensity - 0.2f).coerceAtLeast(0.2f)))
+                },
+                onPlus = {
+                    onStyleChanged(style.copy(shadowDensity = (style.shadowDensity + 0.2f).coerceAtMost(5.0f)))
+                },
+                buttonSize = btnSize,
+                buttonRadius = btnRadius,
+                minWidth = 46.dp,
+                minusIcon = Icons.Rounded.KeyboardArrowDown,
+                plusIcon = Icons.Rounded.KeyboardArrowUp,
+            )
+        }
+
         ToggleRow(
             label = stringResource(Res.string.compose_player_bold),
             enabled = style.bold,

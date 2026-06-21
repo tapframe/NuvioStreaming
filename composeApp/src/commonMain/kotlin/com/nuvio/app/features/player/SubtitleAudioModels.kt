@@ -61,6 +61,8 @@ data class SubtitleStyleState(
     val bottomOffset: Int = 20,
     val useForcedSubtitles: Boolean = false,
     val showOnlyPreferredLanguages: Boolean = false,
+    val shadowEnabled: Boolean = false,
+    val shadowDensity: Float = 1.0f,
 ) {
     companion object {
         val DEFAULT = SubtitleStyleState()

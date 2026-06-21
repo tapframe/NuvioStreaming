@@ -557,6 +557,30 @@ private fun PlaybackSettingsSection(
                         onClick = { showSubtitleOutlineColorDialog = true },
                     )
                 }
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_subtitle_shadow),
+                    description = stringResource(Res.string.settings_playback_subtitle_shadow_description),
+                    checked = subtitleStyle.shadowEnabled,
+                    enabled = subtitleRenderingEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = { enabled ->
+                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(shadowEnabled = enabled))
+                    },
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSliderRow(
+                    title = stringResource(Res.string.compose_player_shadow_density),
+                    value = (subtitleStyle.shadowDensity * 10f).roundToInt(),
+                    valueText = ((subtitleStyle.shadowDensity * 10f).roundToInt() / 10f).toString(),
+                    valueRange = 5..50,
+                    step = 2,
+                    isTablet = isTablet,
+                    enabled = subtitleRenderingEnabled,
+                    onValueChange = { value ->
+                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(shadowDensity = value / 10f))
+                    },
+                )
                 if (!isIos) {
                     SettingsGroupDivider(isTablet = isTablet)
                     SettingsSwitchRow(

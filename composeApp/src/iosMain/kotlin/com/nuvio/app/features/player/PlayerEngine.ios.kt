@@ -239,6 +239,8 @@ actual fun PlatformPlayerSurface(
                     bold = style.bold,
                     fontSize = style.toMpvSubtitleFontSize(),
                     subPos = style.toMpvSubtitlePosition(),
+                    shadowEnabled = style.shadowEnabled,
+                    shadowDensity = style.shadowDensity,
                 )
             }
         }

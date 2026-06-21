@@ -60,6 +60,8 @@ interface NuvioPlayerBridge {
         bold: Boolean,
         fontSize: Float,
         subPos: Int,
+        shadowEnabled: Boolean,
+        shadowDensity: Float,
     )
     fun getIsLoading(): Boolean
     fun getIsPlaying(): Boolean

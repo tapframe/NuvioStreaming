@@ -251,6 +251,7 @@ actual fun PlatformPlayerSurface(
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
     val pendingAudioTrackSelection = remember { mutableListOf<TrackSelectionSnapshot>() }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+    var nuvioSubtitleOverlayRef by remember { mutableStateOf<NuvioSubtitleOverlay?>(null) }
     var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
 
@@ -369,6 +370,11 @@ actual fun PlatformPlayerSurface(
                     }
                 }
                 latestOnSnapshot.value(exoPlayer.snapshot())
+            }
+
+            override fun onCues(cueGroup: CueGroup) {
+                // Forward cues to the custom overlay when it is active (shadow mode).
+                nuvioSubtitleOverlayRef?.onCueGroup(cueGroup)
             }
 
         }
@@ -555,7 +561,9 @@ actual fun PlatformPlayerSurface(
 
                 override fun applySubtitleStyle(style: SubtitleStyleState) {
                     currentSubtitleStyle = style
-                    playerViewRef?.applySubtitleStyle(style)
+                    val overlay = playerViewRef?.syncNuvioSubtitleOverlay(style.shadowEnabled)
+                    nuvioSubtitleOverlayRef = overlay
+                    playerViewRef?.applySubtitleStyle(style, overlay)
                 }
 
                 override fun setSubtitleDelayMs(delayMs: Int) {
@@ -583,12 +591,14 @@ actual fun PlatformPlayerSurface(
                 this.resizeMode = resizeMode.toExoResizeMode()
                 setShutterBackgroundColor(android.graphics.Color.BLACK)
                 playerViewRef = this
+                val overlay = syncNuvioSubtitleOverlay(currentSubtitleStyle.shadowEnabled)
+                nuvioSubtitleOverlayRef = overlay
                 syncLibassOverlay(
                     player = exoPlayer,
                     enabled = useLibass,
                     renderType = libassRenderType,
                 )
-                applySubtitleStyle(currentSubtitleStyle)
+                applySubtitleStyle(currentSubtitleStyle, overlay)
             }
         },
         update = { playerView ->
@@ -597,12 +607,14 @@ actual fun PlatformPlayerSurface(
             playerView.resizeMode = resizeMode.toExoResizeMode()
             playerViewRef = playerView
             syncPlayerViewKeepScreenOn()
+            val overlay = playerView.syncNuvioSubtitleOverlay(currentSubtitleStyle.shadowEnabled)
+            nuvioSubtitleOverlayRef = overlay
             playerView.syncLibassOverlay(
                 player = exoPlayer,
                 enabled = useLibass,
                 renderType = libassRenderType,
             )
-            playerView.applySubtitleStyle(currentSubtitleStyle)
+            playerView.applySubtitleStyle(currentSubtitleStyle, overlay)
         },
     )
 }
@@ -786,7 +798,34 @@ private fun android.widget.FrameLayout.removeAssOverlayChildren() {
     }
 }
 
-private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
+private fun PlayerView.syncNuvioSubtitleOverlay(shadowEnabled: Boolean): NuvioSubtitleOverlay? {
+    val container = findViewById<android.widget.FrameLayout>(R.id.nuvio_subtitle_overlay_container)
+        ?: return null
+
+    // Remove any stale overlay
+    for (i in container.childCount - 1 downTo 0) {
+        if (container.getChildAt(i) is NuvioSubtitleOverlay) container.removeViewAt(i)
+    }
+
+    if (!shadowEnabled) return null
+
+    val overlay = NuvioSubtitleOverlay(container.context)
+    container.addView(overlay, android.widget.FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+    return overlay
+}
+
+private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState, overlay: NuvioSubtitleOverlay?) {
+    // When shadow is enabled, hand off rendering to our custom overlay which uses
+    // setShadowLayer() directly on the drawing Paint. Hide ExoPlayer's native SubtitleView
+    // to avoid showing both at once.
+    if (style.shadowEnabled && overlay != null) {
+        subtitleView?.visibility = android.view.View.INVISIBLE
+        overlay.applyStyle(style)
+        return
+    }
+
+    // Shadow off — restore native SubtitleView and apply style through CaptionStyleCompat.
+    subtitleView?.visibility = android.view.View.VISIBLE
     subtitleView?.apply {
         val baseBottomPaddingFraction = SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION * 2f / 3f
         val offsetFraction = (style.bottomOffset / 1000f).coerceIn(0f, 0.2f)
@@ -795,12 +834,19 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
         setApplyEmbeddedStyles(false)
         setApplyEmbeddedFontSizes(false)
         setBottomPaddingFraction(bottomPaddingFraction)
+        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+
+        val edgeType = when {
+            style.outlineEnabled -> CaptionStyleCompat.EDGE_TYPE_OUTLINE
+            else -> CaptionStyleCompat.EDGE_TYPE_NONE
+        }
+
         setStyle(
             CaptionStyleCompat(
                 style.textColor.toArgb(),
                 style.backgroundColor.toArgb(),
                 android.graphics.Color.TRANSPARENT,
-                if (style.outlineEnabled) CaptionStyleCompat.EDGE_TYPE_OUTLINE else CaptionStyleCompat.EDGE_TYPE_NONE,
+                edgeType,
                 style.outlineColor.toArgb(),
                 if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT,
             )
@@ -808,6 +854,7 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
         setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, style.fontSizeSp.toFloat())
     }
 }
+
 
 private fun ExoPlayer.extractAudioTracks(context: Context): List<AudioTrack> {
     val tracks = mutableListOf<AudioTrack>()

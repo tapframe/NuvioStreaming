@@ -352,6 +352,8 @@
     <string name="compose_player_none">None</string>
     <string name="compose_player_outline">Outline</string>
     <string name="compose_player_outline_color">Outline Color</string>
+    <string name="compose_player_shadow">Shadow</string>
+    <string name="compose_player_shadow_density">Shadow Density</string>
     <string name="compose_player_panel_episodes">Episodes</string>
     <string name="compose_player_panel_sources">Sources</string>
     <string name="compose_player_panel_streams">Streams</string>
@@ -927,6 +929,8 @@
     <string name="settings_playback_subtitle_outline">Outline</string>
     <string name="settings_playback_subtitle_outline_color">Outline Color</string>
     <string name="settings_playback_subtitle_outline_description">Draw a border around subtitle text.</string>
+    <string name="settings_playback_subtitle_shadow">Shadow</string>
+    <string name="settings_playback_subtitle_shadow_description">Draw a shadow under subtitle text.</string>
     <string name="settings_playback_subtitle_show_preferred_only">Show Only Preferred Languages</string>
     <string name="settings_playback_subtitle_show_preferred_only_description">Only show subtitles matching your preferred subtitle languages.</string>
     <string name="settings_playback_subtitle_size">Subtitle Size</string>
