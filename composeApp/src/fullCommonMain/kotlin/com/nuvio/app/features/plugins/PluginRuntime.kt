@@ -1,6 +1,7 @@
 package com.nuvio.app.features.plugins
 
 import co.touchlab.kermit.Logger
+import com.dokar.quickjs.binding.asyncFunction
 import com.dokar.quickjs.binding.define
 import com.dokar.quickjs.binding.function
 import com.dokar.quickjs.quickJs
@@ -10,7 +11,6 @@ import com.fleeksoft.ksoup.nodes.Element
 import com.fleeksoft.ksoup.select.Elements
 import com.nuvio.app.features.addons.httpRequestRaw
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -76,6 +76,7 @@ internal object PluginRuntime {
         val elementCache = mutableMapOf<String, Element>()
         var idCounter = 0
         var resultJson = "[]"
+        val unknownString = getString(Res.string.generic_unknown)
 
         try {
             quickJs(Dispatchers.IO) {
@@ -102,7 +103,7 @@ internal object PluginRuntime {
                     }
                 }
 
-                function("__native_fetch") { args ->
+                asyncFunction("__native_fetch") { args ->
                     val url = args.getOrNull(0)?.toString() ?: ""
                     val method = args.getOrNull(1)?.toString() ?: "GET"
                     val headersJson = args.getOrNull(2)?.toString() ?: "{}"
@@ -308,14 +309,14 @@ internal object PluginRuntime {
                 evaluate<Any?>(callCode)
             }
 
-            return parseJsonResults(resultJson)
+            return parseJsonResults(resultJson, unknownString)
         } finally {
             documentCache.clear()
             elementCache.clear()
         }
     }
 
-    private fun performNativeFetch(
+    private suspend fun performNativeFetch(
         url: String,
         method: String,
         headersJson: String,
@@ -329,15 +330,13 @@ internal object PluginRuntime {
             }
 
             val startedAt = kotlin.time.TimeSource.Monotonic.markNow()
-            val response = runBlocking(Dispatchers.IO) {
-                httpRequestRaw(
-                    method = method,
-                    url = url,
-                    headers = headers,
-                    body = body,
-                    followRedirects = followRedirects,
-                )
-            }
+            val response = httpRequestRaw(
+                method = method,
+                url = url,
+                headers = headers,
+                body = body,
+                followRedirects = followRedirects,
+            )
             val elapsed = startedAt.elapsedNow()
             if (elapsed.inWholeMilliseconds >= SLOW_PLUGIN_FETCH_MS) {
                 log.w { "Slow plugin fetch $method $url status=${response.status} elapsed=$elapsed" }
@@ -428,7 +427,7 @@ internal object PluginRuntime {
         return value.substring(0, end) + FETCH_TRUNCATION_SUFFIX
     }
 
-    private fun parseJsonResults(rawJson: String): List<PluginRuntimeResult> {
+    private fun parseJsonResults(rawJson: String, unknownString: String): List<PluginRuntimeResult> {
         return runCatching {
             val array = json.parseToJsonElement(rawJson) as? JsonArray ?: return emptyList()
             array.mapNotNull { element ->
@@ -447,7 +446,7 @@ internal object PluginRuntime {
                     ?.takeIf { it.isNotEmpty() }
 
                 PluginRuntimeResult(
-                    title = item.stringOrNull("title") ?: item.stringOrNull("name") ?: runBlocking { getString(Res.string.generic_unknown) },
+                    title = item.stringOrNull("title") ?: item.stringOrNull("name") ?: unknownString,
                     name = item.stringOrNull("name"),
                     url = url,
                     quality = item.stringOrNull("quality"),
@@ -503,7 +502,7 @@ internal object PluginRuntime {
                 var headers = options.headers || {};
                 var body = options.body || '';
                 var followRedirects = options.redirect !== 'manual';
-                var result = __native_fetch(url, method, JSON.stringify(headers), body, followRedirects);
+                var result = await __native_fetch(url, method, JSON.stringify(headers), body, followRedirects);
                 var parsed = JSON.parse(result);
                 return {
                     ok: parsed.ok,
