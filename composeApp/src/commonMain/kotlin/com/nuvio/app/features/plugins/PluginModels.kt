@@ -63,6 +63,13 @@ data class PluginScraper(
     }
 }
 
+/**
+ * Thrown when a plugin's getStreams() throws inside the JS runtime. Carrying the
+ * real JS error message lets the streams UI display a useful "source error"
+ * instead of silently showing "no streams found".
+ */
+class PluginExecutionException(message: String) : Exception(message)
+
 data class PluginRuntimeResult(
     val title: String,
     val name: String? = null,
