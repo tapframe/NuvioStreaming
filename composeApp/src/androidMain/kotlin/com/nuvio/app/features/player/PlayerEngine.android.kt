@@ -1059,7 +1059,109 @@ private class NuvioLibmpvView(
             positionMs = positionMs,
             bufferedPositionMs = maxOf(positionMs, cachePositionMs),
             playbackSpeed = (mpv.getPropertyDouble("speed") ?: 1.0).toFloat(),
+            mediaInfoJson = buildLibmpvMediaInfoJson(),
         )
+    }
+
+    private fun buildLibmpvMediaInfoJson(): String {
+        return try {
+            val nodes = mpv.getPropertyNode("track-list")?.asArray()?.toList().orEmpty()
+
+            // Video track info
+            var videoCodec = ""
+            var videoDecoder = ""
+            var dvProfile = ""
+            var codecProfile = ""
+            val filename = currentSourceUrl?.substringAfterLast('/') ?: ""
+            val gamma = mpv.getPropertyString("video-params/gamma") ?: ""
+            val primaries = mpv.getPropertyString("video-params/primaries") ?: ""
+            val videoW = mpv.getPropertyInt("video-params/w") ?: 0
+            val videoH = mpv.getPropertyInt("video-params/h") ?: 0
+            val fps = mpv.getPropertyDouble("container-fps") ?: 0.0
+            val hwdecCurrent = mpv.getPropertyString("hwdec-current") ?: ""
+            var hdrFormat = ""
+
+            for (node in nodes) {
+                if (node.nodeString("type") == "video") {
+                    videoCodec = node.nodeString("codec") ?: ""
+                    videoDecoder = node.nodeString("decoder-desc") ?: ""
+                    dvProfile = node.nodeString("dolby-vision-profile")
+                        ?: node.nodeString("dv_profile") ?: ""
+                    codecProfile = node.nodeString("codec-profile") ?: ""
+
+                    val dvLower = dvProfile.lowercase()
+                    val isDvValid = dvProfile.isNotBlank() &&
+                        dvLower != "none" && dvLower != "unknown" &&
+                        dvLower != "0" && dvLower != "false"
+
+                    if (isDvValid ||
+                        videoDecoder.contains("dovi", ignoreCase = true) ||
+                        codecProfile.contains("dovi", ignoreCase = true)
+                    ) {
+                        hdrFormat = "dolby_vision"
+                    }
+                    break
+                }
+            }
+
+            if (hdrFormat.isEmpty()) {
+                if (gamma == "pq" || gamma == "hlg" ||
+                    primaries == "bt.2020" || primaries == "bt.2020nc"
+                ) {
+                    hdrFormat = "hdr"
+                }
+            }
+
+            // Audio track info
+            var audioCodec = ""
+            var audioDecoder = ""
+            var audioChannels = ""
+            var audioSampleRate = ""
+            var audioLang = ""
+            for (node in nodes) {
+                if (node.nodeString("type") == "audio" && node.nodeBoolean("selected") == true) {
+                    audioCodec = node.nodeString("codec") ?: ""
+                    audioDecoder = node.nodeString("decoder-desc") ?: ""
+                    val channelCount = node.nodeInt("demux-channel-count") ?: 0
+                    audioChannels = if (channelCount > 0) channelCount.toString() else ""
+                    val sampleRate = node.nodeInt("demux-samplerate") ?: 0
+                    audioSampleRate = if (sampleRate > 0) sampleRate.toString() else ""
+                    audioLang = node.nodeString("lang") ?: ""
+                    break
+                }
+            }
+
+            val vBitrate = mpv.getPropertyDouble("video-bitrate") ?: 0.0
+            val aBitrate = mpv.getPropertyDouble("audio-bitrate") ?: 0.0
+            val vBitrateKbps = if (vBitrate.isFinite() && vBitrate > 0) (vBitrate / 1000.0).toInt() else 0
+            val aBitrateKbps = if (aBitrate.isFinite() && aBitrate > 0) (aBitrate / 1000.0).toInt() else 0
+
+            val json = StringBuilder().append("{")
+            json.append("\"filename\":\"").append(escapeJson(filename)).append("\",")
+            json.append("\"videoCodec\":\"").append(escapeJson(videoCodec)).append("\",")
+            json.append("\"videoDecoder\":\"").append(escapeJson(videoDecoder)).append("\",")
+            json.append("\"dvProfile\":\"").append(escapeJson(dvProfile)).append("\",")
+            json.append("\"codecProfile\":\"").append(escapeJson(codecProfile)).append("\",")
+            json.append("\"hdrFormat\":\"").append(hdrFormat).append("\",")
+            json.append("\"gamma\":\"").append(escapeJson(gamma)).append("\",")
+            json.append("\"primaries\":\"").append(escapeJson(primaries)).append("\",")
+            json.append("\"videoWidth\":").append(videoW).append(",")
+            json.append("\"videoHeight\":").append(videoH).append(",")
+            json.append("\"fps\":").append(if (fps.isFinite()) fps else 0.0).append(",")
+            json.append("\"hwdecCurrent\":\"").append(escapeJson(hwdecCurrent)).append("\",")
+            json.append("\"audioCodec\":\"").append(escapeJson(audioCodec)).append("\",")
+            json.append("\"audioDecoder\":\"").append(escapeJson(audioDecoder)).append("\",")
+            json.append("\"audioChannels\":\"").append(audioChannels).append("\",")
+            json.append("\"audioSampleRate\":\"").append(audioSampleRate).append("\",")
+            json.append("\"audioLang\":\"").append(escapeJson(audioLang)).append("\",")
+            json.append("\"videoBitrateKbps\":").append(vBitrateKbps).append(",")
+            json.append("\"audioBitrateKbps\":").append(aBitrateKbps)
+            json.append("}")
+            json.toString()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error building libmpv media info json", e)
+            "{}"
+        }
     }
 
     fun shouldKeepScreenOn(): Boolean {
