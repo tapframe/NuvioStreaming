@@ -29,9 +29,17 @@ import org.jetbrains.compose.resources.getString
 import kotlin.random.Random
 
 private const val PLUGIN_TIMEOUT_MS = 60_000L
-private const val MAX_FETCH_BODY_CHARS = 256 * 1024
-private const val MAX_FETCH_HEADER_VALUE_CHARS = 8 * 1024
+// Match the native HTTP layer's body cap (1 MiB) so we never truncate a
+// response the native side already delivered in full. Truncating here was a
+// major source of "source error" failures: any response between 256 KiB and
+// 1 MiB (large HTML episode lists, embedded JSON, m3u8 manifests) was silently
+// cut mid-document, which broke JSON.parse() and dropped episodes.
+private const val MAX_FETCH_BODY_CHARS = 1024 * 1024
+private const val MAX_FETCH_HEADER_VALUE_CHARS = 16 * 1024
 private const val FETCH_TRUNCATION_SUFFIX = "\n...[truncated]"
+// Per-request soft timeout so a single hung host cannot consume the whole
+// plugin budget. Kept comfortably below PLUGIN_TIMEOUT_MS.
+private const val PER_FETCH_TIMEOUT_MS = 30_000L
 
 internal object PluginRuntime {
     private val log = Logger.withTag("PluginRuntime")
@@ -76,6 +84,7 @@ internal object PluginRuntime {
         val elementCache = mutableMapOf<String, Element>()
         var idCounter = 0
         var resultJson = "[]"
+        var pluginError: String? = null
 
         try {
             quickJs(Dispatchers.Default) {
@@ -273,6 +282,14 @@ internal object PluginRuntime {
                     null
                 }
 
+                function("__capture_error") { args ->
+                    val message = args.getOrNull(0)?.toString()?.takeIf { it.isNotBlank() && it != "null" && it != "undefined" }
+                    if (!message.isNullOrBlank()) {
+                        pluginError = message
+                    }
+                    null
+                }
+
                 val settingsJson = toJsonElement(scraperSettings).toString()
                 val polyfillCode = buildPolyfillCode(scraperId, settingsJson)
                 evaluate<Any?>(polyfillCode)
@@ -294,13 +311,16 @@ internal object PluginRuntime {
                             var getStreams = module.exports.getStreams || globalThis.getStreams;
                             if (!getStreams) {
                                 console.error("getStreams function not found on module.exports or globalThis");
+                                __capture_error("Plugin does not export a getStreams() function");
                                 __capture_result(JSON.stringify([]));
                                 return;
                             }
                             var result = await getStreams("$tmdbId", "$mediaType", $seasonArg, $episodeArg);
                             __capture_result(JSON.stringify(result || []));
                         } catch (e) {
-                            console.error("getStreams error:", e && e.message ? e.message : e, e && e.stack ? e.stack : "");
+                            var msg = e && e.message ? e.message : (e ? String(e) : "Unknown error");
+                            console.error("getStreams error:", msg, e && e.stack ? e.stack : "");
+                            __capture_error(msg);
                             __capture_result(JSON.stringify([]));
                         }
                     })();
@@ -308,6 +328,12 @@ internal object PluginRuntime {
                 evaluate<Any?>(callCode)
             }
 
+            val capturedError = pluginError
+            if (capturedError != null) {
+                // Surface the real JS failure to the caller so the UI can show a
+                // meaningful "source error" instead of a generic empty result.
+                throw PluginExecutionException(capturedError)
+            }
             return parseJsonResults(resultJson)
         } finally {
             documentCache.clear()
@@ -329,13 +355,15 @@ internal object PluginRuntime {
             }
 
             val response = runBlocking {
-                httpRequestRaw(
-                    method = method,
-                    url = url,
-                    headers = headers,
-                    body = body,
-                    followRedirects = followRedirects,
-                )
+                withTimeout(PER_FETCH_TIMEOUT_MS) {
+                    httpRequestRaw(
+                        method = method,
+                        url = url,
+                        headers = headers,
+                        body = body,
+                        followRedirects = followRedirects,
+                    )
+                }
             }
 
             val responseHeaders = response.headers.mapValues { (_, value) ->
@@ -347,6 +375,7 @@ internal object PluginRuntime {
                     "status" to JsonPrimitive(response.status),
                     "statusText" to JsonPrimitive(response.statusText),
                     "url" to JsonPrimitive(response.url),
+                    "redirected" to JsonPrimitive(response.url.isNotBlank() && response.url != url),
                     "body" to JsonPrimitive(truncateString(response.body, MAX_FETCH_BODY_CHARS)),
                     "headers" to JsonObject(responseHeaders.mapValues { JsonPrimitive(it.value) }),
                 ),
@@ -373,7 +402,22 @@ internal object PluginRuntime {
             val obj = json.parseToJsonElement(headersJson) as? JsonObject ?: JsonObject(emptyMap())
             obj.entries
                 .mapNotNull { (key, value) ->
-                    value.jsonPrimitive.contentOrNull?.let { key to it }
+                    val headerValue = when (value) {
+                        // Common case: { "Header": "value" }
+                        is JsonPrimitive -> value.contentOrNull
+                        // Some plugins pass { "Header": ["a", "b"] }
+                        is JsonArray -> value
+                            .mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                            .takeIf { it.isNotEmpty() }
+                            ?.joinToString(", ")
+                        else -> null
+                    }
+                    val trimmedKey = key.trim()
+                    if (trimmedKey.isBlank() || headerValue.isNullOrBlank()) {
+                        null
+                    } else {
+                        trimmedKey to headerValue
+                    }
                 }
                 .toMap()
         }.getOrDefault(emptyMap())
@@ -492,6 +536,84 @@ internal object PluginRuntime {
             if (typeof globalThis.window === 'undefined') globalThis.window = globalThis;
             if (typeof globalThis.self === 'undefined') globalThis.self = globalThis;
 
+            // ---- Timer / scheduling polyfills ----------------------------------
+            // QuickJS does not expose setTimeout/setInterval. Many scrapers call
+            // these (often as a "sleep"/debounce or to schedule retries). Without
+            // them the plugin throws "setTimeout is not defined" -> source error.
+            // We run the callback synchronously after resolving the (ignored) delay
+            // via a microtask so ordering stays reasonable inside the event loop.
+            if (typeof globalThis.setTimeout === 'undefined') {
+                globalThis.setTimeout = function(callback, delay) {
+                    var args = Array.prototype.slice.call(arguments, 2);
+                    if (typeof callback === 'function') {
+                        Promise.resolve().then(function() {
+                            try { callback.apply(null, args); } catch (e) { console.error('setTimeout callback error:', e && e.message ? e.message : e); }
+                        });
+                    }
+                    return 0;
+                };
+            }
+            if (typeof globalThis.clearTimeout === 'undefined') {
+                globalThis.clearTimeout = function() {};
+            }
+            if (typeof globalThis.setInterval === 'undefined') {
+                // No real interval timer; run once to avoid breaking call sites.
+                globalThis.setInterval = function(callback) {
+                    if (typeof callback === 'function') {
+                        Promise.resolve().then(function() {
+                            try { callback(); } catch (e) {}
+                        });
+                    }
+                    return 0;
+                };
+            }
+            if (typeof globalThis.clearInterval === 'undefined') {
+                globalThis.clearInterval = function() {};
+            }
+            if (typeof globalThis.queueMicrotask === 'undefined') {
+                globalThis.queueMicrotask = function(callback) {
+                    Promise.resolve().then(callback);
+                };
+            }
+            // A real async delay scrapers can await: "await sleep(ms)".
+            if (typeof globalThis.sleep === 'undefined') {
+                globalThis.sleep = function(ms) {
+                    return new Promise(function(resolve) { setTimeout(resolve, ms || 0); });
+                };
+            }
+
+            // ---- Promise combinator polyfills ----------------------------------
+            // Promise.allSettled / Promise.any are heavily used by multi-server
+            // scrapers to probe several mirrors in parallel. A missing combinator
+            // means the whole getStreams() rejects and the source shows an error.
+            if (typeof Promise.allSettled !== 'function') {
+                Promise.allSettled = function(promises) {
+                    return Promise.all(Array.prototype.map.call(promises, function(p) {
+                        return Promise.resolve(p).then(
+                            function(value) { return { status: 'fulfilled', value: value }; },
+                            function(reason) { return { status: 'rejected', reason: reason }; }
+                        );
+                    }));
+                };
+            }
+            if (typeof Promise.any !== 'function') {
+                Promise.any = function(promises) {
+                    return new Promise(function(resolve, reject) {
+                        var list = Array.prototype.slice.call(promises);
+                        var remaining = list.length;
+                        var errors = [];
+                        if (remaining === 0) { reject(new Error('All promises were rejected')); return; }
+                        list.forEach(function(p, i) {
+                            Promise.resolve(p).then(resolve, function(err) {
+                                errors[i] = err;
+                                remaining--;
+                                if (remaining === 0) reject(new Error('All promises were rejected'));
+                            });
+                        });
+                    });
+                };
+            }
+
             var fetch = async function(url, options) {
                 options = options || {};
                 var method = (options.method || 'GET').toUpperCase();
@@ -500,16 +622,38 @@ internal object PluginRuntime {
                 var followRedirects = options.redirect !== 'manual';
                 var result = __native_fetch(url, method, JSON.stringify(headers), body, followRedirects);
                 var parsed = JSON.parse(result);
+                var __rawHeaders = parsed.headers || {};
+                var __headers = {
+                    get: function(name) {
+                        if (name == null) return null;
+                        var key = String(name).toLowerCase();
+                        var v = __rawHeaders[key];
+                        return (v === undefined || v === null) ? null : v;
+                    },
+                    has: function(name) {
+                        if (name == null) return false;
+                        return Object.prototype.hasOwnProperty.call(__rawHeaders, String(name).toLowerCase());
+                    },
+                    forEach: function(callback, thisArg) {
+                        for (var k in __rawHeaders) {
+                            if (Object.prototype.hasOwnProperty.call(__rawHeaders, k)) {
+                                callback.call(thisArg, __rawHeaders[k], k, __headers);
+                            }
+                        }
+                    },
+                    keys: function() { return Object.keys(__rawHeaders); },
+                    entries: function() {
+                        return Object.keys(__rawHeaders).map(function(k) { return [k, __rawHeaders[k]]; });
+                    },
+                    raw: function() { return __rawHeaders; }
+                };
                 return {
                     ok: parsed.ok,
                     status: parsed.status,
                     statusText: parsed.statusText,
                     url: parsed.url,
-                    headers: {
-                        get: function(name) {
-                            return parsed.headers[name.toLowerCase()] || null;
-                        }
-                    },
+                    redirected: parsed.redirected === true,
+                    headers: __headers,
                     text: function() { return Promise.resolve(parsed.body); },
                     json: function() {
                         try {
@@ -518,9 +662,10 @@ internal object PluginRuntime {
                             }
                             return Promise.resolve(JSON.parse(parsed.body));
                         } catch (e) {
-                            return Promise.resolve(null);
+                            return Promise.reject(new Error('Failed to parse JSON response: ' + (e && e.message ? e.message : e)));
                         }
-                    }
+                    },
+                    clone: function() { return this; }
                 };
             };
 
@@ -988,6 +1133,136 @@ internal object PluginRuntime {
                         return this.replace(search, replace);
                     }
                     return this.split(search).join(replace);
+                };
+            }
+
+            if (!String.prototype.padStart) {
+                String.prototype.padStart = function(targetLength, padString) {
+                    targetLength = targetLength >> 0;
+                    padString = String(typeof padString !== 'undefined' ? padString : ' ');
+                    if (this.length >= targetLength || padString.length === 0) return String(this);
+                    var pad = '';
+                    while (pad.length < targetLength - this.length) pad += padString;
+                    return pad.slice(0, targetLength - this.length) + String(this);
+                };
+            }
+            if (!String.prototype.padEnd) {
+                String.prototype.padEnd = function(targetLength, padString) {
+                    targetLength = targetLength >> 0;
+                    padString = String(typeof padString !== 'undefined' ? padString : ' ');
+                    if (this.length >= targetLength || padString.length === 0) return String(this);
+                    var pad = '';
+                    while (pad.length < targetLength - this.length) pad += padString;
+                    return String(this) + pad.slice(0, targetLength - this.length);
+                };
+            }
+            if (!String.prototype.trimStart) {
+                String.prototype.trimStart = function() { return this.replace(/^\s+/, ''); };
+            }
+            if (!String.prototype.trimEnd) {
+                String.prototype.trimEnd = function() { return this.replace(/\s+$/, ''); };
+            }
+            if (!String.prototype.matchAll) {
+                String.prototype.matchAll = function(regexp) {
+                    if (!(regexp instanceof RegExp)) regexp = new RegExp(regexp, 'g');
+                    if (!regexp.global) throw new TypeError('matchAll must be called with a global RegExp');
+                    var str = String(this);
+                    var matches = [];
+                    var m;
+                    var re = new RegExp(regexp.source, regexp.flags);
+                    while ((m = re.exec(str)) !== null) {
+                        matches.push(m);
+                        if (m.index === re.lastIndex) re.lastIndex++;
+                    }
+                    return matches;
+                };
+            }
+
+            if (!Array.prototype.at) {
+                Array.prototype.at = function(index) {
+                    index = Math.trunc(index) || 0;
+                    if (index < 0) index += this.length;
+                    if (index < 0 || index >= this.length) return undefined;
+                    return this[index];
+                };
+            }
+            if (!Array.prototype.includes) {
+                Array.prototype.includes = function(search, fromIndex) {
+                    return this.indexOf(search, fromIndex) !== -1;
+                };
+            }
+            if (!Array.prototype.find) {
+                Array.prototype.find = function(predicate, thisArg) {
+                    for (var i = 0; i < this.length; i++) {
+                        if (predicate.call(thisArg, this[i], i, this)) return this[i];
+                    }
+                    return undefined;
+                };
+            }
+            if (!Array.prototype.findIndex) {
+                Array.prototype.findIndex = function(predicate, thisArg) {
+                    for (var i = 0; i < this.length; i++) {
+                        if (predicate.call(thisArg, this[i], i, this)) return i;
+                    }
+                    return -1;
+                };
+            }
+            if (typeof Array.from !== 'function') {
+                Array.from = function(arrayLike, mapFn, thisArg) {
+                    var out = [];
+                    var len = arrayLike.length >>> 0;
+                    for (var i = 0; i < len; i++) {
+                        out.push(mapFn ? mapFn.call(thisArg, arrayLike[i], i) : arrayLike[i]);
+                    }
+                    return out;
+                };
+            }
+
+            if (typeof Object.assign !== 'function') {
+                Object.assign = function(target) {
+                    for (var i = 1; i < arguments.length; i++) {
+                        var src = arguments[i];
+                        if (src == null) continue;
+                        for (var key in src) {
+                            if (Object.prototype.hasOwnProperty.call(src, key)) target[key] = src[key];
+                        }
+                    }
+                    return target;
+                };
+            }
+            if (typeof Object.values !== 'function') {
+                Object.values = function(obj) {
+                    return Object.keys(obj).map(function(k) { return obj[k]; });
+                };
+            }
+
+            // Minimal TextEncoder/TextDecoder. Some scrapers use these for byte
+            // handling around crypto. Produces UTF-8 code-unit arrays (sufficient
+            // for the ASCII/Latin payloads these plugins actually process).
+            if (typeof globalThis.TextEncoder === 'undefined') {
+                globalThis.TextEncoder = function() {};
+                globalThis.TextEncoder.prototype.encode = function(str) {
+                    str = String(str == null ? '' : str);
+                    var utf8 = unescape(encodeURIComponent(str));
+                    var arr = new Array(utf8.length);
+                    for (var i = 0; i < utf8.length; i++) arr[i] = utf8.charCodeAt(i) & 0xff;
+                    return arr;
+                };
+            }
+            if (typeof globalThis.TextDecoder === 'undefined') {
+                globalThis.TextDecoder = function() {};
+                globalThis.TextDecoder.prototype.decode = function(bytes) {
+                    if (!bytes) return '';
+                    var binary = '';
+                    for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i] & 0xff);
+                    try { return decodeURIComponent(escape(binary)); } catch (e) { return binary; }
+                };
+            }
+
+            if (typeof globalThis.structuredClone === 'undefined') {
+                globalThis.structuredClone = function(value) {
+                    if (value === undefined) return undefined;
+                    return JSON.parse(JSON.stringify(value));
                 };
             }
         """.trimIndent()
