@@ -1162,6 +1162,15 @@ private class NuvioLibmpvView(
                 mpv.setPropertyInt("sub-outline-size", style.toMpvSubtitleOutlineSize())
                 mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
                 mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
+
+                // Shadow support — mirrors the iOS MPV bridge behavior.
+                if (style.shadowEnabled) {
+                    mpv.setPropertyDouble("sub-shadow-offset", style.shadowDensity.toDouble())
+                    mpv.setPropertyString("sub-shadow-color", "#FF000000")
+                } else {
+                    mpv.setPropertyDouble("sub-shadow-offset", 0.0)
+                    mpv.setPropertyString("sub-shadow-color", "#00000000")
+                }
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {
