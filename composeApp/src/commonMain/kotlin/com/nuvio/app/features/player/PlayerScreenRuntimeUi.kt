@@ -121,6 +121,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 sourceAudioUrl = activeSourceAudioUrl,
                 sourceHeaders = activeSourceHeaders,
                 sourceResponseHeaders = activeSourceResponseHeaders,
+                externalSubtitles = externalSubtitles,
                 streamType = activeStreamType,
                 modifier = Modifier.fillMaxSize(),
                 playWhenReady = shouldPlay,

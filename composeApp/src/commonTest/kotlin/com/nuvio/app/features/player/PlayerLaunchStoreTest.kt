@@ -12,6 +12,7 @@ class PlayerLaunchStoreTest {
             profileId = 1,
             title = "Title",
             sourceUrl = "https://example.com/video.m3u8?token=a/b:c",
+            externalSubtitles = emptyList(),
             streamTitle = "Source",
             providerName = "Provider",
             parentMetaId = "tt1234567",

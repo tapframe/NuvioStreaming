@@ -16,13 +16,34 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 
     func loadFile(url: String) { playerVC?.loadFile(url) }
-    func loadFileWithAudio(videoUrl: String, audioUrl: String?, headersJson: String?) {
+    func loadFileWithAudio(videoUrl: String, audioUrl: String?, headersJson: String?, subtitlesJson: String?) {
         playerVC?.loadFile(
             videoUrl,
             audioUrl: audioUrl,
-            requestHeaders: parseRequestHeaders(headersJson)
+            requestHeaders: parseRequestHeaders(headersJson),
+            subtitles: parseSubtitles(subtitlesJson)
         )
     }
+
+    private func parseSubtitles(_ json: String?) -> [PluginSubtitle] {
+        guard
+            let json,
+            let data = json.data(using: .utf8),
+            let raw = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else {
+            return []
+        }
+        return raw.compactMap { dict in
+            guard let url = dict["url"] as? String else { return nil }
+            return PluginSubtitle(
+                url: url,
+                language: dict["language"] as? String ?? "Unknown",
+                name: dict["name"] as? String,
+                headers: dict["headers"] as? [String: String]
+            )
+        }
+    }
+
     func play() { playerVC?.playPlayback() }
     func pause() { playerVC?.pausePlayback() }
     func seekTo(positionMs: Int64) { playerVC?.seekToMs(positionMs) }
@@ -174,6 +195,13 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 }
 
+struct PluginSubtitle {
+    let url: String
+    let language: String
+    let name: String?
+    let headers: [String: String]?
+}
+
 // MARK: - Track Info
 
 struct TrackInfo {
@@ -189,6 +217,7 @@ private struct PendingLoadRequest {
     let urlString: String
     let audioUrl: String?
     let requestHeaders: [String: String]
+    let subtitles: [PluginSubtitle]
     let queuedAtUptime: TimeInterval
 }
 
@@ -196,7 +225,7 @@ private struct PendingLoadRequest {
 
 final class MPVPlayerViewController: UIViewController {
 
-    private static let defaultAudioOutput = "avfoundation,audiounit,"
+    private static let defaultAudioOutput = "audiounit"
 
     private let errorStateLock = NSLock()
     private var metalLayer = MetalLayer()
@@ -377,11 +406,12 @@ final class MPVPlayerViewController: UIViewController {
 
     // MARK: - Playback API
 
-    func loadFile(_ urlString: String, audioUrl: String? = nil, requestHeaders: [String: String] = [:]) {
+    func loadFile(_ urlString: String, audioUrl: String? = nil, requestHeaders: [String: String] = [:], subtitles: [PluginSubtitle] = []) {
         let request = PendingLoadRequest(
             urlString: urlString,
             audioUrl: audioUrl,
             requestHeaders: requestHeaders,
+            subtitles: subtitles,
             queuedAtUptime: ProcessInfo.processInfo.systemUptime
         )
 
@@ -427,6 +457,12 @@ final class MPVPlayerViewController: UIViewController {
         if let audioUrl = request.audioUrl, !audioUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 self?.command("audio-add", args: [audioUrl, "select"], checkForErrors: false)
+            }
+        }
+
+        for subtitle in request.subtitles {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.addSubtitle(subtitle, mode: "auto")
             }
         }
     }
@@ -521,7 +557,13 @@ final class MPVPlayerViewController: UIViewController {
 
     func configureAudioOutput(audioOutput: String) {
         guard mpv != nil else { return }
-        setStringProperty("ao", audioOutput)
+        let resolvedAudioOutput: String
+        if audioOutput.contains("avfoundation") {
+            resolvedAudioOutput = Self.defaultAudioOutput
+        } else {
+            resolvedAudioOutput = audioOutput
+        }
+        setStringProperty("ao", resolvedAudioOutput)
     }
 
     func setSpeed(_ speed: Float) {
@@ -571,6 +613,26 @@ final class MPVPlayerViewController: UIViewController {
     func addSubtitleUrl(_ url: String) {
         guard mpv != nil else { return }
         command("sub-add", args: [url, "select"])
+    }
+
+    private func addSubtitle(_ subtitle: PluginSubtitle, mode: String) {
+        guard mpv != nil else { return }
+        let subtitleHeaders = sanitizeRequestHeaders(subtitle.headers ?? [:])
+        let previousHeaders = activeRequestHeaders
+
+        if !subtitleHeaders.isEmpty {
+            applyRequestHeaders(previousHeaders.merging(subtitleHeaders) { _, subtitleValue in subtitleValue })
+        }
+
+        command(
+            "sub-add",
+            args: [subtitle.url, mode, subtitle.name ?? subtitle.language, subtitle.language],
+            checkForErrors: false
+        )
+
+        if !subtitleHeaders.isEmpty {
+            applyRequestHeaders(previousHeaders)
+        }
     }
 
     func removeExternalSubtitles() {
