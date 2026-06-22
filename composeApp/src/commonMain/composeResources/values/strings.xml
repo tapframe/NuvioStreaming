@@ -542,7 +542,7 @@
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
-    <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later. Instant profile switching from the tab bar is unavailable while this is on.</string>
+    <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later.</string>
     <string name="settings_appearance_poster_customization_description">Tune card width and corner radius.</string>
     <string name="settings_appearance_section_display">DISPLAY</string>
     <string name="settings_appearance_section_home">HOME</string>
@@ -912,6 +912,16 @@
     <string name="settings_playback_secondary_audio_language">Secondary Audio Language</string>
     <string name="settings_playback_secondary_subtitle_language">Secondary Preferred Language</string>
     <string name="settings_playback_section_decoder">DECODER</string>
+    <string name="settings_playback_engine">Playback Engine</string>
+    <string name="settings_playback_engine_auto_description">Use ExoPlayer first and fall back to libmpv if playback fails.</string>
+    <string name="settings_playback_engine_exoplayer_description">Use ExoPlayer and Android Media3 decoders.</string>
+    <string name="settings_playback_engine_libmpv_description">Use libmpv for Android playback.</string>
+    <string name="settings_playback_libmpv_video_output">libmpv Renderer</string>
+    <string name="settings_playback_libmpv_video_output_dialog">libmpv Renderer</string>
+    <string name="settings_playback_libmpv_hardware_decoding">libmpv Hardware Decoding</string>
+    <string name="settings_playback_libmpv_hardware_decoding_description">Use mpv hardware decoding when available.</string>
+    <string name="settings_playback_libmpv_yuv420p">libmpv YUV420P Compatibility</string>
+    <string name="settings_playback_libmpv_yuv420p_description">Force YUV420P output for devices with renderer or color issues.</string>
     <string name="settings_playback_section_next_episode">NEXT EPISODE</string>
     <string name="settings_playback_section_player">PLAYER</string>
     <string name="settings_playback_section_skip_segments">SKIP SEGMENTS</string>
@@ -1621,7 +1631,7 @@
     <!-- Playback settings iOS audio output -->
     <string name="settings_playback_ios_audio_output_section">iOS audio output</string>
     <string name="settings_playback_ios_audio_output">Audio output</string>
-    <string name="settings_playback_ios_audio_output_auto_desc">Try AVFoundation first, then fall back to AudioUnit.</string>
+    <string name="settings_playback_ios_audio_output_auto_desc">Use AudioUnit while AVFoundation output is temporarily disabled.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Experimental support for Spatial Audio and multichannel output.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Use the legacy AudioUnit output.</string>
     <!-- Debrid Result Management section -->

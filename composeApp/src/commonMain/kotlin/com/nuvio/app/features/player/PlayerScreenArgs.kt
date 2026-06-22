@@ -30,6 +30,7 @@ internal data class PlayerScreenArgs(
     val parentMetaId: String,
     val parentMetaType: String,
     val providerAddonId: String?,
+    val externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle> = emptyList(),
     val torrentInfoHash: String?,
     val torrentFileIdx: Int?,
     val torrentFilename: String?,

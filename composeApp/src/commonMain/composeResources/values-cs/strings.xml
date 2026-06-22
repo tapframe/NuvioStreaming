@@ -453,7 +453,7 @@
     <string name="settings_appearance_app_language_sheet_title">Vyberte jazyk</string>
     <string name="settings_appearance_continue_watching_description">Nastavení pro sekci Pokračovat ve sledování.</string>
     <string name="settings_appearance_liquid_glass">Tekuté sklo (Liquid Glass)</string>
-    <string name="settings_appearance_liquid_glass_description">Použít nativní lištu panelů na iPhonu v iOS 26 a novějším. Okamžité přepínání profilů z lišty panelů není při zapnutí dostupné.</string>
+    <string name="settings_appearance_liquid_glass_description">Použít nativní lištu panelů na iPhonu v iOS 26 a novějším.</string>
     <string name="settings_appearance_poster_customization_description">Vyladit šířku karty a poloměr rohů.</string>
     <string name="settings_appearance_section_display">ZOBRAZENÍ</string>
     <string name="settings_appearance_section_home">DOMŮ</string>

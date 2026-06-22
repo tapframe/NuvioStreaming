@@ -480,3 +480,32 @@ object PlayerStreamsRepository {
         setJob(job)
     }
 }
+private data class PlayerInstalledStreamAddonTarget(
+    val addonName: String,
+    val addonId: String,
+    val manifest: com.nuvio.app.features.addons.AddonManifest,
+)
+
+private fun StreamsUiState.streamDiagnostics(): String {
+    val streamCount = groups.sumOf { it.streams.size }
+    val loadingCount = groups.count { it.isLoading }
+    val errorCount = groups.count { !it.error.isNullOrBlank() }
+    val sampleGroups = groups.take(4).joinToString(prefix = "[", postfix = "]") { group ->
+        buildString {
+            append(group.addonName)
+            append(':')
+            append(group.streams.size)
+            if (group.isLoading) append(":loading")
+            if (!group.error.isNullOrBlank()) append(":error")
+        }
+    }
+    val suffix = if (groups.size > 4) "+${groups.size - 4}" else ""
+    return "groups=${groups.size} streams=$streamCount isAnyLoading=$isAnyLoading " +
+        "loadingGroups=$loadingCount errorGroups=$errorCount empty=${emptyStateReason ?: "none"} " +
+        "sample=$sampleGroups$suffix"
+}
+
+private fun com.nuvio.app.features.addons.ManagedAddon.streamAddonInstanceId(manifestId: String): String =
+    "addon:$manifestId:$manifestUrl"
+
+

@@ -530,7 +530,7 @@
     <string name="settings_appearance_app_language_sheet_title">Choisir la langue</string>
     <string name="settings_appearance_continue_watching_description">Afficher, masquer et ajuster le bandeau Continuer à regarder.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
-    <string name="settings_appearance_liquid_glass_description">Utilise la barre d’onglets native iPhone sur iOS 26 et versions ultérieures. Le changement instantané de profil depuis la barre d’onglets n’est pas disponible quand cette option est activée.</string>
+    <string name="settings_appearance_liquid_glass_description">Utilise la barre d’onglets native iPhone sur iOS 26 et versions ultérieures.</string>
     <string name="settings_appearance_poster_customization_description">Ajuste la largeur des cartes et le rayon des coins.</string>
     <string name="settings_appearance_section_display">AFFICHAGE</string>
     <string name="settings_appearance_section_home">ACCUEIL</string>
@@ -1596,7 +1596,7 @@
     <string name="settings_playback_ios_target_transfer">Transfert cible</string>
     <string name="settings_playback_ios_audio_output_section">Sortie audio iOS</string>
     <string name="settings_playback_ios_audio_output">Sortie audio</string>
-    <string name="settings_playback_ios_audio_output_auto_desc">Essaie d’abord AVFoundation, puis bascule sur AudioUnit.</string>
+    <string name="settings_playback_ios_audio_output_auto_desc">Utilise AudioUnit tant que la sortie AVFoundation est temporairement désactivée.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Prise en charge expérimentale de l’audio spatial et de la sortie multicanal.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Utilise l’ancienne sortie AudioUnit.</string>
     <!-- Debrid Result Management section -->

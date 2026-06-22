@@ -21,6 +21,7 @@ data class PluginManifestScraper(
     val filename: String,
     @SerialName("supportedTypes") val supportedTypes: List<String> = listOf("movie", "tv"),
     val enabled: Boolean = true,
+    val hasSettings: Boolean = false,
     val logo: String? = null,
     @SerialName("contentLanguage") val contentLanguage: List<String>? = null,
     @SerialName("supportedPlatforms") val supportedPlatforms: List<String>? = null,
@@ -52,6 +53,7 @@ data class PluginScraper(
     val supportedTypes: List<String>,
     val enabled: Boolean,
     val manifestEnabled: Boolean,
+    val hasSettings: Boolean = false,
     val logo: String? = null,
     val contentLanguage: List<String> = emptyList(),
     val formats: List<String>? = null,
@@ -76,6 +78,15 @@ data class PluginRuntimeResult(
     val peers: Int? = null,
     val infoHash: String? = null,
     val headers: Map<String, String>? = null,
+    val subtitles: List<PluginSubtitleResult>? = null,
+)
+
+@Serializable
+data class PluginSubtitleResult(
+    val url: String,
+    val language: String,
+    val name: String? = null,
+    val headers: Map<String, String>? = null
 )
 
 data class PluginsUiState(
@@ -119,6 +130,7 @@ internal data class StoredPluginScraper(
     val supportedTypes: List<String>,
     val enabled: Boolean,
     val manifestEnabled: Boolean,
+    val hasSettings: Boolean = false,
     val logo: String? = null,
     val contentLanguage: List<String> = emptyList(),
     val formats: List<String>? = null,

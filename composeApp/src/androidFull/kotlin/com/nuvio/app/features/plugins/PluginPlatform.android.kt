@@ -22,6 +22,16 @@ internal object PluginStorage {
             ?.putString("${pluginsStateKey}_$profileId", payload)
             ?.apply()
     }
+
+    fun loadScraperSettings(scraperId: String): String? =
+        preferences?.getString("settings_${scraperId}", null)
+
+    fun saveScraperSettings(scraperId: String, payload: String) {
+        preferences
+            ?.edit()
+            ?.putString("settings_${scraperId}", payload)
+            ?.apply()
+    }
 }
 
 internal fun currentPluginPlatform(): String = "android"
