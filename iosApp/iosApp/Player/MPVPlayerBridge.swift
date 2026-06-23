@@ -1,5 +1,7 @@
 import Foundation
 import UIKit
+import Metal
+import QuartzCore
 import Libmpv
 import ComposeApp
 
@@ -227,8 +229,7 @@ final class MPVPlayerViewController: UIViewController {
     private static let defaultAudioOutput = "audiounit"
 
     private let errorStateLock = NSLock()
-    private var metalLayer = MetalLayer()
-    private var lastAppliedDrawableSize: CGSize = .zero
+    private let metalLayer = MetalLayer()
     private var pendingLoadRequest: PendingLoadRequest?
     private var pendingLoadRetryWorkItem: DispatchWorkItem?
     private var mpv: OpaquePointer?
@@ -278,9 +279,12 @@ final class MPVPlayerViewController: UIViewController {
         view.backgroundColor = .black
         view.layer.masksToBounds = true
 
+        metalLayer.device = MTLCreateSystemDefaultDevice()
+        metalLayer.pixelFormat = .rgba16Float
         metalLayer.contentsGravity = .resize
         metalLayer.contentsScale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
         metalLayer.framebufferOnly = true
+        metalLayer.isOpaque = true
         metalLayer.backgroundColor = UIColor.black.cgColor
         metalLayer.wantsExtendedDynamicRangeContent = true
         view.layer.addSublayer(metalLayer)
@@ -315,23 +319,38 @@ final class MPVPlayerViewController: UIViewController {
         attemptStartPendingLoad()
     }
 
-    private func layoutMetalLayer() {
-        let bounds = view.bounds
-        guard bounds.width > 1, bounds.height > 1 else { return }
+    override func viewWillTransition(
+        to size: CGSize,
+        with coordinator: UIViewControllerTransitionCoordinator
+    ) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(
+            alongsideTransition: { [weak self] _ in
+                self?.layoutMetalLayer(targetSize: size)
+            },
+            completion: { [weak self] _ in
+                self?.layoutMetalLayer()
+                DispatchQueue.main.async { self?.layoutMetalLayer() }
+            }
+        )
+    }
+
+    private func layoutMetalLayer(targetSize: CGSize? = nil) {
+        let boundsSize = targetSize ?? view.bounds.size
+        guard boundsSize.width > 1, boundsSize.height > 1 else { return }
 
         let scale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
         let drawableSize = CGSize(
-            width: (bounds.width * scale).rounded(.toNearestOrAwayFromZero),
-            height: (bounds.height * scale).rounded(.toNearestOrAwayFromZero)
+            width: (boundsSize.width * scale).rounded(.toNearestOrAwayFromZero),
+            height: (boundsSize.height * scale).rounded(.toNearestOrAwayFromZero)
         )
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         metalLayer.contentsScale = scale
-        metalLayer.frame = CGRect(origin: .zero, size: bounds.size)
-        if drawableSize != lastAppliedDrawableSize {
+        metalLayer.frame = CGRect(origin: .zero, size: boundsSize)
+        if metalLayer.drawableSize != drawableSize {
             metalLayer.drawableSize = drawableSize
-            lastAppliedDrawableSize = drawableSize
         }
         CATransaction.commit()
     }
@@ -347,7 +366,8 @@ final class MPVPlayerViewController: UIViewController {
 
         checkError(mpv_request_log_messages(mpv, "warn"))
 
-        checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &metalLayer))
+        var wid = Int64(Int(bitPattern: Unmanaged.passUnretained(metalLayer).toOpaque()))
+        checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &wid))
         checkError(mpv_set_option_string(mpv, "vo", "gpu-next"))
         checkError(mpv_set_option_string(mpv, "gpu-api", "vulkan"))
         checkError(mpv_set_option_string(mpv, "gpu-context", "moltenvk"))
