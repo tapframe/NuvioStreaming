@@ -552,6 +552,26 @@ private fun PlaybackSettingsSection(
                     isTablet = isTablet,
                     onClick = { showSubtitleBackgroundColorDialog = true },
                 )
+                if (subtitleStyle.backgroundColor.alpha > 0f) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSliderRow(
+                        title = stringResource(Res.string.settings_playback_subtitle_background_opacity),
+                        value = (subtitleStyle.backgroundColor.alpha * 100f).roundToInt(),
+                        valueText = "${(subtitleStyle.backgroundColor.alpha * 100f).roundToInt()}%",
+                        valueRange = 5..100,
+                        step = 5,
+                        isTablet = isTablet,
+                        enabled = subtitleRenderingEnabled,
+                        onValueChange = { value ->
+                            val newAlpha = value / 100f
+                            PlayerSettingsRepository.setSubtitleStyle(
+                                subtitleStyle.copy(
+                                    backgroundColor = subtitleStyle.backgroundColor.copy(alpha = newAlpha)
+                                )
+                            )
+                        },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsSwitchRow(
                     title = stringResource(Res.string.settings_playback_subtitle_outline),
@@ -560,7 +580,16 @@ private fun PlaybackSettingsSection(
                     enabled = subtitleRenderingEnabled,
                     isTablet = isTablet,
                     onCheckedChange = { enabled ->
-                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(outlineEnabled = enabled))
+                        if (enabled) {
+                            // Turning on outline -> turn off shadow and background
+                            PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(
+                                outlineEnabled = true,
+                                shadowEnabled = false,
+                                backgroundColor = Color.Transparent,
+                            ))
+                        } else {
+                            PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(outlineEnabled = false))
+                        }
                     },
                 )
                 if (subtitleStyle.outlineEnabled) {
@@ -581,7 +610,16 @@ private fun PlaybackSettingsSection(
                     enabled = subtitleRenderingEnabled,
                     isTablet = isTablet,
                     onCheckedChange = { enabled ->
-                        PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(shadowEnabled = enabled))
+                        if (enabled) {
+                            // Turning on shadow -> turn off outline and background
+                            PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(
+                                shadowEnabled = true,
+                                outlineEnabled = false,
+                                backgroundColor = Color.Transparent,
+                            ))
+                        } else {
+                            PlayerSettingsRepository.setSubtitleStyle(subtitleStyle.copy(shadowEnabled = false))
+                        }
                     },
                 )
                 SettingsGroupDivider(isTablet = isTablet)
@@ -1276,7 +1314,20 @@ private fun PlaybackSettingsSection(
             colors = SubtitleBackgroundColorSwatches,
             selectedColor = autoPlayPlayerSettings.subtitleStyle.backgroundColor,
             onColorSelected = { color ->
-                PlayerSettingsRepository.setSubtitleStyle(autoPlayPlayerSettings.subtitleStyle.copy(backgroundColor = color))
+                if (color.alpha == 0f) {
+                    PlayerSettingsRepository.setSubtitleStyle(
+                        autoPlayPlayerSettings.subtitleStyle.copy(backgroundColor = Color.Transparent)
+                    )
+                } else {
+                    // Turning on background color -> turn off outline and shadow
+                    PlayerSettingsRepository.setSubtitleStyle(
+                        autoPlayPlayerSettings.subtitleStyle.copy(
+                            backgroundColor = color,
+                            outlineEnabled = false,
+                            shadowEnabled = false,
+                        )
+                    )
+                }
                 showSubtitleBackgroundColorDialog = false
             },
             onDismiss = { showSubtitleBackgroundColorDialog = false },

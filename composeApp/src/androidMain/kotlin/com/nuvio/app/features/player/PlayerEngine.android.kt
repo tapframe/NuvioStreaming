@@ -1153,23 +1153,43 @@ private class NuvioLibmpvView(
             override fun applySubtitleStyle(style: SubtitleStyleState) {
                 mpv.setPropertyString("sub-ass-override", "no")
                 mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
-                mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
                 mpv.setPropertyString("sub-outline-color", style.outlineColor.toMpvColor())
                 mpv.setPropertyString("sub-border-color", style.outlineColor.toMpvColor())
-                mpv.setPropertyString("sub-border-style", style.toMpvSubtitleBorderStyle())
                 mpv.setPropertyString("sub-bold", if (style.bold) "yes" else "no")
                 mpv.setPropertyInt("sub-font-size", style.toMpvSubtitleFontSize())
-                mpv.setPropertyInt("sub-outline-size", style.toMpvSubtitleOutlineSize())
-                mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
                 mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
 
-                // Shadow support — mirrors the iOS MPV bridge behavior.
-                if (style.shadowEnabled) {
-                    mpv.setPropertyDouble("sub-shadow-offset", style.shadowDensity.toDouble())
-                    mpv.setPropertyString("sub-shadow-color", "#FF000000")
+                // IMPORTANT: in mpv, `sub-shadow-color` is an ALIAS for `sub-back-color`
+                // (same property). The background color, the shadow color, and the
+                // background-box color all share `sub-back-color`. The three visual
+                // modes (outline / shadow / background) are mutually exclusive in the
+                // UI, so configure `sub-back-color` + `sub-border-style` per active mode.
+                val hasBackground = style.backgroundColor.alphaByte() > 0
+
+                if (hasBackground) {
+                    // BACKGROUND MODE: draw a box behind text, colored by sub-back-color.
+                    // `background-box` (BorderStyle=4) is colored by sub-back-color; its
+                    // margin is controlled by sub-shadow-offset.
+                    mpv.setPropertyString("sub-border-style", "background-box")
+                    mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
+                    mpv.setPropertyInt("sub-outline-size", 0)
+                    mpv.setPropertyInt("sub-border-size", 0)
+                    mpv.setPropertyDouble("sub-shadow-offset", 6.0)
                 } else {
-                    mpv.setPropertyDouble("sub-shadow-offset", 0.0)
-                    mpv.setPropertyString("sub-shadow-color", "#00000000")
+                    // OUTLINE / SHADOW MODE: standard outline-and-shadow border style.
+                    // The shadow is colored by sub-back-color.
+                    mpv.setPropertyString("sub-border-style", "outline-and-shadow")
+                    val outlineSize = style.toMpvSubtitleOutlineSize()
+                    mpv.setPropertyInt("sub-outline-size", outlineSize)
+                    mpv.setPropertyInt("sub-border-size", outlineSize)
+
+                    if (style.shadowEnabled) {
+                        mpv.setPropertyDouble("sub-shadow-offset", style.shadowDensity.toDouble())
+                        mpv.setPropertyString("sub-back-color", "#FF000000")
+                    } else {
+                        mpv.setPropertyDouble("sub-shadow-offset", 0.0)
+                        mpv.setPropertyString("sub-back-color", "#00000000")
+                    }
                 }
             }
 
@@ -1268,15 +1288,6 @@ private fun SubtitleStyleState.toMpvSubtitleFontSize(): Int =
 
 private fun SubtitleStyleState.toMpvSubtitleOutlineSize(): Int =
     if (!outlineEnabled) 0 else (outlineWidth * MPV_SUBTITLE_OUTLINE_SIZE_SCALE).toInt().coerceAtLeast(1)
-
-private fun SubtitleStyleState.toMpvSubtitleBorderStyle(): String =
-    if (outlineEnabled) {
-        "outline-and-shadow"
-    } else if (backgroundColor.alphaByte() > 0) {
-        "opaque-box"
-    } else {
-        "outline-and-shadow"
-    }
 
 private const val MPV_SUBTITLE_FONT_SIZE_SCALE = 55.0 / 18.0
 private const val MPV_SUBTITLE_FONT_SIZE_MIN = 36

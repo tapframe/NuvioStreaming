@@ -942,6 +942,7 @@
     <string name="settings_playback_show_loading_overlay">Loading Overlay</string>
     <string name="settings_playback_show_loading_overlay_description">Show loading screen until first video frame appears.</string>
     <string name="settings_playback_subtitle_background_color">Background Color</string>
+    <string name="settings_playback_subtitle_background_opacity">Background Opacity</string>
     <string name="settings_playback_subtitle_bold">Bold</string>
     <string name="settings_playback_subtitle_bold_description">Use a heavier subtitle font weight.</string>
     <string name="settings_playback_subtitle_color_transparent">Transparent</string>

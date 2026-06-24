@@ -691,13 +691,8 @@ final class MPVPlayerViewController: UIViewController {
 
         checkError(mpv_set_property_string(mpv, "sub-ass-override", "no"))
         checkError(mpv_set_property_string(mpv, "sub-color", textColor))
-        checkError(mpv_set_property_string(mpv, "sub-back-color", backgroundColor))
         checkError(mpv_set_property_string(mpv, "sub-outline-color", outlineColor))
-        checkError(mpv_set_property_string(mpv, "sub-border-style", backgroundColor.hasPrefix("#00") ? "outline-and-shadow" : "opaque-box"))
         setStringProperty("sub-bold", bold ? "yes" : "no")
-
-        var outline = Double(outlineSize)
-        checkError(mpv_set_property(mpv, "sub-outline-size", MPV_FORMAT_DOUBLE, &outline))
 
         var size = Double(fontSize)
         checkError(mpv_set_property(mpv, "sub-font-size", MPV_FORMAT_DOUBLE, &size))
@@ -705,10 +700,48 @@ final class MPVPlayerViewController: UIViewController {
         var position = Int64(subPos)
         checkError(mpv_set_property(mpv, "sub-pos", MPV_FORMAT_INT64, &position))
 
-        var shadowOffset = shadowEnabled ? Double(shadowDensity) : 0.0
-        checkError(mpv_set_property(mpv, "sub-shadow-offset", MPV_FORMAT_DOUBLE, &shadowOffset))
-        if shadowEnabled {
-            checkError(mpv_set_property_string(mpv, "sub-shadow-color", "#FF000000"))
+        // IMPORTANT: In mpv, `sub-shadow-color` is an ALIAS for `sub-back-color`.
+        // They are the same property. So the background color, the shadow color,
+        // and the background-box color all share `sub-back-color`. The three
+        // visual modes (outline / shadow / background) are mutually exclusive in
+        // the UI, so we configure `sub-back-color` and `sub-border-style`
+        // appropriately for whichever mode is active.
+        let hasBackground = !backgroundColor.hasPrefix("#00")
+
+        if hasBackground {
+            // BACKGROUND MODE: draw a box behind the text colored by sub-back-color.
+            // `background-box` (BorderStyle=4) is colored by sub-back-color; its
+            // margin is controlled by sub-shadow-offset.
+            checkError(mpv_set_property_string(mpv, "sub-border-style", "background-box"))
+            checkError(mpv_set_property_string(mpv, "sub-back-color", backgroundColor))
+
+            var outline = 0.0
+            checkError(mpv_set_property(mpv, "sub-outline-size", MPV_FORMAT_DOUBLE, &outline))
+            checkError(mpv_set_property(mpv, "sub-border-size", MPV_FORMAT_DOUBLE, &outline))
+
+            // Small margin so the box has a little padding around the text.
+            var boxMargin = 6.0
+            checkError(mpv_set_property(mpv, "sub-shadow-offset", MPV_FORMAT_DOUBLE, &boxMargin))
+        } else {
+            // OUTLINE / SHADOW MODE: standard outline-and-shadow border style.
+            // The shadow is colored by sub-back-color.
+            checkError(mpv_set_property_string(mpv, "sub-border-style", "outline-and-shadow"))
+
+            var outline = Double(outlineSize)
+            checkError(mpv_set_property(mpv, "sub-outline-size", MPV_FORMAT_DOUBLE, &outline))
+            checkError(mpv_set_property(mpv, "sub-border-size", MPV_FORMAT_DOUBLE, &outline))
+
+            if shadowEnabled {
+                var shadowOffset = Double(shadowDensity)
+                checkError(mpv_set_property(mpv, "sub-shadow-offset", MPV_FORMAT_DOUBLE, &shadowOffset))
+                // Shadow color uses sub-back-color (opaque black).
+                checkError(mpv_set_property_string(mpv, "sub-back-color", "#FF000000"))
+            } else {
+                var shadowOffset = 0.0
+                checkError(mpv_set_property(mpv, "sub-shadow-offset", MPV_FORMAT_DOUBLE, &shadowOffset))
+                // No shadow, no background -> fully transparent back color.
+                checkError(mpv_set_property_string(mpv, "sub-back-color", "#00000000"))
+            }
         }
     }
 
