@@ -2304,19 +2304,6 @@ private fun MainAppContent(
                             }
                             return
                         }
-                        if (stream.needsLocalDebridResolve && stream.p2pInfoHash != null) {
-                            requestOrOpenP2pStream(
-                                stream = stream,
-                                resolvedResumePositionMs = resolvedResumePositionMs,
-                                resolvedResumeProgressFraction = resolvedResumeProgressFraction,
-                                forceExternal = forceExternal,
-                                forceInternal = forceInternal,
-                                isAutoPlay = false,
-                            )
-                            return
-                        }
-                        val sourceUrl = stream.playableDirectUrl ?: return
-
                         if (launch.isDownloadMode) {
                             val result = DownloadsRepository.enqueueFromStream(
                                 contentType = launch.type,
@@ -2338,6 +2325,19 @@ private fun MainAppContent(
                             navController.popBackStack()
                             return
                         }
+
+                        if (stream.needsLocalDebridResolve && stream.p2pInfoHash != null) {
+                            requestOrOpenP2pStream(
+                                stream = stream,
+                                resolvedResumePositionMs = resolvedResumePositionMs,
+                                resolvedResumeProgressFraction = resolvedResumeProgressFraction,
+                                forceExternal = forceExternal,
+                                forceInternal = forceInternal,
+                                isAutoPlay = false,
+                            )
+                            return
+                        }
+                        val sourceUrl = stream.playableDirectUrl ?: return
 
                         if (playerSettings.streamReuseLastLinkEnabled) {
                             val cacheKey = StreamLinkCacheRepository.contentKey(
