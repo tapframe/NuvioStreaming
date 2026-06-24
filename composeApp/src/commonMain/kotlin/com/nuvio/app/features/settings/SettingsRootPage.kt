@@ -79,6 +79,7 @@ internal fun LazyListScope.settingsRootContent(
     showGeneralSection: Boolean = true,
     showAboutSection: Boolean = true,
     showAdvancedSection: Boolean = true,
+    showSupportersContributorsPage: Boolean = true,
 ) {
     if (showAccountSection) {
         item {
@@ -189,14 +190,16 @@ internal fun LazyListScope.settingsRootContent(
                 isTablet = isTablet,
             ) {
                 SettingsGroup(isTablet = isTablet) {
-                    SettingsNavigationRow(
-                        title = stringResource(Res.string.compose_settings_page_supporters_contributors),
-                        description = stringResource(Res.string.about_supporters_contributors_subtitle),
-                        icon = Icons.Rounded.Favorite,
-                        isTablet = isTablet,
-                        onClick = onSupportersContributorsClick,
-                    )
-                    SettingsGroupDivider(isTablet = isTablet)
+                    if (showSupportersContributorsPage) {
+                        SettingsNavigationRow(
+                            title = stringResource(Res.string.compose_settings_page_supporters_contributors),
+                            description = stringResource(Res.string.about_supporters_contributors_subtitle),
+                            icon = Icons.Rounded.Favorite,
+                            isTablet = isTablet,
+                            onClick = onSupportersContributorsClick,
+                        )
+                        SettingsGroupDivider(isTablet = isTablet)
+                    }
                     SettingsNavigationRow(
                         title = stringResource(Res.string.compose_settings_page_licenses_attributions),
                         description = stringResource(Res.string.about_licenses_attributions_subtitle),

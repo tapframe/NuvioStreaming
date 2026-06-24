@@ -94,6 +94,12 @@ private val SettingsSearchRevealThreshold = 28.dp
 private const val SettingsSearchRevealAnimationMillis = 240L
 private const val SettingsSearchRevealHapticDelayMillis = 90L
 
+private fun SettingsPage.isEnabledByPolicy(): Boolean =
+    when (this) {
+        SettingsPage.SupportersContributors -> AppFeaturePolicy.supportersContributorsPageEnabled
+        else -> true
+    }
+
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
@@ -216,8 +222,19 @@ fun SettingsScreen(
 
         var currentPage by rememberSaveable { mutableStateOf(SettingsPage.Root.name) }
         val scrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
-        val page = remember(currentPage) { SettingsPage.valueOf(currentPage) }
+        val page = remember(currentPage) {
+            runCatching { SettingsPage.valueOf(currentPage) }
+                .getOrDefault(SettingsPage.Root)
+                .takeIf { it.isEnabledByPolicy() }
+                ?: SettingsPage.Root
+        }
         val previousPage = page.previousPage()
+
+        LaunchedEffect(page, currentPage) {
+            if (page.name != currentPage) {
+                currentPage = page.name
+            }
+        }
 
         LaunchedEffect(rootActionRequests, rootActionsEnabled, page) {
             rootActionRequests.collect {
@@ -232,9 +249,12 @@ fun SettingsScreen(
         }
 
         LaunchedEffect(requestedPageName, rootActionsEnabled) {
-            val targetPage = requestedPageName
-                ?.let { runCatching { SettingsPage.valueOf(it) }.getOrNull() }
-                ?: return@LaunchedEffect
+            val requestedPage = requestedPageName ?: return@LaunchedEffect
+            val targetPage = runCatching { SettingsPage.valueOf(requestedPage) }.getOrNull()
+            if (targetPage == null || !targetPage.isEnabledByPolicy()) {
+                onRequestedPageConsumed()
+                return@LaunchedEffect
+            }
             if (!rootActionsEnabled) return@LaunchedEffect
             currentPage = targetPage.name
             onRequestedPageConsumed()
@@ -449,6 +469,9 @@ private fun MobileSettingsScreen(
         }
         val searchEntries = settingsSearchEntries(
             pluginsEnabled = AppFeaturePolicy.pluginsEnabled,
+            supportersContributorsPageEnabled = AppFeaturePolicy.supportersContributorsPageEnabled,
+            accountDeletionEnabled = AppFeaturePolicy.accountDeletionEnabled,
+            personalMediaAddonCopyEnabled = AppFeaturePolicy.personalMediaAddonCopyEnabled,
             liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
             switchProfileAvailable = onSwitchProfile != null,
             checkForUpdatesAvailable = onCheckForUpdatesClick != null,
@@ -458,7 +481,11 @@ private fun MobileSettingsScreen(
             when (target) {
                 is SettingsSearchTarget.Page -> when (target.page) {
                     SettingsPage.Account -> onAccountClick()
-                    SettingsPage.SupportersContributors -> onSupportersContributorsClick()
+                    SettingsPage.SupportersContributors -> {
+                        if (AppFeaturePolicy.supportersContributorsPageEnabled) {
+                            onSupportersContributorsClick()
+                        }
+                    }
                     SettingsPage.LicensesAttributions -> onLicensesAttributionsClick()
                     SettingsPage.ContinueWatching -> onContinueWatchingClick()
                     SettingsPage.Addons -> onAddonsClick()
@@ -531,15 +558,18 @@ private fun MobileSettingsScreen(
                             onDownloadsClick = onDownloadsClick,
                             onAccountClick = onAccountClick,
                             onSwitchProfileClick = onSwitchProfile,
+                            showSupportersContributorsPage = AppFeaturePolicy.supportersContributorsPageEnabled,
                         )
                     }
                 }
                 SettingsPage.Account -> accountSettingsContent(
                     isTablet = false,
                 )
-                SettingsPage.SupportersContributors -> supportersContributorsContent(
-                    isTablet = false,
-                )
+                SettingsPage.SupportersContributors -> {
+                    if (AppFeaturePolicy.supportersContributorsPageEnabled) {
+                        supportersContributorsContent(isTablet = false)
+                    }
+                }
                 SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                     isTablet = false,
                 )
@@ -822,6 +852,9 @@ private fun TabletSettingsScreen(
             val hapticScope = rememberCoroutineScope()
             val searchEntries = settingsSearchEntries(
                 pluginsEnabled = AppFeaturePolicy.pluginsEnabled,
+                supportersContributorsPageEnabled = AppFeaturePolicy.supportersContributorsPageEnabled,
+                accountDeletionEnabled = AppFeaturePolicy.accountDeletionEnabled,
+                personalMediaAddonCopyEnabled = AppFeaturePolicy.personalMediaAddonCopyEnabled,
                 liquidGlassNativeTabBarSupported = liquidGlassNativeTabBarSupported,
                 switchProfileAvailable = onSwitchProfile != null,
                 checkForUpdatesAvailable = onCheckForUpdatesClick != null,
@@ -829,7 +862,11 @@ private fun TabletSettingsScreen(
 
             fun openSearchTarget(target: SettingsSearchTarget) {
                 when (target) {
-                    is SettingsSearchTarget.Page -> openInlinePage(target.page)
+                    is SettingsSearchTarget.Page -> {
+                        if (target.page.isEnabledByPolicy()) {
+                            openInlinePage(target.page)
+                        }
+                    }
                     SettingsSearchTarget.Downloads -> onDownloadsClick()
                     SettingsSearchTarget.Collections -> onCollectionsClick()
                     SettingsSearchTarget.SwitchProfile -> onSwitchProfile?.invoke()
@@ -924,15 +961,18 @@ private fun TabletSettingsScreen(
                                 showGeneralSection = activeCategory == SettingsCategory.General,
                                 showAboutSection = activeCategory == SettingsCategory.About,
                                 showAdvancedSection = activeCategory == SettingsCategory.Advanced,
+                                showSupportersContributorsPage = AppFeaturePolicy.supportersContributorsPageEnabled,
                             )
                         }
                     }
                     SettingsPage.Account -> accountSettingsContent(
                         isTablet = true,
                     )
-                    SettingsPage.SupportersContributors -> supportersContributorsContent(
-                        isTablet = true,
-                    )
+                    SettingsPage.SupportersContributors -> {
+                        if (AppFeaturePolicy.supportersContributorsPageEnabled) {
+                            supportersContributorsContent(isTablet = true)
+                        }
+                    }
                     SettingsPage.LicensesAttributions -> licensesAttributionsContent(
                         isTablet = true,
                     )
