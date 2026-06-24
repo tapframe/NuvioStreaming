@@ -45,6 +45,7 @@ data class SyncBackendState(
     val appliedRevision: String = "",
     val isLoaded: Boolean = false,
     val lastManifestError: String? = null,
+    val isManualDebugOverride: Boolean = false,
 )
 
 sealed interface SyncBackendRefreshResult {
@@ -68,6 +69,7 @@ internal data class StoredSyncBackendSelection(
     val backend: SyncBackendConfig? = null,
     val backendId: String = "",
     val appliedRevision: String = "",
+    val manualDebugOverride: Boolean = false,
 )
 
 object SyncBackendDefaults {
@@ -113,7 +115,7 @@ internal fun SyncBackendManifest.backendConfigForActiveBackend(): SyncBackendCon
         ?.takeIf { it.isUsableClientConfig() }
 }
 
-private fun SyncBackendConfig.isUsableClientConfig(): Boolean =
+internal fun SyncBackendConfig.isUsableClientConfig(): Boolean =
     id in setOf(SYNC_BACKEND_HOSTED_ID, SYNC_BACKEND_NUVIO_ID) &&
         normalizedSupabaseUrl.startsWith("https://") &&
         anonKey.isNotBlank() &&

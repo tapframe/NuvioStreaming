@@ -1139,7 +1139,7 @@ private class NuvioLibmpvView(
             }
 
             override fun applySubtitleStyle(style: SubtitleStyleState) {
-                mpv.setPropertyString("sub-ass-override", "force")
+                mpv.setPropertyString("sub-ass-override", "no")
                 mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
                 mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
                 mpv.setPropertyString("sub-outline-color", style.outlineColor.toMpvColor())

@@ -3,23 +3,18 @@ package com.nuvio.app.features.home
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.core.network.SupabaseProvider
 import com.nuvio.app.core.sync.HOME_CATALOG_LEGACY_SYNC_PLATFORMS
 import com.nuvio.app.core.sync.HOME_CATALOG_SHARED_SYNC_PLATFORM
-import com.nuvio.app.core.network.SupabaseProvider
 import com.nuvio.app.features.profiles.ProfileRepository
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -68,17 +63,6 @@ private data class PullToken(
     val profileId: Int,
 )
 
-private data class ObservedHomeCatalogChange(
-    val signature: String,
-    val token: PullToken?,
-    val initialPullCompleteAtEmission: Boolean,
-)
-
-private data class HomeCatalogChangeSignature(
-    val signature: String,
-    val token: PullToken,
-)
-
 object HomeCatalogSettingsSyncService {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("HomeCatalogSettingsSyncService")
@@ -87,7 +71,6 @@ object HomeCatalogSettingsSyncService {
         encodeDefaults = true
     }
 
-    private const val PUSH_DEBOUNCE_MS = 1500L
     private const val HIDE_UNRELEASED_CONTENT_KEY = "hide_unreleased_content"
     private const val HIDE_CATALOG_UNDERLINE_KEY = "hide_catalog_underline"
 
@@ -95,18 +78,9 @@ object HomeCatalogSettingsSyncService {
     var isSyncingFromRemote: Boolean = false
 
     private var pushJob: Job? = null
-    private var observeJob: Job? = null
 
     @Volatile
     private var completedInitialPull: PullToken? = null
-
-    @Volatile
-    private var remoteAppliedSignature: HomeCatalogChangeSignature? = null
-
-    fun startObserving() {
-        if (observeJob?.isActive == true) return
-        observeLocalChangesAndPush()
-    }
 
     suspend fun pullFromServer(profileId: Int) {
         runCatching {
@@ -124,12 +98,12 @@ object HomeCatalogSettingsSyncService {
 
             if (remotePayload.items.isEmpty()) {
                 log.i { "pullFromServer — remote has empty items, preserving local catalog order" }
-                applyRemotePayload(remotePayload, pullToken)
+                applyRemotePayload(remotePayload)
                 markInitialPullComplete(pullToken)
                 return
             }
 
-            applyRemotePayload(remotePayload, pullToken)
+            applyRemotePayload(remotePayload)
             log.i { "pullFromServer — applied ${remotePayload.items.size} items from remote" }
             markInitialPullComplete(pullToken)
         }.onFailure { e ->
@@ -170,43 +144,6 @@ object HomeCatalogSettingsSyncService {
         }
     }
 
-    @OptIn(FlowPreview::class)
-    private fun observeLocalChangesAndPush() {
-        observeJob = scope.launch {
-            HomeCatalogSettingsRepository.uiState
-                .map { state ->
-                    val token = currentPullToken()
-                    ObservedHomeCatalogChange(
-                        signature = state.signature,
-                        token = token,
-                        initialPullCompleteAtEmission = token?.let(::hasCompletedInitialPull) == true,
-                    )
-                }
-                .drop(1)
-                .distinctUntilChanged()
-                .debounce(PUSH_DEBOUNCE_MS)
-                .collect { change ->
-                    val token = change.token ?: return@collect
-                    val changeSignature = HomeCatalogChangeSignature(change.signature, token)
-                    if (!change.initialPullCompleteAtEmission) {
-                        if (changeSignature == remoteAppliedSignature) {
-                            remoteAppliedSignature = null
-                        }
-                        log.d { "observeLocalChangesAndPush — skipped before initial home catalog pull completed" }
-                        return@collect
-                    }
-                    if (changeSignature == remoteAppliedSignature) {
-                        remoteAppliedSignature = null
-                        log.d { "observeLocalChangesAndPush — skipped remote-applied catalog change" }
-                        return@collect
-                    }
-                    if (isSyncingFromRemote) return@collect
-                    if (currentPullToken() != token) return@collect
-                    pushToRemote(token.profileId)
-                }
-        }
-    }
-
     private fun currentPullToken(profileId: Int = ProfileRepository.activeProfileId): PullToken? {
         val authState = AuthRepository.state.value
         if (authState !is AuthState.Authenticated || authState.isAnonymous) return null
@@ -225,15 +162,10 @@ object HomeCatalogSettingsSyncService {
 
     private fun applyRemotePayload(
         payload: SyncHomeCatalogPayload,
-        token: PullToken,
     ) {
         isSyncingFromRemote = true
         try {
             HomeCatalogSettingsRepository.applyFromRemote(payload)
-            remoteAppliedSignature = HomeCatalogChangeSignature(
-                signature = HomeCatalogSettingsRepository.uiState.value.signature,
-                token = token,
-            )
         } finally {
             isSyncingFromRemote = false
         }

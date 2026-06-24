@@ -69,6 +69,8 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.ui.nuvioOverlayGradientBrush
 import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioSurfaceCard
+import com.nuvio.app.features.dev.DebugSyncBackendSwitch
+import com.nuvio.app.features.dev.shouldShowDebugSyncBackendSwitch
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.app_logo_wordmark
@@ -156,6 +158,15 @@ fun AuthScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            if (shouldShowDebugSyncBackendSwitch()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                DebugSyncBackendSwitch(
+                    modifier = Modifier.fillMaxWidth(),
+                    requireConfirmation = false,
+                    container = true,
+                )
+            }
 
             Spacer(modifier = Modifier.height(48.dp))
 
