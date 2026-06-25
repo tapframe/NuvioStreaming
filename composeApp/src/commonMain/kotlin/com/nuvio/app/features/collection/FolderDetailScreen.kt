@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioPosterCard
 import com.nuvio.app.core.ui.NuvioPosterShape
@@ -61,6 +62,7 @@ import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.home.canOpenCatalog
 import com.nuvio.app.features.home.stableKey
 import com.nuvio.app.features.home.components.HomeCatalogRowSection
+import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watching.application.WatchingState
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -290,6 +292,15 @@ private fun TabbedGridContent(
                             key = { item -> item.lazyKey },
                         ) { keyedItem ->
                             val item = keyedItem.value
+                            val isSaved = remember(
+                                libraryUiState.items,
+                                libraryUiState.sections,
+                                libraryUiState.sourceMode,
+                                item.id,
+                                item.type,
+                            ) {
+                                LibraryRepository.isSaved(item.id, item.type)
+                            }
                             NuvioPosterCard(
                                 title = item.name,
                                 imageUrl = item.poster,
@@ -299,6 +310,7 @@ private fun TabbedGridContent(
                                     watchedKeys = watchedKeys,
                                     item = item,
                                 ),
+                                isSaved = isSaved,
                                 onClick = { onPosterClick(item) },
                             )
                         }
