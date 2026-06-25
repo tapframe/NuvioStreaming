@@ -367,6 +367,7 @@ final class MPVPlayerViewController: UIViewController {
         checkError(mpv_set_option_string(mpv, "target-colorspace-hint", "yes"))
         checkError(mpv_set_option_string(mpv, "tone-mapping", "auto"))
         checkError(mpv_set_option_string(mpv, "hdr-compute-peak", "yes"))
+        checkError(mpv_set_option_string(mpv, "demuxer-lavf-o", "protocol_whitelist=[file,crypto,data,http,https,tcp,tls]"))
 
         checkError(mpv_initialize(mpv))
 
