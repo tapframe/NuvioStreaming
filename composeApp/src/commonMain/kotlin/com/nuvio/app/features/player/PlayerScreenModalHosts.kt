@@ -54,6 +54,11 @@ internal fun PlayerScreenModalHosts(
     sourceStreamsState: StreamsUiState,
     activeSourceUrl: String,
     activeStreamTitle: String,
+    showQualityPanel: Boolean,
+    hlsQualityState: HlsQualitySelectionState,
+    selectedHlsQualityId: String?,
+    onHlsQualitySelected: (String?) -> Unit,
+    onQualityPanelDismissed: () -> Unit,
     onSourceFilterSelected: (String?) -> Unit,
     onSourceStreamSelected: (StreamItem) -> Unit,
     onReloadSources: () -> Unit,
@@ -163,6 +168,14 @@ internal fun PlayerScreenModalHosts(
         onStreamSelected = onSourceStreamSelected,
         onReload = onReloadSources,
         onDismiss = onSourcesPanelDismissed,
+    )
+
+    PlayerHlsQualityPanel(
+        visible = showQualityPanel,
+        state = hlsQualityState,
+        selectedQualityId = selectedHlsQualityId,
+        onQualitySelected = onHlsQualitySelected,
+        onDismiss = onQualityPanelDismissed,
     )
 
     if (isSeries) {

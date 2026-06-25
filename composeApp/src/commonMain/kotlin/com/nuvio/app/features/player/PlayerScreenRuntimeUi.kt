@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import com.nuvio.app.features.p2p.P2pStreamingState
@@ -83,6 +84,29 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     }
     val gestureCallbacks = rememberSurfaceGestureCallbacks()
 
+    LaunchedEffect(activeSourceUrl, activeSourceAudioUrl, activeSourceHeaders, activeTorrentInfoHash) {
+        selectedHlsQualityId = null
+        val shouldInspectHls = activeTorrentInfoHash == null &&
+            activeSourceAudioUrl == null &&
+            activeSourceUrl.contains(".m3u8", ignoreCase = true)
+        activePlaybackSourceUrl = if (shouldInspectHls) null else activeSourceUrl
+        hlsQualityState = HlsQualitySelectionState(
+            isLoading = shouldInspectHls,
+            sourceUrl = activeSourceUrl,
+        )
+
+        if (shouldInspectHls) {
+            val resolved = HlsQualityResolver.resolve(
+                sourceUrl = activeSourceUrl,
+                requestHeaders = activeSourceHeaders,
+            )
+            hlsQualityState = resolved
+            activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: activeSourceUrl
+        } else {
+            hlsQualityState = HlsQualitySelectionState(sourceUrl = activeSourceUrl)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -114,7 +138,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 commitHorizontalSeekState = gestureCallbacks.commitHorizontalSeek,
             ),
     ) {
-        val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activeSourceUrl
+        val playerSurfaceSourceUrl = if (isP2pPlaybackActive) p2pResolvedSourceUrl else activePlaybackSourceUrl
         if (playerSurfaceSourceUrl != null) {
             PlatformPlayerSurface(
                 sourceUrl = playerSurfaceSourceUrl,
@@ -128,7 +152,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 resizeMode = resizeMode,
                 onControllerReady = { controller ->
                     playerController = controller
-                    playerControllerSourceUrl = activeSourceUrl
+                    playerControllerSourceUrl = playerSurfaceSourceUrl
                 },
                 onSnapshot = { snapshot ->
                     playbackSnapshot = snapshot
@@ -236,6 +260,14 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             },
             onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
             onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
+            qualityLabel = hlsQualityControlLabel(),
+            onQualityClick = if (hlsQualityState.isLoading || hlsQualityState.hasSelectableQualities) {
+                {
+                    openQualityPanel()
+                }
+            } else {
+                null
+            },
             onOpenInExternalPlayer = args.onOpenInExternalPlayer?.let { openExternal ->
                 {
                     val loadedSubtitles = addonSubtitles
@@ -367,6 +399,24 @@ private fun BoxScope.RenderPlaybackOverlays(
     }
 }
 
+private fun PlayerScreenRuntime.openQualityPanel() {
+    showQualityPanel = true
+    showSourcesPanel = false
+    showEpisodesPanel = false
+    controlsVisible = false
+}
+
+private fun PlayerScreenRuntime.hlsQualityControlLabel(): String? {
+    if (hlsQualityState.isLoading) return "Quality"
+    if (!hlsQualityState.hasSelectableQualities) return null
+    val label = hlsQualityState.labelFor(selectedHlsQualityId)
+    return if (selectedHlsQualityId == null && !label.isNullOrBlank()) {
+        "Auto $label"
+    } else {
+        label ?: "Quality"
+    }
+}
+
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
     PlayerScreenModalHosts(
@@ -441,6 +491,14 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         sourceStreamsState = sourceStreamsState,
         activeSourceUrl = activeSourceUrl,
         activeStreamTitle = activeStreamTitle,
+        showQualityPanel = showQualityPanel,
+        hlsQualityState = hlsQualityState,
+        selectedHlsQualityId = selectedHlsQualityId,
+        onHlsQualitySelected = { qualityId -> selectHlsQuality(qualityId) },
+        onQualityPanelDismissed = {
+            showQualityPanel = false
+            controlsVisible = true
+        },
         onSourceFilterSelected = PlayerStreamsRepository::selectSourceFilter,
         onSourceStreamSelected = { stream -> switchToSource(stream) },
         onReloadSources = {

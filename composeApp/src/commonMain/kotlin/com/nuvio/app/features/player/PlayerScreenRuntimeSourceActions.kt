@@ -488,3 +488,14 @@ private fun PlayerScreenRuntime.saveDirectStreamForReuse(
         ),
     )
 }
+
+
+internal fun PlayerScreenRuntime.selectHlsQuality(qualityId: String?) {
+    selectedHlsQualityId = qualityId.takeUnless { it == HlsQualityAutoId }
+    activePlaybackSourceUrl = hlsQualityState.playbackUrlFor(selectedHlsQualityId) ?: activeSourceUrl
+    initialLoadCompleted = false
+    errorMessage = null
+    shouldPlay = true
+    showQualityPanel = false
+    controlsVisible = true
+}

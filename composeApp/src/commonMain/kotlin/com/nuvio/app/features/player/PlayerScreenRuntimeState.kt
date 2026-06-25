@@ -95,6 +95,9 @@ internal class PlayerScreenRuntime(
     var controlsVisible by mutableStateOf(true)
     var playerControlsLocked by mutableStateOf(false)
     var activeSourceUrl by mutableStateOf(sourceUrl)
+    var activePlaybackSourceUrl by mutableStateOf<String?>(sourceUrl)
+    var hlsQualityState by mutableStateOf(HlsQualitySelectionState(sourceUrl = sourceUrl))
+    var selectedHlsQualityId by mutableStateOf<String?>(null)
     var activeSourceAudioUrl by mutableStateOf(sourceAudioUrl)
     var activeSourceHeaders by mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))
     var activeSourceResponseHeaders by mutableStateOf(sanitizePlaybackResponseHeaders(sourceResponseHeaders))
@@ -154,6 +157,7 @@ internal class PlayerScreenRuntime(
     var currentTraktScrobbleItem by mutableStateOf<TraktScrobbleItem?>(null)
 
     var showSourcesPanel by mutableStateOf(false)
+    var showQualityPanel by mutableStateOf(false)
     var showEpisodesPanel by mutableStateOf(false)
     var showSubmitIntroModal by mutableStateOf(false)
     var submitIntroSegmentType by mutableStateOf("intro")
