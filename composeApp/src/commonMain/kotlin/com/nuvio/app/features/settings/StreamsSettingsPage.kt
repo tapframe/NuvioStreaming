@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Style
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
@@ -118,14 +117,12 @@ internal fun LazyListScope.streamsSettingsContent(isTablet: Boolean) {
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_stream_badge_position_title),
                     description = badgePlacementLabel,
-                    icon = Icons.Rounded.Style,
                     isTablet = isTablet,
                     onClick = { showBadgePositionDialog = true },
                 )
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_stream_badge_urls_title),
                     description = badgeRulesPreview(currentRules),
-                    icon = Icons.Rounded.Style,
                     isTablet = isTablet,
                     onClick = { showBadgeImportDialog = true },
                 )
