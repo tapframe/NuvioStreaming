@@ -99,6 +99,7 @@ import com.nuvio.app.core.ui.configurePlatformImageLoader
 import com.nuvio.app.core.ui.NuvioToastHost
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.NuvioFloatingPrompt
+import com.nuvio.app.core.ui.ProfileMeshBackground
 import com.nuvio.app.core.ui.TraktListPickerDialog
 import com.nuvio.app.core.ui.NuvioTheme
 import com.nuvio.app.core.ui.NuvioTokens
@@ -166,6 +167,7 @@ import com.nuvio.app.features.profiles.ProfileEditScreen
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.profiles.ProfileSelectionScreen
 import com.nuvio.app.features.profiles.ProfileSwitcherTab
+import com.nuvio.app.features.profiles.parseHexColor
 import com.nuvio.app.features.profiles.profileAvatarImageUrl
 import com.nuvio.app.features.search.SearchScreen
 import com.nuvio.app.features.settings.SettingsScreen
@@ -733,6 +735,10 @@ private fun MainAppContent(
             }
         }
         val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
+        val launchOverlayProfileColor = remember(profileState.activeProfile, profileState.profiles) {
+            val sourceProfile = profileState.activeProfile ?: profileState.profiles.firstOrNull()
+            sourceProfile?.avatarColorHex?.let(::parseHexColor) ?: Color(0xFF1E88E5)
+        }
     val playerSettingsUiState by remember {
         PlayerSettingsRepository.ensureLoaded()
         PlayerSettingsRepository.uiState
@@ -2913,7 +2919,10 @@ private fun MainAppContent(
                 enter = fadeIn(),
                 exit = fadeOut(androidx.compose.animation.core.tween(400)),
             ) {
-                AppLaunchOverlay(modifier = Modifier.fillMaxSize())
+                AppLaunchOverlay(
+                    profileColor = launchOverlayProfileColor,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
 
             // Auto-dismiss profile switch overlay
@@ -3237,15 +3246,19 @@ private fun TabletTopPillItem(
 
 @Composable
 private fun AppLaunchOverlay(
+    profileColor: Color,
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
     Box(
         modifier = modifier
-            .background(tokens.colors.background)
             .zIndex(NuvioTokens.Z.dialog),
         contentAlignment = Alignment.Center,
     ) {
+        ProfileMeshBackground(
+            profileColor = profileColor,
+            modifier = Modifier.fillMaxSize(),
+        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
