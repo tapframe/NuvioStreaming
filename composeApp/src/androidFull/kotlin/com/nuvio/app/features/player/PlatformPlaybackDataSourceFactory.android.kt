@@ -11,13 +11,18 @@ internal object PlatformPlaybackDataSourceFactory {
         defaultRequestHeaders: Map<String, String>,
         defaultResponseHeaders: Map<String, String>,
         useYoutubeChunkedPlayback: Boolean,
+        externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle> = emptyList(),
     ): DataSource.Factory {
         val networkFactory: DataSource.Factory = if (useYoutubeChunkedPlayback) {
             YoutubeChunkedDataSourceFactory(defaultRequestHeaders = defaultRequestHeaders)
         } else {
             PlayerPlaybackNetworking.createHttpDataSourceFactory(defaultRequestHeaders)
         }
-        val baseFactory: DataSource.Factory = DefaultDataSource.Factory(context, networkFactory)
+        val subtitleHeaderFactory = SubtitleRequestHeaderDataSourceFactory(
+            upstreamFactory = networkFactory,
+            externalSubtitles = externalSubtitles
+        )
+        val baseFactory: DataSource.Factory = DefaultDataSource.Factory(context, subtitleHeaderFactory)
         return if (defaultResponseHeaders.isEmpty()) {
             baseFactory
         } else {

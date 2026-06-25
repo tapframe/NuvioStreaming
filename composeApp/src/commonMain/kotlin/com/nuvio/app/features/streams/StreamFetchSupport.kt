@@ -124,6 +124,14 @@ internal fun PluginRuntimeResult.toStreamItem(
                 proxyHeaders = StreamProxyHeaders(request = requestHeaders),
             )
         },
+        externalSubtitles = subtitles?.map {
+            StreamSubtitle(
+                url = it.url,
+                language = it.language,
+                name = it.name,
+                headers = it.headers
+            )
+        } ?: emptyList()
     )
 }
 

@@ -1586,7 +1586,7 @@
     <string name="settings_playback_ios_target_transfer">Transferência de destino</string>
     <string name="settings_playback_ios_audio_output_section">SAÍDA DE ÁUDIO DO iOS</string>
     <string name="settings_playback_ios_audio_output">Saída de áudio</string>
-    <string name="settings_playback_ios_audio_output_auto_desc">Tenta primeiro AVFoundation e, se necessário, recorre ao AudioUnit.</string>
+    <string name="settings_playback_ios_audio_output_auto_desc">Use AudioUnit enquanto a saída AVFoundation estiver temporariamente desativada.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Suporte experimental para Áudio Espacial e saída multicanal.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Utiliza a saída AudioUnit antiga.</string>
     <string name="settings_debrid_section_result_management">Gestão dos resultados</string>

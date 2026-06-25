@@ -1,6 +1,7 @@
 package com.nuvio.app.core.network
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.build.AppFeaturePolicy
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,22 +36,36 @@ object SyncBackendRepository {
                     .getOrNull()
             }
 
-        val backend = storedSelection
-            ?.let { selection ->
-                selection.backendId.ifBlank { selection.backend?.id.orEmpty() }
-            }
-            ?.let(SyncBackendDefaults::byId)
-            ?: SyncBackendDefaults.hosted()
+        val storedManualDebugOverride = storedSelection?.manualDebugOverride == true
+        val backend = if (storedManualDebugOverride && !AppFeaturePolicy.debugBackendSwitcherEnabled) {
+            SyncBackendDefaults.hosted()
+        } else {
+            storedSelection
+                ?.let { selection ->
+                    selection.backendId.ifBlank { selection.backend?.id.orEmpty() }
+                }
+                ?.let(SyncBackendDefaults::byId)
+                ?: SyncBackendDefaults.hosted()
+        }
 
         _state.value = SyncBackendState(
             selectedBackend = backend,
-            appliedRevision = storedSelection?.appliedRevision.orEmpty(),
+            appliedRevision = if (storedManualDebugOverride && !AppFeaturePolicy.debugBackendSwitcherEnabled) {
+                ""
+            } else {
+                storedSelection?.appliedRevision.orEmpty()
+            },
             isLoaded = true,
+            isManualDebugOverride = storedManualDebugOverride && AppFeaturePolicy.debugBackendSwitcherEnabled,
         )
     }
 
     suspend fun refreshFromManifest(): SyncBackendRefreshResult {
         ensureLoaded()
+
+        if (_state.value.isManualDebugOverride && AppFeaturePolicy.debugBackendSwitcherEnabled) {
+            return SyncBackendRefreshResult.Unchanged
+        }
 
         val manifestUrl = SyncBackendBootstrapConfig.SWITCH_MANIFEST_URL.trim()
         if (manifestUrl.isBlank()) {
@@ -97,19 +112,40 @@ object SyncBackendRepository {
         revision: String,
     ): SyncBackendConfig {
         val normalizedBackend = backend.normalized()
-        saveSelection(normalizedBackend, revision)
+        saveSelection(normalizedBackend, revision, manualDebugOverride = false)
+        return normalizedBackend
+    }
+
+    fun debugSelectableBackends(): List<SyncBackendConfig> =
+        listOf(SyncBackendDefaults.hosted(), SyncBackendDefaults.nuvio())
+            .filter { backend -> backend.isUsableClientConfig() }
+
+    fun applyDebugBackendAfterLogout(backend: SyncBackendConfig): SyncBackendConfig? {
+        if (!AppFeaturePolicy.debugBackendSwitcherEnabled) return null
+
+        val normalizedBackend = backend.normalized()
+            .takeIf { it.isUsableClientConfig() }
+            ?: return null
+
+        saveSelection(
+            backend = normalizedBackend,
+            revision = DEBUG_MANUAL_REVISION,
+            manualDebugOverride = true,
+        )
         return normalizedBackend
     }
 
     private fun saveSelection(
         backend: SyncBackendConfig,
         revision: String,
+        manualDebugOverride: Boolean = false,
     ) {
         val normalizedBackend = backend.normalized()
         val payload = json.encodeToString(
             StoredSyncBackendSelection(
                 backendId = normalizedBackend.id,
                 appliedRevision = revision,
+                manualDebugOverride = manualDebugOverride,
             ),
         )
         SyncBackendStorage.saveSelectionPayload(payload)
@@ -117,6 +153,9 @@ object SyncBackendRepository {
             selectedBackend = normalizedBackend,
             appliedRevision = revision,
             isLoaded = true,
+            isManualDebugOverride = manualDebugOverride,
         )
     }
+
+    private const val DEBUG_MANUAL_REVISION = "debug-manual"
 }

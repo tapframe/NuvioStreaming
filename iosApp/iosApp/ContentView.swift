@@ -269,13 +269,26 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
             }
         }
 
-        var title: String {
+        var titleKey: String {
+            switch self {
+            case .home: return "NuvioNativeTabTitleHome"
+            case .search: return "NuvioNativeTabTitleSearch"
+            case .library: return "NuvioNativeTabTitleLibrary"
+            case .settings: return "NuvioNativeTabTitleProfile"
+            }
+        }
+
+        var fallbackTitle: String {
             switch self {
             case .home: return "Home"
             case .search: return "Search"
             case .library: return "Library"
             case .settings: return "Profile"
             }
+        }
+
+        func localizedTitle(defaults: UserDefaults = .standard) -> String {
+            defaults.string(forKey: titleKey)?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty ?? fallbackTitle
         }
 
         var iconImage: UIImage {
@@ -305,10 +318,13 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
 
     private let contentController: UIViewController
     private let tabBar = UITabBar()
+    private let profileTabTouchOverlay = UIControl()
     private var contentBottomToViewBottom: NSLayoutConstraint?
     private var tabBarHeightConstraint: NSLayoutConstraint?
     private var userDefaultsObserver: NSObjectProtocol?
     private var tabChromeObserver: NSObjectProtocol?
+    private var profileTouchRestoreTab: NativeTab?
+    private var profileLongPressHandled = false
     private var profileAvatarImageURL: String?
     private var profileAvatarImageTask: URLSessionDataTask?
     private var profileAvatarImage: UIImage?
@@ -363,10 +379,14 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
         updateTabBarHeight()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateProfileTabTouchOverlayFrame()
+    }
+
     func tabBar(_ tabBar: UITabBar, didSelect item: UITabBarItem) {
         guard let tab = NativeTab(tag: item.tag) else { return }
-        UserDefaults.standard.set(tab.rawValue, forKey: Self.nativeSelectedTabKey)
-        NativeTabBridgeKt.nativeTabSelect(tabName: tab.rawValue)
+        selectNativeTab(tab)
     }
 
     override var childForHomeIndicatorAutoHidden: UIViewController? {
@@ -441,7 +461,7 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
         tabBar.translatesAutoresizingMaskIntoConstraints = false
         tabBar.items = NativeTab.allCases.map { tab in
             let item = UITabBarItem(
-                title: tab.title,
+                title: tab.localizedTitle(),
                 image: tab.iconImage,
                 selectedImage: tab.iconImage
             )
@@ -454,6 +474,7 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
         tabBar.isHidden = true
 
         view.addSubview(tabBar)
+        configureProfileTabTouchOverlay()
         let heightConstraint = tabBar.heightAnchor.constraint(equalToConstant: tabBarHeight)
         tabBarHeightConstraint = heightConstraint
         NSLayoutConstraint.activate([
@@ -488,6 +509,7 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
 
     private func updateTabBarHeight() {
         tabBarHeightConstraint?.constant = tabBarHeight
+        updateProfileTabTouchOverlayFrame()
     }
 
     private func syncNativeTabChrome(animated: Bool) {
@@ -499,15 +521,18 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
         contentBottomToViewBottom?.isActive = true
         if visible {
             tabBar.isHidden = false
+            profileTabTouchOverlay.isHidden = false
         }
 
         let changes = {
             self.tabBar.alpha = visible ? 1 : 0
+            self.profileTabTouchOverlay.alpha = visible ? 1 : 0
             self.view.layoutIfNeeded()
         }
 
         let completion: (Bool) -> Void = { _ in
             self.tabBar.isHidden = !visible
+            self.profileTabTouchOverlay.isHidden = !visible
         }
 
         if animated && view.window != nil {
@@ -525,9 +550,118 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
     }
 
     private func syncSelectedNativeTab() {
+        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == currentNativeSelectedTab.tag })
+    }
+
+    @objc private func handleNativeProfileTabLongPress(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.state == .began else { return }
+
+        profileLongPressHandled = true
+        DispatchQueue.main.async {
+            NativeTabBridgeKt.nativeProfileTabLongPress()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            self?.restoreProfileTabTouchIfNeeded()
+        }
+    }
+
+    @objc private func handleNativeProfileTabTouchDown() {
+        profileTouchRestoreTab = currentNativeSelectedTab
+        profileLongPressHandled = false
+    }
+
+    @objc private func handleNativeProfileTabTap() {
+        if profileLongPressHandled {
+            profileLongPressHandled = false
+            restoreProfileTabTouchIfNeeded()
+            return
+        }
+        profileTouchRestoreTab = nil
+        selectNativeTab(.settings)
+    }
+
+    @objc private func handleNativeProfileTabTouchCancel() {
+        profileLongPressHandled = false
+        restoreProfileTabTouchIfNeeded()
+    }
+
+    private var currentNativeSelectedTab: NativeTab {
         let rawValue = UserDefaults.standard.string(forKey: Self.nativeSelectedTabKey) ?? NativeTab.home.rawValue
-        let selectedTab = NativeTab(rawValue: rawValue) ?? .home
-        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == selectedTab.tag })
+        return NativeTab(rawValue: rawValue) ?? .home
+    }
+
+    private func selectNativeTab(_ tab: NativeTab) {
+        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == tab.tag })
+        UserDefaults.standard.set(tab.rawValue, forKey: Self.nativeSelectedTabKey)
+        NativeTabBridgeKt.nativeTabSelect(tabName: tab.rawValue)
+    }
+
+    private func configureProfileTabTouchOverlay() {
+        profileTabTouchOverlay.backgroundColor = .clear
+        profileTabTouchOverlay.isOpaque = false
+        profileTabTouchOverlay.isExclusiveTouch = true
+        profileTabTouchOverlay.accessibilityLabel = NativeTab.settings.localizedTitle()
+        profileTabTouchOverlay.accessibilityTraits = .button
+        profileTabTouchOverlay.addTarget(
+            self,
+            action: #selector(handleNativeProfileTabTouchDown),
+            for: .touchDown
+        )
+        profileTabTouchOverlay.addTarget(
+            self,
+            action: #selector(handleNativeProfileTabTap),
+            for: .touchUpInside
+        )
+        profileTabTouchOverlay.addTarget(
+            self,
+            action: #selector(handleNativeProfileTabTouchCancel),
+            for: [.touchCancel, .touchUpOutside]
+        )
+
+        let longPressRecognizer = UILongPressGestureRecognizer(
+            target: self,
+            action: #selector(handleNativeProfileTabLongPress(_:))
+        )
+        longPressRecognizer.minimumPressDuration = 0.45
+        longPressRecognizer.cancelsTouchesInView = true
+        profileTabTouchOverlay.addGestureRecognizer(longPressRecognizer)
+
+        profileTabTouchOverlay.alpha = 0
+        profileTabTouchOverlay.isHidden = true
+        view.addSubview(profileTabTouchOverlay)
+        updateProfileTabTouchOverlayFrame()
+    }
+
+    private func restoreProfileTabTouchIfNeeded() {
+        let tab = profileTouchRestoreTab ?? currentNativeSelectedTab
+        tabBar.selectedItem = tabBar.items?.first(where: { $0.tag == tab.tag })
+        profileTouchRestoreTab = nil
+    }
+
+    private func updateProfileTabTouchOverlayFrame() {
+        let tabCount = CGFloat(NativeTab.allCases.count)
+        guard tabCount > 0, tabBar.bounds.width > 0 else {
+            profileTabTouchOverlay.frame = .zero
+            return
+        }
+
+        let itemWidth = tabBar.bounds.width / tabCount
+        let settingsIndex = CGFloat(NativeTab.settings.tag)
+        let visualIndex: CGFloat
+        if tabBar.effectiveUserInterfaceLayoutDirection == .rightToLeft {
+            visualIndex = tabCount - 1 - settingsIndex
+        } else {
+            visualIndex = settingsIndex
+        }
+        let overlayFrameInTabBar = CGRect(
+            x: itemWidth * visualIndex,
+            y: 0,
+            width: itemWidth,
+            height: tabBar.bounds.height
+        )
+        profileTabTouchOverlay.frame = tabBar.convert(overlayFrameInTabBar, to: view)
+        profileTabTouchOverlay.alpha = tabBar.alpha
+        view.bringSubviewToFront(profileTabTouchOverlay)
     }
 
     private func applyNativeTabBarAppearance() {
@@ -535,6 +669,7 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
             UIColor(red: 0.96, green: 0.96, blue: 0.96, alpha: 1)
         let unselected = UIColor(red: 150 / 255, green: 156 / 255, blue: 163 / 255, alpha: 1)
 
+        updateNativeTabTitles()
         refreshProfileAvatarImageIfNeeded()
         updateNativeTabImages(accent: accent)
 
@@ -564,6 +699,14 @@ final class RootComposeViewController: UIViewController, UITabBarDelegate {
             item.image = nativeTabImage(for: tab, selected: false, accent: accent)
             item.selectedImage = nativeTabImage(for: tab, selected: true, accent: accent)
         }
+    }
+
+    private func updateNativeTabTitles() {
+        tabBar.items?.forEach { item in
+            guard let tab = NativeTab(tag: item.tag) else { return }
+            item.title = tab.localizedTitle()
+        }
+        profileTabTouchOverlay.accessibilityLabel = NativeTab.settings.localizedTitle()
     }
 
     private func nativeTabImage(for tab: NativeTab, selected: Bool, accent: UIColor) -> UIImage {
@@ -627,6 +770,12 @@ private extension UIColor {
             blue: CGFloat(rgb & 0xFF) / 255,
             alpha: 1
         )
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 
