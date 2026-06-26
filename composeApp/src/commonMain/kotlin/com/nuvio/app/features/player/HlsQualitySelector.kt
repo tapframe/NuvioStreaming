@@ -2,6 +2,7 @@ package com.nuvio.app.features.player
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
+import com.nuvio.app.features.addons.httpGetTextWithHeaders
 
 internal const val HlsQualityAutoId = "auto"
 
@@ -107,9 +108,11 @@ internal object HlsQualityResolver {
         }
 
         val playlistText = runCatching {
-            // Keep the first implementation intentionally simple and cross-platform.
-            // Existing playback headers are still passed to the player for child playlist/segment requests.
-            httpGetText(normalizedUrl)
+            if (requestHeaders.isEmpty()) {
+                httpGetText(normalizedUrl)
+            } else {
+                httpGetTextWithHeaders(url = normalizedUrl, headers = requestHeaders)
+            }
         }.onFailure { error ->
             log.w(error) { "Failed to fetch HLS master playlist for quality detection" }
         }.getOrNull() ?: return HlsQualitySelectionState(
