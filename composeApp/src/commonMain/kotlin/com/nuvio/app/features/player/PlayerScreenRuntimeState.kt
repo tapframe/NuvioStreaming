@@ -94,11 +94,22 @@ internal class PlayerScreenRuntime(
 
     var controlsVisible by mutableStateOf(true)
     var playerControlsLocked by mutableStateOf(false)
+    private val shouldResolveInitialHlsQuality: Boolean
+        get() = torrentInfoHash == null &&
+            sourceAudioUrl == null &&
+            sourceUrl.contains(".m3u8", ignoreCase = true)
+
     var activeSourceUrl by mutableStateOf(sourceUrl)
-    var activePlaybackSourceUrl by mutableStateOf<String?>(sourceUrl)
-    var hlsQualityState by mutableStateOf(HlsQualitySelectionState(sourceUrl = sourceUrl))
     var selectedHlsQualityId by mutableStateOf<String?>(null)
     var activeSourceAudioUrl by mutableStateOf(sourceAudioUrl)
+
+    var activePlaybackSourceUrl by mutableStateOf<String?>(
+        if (shouldResolveInitialHlsQuality) null else sourceUrl,
+    )
+    var hlsQualityState by mutableStateOf(
+        HlsQualitySelectionState(isLoading = shouldResolveInitialHlsQuality, sourceUrl = sourceUrl),
+    )
+
     var activeSourceHeaders by mutableStateOf(sanitizePlaybackHeaders(sourceHeaders))
     var activeSourceResponseHeaders by mutableStateOf(sanitizePlaybackResponseHeaders(sourceResponseHeaders))
     var activeStreamType by mutableStateOf(streamType)

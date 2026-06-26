@@ -85,6 +85,11 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
     val gestureCallbacks = rememberSurfaceGestureCallbacks()
 
     LaunchedEffect(activeSourceUrl, activeSourceAudioUrl, activeSourceHeaders, activeTorrentInfoHash) {
+        val resolvingSourceUrl = activeSourceUrl
+        val resolvingAudioUrl = activeSourceAudioUrl
+        val resolvingHeaders = activeSourceHeaders
+        val resolvingTorrentInfoHash = activeTorrentInfoHash
+
         selectedHlsQualityId = null
         val shouldInspectHls = activeTorrentInfoHash == null &&
             activeSourceAudioUrl == null &&
@@ -96,14 +101,27 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         )
 
         if (shouldInspectHls) {
-            val resolved = HlsQualityResolver.resolve(
-                sourceUrl = activeSourceUrl,
-                requestHeaders = activeSourceHeaders,
-            )
+            val resolved = runCatching {
+                HlsQualityResolver.resolve(
+                    sourceUrl = resolvingSourceUrl,
+                    requestHeaders = resolvingHeaders,
+                )
+            }.getOrElse { error ->
+                HlsQualitySelectionState(
+                    sourceUrl = resolvingSourceUrl,
+                    errorMessage = error.message ?: "Unable to inspect HLS quality variants.",
+                )
+            }
+
+            if (activeSourceUrl != resolvingSourceUrl ||
+                activeSourceAudioUrl != resolvingAudioUrl ||
+                activeTorrentInfoHash != resolvingTorrentInfoHash
+            ) return@LaunchedEffect
+
             hlsQualityState = resolved
-            activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: activeSourceUrl
+            activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: resolvingSourceUrl
         } else {
-            hlsQualityState = HlsQualitySelectionState(sourceUrl = activeSourceUrl)
+            hlsQualityState = HlsQualitySelectionState(sourceUrl = resolvingSourceUrl)
         }
     }
 
