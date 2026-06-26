@@ -17,6 +17,8 @@ internal expect object PlayerSettingsStorage {
     fun saveExternalPlayerEnabled(enabled: Boolean)
     fun loadExternalPlayerForwardSubtitles(): Boolean?
     fun saveExternalPlayerForwardSubtitles(enabled: Boolean)
+    fun loadExternalPlayerSendSkipSegments(): Boolean?
+    fun saveExternalPlayerSendSkipSegments(enabled: Boolean)
     fun loadExternalPlayerId(): String?
     fun saveExternalPlayerId(playerId: String?)
     fun loadPreferredAudioLanguage(): String?

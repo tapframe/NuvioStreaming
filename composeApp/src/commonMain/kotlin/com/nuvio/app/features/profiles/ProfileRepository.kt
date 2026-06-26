@@ -185,6 +185,7 @@ object ProfileRepository {
         }
         try {
             val params = buildJsonObject {
+                put("p_client_max_profiles", MAX_PROFILES)
                 put("p_profiles", json.encodeToJsonElement(profiles))
             }
             SupabaseProvider.client.postgrest.rpc("sync_push_profiles", params)
@@ -203,7 +204,7 @@ object ProfileRepository {
         usesPrimaryAddons: Boolean = false,
     ) {
         val existing = _state.value.profiles
-        val nextIndex = ((1..4).toSet() - existing.map { it.profileIndex }.toSet()).minOrNull() ?: return
+        val nextIndex = ((1..MAX_PROFILES).toSet() - existing.map { it.profileIndex }.toSet()).minOrNull() ?: return
 
         val allPayloads = existing.map { profile ->
             ProfilePushPayload(
@@ -478,7 +479,7 @@ object ProfileRepository {
 
     private fun syncPinCache(profiles: List<NuvioProfile>) {
         val profilesByIndex = profiles.associateBy { it.profileIndex }
-        for (profileIndex in 1..4) {
+        for (profileIndex in 1..MAX_PROFILES) {
             val profile = profilesByIndex[profileIndex]
             if (profile == null || !profile.pinEnabled) {
                 ProfilePinCacheStorage.removePayload(profileIndex)

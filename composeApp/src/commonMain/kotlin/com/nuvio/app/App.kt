@@ -1082,14 +1082,18 @@ private fun MainAppContent(
             val baseRequest = launch.toExternalPlayerPlaybackRequest()
             val shouldForwardSubtitles = playerSettingsUiState.externalPlayerForwardSubtitles &&
                 !playerSettingsUiState.preferredSubtitleLanguage.equals(SubtitleLanguageOption.NONE, ignoreCase = true)
+            val shouldSendSkipSegments = playerSettingsUiState.externalPlayerSendSkipSegments
             if (shouldForwardSubtitles) {
                 StreamsRepository.setOverlayVisible(true, getString(Res.string.streams_loading_subtitles))
+            } else if (shouldSendSkipSegments) {
+                StreamsRepository.setOverlayVisible(true, getString(Res.string.streams_loading_skip_segments))
             }
             val enrichedRequest = prepareExternalPlayerLaunch(
                 request = baseRequest,
                 type = launch.contentType ?: launch.parentMetaType,
                 videoId = launch.videoId ?: launch.parentMetaId,
                 forwardSubtitles = playerSettingsUiState.externalPlayerForwardSubtitles,
+                sendSkipSegments = shouldSendSkipSegments,
                 preferredLanguage = playerSettingsUiState.preferredSubtitleLanguage,
                 secondaryLanguage = playerSettingsUiState.secondaryPreferredSubtitleLanguage,
                 onOverlayMessage = { _ -> },
