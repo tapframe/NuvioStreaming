@@ -855,6 +855,8 @@
     <string name="settings_playback_external_player_description_ios">Open new playback with the selected installed player.</string>
     <string name="settings_playback_external_player_forward_subtitles">Forward Subtitles to External Player</string>
     <string name="settings_playback_external_player_forward_subtitles_description">Fetch addon subtitles in your preferred language and pass them to the external player.</string>
+    <string name="settings_playback_external_player_send_skip_segments">Send Intro and Outro Timestamps</string>
+    <string name="settings_playback_external_player_send_skip_segments_description">Pass resolved intro and outro skip timestamps to the external player for auto-skipping. Only works in players that support it; other players ignore it.</string>
     <string name="settings_playback_external_player_none_available">No supported external players installed</string>
     <string name="settings_playback_player_preference">Player</string>
     <string name="settings_playback_player_preference_internal">Internal</string>
@@ -1317,6 +1319,7 @@
     <string name="streams_fetching">Fetching…</string>
     <string name="streams_finding_source">Finding source…</string>
     <string name="streams_loading_subtitles">Loading subtitles from addons…</string>
+    <string name="streams_loading_skip_segments">Loading skip segments…</string>
     <string name="streams_finding_streams">Finding streams…</string>
     <string name="streams_link_copied">Stream link copied</string>
     <string name="streams_no_direct_link">No direct stream link available</string>
