@@ -5,6 +5,8 @@ import com.nuvio.app.core.network.SyncBackendRepository
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+const val MAX_PROFILES = 6
+
 @Serializable
 data class NuvioProfile(
     val id: String = "",

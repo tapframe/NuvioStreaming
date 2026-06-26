@@ -19,6 +19,7 @@
     <string name="action_retry">再試行</string>
     <string name="action_save">保存</string>
     <string name="action_saving">保存中…</string>
+    <string name="action_switch">切り替え</string>
     <string name="action_validate">検証</string>
     <string name="addon_installing">インストール中</string>
     <string name="addon_title">アドオン</string>
@@ -31,6 +32,11 @@
     <string name="addons_badge_unavailable">利用不可</string>
     <string name="addons_configure">アドオンを設定</string>
     <string name="addons_delete">アドオンを削除</string>
+    <string name="addons_appstore_add_description">独自のメディアサーバーを接続して、個人ライブラリを参照・再生します。</string>
+    <string name="addons_appstore_empty_subtitle">Nuvioに個人ライブラリを表示させたい場合は、上にサーバーURLを追加してください。</string>
+    <string name="addons_appstore_empty_title">接続された個人ライブラリはありません。</string>
+    <string name="addons_appstore_input_placeholder">サーバーURL</string>
+    <string name="addons_appstore_install_button">追加</string>
     <string name="addons_empty_subtitle">マニフェストURLを追加して、カタログ・メタデータ・ストリーム・字幕をNuvioに読み込みましょう。</string>
     <string name="addons_empty_title">アドオンがありません</string>
     <string name="addons_error_enter_url">アドオンのURLを入力してください。</string>
@@ -319,6 +325,8 @@
     <string name="compose_auth_sign_up">サインアップ</string>
     <string name="compose_auth_store_locally">データはこのデバイスにのみ保存されます</string>
     <string name="compose_auth_tagline">いつでも、どこでも、すべてをストリーム</string>
+    <string name="compose_auth_terms_prefix">サインアップにより、</string>
+    <string name="compose_auth_terms_link">利用規約</string>
     <string name="compose_auth_welcome_back">おかえりなさい</string>
     <string name="compose_catalog_subtitle_library">ライブラリ</string>
     <string name="compose_catalog_subtitle_trakt_library">Traktライブラリ</string>
@@ -533,6 +541,8 @@
     <string name="settings_account_status_anonymous">匿名</string>
     <string name="settings_account_status_signed_in">サインイン済み</string>
     <string name="settings_account_sync_backend">同期バックエンド</string>
+    <string name="debug_backend_switch_confirm_title">バックエンドを切り替えますか？</string>
+    <string name="debug_backend_switch_confirm_message">%1$s に切り替えてサインアウトしますか？選択したバックエンドで再度サインインできます。</string>
     <string name="settings_appearance_amoled_black">AMOLED ブラック</string>
     <string name="settings_appearance_amoled_description">OLEDスクリーン向けに純粋な黒背景を使用します。</string>
     <string name="settings_appearance_app_language">アプリの言語</string>
@@ -540,7 +550,7 @@
     <string name="settings_appearance_app_language_sheet_title">言語を選択</string>
     <string name="settings_appearance_continue_watching_description">「視聴を続ける」セクションの設定</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
-    <string name="settings_appearance_liquid_glass_description">iOS 26以降でネイティブのiPhoneタブバーを使用します。オン中はタブバーからのプロフィール即時切り替えが利用できません。</string>
+    <string name="settings_appearance_liquid_glass_description">iOS 26以降でネイティブのiPhoneタブバーを使用します。</string>
     <string name="settings_appearance_poster_customization_description">カードの幅と角の丸みを調整します。</string>
     <string name="settings_appearance_section_display">ディスプレイ</string>
     <string name="settings_appearance_section_home">ホーム</string>
@@ -631,6 +641,7 @@
     <string name="settings_content_discovery_section_home">ホーム</string>
     <string name="settings_content_discovery_section_sources">ソース</string>
     <string name="settings_content_discovery_addons_description">コンテンツソースのインストール・削除・更新・並べ替え</string>
+    <string name="settings_content_discovery_addons_description_appstore">個人メディアソースを接続し、自分専用ライブラリへのアクセスを管理します。</string>
     <string name="settings_content_discovery_plugins_description">JavaScriptスクレイパーリポジトリのインストールと内部テスト</string>
     <string name="settings_content_discovery_homescreen_description">ホームレイアウト・コンテンツ表示・ポスターの動作を調整</string>
     <string name="settings_content_discovery_meta_screen_description">詳細画面とエピソード画面の設定</string>
@@ -910,6 +921,16 @@
     <string name="settings_playback_secondary_audio_language">第2音声言語</string>
     <string name="settings_playback_secondary_subtitle_language">第2優先言語</string>
     <string name="settings_playback_section_decoder">デコーダー</string>
+    <string name="settings_playback_engine">再生エンジン</string>
+    <string name="settings_playback_engine_auto_description">ExoPlayerを優先し、再生に失敗した場合はlibmpvにフォールバックします。</string>
+    <string name="settings_playback_engine_exoplayer_description">ExoPlayerとAndroid Media3デコーダーを使用します。</string>
+    <string name="settings_playback_engine_libmpv_description">Android再生にlibmpvを使用します。</string>
+    <string name="settings_playback_libmpv_video_output">libmpvレンダラー</string>
+    <string name="settings_playback_libmpv_video_output_dialog">libmpvレンダラー</string>
+    <string name="settings_playback_libmpv_hardware_decoding">libmpvハードウェアデコード</string>
+    <string name="settings_playback_libmpv_hardware_decoding_description">利用可能な場合、mpvハードウェアデコードを使用します。</string>
+    <string name="settings_playback_libmpv_yuv420p">libmpv YUV420P互換</string>
+    <string name="settings_playback_libmpv_yuv420p_description">レンダラーや色の問題があるデバイス向けにYUV420P出力を強制します。</string>
     <string name="settings_playback_section_next_episode">次のエピソード</string>
     <string name="settings_playback_section_player">プレーヤー</string>
     <string name="settings_playback_section_skip_segments">スキップセグメント</string>
@@ -1301,9 +1322,9 @@
     <string name="streams_no_direct_link">直接のストリームリンクがありません</string>
     <string name="streams_no_metadata">メタデータがありません</string>
     <string name="streams_refresh">ストリームを更新</string>
-    <string name="streams_resume_from_percent">%1$d%% から再開</string>
+    <string name="streams_resume_from_percent">%1$d% から再開</string>
     <string name="streams_resume_from_time">%1$s から再開</string>
-    <string name="streams_size">サイズ %1$s</string>
+    <string name="streams_size">%1$s</string>
     <string name="streams_torrent_not_supported">このストリームタイプはサポートされていません</string>
     <string name="debrid_missing_api_key">設定でアカウントを連携してください。</string>
     <string name="debrid_not_cached">TorBoxにキャッシュされていません。</string>
@@ -1321,7 +1342,7 @@
     <string name="updates_download_failed">ダウンロードに失敗しました</string>
     <string name="updates_download_empty_body">ダウンロードボディが空です</string>
     <string name="updates_download_file_missing">ダウンロードした更新ファイルが見つかりません。</string>
-    <string name="updates_downloading_progress">ダウンロード中 %1$d%%</string>
+    <string name="updates_downloading_progress">ダウンロード中 %1$d%</string>
     <string name="updates_install_failed">インストールを開始できません</string>
     <string name="updates_latest_version">最新バージョンを使用しています。</string>
     <string name="updates_message_allow_installs">Nuvioのアプリインストールを有効にして、戻って続けてください。</string>
@@ -1404,6 +1425,7 @@
     <string name="trakt_sign_in_complete_failed">Traktのサインイン完了に失敗しました</string>
     <string name="trakt_user_fallback">Traktユーザー</string>
     <string name="trakt_watchlist">ウォッチリスト</string>
+    <!-- Trakt library sync errors -->
     <string name="trakt_error_authorization_expired">Traktの認証が期限切れです</string>
     <string name="trakt_error_list_not_found">Traktリストが見つかりません</string>
     <string name="trakt_error_list_limit_reached">Traktリストの上限に達しました</string>
@@ -1574,9 +1596,12 @@
     <string name="unit_bytes_kb">KB</string>
     <string name="unit_bytes_mb">MB</string>
     <string name="unit_bytes_gb">GB</string>
+    <!-- PlayerControls a11y -->
     <string name="player_action_submit_intro">イントロを投稿</string>
     <string name="player_action_video_settings">映像設定</string>
+    <!-- CloudLibrary -->
     <string name="cloud_library_provider_unavailable">%1$s ではクラウドライブラリが利用できません。</string>
+    <!-- Player iOS video settings modal -->
     <string name="player_video_settings_title">映像</string>
     <string name="player_video_settings_reset_tuning">調整をリセット</string>
     <string name="player_video_settings_output_preset">出力プリセット</string>
@@ -1591,6 +1616,7 @@
     <string name="player_video_settings_contrast">コントラスト</string>
     <string name="player_video_settings_saturation">彩度</string>
     <string name="player_video_settings_gamma">ガンマ</string>
+    <!-- iOS video output presets -->
     <string name="player_ios_preset_native_edr_label">ネイティブEDR</string>
     <string name="player_ios_preset_native_edr_desc">HDR対応のiPhoneとiPadに最適。</string>
     <string name="player_ios_preset_sdr_tone_mapped_label">SDRトーンマッピング</string>
@@ -1600,6 +1626,7 @@
     <string name="player_ios_preset_custom_label">カスタム</string>
     <string name="player_ios_preset_custom_desc">下の詳細設定値を使用します。</string>
     <string name="player_ios_hardware_decoder_off">オフ</string>
+    <!-- Playback settings iOS video output -->
     <string name="settings_playback_ios_video_output">iOS映像出力</string>
     <string name="settings_playback_ios_hardware_decoder">ハードウェアデコーダー</string>
     <string name="settings_playback_ios_extended_dynamic_range">拡張ダイナミックレンジ</string>
@@ -1608,11 +1635,13 @@
     <string name="settings_playback_ios_display_color_hint_desc">mpvがデフォルトでアクティブなディスプレイの色空間をターゲットにするようにします。</string>
     <string name="settings_playback_ios_target_primaries">ターゲット原色</string>
     <string name="settings_playback_ios_target_transfer">ターゲット転送</string>
+    <!-- Playback settings iOS audio output -->
     <string name="settings_playback_ios_audio_output_section">iOS音声出力</string>
     <string name="settings_playback_ios_audio_output">音声出力</string>
     <string name="settings_playback_ios_audio_output_auto_desc">AVFoundation出力が一時的に無効な間はAudioUnitを使用します。</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">空間オーディオとマルチチャンネル出力の試験的サポート。</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">レガシーのAudioUnit出力を使用します。</string>
+    <!-- Debrid Result Management section -->
     <string name="settings_debrid_section_result_management">結果の管理</string>
     <string name="settings_debrid_max_results">最大結果数</string>
     <string name="settings_debrid_max_results_desc">表示する結果数を制限します。</string>
@@ -1624,69 +1653,83 @@
     <string name="settings_debrid_per_quality_limit_desc">並び替え後のBluRay・WEB-DL・REMUX の重複結果を制限します。</string>
     <string name="settings_debrid_size_range">サイズ範囲</string>
     <string name="settings_debrid_size_range_desc">ファイルサイズで結果をフィルターします。</string>
+    <!-- Debrid misc -->
     <string name="settings_debrid_learn_more">詳しく見る</string>
     <string name="settings_debrid_template_default_format">デフォルト形式</string>
     <string name="settings_debrid_template_original_format">オリジナル形式</string>
     <string name="settings_debrid_release_groups_hint">1行に1グループずつ入力してください。</string>
+    <!-- Debrid sort profiles -->
     <string name="settings_debrid_sort_original">オリジナル順</string>
     <string name="settings_debrid_sort_best_quality">最高品質優先</string>
     <string name="settings_debrid_sort_largest">ファイルサイズ大優先</string>
     <string name="settings_debrid_sort_smallest">ファイルサイズ小優先</string>
     <string name="settings_debrid_sort_best_audio">最高音質優先</string>
     <string name="settings_debrid_sort_language">言語優先</string>
+    <!-- Debrid selection labels -->
     <string name="settings_debrid_selection_any">すべて</string>
     <string name="settings_debrid_selection_count">%1$d 件選択中</string>
+    <!-- Debrid result count labels -->
     <string name="settings_debrid_results_all">すべての結果</string>
     <string name="settings_debrid_results_count">%1$d 件の結果</string>
+    <!-- Debrid size range labels -->
     <string name="settings_debrid_size_up_to">最大 %1$dGB</string>
     <string name="settings_debrid_size_min">%1$dGB 以上</string>
     <string name="settings_debrid_size_range_value">%1$d〜%2$dGB</string>
+    <!-- Debrid rule rows: resolutions -->
     <string name="settings_debrid_rule_preferred_resolutions">優先解像度</string>
     <string name="settings_debrid_rule_preferred_resolutions_desc">選択した解像度をデフォルト順で先頭に並べます。</string>
     <string name="settings_debrid_rule_required_resolutions">必須解像度</string>
     <string name="settings_debrid_rule_required_resolutions_desc">選択した解像度のみ表示します。</string>
     <string name="settings_debrid_rule_excluded_resolutions">除外する解像度</string>
     <string name="settings_debrid_rule_excluded_resolutions_desc">選択した解像度を非表示にします。</string>
+    <!-- Debrid rule rows: qualities -->
     <string name="settings_debrid_rule_preferred_qualities">優先品質</string>
     <string name="settings_debrid_rule_preferred_qualities_desc">選択した品質をデフォルト順で先頭に並べます。</string>
     <string name="settings_debrid_rule_required_qualities">必須品質</string>
     <string name="settings_debrid_rule_required_qualities_desc">選択した品質のみ表示します。</string>
     <string name="settings_debrid_rule_excluded_qualities">除外する品質</string>
     <string name="settings_debrid_rule_excluded_qualities_desc">選択した品質を非表示にします。</string>
+    <!-- Debrid rule rows: visual tags -->
     <string name="settings_debrid_rule_preferred_visual_tags">優先映像タグ</string>
     <string name="settings_debrid_rule_preferred_visual_tags_desc">DV・HDR・10bit・IMAXなどのタグを並べ替えます。</string>
     <string name="settings_debrid_rule_required_visual_tags">必須映像タグ</string>
     <string name="settings_debrid_rule_required_visual_tags_desc">DV・HDR・10bit・IMAX・SDRなどのタグを必須にします。</string>
     <string name="settings_debrid_rule_excluded_visual_tags">除外する映像タグ</string>
     <string name="settings_debrid_rule_excluded_visual_tags_desc">DV・HDR・10bit・3Dなどのタグを非表示にします。</string>
+    <!-- Debrid rule rows: audio tags -->
     <string name="settings_debrid_rule_preferred_audio_tags">優先音声タグ</string>
     <string name="settings_debrid_rule_preferred_audio_tags_desc">Atmos・TrueHD・DTS・AACなどのタグを並べ替えます。</string>
     <string name="settings_debrid_rule_required_audio_tags">必須音声タグ</string>
     <string name="settings_debrid_rule_required_audio_tags_desc">Atmos・TrueHD・DTS・AACなどのタグを必須にします。</string>
     <string name="settings_debrid_rule_excluded_audio_tags">除外する音声タグ</string>
     <string name="settings_debrid_rule_excluded_audio_tags_desc">選択した音声タグを非表示にします。</string>
+    <!-- Debrid rule rows: channels -->
     <string name="settings_debrid_rule_preferred_channels">優先チャンネル</string>
     <string name="settings_debrid_rule_preferred_channels_desc">優先するチャンネルレイアウトを先頭に並べます。</string>
     <string name="settings_debrid_rule_required_channels">必須チャンネル</string>
     <string name="settings_debrid_rule_required_channels_desc">選択したチャンネルレイアウトのみ表示します。</string>
     <string name="settings_debrid_rule_excluded_channels">除外するチャンネル</string>
     <string name="settings_debrid_rule_excluded_channels_desc">選択したチャンネルレイアウトを非表示にします。</string>
+    <!-- Debrid rule rows: encodes -->
     <string name="settings_debrid_rule_preferred_encodes">優先エンコード</string>
     <string name="settings_debrid_rule_preferred_encodes_desc">AV1・HEVC・AVCなどのエンコードを並べ替えます。</string>
     <string name="settings_debrid_rule_required_encodes">必須エンコード</string>
     <string name="settings_debrid_rule_required_encodes_desc">AV1・HEVC・AVCなどのエンコードを必須にします。</string>
     <string name="settings_debrid_rule_excluded_encodes">除外するエンコード</string>
     <string name="settings_debrid_rule_excluded_encodes_desc">選択したエンコードを非表示にします。</string>
+    <!-- Debrid rule rows: languages -->
     <string name="settings_debrid_rule_preferred_languages">優先言語</string>
     <string name="settings_debrid_rule_preferred_languages_desc">優先する音声言語を先頭に並べます。</string>
     <string name="settings_debrid_rule_required_languages">必須言語</string>
     <string name="settings_debrid_rule_required_languages_desc">選択した言語を含む結果のみ表示します。</string>
     <string name="settings_debrid_rule_excluded_languages">除外する言語</string>
     <string name="settings_debrid_rule_excluded_languages_desc">すべての言語が除外対象の結果を非表示にします。</string>
+    <!-- Debrid rule rows: release groups -->
     <string name="settings_debrid_rule_required_release_groups">必須リリースグループ</string>
     <string name="settings_debrid_rule_required_release_groups_desc">選択したリリースグループのみ表示します。</string>
     <string name="settings_debrid_rule_excluded_release_groups">除外するリリースグループ</string>
     <string name="settings_debrid_rule_excluded_release_groups_desc">選択したリリースグループを非表示にします。</string>
+    <!-- Submit intro/recap/outro dialog -->
     <string name="submit_intro_title">タイムスタンプを投稿</string>
     <string name="submit_intro_segment_type">セグメントタイプ</string>
     <string name="submit_intro_segment_intro">イントロ</string>
@@ -1696,24 +1739,31 @@
     <string name="submit_intro_end_time">終了時刻 (MM:SS)</string>
     <string name="submit_intro_submit">投稿</string>
     <string name="submit_intro_capture">キャプチャ</string>
+    <!-- iOS advanced playback -->
     <string name="settings_playback_ios_hw_decoder_dialog">ハードウェアデコーダー</string>
     <string name="settings_playback_ios_audio_output_dialog">音声出力</string>
     <string name="settings_playback_ios_target_primaries_dialog">ターゲット原色</string>
     <string name="settings_playback_ios_target_transfer_dialog">ターゲット転送</string>
+    <!-- Collection editor -->
     <string name="collections_editor_resolved_trakt_list">解決済みTraktリスト</string>
     <string name="collections_editor_tmdb_discover">TMDBディスカバー</string>
     <string name="collections_editor_watch_region_placeholder">US, KR, JP, IN</string>
+    <!-- Collection editor error messages -->
     <string name="collections_editor_trakt_input_required">Traktリスト名、URL、またはIDを入力してください</string>
     <string name="collections_editor_tmdb_invalid_id_error">有効なTMDB IDまたはURLを入力してください。</string>
     <string name="collections_editor_tmdb_load_error">TMDBソースを読み込めませんでした</string>
     <string name="collections_editor_trakt_id_url_required">TraktリストIDまたはURLを入力してください</string>
     <string name="collections_editor_trakt_load_error">Traktリストを読み込めませんでした</string>
+    <!-- Collection editor TMDB country chips -->
     <string name="collections_editor_tmdb_country_ca">カナダ</string>
     <string name="collections_editor_tmdb_country_au">オーストラリア</string>
     <string name="collections_editor_tmdb_country_de">ドイツ</string>
+    <!-- Collection editor media type suffixes (appended to source titles) -->
     <string name="collections_editor_media_movies_suffix">映画</string>
     <string name="collections_editor_media_series_suffix">シリーズ</string>
+    <!-- Cloud library -->
     <string name="cloud_library_playback_disabled">クラウドライブラリが無効です。</string>
+    <!-- IntroDB settings -->
     <string name="settings_playback_introdb_invalid_api_key">APIキーが無効か接続に失敗しました</string>
     <string name="addons_manifest_missing_field">マニフェストに「%1$s」がありません</string>
     <string name="collections_editor_tmdb_collection_title_format">TMDBコレクション %1$s</string>
@@ -1834,20 +1884,24 @@
     <string name="updates_github_api_error">GitHub releases APIエラー：%1$d</string>
     <string name="updates_no_channel_release">まだアップデートが公開されていません。</string>
     <string name="updates_release_missing_title">リリースにタグまたは名前がありません</string>
+    <!-- Continue Watching air date display -->
     <string name="cw_airs_date">%1$s に放送</string>
     <string name="cw_airs_today">本日放送</string>
     <string name="cw_airs_tomorrow">明日放送</string>
     <plurals name="cw_airs_in_days">
+        <item quantity="one">%1$d 日後に放送</item>
         <item quantity="other">%1$d 日後に放送</item>
     </plurals>
     <string name="cw_airs_date_short">%1$s</string>
     <string name="cw_airs_today_short">今日</string>
     <string name="cw_airs_tomorrow_short">明日</string>
     <plurals name="cw_airs_in_days_short">
+        <item quantity="one">%1$d 日後</item>
         <item quantity="other">%1$d 日後</item>
     </plurals>
     <string name="cw_new_episode">新しいエピソード</string>
     <string name="cw_new_season">新シーズン</string>
+    <!-- Pass 4 — platform stubs and dynamic title fallbacks -->
     <string name="collections_editor_trakt_list_title_format">Traktリスト %1$s</string>
     <string name="external_player_android_system">Androidシステムプレーヤー</string>
     <string name="p2p_consent_title">P2Pストリーミング</string>
