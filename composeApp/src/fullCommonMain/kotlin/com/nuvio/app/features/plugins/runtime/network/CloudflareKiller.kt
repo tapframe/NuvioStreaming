@@ -1,6 +1,7 @@
 package com.nuvio.app.features.plugins.runtime.network
 
-import kotlin.concurrent.Synchronized
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -42,39 +43,37 @@ internal fun createPlatformWebViewSolver(): WebViewSolver = platformWebViewSolve
 internal object CfSessionCache {
     private val sessions = mutableMapOf<String, CfSolveResult>()
     private val hostLocks = mutableMapOf<String, Mutex>()
+    private val lock = SynchronizedObject()
 
-    @Synchronized
-    fun getMutex(host: String): Mutex = hostLocks.getOrPut(host) { Mutex() }
+    fun getMutex(host: String): Mutex = synchronized(lock) {
+        hostLocks.getOrPut(host) { Mutex() }
+    }
 
-    @Synchronized
-    fun get(host: String, pluginId: String): CfSolveResult? {
+    fun get(host: String, pluginId: String): CfSolveResult? = synchronized(lock) {
         sessions[host]?.let { return it }
         val persisted = runCatching {
             com.nuvio.app.features.plugins.PluginStorage.loadCfSession(host)
         }.getOrNull()
         val parsed = persisted?.let(::jsonStringToCfSolveResult) ?: return null
         sessions[host] = parsed
-        return parsed
+        parsed
     }
 
-    @Synchronized
-    fun put(host: String, pluginId: String, result: CfSolveResult) {
+    fun put(host: String, pluginId: String, result: CfSolveResult) = synchronized(lock) {
         sessions[host] = result
         runCatching {
             com.nuvio.app.features.plugins.PluginStorage.saveCfSession(host, result.toJsonString())
         }
     }
 
-    @Synchronized
-    fun evict(host: String, pluginId: String) {
+    fun evict(host: String, pluginId: String) = synchronized(lock) {
         sessions.remove(host)
         runCatching {
             com.nuvio.app.features.plugins.PluginStorage.removeCfSession(host)
         }
     }
 
-    @Synchronized
-    fun evictIfSame(host: String, result: CfSolveResult) {
+    fun evictIfSame(host: String, result: CfSolveResult) = synchronized(lock) {
         if (sessions[host] == result) {
             sessions.remove(host)
             runCatching {
@@ -83,8 +82,7 @@ internal object CfSessionCache {
         }
     }
 
-    @Synchronized
-    fun clear() {
+    fun clear() = synchronized(lock) {
         sessions.clear()
     }
 }
