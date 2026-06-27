@@ -72,6 +72,8 @@ import com.nuvio.app.features.debrid.DebridStreamSortCriterion
 import com.nuvio.app.features.debrid.DebridStreamSortDirection
 import com.nuvio.app.features.debrid.DebridStreamSortKey
 import com.nuvio.app.features.debrid.DebridStreamVisualTag
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -209,6 +211,11 @@ import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.runBlocking
 
 private const val CLOUD_SERVICES_FAQ_URL = "https://nuvioapp.space/faq#common-cloud-library-and-cloud-services"
+
+// Upper bound for device-authorization polling when every redeem keeps throwing. Device codes
+// expire server-side within minutes (TorBox/Premiumize), so this is comfortably beyond any code's
+// lifetime — it only exists to stop an indefinitely-offline dialog from polling forever.
+private val DEVICE_AUTH_MAX_POLL_DURATION = 15.minutes
 
 internal fun LazyListScope.debridSettingsContent(
     isTablet: Boolean,
@@ -1499,6 +1506,10 @@ private fun DebridDeviceAuthDialog(
     LaunchedEffect(session?.deviceCode, restartNonce, isConnected) {
         if (isConnected) return@LaunchedEffect
         val activeSession = session ?: return@LaunchedEffect
+        // Watchdog for the throwing path below: device codes expire server-side within minutes,
+        // so if every redeem keeps throwing past this deadline the failure is persistent (e.g.
+        // airplane mode / captive portal), not a brief background-network blip — give up then.
+        val pollDeadline = TimeSource.Monotonic.markNow() + DEVICE_AUTH_MAX_POLL_DURATION
         while (true) {
             delay(activeSession.intervalSeconds.coerceAtLeast(1) * 1_000L)
             isPolling = true
@@ -1508,10 +1519,18 @@ private fun DebridDeviceAuthDialog(
                     ?: DebridDeviceAuthorizationTokenResult.Unsupported
             }.getOrElse { error ->
                 if (error is CancellationException) throw error
-                if (error.isCancelledHttpRequest()) {
-                    DebridDeviceAuthorizationTokenResult.Pending
-                } else {
+                // A throwing redeem is almost always transient connectivity loss rather than a
+                // fatal error: aggressive ROMs (OxygenOS/MIUI/etc.) sever the backgrounded app's
+                // sockets + DNS while the user approves in the browser, so the in-flight poll
+                // throws UnknownHostException/IOException. Keep polling instead of terminating —
+                // terminating here on a transient error is what caused "Could not start sign-in"
+                // on OnePlus devices (issue #1409). A response-bearing expiry still surfaces via
+                // the Expired branch once requests reach the server; the pollDeadline watchdog
+                // bounds the loop when the failure is persistent and no response ever arrives.
+                if (pollDeadline.hasPassedNow()) {
                     DebridDeviceAuthorizationTokenResult.Failed(null)
+                } else {
+                    DebridDeviceAuthorizationTokenResult.Pending
                 }
             }
             isPolling = false
@@ -1698,14 +1717,6 @@ private fun savePendingDeviceAuthorization(session: DebridDeviceAuthorization) {
 
 private fun clearPendingDeviceAuthorization(providerId: String) {
     DebridSettingsStorage.clearPendingDeviceAuthorization(providerId)
-}
-
-private fun Throwable.isCancelledHttpRequest(): Boolean {
-    val text = listOfNotNull(message, toString())
-        .joinToString(" ")
-        .lowercase()
-    return "code=-999" in text ||
-        ("nsurlerrordomain" in text && ("cancelled" in text || "canceled" in text))
 }
 
 private fun String?.toDeviceAuthStatusMessage(fallback: String): String {
