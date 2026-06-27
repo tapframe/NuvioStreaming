@@ -1,4 +1,4 @@
-name: Build Nuvio Mobile (iOS & Android)
+name: Build Nuvio
 
 on:
   push:
@@ -7,30 +7,95 @@ on:
       - '*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
-  build-ios-full:
-    name: Build iOS Full Version
+  build-ios-enhanced:
+    name: Build iOS Enhanced Version
     runs-on: macos-latest
-    env:
-      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx11264M -Dkotlin.daemon.jvmargs=-Xmx11264M -Dkotlin.native.jvmargs=-Xmx11264M"
     steps:
       - name: Checkout Repository & Submodules
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Fetch iOS Specific Submodule
-        run: |
-          set -euo pipefail
-          git submodule sync -- MPVKit
-          git submodule update --init --depth 1 -- MPVKit
+        run: git submodule update --init --recursive MPVKit
 
-      - name: Pull Git LFS files
+      - name: Patch MPVKit Package.swift for CI (replace local path targets with remote URLs)
         run: |
-          set -euo pipefail
-          git lfs install --local
-          git lfs pull
           cd MPVKit
-          git lfs install --local
-          git lfs pull
+          python3 - << 'PYEOF'
+          import re
+
+          replacements = {
+              "Libplacebo": (
+                  "https://github.com/mpvkit/libplacebo-build/releases/download/7.360.1/Libplacebo.xcframework.zip",
+                  "2fa3d54cb81f302d6f11c7b2f509af30944381c3b11ee9d35096eb4637a6e2dd"
+              ),
+              "Libavcodec": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libavcodec.xcframework.zip",
+                  "22af1a028043c1953cae8cc8b9d632da8d8c733364dc896242010457e2601905"
+              ),
+              "Libavdevice": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libavdevice.xcframework.zip",
+                  "b1ba57380014e7680918a5f9f9d52cf91883f600ba1d53857f3720494de91c99"
+              ),
+              "Libavformat": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libavformat.xcframework.zip",
+                  "ded64005204d4af754273ffe11e69a91752f8a6a1c64f4540205e1666698e317"
+              ),
+              "Libavfilter": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libavfilter.xcframework.zip",
+                  "aedda48ffcb27e461e962af7ad7e92be736dca82943cb18dee9e4fec756b0aa4"
+              ),
+              "Libavutil": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libavutil.xcframework.zip",
+                  "947c31241e317e21e20e7ac0c24c467541d383b6ab88bd42acccc5947e1a674f"
+              ),
+              "Libswresample": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libswresample.xcframework.zip",
+                  "3832feceb12606ac342dd93219ae1ca2f4bcabf037ab9299cb5b633060a34248"
+              ),
+              "Libswscale": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libswscale.xcframework.zip",
+                  "ed201cdae3c8e8262f3d9f3618cf3de552db47e607e39d45f93eb336ed05a075"
+              ),
+              "Libmpv": (
+                  "https://github.com/mpvkit/MPVKit/releases/download/0.41.0-n8.1/Libmpv.xcframework.zip",
+                  "b4d0a9ef26abd7bbf1e0a386902206deddaeae5cd36a8ab1ba638c5327389ca7"
+              ),
+          }
+
+          with open("Package.swift", "r") as f:
+              content = f.read()
+
+          for name, (url, checksum) in replacements.items():
+              # Match binaryTarget with path: for this exact name
+              pattern = (
+                  r'(\.binaryTarget\(\s*\n\s*name:\s*"' + re.escape(name) + r'",\s*\n)'
+                  r'\s*path:\s*"[^"]+"\s*\n'
+                  r'(\s*\))'
+              )
+              replacement = (
+                  r'\g<1>'
+                  f'            url: "{url}",\n'
+                  f'            checksum: "{checksum}"\n'
+                  r'\g<2>'
+              )
+              new_content, count = re.subn(pattern, replacement, content)
+              if count:
+                  print(f"✓ Patched {name}")
+                  content = new_content
+              else:
+                  print(f"  (skipped {name} — already url-based or not found)")
+
+          with open("Package.swift", "w") as f:
+              f.write(content)
+
+          print("\nDone.")
+          PYEOF
 
       - name: Select Latest Stable Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -41,7 +106,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -83,11 +148,7 @@ jobs:
 
       - name: Build iOS App via Xcode
         run: |
-          rm -rf ~/Library/Caches/org.swift.swiftpm/
-          rm -rf ~/Library/Developer/Xcode/DerivedData/
           cd iosApp
-          rm -rf build
-          xcodebuild -resolvePackageDependencies -project iosApp.xcodeproj -scheme iosApp -derivedDataPath build
           xcodebuild \
             -project iosApp.xcodeproj \
             -scheme iosApp \
@@ -104,32 +165,32 @@ jobs:
         run: |
           cd iosApp/build/Build/Products/Release-iphoneos
           APP_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Nuvio.app/Info.plist)
-          mkdir -p Payload
+          mkdir Payload
           mv Nuvio.app Payload/
-          zip -q -r "Nuvio-v${APP_VERSION}-Full.ipa" Payload
-          echo "IPA_FILENAME=Nuvio-v${APP_VERSION}-Full.ipa" >> $GITHUB_ENV
+          zip -q -r "Nuvio-v${APP_VERSION}-Enhanced.ipa" Payload
+          echo "IPA_FILENAME=Nuvio-v${APP_VERSION}-Enhanced.ipa" >> $GITHUB_ENV
 
       - name: Upload iOS Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: Nuvio-iOS-Full
+          name: Nuvio-iOS-Enhanced
           path: iosApp/build/Build/Products/Release-iphoneos/${{ env.IPA_FILENAME }}
 
-  build-android:
-    name: Build Android Full Version
+  build-android-enhanced:
+    name: Build Android Enhanced Version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Generate local.properties
         env:
@@ -167,23 +228,22 @@ jobs:
           EOF
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
 
-      - name: Build Full APK
+      - name: Build Enhanced APK
         run: |
           ./gradlew \
             :androidApp:assembleFullDebug \
-            -Pnuvio.android.distribution=full \
             -Pnuvio.splitAbi=true \
             --stacktrace
 
       - name: Upload Android Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
-          name: Nuvio-Android-Full
+          name: Nuvio-Android-Enhanced
           path: androidApp/build/outputs/apk/full/debug/*.apk
