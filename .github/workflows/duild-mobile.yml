@@ -14,6 +14,8 @@ jobs:
   build-ios-enhanced:
     name: Build iOS Enhanced Version
     runs-on: macos-latest
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx11264M -Dkotlin.daemon.jvmargs=-Xmx11264M -Dkotlin.native.jvmargs=-Xmx11264M"
     steps:
       - name: Checkout Repository & Submodules
         uses: actions/checkout@v4
