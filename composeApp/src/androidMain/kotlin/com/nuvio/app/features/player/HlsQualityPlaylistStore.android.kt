@@ -6,5 +6,5 @@ internal actual fun writeTemporaryHlsPlaylist(playlistText: String): String? = r
     val file = File.createTempFile("nuvio_hls_quality_", ".m3u8")
     file.writeText(playlistText)
     file.deleteOnExit()
-    file.toURI().toString()
+    "file://${file.absolutePath}"
 }.getOrNull()
