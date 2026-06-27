@@ -152,6 +152,7 @@ internal fun PlayerControlsShell(
                 onParentalGuideAnimationComplete = onParentalGuideAnimationComplete,
                 onLockToggle = onLockToggle,
                 onVideoSettingsClick = onVideoSettingsClick,
+                onOpenInExternalPlayer = onOpenInExternalPlayer,
                 onBack = onBack,
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -193,7 +194,6 @@ internal fun PlayerControlsShell(
                     onQualityClick = onQualityClick,
                     onSourcesClick = onSourcesClick,
                     onEpisodesClick = onEpisodesClick,
-                    onOpenInExternalPlayer = onOpenInExternalPlayer,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
@@ -222,6 +222,7 @@ private fun PlayerHeader(
     onParentalGuideAnimationComplete: () -> Unit,
     onLockToggle: () -> Unit,
     onVideoSettingsClick: (() -> Unit)?,
+    onOpenInExternalPlayer: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -319,6 +320,15 @@ private fun PlayerHeader(
                             buttonSize = metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onSubmitIntroClick,
+                        )
+                    }
+                    if (onOpenInExternalPlayer != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.AutoMirrored.Rounded.OpenInNew,
+                            contentDescription = stringResource(Res.string.streams_open_external_player),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onOpenInExternalPlayer,
                         )
                     }
                     PlayerHeaderIconButton(
@@ -493,7 +503,6 @@ private fun ProgressControls(
     onQualityClick: (() -> Unit)? = null,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
-    onOpenInExternalPlayer: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val durationMs = playbackSnapshot.durationMs.coerceAtLeast(1L)
@@ -579,13 +588,6 @@ private fun ProgressControls(
                         PlayerActionPillButton(
                             label = qualityLabel,
                             onClick = onQualityClick,
-                        )
-                    }
-                    if (onOpenInExternalPlayer != null) {
-                        PlayerActionPillButton(
-                            label = stringResource(Res.string.streams_open_external_player),
-                            icon = Icons.AutoMirrored.Rounded.OpenInNew,
-                            onClick = onOpenInExternalPlayer,
                         )
                     }
                 }

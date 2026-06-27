@@ -6,7 +6,7 @@
 #  level.  Press  C  to clear all logs on screen.  Press  Q  to quit.
 #
 #  Usage:
-#    ./scripts/nuvio_debug_logs.sh [options]
+#    ./scripts/debug_logs.sh [options]
 #
 #  Options:
 #    -s, --serial <id>    ADB device serial (optional, for multi-device)
@@ -53,7 +53,7 @@ CLR_HOTKEY='\033[38;5;220m'
 # ── Helpers ──────────────────────────────────────────────────────────────────
 usage() {
   cat <<'EOF'
-Usage: ./scripts/nuvio_debug_logs.sh [options]
+Usage: ./scripts/debug_logs.sh [options]
 
 Stream live colour-coded ADB logs for Nuvio debug builds.
 
@@ -68,10 +68,10 @@ Hotkeys (while running):
   Q   Quit the log viewer
 
 Examples:
-  ./scripts/nuvio_debug_logs.sh
-  ./scripts/nuvio_debug_logs.sh --serial emulator-5554
-  ./scripts/nuvio_debug_logs.sh --tag 'MetaDetailsRepo|SeriesContent'
-  ./scripts/nuvio_debug_logs.sh --clear --tag 'Sync|Auth'
+  ./scripts/debug_logs.sh
+  ./scripts/debug_logs.sh --serial emulator-5554
+  ./scripts/debug_logs.sh --tag 'MetaDetailsRepo|SeriesContent'
+  ./scripts/debug_logs.sh --clear --tag 'Sync|Auth'
 EOF
 }
 

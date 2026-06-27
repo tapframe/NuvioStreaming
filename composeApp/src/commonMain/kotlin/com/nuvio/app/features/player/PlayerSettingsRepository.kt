@@ -39,6 +39,7 @@ data class PlayerSettingsUiState(
     val touchGesturesEnabled: Boolean = true,
     val externalPlayerEnabled: Boolean = false,
     val externalPlayerForwardSubtitles: Boolean = false,
+    val externalPlayerSendSkipSegments: Boolean = false,
     val externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId(),
     val preferredAudioLanguage: String = AudioLanguageOption.DEVICE,
     val secondaryPreferredAudioLanguage: String? = null,
@@ -103,6 +104,7 @@ object PlayerSettingsRepository {
     private var touchGesturesEnabled = true
     private var externalPlayerEnabled = false
     private var externalPlayerForwardSubtitles = false
+    private var externalPlayerSendSkipSegments = false
     private var externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId()
     private var preferredAudioLanguage = AudioLanguageOption.DEVICE
     private var secondaryPreferredAudioLanguage: String? = null
@@ -172,6 +174,7 @@ object PlayerSettingsRepository {
         touchGesturesEnabled = true
         externalPlayerEnabled = false
         externalPlayerForwardSubtitles = false
+        externalPlayerSendSkipSegments = false
         externalPlayerId = ExternalPlayerPlatform.defaultPlayerId()
         preferredAudioLanguage = AudioLanguageOption.DEVICE
         secondaryPreferredAudioLanguage = null
@@ -236,6 +239,7 @@ object PlayerSettingsRepository {
         touchGesturesEnabled = PlayerSettingsStorage.loadTouchGesturesEnabled() ?: true
         externalPlayerEnabled = PlayerSettingsStorage.loadExternalPlayerEnabled() ?: false
         externalPlayerForwardSubtitles = PlayerSettingsStorage.loadExternalPlayerForwardSubtitles() ?: false
+        externalPlayerSendSkipSegments = PlayerSettingsStorage.loadExternalPlayerSendSkipSegments() ?: false
         externalPlayerId = PlayerSettingsStorage.loadExternalPlayerId()
             ?: ExternalPlayerPlatform.defaultPlayerId()
         preferredAudioLanguage =
@@ -430,6 +434,14 @@ object PlayerSettingsRepository {
         externalPlayerForwardSubtitles = enabled
         publish()
         PlayerSettingsStorage.saveExternalPlayerForwardSubtitles(enabled)
+    }
+
+    fun setExternalPlayerSendSkipSegments(enabled: Boolean) {
+        ensureLoaded()
+        if (externalPlayerSendSkipSegments == enabled) return
+        externalPlayerSendSkipSegments = enabled
+        publish()
+        PlayerSettingsStorage.saveExternalPlayerSendSkipSegments(enabled)
     }
 
     fun setPreferredAudioLanguage(language: String) {
@@ -893,6 +905,7 @@ object PlayerSettingsRepository {
             touchGesturesEnabled = touchGesturesEnabled,
             externalPlayerEnabled = externalPlayerEnabled,
             externalPlayerForwardSubtitles = externalPlayerForwardSubtitles,
+            externalPlayerSendSkipSegments = externalPlayerSendSkipSegments,
             externalPlayerId = externalPlayerId,
             preferredAudioLanguage = preferredAudioLanguage,
             secondaryPreferredAudioLanguage = secondaryPreferredAudioLanguage,

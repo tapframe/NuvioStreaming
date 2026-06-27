@@ -24,6 +24,7 @@ actual object PlayerSettingsStorage {
     private const val touchGesturesEnabledKey = "touch_gestures_enabled"
     private const val externalPlayerEnabledKey = "external_player_enabled"
     private const val externalPlayerForwardSubtitlesKey = "external_player_forward_subtitles"
+    private const val externalPlayerSendSkipSegmentsKey = "external_player_send_skip_segments"
     private const val externalPlayerIdKey = "external_player_id"
     private const val preferredAudioLanguageKey = "preferred_audio_language"
     private const val secondaryPreferredAudioLanguageKey = "secondary_preferred_audio_language"
@@ -91,6 +92,7 @@ actual object PlayerSettingsStorage {
         touchGesturesEnabledKey,
         externalPlayerEnabledKey,
         externalPlayerForwardSubtitlesKey,
+        externalPlayerSendSkipSegmentsKey,
         externalPlayerIdKey,
         preferredAudioLanguageKey,
         secondaryPreferredAudioLanguageKey,
@@ -254,6 +256,20 @@ actual object PlayerSettingsStorage {
 
     actual fun saveExternalPlayerForwardSubtitles(enabled: Boolean) {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(externalPlayerForwardSubtitlesKey))
+    }
+
+    actual fun loadExternalPlayerSendSkipSegments(): Boolean? {
+        val defaults = NSUserDefaults.standardUserDefaults
+        val key = ProfileScopedKey.of(externalPlayerSendSkipSegmentsKey)
+        return if (defaults.objectForKey(key) != null) {
+            defaults.boolForKey(key)
+        } else {
+            null
+        }
+    }
+
+    actual fun saveExternalPlayerSendSkipSegments(enabled: Boolean) {
+        NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(externalPlayerSendSkipSegmentsKey))
     }
 
     actual fun loadExternalPlayerId(): String? {

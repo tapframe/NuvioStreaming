@@ -855,6 +855,8 @@
     <string name="settings_playback_external_player_description_ios">Open new playback with the selected installed player.</string>
     <string name="settings_playback_external_player_forward_subtitles">Forward Subtitles to External Player</string>
     <string name="settings_playback_external_player_forward_subtitles_description">Fetch addon subtitles in your preferred language and pass them to the external player.</string>
+    <string name="settings_playback_external_player_send_skip_segments">Send Intro and Outro Timestamps</string>
+    <string name="settings_playback_external_player_send_skip_segments_description">Pass resolved intro and outro skip timestamps to the external player for auto-skipping. Only works in players that support it; other players ignore it.</string>
     <string name="settings_playback_external_player_none_available">No supported external players installed</string>
     <string name="settings_playback_player_preference">Player</string>
     <string name="settings_playback_player_preference_internal">Internal</string>
@@ -1317,6 +1319,7 @@
     <string name="streams_fetching">Fetching…</string>
     <string name="streams_finding_source">Finding source…</string>
     <string name="streams_loading_subtitles">Loading subtitles from addons…</string>
+    <string name="streams_loading_skip_segments">Loading skip segments…</string>
     <string name="streams_finding_streams">Finding streams…</string>
     <string name="streams_link_copied">Stream link copied</string>
     <string name="streams_no_direct_link">No direct stream link available</string>
@@ -1463,8 +1466,10 @@
     <string name="action_resume_episode">Resume %1$s</string>
     <string name="collections_import_error_empty_json">JSON is empty.</string>
     <string name="collections_import_error_collection_blank_id">Collection %1$d has blank id.</string>
+    <string name="collections_import_error_collection_duplicate_id">Collection id '%1$s' is used more than once.</string>
     <string name="collections_import_error_collection_blank_title">Collection '%1$s' has blank title.</string>
     <string name="collections_import_error_folder_blank_id">Folder %1$d in '%2$s' has blank id.</string>
+    <string name="collections_import_error_folder_duplicate_id">Folder id '%1$s' is used more than once in '%2$s'.</string>
     <string name="collections_import_error_folder_blank_title">Folder '%1$s' in '%2$s' has blank title.</string>
     <string name="collections_import_error_source_blank_fields">Source %1$d in folder '%2$s' has blank fields.</string>
     <string name="collections_import_error_trakt_list_id">Source %1$d in folder '%2$s' is missing a Trakt list ID.</string>

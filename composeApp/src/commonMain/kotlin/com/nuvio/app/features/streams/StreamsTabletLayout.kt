@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.nuvio.app.isIos
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -172,8 +173,11 @@ internal fun TabletStreamsLayout(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(24.dp))
-                        .hazeEffect(state = hazeState)
-                        .background(Color.Black.copy(alpha = 0.22f)),
+                        .hazeEffect(state = hazeState) {
+                            inputScale = HazeInputScale.Fixed(0.66f)
+                            blurRadius = 56.dp
+                        }
+                        .background(Color.Black.copy(alpha = 0.36f)),
                 ) {
                     Column(
                         modifier = Modifier

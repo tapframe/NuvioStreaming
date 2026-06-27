@@ -93,6 +93,10 @@ internal actual object ExternalPlayerPlatform {
         // Required by MX Player; harmless for other players.
         putExtra("return_result", true)
 
+        // Intro/outro skip segments for players that support auto-skipping.
+        // Players that don't understand this extra simply ignore it.
+        request.skipSegmentsJson?.let { putExtra("skip_segments", it) }
+
         // Headers
         if (request.sourceHeaders.isNotEmpty()) {
             val headerArray = request.sourceHeaders.entries

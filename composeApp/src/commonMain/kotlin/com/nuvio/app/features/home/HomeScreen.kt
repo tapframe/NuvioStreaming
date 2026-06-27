@@ -433,18 +433,8 @@ fun HomeScreen(
             .sorted()
     }
 
-    val catalogRefreshKey = remember(availableManifests) {
-        availableManifests
-            .map { manifest ->
-                buildString {
-                    append(manifest.transportUrl)
-                    append(':')
-                    append(manifest.catalogs.joinToString(separator = ",") { catalog ->
-                        "${catalog.type}:${catalog.id}:${catalog.extra.count { it.isRequired }}"
-                    })
-                }
-            }
-            .sorted()
+    val catalogRefreshKey = remember(enabledAddons) {
+        buildHomeCatalogRefreshSignature(enabledAddons)
     }
 
     LaunchedEffect(catalogRefreshKey) {
