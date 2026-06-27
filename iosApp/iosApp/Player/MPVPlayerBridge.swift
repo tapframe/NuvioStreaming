@@ -168,6 +168,7 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func getBufferedMs() -> Int64 { return playerVC?.bufferedMs ?? 0 }
     func getPlaybackSpeed() -> Float { playerVC?.currentSpeed ?? 1.0 }
     func getErrorMessage() -> String { playerVC?.currentErrorMessage ?? "" }
+    func getMediaInfoJson() -> String { playerVC?.getMediaInfoJson() ?? "{}" }
 
     func destroy() {
         playerVC?.destroyPlayer()
@@ -712,6 +713,110 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     // MARK: - State Update
+
+    func getMediaInfoJson() -> String {
+        guard mpv != nil else { return "{}" }
+        let count = getInt("track-list/count")
+
+        var videoCodec = ""
+        var videoDecoder = ""
+        var dvProfile = ""
+        var codecProfile = ""
+        let filename = getString("filename") ?? ""
+        let gamma = getString("video-params/gamma") ?? ""
+        let primaries = getString("video-params/primaries") ?? ""
+        let colorLevels = getString("video-params/colorlevels") ?? ""
+        let pixelFmt = getString("video-out-params/pixelformat") ?? ""
+        let videoW = getInt("video-params/w")
+        let videoH = getInt("video-params/h")
+        let fps = getDouble("container-fps")
+        let hwdecCurrent = getString("hwdec-current") ?? ""
+        var hdrFormat = ""
+
+        for index in 0..<count {
+            let type = getString("track-list/\(index)/type") ?? ""
+            if type == "video" {
+                videoCodec = getString("track-list/\(index)/codec") ?? ""
+                videoDecoder = getString("track-list/\(index)/decoder-desc") ?? ""
+                dvProfile = getString("track-list/\(index)/dolby-vision-profile") ?? ""
+                if dvProfile.isEmpty {
+                    dvProfile = getString("track-list/\(index)/dv_profile") ?? ""
+                }
+                codecProfile = getString("track-list/\(index)/codec-profile") ?? ""
+
+                let dvLower = dvProfile.lowercased()
+                let isDvValid = !dvProfile.isEmpty &&
+                                 dvLower != "none" &&
+                                 dvLower != "unknown" &&
+                                 dvLower != "0" &&
+                                 dvLower != "false"
+
+                if isDvValid || videoDecoder.localizedCaseInsensitiveContains("dovi") || codecProfile.localizedCaseInsensitiveContains("dovi") {
+                    hdrFormat = "dolby_vision"
+                }
+                break
+            }
+        }
+
+        if hdrFormat.isEmpty {
+            if gamma == "pq" || gamma == "hlg" || primaries == "bt.2020" || primaries == "bt.2020nc" {
+                hdrFormat = "hdr"
+            }
+        }
+
+        var audioCodec = ""
+        var audioDecoder = ""
+        var audioChannels = ""
+        var audioSampleRate = ""
+        var audioLang = ""
+        for index in 0..<count {
+            let type = getString("track-list/\(index)/type") ?? ""
+            let selected = getFlag("track-list/\(index)/selected")
+            if type == "audio" && selected {
+                audioCodec = getString("track-list/\(index)/codec") ?? ""
+                audioDecoder = getString("track-list/\(index)/decoder-desc") ?? ""
+                audioChannels = "\(getInt("track-list/\(index)/demux-channel-count"))"
+                audioSampleRate = "\(getInt("track-list/\(index)/demux-samplerate"))"
+                audioLang = getString("track-list/\(index)/lang") ?? ""
+                break
+            }
+        }
+
+        let vBitrate = getDouble("video-bitrate")
+        let aBitrate = getDouble("audio-bitrate")
+        let vBitrateKbps = vBitrate.isFinite && vBitrate > 0 ? vBitrate / 1000.0 : 0.0
+        let aBitrateKbps = aBitrate.isFinite && aBitrate > 0 ? aBitrate / 1000.0 : 0.0
+
+        let dict: [String: Any] = [
+            "hdrFormat": hdrFormat,
+            "filename": filename,
+            "videoCodec": videoCodec,
+            "videoDecoder": videoDecoder,
+            "dvProfile": dvProfile,
+            "codecProfile": codecProfile,
+            "gamma": gamma,
+            "primaries": primaries,
+            "colorLevels": colorLevels,
+            "pixelFormat": pixelFmt,
+            "videoWidth": videoW,
+            "videoHeight": videoH,
+            "fps": fps,
+            "hwdecCurrent": hwdecCurrent,
+            "audioCodec": audioCodec,
+            "audioDecoder": audioDecoder,
+            "audioChannels": audioChannels,
+            "audioSampleRate": audioSampleRate,
+            "audioLang": audioLang,
+            "videoBitrateKbps": Int(round(vBitrateKbps)),
+            "audioBitrateKbps": Int(round(aBitrateKbps))
+        ]
+
+        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: []),
+              let jsonString = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return jsonString
+    }
 
     /// Lightweight state refresh — called by Kotlin polling (every 250ms).
     /// Only reads cheap scalar properties; does NOT re-enumerate tracks.

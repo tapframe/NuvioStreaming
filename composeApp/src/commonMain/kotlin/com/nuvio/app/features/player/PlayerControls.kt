@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Replay10
@@ -86,6 +87,7 @@ internal fun PlayerControlsShell(
     onSubtitleClick: () -> Unit,
     onAudioClick: () -> Unit,
     onVideoSettingsClick: (() -> Unit)? = null,
+    onInfoClick: (() -> Unit)? = null,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
     onOpenInExternalPlayer: (() -> Unit)? = null,
@@ -150,6 +152,7 @@ internal fun PlayerControlsShell(
                 onParentalGuideAnimationComplete = onParentalGuideAnimationComplete,
                 onLockToggle = onLockToggle,
                 onVideoSettingsClick = onVideoSettingsClick,
+                onInfoClick = onInfoClick,
                 onBack = onBack,
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -218,6 +221,7 @@ private fun PlayerHeader(
     onParentalGuideAnimationComplete: () -> Unit,
     onLockToggle: () -> Unit,
     onVideoSettingsClick: (() -> Unit)?,
+    onInfoClick: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -335,6 +339,15 @@ private fun PlayerHeader(
                             buttonSize = metrics.headerIconSize + 16.dp,
                             iconSize = metrics.headerIconSize,
                             onClick = onVideoSettingsClick,
+                        )
+                    }
+                    if (onInfoClick != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.Rounded.Info,
+                            contentDescription = stringResource(Res.string.compose_player_playback_info),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onInfoClick,
                         )
                     }
                     NuvioBackButton(

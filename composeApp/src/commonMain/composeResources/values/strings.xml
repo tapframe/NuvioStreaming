@@ -351,6 +351,7 @@
     <string name="compose_player_font_size">Font Size</string>
     <string name="compose_player_font_size_value">%1$dsp</string>
     <string name="compose_player_lock_controls">Lock player controls</string>
+    <string name="compose_player_playback_info">Playback Info</string>
     <string name="compose_player_loading_lines">Loading subtitle lines...</string>
     <string name="compose_player_no_subtitle_lines_found">No subtitle lines found</string>
     <string name="compose_player_subtitle_lines_load_error">Unable to load subtitle lines</string>
