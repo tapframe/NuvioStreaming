@@ -152,6 +152,10 @@ internal fun PlayerScreenRuntime.refreshTracks() {
             preferredAudioLanguage = playerSettingsUiState.preferredAudioLanguage,
             secondaryPreferredAudioLanguage = playerSettingsUiState.secondaryPreferredAudioLanguage,
             deviceLanguages = DeviceLanguagePreferences.preferredLanguageCodes(),
+            contentOriginalLanguage = resolveContentLanguage(
+                language = metaUiState.meta?.language,
+                country = metaUiState.meta?.country,
+            ) ?: args.contentLanguage,
         )
         if (preferredAudioTargets.isEmpty()) {
             preferredAudioSelectionApplied = true

@@ -46,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -59,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
+import com.nuvio.app.core.ui.ProfileMeshBackground
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -100,26 +100,23 @@ fun ProfileSelectionScreen(
     }
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val backgroundProfileColor = remember(profileState.activeProfile, profileState.profiles) {
+        val sourceProfile = profileState.activeProfile ?: profileState.profiles.firstOrNull()
+        sourceProfile?.avatarColorHex?.let(::parseHexColor) ?: Color(0xFF1E88E5)
+    }
 
     BoxWithConstraints(
         modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f),
-                    ),
-                ),
-            )
-            .padding(top = statusBarTop),
+            .fillMaxSize(),
     ) {
         val isTabletLayout = maxWidth >= 768.dp
+
+        ProfileMeshBackground(profileColor = backgroundProfileColor)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(top = statusBarTop)
                 .then(
                     if (isTabletLayout) {
                         Modifier
@@ -137,7 +134,7 @@ fun ProfileSelectionScreen(
                 text = stringResource(Res.string.profile_who_is_watching),
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontSize = 30.sp,
-                    letterSpacing = (-0.5).sp,
+                    letterSpacing = 0.sp,
                 ),
                 color = MaterialTheme.colorScheme.onBackground,
                 fontWeight = FontWeight.Bold,
@@ -150,7 +147,7 @@ fun ProfileSelectionScreen(
             Spacer(modifier = Modifier.height(if (isTabletLayout) 28.dp else 48.dp))
 
             val profiles = profileState.profiles
-            val items = profiles.size + if (profiles.size < 4) 1 else 0
+            val items = profiles.size + if (profiles.size < MAX_PROFILES) 1 else 0
 
             if (isTabletLayout) {
                 Box(

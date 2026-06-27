@@ -224,7 +224,7 @@ private struct PendingLoadRequest {
 
 final class MPVPlayerViewController: UIViewController {
 
-    private static let defaultAudioOutput = "avfoundation,audiounit,"
+    private static let defaultAudioOutput = "audiounit"
 
     private let errorStateLock = NSLock()
     private var metalLayer = MetalLayer()
@@ -556,7 +556,13 @@ final class MPVPlayerViewController: UIViewController {
 
     func configureAudioOutput(audioOutput: String) {
         guard mpv != nil else { return }
-        setStringProperty("ao", audioOutput)
+        let resolvedAudioOutput: String
+        if audioOutput.contains("avfoundation") {
+            resolvedAudioOutput = Self.defaultAudioOutput
+        } else {
+            resolvedAudioOutput = audioOutput
+        }
+        setStringProperty("ao", resolvedAudioOutput)
     }
 
     func setSpeed(_ speed: Float) {
@@ -677,7 +683,7 @@ final class MPVPlayerViewController: UIViewController {
     ) {
         guard mpv != nil else { return }
 
-        checkError(mpv_set_property_string(mpv, "sub-ass-override", "force"))
+        checkError(mpv_set_property_string(mpv, "sub-ass-override", "no"))
         checkError(mpv_set_property_string(mpv, "sub-color", textColor))
         checkError(mpv_set_property_string(mpv, "sub-back-color", backgroundColor))
         checkError(mpv_set_property_string(mpv, "sub-outline-color", outlineColor))

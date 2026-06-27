@@ -74,15 +74,15 @@ internal enum class SettingsPage(
         category = SettingsCategory.General,
         parentPage = Root,
     ),
-    Streams(
-        titleRes = Res.string.compose_settings_page_streams,
-        category = SettingsCategory.General,
-        parentPage = Root,
-    ),
     Appearance(
         titleRes = Res.string.compose_settings_page_appearance,
         category = SettingsCategory.General,
         parentPage = Root,
+    ),
+    Streams(
+        titleRes = Res.string.compose_settings_page_streams,
+        category = SettingsCategory.General,
+        parentPage = Appearance,
     ),
     Advanced(
         titleRes = Res.string.compose_settings_page_advanced,
@@ -122,12 +122,12 @@ internal enum class SettingsPage(
     Homescreen(
         titleRes = Res.string.compose_settings_page_homescreen,
         category = SettingsCategory.General,
-        parentPage = ContentDiscovery,
+        parentPage = Appearance,
     ),
     MetaScreen(
         titleRes = Res.string.compose_settings_page_meta_screen,
         category = SettingsCategory.General,
-        parentPage = ContentDiscovery,
+        parentPage = Appearance,
     ),
     Integrations(
         titleRes = Res.string.compose_settings_page_integrations,

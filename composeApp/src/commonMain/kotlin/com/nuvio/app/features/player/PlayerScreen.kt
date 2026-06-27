@@ -39,6 +39,7 @@ fun PlayerScreen(
     torrentTrackers: List<String> = emptyList(),
     initialPositionMs: Long = 0L,
     initialProgressFraction: Float? = null,
+    contentLanguage: String? = null,
 ) {
     PlayerScreenContent(
         PlayerScreenArgs(
@@ -76,6 +77,7 @@ fun PlayerScreen(
             torrentTrackers = torrentTrackers,
             initialPositionMs = initialPositionMs,
             initialProgressFraction = initialProgressFraction,
+            contentLanguage = contentLanguage,
         )
     )
 }

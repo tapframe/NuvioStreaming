@@ -42,12 +42,17 @@
 # TorrServer based P2P streaming.
 -keep class com.nuvio.app.features.p2p.** { *; }
 
+-keep class androidx.work.impl.WorkDatabase_Impl { *; }
+
 # Media3 / ExoPlayer classes from local AAR decoders and stock modules.
 -dontwarn androidx.media3.**
 -keep class androidx.media3.** { *; }
 -keep interface androidx.media3.** { *; }
 -keep class com.google.android.exoplayer2.** { *; }
 -keep interface com.google.android.exoplayer2.** { *; }
+
+-keep class is.xyz.mpv.** { *; }
+-keep interface is.xyz.mpv.** { *; }
 
 # Common optional security providers used by okhttp on some devices.
 -dontwarn okhttp3.internal.platform.**

@@ -17,7 +17,7 @@ object ThemeSettingsRepository {
     private val _liquidGlassNativeTabBarEnabled = MutableStateFlow(false)
     val liquidGlassNativeTabBarEnabled: StateFlow<Boolean> = _liquidGlassNativeTabBarEnabled.asStateFlow()
 
-    private val _selectedAppLanguage = MutableStateFlow(AppLanguage.ENGLISH)
+    private val _selectedAppLanguage = MutableStateFlow(AppLanguage.DEVICE)
     val selectedAppLanguage: StateFlow<AppLanguage> = _selectedAppLanguage.asStateFlow()
 
     private var hasLoaded = false
@@ -38,7 +38,7 @@ object ThemeSettingsRepository {
         _liquidGlassNativeTabBarEnabled.value = false
         NativeTabBridge.publishAccentColor(AppTheme.WHITE.nativeTabAccentHex())
         NativeTabBridge.publishLiquidGlassEnabled(false)
-        _selectedAppLanguage.value = AppLanguage.ENGLISH
+        _selectedAppLanguage.value = AppLanguage.DEVICE
     }
 
     private fun loadFromDisk() {

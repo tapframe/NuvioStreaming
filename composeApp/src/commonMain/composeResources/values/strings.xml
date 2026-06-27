@@ -19,6 +19,7 @@
     <string name="action_retry">Retry</string>
     <string name="action_save">Save</string>
     <string name="action_saving">Saving…</string>
+    <string name="action_switch">Switch</string>
     <string name="action_validate">Validate</string>
     <string name="addon_installing">Installing</string>
     <string name="addon_title">Addons</string>
@@ -31,6 +32,11 @@
     <string name="addons_badge_unavailable">Unavailable</string>
     <string name="addons_configure">Configure addon</string>
     <string name="addons_delete">Delete addon</string>
+    <string name="addons_appstore_add_description">Connect your own media server to browse and play from your personal library.</string>
+    <string name="addons_appstore_empty_subtitle">Add a server URL above when you want Nuvio to show your private library.</string>
+    <string name="addons_appstore_empty_title">No personal libraries connected.</string>
+    <string name="addons_appstore_input_placeholder">Server URL</string>
+    <string name="addons_appstore_install_button">Add</string>
     <string name="addons_empty_subtitle">Add a manifest URL to start loading catalogs, metadata, streams or subtitles into Nuvio.</string>
     <string name="addons_empty_title">No addons installed yet.</string>
     <string name="addons_error_enter_url">Enter an addon URL.</string>
@@ -318,7 +324,9 @@
     <string name="compose_auth_sign_up_subtitle">Sign up to sync your data across devices</string>
     <string name="compose_auth_sign_up">Sign Up</string>
     <string name="compose_auth_store_locally">Your data will only be stored locally</string>
-    <string name="compose_auth_tagline">Stream everything, everywhere</string>
+    <string name="compose_auth_tagline">Watch your library, anywhere</string>
+    <string name="compose_auth_terms_prefix">By signing up, I agree to the</string>
+    <string name="compose_auth_terms_link">Terms</string>
     <string name="compose_auth_welcome_back">Welcome Back</string>
     <string name="compose_catalog_subtitle_library">Library</string>
     <string name="compose_catalog_subtitle_trakt_library">Trakt Library</string>
@@ -430,7 +438,7 @@
     <string name="compose_settings_root_account_section">ACCOUNT</string>
     <string name="compose_settings_root_advanced_description">Startup and profile behavior.</string>
     <string name="compose_settings_root_advanced_section">ADVANCED</string>
-    <string name="compose_settings_root_appearance_description">Home structure and poster styles</string>
+    <string name="compose_settings_root_appearance_description">Home, streams, collections, and detail pages</string>
     <string name="compose_settings_root_check_updates_description">Download latest release</string>
     <string name="compose_settings_root_check_updates_title">Check for updates</string>
     <string name="compose_settings_root_content_discovery_description">Manage addons and discovery sources.</string>
@@ -533,13 +541,16 @@
     <string name="settings_account_status_anonymous">Anonymous</string>
     <string name="settings_account_status_signed_in">Signed in</string>
     <string name="settings_account_sync_backend">Sync backend</string>
+    <string name="debug_backend_switch_confirm_title">Switch backend?</string>
+    <string name="debug_backend_switch_confirm_message">Switch to %1$s and sign out? You can sign in again on the selected backend.</string>
     <string name="settings_appearance_amoled_black">AMOLED Black</string>
     <string name="settings_appearance_amoled_description">Use pure black backgrounds for OLED screens.</string>
     <string name="settings_appearance_app_language">App Language</string>
+    <string name="settings_appearance_app_language_device">Device language</string>
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
-    <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later. Instant profile switching from the tab bar is unavailable while this is on.</string>
+    <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later.</string>
     <string name="settings_appearance_poster_customization_description">Tune card width and corner radius.</string>
     <string name="settings_appearance_section_display">DISPLAY</string>
     <string name="settings_appearance_section_home">HOME</string>
@@ -630,6 +641,7 @@
     <string name="settings_content_discovery_section_home">HOME</string>
     <string name="settings_content_discovery_section_sources">SOURCES</string>
     <string name="settings_content_discovery_addons_description">Install, remove, refresh, and sort your content sources.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Connect personal media sources and manage access to your own library.</string>
     <string name="settings_content_discovery_plugins_description">Install JavaScript scraper repositories and test providers internally.</string>
     <string name="settings_content_discovery_homescreen_description">Adjust home layout, content visibility, and poster behavior</string>
     <string name="settings_content_discovery_meta_screen_description">Settings for the detail and episode screens.</string>
@@ -843,6 +855,8 @@
     <string name="settings_playback_external_player_description_ios">Open new playback with the selected installed player.</string>
     <string name="settings_playback_external_player_forward_subtitles">Forward Subtitles to External Player</string>
     <string name="settings_playback_external_player_forward_subtitles_description">Fetch addon subtitles in your preferred language and pass them to the external player.</string>
+    <string name="settings_playback_external_player_send_skip_segments">Send Intro and Outro Timestamps</string>
+    <string name="settings_playback_external_player_send_skip_segments_description">Pass resolved intro and outro skip timestamps to the external player for auto-skipping. Only works in players that support it; other players ignore it.</string>
     <string name="settings_playback_external_player_none_available">No supported external players installed</string>
     <string name="settings_playback_player_preference">Player</string>
     <string name="settings_playback_player_preference_internal">Internal</string>
@@ -864,6 +878,8 @@
     <string name="settings_playback_not_set">Not set</string>
     <string name="settings_playback_option_default">Default (media file)</string>
     <string name="settings_playback_option_device_language">Device language</string>
+    <string name="settings_playback_option_original">Original language</string>
+    <string name="settings_playback_option_original_hint">Requires TMDB enrichment to be enabled</string>
     <string name="settings_playback_option_forced">Forced</string>
     <string name="settings_playback_option_none">None</string>
     <string name="settings_playback_addon_subtitle_startup_all">All subtitles</string>
@@ -907,6 +923,16 @@
     <string name="settings_playback_secondary_audio_language">Secondary Audio Language</string>
     <string name="settings_playback_secondary_subtitle_language">Secondary Preferred Language</string>
     <string name="settings_playback_section_decoder">DECODER</string>
+    <string name="settings_playback_engine">Playback Engine</string>
+    <string name="settings_playback_engine_auto_description">Use ExoPlayer first and fall back to libmpv if playback fails.</string>
+    <string name="settings_playback_engine_exoplayer_description">Use ExoPlayer and Android Media3 decoders.</string>
+    <string name="settings_playback_engine_libmpv_description">Use libmpv for Android playback.</string>
+    <string name="settings_playback_libmpv_video_output">libmpv Renderer</string>
+    <string name="settings_playback_libmpv_video_output_dialog">libmpv Renderer</string>
+    <string name="settings_playback_libmpv_hardware_decoding">libmpv Hardware Decoding</string>
+    <string name="settings_playback_libmpv_hardware_decoding_description">Use mpv hardware decoding when available.</string>
+    <string name="settings_playback_libmpv_yuv420p">libmpv YUV420P Compatibility</string>
+    <string name="settings_playback_libmpv_yuv420p_description">Force YUV420P output for devices with renderer or color issues.</string>
     <string name="settings_playback_section_next_episode">NEXT EPISODE</string>
     <string name="settings_playback_section_player">PLAYER</string>
     <string name="settings_playback_section_skip_segments">SKIP SEGMENTS</string>
@@ -1293,6 +1319,7 @@
     <string name="streams_fetching">Fetching…</string>
     <string name="streams_finding_source">Finding source…</string>
     <string name="streams_loading_subtitles">Loading subtitles from addons…</string>
+    <string name="streams_loading_skip_segments">Loading skip segments…</string>
     <string name="streams_finding_streams">Finding streams…</string>
     <string name="streams_link_copied">Stream link copied</string>
     <string name="streams_no_direct_link">No direct stream link available</string>
@@ -1439,8 +1466,10 @@
     <string name="action_resume_episode">Resume %1$s</string>
     <string name="collections_import_error_empty_json">JSON is empty.</string>
     <string name="collections_import_error_collection_blank_id">Collection %1$d has blank id.</string>
+    <string name="collections_import_error_collection_duplicate_id">Collection id '%1$s' is used more than once.</string>
     <string name="collections_import_error_collection_blank_title">Collection '%1$s' has blank title.</string>
     <string name="collections_import_error_folder_blank_id">Folder %1$d in '%2$s' has blank id.</string>
+    <string name="collections_import_error_folder_duplicate_id">Folder id '%1$s' is used more than once in '%2$s'.</string>
     <string name="collections_import_error_folder_blank_title">Folder '%1$s' in '%2$s' has blank title.</string>
     <string name="collections_import_error_source_blank_fields">Source %1$d in folder '%2$s' has blank fields.</string>
     <string name="collections_import_error_trakt_list_id">Source %1$d in folder '%2$s' is missing a Trakt list ID.</string>
@@ -1614,7 +1643,7 @@
     <!-- Playback settings iOS audio output -->
     <string name="settings_playback_ios_audio_output_section">iOS audio output</string>
     <string name="settings_playback_ios_audio_output">Audio output</string>
-    <string name="settings_playback_ios_audio_output_auto_desc">Try AVFoundation first, then fall back to AudioUnit.</string>
+    <string name="settings_playback_ios_audio_output_auto_desc">Use AudioUnit while AVFoundation output is temporarily disabled.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Experimental support for Spatial Audio and multichannel output.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Use the legacy AudioUnit output.</string>
     <!-- Debrid Result Management section -->
