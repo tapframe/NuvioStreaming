@@ -2,6 +2,7 @@ package com.nuvio.app.features.plugins.runtime.network
 
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.readValue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -56,7 +57,7 @@ internal object IosWebViewSolver : WebViewSolver {
             withContext(Dispatchers.Main) {
                 val config = WKWebViewConfiguration()
                 val webView = WKWebView(
-                    frame = platform.CoreGraphics.CGRectZero,
+                    frame = platform.CoreGraphics.CGRectZero.readValue(),
                     configuration = config,
                 )
                 webView.customUserAgent = webViewUserAgent
@@ -99,7 +100,7 @@ internal object IosWebViewSolver : WebViewSolver {
         cachedUserAgent?.let { return it }
         return withContext(Dispatchers.Main) {
             val webView = WKWebView(
-                frame = platform.CoreGraphics.CGRectZero,
+                frame = platform.CoreGraphics.CGRectZero.readValue(),
                 configuration = WKWebViewConfiguration(),
             )
             val deferred = CompletableDeferred<String>()
