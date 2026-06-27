@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -33,35 +34,47 @@ suspend fun prepareExternalPlayerLaunch(
     preferredLanguage: String,
     secondaryLanguage: String?,
     onOverlayMessage: (String?) -> Unit,
-): ExternalPlayerPlaybackRequest {
+): ExternalPlayerPlaybackRequest = coroutineScope {
     var result = request
 
-    if (forwardSubtitles && !preferredLanguage.equals(SubtitleLanguageOption.NONE, ignoreCase = true)) {
-        onOverlayMessage("Loading subtitles from addons...")
+    val subtitlesDeferred = if (forwardSubtitles && !preferredLanguage.equals(SubtitleLanguageOption.NONE, ignoreCase = true)) {
+        async {
+            onOverlayMessage("Loading subtitles from addons...")
 
-        val subtitles = SubtitleForwarder.fetchForExternalPlayer(
-            type = type,
-            videoId = videoId,
-            preferredLanguage = preferredLanguage,
-            secondaryLanguage = secondaryLanguage,
-        )
+            val subtitles = SubtitleForwarder.fetchForExternalPlayer(
+                type = type,
+                videoId = videoId,
+                preferredLanguage = preferredLanguage,
+                secondaryLanguage = secondaryLanguage,
+            )
 
-        if (subtitles != null) {
-            onOverlayMessage("Downloading subtitles...")
-            val cachedSubtitles = SubtitleCacheProvider.cacheForExternalPlayer(subtitles)
-            // Fallback: use original URLs if caching fails
-            result = result.copy(subtitles = cachedSubtitles ?: subtitles)
+            if (subtitles != null) {
+                onOverlayMessage("Downloading subtitles...")
+                val cachedSubtitles = SubtitleCacheProvider.cacheForExternalPlayer(subtitles)
+                // Fallback: use original URLs if caching fails
+                cachedSubtitles ?: subtitles
+            } else {
+                null
+            }
         }
+    } else {
+        null
     }
 
-    if (sendSkipSegments) {
-        val skipSegmentsJson = resolveSkipSegmentsJson(videoId, request.season, request.episode)
-        if (skipSegmentsJson != null) {
-            result = result.copy(skipSegmentsJson = skipSegmentsJson)
-        }
+    val skipSegmentsDeferred = if (sendSkipSegments) {
+        async { resolveSkipSegmentsJson(videoId, request.season, request.episode) }
+    } else {
+        null
     }
 
-    return result
+    subtitlesDeferred?.await()?.let { subtitles ->
+        result = result.copy(subtitles = subtitles)
+    }
+    skipSegmentsDeferred?.await()?.let { skipSegmentsJson ->
+        result = result.copy(skipSegmentsJson = skipSegmentsJson)
+    }
+
+    return@coroutineScope result
 }
 
 /**

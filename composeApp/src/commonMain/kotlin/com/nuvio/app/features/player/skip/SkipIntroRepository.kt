@@ -1,6 +1,8 @@
 package com.nuvio.app.features.player.skip
 
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 object SkipIntroRepository {
 
@@ -17,48 +19,64 @@ object SkipIntroRepository {
         season: Int,
         episode: Int,
         requireSkipIntroEnabled: Boolean = true,
-    ): List<SkipInterval> {
-        if (imdbId == null) return emptyList()
+    ): List<SkipInterval> = coroutineScope {
+        if (imdbId == null) return@coroutineScope emptyList()
         val settings = PlayerSettingsRepository.uiState.value
-        if (requireSkipIntroEnabled && !settings.skipIntroEnabled) return emptyList()
+        if (requireSkipIntroEnabled && !settings.skipIntroEnabled) return@coroutineScope emptyList()
 
         val cacheKey = "$imdbId:$season:$episode"
-        cache[cacheKey]?.let { return it }
+        cache[cacheKey]?.let { return@coroutineScope it }
 
-        val introDb = if (introDbConfigured) fetchFromIntroDb(imdbId, season, episode) else emptyList()
-        val entries = resolveImdbEntries(imdbId)
-        val animeSkip = fetchAnimeSkipForEntries(entries, season, episode)
+        val introDbDeferred = async {
+            if (introDbConfigured) fetchFromIntroDb(imdbId, season, episode) else emptyList()
+        }
+        val entriesDeferred = async { resolveImdbEntries(imdbId) }
+        val entries = entriesDeferred.await()
+        val animeSkipDeferred = async { fetchAnimeSkipForEntries(entries, season, episode) }
         val malId = entries.getOrNull(season - 1)?.myanimelist?.toString()
             ?: entries.firstOrNull()?.myanimelist?.toString()
-        val aniSkip = if (malId != null) fetchFromAniSkip(malId, episode) else emptyList()
+        val aniSkipDeferred = async {
+            if (malId != null) fetchFromAniSkip(malId, episode) else emptyList()
+        }
 
-        return mergeByPriority(introDb, animeSkip, aniSkip).also { cache[cacheKey] = it }
+        return@coroutineScope mergeByPriority(
+            introDbDeferred.await(),
+            animeSkipDeferred.await(),
+            aniSkipDeferred.await(),
+        ).also { cache[cacheKey] = it }
     }
 
     suspend fun getSkipIntervalsForMal(
         malId: String,
         episode: Int,
         requireSkipIntroEnabled: Boolean = true,
-    ): List<SkipInterval> {
+    ): List<SkipInterval> = coroutineScope {
         val settings = PlayerSettingsRepository.uiState.value
-        if (requireSkipIntroEnabled && !settings.skipIntroEnabled) return emptyList()
+        if (requireSkipIntroEnabled && !settings.skipIntroEnabled) return@coroutineScope emptyList()
 
         val cacheKey = "mal:$malId:$episode"
-        cache[cacheKey]?.let { return it }
+        cache[cacheKey]?.let { return@coroutineScope it }
 
-        val aniSkip = fetchFromAniSkip(malId, episode)
+        val aniSkipDeferred = async { fetchFromAniSkip(malId, episode) }
 
-        val imdbId = try {
-            SkipIntroApi.resolveMalToImdb(malId)?.imdb
-        } catch (_: Exception) { null }
+        val imdbIdDeferred = async {
+            try {
+                SkipIntroApi.resolveMalToImdb(malId)?.imdb
+            } catch (_: Exception) { null }
+        }
 
         var introDb = emptyList<SkipInterval>()
         var animeSkip = emptyList<SkipInterval>()
+        val imdbId = imdbIdDeferred.await()
         if (imdbId != null) {
             val entries = resolveImdbEntries(imdbId)
             val season = entries.indexOfFirst { it.myanimelist == malId.toIntOrNull() } + 1
-            if (introDbConfigured) introDb = fetchFromIntroDb(imdbId, season, episode)
-            animeSkip = fetchAnimeSkipForEntries(entries, season, episode)
+            val introDbDeferred = async {
+                if (introDbConfigured) fetchFromIntroDb(imdbId, season, episode) else emptyList()
+            }
+            val animeSkipDeferred = async { fetchAnimeSkipForEntries(entries, season, episode) }
+            introDb = introDbDeferred.await()
+            animeSkip = animeSkipDeferred.await()
         } else {
             val anilistId = try {
                 SkipIntroApi.resolveMalToAnilist(malId)?.anilist?.toString()
@@ -66,36 +84,46 @@ object SkipIntroRepository {
             if (anilistId != null) animeSkip = fetchFromAnimeSkip(anilistId, episode, season = null)
         }
 
-        return mergeByPriority(introDb, animeSkip, aniSkip).also { cache[cacheKey] = it }
+        return@coroutineScope mergeByPriority(introDb, animeSkip, aniSkipDeferred.await()).also { cache[cacheKey] = it }
     }
 
     suspend fun getSkipIntervalsForKitsu(
         kitsuId: String,
         episode: Int,
         requireSkipIntroEnabled: Boolean = true,
-    ): List<SkipInterval> {
+    ): List<SkipInterval> = coroutineScope {
         val settings = PlayerSettingsRepository.uiState.value
-        if (requireSkipIntroEnabled && !settings.skipIntroEnabled) return emptyList()
+        if (requireSkipIntroEnabled && !settings.skipIntroEnabled) return@coroutineScope emptyList()
 
         val cacheKey = "kitsu:$kitsuId:$episode"
-        cache[cacheKey]?.let { return it }
+        cache[cacheKey]?.let { return@coroutineScope it }
 
-        val malId = try {
-            SkipIntroApi.resolveKitsuToMal(kitsuId)?.myanimelist?.toString()
-        } catch (_: Exception) { null }
-        val aniSkip = if (malId != null) fetchFromAniSkip(malId, episode) else emptyList()
-
-        val imdbId = try {
-            SkipIntroApi.resolveKitsuToImdb(kitsuId)?.imdb
-        } catch (_: Exception) { null }
+        val malIdDeferred = async {
+            try {
+                SkipIntroApi.resolveKitsuToMal(kitsuId)?.myanimelist?.toString()
+            } catch (_: Exception) { null }
+        }
+        val imdbIdDeferred = async {
+            try {
+                SkipIntroApi.resolveKitsuToImdb(kitsuId)?.imdb
+            } catch (_: Exception) { null }
+        }
+        val aniSkipDeferred = async {
+            malIdDeferred.await()?.let { fetchFromAniSkip(it, episode) } ?: emptyList()
+        }
 
         var introDb = emptyList<SkipInterval>()
         var animeSkip = emptyList<SkipInterval>()
+        val imdbId = imdbIdDeferred.await()
         if (imdbId != null) {
             val entries = resolveImdbEntries(imdbId)
             val season = entries.indexOfFirst { it.kitsu == kitsuId.toIntOrNull() } + 1
-            if (introDbConfigured) introDb = fetchFromIntroDb(imdbId, season, episode)
-            animeSkip = fetchAnimeSkipForEntries(entries, season, episode)
+            val introDbDeferred = async {
+                if (introDbConfigured) fetchFromIntroDb(imdbId, season, episode) else emptyList()
+            }
+            val animeSkipDeferred = async { fetchAnimeSkipForEntries(entries, season, episode) }
+            introDb = introDbDeferred.await()
+            animeSkip = animeSkipDeferred.await()
         } else {
             val anilistId = try {
                 SkipIntroApi.resolveKitsuToAnilist(kitsuId)?.anilist?.toString()
@@ -103,7 +131,7 @@ object SkipIntroRepository {
             if (anilistId != null) animeSkip = fetchFromAnimeSkip(anilistId, episode, season = null)
         }
 
-        return mergeByPriority(introDb, animeSkip, aniSkip).also { cache[cacheKey] = it }
+        return@coroutineScope mergeByPriority(introDb, animeSkip, aniSkipDeferred.await()).also { cache[cacheKey] = it }
     }
 
     /**
