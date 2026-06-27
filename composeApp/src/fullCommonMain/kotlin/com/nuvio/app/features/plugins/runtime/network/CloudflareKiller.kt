@@ -1,5 +1,6 @@
 package com.nuvio.app.features.plugins.runtime.network
 
+import kotlin.concurrent.Synchronized
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
