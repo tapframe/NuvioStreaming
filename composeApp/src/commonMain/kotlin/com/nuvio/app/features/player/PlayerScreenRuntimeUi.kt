@@ -90,24 +90,24 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         val resolvingHeaders = activeSourceHeaders
         val resolvingTorrentInfoHash = activeTorrentInfoHash
 
-        selectedHlsQualityId = null
+        selectedPlayerQualityId = null
         val shouldInspectHls = activeTorrentInfoHash == null &&
             activeSourceAudioUrl == null &&
             activeSourceUrl.contains(".m3u8", ignoreCase = true)
         activePlaybackSourceUrl = if (shouldInspectHls) null else activeSourceUrl
-        hlsQualityState = HlsQualitySelectionState(
+        playerQualityState = PlayerQualitySelectionState(
             isLoading = shouldInspectHls,
             sourceUrl = activeSourceUrl,
         )
 
         if (shouldInspectHls) {
             val resolved = runCatching {
-                HlsQualityResolver.resolve(
+                PlayerQualityResolver.resolve(
                     sourceUrl = resolvingSourceUrl,
                     requestHeaders = resolvingHeaders,
                 )
             }.getOrElse { error ->
-                HlsQualitySelectionState(
+                PlayerQualitySelectionState(
                     sourceUrl = resolvingSourceUrl,
                     errorMessage = error.message ?: "Unable to inspect HLS quality variants.",
                 )
@@ -118,10 +118,10 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 activeTorrentInfoHash != resolvingTorrentInfoHash
             ) return@LaunchedEffect
 
-            hlsQualityState = resolved
+            playerQualityState = resolved
             activePlaybackSourceUrl = resolved.playbackUrlFor(null) ?: resolvingSourceUrl
         } else {
-            hlsQualityState = HlsQualitySelectionState(sourceUrl = resolvingSourceUrl)
+            playerQualityState = PlayerQualitySelectionState(sourceUrl = resolvingSourceUrl)
         }
     }
 
@@ -278,7 +278,7 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             },
             onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
             onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
-            qualityLabel = hlsQualityControlLabel(),
+            qualityLabel = playerQualityControlLabel(),
             onQualityClick = {
                 openQualityPanel()
             },
@@ -420,11 +420,11 @@ private fun PlayerScreenRuntime.openQualityPanel() {
     controlsVisible = false
 }
 
-private fun PlayerScreenRuntime.hlsQualityControlLabel(): String {
-    if (hlsQualityState.isLoading) return playbackResolutionLabel(forButton = true) ?: "Quality"
-    val label = hlsQualityState.labelFor(selectedHlsQualityId, forButton = true)
+private fun PlayerScreenRuntime.playerQualityControlLabel(): String {
+    if (playerQualityState.isLoading) return playbackResolutionLabel(forButton = true) ?: "Quality"
+    val label = playerQualityState.labelFor(selectedPlayerQualityId, forButton = true)
     if (!label.isNullOrBlank()) {
-        return if (selectedHlsQualityId == null && hlsQualityState.hasSelectableQualities) {
+        return if (selectedPlayerQualityId == null && playerQualityState.hasSelectableQualities) {
             "Auto $label"
         } else {
             label
@@ -435,11 +435,11 @@ private fun PlayerScreenRuntime.hlsQualityControlLabel(): String {
 
 private fun PlayerScreenRuntime.currentQualityPanelResolutionLabel(): String? {
     playbackResolutionLabel(forButton = false)?.let { return it }
-    return hlsQualityState.labelFor(selectedHlsQualityId, forButton = false)
+    return playerQualityState.labelFor(selectedPlayerQualityId, forButton = false)
 }
 
 private fun PlayerScreenRuntime.playbackResolutionLabel(forButton: Boolean): String? =
-    hlsQualityNameForResolution(
+    playerQualityNameForResolution(
         width = playbackSnapshot.videoWidth,
         height = playbackSnapshot.videoHeight,
         forButton = forButton,
@@ -520,10 +520,10 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         activeSourceUrl = activeSourceUrl,
         activeStreamTitle = activeStreamTitle,
         showQualityPanel = showQualityPanel,
-        hlsQualityState = hlsQualityState,
-        selectedHlsQualityId = selectedHlsQualityId,
+        playerQualityState = playerQualityState,
+        selectedPlayerQualityId = selectedPlayerQualityId,
         currentQualityLabel = currentQualityPanelResolutionLabel(),
-        onHlsQualitySelected = { qualityId -> selectHlsQuality(qualityId) },
+        onPlayerQualitySelected = { qualityId -> selectPlayerQuality(qualityId) },
         onQualityPanelDismissed = {
             showQualityPanel = false
             controlsVisible = true

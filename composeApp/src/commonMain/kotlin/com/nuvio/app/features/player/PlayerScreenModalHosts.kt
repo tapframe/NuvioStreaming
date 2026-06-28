@@ -55,10 +55,10 @@ internal fun PlayerScreenModalHosts(
     activeSourceUrl: String,
     activeStreamTitle: String,
     showQualityPanel: Boolean,
-    hlsQualityState: HlsQualitySelectionState,
-    selectedHlsQualityId: String?,
+    playerQualityState: PlayerQualitySelectionState,
+    selectedPlayerQualityId: String?,
     currentQualityLabel: String?,
-    onHlsQualitySelected: (String?) -> Unit,
+    onPlayerQualitySelected: (String?) -> Unit,
     onQualityPanelDismissed: () -> Unit,
     onSourceFilterSelected: (String?) -> Unit,
     onSourceStreamSelected: (StreamItem) -> Unit,
@@ -171,12 +171,12 @@ internal fun PlayerScreenModalHosts(
         onDismiss = onSourcesPanelDismissed,
     )
 
-    PlayerHlsQualityPanel(
+    PlayerQualityPanel(
         visible = showQualityPanel,
-        state = hlsQualityState,
-        selectedQualityId = selectedHlsQualityId,
+        state = playerQualityState,
+        selectedQualityId = selectedPlayerQualityId,
         currentResolutionLabel = currentQualityLabel,
-        onQualitySelected = onHlsQualitySelected,
+        onQualitySelected = onPlayerQualitySelected,
         onDismiss = onQualityPanelDismissed,
     )
 

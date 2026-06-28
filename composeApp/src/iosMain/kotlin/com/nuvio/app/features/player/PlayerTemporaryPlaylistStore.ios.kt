@@ -10,7 +10,7 @@ import platform.Foundation.writeToFile
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun writeTemporaryHlsPlaylist(playlistText: String): String? {
     val directory = NSTemporaryDirectory().trimEnd('/')
-    val filename = "nuvio_hls_quality_${NSUUID().UUIDString}.m3u8"
+    val filename = "nuvio_player_quality_${NSUUID().UUIDString}.m3u8"
     val path = "$directory/$filename"
     val success = (playlistText as NSString).writeToFile(
         path,

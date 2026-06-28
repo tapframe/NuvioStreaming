@@ -4,9 +4,9 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.httpGetText
 import com.nuvio.app.features.addons.httpGetTextWithHeaders
 
-internal const val HlsQualityAutoId = "auto"
+internal const val PlayerQualityAutoId = "auto"
 
-data class HlsQualityVariant(
+data class PlayerQualityVariant(
     val id: String,
     val name: String,
     val width: Int?,
@@ -43,7 +43,7 @@ data class HlsQualityVariant(
         }
 
     val buttonQualityName: String
-        get() = qualityName.toHlsQualityButtonName()
+        get() = qualityName.toPlayerQualityButtonName()
 
     private val codecLabel: String
         get() = when {
@@ -67,10 +67,10 @@ data class HlsQualityVariant(
         }
 }
 
-data class HlsQualitySelectionState(
+data class PlayerQualitySelectionState(
     val isLoading: Boolean = false,
     val sourceUrl: String = "",
-    val variants: List<HlsQualityVariant> = emptyList(),
+    val variants: List<PlayerQualityVariant> = emptyList(),
     val recommendedVariantId: String? = null,
     val errorMessage: String? = null,
 ) {
@@ -79,7 +79,7 @@ data class HlsQualitySelectionState(
 
     fun playbackUrlFor(selectedVariantId: String?): String? {
         val selected = when {
-            selectedVariantId.isNullOrBlank() || selectedVariantId == HlsQualityAutoId -> {
+            selectedVariantId.isNullOrBlank() || selectedVariantId == PlayerQualityAutoId -> {
                 variants.firstOrNull { it.id == recommendedVariantId }
             }
             else -> variants.firstOrNull { it.id == selectedVariantId }
@@ -89,7 +89,7 @@ data class HlsQualitySelectionState(
 
     fun labelFor(selectedVariantId: String?, forButton: Boolean = false): String? {
         val selected = when {
-            selectedVariantId.isNullOrBlank() || selectedVariantId == HlsQualityAutoId -> {
+            selectedVariantId.isNullOrBlank() || selectedVariantId == PlayerQualityAutoId -> {
                 variants.firstOrNull { it.id == recommendedVariantId }
             }
             else -> variants.firstOrNull { it.id == selectedVariantId }
@@ -102,16 +102,16 @@ data class HlsQualitySelectionState(
     }
 }
 
-internal object HlsQualityResolver {
-    private val log = Logger.withTag("HlsQuality")
+internal object PlayerQualityResolver {
+    private val log = Logger.withTag("PlayerQuality")
 
     suspend fun resolve(
         sourceUrl: String,
         requestHeaders: Map<String, String> = emptyMap(),
-    ): HlsQualitySelectionState {
+    ): PlayerQualitySelectionState {
         val normalizedUrl = sourceUrl.trim()
         if (!looksLikeHlsPlaylist(normalizedUrl)) {
-            return HlsQualitySelectionState(sourceUrl = normalizedUrl)
+            return PlayerQualitySelectionState(sourceUrl = normalizedUrl)
         }
 
         val playlistText = runCatching {
@@ -122,18 +122,18 @@ internal object HlsQualityResolver {
             }
         }.onFailure { error ->
             log.w(error) { "Failed to fetch HLS master playlist for quality detection" }
-        }.getOrNull() ?: return HlsQualitySelectionState(
+        }.getOrNull() ?: return PlayerQualitySelectionState(
             sourceUrl = normalizedUrl,
             errorMessage = "Unable to inspect HLS quality variants.",
         )
 
         if (!playlistText.contains("#EXT-X-STREAM-INF", ignoreCase = true)) {
-            return HlsQualitySelectionState(sourceUrl = normalizedUrl)
+            return PlayerQualitySelectionState(sourceUrl = normalizedUrl)
         }
 
         val parsed = HlsMasterPlaylist.parse(normalizedUrl, playlistText)
         if (parsed.variants.isEmpty()) {
-            return HlsQualitySelectionState(sourceUrl = normalizedUrl)
+            return PlayerQualitySelectionState(sourceUrl = normalizedUrl)
         }
 
         val variants = parsed.variants.mapIndexedNotNull { index, variant ->
@@ -148,7 +148,7 @@ internal object HlsQualityResolver {
         }
 
         if (variants.isEmpty()) {
-            return HlsQualitySelectionState(
+            return PlayerQualitySelectionState(
                 sourceUrl = normalizedUrl,
                 errorMessage = "Unable to prepare HLS quality variants.",
             )
@@ -158,17 +158,17 @@ internal object HlsQualityResolver {
         log.i {
             "Detected HLS qualities count=${variants.size} recommended=${recommended?.displayLabel.orEmpty()} url=${redactUrl(normalizedUrl)}"
         }
-        return HlsQualitySelectionState(
+        return PlayerQualitySelectionState(
             sourceUrl = normalizedUrl,
             variants = variants,
             recommendedVariantId = recommended?.id,
         )
     }
 
-    private fun chooseRecommendedVariant(variants: List<HlsQualityVariant>): HlsQualityVariant? {
+    private fun chooseRecommendedVariant(variants: List<PlayerQualityVariant>): PlayerQualityVariant? {
         val compatible = variants.filter { it.isLikelyHardwareDecodable }
         val pool = compatible.ifEmpty { variants }
-        return pool.maxWithOrNull(compareBy<HlsQualityVariant> { it.sortHeight }.thenBy { it.bandwidth ?: 0L })
+        return pool.maxWithOrNull(compareBy<PlayerQualityVariant> { it.sortHeight }.thenBy { it.bandwidth ?: 0L })
     }
 }
 
@@ -283,7 +283,7 @@ private data class HlsVariant(
     val audioGroupId: String?,
     val absoluteUri: String,
 ) {
-    fun toUiVariant(index: Int, playbackUrl: String): HlsQualityVariant = HlsQualityVariant(
+    fun toUiVariant(index: Int, playbackUrl: String): PlayerQualityVariant = PlayerQualityVariant(
         id = id.ifBlank { "q$index" },
         name = name,
         width = width,
@@ -303,7 +303,7 @@ private fun looksLikeHlsPlaylist(url: String): Boolean {
     return path.endsWith(".m3u8") || url.contains(".m3u8", ignoreCase = true)
 }
 
-internal fun hlsQualityNameForResolution(
+internal fun playerQualityNameForResolution(
     width: Int?,
     height: Int?,
     forButton: Boolean = false,
@@ -321,13 +321,13 @@ internal fun hlsQualityNameForResolution(
         h > 0 -> "${h}p"
         else -> "${w}w"
     }
-    return if (forButton) label.toHlsQualityButtonName() else label
+    return if (forButton) label.toPlayerQualityButtonName() else label
 }
 
-internal fun hlsQualityNameForHeight(height: Int?, forButton: Boolean = false): String? =
-    hlsQualityNameForResolution(width = null, height = height, forButton = forButton)
+internal fun playerQualityNameForHeight(height: Int?, forButton: Boolean = false): String? =
+    playerQualityNameForResolution(width = null, height = height, forButton = forButton)
 
-internal fun String.toHlsQualityButtonName(): String =
+internal fun String.toPlayerQualityButtonName(): String =
     if (equals("2160p", ignoreCase = true)) "4K UHD" else this
 
 private fun parseAttributes(attributeText: String): Map<String, String> {

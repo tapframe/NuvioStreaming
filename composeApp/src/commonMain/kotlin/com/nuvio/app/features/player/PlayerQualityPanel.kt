@@ -40,9 +40,9 @@ import nuvio.composeapp.generated.resources.action_close
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun PlayerHlsQualityPanel(
+internal fun PlayerQualityPanel(
     visible: Boolean,
-    state: HlsQualitySelectionState,
+    state: PlayerQualitySelectionState,
     selectedQualityId: String?,
     currentResolutionLabel: String? = null,
     onQualitySelected: (String?) -> Unit,
