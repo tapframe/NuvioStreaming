@@ -279,12 +279,8 @@ private fun PlayerScreenRuntime.RenderPlayerControls(displayedPositionMs: Long, 
             onSourcesClick = if (activeVideoId != null) { { openSourcesPanel() } } else null,
             onEpisodesClick = if (isSeries) { { openEpisodesPanel() } } else null,
             qualityLabel = hlsQualityControlLabel(),
-            onQualityClick = if (hlsQualityState.isLoading || hlsQualityState.hasSelectableQualities) {
-                {
-                    openQualityPanel()
-                }
-            } else {
-                null
+            onQualityClick = {
+                openQualityPanel()
             },
             onOpenInExternalPlayer = args.onOpenInExternalPlayer?.let { openExternal ->
                 {
@@ -424,16 +420,30 @@ private fun PlayerScreenRuntime.openQualityPanel() {
     controlsVisible = false
 }
 
-private fun PlayerScreenRuntime.hlsQualityControlLabel(): String? {
-    if (hlsQualityState.isLoading) return "Quality"
-    if (!hlsQualityState.hasSelectableQualities) return null
-    val label = hlsQualityState.labelFor(selectedHlsQualityId)
-    return if (selectedHlsQualityId == null && !label.isNullOrBlank()) {
-        "Auto $label"
-    } else {
-        label ?: "Quality"
+private fun PlayerScreenRuntime.hlsQualityControlLabel(): String {
+    if (hlsQualityState.isLoading) return playbackResolutionLabel(forButton = true) ?: "Quality"
+    val label = hlsQualityState.labelFor(selectedHlsQualityId, forButton = true)
+    if (!label.isNullOrBlank()) {
+        return if (selectedHlsQualityId == null && hlsQualityState.hasSelectableQualities) {
+            "Auto $label"
+        } else {
+            label
+        }
     }
+    return playbackResolutionLabel(forButton = true) ?: "Quality"
 }
+
+private fun PlayerScreenRuntime.currentQualityPanelResolutionLabel(): String? {
+    playbackResolutionLabel(forButton = false)?.let { return it }
+    return hlsQualityState.labelFor(selectedHlsQualityId, forButton = false)
+}
+
+private fun PlayerScreenRuntime.playbackResolutionLabel(forButton: Boolean): String? =
+    hlsQualityNameForResolution(
+        width = playbackSnapshot.videoWidth,
+        height = playbackSnapshot.videoHeight,
+        forButton = forButton,
+    )
 
 @Composable
 private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
@@ -512,6 +522,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
         showQualityPanel = showQualityPanel,
         hlsQualityState = hlsQualityState,
         selectedHlsQualityId = selectedHlsQualityId,
+        currentQualityLabel = currentQualityPanelResolutionLabel(),
         onHlsQualitySelected = { qualityId -> selectHlsQuality(qualityId) },
         onQualityPanelDismissed = {
             showQualityPanel = false

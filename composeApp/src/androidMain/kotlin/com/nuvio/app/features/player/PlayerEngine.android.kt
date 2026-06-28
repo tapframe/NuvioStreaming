@@ -978,6 +978,10 @@ private class NuvioLibmpvView(
             "time-pos" to MPV.mpvFormat.MPV_FORMAT_DOUBLE,
             "demuxer-cache-time" to MPV.mpvFormat.MPV_FORMAT_DOUBLE,
             "speed" to MPV.mpvFormat.MPV_FORMAT_DOUBLE,
+            "video-params/w" to MPV.mpvFormat.MPV_FORMAT_INT64,
+            "video-params/h" to MPV.mpvFormat.MPV_FORMAT_INT64,
+            "video-out-params/w" to MPV.mpvFormat.MPV_FORMAT_INT64,
+            "video-out-params/h" to MPV.mpvFormat.MPV_FORMAT_INT64,
             "track-list" to MPV.mpvFormat.MPV_FORMAT_NODE,
         )
         props.forEach { (name, format) -> mpv.observeProperty(name, format) }
@@ -1047,8 +1051,14 @@ private class NuvioLibmpvView(
             positionMs = positionMs,
             bufferedPositionMs = maxOf(positionMs, cachePositionMs),
             playbackSpeed = (mpv.getPropertyDouble("speed") ?: 1.0).toFloat(),
+            videoWidth = mpvVideoDimension("w"),
+            videoHeight = mpvVideoDimension("h"),
         )
     }
+
+    private fun mpvVideoDimension(axis: String): Int? =
+        (mpv.getPropertyInt("video-params/$axis") ?: mpv.getPropertyInt("video-out-params/$axis"))
+            ?.takeIf { it > 0 }
 
     fun shouldKeepScreenOn(): Boolean {
         val snapshot = snapshot()
@@ -1286,6 +1296,8 @@ private fun ExoPlayer.snapshot(): PlayerPlaybackSnapshot =
         positionMs = currentPosition.coerceAtLeast(0L),
         bufferedPositionMs = bufferedPosition.coerceAtLeast(0L),
         playbackSpeed = playbackParameters.speed,
+        videoWidth = videoSize.width.takeIf { it > 0 },
+        videoHeight = videoSize.height.takeIf { it > 0 },
     )
 
 private fun ExoPlayer.shouldKeepPlayerScreenOn(): Boolean =

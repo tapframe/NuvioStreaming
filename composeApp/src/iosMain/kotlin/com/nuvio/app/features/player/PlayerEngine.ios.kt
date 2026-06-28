@@ -297,6 +297,8 @@ actual fun PlatformPlayerSurface(
                 positionMs = bridge.getPositionMs(),
                 bufferedPositionMs = bridge.getBufferedMs(),
                 playbackSpeed = bridge.getPlaybackSpeed(),
+                videoWidth = bridge.getVideoWidth().takeIf { it > 0 },
+                videoHeight = bridge.getVideoHeight().takeIf { it > 0 },
             )
             latestOnSnapshot.value(snapshot)
             val errorMessage = bridge.getErrorMessage().ifBlank { null }

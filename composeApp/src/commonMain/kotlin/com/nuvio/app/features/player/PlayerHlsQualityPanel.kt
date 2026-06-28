@@ -44,6 +44,7 @@ internal fun PlayerHlsQualityPanel(
     visible: Boolean,
     state: HlsQualitySelectionState,
     selectedQualityId: String?,
+    currentResolutionLabel: String? = null,
     onQualitySelected: (String?) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -124,15 +125,27 @@ internal fun PlayerHlsQualityPanel(
                             }
 
                             !state.hasSelectableQualities -> {
-                                Box(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = tokens.spacing.sheetPadding)
                                         .padding(bottom = tokens.spacing.sheetPadding),
-                                    contentAlignment = Alignment.CenterStart,
+                                    verticalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s10),
                                 ) {
+                                    val currentQualityTitle = currentResolutionLabel
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?: "Current quality"
+                                    QualityOptionRow(
+                                        title = currentQualityTitle,
+                                        subtitle = "Currently playing",
+                                        isSelected = true,
+                                        hasWarning = false,
+                                        enabled = false,
+                                        onClick = {},
+                                    )
                                     Text(
-                                        text = state.errorMessage ?: "No selectable HLS qualities found for this stream.",
+                                        text = state.errorMessage
+                                            ?: "This stream does not expose selectable quality variants.",
                                         color = tokens.colors.textMuted,
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
@@ -184,6 +197,7 @@ private fun QualityOptionRow(
     subtitle: String,
     isSelected: Boolean,
     hasWarning: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -198,7 +212,7 @@ private fun QualityOptionRow(
                 if (isSelected) tokens.colors.borderSelected else tokens.colors.borderSubtle,
                 tokens.shapes.compactCard,
             )
-            .clickable(onClick = onClick)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = NuvioTokens.Space.s14, vertical = NuvioTokens.Space.s12),
         verticalAlignment = Alignment.CenterVertically,
     ) {

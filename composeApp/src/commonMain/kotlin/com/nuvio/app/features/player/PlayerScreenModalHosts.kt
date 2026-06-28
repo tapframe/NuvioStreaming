@@ -57,6 +57,7 @@ internal fun PlayerScreenModalHosts(
     showQualityPanel: Boolean,
     hlsQualityState: HlsQualitySelectionState,
     selectedHlsQualityId: String?,
+    currentQualityLabel: String?,
     onHlsQualitySelected: (String?) -> Unit,
     onQualityPanelDismissed: () -> Unit,
     onSourceFilterSelected: (String?) -> Unit,
@@ -174,6 +175,7 @@ internal fun PlayerScreenModalHosts(
         visible = showQualityPanel,
         state = hlsQualityState,
         selectedQualityId = selectedHlsQualityId,
+        currentResolutionLabel = currentQualityLabel,
         onQualitySelected = onHlsQualitySelected,
         onDismiss = onQualityPanelDismissed,
     )

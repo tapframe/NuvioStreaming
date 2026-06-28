@@ -584,9 +584,9 @@ private fun ProgressControls(
                             onClick = onEpisodesClick,
                         )
                     }
-                    if (onQualityClick != null && !qualityLabel.isNullOrBlank()) {
+                    if (onQualityClick != null) {
                         PlayerActionPillButton(
-                            label = qualityLabel,
+                            label = qualityLabel?.takeIf { it.isNotBlank() } ?: "Quality",
                             onClick = onQualityClick,
                         )
                     }

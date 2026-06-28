@@ -42,6 +42,9 @@ data class HlsQualityVariant(
             else -> "Unknown"
         }
 
+    val buttonQualityName: String
+        get() = qualityName.toHlsQualityButtonName()
+
     private val codecLabel: String
         get() = when {
             isAv1 -> "AV1"
@@ -84,14 +87,18 @@ data class HlsQualitySelectionState(
         return selected?.playbackUrl ?: sourceUrl.takeIf { it.isNotBlank() }
     }
 
-    fun labelFor(selectedVariantId: String?): String? {
+    fun labelFor(selectedVariantId: String?, forButton: Boolean = false): String? {
         val selected = when {
             selectedVariantId.isNullOrBlank() || selectedVariantId == HlsQualityAutoId -> {
                 variants.firstOrNull { it.id == recommendedVariantId }
             }
             else -> variants.firstOrNull { it.id == selectedVariantId }
         }
-        return selected?.qualityName
+        return if (forButton) {
+            selected?.buttonQualityName
+        } else {
+            selected?.qualityName
+        }
     }
 }
 
@@ -295,6 +302,33 @@ private fun looksLikeHlsPlaylist(url: String): Boolean {
     val path = url.substringBefore('?').substringBefore('#').lowercase()
     return path.endsWith(".m3u8") || url.contains(".m3u8", ignoreCase = true)
 }
+
+internal fun hlsQualityNameForResolution(
+    width: Int?,
+    height: Int?,
+    forButton: Boolean = false,
+): String? {
+    val w = width?.takeIf { it > 0 } ?: 0
+    val h = height?.takeIf { it > 0 } ?: 0
+    if (w <= 0 && h <= 0) return null
+    val label = when {
+        w >= 3840 || h >= 2160 -> "2160p"
+        w >= 2560 || h >= 1440 -> "1440p"
+        w >= 1920 || h >= 1080 -> "1080p"
+        w >= 1280 || h >= 720 -> "720p"
+        w >= 854 || h >= 480 -> "480p"
+        w >= 640 || h >= 360 -> "360p"
+        h > 0 -> "${h}p"
+        else -> "${w}w"
+    }
+    return if (forButton) label.toHlsQualityButtonName() else label
+}
+
+internal fun hlsQualityNameForHeight(height: Int?, forButton: Boolean = false): String? =
+    hlsQualityNameForResolution(width = null, height = height, forButton = forButton)
+
+internal fun String.toHlsQualityButtonName(): String =
+    if (equals("2160p", ignoreCase = true)) "4K UHD" else this
 
 private fun parseAttributes(attributeText: String): Map<String, String> {
     val attributes = linkedMapOf<String, String>()
