@@ -110,7 +110,10 @@ internal object IosWebViewSolver : WebViewSolver {
                         ?: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
                 )
             }
-            deferred.await().also { cachedUserAgent = it }
+            val userAgent = deferred.await()
+            // Keep the WebView reference alive during suspension by referencing it here
+            log.d { "Captured User-Agent using WebView. WebView description: ${webView.description}" }
+            userAgent.also { cachedUserAgent = it }
         }
     }
 
