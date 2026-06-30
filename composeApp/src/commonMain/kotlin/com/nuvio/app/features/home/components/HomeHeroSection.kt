@@ -474,7 +474,7 @@ internal fun homeHeroLayout(
             contentMaxWidth = 480.dp,
             contentWidthFraction = 1f,
             contentHorizontalPadding = 24.dp,
-            contentVerticalPadding = 16.dp,
+            contentVerticalPadding = 0.dp,
             bottomFadeHeight = 220.dp,
             logoWidthFraction = 0.62f,
         )
@@ -489,14 +489,27 @@ private fun mobileHeroHeight(
     val widthFallbackHeight = (maxWidthDp * 1.16f).dp
     val baseHeight = viewportDrivenHeight ?: widthFallbackHeight
 
-    val cappedHeight = if (viewportHeightDp != null && mobileBelowSectionHeightHintDp != null) {
-        val maxAllowedFromViewport = (viewportHeightDp - mobileBelowSectionHeightHintDp).dp
+    val maxAllowedFromViewport = if (viewportHeightDp != null && mobileBelowSectionHeightHintDp != null) {
+        (viewportHeightDp - mobileBelowSectionHeightHintDp).dp
+    } else {
+        null
+    }
+    val cappedHeight = if (maxAllowedFromViewport != null) {
         baseHeight.coerceAtMost(maxAllowedFromViewport)
     } else {
         baseHeight
     }
 
-    return cappedHeight.coerceIn(MOBILE_HERO_MIN_HEIGHT_DP.dp, MOBILE_HERO_MAX_HEIGHT_DP.dp)
+    // The minimum height floor exists for readability of the hero itself, but it must never
+    // push the hero taller than the space the viewport actually has left below it — doing so
+    // would re-clip whatever section (e.g. Continue Watching) is reserved underneath.
+    val safeFlooredHeight = if (maxAllowedFromViewport != null && maxAllowedFromViewport >= cappedHeight) {
+        cappedHeight.coerceAtLeast(MOBILE_HERO_MIN_HEIGHT_DP.dp.coerceAtMost(maxAllowedFromViewport))
+    } else {
+        cappedHeight.coerceAtLeast(MOBILE_HERO_MIN_HEIGHT_DP.dp)
+    }
+
+    return safeFlooredHeight.coerceAtMost(MOBILE_HERO_MAX_HEIGHT_DP.dp)
 }
 
 @Composable
@@ -594,7 +607,7 @@ private fun resolveHeroTargetPage(
     widthPx: Float,
 ): Int {
     val thresholdPassed = abs(totalDx) > widthPx * HERO_SWIPE_THRESHOLD_FRACTION ||
-        abs(velocityX) > HERO_SWIPE_VELOCITY_THRESHOLD
+            abs(velocityX) > HERO_SWIPE_VELOCITY_THRESHOLD
     if (!thresholdPassed) return startPage
 
     val currentPage = startPage.coerceIn(0, itemCount - 1)
