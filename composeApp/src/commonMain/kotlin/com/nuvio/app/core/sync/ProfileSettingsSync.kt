@@ -89,9 +89,14 @@ object ProfileSettingsSync {
     suspend fun pull(profileId: Int): Boolean {
         ensureRepositoriesLoaded()
         return syncMutex.withLock {
+            if (ProfileRepository.activeProfileId != profileId) {
+                log.d { "pull(profileId=$profileId) — skipped because profile is no longer active" }
+                return@withLock false
+            }
             isServerSyncInFlight = true
             try {
                 val localBlob = exportSettingsBlob()
+                if (ProfileRepository.activeProfileId != profileId) return@withLock false
                 val localSignature = buildSignature(localBlob)
 
                 val params = buildJsonObject {
@@ -99,6 +104,7 @@ object ProfileSettingsSync {
                     put("p_platform", MOBILE_SYNC_PLATFORM)
                 }
                 val result = SupabaseProvider.client.postgrest.rpc("sync_pull_profile_settings_blob", params)
+                if (ProfileRepository.activeProfileId != profileId) return@withLock false
                 val response = result.decodeList<SettingsBlobResponse>().firstOrNull()
                 val remoteJson = response?.settingsJson
 
@@ -125,6 +131,7 @@ object ProfileSettingsSync {
                         return@withLock false
                     }
 
+                    if (ProfileRepository.activeProfileId != profileId) return@withLock false
                     applyRemoteBlob(remoteBlob)
                     skipNextPushSignature = currentObservedStateSignature()
                 } finally {
@@ -146,7 +153,10 @@ object ProfileSettingsSync {
         ensureRepositoriesLoaded()
         syncMutex.withLock {
             runCatching {
-                pushToRemoteLocked(ProfileRepository.activeProfileId, exportSettingsBlob())
+                val profileId = ProfileRepository.activeProfileId
+                val blob = exportSettingsBlob()
+                if (ProfileRepository.activeProfileId != profileId) return@runCatching
+                pushToRemoteLocked(profileId, blob)
             }.onFailure { error ->
                 log.e(error) { "pushCurrentProfileToRemote() — FAILED" }
             }

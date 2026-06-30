@@ -111,7 +111,7 @@ fun DetailFloatingHeader(
                         .padding(horizontal = 10.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    if (meta.logo != null && !logoLoadError) {
+                    if (!meta.logo.isNullOrBlank() && !logoLoadError) {
                         AsyncImage(
                             model = meta.logo,
                             contentDescription = stringResource(Res.string.detail_logo_content_description, meta.name),

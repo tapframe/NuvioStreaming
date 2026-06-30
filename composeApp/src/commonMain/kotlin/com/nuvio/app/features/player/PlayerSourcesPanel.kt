@@ -15,11 +15,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,19 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.debrid.DebridSettingsRepository
-import com.nuvio.app.features.streams.StreamBadge
-import com.nuvio.app.features.streams.StreamBadgeImage
-import com.nuvio.app.features.streams.StreamBadgePlacement
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
-import com.nuvio.app.features.streams.StreamFileSizeBadge
+import com.nuvio.app.features.streams.StreamCard
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.streams.isSelectableForPlayback
@@ -224,12 +215,16 @@ fun PlayerSourcesPanel(
                                             currentUrl = currentStreamUrl,
                                             currentName = currentStreamName,
                                         )
-                                        SourceStreamRow(
+                                        StreamCard(
                                             stream = stream,
-                                            isCurrent = isCurrent,
                                             enabled = stream.isSelectableForPlayback(debridSettings.canResolvePlayableLinks),
+                                            appendInstantServiceToDefaultName = debridSettings.canResolvePlayableLinks &&
+                                                !debridSettings.hasCustomStreamFormatting,
                                             showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                                            showAddonLogo = streamBadgeSettings.showAddonLogo,
                                             badgePlacement = streamBadgeSettings.badgePlacement,
+                                            isCurrent = isCurrent,
+                                            currentLabel = stringResource(Res.string.compose_player_playing),
                                             onClick = { onStreamSelected(stream) },
                                         )
                                     }
@@ -240,150 +235,6 @@ fun PlayerSourcesPanel(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun SourceStreamRow(
-    stream: StreamItem,
-    isCurrent: Boolean,
-    enabled: Boolean,
-    showFileSizeBadges: Boolean,
-    badgePlacement: StreamBadgePlacement,
-    onClick: () -> Unit,
-) {
-    val tokens = MaterialTheme.nuvio
-    val cardShape = tokens.shapes.compactCard
-    val badgeImages = stream.badges.filter { it.imageURL.isNotBlank() }
-    val hasBadgeMetadata = badgeImages.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints.videoSize != null)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = NuvioTokens.Space.s64 + NuvioTokens.Space.s4)
-            .shadow(
-                elevation = tokens.elevation.raised,
-                shape = cardShape,
-                ambientColor = tokens.colors.overlayScrim.copy(alpha = tokens.opacity.subtle),
-                spotColor = tokens.colors.overlayScrim.copy(alpha = tokens.opacity.subtle),
-            )
-            .clip(cardShape)
-            .background(
-                if (isCurrent) tokens.colors.overlaySelected else tokens.colors.surfaceCard,
-            )
-            .then(
-                if (isCurrent) {
-                    Modifier.border(tokens.borders.thin, tokens.colors.borderSelected, cardShape)
-                } else {
-                    Modifier
-                },
-            )
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(tokens.spacing.cardPaddingCompact),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            if (hasBadgeMetadata && badgePlacement == StreamBadgePlacement.TOP) {
-                SourceStreamBadgeRow(
-                    badgeImages = badgeImages,
-                    stream = stream,
-                    showFileSizeBadges = showFileSizeBadges,
-                )
-                Spacer(modifier = Modifier.height(NuvioTokens.Space.s6))
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
-            ) {
-                Text(
-                    text = stream.streamLabel,
-                    color = tokens.colors.textPrimary,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = NuvioTokens.LetterSpacing.none,
-                    ),
-                    modifier = Modifier.weight(1f),
-                )
-                if (isCurrent) {
-                    Box(
-                        modifier = Modifier
-                            .clip(tokens.shapes.chip)
-                            .background(tokens.colors.accent)
-                            .padding(horizontal = NuvioTokens.Space.s8, vertical = NuvioTokens.Space.s3),
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.compose_player_playing),
-                            color = tokens.colors.onAccent,
-                            fontSize = NuvioTokens.Type.labelXs,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
-
-            val subtitle = stream.streamSubtitle
-            if (!subtitle.isNullOrBlank() && subtitle != stream.streamLabel) {
-                Spacer(modifier = Modifier.height(NuvioTokens.Space.s2))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tokens.colors.textSecondary,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(NuvioTokens.Space.s6))
-            if (badgePlacement == StreamBadgePlacement.BOTTOM) {
-                SourceStreamBadgeRow(
-                    badgeImages = badgeImages,
-                    stream = stream,
-                    showFileSizeBadges = showFileSizeBadges,
-                ) {
-                    Text(
-                        text = stream.addonName,
-                        modifier = if (hasBadgeMetadata) Modifier.padding(start = NuvioTokens.Space.s4) else Modifier,
-                        color = tokens.colors.textMuted,
-                        fontSize = NuvioTokens.Type.labelXs,
-                        fontStyle = FontStyle.Italic,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            } else {
-                Text(
-                    text = stream.addonName,
-                    color = tokens.colors.textMuted,
-                    fontSize = NuvioTokens.Type.labelXs,
-                    fontStyle = FontStyle.Italic,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SourceStreamBadgeRow(
-    badgeImages: List<StreamBadge>,
-    stream: StreamItem,
-    showFileSizeBadges: Boolean,
-    modifier: Modifier = Modifier,
-    trailingContent: @Composable RowScope.() -> Unit = {},
-) {
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s4),
-    ) {
-        badgeImages.forEach { badge ->
-            StreamBadgeImage(badge = badge)
-        }
-        if (showFileSizeBadges) {
-            StreamFileSizeBadge(stream = stream)
-        }
-        trailingContent()
     }
 }
 

@@ -19,9 +19,11 @@ import kotlinx.serialization.json.JsonElement
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.collections_import_error_collection_blank_id
 import nuvio.composeapp.generated.resources.collections_import_error_collection_blank_title
+import nuvio.composeapp.generated.resources.collections_import_error_collection_duplicate_id
 import nuvio.composeapp.generated.resources.collections_import_error_empty_json
 import nuvio.composeapp.generated.resources.collections_import_error_folder_blank_id
 import nuvio.composeapp.generated.resources.collections_import_error_folder_blank_title
+import nuvio.composeapp.generated.resources.collections_import_error_folder_duplicate_id
 import nuvio.composeapp.generated.resources.collections_import_error_invalid_json
 import nuvio.composeapp.generated.resources.collections_import_error_source_blank_fields
 import nuvio.composeapp.generated.resources.collections_import_error_trakt_list_id
@@ -128,6 +130,10 @@ object CollectionRepository {
 
     fun importFromJson(jsonString: String): Result<List<Collection>> {
         return runCatching {
+            val validation = validateJson(jsonString)
+            if (!validation.valid) {
+                throw IllegalArgumentException(validation.error.orEmpty())
+            }
             rawCollectionsJson = json.parseToJsonElement(jsonString)
             val imported = json.decodeFromString<List<Collection>>(jsonString)
             _collections.value = CollectionMobileSettingsRepository.applyToCollections(imported)
@@ -145,87 +151,13 @@ object CollectionRepository {
         }
         return try {
             val collections = json.decodeFromString<List<Collection>>(jsonString)
-            var totalFolders = 0
-            collections.forEachIndexed { ci, c ->
-                if (c.id.isBlank()) {
-                    return ValidationResult(
-                        valid = false,
-                        error = runBlocking {
-                            getString(Res.string.collections_import_error_collection_blank_id, ci + 1)
-                        },
-                    )
-                }
-                if (c.title.isBlank()) {
-                    return ValidationResult(
-                        valid = false,
-                        error = runBlocking {
-                            getString(Res.string.collections_import_error_collection_blank_title, c.id)
-                        },
-                    )
-                }
-                c.folders.forEachIndexed { fi, f ->
-                    if (f.id.isBlank()) {
-                        return ValidationResult(
-                            valid = false,
-                            error = runBlocking {
-                                getString(
-                                    Res.string.collections_import_error_folder_blank_id,
-                                    fi + 1,
-                                    c.title,
-                                )
-                            },
-                        )
-                    }
-                    if (f.title.isBlank()) {
-                        return ValidationResult(
-                            valid = false,
-                            error = runBlocking {
-                                getString(
-                                    Res.string.collections_import_error_folder_blank_title,
-                                    f.id,
-                                    c.title,
-                                )
-                            },
-                        )
-                    }
-                    f.resolvedSources.forEachIndexed { si, s ->
-                        if (s.hasInvalidTraktListId()) {
-                            return ValidationResult(
-                                valid = false,
-                                error = runBlocking {
-                                    getString(
-                                        Res.string.collections_import_error_trakt_list_id,
-                                        si + 1,
-                                        f.title,
-                                    )
-                                },
-                            )
-                        }
-
-                        val invalidAddon = !s.isTmdb && !s.isTrakt &&
-                            (s.addonId.isNullOrBlank() || s.type.isNullOrBlank() || s.catalogId.isNullOrBlank())
-                        val invalidTmdb = s.isTmdb &&
-                            s.tmdbSourceType.isNullOrBlank()
-                        if (invalidAddon || invalidTmdb) {
-                            return ValidationResult(
-                                valid = false,
-                                error = runBlocking {
-                                    getString(
-                                        Res.string.collections_import_error_source_blank_fields,
-                                        si + 1,
-                                        f.title,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                    totalFolders++
-                }
+            validateImportModel(collections)?.let { error ->
+                return ValidationResult(valid = false, error = error.localizedMessage())
             }
             ValidationResult(
                 valid = true,
                 collectionCount = collections.size,
-                folderCount = totalFolders,
+                folderCount = collections.sumOf { it.folders.size },
             )
         } catch (e: Exception) {
             ValidationResult(
@@ -294,3 +226,78 @@ object CollectionRepository {
             rawCollectionsJson = it
         }
 }
+
+internal sealed interface CollectionImportModelError {
+    data class BlankCollectionId(val collectionIndex: Int) : CollectionImportModelError
+    data class DuplicateCollectionId(val collectionId: String) : CollectionImportModelError
+    data class BlankCollectionTitle(val collectionId: String) : CollectionImportModelError
+    data class BlankFolderId(val folderIndex: Int, val collectionTitle: String) : CollectionImportModelError
+    data class DuplicateFolderId(val folderId: String, val collectionTitle: String) : CollectionImportModelError
+    data class BlankFolderTitle(val folderId: String, val collectionTitle: String) : CollectionImportModelError
+    data class InvalidTraktListId(val sourceIndex: Int, val folderTitle: String) : CollectionImportModelError
+    data class BlankSourceFields(val sourceIndex: Int, val folderTitle: String) : CollectionImportModelError
+}
+
+internal fun validateImportModel(collections: List<Collection>): CollectionImportModelError? {
+    val collectionIds = mutableSetOf<String>()
+    collections.forEachIndexed { ci, c ->
+        if (c.id.isBlank()) {
+            return CollectionImportModelError.BlankCollectionId(ci + 1)
+        }
+        if (!collectionIds.add(c.id)) {
+            return CollectionImportModelError.DuplicateCollectionId(c.id)
+        }
+        if (c.title.isBlank()) {
+            return CollectionImportModelError.BlankCollectionTitle(c.id)
+        }
+
+        val folderIds = mutableSetOf<String>()
+        c.folders.forEachIndexed { fi, f ->
+            if (f.id.isBlank()) {
+                return CollectionImportModelError.BlankFolderId(fi + 1, c.title)
+            }
+            if (!folderIds.add(f.id)) {
+                return CollectionImportModelError.DuplicateFolderId(f.id, c.title)
+            }
+            if (f.title.isBlank()) {
+                return CollectionImportModelError.BlankFolderTitle(f.id, c.title)
+            }
+            f.resolvedSources.forEachIndexed { si, s ->
+                if (s.hasInvalidTraktListId()) {
+                    return CollectionImportModelError.InvalidTraktListId(si + 1, f.title)
+                }
+
+                val invalidAddon = !s.isTmdb && !s.isTrakt &&
+                    (s.addonId.isNullOrBlank() || s.type.isNullOrBlank() || s.catalogId.isNullOrBlank())
+                val invalidTmdb = s.isTmdb &&
+                    s.tmdbSourceType.isNullOrBlank()
+                if (invalidAddon || invalidTmdb) {
+                    return CollectionImportModelError.BlankSourceFields(si + 1, f.title)
+                }
+            }
+        }
+    }
+    return null
+}
+
+private fun CollectionImportModelError.localizedMessage(): String =
+    runBlocking {
+        when (this@localizedMessage) {
+            is CollectionImportModelError.BlankCollectionId ->
+                getString(Res.string.collections_import_error_collection_blank_id, collectionIndex)
+            is CollectionImportModelError.DuplicateCollectionId ->
+                getString(Res.string.collections_import_error_collection_duplicate_id, collectionId)
+            is CollectionImportModelError.BlankCollectionTitle ->
+                getString(Res.string.collections_import_error_collection_blank_title, collectionId)
+            is CollectionImportModelError.BlankFolderId ->
+                getString(Res.string.collections_import_error_folder_blank_id, folderIndex, collectionTitle)
+            is CollectionImportModelError.DuplicateFolderId ->
+                getString(Res.string.collections_import_error_folder_duplicate_id, folderId, collectionTitle)
+            is CollectionImportModelError.BlankFolderTitle ->
+                getString(Res.string.collections_import_error_folder_blank_title, folderId, collectionTitle)
+            is CollectionImportModelError.InvalidTraktListId ->
+                getString(Res.string.collections_import_error_trakt_list_id, sourceIndex, folderTitle)
+            is CollectionImportModelError.BlankSourceFields ->
+                getString(Res.string.collections_import_error_source_blank_fields, sourceIndex, folderTitle)
+        }
+    }

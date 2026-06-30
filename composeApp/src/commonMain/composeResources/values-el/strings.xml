@@ -355,7 +355,7 @@
     <string name="settings_continue_watching_resume_prompt_title">Προτροπή συνέχισης κατά την εκκίνηση</string>
     <string name="settings_continue_watching_section_card_style">ΣΤΥΛ ΚΑΡΤΑΣ</string>
     <string name="settings_continue_watching_section_on_launch">ΚΑΤΑ ΤΗΝ ΕΚΚΙΝΗΣΗ</string>
-    <string name="settings_continue_watching_section_up_next_behavior">ΣΥΜΠΕΡΙΦΟΡΑ UP NEXT</string>
+    <string name="settings_continue_watching_section_up_next_behavior">ΣΥΜΠΕΡΙΦΟΡΑ ΕΠΟΜΕΝΟΥ</string>
     <string name="settings_continue_watching_section_visibility">ΟΡΑΤΟΤΗΤΑ</string>
     <string name="settings_continue_watching_show_description">Εμφάνιση της ενότητας Συνέχεια παρακολούθησης στην Αρχική οθόνη.</string>
     <string name="settings_continue_watching_show_title">Εμφάνιση συνέχειας παρακολούθησης</string>
@@ -363,8 +363,8 @@
     <string name="settings_continue_watching_style_poster_description">Κάρτα αφίσας με προτεραιότητα στο artwork</string>
     <string name="settings_continue_watching_style_wide">Πλατύ</string>
     <string name="settings_continue_watching_style_wide_description">Οριζόντια κάρτα με πλούσιες πληροφορίες</string>
-    <string name="settings_continue_watching_up_next_description">Όταν είναι ενεργοποιημένο, το Up Next συνεχίζει πάντα από το πιο απομακρυσμένο παρακολουθημένο επεισόδιο. Όταν είναι απενεργοποιημένο, ακολουθεί το πιο πρόσφατα παρακολουθηθέν επεισόδιο. Χρήσιμο αν ξαναβλέπετε παλαιότερα επεισόδια.</string>
-    <string name="settings_continue_watching_up_next_title">Up Next από το πιο απομακρυσμένο επεισόδιο</string>
+    <string name="settings_continue_watching_up_next_description">Εμφάνιση επόμενου επεισοδίου με βάση το πιο προχωρημένο προβληθέν επεισόδιο. Απενεργοποιήστε το για επαναπροβολές ώστε να χρησιμοποιείται το πιο πρόσφατα προβληθέν επεισόδιο.</string>
+    <string name="settings_continue_watching_up_next_title">Επόμενο από το πιο προχωρημένο επεισόδιο</string>
     <string name="settings_content_discovery_section_home">ΑΡΧΙΚΗ</string>
     <string name="settings_content_discovery_section_sources">ΠΗΓΕΣ</string>
     <string name="settings_content_discovery_addons_description">Εγκατάσταση, αφαίρεση, ανανέωση και ταξινόμηση των πηγών περιεχομένου σας.</string>

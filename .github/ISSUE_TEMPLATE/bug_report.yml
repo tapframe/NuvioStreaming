@@ -12,7 +12,8 @@ body:
         If we can reproduce it, we can usually fix it. Please describe the bug in enough detail that someone else can understand what failed without watching a video or guessing from the title.
         Please replace the default title with a short summary of the actual problem.
 
-        Vague reports such as "not working", "broken", or "same issue" may be labeled `needs-info` and closed if the missing details are not added.
+        Vague reports such as "not working", "broken", or "same issue" may be labeled `needs-info` and closed after 1 day if the missing details are not added.
+        Bug reports left open for more than 30 days may be closed as stale.
         If the app crashes or force closes, logs are required. Crash reports without logs will be closed.
 
   - type: markdown

@@ -508,7 +508,7 @@
     <string name="settings_appearance_app_language_sheet_title">Pilih Bahasa</string>
     <string name="settings_appearance_continue_watching_description">Pengaturan untuk bagian Lanjutkan Menonton.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
-    <string name="settings_appearance_liquid_glass_description">Gunakan tab bar iPhone asli di iOS 26 dan yang lebih baru. Pergantian profil instan dari tab bar tidak tersedia saat ini aktif.</string>
+    <string name="settings_appearance_liquid_glass_description">Gunakan tab bar iPhone asli di iOS 26 dan yang lebih baru.</string>
     <string name="settings_appearance_poster_customization_description">Sesuaikan lebar kartu dan radius sudut.</string>
     <string name="settings_appearance_section_display">TAMPILAN</string>
     <string name="settings_appearance_section_home">BERANDA</string>

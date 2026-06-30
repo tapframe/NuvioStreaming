@@ -59,6 +59,7 @@ object WatchedRepository {
 
     private var hasLoaded = false
     private var currentProfileId: Int = 1
+    private var profileGeneration: Long = 0L
     private var itemsByKey: MutableMap<String, WatchedItem> = mutableMapOf()
     private var lastSuccessfulPushEpochMs: Long = 0L
     private var deltaCursorEventId: Long = 0L
@@ -78,6 +79,7 @@ object WatchedRepository {
     fun clearLocalState() {
         hasLoaded = false
         currentProfileId = 1
+        profileGeneration += 1L
         itemsByKey.clear()
         lastSuccessfulPushEpochMs = 0L
         deltaCursorEventId = 0L
@@ -87,6 +89,7 @@ object WatchedRepository {
 
     private fun loadFromDisk(profileId: Int) {
         currentProfileId = profileId
+        profileGeneration += 1L
         hasLoaded = true
         itemsByKey.clear()
 
@@ -111,10 +114,26 @@ object WatchedRepository {
         publish()
     }
 
+    private fun activeOperationGeneration(profileId: Int): Long? {
+        if (ProfileRepository.activeProfileId != profileId) return null
+        if (!hasLoaded || currentProfileId != profileId) {
+            loadFromDisk(profileId)
+        }
+        return profileGeneration
+    }
+
+    private fun isActiveOperation(profileId: Int, generation: Long): Boolean =
+        currentProfileId == profileId &&
+            profileGeneration == generation &&
+            ProfileRepository.activeProfileId == profileId
+
     suspend fun pullFromServer(profileId: Int) {
         TraktAuthRepository.ensureLoaded()
         TraktSettingsRepository.ensureLoaded()
-        currentProfileId = profileId
+        val operationGeneration = activeOperationGeneration(profileId) ?: run {
+            log.d { "Skipping watched pull for inactive profile $profileId" }
+            return
+        }
         val pullStartedEpochMs = WatchedClock.nowEpochMs()
         val localBeforePull = itemsByKey.values
             .map(WatchedItem::normalizedMarkedAt)
@@ -129,6 +148,7 @@ object WatchedRepository {
                     lastPushEpochMs = lastPushEpochMs,
                     pullStartedEpochMs = pullStartedEpochMs,
                     resetDeltaState = true,
+                    operationGeneration = operationGeneration,
                 )
             } else {
                 pullSupabaseDeltaFromServer(
@@ -136,6 +156,7 @@ object WatchedRepository {
                     localBeforePull = localBeforePull,
                     lastPushEpochMs = lastPushEpochMs,
                     pullStartedEpochMs = pullStartedEpochMs,
+                    operationGeneration = operationGeneration,
                 )
             }
         }.onFailure { e ->
@@ -150,11 +171,13 @@ object WatchedRepository {
         lastPushEpochMs: Long,
         pullStartedEpochMs: Long,
         resetDeltaState: Boolean,
+        operationGeneration: Long,
     ) {
         val serverItems = adapter.pull(
             profileId = profileId,
             pageSize = watchedItemsPageSize,
         )
+        if (!isActiveOperation(profileId, operationGeneration)) return
 
         itemsByKey = mergeWatchedItemsPreservingUnsynced(
             serverItems = serverItems,
@@ -176,7 +199,9 @@ object WatchedRepository {
         localBeforePull: List<WatchedItem>,
         lastPushEpochMs: Long,
         pullStartedEpochMs: Long,
+        operationGeneration: Long,
     ) {
+        if (!isActiveOperation(profileId, operationGeneration)) return
         if (!deltaInitialized) {
             val cursorBeforeSnapshot = syncAdapter.getDeltaCursor(profileId) ?: return
             pullFullFromAdapter(
@@ -186,7 +211,9 @@ object WatchedRepository {
                 lastPushEpochMs = lastPushEpochMs,
                 pullStartedEpochMs = pullStartedEpochMs,
                 resetDeltaState = false,
+                operationGeneration = operationGeneration,
             )
+            if (!isActiveOperation(profileId, operationGeneration)) return
             deltaCursorEventId = cursorBeforeSnapshot
             deltaInitialized = true
             persist()
@@ -202,6 +229,7 @@ object WatchedRepository {
                 sinceEventId = cursor,
                 limit = watchedItemsDeltaPageSize,
             )
+            if (!isActiveOperation(profileId, operationGeneration)) return
             if (events.isEmpty()) break
 
             applyWatchedDeltaEvents(
@@ -375,10 +403,10 @@ object WatchedRepository {
         items: Collection<WatchedItem>,
         traktHistorySync: WatchedTraktHistorySync,
     ) {
+        val profileId = currentProfileId
         syncScope.launch {
             runCatching {
                 if (items.isEmpty()) return@runCatching
-                val profileId = ProfileRepository.activeProfileId
                 val pushed = pushToActiveTargets(
                     profileId = profileId,
                     items = items,
@@ -394,10 +422,10 @@ object WatchedRepository {
     }
 
     private fun pushDeleteToServer(items: Collection<WatchedItem>) {
+        val profileId = currentProfileId
         syncScope.launch {
             runCatching {
                 if (items.isEmpty()) return@runCatching
-                val profileId = ProfileRepository.activeProfileId
                 deleteFromActiveTargets(profileId = profileId, items = items)
             }.onFailure { e ->
                 log.e(e) { "Failed to push watched item delete" }

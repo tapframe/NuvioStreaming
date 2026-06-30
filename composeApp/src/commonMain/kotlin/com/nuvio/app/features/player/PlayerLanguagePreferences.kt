@@ -84,6 +84,7 @@ import nuvio.composeapp.generated.resources.settings_playback_option_default
 import nuvio.composeapp.generated.resources.settings_playback_option_device_language
 import nuvio.composeapp.generated.resources.settings_playback_option_forced
 import nuvio.composeapp.generated.resources.settings_playback_option_none
+import nuvio.composeapp.generated.resources.settings_playback_option_original
 import nuvio.composeapp.generated.resources.subtitle_language_unknown
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
@@ -97,6 +98,7 @@ data class LanguagePreferenceOption(
 object AudioLanguageOption {
     const val DEFAULT = "default"
     const val DEVICE = "device"
+    const val ORIGINAL = "original"
 }
 
 object SubtitleLanguageOption {
@@ -463,6 +465,8 @@ fun languageLabelForCode(code: String?): String = when {
     code.equals(AudioLanguageOption.DEVICE, ignoreCase = true) ||
         code.equals(SubtitleLanguageOption.DEVICE, ignoreCase = true) ->
         stringResource(Res.string.settings_playback_option_device_language)
+    code.equals(AudioLanguageOption.ORIGINAL, ignoreCase = true) ->
+        stringResource(Res.string.settings_playback_option_original)
     else -> languageLabelResForCode(code)?.let { stringResource(it) }
         ?: stringResource(Res.string.subtitle_language_unknown)
 }
@@ -477,6 +481,8 @@ suspend fun getLanguageLabelForCode(code: String?): String = when {
     code.equals(AudioLanguageOption.DEVICE, ignoreCase = true) ||
         code.equals(SubtitleLanguageOption.DEVICE, ignoreCase = true) ->
         getString(Res.string.settings_playback_option_device_language)
+    code.equals(AudioLanguageOption.ORIGINAL, ignoreCase = true) ->
+        getString(Res.string.settings_playback_option_original)
     else -> languageLabelResForCode(code)?.let { getString(it) }
         ?: getString(Res.string.subtitle_language_unknown)
 }
@@ -485,6 +491,7 @@ fun resolvePreferredAudioLanguageTargets(
     preferredAudioLanguage: String,
     secondaryPreferredAudioLanguage: String?,
     deviceLanguages: List<String>,
+    contentOriginalLanguage: String? = null,
 ): List<String> {
     fun normalize(language: String?): String? {
         val normalized = normalizeLanguageCode(language)
@@ -495,6 +502,7 @@ fun resolvePreferredAudioLanguageTargets(
             SubtitleLanguageOption.NONE,
             SubtitleLanguageOption.FORCED,
             -> null
+            AudioLanguageOption.ORIGINAL -> contentOriginalLanguage?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
             else -> normalized
         }
     }
@@ -510,6 +518,21 @@ fun resolvePreferredAudioLanguageTargets(
             deviceLanguages.mapNotNull(::normalize)
                 + listOfNotNull(normalize(secondaryPreferredAudioLanguage))
             ).distinct()
+
+        AudioLanguageOption.ORIGINAL -> {
+            val originalLang = contentOriginalLanguage?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+            if (originalLang != null) {
+                listOfNotNull(
+                    originalLang,
+                    normalize(secondaryPreferredAudioLanguage),
+                ).distinct()
+            } else {
+                // Fallback to device languages when original language is unknown
+                (deviceLanguages.mapNotNull(::normalize)
+                    + listOfNotNull(normalize(secondaryPreferredAudioLanguage))
+                ).distinct()
+            }
+        }
 
         else -> listOfNotNull(
             normalize(preferredAudioLanguage),
@@ -575,3 +598,51 @@ fun inferForcedSubtitleTrack(
     if ("forced" in text) return true
     return text.contains("songs") && text.contains("sign")
 }
+
+/**
+ * Best-effort mapping from country name/code to ISO 639-1 primary language.
+ * Used as a fallback when [resolveContentLanguage] has no explicit language field.
+ */
+fun countryToLanguageCode(country: String?): String? {
+    val normalized = country?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return null
+    return COUNTRY_TO_LANGUAGE_MAP[normalized]
+}
+
+/**
+ * Resolves the original content language as an ISO 639-1 code.
+ * Falls back to country-based inference when the explicit language field is absent.
+ */
+fun resolveContentLanguage(language: String?, country: String?): String? {
+    normalizeLanguageCode(language)?.let { return it }
+    countryToLanguageCode(country)?.let { return it }
+    return null
+}
+
+private val COUNTRY_TO_LANGUAGE_MAP = mapOf(
+    // ISO 3166-1 alpha-2
+    "jp" to "ja", "kr" to "ko", "cn" to "zh", "tw" to "zh",
+    "fr" to "fr", "de" to "de", "it" to "it", "es" to "es",
+    "pt" to "pt", "br" to "pt", "ru" to "ru", "in" to "hi",
+    "tr" to "tr", "pl" to "pl", "nl" to "nl", "se" to "sv",
+    "no" to "no", "dk" to "da", "fi" to "fi", "th" to "th",
+    "il" to "he", "cz" to "cs", "ro" to "ro", "hu" to "hu",
+    "ua" to "uk", "gr" to "el",
+    // ISO 3166-1 alpha-3
+    "jpn" to "ja", "kor" to "ko", "chn" to "zh", "twn" to "zh",
+    "fra" to "fr", "deu" to "de", "ita" to "it", "esp" to "es",
+    "prt" to "pt", "bra" to "pt", "rus" to "ru", "ind" to "hi",
+    "tur" to "tr", "pol" to "pl", "nld" to "nl", "swe" to "sv",
+    "nor" to "no", "dnk" to "da", "fin" to "fi", "tha" to "th",
+    "isr" to "he", "cze" to "cs", "rou" to "ro", "hun" to "hu",
+    "ukr" to "uk", "grc" to "el",
+    // Common full names
+    "japan" to "ja", "south korea" to "ko", "korea" to "ko",
+    "china" to "zh", "taiwan" to "zh", "france" to "fr",
+    "germany" to "de", "italy" to "it", "spain" to "es",
+    "portugal" to "pt", "brazil" to "pt", "russia" to "ru",
+    "india" to "hi", "turkey" to "tr", "poland" to "pl",
+    "netherlands" to "nl", "sweden" to "sv", "norway" to "no",
+    "denmark" to "da", "finland" to "fi", "thailand" to "th",
+    "israel" to "he", "romania" to "ro", "hungary" to "hu",
+    "ukraine" to "uk", "greece" to "el",
+)

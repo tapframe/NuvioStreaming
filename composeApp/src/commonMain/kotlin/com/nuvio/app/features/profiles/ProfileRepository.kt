@@ -120,7 +120,7 @@ object ProfileRepository {
             }
             return
         }
-        runCatching {
+        try {
             val result = SupabaseProvider.client.postgrest.rpc("sync_pull_profiles")
             val profiles = result.decodeList<NuvioProfile>()
             _state.value = _state.value.copy(
@@ -133,7 +133,8 @@ object ProfileRepository {
                 activeProfileIndex = _state.value.activeProfile!!.profileIndex
             }
             persist()
-        }.onFailure { e ->
+        } catch (e: Throwable) {
+            if (AuthRepository.signOutIfSessionInvalid(e, "Profile pull")) return
             log.e(e) { "Failed to pull profiles" }
             if (!_state.value.isLoaded) {
                 _state.value = _state.value.copy(isLoaded = true)
@@ -151,6 +152,7 @@ object ProfileRepository {
         persist()
         WatchedRepository.onProfileChanged(profileIndex)
         TraktSettingsRepository.onProfileChanged()
+        TraktAuthRepository.onProfileChanged()
         LibraryRepository.onProfileChanged(profileIndex)
         WatchProgressRepository.onProfileChanged(profileIndex)
         AddonRepository.onProfileChanged(profileIndex)
@@ -166,10 +168,10 @@ object ProfileRepository {
         HomeRepository.clear()
         MetaScreenSettingsRepository.onProfileChanged()
         ContinueWatchingPreferencesRepository.onProfileChanged()
+        com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache.onProfileChanged()
         EpisodeReleaseNotificationsRepository.onProfileChanged()
         TmdbSettingsRepository.onProfileChanged()
         MdbListSettingsRepository.onProfileChanged()
-        TraktAuthRepository.onProfileChanged()
         SearchHistoryRepository.onProfileChanged()
         CollectionRepository.onProfileChanged()
         CollectionMobileSettingsRepository.onProfileChanged()
@@ -181,13 +183,15 @@ object ProfileRepository {
             applyPayloadsLocally(profiles)
             return
         }
-        runCatching {
+        try {
             val params = buildJsonObject {
+                put("p_client_max_profiles", MAX_PROFILES)
                 put("p_profiles", json.encodeToJsonElement(profiles))
             }
             SupabaseProvider.client.postgrest.rpc("sync_push_profiles", params)
             pullProfiles()
-        }.onFailure { e ->
+        } catch (e: Throwable) {
+            if (AuthRepository.signOutIfSessionInvalid(e, "Profile push")) return
             log.e(e) { "Failed to push profiles" }
         }
     }
@@ -200,7 +204,7 @@ object ProfileRepository {
         usesPrimaryAddons: Boolean = false,
     ) {
         val existing = _state.value.profiles
-        val nextIndex = ((1..4).toSet() - existing.map { it.profileIndex }.toSet()).minOrNull() ?: return
+        val nextIndex = ((1..MAX_PROFILES).toSet() - existing.map { it.profileIndex }.toSet()).minOrNull() ?: return
 
         val allPayloads = existing.map { profile ->
             ProfilePushPayload(
@@ -272,11 +276,12 @@ object ProfileRepository {
             persist()
             return
         }
-        runCatching {
+        try {
             val params = buildJsonObject { put("p_profile_id", profileIndex) }
             SupabaseProvider.client.postgrest.rpc("sync_delete_profile_data", params)
             pullProfiles()
-        }.onFailure { e ->
+        } catch (e: Throwable) {
+            if (AuthRepository.signOutIfSessionInvalid(e, "Profile delete")) return
             log.e(e) { "Failed to delete profile $profileIndex" }
         }
     }
@@ -474,7 +479,7 @@ object ProfileRepository {
 
     private fun syncPinCache(profiles: List<NuvioProfile>) {
         val profilesByIndex = profiles.associateBy { it.profileIndex }
-        for (profileIndex in 1..4) {
+        for (profileIndex in 1..MAX_PROFILES) {
             val profile = profilesByIndex[profileIndex]
             if (profile == null || !profile.pinEnabled) {
                 ProfilePinCacheStorage.removePayload(profileIndex)

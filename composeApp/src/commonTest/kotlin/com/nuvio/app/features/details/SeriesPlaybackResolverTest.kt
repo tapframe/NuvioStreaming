@@ -37,7 +37,7 @@ class SeriesPlaybackResolverTest {
         )
 
         assertNotNull(action)
-        assertEquals("Up Next • S1E3", action.label)
+        assertEquals("Next Up • S1E3", action.label)
         assertEquals("show:1:3", action.videoId)
         assertEquals(1, action.seasonNumber)
         assertEquals(3, action.episodeNumber)
@@ -86,7 +86,7 @@ class SeriesPlaybackResolverTest {
         )
 
         assertNotNull(action)
-        assertEquals("Up Next • S1E3", action.label)
+        assertEquals("Next Up • S1E3", action.label)
         assertEquals("show:1:3", action.videoId)
     }
 
@@ -124,7 +124,7 @@ class SeriesPlaybackResolverTest {
         )
 
         assertNotNull(action)
-        assertEquals("Up Next • S4E15", action.label)
+        assertEquals("Next Up • S4E15", action.label)
         assertEquals("tmdb:98765:4:15", action.videoId)
         assertEquals(4, action.seasonNumber)
         assertEquals(15, action.episodeNumber)

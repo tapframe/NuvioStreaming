@@ -32,7 +32,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -79,6 +81,10 @@ fun DetailHero(
         val heroChromeTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
             8.dp +
             ((40.dp - muteIconSize) / 2)
+        var logoLoadError by remember(meta.id, meta.logo) {
+            mutableStateOf(false)
+        }
+        val logoUrl = meta.logo?.takeIf { it.isNotBlank() }
 
         Box(
             modifier = Modifier
@@ -178,14 +184,18 @@ fun DetailHero(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(260.dp)
+                        .height(if (isTablet) 360.dp else 320.dp)
                         .align(Alignment.BottomCenter)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    MaterialTheme.colorScheme.background.copy(alpha = 0.7f),
-                                    MaterialTheme.colorScheme.background,
+                                colorStops = arrayOf(
+                                    0.00f to Color.Transparent,
+                                    0.16f to MaterialTheme.colorScheme.background.copy(alpha = 0.04f),
+                                    0.32f to MaterialTheme.colorScheme.background.copy(alpha = 0.14f),
+                                    0.50f to MaterialTheme.colorScheme.background.copy(alpha = 0.34f),
+                                    0.68f to MaterialTheme.colorScheme.background.copy(alpha = 0.62f),
+                                    0.84f to MaterialTheme.colorScheme.background.copy(alpha = 0.84f),
+                                    1.00f to MaterialTheme.colorScheme.background,
                                 ),
                             ),
                         ),
@@ -198,9 +208,9 @@ fun DetailHero(
                         .padding(bottom = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (meta.logo != null) {
+                    if (logoUrl != null && !logoLoadError) {
                         AsyncImage(
-                            model = meta.logo,
+                            model = logoUrl,
                             contentDescription = stringResource(Res.string.detail_logo_content_description, meta.name),
                             modifier = Modifier
                                 .fillMaxWidth(if (isTablet) 0.56f else 0.6f)
@@ -208,6 +218,7 @@ fun DetailHero(
                                 .height(if (isTablet) 72.dp else 80.dp),
                             alignment = Alignment.Center,
                             contentScale = ContentScale.Fit,
+                            onError = { logoLoadError = true },
                         )
                     } else {
                         Text(

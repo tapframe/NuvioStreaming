@@ -3,11 +3,13 @@ package com.nuvio.app.features.home
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
+import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.catalog.fetchCatalogPage
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.collection.CollectionSource
 import com.nuvio.app.features.collection.TmdbCollectionSourceResolver
+import com.nuvio.app.features.collection.catalogRouteKey
 import com.nuvio.app.features.collection.findCollectionCatalog
 import com.nuvio.app.features.trakt.TraktPublicListSourceResolver
 import com.nuvio.app.features.watchprogress.CurrentDateProvider
@@ -45,15 +47,15 @@ object HomeRepository {
         val activeAddons = addons.enabledAddons()
         val requests = buildHomeCatalogDefinitions(activeAddons)
         currentDefinitions = requests
-        val requestKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::key)
-        cachedSections = cachedSections.filterKeys(requestKeys::contains)
+        val requestCacheKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::cacheKey)
+        cachedSections = cachedSections.filterKeys(requestCacheKeys::contains)
         val requestKey = requests.joinToString(separator = "|") { request ->
-            "${request.manifestUrl}:${request.type}:${request.catalogId}"
+            request.cacheKey
         }
 
         if (!force && activeRequestKey == requestKey && _uiState.value.isLoading) return
 
-        if (!force && requestKey == lastRequestKey && requestKeys.all(cachedSections::containsKey)) {
+        if (!force && requestKey == lastRequestKey && requestCacheKeys.all(cachedSections::containsKey)) {
             if (_uiState.value.sections.isEmpty() || _uiState.value.heroItems.isEmpty()) {
                 applyCurrentSettings()
             }
@@ -88,7 +90,7 @@ object HomeRepository {
                 snapshot = HomeCatalogSettingsRepository.snapshot(),
             )
             val pendingRequests = prioritizedRequests.filter { definition ->
-                force || cachedSections[definition.key] == null
+                force || cachedSections[definition.cacheKey] == null
             }
             if (pendingRequests.isEmpty()) {
                 publishCurrentState(
@@ -106,16 +108,20 @@ object HomeRepository {
             pendingRequests.chunked(HOME_CATALOG_FETCH_BATCH_SIZE).forEach { batch ->
                 if (activeRequestKey != requestKey) return@launch
                 val results = batch.map { request ->
-                    async { runCatching { request.toSection() } }
+                    async { request to runCatching { request.toSection() } }
                 }.awaitAll()
 
                 if (activeRequestKey != requestKey) return@launch
 
-                results.mapNotNull { it.getOrNull() }.forEach { section ->
-                    loadedSections[section.key] = section
+                results.mapNotNull { (request, result) ->
+                    result.getOrNull()?.let { section -> request.cacheKey to section }
+                }.forEach { (cacheKey, section) ->
+                    loadedSections[cacheKey] = section
                 }
                 if (firstErrorMessage == null) {
-                    firstErrorMessage = results.firstNotNullOfOrNull { it.exceptionOrNull()?.message }
+                    firstErrorMessage = results.firstNotNullOfOrNull { (_, result) ->
+                        result.exceptionOrNull()?.message
+                    }
                 }
                 cachedSections = loadedSections.toMap()
                 lastErrorMessage = firstErrorMessage
@@ -188,7 +194,7 @@ object HomeRepository {
                 val preference = preferences[definition.key]
                 if (preference?.enabled == false) return@mapNotNull null
 
-                val section = cachedSections[definition.key]?.withReleaseFilter() ?: return@mapNotNull null
+                val section = cachedSections[definition.cacheKey]?.withReleaseFilter() ?: return@mapNotNull null
                 if (section.items.isEmpty()) return@mapNotNull null
                 val customTitle = preference?.customTitle.orEmpty()
                 section.copy(
@@ -200,7 +206,7 @@ object HomeRepository {
             val heroRandom = Random((requestKey?.hashCode() ?: 0).absoluteValue + 1)
             currentDefinitions
                 .filter { definition -> preferences[definition.key]?.heroSourceEnabled != false }
-                .mapNotNull { definition -> cachedSections[definition.key] }
+                .mapNotNull { definition -> cachedSections[definition.cacheKey] }
                 .map { section -> section.withReleaseFilter() }
                 .flatMap { section -> section.items }
                 .distinctBy { item -> "${item.type}:${item.id}" }
@@ -238,12 +244,15 @@ object HomeRepository {
                 title = defaultTitle,
                 subtitle = addonName,
                 addonName = addonName,
-                type = type,
-                manifestUrl = manifestUrl,
-                catalogId = catalogId,
+                target = CatalogTarget.Addon(
+                    manifestUrl = manifestUrl,
+                    contentType = type,
+                    catalogId = catalogId,
+                    supportsPagination = supportsPagination,
+                ),
                 items = emptyList(),
                 availableItemCount = 0,
-                supportsPagination = supportsPagination,
+                hasMore = false,
             )
         }
 
@@ -252,12 +261,15 @@ object HomeRepository {
             title = defaultTitle,
             subtitle = addonName,
             addonName = addonName,
-            type = type,
-            manifestUrl = manifestUrl,
-            catalogId = catalogId,
+            target = CatalogTarget.Addon(
+                manifestUrl = manifestUrl,
+                contentType = type,
+                catalogId = catalogId,
+                supportsPagination = supportsPagination,
+            ),
             items = items,
             availableItemCount = page.rawItemCount,
-            supportsPagination = supportsPagination,
+            hasMore = supportsPagination && page.nextSkip != null,
         )
     }
 
@@ -411,19 +423,7 @@ object HomeRepository {
     }
 
     private fun collectionSourceKey(source: CollectionSource): String =
-        listOf(
-            source.provider,
-            source.addonId,
-            source.type,
-            source.catalogId,
-            source.genre,
-            source.tmdbSourceType,
-            source.tmdbId?.toString(),
-            source.traktListId?.toString(),
-            source.mediaType,
-            source.sortBy,
-            source.sortHow,
-        ).joinToString(":") { it.orEmpty() }
+        source.catalogRouteKey()
 }
 
 private const val HOME_HERO_ITEM_LIMIT = 8

@@ -19,6 +19,7 @@
     <string name="action_retry">Retry</string>
     <string name="action_save">Save</string>
     <string name="action_saving">Saving…</string>
+    <string name="action_switch">Switch</string>
     <string name="action_validate">Validate</string>
     <string name="addon_installing">Installing</string>
     <string name="addon_title">Addons</string>
@@ -31,6 +32,11 @@
     <string name="addons_badge_unavailable">Unavailable</string>
     <string name="addons_configure">Configure addon</string>
     <string name="addons_delete">Delete addon</string>
+    <string name="addons_appstore_add_description">Connect your own media server to browse and play from your personal library.</string>
+    <string name="addons_appstore_empty_subtitle">Add a server URL above when you want Nuvio to show your private library.</string>
+    <string name="addons_appstore_empty_title">No personal libraries connected.</string>
+    <string name="addons_appstore_input_placeholder">Server URL</string>
+    <string name="addons_appstore_install_button">Add</string>
     <string name="addons_empty_subtitle">Add a manifest URL to start loading catalogs, metadata, streams or subtitles into Nuvio.</string>
     <string name="addons_empty_title">No addons installed yet.</string>
     <string name="addons_error_enter_url">Enter an addon URL.</string>
@@ -318,7 +324,9 @@
     <string name="compose_auth_sign_up_subtitle">Sign up to sync your data across devices</string>
     <string name="compose_auth_sign_up">Sign Up</string>
     <string name="compose_auth_store_locally">Your data will only be stored locally</string>
-    <string name="compose_auth_tagline">Stream everything, everywhere</string>
+    <string name="compose_auth_tagline">Watch your library, anywhere</string>
+    <string name="compose_auth_terms_prefix">By signing up, I agree to the</string>
+    <string name="compose_auth_terms_link">Terms</string>
     <string name="compose_auth_welcome_back">Welcome Back</string>
     <string name="compose_catalog_subtitle_library">Library</string>
     <string name="compose_catalog_subtitle_trakt_library">Trakt Library</string>
@@ -344,6 +352,8 @@
     <string name="compose_player_font_size_value">%1$dsp</string>
     <string name="compose_player_lock_controls">Lock player controls</string>
     <string name="compose_player_loading_lines">Loading subtitle lines...</string>
+    <string name="compose_player_no_subtitle_lines_found">No subtitle lines found</string>
+    <string name="compose_player_subtitle_lines_load_error">Unable to load subtitle lines</string>
     <string name="compose_player_no_audio_tracks_available">No audio tracks available</string>
     <string name="compose_player_no_episodes_available">No episodes available</string>
     <string name="compose_player_no_streams_found">No streams found</string>
@@ -428,7 +438,7 @@
     <string name="compose_settings_root_account_section">ACCOUNT</string>
     <string name="compose_settings_root_advanced_description">Startup and profile behavior.</string>
     <string name="compose_settings_root_advanced_section">ADVANCED</string>
-    <string name="compose_settings_root_appearance_description">Home structure and poster styles</string>
+    <string name="compose_settings_root_appearance_description">Home, streams, collections, and detail pages</string>
     <string name="compose_settings_root_check_updates_description">Download latest release</string>
     <string name="compose_settings_root_check_updates_title">Check for updates</string>
     <string name="compose_settings_root_content_discovery_description">Manage addons and discovery sources.</string>
@@ -449,7 +459,7 @@
     <string name="settings_advanced_remember_last_profile">Remember Last Profile</string>
     <string name="settings_advanced_remember_last_profile_description">Remember last selected profile at startup</string>
     <string name="settings_advanced_clear_cw_cache">Clear Continue Watching Cache</string>
-    <string name="settings_advanced_clear_cw_cache_subtitle">Remove cached thumbnails, titles, and enrichment data for Continue Watching</string>
+    <string name="settings_advanced_clear_cw_cache_subtitle">Remove cached Continue Watching data and refresh watch progress</string>
     <string name="settings_advanced_clear_cw_cache_done">Cache cleared</string>
     <string name="settings_licenses_attributions_section_app">APP LICENSE</string>
     <string name="settings_licenses_attributions_section_data">DATA &amp; SERVICES</string>
@@ -530,13 +540,17 @@
     <string name="settings_account_status">Status</string>
     <string name="settings_account_status_anonymous">Anonymous</string>
     <string name="settings_account_status_signed_in">Signed in</string>
+    <string name="settings_account_sync_backend">Sync backend</string>
+    <string name="debug_backend_switch_confirm_title">Switch backend?</string>
+    <string name="debug_backend_switch_confirm_message">Switch to %1$s and sign out? You can sign in again on the selected backend.</string>
     <string name="settings_appearance_amoled_black">AMOLED Black</string>
     <string name="settings_appearance_amoled_description">Use pure black backgrounds for OLED screens.</string>
     <string name="settings_appearance_app_language">App Language</string>
+    <string name="settings_appearance_app_language_device">Device language</string>
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
-    <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later. Instant profile switching from the tab bar is unavailable while this is on.</string>
+    <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later.</string>
     <string name="settings_appearance_poster_customization_description">Tune card width and corner radius.</string>
     <string name="settings_appearance_section_display">DISPLAY</string>
     <string name="settings_appearance_section_home">HOME</string>
@@ -610,7 +624,7 @@
     <string name="settings_continue_watching_sort_mode_streaming_desc">Released items first, upcoming at the end</string>
     <string name="settings_continue_watching_section_card_style">Poster Card Style</string>
     <string name="settings_continue_watching_section_on_launch">ON LAUNCH</string>
-    <string name="settings_continue_watching_section_up_next_behavior">UP NEXT BEHAVIOR</string>
+    <string name="settings_continue_watching_section_up_next_behavior">NEXT UP BEHAVIOR</string>
     <string name="settings_continue_watching_section_visibility">VISIBILITY</string>
     <string name="settings_continue_watching_show_description">Display the Continue Watching shelf on the Home screen.</string>
     <string name="settings_continue_watching_show_title">Show Continue Watching</string>
@@ -621,12 +635,13 @@
     <string name="settings_continue_watching_style_wide">Wide</string>
     <string name="settings_continue_watching_style_wide_description">Info-dense horizontal card</string>
     <string name="settings_continue_watching_up_next_description">Show next episode based on the furthest watched episode. Disable for rewatches to use the most recently watched episode instead.</string>
-    <string name="settings_continue_watching_up_next_title">Up Next From Furthest Episode</string>
+    <string name="settings_continue_watching_up_next_title">Next Up From Furthest Episode</string>
     <string name="settings_continue_watching_use_episode_thumbnails_description">Prefer episode thumbnails when available.</string>
     <string name="settings_continue_watching_use_episode_thumbnails_title">Prefer Episode Thumbnails in Continue Watching</string>
     <string name="settings_content_discovery_section_home">HOME</string>
     <string name="settings_content_discovery_section_sources">SOURCES</string>
     <string name="settings_content_discovery_addons_description">Install, remove, refresh, and sort your content sources.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Connect personal media sources and manage access to your own library.</string>
     <string name="settings_content_discovery_plugins_description">Install JavaScript scraper repositories and test providers internally.</string>
     <string name="settings_content_discovery_homescreen_description">Adjust home layout, content visibility, and poster behavior</string>
     <string name="settings_content_discovery_meta_screen_description">Settings for the detail and episode screens.</string>
@@ -693,6 +708,10 @@
     <string name="settings_stream_badge_urls_title">Fusion badge URLs</string>
     <string name="settings_stream_badge_urls_description">Import up to %1$d Fusion-style stream badge JSON URLs. Each URL can be updated or deleted separately.</string>
     <string name="settings_stream_badge_urls_search_description">Manage imported Fusion-style stream badge JSON URLs.</string>
+    <string name="settings_stream_badge_import_failed">Badge import failed.</string>
+    <string name="settings_stream_badge_enter_url">Enter a badge JSON URL.</string>
+    <string name="settings_stream_badge_url_scheme_invalid">Badge URL must start with http:// or https://.</string>
+    <string name="settings_stream_badge_import_limit">You can import up to %1$d badge URLs.</string>
     <string name="settings_fusion_badges_summary">%1$d/%2$d URLs, %3$d active Fusion badges</string>
     <string name="settings_fusion_badges_empty">No Fusion badge URLs imported.</string>
     <string name="settings_fusion_badge_url_label">Fusion badge JSON URL</string>
@@ -770,6 +789,10 @@
     <string name="settings_notifications_test_title">Test notification</string>
     <string name="community_section_title">Community</string>
     <string name="community_section_description">See the people building and supporting Nuvio across Mobile, TV, and Web.</string>
+    <string name="community_donation_progress_title">This month&apos;s server &amp; maintenance</string>
+    <string name="community_donation_progress_complete">Covered. Additional support now goes to development.</string>
+    <string name="community_donation_progress_remaining">After 100%%, additional support goes to development.</string>
+    <string name="community_loading_donation_progress">Loading funding progress...</string>
     <string name="community_supporters_not_configured">Supporters API is not configured. Add DONATIONS_BASE_URL to local.properties.</string>
     <string name="community_tab_contributors">Contributors</string>
     <string name="community_tab_supporters">Supporters</string>
@@ -832,6 +855,8 @@
     <string name="settings_playback_external_player_description_ios">Open new playback with the selected installed player.</string>
     <string name="settings_playback_external_player_forward_subtitles">Forward Subtitles to External Player</string>
     <string name="settings_playback_external_player_forward_subtitles_description">Fetch addon subtitles in your preferred language and pass them to the external player.</string>
+    <string name="settings_playback_external_player_send_skip_segments">Send Intro and Outro Timestamps</string>
+    <string name="settings_playback_external_player_send_skip_segments_description">Pass resolved intro and outro skip timestamps to the external player for auto-skipping. Only works in players that support it; other players ignore it.</string>
     <string name="settings_playback_external_player_none_available">No supported external players installed</string>
     <string name="settings_playback_player_preference">Player</string>
     <string name="settings_playback_player_preference_internal">Internal</string>
@@ -840,6 +865,8 @@
     <string name="settings_playback_hold_speed">Hold Speed</string>
     <string name="settings_playback_hold_to_speed">Hold To Speed</string>
     <string name="settings_playback_hold_to_speed_description">Long-press anywhere on the player surface to temporarily boost playback speed.</string>
+    <string name="settings_playback_touch_gestures">Touch Gestures</string>
+    <string name="settings_playback_touch_gestures_description">Allow swipes and double-taps on the player surface to seek, adjust brightness, or adjust volume.</string>
     <string name="settings_playback_invalid_regex_pattern">Invalid regex pattern</string>
     <string name="settings_playback_last_link_cache_duration">Last Link Cache Duration</string>
     <string name="settings_playback_map_dv7_to_hevc">DV7 - HEVC Fallback</string>
@@ -851,6 +878,8 @@
     <string name="settings_playback_not_set">Not set</string>
     <string name="settings_playback_option_default">Default (media file)</string>
     <string name="settings_playback_option_device_language">Device language</string>
+    <string name="settings_playback_option_original">Original language</string>
+    <string name="settings_playback_option_original_hint">Requires TMDB enrichment to be enabled</string>
     <string name="settings_playback_option_forced">Forced</string>
     <string name="settings_playback_option_none">None</string>
     <string name="settings_playback_addon_subtitle_startup_all">All subtitles</string>
@@ -894,6 +923,16 @@
     <string name="settings_playback_secondary_audio_language">Secondary Audio Language</string>
     <string name="settings_playback_secondary_subtitle_language">Secondary Preferred Language</string>
     <string name="settings_playback_section_decoder">DECODER</string>
+    <string name="settings_playback_engine">Playback Engine</string>
+    <string name="settings_playback_engine_auto_description">Use ExoPlayer first and fall back to libmpv if playback fails.</string>
+    <string name="settings_playback_engine_exoplayer_description">Use ExoPlayer and Android Media3 decoders.</string>
+    <string name="settings_playback_engine_libmpv_description">Use libmpv for Android playback.</string>
+    <string name="settings_playback_libmpv_video_output">libmpv Renderer</string>
+    <string name="settings_playback_libmpv_video_output_dialog">libmpv Renderer</string>
+    <string name="settings_playback_libmpv_hardware_decoding">libmpv Hardware Decoding</string>
+    <string name="settings_playback_libmpv_hardware_decoding_description">Use mpv hardware decoding when available.</string>
+    <string name="settings_playback_libmpv_yuv420p">libmpv YUV420P Compatibility</string>
+    <string name="settings_playback_libmpv_yuv420p_description">Force YUV420P output for devices with renderer or color issues.</string>
     <string name="settings_playback_section_next_episode">NEXT EPISODE</string>
     <string name="settings_playback_section_player">PLAYER</string>
     <string name="settings_playback_section_skip_segments">SKIP SEGMENTS</string>
@@ -1150,6 +1189,7 @@
     <string name="app_exit_title">Exit app</string>
     <string name="catalog_empty_message">This catalog did not return any items.</string>
     <string name="catalog_empty_title">No titles found</string>
+    <string name="details_actions_menu_label">More actions</string>
     <string name="details_check_connection">Check your Wi-Fi or mobile data connection and try again.</string>
     <string name="details_director">Director</string>
     <string name="details_failed_to_load">Failed to load</string>
@@ -1185,7 +1225,7 @@
     <string name="episode_mark_previous_seasons_watched">Mark previous seasons as watched</string>
     <string name="episode_mark_unwatched">Mark as unwatched</string>
     <string name="episode_mark_watched">Mark as watched</string>
-    <string name="home_continue_watching_up_next">Up next</string>
+    <string name="home_continue_watching_up_next">Next Up</string>
     <string name="home_continue_watching_watched">%1$s watched</string>
     <string name="home_continue_watching_hours_minutes_left">%1$dh %2$dm left</string>
     <string name="home_continue_watching_minutes_left">%1$dm left</string>
@@ -1285,6 +1325,7 @@
     <string name="streams_fetching">Fetching…</string>
     <string name="streams_finding_source">Finding source…</string>
     <string name="streams_loading_subtitles">Loading subtitles from addons…</string>
+    <string name="streams_loading_skip_segments">Loading skip segments…</string>
     <string name="streams_finding_streams">Finding streams…</string>
     <string name="streams_link_copied">Stream link copied</string>
     <string name="streams_no_direct_link">No direct stream link available</string>
@@ -1332,8 +1373,8 @@
     <string name="auth_sign_out_failed">Sign-out failed</string>
     <string name="auth_sign_up_failed">Sign-up failed</string>
     <string name="catalog_load_failed">Unable to load catalog items.</string>
-    <string name="continue_watching_up_next">Up Next</string>
-    <string name="continue_watching_up_next_episode">Up Next • S%1$dE%2$d</string>
+    <string name="continue_watching_up_next">Next Up</string>
+    <string name="continue_watching_up_next_episode">Next Up • S%1$dE%2$d</string>
     <string name="detail_logo_content_description">%1$s logo</string>
     <string name="details_comments_load_failed">Failed to load comments</string>
     <string name="details_load_failed_all_addons">Could not load details from any addon.</string>
@@ -1393,6 +1434,16 @@
     <string name="trakt_sign_in_complete_failed">Failed to complete Trakt sign in</string>
     <string name="trakt_user_fallback">Trakt user</string>
     <string name="trakt_watchlist">Watchlist</string>
+    <!-- Trakt library sync errors -->
+    <string name="trakt_error_authorization_expired">Trakt authorization expired</string>
+    <string name="trakt_error_list_not_found">Trakt list not found</string>
+    <string name="trakt_error_list_limit_reached">Trakt list limit reached</string>
+    <string name="trakt_error_rate_limit_reached">Trakt rate limit reached</string>
+    <string name="trakt_error_request_failed">Trakt request failed</string>
+    <string name="trakt_error_add_watchlist_failed">Failed to add to Trakt watchlist</string>
+    <string name="trakt_error_add_list_failed">Failed to add to Trakt list</string>
+    <string name="trakt_error_missing_ids">Missing compatible Trakt IDs</string>
+    <string name="trakt_error_empty_response">Empty response body</string>
     <string name="tmdb_sources_api_key_required">Add a TMDB API key in Settings to use TMDB sources.</string>
     <string name="tmdb_sources_collection_fallback_title">TMDB Collection %1$d</string>
     <string name="tmdb_sources_collection_not_found">TMDB collection not found</string>
@@ -1421,8 +1472,10 @@
     <string name="action_resume_episode">Resume %1$s</string>
     <string name="collections_import_error_empty_json">JSON is empty.</string>
     <string name="collections_import_error_collection_blank_id">Collection %1$d has blank id.</string>
+    <string name="collections_import_error_collection_duplicate_id">Collection id '%1$s' is used more than once.</string>
     <string name="collections_import_error_collection_blank_title">Collection '%1$s' has blank title.</string>
     <string name="collections_import_error_folder_blank_id">Folder %1$d in '%2$s' has blank id.</string>
+    <string name="collections_import_error_folder_duplicate_id">Folder id '%1$s' is used more than once in '%2$s'.</string>
     <string name="collections_import_error_folder_blank_title">Folder '%1$s' in '%2$s' has blank title.</string>
     <string name="collections_import_error_source_blank_fields">Source %1$d in folder '%2$s' has blank fields.</string>
     <string name="collections_import_error_trakt_list_id">Source %1$d in folder '%2$s' is missing a Trakt list ID.</string>
@@ -1596,7 +1649,7 @@
     <!-- Playback settings iOS audio output -->
     <string name="settings_playback_ios_audio_output_section">iOS audio output</string>
     <string name="settings_playback_ios_audio_output">Audio output</string>
-    <string name="settings_playback_ios_audio_output_auto_desc">Try AVFoundation first, then fall back to AudioUnit.</string>
+    <string name="settings_playback_ios_audio_output_auto_desc">Use AudioUnit while AVFoundation output is temporarily disabled.</string>
     <string name="settings_playback_ios_audio_output_avfoundation_desc">Experimental support for Spatial Audio and multichannel output.</string>
     <string name="settings_playback_ios_audio_output_audiounit_desc">Use the legacy AudioUnit output.</string>
     <!-- Debrid Result Management section -->
@@ -1866,6 +1919,7 @@
     <string name="p2p_consent_body">This stream uses peer-to-peer (P2P) technology. By enabling P2P, you acknowledge and agree that:\n\n• Your IP address will be visible to other peers in the network\n• You are solely responsible for the content you access\n• You confirm you have the legal right to stream this content in your jurisdiction\n• Nuvio does not host, distribute, or control any P2P content\n• Nuvio bears no liability for any legal consequences arising from your use of P2P streaming\n\nYou use this feature entirely at your own risk. P2P can be disabled anytime in Settings.</string>
     <string name="p2p_consent_enable">Enable P2P</string>
     <string name="p2p_consent_cancel">Cancel</string>
+    <string name="p2p_error_unknown">Unknown torrent error</string>
     <string name="settings_p2p_title">P2P Streaming</string>
     <string name="settings_p2p_subtitle">Allow peer-to-peer (torrent) streams</string>
     <string name="settings_p2p_hide_stats_title">Hide torrent stats</string>

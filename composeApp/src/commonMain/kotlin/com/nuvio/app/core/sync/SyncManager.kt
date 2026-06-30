@@ -102,7 +102,7 @@ object SyncManager {
 
     private fun pullForegroundForProfile(profileId: Int) {
         scope.launch {
-            log.i { "pullForegroundForProfile($profileId) — syncing watch progress + library" }
+            log.i { "pullForegroundForProfile($profileId) — syncing watch progress, library, collections, and home settings" }
 
             launch {
                 runCatching { LibraryRepository.pullFromServer(profileId) }
@@ -112,6 +112,16 @@ object SyncManager {
             launch {
                 runCatching { WatchProgressRepository.pullFromServer(profileId) }
                     .onFailure { log.e(it) { "Foreground watch progress pull failed" } }
+            }
+
+            launch {
+                runCatching { CollectionSyncService.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground collections pull failed" } }
+            }
+
+            launch {
+                runCatching { HomeCatalogSettingsSyncService.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground home catalog settings pull failed" } }
             }
         }
     }

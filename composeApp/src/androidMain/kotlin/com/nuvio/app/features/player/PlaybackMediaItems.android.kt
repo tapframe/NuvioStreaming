@@ -2,16 +2,20 @@ package com.nuvio.app.features.player
 
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 
 internal fun playbackMediaItemFromUrl(
     url: String,
     responseHeaders: Map<String, String> = emptyMap(),
+    streamType: String? = null,
 ): MediaItem {
     val builder = MediaItem.Builder().setUri(url)
     inferPlaybackMimeType(
         url = url,
         responseHeaders = responseHeaders,
+        streamType = streamType,
     )?.let(builder::setMimeType)
     return builder.build()
 }
@@ -19,9 +23,25 @@ internal fun playbackMediaItemFromUrl(
 private fun inferPlaybackMimeType(
     url: String,
     responseHeaders: Map<String, String>,
+    streamType: String?,
 ): String? =
-    inferMimeTypeFromResponseHeaders(responseHeaders)
+    inferMimeTypeFromStreamType(streamType)
+        ?: inferMimeTypeFromResponseHeaders(responseHeaders)
         ?: inferMimeTypeFromPath(url)
+
+private fun inferMimeTypeFromStreamType(streamType: String?): String? {
+    val normalized = streamType
+        ?.trim()
+        ?.lowercase(Locale.US)
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+    return when (normalized) {
+        "hls", "m3u8" -> MimeTypes.APPLICATION_M3U8
+        "dash", "mpd" -> MimeTypes.APPLICATION_MPD
+        "smoothstreaming", "ss" -> MimeTypes.APPLICATION_SS
+        else -> null
+    }
+}
 
 private fun inferMimeTypeFromResponseHeaders(headers: Map<String, String>): String? {
     if (headers.isEmpty()) return null
@@ -50,7 +70,7 @@ private fun inferMimeTypeFromResponseHeaders(headers: Map<String, String>): Stri
     return inferMimeTypeFromPath(filename)
 }
 
-private fun normalizeMimeType(contentType: String?): String? {
+internal fun normalizeMimeType(contentType: String?): String? {
     val normalized = contentType
         ?.substringBefore(';')
         ?.trim()
@@ -169,12 +189,44 @@ private fun inferMimeTypeFromQuery(query: String): String? {
 private fun inferMimeTypeFromDelimitedToken(value: String): String? =
     when {
         DELIMITED_M3U8_PATTERN.containsMatchIn(value) -> MimeTypes.APPLICATION_M3U8
+        DELIMITED_HLS_PATTERN.containsMatchIn(value) -> MimeTypes.APPLICATION_M3U8
         DELIMITED_MPD_PATTERN.containsMatchIn(value) -> MimeTypes.APPLICATION_MPD
         DELIMITED_SS_PATTERN.containsMatchIn(value) -> MimeTypes.APPLICATION_SS
         else -> null
     }
 
+internal fun probeMimeType(url: String, headers: Map<String, String>): String? {
+    if (!url.startsWith("http://") && !url.startsWith("https://")) return null
+    val methods = listOf("HEAD", "GET")
+    methods.forEach { method ->
+        runCatching {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = 3_000
+                readTimeout = 3_000
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "Mozilla/5.0")
+                setRequestProperty("Accept", "*/*")
+                headers.forEach { (key, value) ->
+                    setRequestProperty(key, value)
+                }
+            }
+            try {
+                val responseCode = connection.responseCode
+                if (responseCode in 200..299) {
+                    val contentType = connection.contentType
+                    normalizeMimeType(contentType)
+                } else null
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrNull()?.let { return it }
+    }
+    return null
+}
+
 private const val MIME_VIDEO_QUICK_TIME = "video/quicktime"
-private val DELIMITED_M3U8_PATTERN = Regex("(^|[=/_.?&-])m3u8($|[=/_.?&-])")
-private val DELIMITED_MPD_PATTERN = Regex("(^|[=/_.?&-])mpd($|[=/_.?&-])")
-private val DELIMITED_SS_PATTERN = Regex("(^|[=/_.?&-])(ism|isml)($|[=/_.?&-])")
+private val DELIMITED_M3U8_PATTERN = Regex("(^|[=/_.?&%-])m3u8($|[=/_.?&%-])")
+private val DELIMITED_HLS_PATTERN = Regex("(^|[=/_.?&%-])hls($|[=/_.?&%-])")
+private val DELIMITED_MPD_PATTERN = Regex("(^|[=/_.?&%-])mpd($|[=/_.?&%-])")
+private val DELIMITED_SS_PATTERN = Regex("(^|[=/_.?&%-])(ism|isml)($|[=/_.?&%-])")

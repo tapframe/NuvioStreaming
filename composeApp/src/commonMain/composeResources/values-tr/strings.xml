@@ -498,7 +498,7 @@
     <string name="settings_appearance_app_language_sheet_title">Dil seç</string>
     <string name="settings_appearance_continue_watching_description">İzlemeye Devam Et rafını göster, gizle ve stilini ayarla.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
-    <string name="settings_appearance_liquid_glass_description">iOS 26 ve sonrasında yerel iPhone sekme çubuğunu kullan. Bu özellik açıkken sekme çubuğundan anlık profil geçişi yapılamaz.</string>
+    <string name="settings_appearance_liquid_glass_description">iOS 26 ve sonrasında yerel iPhone sekme çubuğunu kullan.</string>
     <string name="settings_appearance_poster_customization_description">Uygulama genelindeki poster kartlarının ortak genişliğini ve köşe yuvarlaklığını ayarla.</string>
     <string name="settings_appearance_section_display">EKRAN</string>
     <string name="settings_appearance_section_home">ANA SAYFA</string>

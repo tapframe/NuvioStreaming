@@ -48,6 +48,7 @@ object StreamParser {
                 addonName = addonName,
                 addonId = addonId,
                 addonLogo = addonLogo,
+                streamType = normalizeStreamType(obj.string("type")),
                 clientResolve = clientResolve,
                 behaviorHints = StreamBehaviorHints(
                     bingeGroup = hintsObj?.string("bingeGroup"),

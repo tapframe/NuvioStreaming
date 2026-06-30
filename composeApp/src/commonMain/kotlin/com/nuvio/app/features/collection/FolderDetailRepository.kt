@@ -4,8 +4,10 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.catalog.CATALOG_PAGE_SIZE
 import com.nuvio.app.features.catalog.CatalogPage
+import com.nuvio.app.features.catalog.CatalogTarget
 import com.nuvio.app.features.catalog.fetchCatalogPage
 import com.nuvio.app.features.catalog.mergeCatalogItems
+import com.nuvio.app.features.catalog.nextCatalogPaginationState
 import com.nuvio.app.features.catalog.supportsPagination
 import com.nuvio.app.core.i18n.localizedMediaTypeLabel
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
@@ -35,6 +37,7 @@ data class FolderTab(
     val label: String,
     val typeLabel: String = "",
     val source: CollectionSource? = null,
+    val sourceKey: String? = null,
     val manifestUrl: String? = null,
     val type: String = "",
     val catalogId: String = "",
@@ -44,6 +47,7 @@ data class FolderTab(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val nextSkip: Int? = null,
+    val consecutiveDuplicatePages: Int = 0,
     val error: String? = null,
     val isAllTab: Boolean = false,
 ) {
@@ -136,7 +140,7 @@ object FolderDetailRepository {
                     ),
                 )
             }
-            sources.forEach { source ->
+            sources.forEachIndexed { sourceIndex, source ->
                 if (source.isTmdb) {
                     val mediaType = TmdbCollectionMediaType.fromString(source.mediaType)
                     val type = if (mediaType == TmdbCollectionMediaType.TV) "series" else "movie"
@@ -145,6 +149,7 @@ object FolderDetailRepository {
                             label = source.title?.takeIf { it.isNotBlank() } ?: "TMDB",
                             typeLabel = "TMDB",
                             source = source,
+                            sourceKey = source.catalogRouteKey(),
                             type = type,
                             catalogId = tmdbCatalogId(source),
                             supportsPagination = source.tmdbSourceType !in setOf(
@@ -172,6 +177,7 @@ object FolderDetailRepository {
                             label = source.title?.takeIf { it.isNotBlank() } ?: "Trakt",
                             typeLabel = typeLabel,
                             source = source,
+                            sourceKey = source.catalogRouteKey(),
                             type = type,
                             catalogId = traktCatalogId(source),
                             supportsPagination = true,
@@ -179,7 +185,7 @@ object FolderDetailRepository {
                         ),
                     )
                 } else {
-                    val catalogSource = source.addonCatalogSource() ?: return@forEach
+                    val catalogSource = source.addonCatalogSource() ?: return@forEachIndexed
                     val resolvedCatalog = addons.findCollectionCatalog(catalogSource)
                     val addon = resolvedCatalog?.addon
                     val catalog = resolvedCatalog?.catalog
@@ -191,6 +197,7 @@ object FolderDetailRepository {
                             label = "$label ($typeLabel)$genreSuffix",
                             typeLabel = typeLabel,
                             source = source,
+                            sourceKey = source.catalogRouteKey(),
                             manifestUrl = addon?.manifestUrl,
                             type = catalogSource.type,
                             catalogId = catalogSource.catalogId,
@@ -298,6 +305,7 @@ object FolderDetailRepository {
                     isLoading = true,
                     isLoadingMore = false,
                     nextSkip = null,
+                    consecutiveDuplicatePages = 0,
                     error = null,
                 )
             } else {
@@ -340,12 +348,20 @@ object FolderDetailRepository {
                     }
                     val supportsPagination = tab.supportsPagination || page.rawItemCount >= CATALOG_PAGE_SIZE
                     val loadedNewItems = reset || mergedItems.size > tab.items.size
+                    val paginationState = nextCatalogPaginationState(
+                        supportsPagination = supportsPagination,
+                        requestedSkip = requestedSkip,
+                        page = page,
+                        loadedNewItems = loadedNewItems,
+                        consecutiveDuplicatePages = if (reset) 0 else tab.consecutiveDuplicatePages,
+                    )
                     tab.copy(
                         items = mergedItems,
                         supportsPagination = supportsPagination,
                         isLoading = false,
                         isLoadingMore = false,
-                        nextSkip = if (supportsPagination && loadedNewItems) page.nextSkip else null,
+                        nextSkip = paginationState.nextSkip,
+                        consecutiveDuplicatePages = paginationState.consecutiveDuplicatePages,
                         error = null,
                     )
                 }
@@ -408,20 +424,38 @@ object FolderDetailRepository {
     fun getCatalogSectionsForRows(): List<HomeCatalogSection> {
         val current = _uiState.value
         val folder = current.folder ?: return emptyList()
+        val collectionId = activeCollectionId ?: return emptyList()
 
-        return current.tabs.filter { !it.isAllTab && it.items.isNotEmpty() }.map { tab ->
+        return current.tabs.filter { !it.isAllTab && it.items.isNotEmpty() }.mapNotNull { tab ->
+            val directSource = tab.source?.let { it.isTmdb || it.isTrakt } == true
+            val target = if (directSource) {
+                val sourceKey = tab.sourceKey ?: return@mapNotNull null
+                CatalogTarget.CollectionSource(
+                    collectionId = collectionId,
+                    folderId = folder.id,
+                    sourceKey = sourceKey,
+                    contentType = tab.type,
+                    supportsPagination = tab.supportsPagination,
+                )
+            } else {
+                val manifestUrl = tab.manifestUrl ?: return@mapNotNull null
+                CatalogTarget.Addon(
+                    manifestUrl = manifestUrl,
+                    contentType = tab.type,
+                    catalogId = tab.catalogId,
+                    genre = tab.genre,
+                    supportsPagination = tab.supportsPagination,
+                )
+            }
             HomeCatalogSection(
                 key = "folder_${folder.id}_${tab.label}",
                 title = tab.label,
                 subtitle = tab.typeLabel,
                 addonName = "",
-                type = tab.type,
-                manifestUrl = tab.manifestUrl.orEmpty(),
-                catalogId = tab.catalogId,
+                target = target,
                 items = tab.items,
                 availableItemCount = tab.items.size,
-                supportsPagination = tab.supportsPagination,
-                genre = tab.genre,
+                hasMore = tab.canLoadMore,
             )
         }
     }

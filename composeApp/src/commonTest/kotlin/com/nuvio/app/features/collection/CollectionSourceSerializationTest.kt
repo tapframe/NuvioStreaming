@@ -94,6 +94,41 @@ class CollectionSourceSerializationTest {
     }
 
     @Test
+    fun importModelRejectsDuplicateCollectionIds() {
+        val collections = listOf(
+            Collection(id = "collection-1", title = "One"),
+            Collection(id = "collection-1", title = "Two"),
+        )
+
+        assertEquals(
+            CollectionImportModelError.DuplicateCollectionId("collection-1"),
+            validateImportModel(collections),
+        )
+    }
+
+    @Test
+    fun importModelRejectsDuplicateFolderIdsWithinCollection() {
+        val collections = listOf(
+            Collection(
+                id = "collection-1",
+                title = "Favorites",
+                folders = listOf(
+                    CollectionFolder(id = "folder-1", title = "One"),
+                    CollectionFolder(id = "folder-1", title = "Two"),
+                ),
+            ),
+        )
+
+        assertEquals(
+            CollectionImportModelError.DuplicateFolderId(
+                folderId = "folder-1",
+                collectionTitle = "Favorites",
+            ),
+            validateImportModel(collections),
+        )
+    }
+
+    @Test
     fun legacyAddonCatalogSourcesRemainCompatible() {
         val payload = """
             [

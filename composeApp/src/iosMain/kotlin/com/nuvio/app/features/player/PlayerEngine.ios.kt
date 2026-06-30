@@ -4,9 +4,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitViewController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,6 +41,8 @@ actual fun PlatformPlayerSurface(
     sourceAudioUrl: String?,
     sourceHeaders: Map<String, String>,
     sourceResponseHeaders: Map<String, String>,
+    externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle>,
+    streamType: String?,
     useYoutubeChunkedPlayback: Boolean,
     modifier: Modifier,
     playWhenReady: Boolean,
@@ -236,12 +250,13 @@ actual fun PlatformPlayerSurface(
     }
 
     // Load file and set initial state
-    LaunchedEffect(bridge, sourceUrl, sourceAudioUrl, sourceHeaders) {
+    LaunchedEffect(bridge, sourceUrl, sourceAudioUrl, sourceHeaders, externalSubtitles) {
         bridge.applyIosVideoOutputSettings(latestPlayerSettings.value)
         bridge.loadFileWithAudio(
-            sourceUrl,
-            sourceAudioUrl,
-            encodePlaybackHeadersForBridge(sourceHeaders),
+            videoUrl = sourceUrl,
+            audioUrl = sourceAudioUrl,
+            headersJson = encodePlaybackHeadersForBridge(sourceHeaders),
+            subtitlesJson = encodeExternalSubtitlesForBridge(externalSubtitles),
         )
         if (playWhenReady) {
             bridge.play()
@@ -301,11 +316,42 @@ actual fun PlatformPlayerSurface(
     }
 
     // Render the player view
-    UIKitViewController(
-        factory = { bridge.createPlayerViewController() },
-        modifier = modifier,
-        interactive = false,
-    )
+    Box(modifier = modifier) {
+        UIKitViewController(
+            factory = { bridge.createPlayerViewController() },
+            modifier = Modifier.fillMaxSize(),
+            interactive = false,
+        )
+        
+        if (useNativeController) {
+            var isPlayingLocal by remember { mutableStateOf(playWhenReady) }
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(if (!isPlayingLocal) Color.Black.copy(alpha = 0.4f) else Color.Transparent)
+                    .clickable {
+                        if (isPlayingLocal) {
+                            bridge.pause()
+                            isPlayingLocal = false
+                        } else {
+                            bridge.play()
+                            isPlayingLocal = true
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (!isPlayingLocal) {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(64.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun NuvioPlayerBridge.applyIosVideoOutputSettings(settings: PlayerSettingsUiState) {
@@ -354,6 +400,13 @@ private fun Int.toHexByte(): String {
         append(digits[value / 16])
         append(digits[value % 16])
     }
+}
+
+private fun encodeExternalSubtitlesForBridge(subtitles: List<com.nuvio.app.features.streams.StreamSubtitle>): String? {
+    if (subtitles.isEmpty()) return null
+    return runCatching {
+        Json.encodeToString(subtitles)
+    }.getOrNull()
 }
 
 private fun encodePlaybackHeadersForBridge(headers: Map<String, String>): String? {

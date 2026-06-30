@@ -171,4 +171,78 @@ class StreamParserTest {
         assertEquals("2160p", stream.clientResolve?.stream?.raw?.parsed?.resolution)
         assertEquals(listOf(1, 2), stream.clientResolve?.stream?.raw?.parsed?.episodes)
     }
+
+    @Test
+    fun `parse keeps addon-declared streamType`() {
+        val streams = StreamParser.parse(
+            payload =
+                """
+                {
+                  "streams": [
+                    {
+                      "url": "https://cdn.example.com/playlist?token=abc",
+                      "name": "1080p",
+                      "type": "hls"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            addonName = "Addon",
+            addonId = "addon.id",
+        )
+
+        assertEquals("hls", streams.single().streamType)
+    }
+
+    @Test
+    fun `parse normalizes streamType casing and whitespace`() {
+        val streams = StreamParser.parse(
+            payload =
+                """
+                {
+                  "streams": [
+                    {
+                      "url": "https://cdn.example.com/playlist?token=abc",
+                      "name": "1080p",
+                      "type": " HLS "
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            addonName = "Addon",
+            addonId = "addon.id",
+        )
+
+        assertEquals("hls", streams.single().streamType)
+    }
+
+    @Test
+    fun `normalizeStreamType trims lowercases and blanks to null`() {
+        assertEquals("hls", normalizeStreamType(" Hls "))
+        assertEquals("dash", normalizeStreamType("DASH"))
+        assertEquals(null, normalizeStreamType("   "))
+        assertEquals(null, normalizeStreamType(""))
+        assertEquals(null, normalizeStreamType(null))
+    }
+
+    @Test
+    fun `parse leaves streamType null when addon omits it`() {
+        val streams = StreamParser.parse(
+            payload =
+                """
+                {
+                  "streams": [
+                    {
+                      "url": "https://example.com/video.mp4",
+                      "name": "1080p"
+                    }
+                  ]
+                }
+                """.trimIndent(),
+            addonName = "Addon",
+            addonId = "addon.id",
+        )
+
+        assertEquals(null, streams.single().streamType)
+    }
 }

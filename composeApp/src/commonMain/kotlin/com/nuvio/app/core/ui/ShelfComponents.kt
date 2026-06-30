@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
@@ -26,8 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -217,38 +220,45 @@ private fun NuvioShelfSectionHeader(
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
 ) {
     val tokens = MaterialTheme.nuvio
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = title,
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleLarge,
                 color = tokens.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (showAccent) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = NuvioTokens.Space.s6)
-                        .width(NuvioTokens.Space.s64 - NuvioTokens.Space.s4)
-                        .height(NuvioTokens.Space.s4)
-                        .background(
-                            color = tokens.colors.accent,
-                            shape = tokens.shapes.chip,
-                    ),
-                )
+            val viewAllPlaceholderModifier = if (onViewAllClick == null) {
+                Modifier
+                    .alpha(0f)
+                    .clearAndSetSemantics { }
+            } else {
+                Modifier
             }
-        }
-        if (onViewAllClick != null) {
             NuvioViewAllPill(
                 onClick = onViewAllClick,
                 size = viewAllPillSize,
+                modifier = viewAllPlaceholderModifier,
+            )
+        }
+        if (showAccent) {
+            Box(
+                modifier = Modifier
+                    .padding(top = NuvioTokens.Space.s6)
+                    .width(NuvioTokens.Space.s64 - NuvioTokens.Space.s4)
+                    .height(NuvioTokens.Space.s4)
+                    .background(
+                        color = tokens.colors.accent,
+                        shape = tokens.shapes.chip,
+                    ),
             )
         }
     }
@@ -258,38 +268,28 @@ private fun NuvioShelfSectionHeader(
 private fun NuvioViewAllPill(
     onClick: (() -> Unit)?,
     size: NuvioViewAllPillSize,
+    modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
-    val horizontalPadding = if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Space.s12 else NuvioTokens.Space.s18
-    val verticalPadding = if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Space.s8 + NuvioTokens.Space.s1 else NuvioTokens.Space.s14
-    val textStyle = if (size == NuvioViewAllPillSize.Compact) {
-        MaterialTheme.typography.labelLarge
-    } else {
-        MaterialTheme.typography.titleMedium
-    }
-    val iconSpacing = if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Space.s2 else NuvioTokens.Space.s4
+    val actionSize = if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Space.s32 else NuvioTokens.Space.s40
+    val iconSize = if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Icon.sm else tokens.icons.md
+    val viewAllText = stringResource(Res.string.home_view_all)
 
-    Row(
-        modifier = Modifier
+    Box(
+        modifier = modifier
+            .size(actionSize)
             .background(
                 color = tokens.colors.surface,
                 shape = RoundedCornerShape(NuvioTokens.Radius.xl),
             )
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-        horizontalArrangement = Arrangement.spacedBy(iconSpacing),
-        verticalAlignment = Alignment.CenterVertically,
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = stringResource(Res.string.home_view_all),
-            style = textStyle,
-            color = tokens.colors.textPrimary,
-        )
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-            contentDescription = null,
+            contentDescription = viewAllText,
             tint = tokens.colors.textMuted,
-            modifier = Modifier.height(if (size == NuvioViewAllPillSize.Compact) NuvioTokens.Icon.sm else tokens.icons.md),
+            modifier = Modifier.size(iconSize),
         )
     }
 }

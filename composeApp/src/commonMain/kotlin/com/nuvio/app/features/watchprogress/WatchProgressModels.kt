@@ -131,6 +131,7 @@ data class WatchProgressUiState(
 }
 
 data class WatchProgressPlaybackSession(
+    val profileId: Int,
     val contentType: String,
     val parentMetaId: String,
     val parentMetaType: String,

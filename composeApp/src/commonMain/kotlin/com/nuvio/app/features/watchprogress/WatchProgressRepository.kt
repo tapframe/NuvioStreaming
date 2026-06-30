@@ -37,6 +37,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
@@ -83,6 +85,8 @@ object WatchProgressRepository {
 
     private var hasLoaded = false
     private var currentProfileId: Int = 1
+    private var profileGeneration: Long = 0L
+    private val entriesLock = SynchronizedObject()
     private var entriesByVideoId: MutableMap<String, WatchProgressEntry> = mutableMapOf()
     private var metadataResolutionJob: Job? = null
     private var isPullingNuvioSyncFromServer = false
@@ -168,8 +172,9 @@ object WatchProgressRepository {
         metadataResolutionJob?.cancel()
         hasLoaded = false
         currentProfileId = 1
+        profileGeneration += 1L
         lastAddonMetadataReadyFingerprint = null
-        entriesByVideoId.clear()
+        clearLocalEntries()
         lastSuccessfulPushEpochMs = 0L
         deltaCursorEventId = 0L
         deltaInitialized = false
@@ -179,10 +184,12 @@ object WatchProgressRepository {
     }
 
     private fun loadFromDisk(profileId: Int) {
+        metadataResolutionJob?.cancel()
         currentProfileId = profileId
+        profileGeneration += 1L
         hasLoaded = true
         lastAddonMetadataReadyFingerprint = null
-        entriesByVideoId.clear()
+        clearLocalEntries()
 
         val payload = WatchProgressStorage.loadPayload(profileId).orEmpty().trim()
         if (payload.isNotEmpty()) {
@@ -190,27 +197,41 @@ object WatchProgressRepository {
             lastSuccessfulPushEpochMs = storedPayload.lastSuccessfulPushEpochMs
             deltaCursorEventId = storedPayload.deltaCursorEventId
             deltaInitialized = storedPayload.deltaInitialized
-            entriesByVideoId = storedPayload.entries
-                .associateBy { it.videoId }
-                .toMutableMap()
+            replaceLocalEntries(storedPayload.entries)
         } else {
             lastSuccessfulPushEpochMs = 0L
             deltaCursorEventId = 0L
             deltaInitialized = false
         }
         log.d {
-            "Loaded watch progress for profile $profileId: entries=${entriesByVideoId.size} " +
+            "Loaded watch progress for profile $profileId: entries=${localEntryCount()} " +
                 "deltaInitialized=$deltaInitialized cursor=$deltaCursorEventId lastPush=$lastSuccessfulPushEpochMs"
         }
         publish()
         resolveRemoteMetadata()
     }
 
+    private fun activeOperationGeneration(profileId: Int): Long? {
+        if (ProfileRepository.activeProfileId != profileId) return null
+        if (!hasLoaded || currentProfileId != profileId) {
+            loadFromDisk(profileId)
+        }
+        return profileGeneration
+    }
+
+    private fun isActiveOperation(profileId: Int, generation: Long): Boolean =
+        currentProfileId == profileId &&
+            profileGeneration == generation &&
+            ProfileRepository.activeProfileId == profileId
+
     suspend fun pullFromServer(profileId: Int) {
         TraktAuthRepository.ensureLoaded()
         TraktSettingsRepository.ensureLoaded()
         TraktProgressRepository.ensureLoaded()
-        currentProfileId = profileId
+        val operationGeneration = activeOperationGeneration(profileId) ?: run {
+            log.d { "Skipping watch progress pull for inactive profile $profileId" }
+            return
+        }
 
         val useTraktProgress = shouldUseTraktProgress()
 
@@ -230,7 +251,9 @@ object WatchProgressRepository {
                         if (e is CancellationException) throw e
                         log.e(e) { "Failed to pull Trakt progress" }
                     }
-                publish()
+                if (isActiveOperation(profileId, operationGeneration)) {
+                    publish()
+                }
                 return
             }
 
@@ -239,6 +262,7 @@ object WatchProgressRepository {
                 pullSupabaseDeltaFromServer(
                     profileId = profileId,
                     pullStartedEpochMs = WatchProgressClock.nowEpochMs(),
+                    operationGeneration = operationGeneration,
                 )
             }.onFailure { e ->
                 if (e is CancellationException) throw e
@@ -251,12 +275,43 @@ object WatchProgressRepository {
         }
     }
 
+    suspend fun forceSnapshotRefreshFromServer(profileId: Int) {
+        ensureLoaded()
+        if (currentProfileId != profileId) {
+            loadFromDisk(profileId)
+        }
+
+        if (shouldUseTraktProgress()) {
+            log.d { "Force refreshing Trakt watch progress for profile $profileId" }
+            runCatching { TraktProgressRepository.refreshNow() }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    log.e(error) { "Failed to force refresh Trakt progress" }
+                }
+            publish()
+            return
+        }
+
+        val authState = AuthRepository.state.value
+        if (authState !is AuthState.Authenticated || authState.isAnonymous) {
+            log.d { "Skipping force watch progress refresh because Nuvio Sync is not authenticated" }
+            return
+        }
+
+        deltaCursorEventId = 0L
+        deltaInitialized = false
+        persist()
+        pullFromServer(profileId)
+    }
+
     private suspend fun pullSupabaseDeltaFromServer(
         profileId: Int,
         pullStartedEpochMs: Long,
+        operationGeneration: Long,
     ) {
+        if (!isActiveOperation(profileId, operationGeneration)) return
         log.d {
-            "Watch progress delta sync start: profile=$profileId entries=${entriesByVideoId.size} " +
+            "Watch progress delta sync start: profile=$profileId entries=${localEntryCount()} " +
                 "deltaInitialized=$deltaInitialized cursor=$deltaCursorEventId lastPush=$lastSuccessfulPushEpochMs"
         }
         if (!deltaInitialized) {
@@ -275,6 +330,7 @@ object WatchProgressRepository {
                     profileId = profileId,
                     pullStartedEpochMs = pullStartedEpochMs,
                     resetDeltaState = true,
+                    operationGeneration = operationGeneration,
                 )
                 return
             }
@@ -284,13 +340,15 @@ object WatchProgressRepository {
                 profileId = profileId,
                 pullStartedEpochMs = pullStartedEpochMs,
                 resetDeltaState = false,
+                operationGeneration = operationGeneration,
             )
+            if (!isActiveOperation(profileId, operationGeneration)) return
             deltaCursorEventId = cursorBeforeSnapshot
             deltaInitialized = true
             persist()
             log.d {
                 "Watch progress delta initialized for profile $profileId: cursor=$deltaCursorEventId " +
-                    "entries=${entriesByVideoId.size}"
+                    "entries=${localEntryCount()}"
             }
             return
         }
@@ -318,9 +376,11 @@ object WatchProgressRepository {
                     profileId = profileId,
                     pullStartedEpochMs = pullStartedEpochMs,
                     resetDeltaState = true,
+                    operationGeneration = operationGeneration,
                 )
                 return
             }
+            if (!isActiveOperation(profileId, operationGeneration)) return
             if (events.isEmpty()) {
                 log.d { "Watch progress delta page $page returned no events for profile $profileId at cursor $cursor" }
                 break
@@ -365,7 +425,7 @@ object WatchProgressRepository {
         log.d {
             "Watch progress delta sync finished for profile $profileId: changed=$changed " +
                 "appliedUpserts=$totalUpserts appliedDeletes=$totalDeletes preservedLocal=$preservedLocalItems " +
-                "cursor=$deltaCursorEventId entries=${entriesByVideoId.size}"
+                "cursor=$deltaCursorEventId entries=${localEntryCount()}"
         }
     }
 
@@ -373,18 +433,22 @@ object WatchProgressRepository {
         profileId: Int,
         pullStartedEpochMs: Long,
         resetDeltaState: Boolean,
+        operationGeneration: Long,
     ) {
         val serverEntries = syncAdapter.pull(profileId = profileId)
+        if (!isActiveOperation(profileId, operationGeneration)) return
         log.d {
             "Watch progress snapshot fetched ${serverEntries.size} entries for profile $profileId " +
                 "resetDeltaState=$resetDeltaState"
         }
-        entriesByVideoId = mergeWatchProgressEntriesPreservingUnsynced(
+        replaceLocalEntries(
+            mergeWatchProgressEntriesPreservingUnsynced(
             serverEntries = serverEntries,
-            localEntries = entriesByVideoId.values,
+            localEntries = localEntriesSnapshot(),
             lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
             pullStartedEpochMs = pullStartedEpochMs,
-        ).toMutableMap()
+            ),
+        )
         if (resetDeltaState) {
             deltaCursorEventId = 0L
             deltaInitialized = false
@@ -394,7 +458,7 @@ object WatchProgressRepository {
         persist()
         resolveRemoteMetadata()
         log.d {
-            "Watch progress snapshot applied for profile $profileId: entries=${entriesByVideoId.size} " +
+            "Watch progress snapshot applied for profile $profileId: entries=${localEntryCount()} " +
                 "deltaInitialized=$deltaInitialized cursor=$deltaCursorEventId"
         }
     }
@@ -411,16 +475,16 @@ object WatchProgressRepository {
             if (event.videoId.isBlank()) return@forEach
             when (event.operation.lowercase()) {
                 WATCH_PROGRESS_DELTA_OPERATION_UPSERT -> {
-                    val current = entriesByVideoId[event.videoId]
+                    val current = localEntry(event.videoId)
                     val updated = event.toProgressSyncRecord().toWatchProgressEntry(cached = current)
                     if (current != updated) {
-                        entriesByVideoId[event.videoId] = updated
+                        upsertLocalEntry(updated)
                         changed = true
                         appliedUpserts += 1
                     }
                 }
                 WATCH_PROGRESS_DELTA_OPERATION_DELETE -> {
-                    val localEntry = entriesByVideoId[event.videoId]
+                    val localEntry = localEntry(event.videoId)
                     if (
                         localEntry != null &&
                         shouldPreserveLocalWatchProgressEntry(
@@ -432,7 +496,7 @@ object WatchProgressRepository {
                         preservedLocalItems = true
                         return@forEach
                     }
-                    if (entriesByVideoId.remove(event.videoId) != null) {
+                    if (removeLocalEntry(event.videoId) != null) {
                         changed = true
                         appliedDeletes += 1
                     }
@@ -538,7 +602,9 @@ object WatchProgressRepository {
     }
 
     private fun resolveRemoteMetadata() {
-        val missingMetadataEntries = entriesByVideoId.values
+        val targetProfileId = currentProfileId
+        val targetGeneration = profileGeneration
+        val missingMetadataEntries = localEntriesSnapshot()
             .filter { it.poster.isNullOrBlank() || it.background.isNullOrBlank() }
         val entriesToResolve = missingMetadataEntries.continueWatchingEntries(
             limit = WATCH_PROGRESS_METADATA_RESOLUTION_LIMIT,
@@ -551,6 +617,7 @@ object WatchProgressRepository {
         metadataResolutionJob?.cancel()
         metadataResolutionJob = syncScope.launch {
             val providerReadiness = awaitReadyMetadataProviders() ?: return@launch
+            if (!isActiveOperation(targetProfileId, targetGeneration)) return@launch
             lastAddonMetadataReadyFingerprint = providerReadiness.fingerprint
 
             val supportedNeedsResolution = needsResolution.filter { (key, _) ->
@@ -575,6 +642,7 @@ object WatchProgressRepository {
 
             for (result in resolutionResults) {
                 ensureActive()
+                if (!isActiveOperation(targetProfileId, targetGeneration)) return@launch
                 val meta = result.meta
                 if (meta == null) {
                     continue
@@ -582,23 +650,25 @@ object WatchProgressRepository {
 
                 var appliedEntries = 0
                 for (entry in result.entries) {
-                    val current = entriesByVideoId[entry.videoId] ?: continue
+                    val current = localEntry(entry.videoId) ?: continue
                     val episodeVideo = if (current.seasonNumber != null && current.episodeNumber != null) {
                         meta.videos.find { v ->
                             v.season == current.seasonNumber && v.episode == current.episodeNumber
                         }
                     } else null
 
-                    entriesByVideoId[current.videoId] = current.copy(
-                        title = meta.name,
-                        poster = meta.poster,
-                        background = meta.background,
-                        logo = meta.logo,
-                        episodeTitle = episodeVideo?.title ?: current.episodeTitle,
-                        episodeThumbnail = episodeVideo?.thumbnail ?: current.episodeThumbnail,
-                        pauseDescription = episodeVideo?.overview
-                            ?: meta.description
-                            ?: current.pauseDescription,
+                    upsertLocalEntry(
+                        current.copy(
+                            title = meta.name,
+                            poster = meta.poster,
+                            background = meta.background,
+                            logo = meta.logo,
+                            episodeTitle = episodeVideo?.title ?: current.episodeTitle,
+                            episodeThumbnail = episodeVideo?.thumbnail ?: current.episodeThumbnail,
+                            pauseDescription = episodeVideo?.overview
+                                ?: meta.description
+                                ?: current.pauseDescription,
+                        ),
                     )
                     appliedEntries += 1
                 }
@@ -609,8 +679,10 @@ object WatchProgressRepository {
                 resolvedEntries += appliedEntries
             }
             if (resolvedEntries > 0) {
-                publish()
-                persist()
+                if (isActiveOperation(targetProfileId, targetGeneration)) {
+                    publish()
+                    persist()
+                }
             }
         }
     }
@@ -674,13 +746,19 @@ object WatchProgressRepository {
         ensureLoaded()
         if (videoIds.isEmpty()) return
 
-        if (shouldUseTraktProgress()) {
+        val useTraktProgress = shouldUseTraktProgress()
+        if (useTraktProgress) {
             val entriesToRemove = currentEntries().filter { entry -> entry.videoId in videoIds }
+            val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
             videoIds.forEach(TraktProgressRepository::applyOptimisticRemoval)
+            if (locallyRemovedEntries.isNotEmpty()) {
+                persist()
+            }
             publish()
-            if (entriesToRemove.isNotEmpty()) {
+            val traktEntriesToRemove = entriesToRemove.filter { entry -> entry.shouldAttemptTraktPlaybackDelete() }
+            if (traktEntriesToRemove.isNotEmpty()) {
                 syncScope.launch {
-                    entriesToRemove.forEach { entry ->
+                    traktEntriesToRemove.forEach { entry ->
                         runCatching {
                             TraktProgressRepository.removeProgress(
                                 contentId = entry.parentMetaId,
@@ -698,7 +776,7 @@ object WatchProgressRepository {
         }
 
         val removedEntries = videoIds.mapNotNull { videoId ->
-            entriesByVideoId.remove(videoId)
+            removeLocalEntry(videoId)
         }
         if (removedEntries.isNotEmpty()) {
             publish()
@@ -716,6 +794,7 @@ object WatchProgressRepository {
         val normalizedContentId = contentId.trim()
         if (normalizedContentId.isBlank()) return
 
+        val useTraktProgress = shouldUseTraktProgress()
         val entriesToRemove = currentEntries().filter { entry ->
             if (entry.parentMetaId != normalizedContentId) {
                 false
@@ -727,13 +806,21 @@ object WatchProgressRepository {
         }
         if (entriesToRemove.isEmpty()) return
 
-        if (shouldUseTraktProgress()) {
+        if (useTraktProgress) {
+            val locallyRemovedEntries = removeStoredLocalEntries(entriesToRemove)
             TraktProgressRepository.applyOptimisticRemoval(
                 contentId = normalizedContentId,
                 seasonNumber = seasonNumber,
                 episodeNumber = episodeNumber,
             )
+            if (locallyRemovedEntries.isNotEmpty()) {
+                persist()
+            }
             publish()
+            val shouldAttemptTraktDelete = entriesToRemove.any { entry -> entry.shouldAttemptTraktPlaybackDelete() }
+            if (!shouldAttemptTraktDelete) {
+                return
+            }
             syncScope.launch {
                 runCatching {
                     TraktProgressRepository.removeProgress(
@@ -742,6 +829,7 @@ object WatchProgressRepository {
                         episodeNumber = episodeNumber,
                     )
                 }.onFailure { error ->
+                    if (error is CancellationException) throw error
                     log.e(error) { "Failed to remove Trakt watch progress" }
                 }
             }
@@ -749,7 +837,7 @@ object WatchProgressRepository {
         }
 
         entriesToRemove.forEach { entry ->
-            entriesByVideoId.remove(entry.videoId)
+            removeLocalEntry(entry.videoId)
         }
         publish()
         persist()
@@ -761,7 +849,7 @@ object WatchProgressRepository {
         return if (shouldUseTraktProgress()) {
             TraktProgressRepository.uiState.value.entries
         } else {
-            entriesByVideoId.values.toList()
+            localEntriesSnapshot()
         }.firstOrNull { it.videoId == videoId }
     }
 
@@ -797,6 +885,7 @@ object WatchProgressRepository {
         persist: Boolean,
         syncRemote: Boolean,
     ) {
+        val targetProfileId = session.profileId
         val positionMs = snapshot.positionMs.coerceAtLeast(0L)
         val durationMs = snapshot.durationMs.coerceAtLeast(0L)
         val isCompleted = isWatchProgressComplete(
@@ -844,11 +933,21 @@ object WatchProgressRepository {
             isCompleted = isCompleted,
         ).normalizedCompletion()
 
+        if (targetProfileId != currentProfileId || ProfileRepository.activeProfileId != targetProfileId) {
+            if (persist) {
+                upsertStoredProfileProgress(profileId = targetProfileId, entry = entry)
+            }
+            if (syncRemote) {
+                pushScrobbleToServer(entry = entry, profileId = targetProfileId)
+            }
+            return
+        }
+
         if (entry.parentMetaType.equals("series", ignoreCase = true)) {
             ContinueWatchingPreferencesRepository.removeDismissedNextUpKeysForContent(entry.parentMetaId)
         }
 
-        entriesByVideoId[session.videoId] = entry
+        upsertLocalEntry(entry)
         if (useTraktProgress) {
             TraktProgressRepository.applyOptimisticProgress(entry)
         }
@@ -858,17 +957,36 @@ object WatchProgressRepository {
             resolveRemoteMetadata()
         }
         if (syncRemote) {
-            pushScrobbleToServer(entry)
+            pushScrobbleToServer(entry = entry, profileId = targetProfileId)
         }
         if (shouldCascadeCompletedProgressToWatchedHistory(entry, useTraktProgress)) {
             WatchingActions.onProgressEntryUpdated(entry, syncRemote = syncRemote)
         }
     }
 
-    private fun pushScrobbleToServer(entry: WatchProgressEntry) {
+    private fun upsertStoredProfileProgress(profileId: Int, entry: WatchProgressEntry) {
+        val payload = WatchProgressStorage.loadPayload(profileId).orEmpty().trim()
+        val storedPayload = if (payload.isNotEmpty()) {
+            WatchProgressCodec.decodePayload(payload)
+        } else {
+            StoredWatchProgressPayload()
+        }
+        val updatedEntries = storedPayload.entries
+            .filterNot { it.videoId == entry.videoId } + entry
+        WatchProgressStorage.savePayload(
+            profileId,
+            WatchProgressCodec.encodePayload(
+                entries = updatedEntries,
+                lastSuccessfulPushEpochMs = storedPayload.lastSuccessfulPushEpochMs,
+                deltaCursorEventId = storedPayload.deltaCursorEventId,
+                deltaInitialized = storedPayload.deltaInitialized,
+            ),
+        )
+    }
+
+    private fun pushScrobbleToServer(entry: WatchProgressEntry, profileId: Int) {
         syncScope.launch {
             runCatching {
-                val profileId = ProfileRepository.activeProfileId
                 syncAdapter.push(profileId = profileId, entries = listOf(entry))
                 recordSuccessfulPush(profileId = profileId, entries = listOf(entry))
             }.onFailure { e ->
@@ -879,10 +997,10 @@ object WatchProgressRepository {
 
     private fun pushDeleteToServer(entries: Collection<WatchProgressEntry>) {
         if (shouldUseTraktProgress()) return
+        val profileId = currentProfileId
         syncScope.launch {
             runCatching {
                 if (entries.isEmpty()) return@runCatching
-                val profileId = ProfileRepository.activeProfileId
                 syncAdapter.delete(profileId = profileId, entries = entries)
             }.onFailure { e ->
                 log.e(e) { "Failed to push watch progress delete" }
@@ -908,7 +1026,7 @@ object WatchProgressRepository {
         WatchProgressStorage.savePayload(
             currentProfileId,
             WatchProgressCodec.encodePayload(
-                entries = entriesByVideoId.values,
+                entries = localEntriesSnapshot(),
                 lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
                 deltaCursorEventId = deltaCursorEventId,
                 deltaInitialized = deltaInitialized,
@@ -934,13 +1052,23 @@ object WatchProgressRepository {
             source = TraktSettingsRepository.uiState.value.watchProgressSource,
         )
 
+    private fun WatchProgressEntry.shouldAttemptTraktPlaybackDelete(): Boolean =
+        isTraktCompatibleId(parentMetaId)
+
+    private fun removeStoredLocalEntries(entries: Collection<WatchProgressEntry>): List<WatchProgressEntry> =
+        synchronized(entriesLock) {
+            entries.mapNotNull { entry ->
+                entriesByVideoId.remove(entry.videoId)
+            }
+        }
+
     private fun currentEntries(): List<WatchProgressEntry> {
         return if (shouldUseTraktProgress()) {
             // Merge Trakt remote progress with local-only entries that use
             // non-Trakt-compatible IDs (kitsu:, mal:, anilist:, etc.).
             // Trakt will never return these IDs, so they must come from local storage.
             val traktItems = TraktProgressRepository.uiState.value.entries
-            val localNonTraktItems = entriesByVideoId.values.filter {
+            val localNonTraktItems = localEntriesSnapshot().filter {
                 !isTraktCompatibleId(it.parentMetaId)
             }
             if (localNonTraktItems.isEmpty()) {
@@ -956,9 +1084,55 @@ object WatchProgressRepository {
                 merged
             }
         } else {
-            entriesByVideoId.values.toList()
+            localEntriesSnapshot()
         }
     }
+
+    private fun localEntriesSnapshot(): List<WatchProgressEntry> =
+        synchronized(entriesLock) {
+            entriesByVideoId.values.toList()
+        }
+
+    private fun localEntry(videoId: String): WatchProgressEntry? =
+        synchronized(entriesLock) {
+            entriesByVideoId[videoId]
+        }
+
+    private fun localEntryCount(): Int =
+        synchronized(entriesLock) {
+            entriesByVideoId.size
+        }
+
+    private fun clearLocalEntries() {
+        synchronized(entriesLock) {
+            entriesByVideoId.clear()
+        }
+    }
+
+    private fun replaceLocalEntries(entries: Collection<WatchProgressEntry>) {
+        synchronized(entriesLock) {
+            entriesByVideoId = entries
+                .associateBy { it.videoId }
+                .toMutableMap()
+        }
+    }
+
+    private fun replaceLocalEntries(entries: Map<String, WatchProgressEntry>) {
+        synchronized(entriesLock) {
+            entriesByVideoId = entries.toMutableMap()
+        }
+    }
+
+    private fun upsertLocalEntry(entry: WatchProgressEntry) {
+        synchronized(entriesLock) {
+            entriesByVideoId[entry.videoId] = entry
+        }
+    }
+
+    private fun removeLocalEntry(videoId: String): WatchProgressEntry? =
+        synchronized(entriesLock) {
+            entriesByVideoId.remove(videoId)
+        }
 
     fun isDroppedShow(contentId: String): Boolean {
         return shouldUseTraktProgress() && TraktProgressRepository.isShowHiddenFromProgress(contentId)
