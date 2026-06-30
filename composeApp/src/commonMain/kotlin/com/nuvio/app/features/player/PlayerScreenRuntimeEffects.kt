@@ -23,12 +23,12 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
-/** Whether auto-skip is enabled for this segment's type. */
+/** Whether auto-skip is enabled for this segment's type (categorized by SkipIntroRepository). */
 internal fun PlayerSettingsUiState.autoSkips(interval: SkipInterval): Boolean =
-    when (interval.type.lowercase()) {
-        "intro", "op", "mixed-op" -> autoSkipIntroEnabled
+    when (SkipIntroRepository.segmentCategory(interval.type)) {
+        "opening" -> autoSkipIntroEnabled
         "recap" -> autoSkipRecapEnabled
-        "outro", "ed", "mixed-ed", "credits" -> autoSkipOutroEnabled
+        "ending" -> autoSkipOutroEnabled
         else -> false
     }
 
