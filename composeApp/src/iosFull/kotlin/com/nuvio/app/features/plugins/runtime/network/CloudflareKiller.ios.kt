@@ -120,37 +120,41 @@ internal object IosWebViewSolver : WebViewSolver {
     private suspend fun getWkCookies(
         cookieStore: WKHTTPCookieStore,
         host: String,
-    ): Map<String, String> = suspendCoroutine { cont ->
-        cookieStore.getAllCookies { rawList ->
-            @Suppress("UNCHECKED_CAST")
-            val cookies = (rawList as? List<NSHTTPCookie>)
-                ?.filter { cookieMatchesHost(it.domain, host) }
-                ?.associate { it.name to it.value }
-                ?.filter { (key, value) -> key.isNotBlank() && value.isNotBlank() }
-                .orEmpty()
-            cont.resume(cookies)
+    ): Map<String, String> = withContext(Dispatchers.Main) {
+        suspendCoroutine { cont ->
+            cookieStore.getAllCookies { rawList ->
+                @Suppress("UNCHECKED_CAST")
+                val cookies = (rawList as? List<NSHTTPCookie>)
+                    ?.filter { cookieMatchesHost(it.domain, host) }
+                    ?.associate { it.name to it.value }
+                    ?.filter { (key, value) -> key.isNotBlank() && value.isNotBlank() }
+                    .orEmpty()
+                cont.resume(cookies)
+            }
         }
     }
 
-    private suspend fun clearWkCookiesForHost(host: String) = suspendCoroutine<Unit> { cont ->
-        val store = WKWebsiteDataStore.defaultDataStore().httpCookieStore
-        store.getAllCookies { rawList ->
-            @Suppress("UNCHECKED_CAST")
-            val cookies = (rawList as? List<NSHTTPCookie>)
-                ?.filter { cookieMatchesHost(it.domain, host) }
-                .orEmpty()
+    private suspend fun clearWkCookiesForHost(host: String) = withContext(Dispatchers.Main) {
+        suspendCoroutine<Unit> { cont ->
+            val store = WKWebsiteDataStore.defaultDataStore().httpCookieStore
+            store.getAllCookies { rawList ->
+                @Suppress("UNCHECKED_CAST")
+                val cookies = (rawList as? List<NSHTTPCookie>)
+                    ?.filter { cookieMatchesHost(it.domain, host) }
+                    .orEmpty()
 
-            if (cookies.isEmpty()) {
-                cont.resume(Unit)
-                return@getAllCookies
-            }
+                if (cookies.isEmpty()) {
+                    cont.resume(Unit)
+                    return@getAllCookies
+                }
 
-            var remaining = cookies.size
-            cookies.forEach { cookie ->
-                store.deleteCookie(cookie) {
-                    remaining -= 1
-                    if (remaining == 0) {
-                        cont.resume(Unit)
+                var remaining = cookies.size
+                cookies.forEach { cookie ->
+                    store.deleteCookie(cookie) {
+                        remaining -= 1
+                        if (remaining == 0) {
+                            cont.resume(Unit)
+                        }
                     }
                 }
             }
