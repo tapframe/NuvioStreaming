@@ -20,6 +20,7 @@ import com.nuvio.app.core.ui.LocalNuvioBottomNavigationOverlayPadding
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import com.nuvio.app.core.ui.nuvioStandardBottomNavigationBarHeight
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.enabledAddons
@@ -145,7 +146,7 @@ fun HomeScreen(
         when (networkStatusUiState.condition) {
             NetworkCondition.NoInternet,
             NetworkCondition.ServersUnreachable,
-            -> {
+                -> {
                 observedOfflineState = true
             }
 
@@ -158,7 +159,7 @@ fun HomeScreen(
 
             NetworkCondition.Unknown,
             NetworkCondition.Checking,
-            -> Unit
+                -> Unit
         }
     }
 
@@ -551,9 +552,9 @@ fun HomeScreen(
                     withContext(Dispatchers.Main) {
                         nextUpItemsBySeries = progressiveResults
                         processedNextUpContentIds = (
-                            cachedResolvedNextUpItems.keys +
-                                processedFreshContentIds
-                            ).toSet()
+                                cachedResolvedNextUpItems.keys +
+                                        processedFreshContentIds
+                                ).toSet()
                     }
                 }
 
@@ -566,9 +567,9 @@ fun HomeScreen(
             withContext(Dispatchers.Main) {
                 nextUpItemsBySeries = results
                 processedNextUpContentIds = (
-                    cachedResolvedNextUpItems.keys +
-                        processedFreshContentIds
-                    ).toSet()
+                        cachedResolvedNextUpItems.keys +
+                                processedFreshContentIds
+                        ).toSet()
             }
 
             saveContinueWatchingSnapshots(
@@ -618,9 +619,9 @@ fun HomeScreen(
                     withContext(Dispatchers.Main) {
                         nextUpItemsBySeries = progressiveResults
                         processedNextUpContentIds = (
-                            cachedResolvedNextUpItems.keys +
-                                processedFreshContentIds
-                            ).toSet()
+                                cachedResolvedNextUpItems.keys +
+                                        processedFreshContentIds
+                                ).toSet()
                     }
                     saveContinueWatchingSnapshots(
                         profileId = activeProfileId,
@@ -639,8 +640,8 @@ fun HomeScreen(
     val showHeroSlot = homeSettingsUiState.heroEnabled
     val isResolvingHeroSources = enabledAddons.any { it.isRefreshing } || homeUiState.isLoading
     val showHeroSkeleton = showHeroSlot &&
-        homeUiState.heroItems.isEmpty() &&
-        isResolvingHeroSources
+            homeUiState.heroItems.isEmpty() &&
+            isResolvingHeroSources
     var firstCatalogReported by remember { mutableStateOf(false) }
 
     LaunchedEffect(homeUiState.sections.firstOrNull()?.key, onFirstCatalogRendered) {
@@ -674,11 +675,17 @@ fun HomeScreen(
         val continueWatchingCardHeight = remember(posterCardStyle.widthDp) {
             continueWatchingLandscapeCardHeight(posterCardStyle.widthDp)
         }
+        val standardBottomNavigationBarHeight = nuvioStandardBottomNavigationBarHeight()
         val nativeBottomNavigationOverlayHeight =
             if (LocalNuvioBottomNavigationOverlayPadding.current > 0.dp) {
+                // Native (e.g. iOS Liquid Glass) tab bar overlay: its height is reported via
+                // nuvioSafeBottomPadding/LocalNuvioBottomNavigationOverlayPadding.
                 nuvioSafeBottomPadding()
             } else {
-                0.dp
+                // Standard floating NuvioNavigationBar (Android, and iOS when native tabs are
+                // unavailable/disabled): reserve its real rendered height so the hero doesn't
+                // size the Continue Watching row so tall that the bar clips its bottom edge.
+                standardBottomNavigationBarHeight
             }
         val mobileHeroBelowSectionHeightHint = remember(
             maxWidth.value,
@@ -784,8 +791,8 @@ fun HomeScreen(
                 }
 
                 homeUiState.sections.isEmpty() && homeUiState.heroItems.isEmpty() &&
-                    (!continueWatchingPreferences.isVisible || continueWatchingItems.isEmpty()) &&
-                    !hasRenderableCollectionRows -> {
+                        (!continueWatchingPreferences.isVisible || continueWatchingItems.isEmpty()) &&
+                        !hasRenderableCollectionRows -> {
                     item {
                         if (networkStatusUiState.isOfflineLike) {
                             NuvioNetworkOfflineCard(
@@ -938,10 +945,10 @@ internal fun buildHomeNextUpSeedCandidates(
         .toList()
     val watchedSeeds = watchedItems.filter { item ->
         item.type.isSeriesTypeForContinueWatching() &&
-            item.season != null &&
-            item.episode != null &&
-            item.season != 0 &&
-            !isMalformedNextUpSeedContentId(item.id)
+                item.season != null &&
+                item.episode != null &&
+                item.season != 0 &&
+                !isMalformedNextUpSeedContentId(item.id)
     }
 
     return WatchingState.latestCompletedBySeries(
@@ -978,7 +985,7 @@ internal fun filterNextUpItemsByCurrentSeeds(
         val item = pair.second
         val currentSeed = currentSeedByContentId[contentId] ?: return@filter true
         item.nextUpSeedSeasonNumber == currentSeed.first &&
-            item.nextUpSeedEpisodeNumber == currentSeed.second
+                item.nextUpSeedEpisodeNumber == currentSeed.second
     }
 
 private suspend fun resolveHomeNextUpCandidate(
@@ -1045,7 +1052,7 @@ private fun MetaDetails.videoForSeriesAction(action: SeriesPrimaryAction): MetaV
     if (action.seasonNumber != null && action.episodeNumber != null) {
         videos.firstOrNull { video ->
             video.season == action.seasonNumber &&
-                video.episode == action.episodeNumber
+                    video.episode == action.episodeNumber
         }?.let { return it }
     }
     return videos.firstOrNull { video ->
@@ -1090,10 +1097,10 @@ private fun heroMobileBelowSectionHeightHint(
     if (maxWidthDp >= 600f || !continueWatchingVisible || !hasContinueWatchingItems) return null
 
     val sectionHeight = when (continueWatchingStyle) {
-        ContinueWatchingSectionStyle.Card -> continueWatchingCardHeight + 56.dp
-        ContinueWatchingSectionStyle.Wide -> continueWatchingLayout.wideCardHeight + 56.dp
+        ContinueWatchingSectionStyle.Card -> continueWatchingCardHeight
+        ContinueWatchingSectionStyle.Wide -> continueWatchingLayout.wideCardHeight
         ContinueWatchingSectionStyle.Poster ->
-            continueWatchingLayout.posterCardHeight + continueWatchingLayout.posterTitleBlockHeight + 70.dp
+            continueWatchingLayout.posterCardHeight + continueWatchingLayout.posterTitleBlockHeight
     }
     return sectionHeight + bottomNavigationOverlayHeight
 }
@@ -1420,7 +1427,7 @@ private fun ContinueWatchingItem.hasPlaceholderCloudTitle(): Boolean {
     if (!isCloudLibraryContinueWatchingItem()) return false
     val normalizedTitle = title.trim()
     return normalizedTitle.equals(parentMetaId, ignoreCase = true) ||
-        normalizedTitle.equals(videoId, ignoreCase = true)
+            normalizedTitle.equals(videoId, ignoreCase = true)
 }
 
 private fun ContinueWatchingItem.isCloudLibraryContinueWatchingItem(): Boolean =
@@ -1428,7 +1435,7 @@ private fun ContinueWatchingItem.isCloudLibraryContinueWatchingItem(): Boolean =
 
 private fun WatchProgressEntry.isCloudLibraryProgressEntry(): Boolean =
     contentType.equals(CloudLibraryContentType, ignoreCase = true) ||
-        parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
+            parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
 
 private suspend fun remapTraktProgressEntries(
     entries: List<WatchProgressEntry>,
