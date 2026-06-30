@@ -26,6 +26,50 @@ internal object IosWebViewSolver : WebViewSolver {
     private val log = Logger.withTag("IosWebViewSolver")
     private var cachedUserAgent: String? = null
 
+    private const val PAGE_STATE_JS = """
+        (function() {
+            try {
+                if (document.readyState !== 'interactive' && document.readyState !== 'complete') return 'wait';
+                var title = (document.title || '').toLowerCase();
+                if (title.indexOf('attention required') !== -1 || title.indexOf('access denied') !== -1) return 'blocked';
+                if (title.indexOf('just a moment') !== -1) return 'wait';
+                if (document.querySelector('#challenge-running, #challenge-stage, #cf-challenge-running, .cf-browser-verification, #turnstile-wrapper, #cf-please-wait, script[src*="challenge-platform"]')) return 'wait';
+                if (!document.documentElement || !document.body) return 'wait';
+                var contentType = (document.contentType || '').toLowerCase();
+                if ((contentType.indexOf('json') !== -1 || contentType.indexOf('text/plain') !== -1) && (document.body.innerText || '').length > 0) return 'ok';
+                var html = document.documentElement.outerHTML || '';
+                if (html.length < 64) return 'wait';
+                return 'ok';
+            } catch (e) {
+                return 'wait';
+            }
+        })()
+    """
+
+    private const val PAGE_BODY_JS = """
+        (function() {
+            try {
+                var contentType = (document.contentType || '').toLowerCase();
+                if (contentType.indexOf('json') !== -1 || contentType.indexOf('text/plain') !== -1) {
+                    return document.body ? (document.body.innerText || '') : '';
+                }
+                return document.documentElement ? (document.documentElement.outerHTML || '') : '';
+            } catch (e) {
+                return '';
+            }
+        })()
+    """
+
+    private const val PAGE_CONTENT_TYPE_JS = """
+        (function() {
+            try {
+                return document.contentType || 'text/html';
+            } catch (e) {
+                return 'text/html';
+            }
+        })()
+    """
+
     override suspend fun solve(
         url: String,
         headers: Map<String, String>,
@@ -95,6 +139,83 @@ internal object IosWebViewSolver : WebViewSolver {
             }
         }
     }
+
+    override suspend fun fetchRenderedPage(
+        url: String,
+        headers: Map<String, String>,
+        timeoutMs: Long,
+    ): WebViewFetchResult? {
+        val nsUrl = NSURL.URLWithString(url) ?: run {
+            log.e { "CF fetch fallback: invalid URL: $url" }
+            return null
+        }
+
+        var webViewRef: WKWebView? = null
+        val webViewUserAgent = getOrCaptureUserAgent()
+
+        try {
+            withContext(Dispatchers.Main) {
+                val config = WKWebViewConfiguration()
+                val webView = WKWebView(
+                    frame = platform.CoreGraphics.CGRectZero.readValue(),
+                    configuration = config,
+                )
+                webView.customUserAgent = webViewUserAgent
+                webViewRef = webView
+                webView.loadRequest(NSURLRequest.requestWithURL(nsUrl))
+            }
+
+            val result = withTimeoutOrNull(timeoutMs) {
+                var rendered: WebViewFetchResult? = null
+                while (rendered == null) {
+                    delay(250L)
+                    val state = webViewRef?.evaluateJavascriptString(PAGE_STATE_JS).orEmpty()
+                    if (state == "blocked") {
+                        return@withTimeoutOrNull null
+                    }
+
+                    if (state == "ok") {
+                        val body = webViewRef?.evaluateJavascriptString(PAGE_BODY_JS).orEmpty()
+                        if (body.isNotBlank()) {
+                            val contentType = webViewRef?.evaluateJavascriptString(PAGE_CONTENT_TYPE_JS)
+                                .orEmpty().ifBlank { "text/html" }
+                            val headersWithContentType = mutableMapOf<String, String>()
+                            headersWithContentType["content-type"] = contentType
+                            rendered = WebViewFetchResult(
+                                status = 200,
+                                statusText = "OK",
+                                url = withContext(Dispatchers.Main) {
+                                    webViewRef?.URL?.absoluteString ?: url
+                                },
+                                body = body,
+                                headers = headersWithContentType,
+                            )
+                        }
+                    }
+                }
+                rendered
+            }
+
+            if (result == null) {
+                log.w { "CF WebView fetch fallback timed out after ${timeoutMs}ms for $url" }
+            }
+            return result
+        } finally {
+            withContext(NonCancellable + Dispatchers.Main) {
+                webViewRef?.stopLoading()
+                webViewRef = null
+            }
+        }
+    }
+
+    private suspend fun WKWebView.evaluateJavascriptString(script: String): String =
+        withContext(Dispatchers.Main) {
+            suspendCoroutine { cont ->
+                evaluateJavaScript(script) { result, _ ->
+                    cont.resume(result as? String ?: "")
+                }
+            }
+        }
 
     private suspend fun getOrCaptureUserAgent(): String {
         cachedUserAgent?.let { return it }
