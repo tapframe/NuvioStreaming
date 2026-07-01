@@ -1,0 +1,251 @@
+# Builds an unsigned iOS IPA of the latest NuvioMedia/NuvioMobile release and
+# publishes it as a GitHub Release on this repository, for consumption by a
+# SideStore-compatible source (apps.json). SideStore signs the app on-device,
+# so this pipeline intentionally contains no certificates, provisioning
+# profiles, or Apple Developer credentials.
+#
+# How "did upstream move?" is tracked: instead of a repo variable or a state
+# file, the workflow checks whether this repository already has a release for
+# the latest upstream tag. That makes runs idempotent and self-healing (a
+# deleted release simply gets rebuilt on the next run).
+#
+# Build process notes (verified against the upstream cmp-rewrite codebase,
+# which replaced the legacy React Native app — there is no package.json,
+# expo, or Podfile anymore):
+#   - The Xcode project is iosApp/iosApp.xcodeproj, scheme "iosApp", and its
+#     "Compile Kotlin Framework" build phase runs
+#     `./gradlew :composeApp:embedAndSignAppleFrameworkForXcode` (JDK 17+).
+#   - The MPVKit git submodule is a local Swift package whose Libmpv/FFmpeg/
+#     Libplacebo binary targets point at dist/release/xcframework/, which is
+#     NOT committed — it must be built from source with `make build`
+#     (~1-2 h). Because that only changes when the submodule pointer moves,
+#     the resulting xcframeworks are stored as assets on an internal
+#     prerelease tagged mpvkit-<submodule sha> and reused until upstream bumps
+#     the submodule. (GitHub's actions/cache is evicted after 7 idle days,
+#     which a weekly schedule would race against, so release assets are used
+#     instead.)
+#   - The Android SDK is required even for the iOS build: the Kotlin
+#     Multiplatform Gradle configuration also configures the Android targets.
+#   - NUVIO_IOS_DISTRIBUTION selects the app flavor; "full" is the sideload
+#     distribution ("appstore" is the reduced App Store flavor).
+
+name: Build unsigned iOS IPA
+
+on:
+  schedule:
+    # Weekly. Upstream releases every 1-2 days, but macOS runner usage is kept
+    # reasonable by building weekly; use workflow_dispatch for on-demand
+    # builds. Note: scheduled runs only trigger on the default branch.
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if a release for the latest upstream tag already exists here
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-ios-ipa
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: NuvioMedia/NuvioMobile
+
+jobs:
+  check:
+    name: Check for new upstream release
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Compare latest upstream tag against our releases
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force == true }}
+        run: |
+          set -euo pipefail
+
+          tag="$(gh api "repos/$UPSTREAM_REPO/releases/latest" --jq .tag_name)"
+          echo "Latest upstream release tag: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --silent 2>/dev/null; then
+            if [ "$FORCE" = "true" ]; then
+              echo "Release $tag already exists here; rebuilding because force was requested."
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Release $tag already published here; skipping build."
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No release for $tag here yet; building."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build IPA ${{ needs.check.outputs.tag }}
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: macos-latest
+    # Generous limit: a cold MPVKit source build (mpv/ffmpeg/libplacebo) can
+    # take a couple of hours. Cached runs finish far quicker.
+    timeout-minutes: 350
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.check.outputs.tag }}
+      NUVIO_IOS_DISTRIBUTION: full
+    steps:
+      - name: Checkout upstream source at release tag
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UPSTREAM_REPO }}
+          ref: ${{ needs.check.outputs.tag }}
+          path: source
+
+      - name: Init MPVKit submodule
+        # The other submodules (libass-android, vendor/TorrServer,
+        # vendor/quickjs-kt) are Android/dev-only; the iOS build resolves its
+        # remaining dependencies from Maven Central and SwiftPM.
+        working-directory: source
+        run: git submodule update --init MPVKit
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        # Required at Gradle configuration time by the Android targets of the
+        # Kotlin Multiplatform build, even though only the iOS framework is
+        # compiled here.
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle build cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('source/gradle/libs.versions.toml', 'source/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Restore prebuilt MPVKit xcframeworks
+        id: mpvkit
+        run: |
+          set -euo pipefail
+
+          sha="$(git -C source rev-parse HEAD:MPVKit)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "MPVKit submodule pinned at $sha"
+
+          if gh release download "mpvkit-$sha" \
+              --repo "$GITHUB_REPOSITORY" \
+              --pattern mpvkit-xcframeworks-ios.tar.gz \
+              --output mpvkit-xcframeworks-ios.tar.gz; then
+            mkdir -p source/MPVKit/dist/release
+            tar -xzf mpvkit-xcframeworks-ios.tar.gz -C source/MPVKit/dist/release
+            rm mpvkit-xcframeworks-ios.tar.gz
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+            echo "Restored prebuilt xcframeworks for MPVKit@$sha"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+            echo "No prebuilt xcframeworks for MPVKit@$sha; will build from source."
+          fi
+
+      - name: Build MPVKit xcframeworks from source
+        if: steps.mpvkit.outputs.hit != 'true'
+        working-directory: source/MPVKit
+        run: |
+          set -euo pipefail
+          # Same toolchain the upstream MPVKit build workflow installs.
+          brew install autoconf automake libtool ninja meson
+          make build platform=ios
+
+      - name: Publish MPVKit prebuilt cache release
+        # Stored as a prerelease so it never shows up as this repo's "latest"
+        # release and won't be picked up by SideStore sources reading
+        # releases/latest.
+        if: steps.mpvkit.outputs.hit != 'true'
+        run: |
+          set -euo pipefail
+
+          sha="${{ steps.mpvkit.outputs.sha }}"
+          tar -czf mpvkit-xcframeworks-ios.tar.gz -C source/MPVKit/dist/release xcframework
+
+          gh release create "mpvkit-$sha" mpvkit-xcframeworks-ios.tar.gz \
+            --repo "$GITHUB_REPOSITORY" \
+            --prerelease \
+            --title "MPVKit prebuilt cache (${sha:0:12})" \
+            --notes "Internal CI cache: iOS xcframeworks built from NuvioMedia/MPVKit@$sha. Not an app release." \
+          || gh release upload "mpvkit-$sha" mpvkit-xcframeworks-ios.tar.gz \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Archive app (unsigned)
+        run: |
+          set -euo pipefail
+
+          # Fail fast with a clear message if the MPVKit binaries are missing.
+          test -d source/MPVKit/dist/release/xcframework/Libmpv.xcframework || {
+            echo "::error::MPVKit dist/release/xcframework is missing Libmpv.xcframework"
+            exit 1
+          }
+
+          # NUVIO_IOS_DISTRIBUTION (job env) reaches the Gradle invocation via
+          # the Xcode "Compile Kotlin Framework" script phase, matching
+          # upstream's scripts/run-mobile.sh behaviour. JAVA_HOME comes from
+          # setup-java. Signing is disabled: SideStore signs on-device.
+          xcodebuild archive \
+            -project source/iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Nuvio.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package unsigned IPA
+        id: ipa
+        run: |
+          set -euo pipefail
+
+          app="$RUNNER_TEMP/Nuvio.xcarchive/Products/Applications/Nuvio.app"
+          test -d "$app" || {
+            echo "::error::Nuvio.app not found in the archive at $app"
+            exit 1
+          }
+
+          ipa="$GITHUB_WORKSPACE/Nuvio-$TAG-unsigned.ipa"
+          mkdir "$RUNNER_TEMP/Payload"
+          cp -R "$app" "$RUNNER_TEMP/Payload/"
+          (cd "$RUNNER_TEMP" && zip -qry "$ipa" Payload)
+
+          ls -lh "$ipa"
+          echo "path=$ipa" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        run: |
+          set -euo pipefail
+
+          ipa="${{ steps.ipa.outputs.path }}"
+          upstream_url="https://github.com/$UPSTREAM_REPO/releases/tag/$TAG"
+          notes="Unsigned iOS build of [\`$UPSTREAM_REPO\` $TAG]($upstream_url).
+
+          - Upstream release notes: $upstream_url
+          - The IPA is not code-signed; install it with a tool that signs on-device (e.g. SideStore)."
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ipa" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "$ipa" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Nuvio $TAG (unsigned iOS)" \
+              --notes "$notes"
+          fi
