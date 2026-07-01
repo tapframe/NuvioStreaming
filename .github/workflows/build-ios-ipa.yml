@@ -33,10 +33,15 @@ name: Build unsigned iOS IPA
 
 on:
   schedule:
-    # Weekly. Upstream releases every 1-2 days, but macOS runner usage is kept
-    # reasonable by building weekly; use workflow_dispatch for on-demand
-    # builds. Note: scheduled runs only trigger on the default branch.
-    - cron: '0 3 * * 1'
+    # Hourly check for a new upstream release. Actions minutes are free and
+    # unlimited on public repositories, and the check job is a single cheap
+    # ubuntu API call — the macOS build only runs when upstream actually
+    # publishes a new tag (roughly every 1-2 days). The off-peak minute (:23)
+    # avoids the top-of-hour scheduling congestion where GitHub delays or
+    # drops cron runs. Note: scheduled runs only trigger on the default
+    # branch, and GitHub suspends schedules after 60 days without repo
+    # activity.
+    - cron: '23 * * * *'
   workflow_dispatch:
     inputs:
       force:
