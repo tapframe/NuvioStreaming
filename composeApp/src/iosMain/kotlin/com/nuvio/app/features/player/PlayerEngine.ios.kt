@@ -44,6 +44,7 @@ actual fun PlatformPlayerSurface(
     externalSubtitles: List<com.nuvio.app.features.streams.StreamSubtitle>,
     streamType: String?,
     useYoutubeChunkedPlayback: Boolean,
+    posterUrl: String?,
     modifier: Modifier,
     playWhenReady: Boolean,
     resizeMode: PlayerResizeMode,
@@ -257,6 +258,7 @@ actual fun PlatformPlayerSurface(
             audioUrl = sourceAudioUrl,
             headersJson = encodePlaybackHeadersForBridge(sourceHeaders),
             subtitlesJson = encodeExternalSubtitlesForBridge(externalSubtitles),
+            posterUrl = posterUrl,
         )
         if (playWhenReady) {
             bridge.play()

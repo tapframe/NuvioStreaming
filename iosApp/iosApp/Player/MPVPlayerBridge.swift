@@ -16,10 +16,11 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     }
 
     func loadFile(url: String) { playerVC?.loadFile(url) }
-    func loadFileWithAudio(videoUrl: String, audioUrl: String?, headersJson: String?, subtitlesJson: String?) {
+    func loadFileWithAudio(videoUrl: String, audioUrl: String?, headersJson: String?, subtitlesJson: String?, posterUrl: String?) {
         playerVC?.loadFile(
             videoUrl,
             audioUrl: audioUrl,
+            posterUrl: posterUrl,
             requestHeaders: parseRequestHeaders(headersJson),
             subtitles: parseSubtitles(subtitlesJson)
         )
@@ -215,6 +216,7 @@ struct TrackInfo {
 private struct PendingLoadRequest {
     let urlString: String
     let audioUrl: String?
+    let posterUrl: String?
     let requestHeaders: [String: String]
     let subtitles: [PluginSubtitle]
     let queuedAtUptime: TimeInterval
@@ -240,6 +242,11 @@ final class MPVPlayerViewController: UIViewController {
     var audioTracks: [TrackInfo] = []
     var subtitleTracks: [TrackInfo] = []
 
+    // Metadata for Now Playing
+    private var currentPosterUrl: String?
+    private var currentPosterImage: UIImage?
+    private static var posterImageCache: [String: UIImage] = [:]
+
     // State (polled from Kotlin every 250ms)
     var isPlayerLoading: Bool = true
     var isPlayerPlaying: Bool = false
@@ -257,6 +264,10 @@ final class MPVPlayerViewController: UIViewController {
 
     override var prefersHomeIndicatorAutoHidden: Bool {
         true
+    }
+
+    override var canBecomeFirstResponder: Bool {
+        return true
     }
 
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
@@ -286,6 +297,9 @@ final class MPVPlayerViewController: UIViewController {
         view.layer.addSublayer(metalLayer)
         layoutMetalLayer()
 
+        // Set up audio session before MPV initializes
+        AudioSessionManager.shared.registerActivePlayer(self)
+        
         setupMpv()
         setupNotifications()
         refreshImmersiveSystemUI()
@@ -304,6 +318,7 @@ final class MPVPlayerViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        becomeFirstResponder()
         refreshImmersiveSystemUI()
         attemptStartPendingLoad()
     }
@@ -313,6 +328,37 @@ final class MPVPlayerViewController: UIViewController {
         layoutMetalLayer()
         refreshImmersiveSystemUI()
         attemptStartPendingLoad()
+    }
+
+    // MARK: - Remote Control Events
+
+    override func remoteControlReceived(with event: UIEvent?) {
+        guard let event = event, event.type == .remoteControl else { return }
+
+        switch event.subtype {
+        case .remoteControlTogglePlayPause:
+            let paused = isMpvPaused()
+            if paused {
+                playPlayback()
+            } else {
+                pausePlayback()
+            }
+            refreshPlaybackState()
+            AudioSessionManager.shared.updateNowPlayingInfo()
+
+        case .remoteControlPlay:
+            playPlayback()
+            refreshPlaybackState()
+            AudioSessionManager.shared.updateNowPlayingInfo()
+
+        case .remoteControlPause:
+            pausePlayback()
+            refreshPlaybackState()
+            AudioSessionManager.shared.updateNowPlayingInfo()
+
+        default:
+            break
+        }
     }
 
     private func layoutMetalLayer() {
@@ -405,10 +451,15 @@ final class MPVPlayerViewController: UIViewController {
 
     // MARK: - Playback API
 
-    func loadFile(_ urlString: String, audioUrl: String? = nil, requestHeaders: [String: String] = [:], subtitles: [PluginSubtitle] = []) {
+    func loadFile(_ urlString: String, audioUrl: String? = nil, posterUrl: String? = nil, requestHeaders: [String: String] = [:], subtitles: [PluginSubtitle] = []) {
+        currentPosterUrl = posterUrl
+        currentPosterImage = nil
+        downloadPosterImageIfNeeded()
+        
         let request = PendingLoadRequest(
             urlString: urlString,
             audioUrl: audioUrl,
+            posterUrl: posterUrl,
             requestHeaders: requestHeaders,
             subtitles: subtitles,
             queuedAtUptime: ProcessInfo.processInfo.systemUptime
@@ -490,11 +541,56 @@ final class MPVPlayerViewController: UIViewController {
     func playPlayback() {
         guard mpv != nil else { return }
         setFlag("pause", false)
+        DispatchQueue.main.async {
+            AudioSessionManager.shared.refreshSessionAndNowPlaying()
+        }
     }
 
     func pausePlayback() {
         guard mpv != nil else { return }
         setFlag("pause", true)
+    }
+
+    /// Reads mpv pause flag directly (real-time) vs cached value (250ms polling)
+    func isMpvPaused() -> Bool {
+        return getFlag("pause")
+    }
+
+    func mediaTitle() -> String {
+        return getString("media-title") ?? "Nuvio"
+    }
+
+    func getPosterImage() -> UIImage? {
+        return currentPosterImage
+    }
+
+    private func downloadPosterImageIfNeeded() {
+        guard let posterUrl = currentPosterUrl, !posterUrl.isEmpty else {
+            currentPosterImage = nil
+            return
+        }
+
+        if let cachedImage = Self.posterImageCache[posterUrl] {
+            currentPosterImage = cachedImage
+            return
+        }
+
+        guard let url = URL(string: posterUrl) else {
+            currentPosterImage = nil
+            return
+        }
+
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self, let data = data, error == nil else { return }
+            guard let image = UIImage(data: data) else { return }
+            
+            Self.posterImageCache[posterUrl] = image
+            
+            DispatchQueue.main.async {
+                self.currentPosterImage = image
+                AudioSessionManager.shared.updateNowPlayingInfo()
+            }
+        }.resume()
     }
 
     func seekToMs(_ ms: Int64) {
@@ -701,13 +797,16 @@ final class MPVPlayerViewController: UIViewController {
     }
 
     func destroyPlayer() {
+        AudioSessionManager.shared.unregisterActivePlayer(self)
         NotificationCenter.default.removeObserver(self)
         pendingLoadRetryWorkItem?.cancel()
         pendingLoadRetryWorkItem = nil
         pendingLoadRequest = nil
         clearPlaybackError()
+        currentPosterUrl = nil
+        currentPosterImage = nil
         guard let ctx = mpv else { return }
-        mpv = nil  // nil first so event loop stops reading
+        mpv = nil
         mpv_terminate_destroy(ctx)
     }
 
@@ -927,6 +1026,7 @@ final class MPVPlayerViewController: UIViewController {
                         self.isPlayerLoading = false
                         self.updateState()
                         self.logCurrentAudioOutput()
+                        AudioSessionManager.shared.refreshSessionAndNowPlaying()
                     }
                 case MPV_EVENT_END_FILE:
                     if let data = eventPtr.pointee.data {

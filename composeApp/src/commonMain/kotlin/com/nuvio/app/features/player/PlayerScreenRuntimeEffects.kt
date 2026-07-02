@@ -296,6 +296,11 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
         if (playbackSnapshot.isPlaying || playbackSnapshot.isLoading || playbackSnapshot.durationMs <= 0L || errorMessage != null) {
             return@LaunchedEffect
         }
+        // Check if this is an auto-pause (transition from playing to paused, not by user action)
+        if (previousIsPlaying && !playbackSnapshot.isPlaying) {
+            // Auto-pause detected (AirPods removed, phone call, etc.) - show controls immediately
+            controlsVisible = !playerControlsLocked
+        }
         delay(5000)
         pausedOverlayVisible = true
     }

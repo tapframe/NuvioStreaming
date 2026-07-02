@@ -17,11 +17,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>infuse</string>
@@ -29,9 +24,14 @@
 		<string>outplayer</string>
 		<string>open-vidhub</string>
 	</array>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 </dict>
 </plist>

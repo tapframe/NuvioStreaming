@@ -123,6 +123,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
                 sourceResponseHeaders = activeSourceResponseHeaders,
                 externalSubtitles = externalSubtitles,
                 streamType = activeStreamType,
+                posterUrl = poster,
                 modifier = Modifier.fillMaxSize(),
                 playWhenReady = shouldPlay,
                 resizeMode = resizeMode,
