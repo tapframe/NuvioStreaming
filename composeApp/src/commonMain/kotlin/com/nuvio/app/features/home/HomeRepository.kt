@@ -34,7 +34,7 @@ object HomeRepository {
 
     private var activeJob: Job? = null
     private var activeRequestKey: String? = null
-    private var lastRequestKey: String? = null
+    private var completedRequestKey: String? = null
     private var currentDefinitions: List<HomeCatalogDefinition> = emptyList()
     private var cachedSections: Map<String, HomeCatalogSection> = emptyMap()
     private var cachedCollectionHeroItems: List<MetaPreview> = emptyList()
@@ -49,25 +49,28 @@ object HomeRepository {
         currentDefinitions = requests
         val requestCacheKeys = requests.mapTo(mutableSetOf(), HomeCatalogDefinition::cacheKey)
         cachedSections = cachedSections.filterKeys(requestCacheKeys::contains)
-        val requestKey = requests.joinToString(separator = "|") { request ->
-            request.cacheKey
-        }
+        val requestKey = requests.joinToString(separator = "|", transform = HomeCatalogDefinition::cacheKey)
 
         if (!force && activeRequestKey == requestKey && _uiState.value.isLoading) return
 
-        if (!force && requestKey == lastRequestKey && requestCacheKeys.all(cachedSections::containsKey)) {
+        if (
+            !force &&
+            requestKey == completedRequestKey &&
+            requestCacheKeys.all(cachedSections::containsKey) &&
+            requestCacheKeys.any(::hasRenderableCachedSection)
+        ) {
             if (_uiState.value.sections.isEmpty() || _uiState.value.heroItems.isEmpty()) {
                 applyCurrentSettings()
             }
             return
         }
-        lastRequestKey = requestKey
         activeRequestKey = requestKey
 
         if (requests.isEmpty()) {
             activeJob?.cancel()
             activeJob = null
             activeRequestKey = null
+            completedRequestKey = requestKey
             cachedSections = emptyMap()
             lastErrorMessage = null
             publishCurrentState(
@@ -138,6 +141,10 @@ object HomeRepository {
 
             cachedSections = loadedSections.toMap()
             lastErrorMessage = firstErrorMessage
+            if (cachedSections.values.any { section -> section.items.isNotEmpty() }) {
+                completedRequestKey = requestKey
+            }
+            activeRequestKey = null
             publishCurrentState(
                 isLoading = false,
                 requestKey = requestKey,
@@ -153,12 +160,12 @@ object HomeRepository {
     fun applyCurrentSettings() {
         publishCurrentState(
             isLoading = _uiState.value.isLoading,
-            requestKey = activeRequestKey ?: lastRequestKey,
+            requestKey = activeRequestKey ?: completedRequestKey,
         )
         ensureCollectionHeroFallback(
             addons = AddonRepository.uiState.value.addons.enabledAddons(),
             force = false,
-            requestKey = activeRequestKey ?: lastRequestKey,
+            requestKey = activeRequestKey ?: completedRequestKey,
         )
     }
 
@@ -166,7 +173,7 @@ object HomeRepository {
         activeJob?.cancel()
         activeJob = null
         activeRequestKey = null
-        lastRequestKey = null
+        completedRequestKey = null
         currentDefinitions = emptyList()
         cachedSections = emptyMap()
         cachedCollectionHeroItems = emptyList()
@@ -177,6 +184,9 @@ object HomeRepository {
         lastErrorMessage = null
         _uiState.value = HomeUiState()
     }
+
+    private fun hasRenderableCachedSection(cacheKey: String): Boolean =
+        cachedSections[cacheKey]?.items?.isNotEmpty() == true
 
     private fun publishCurrentState(
         isLoading: Boolean,

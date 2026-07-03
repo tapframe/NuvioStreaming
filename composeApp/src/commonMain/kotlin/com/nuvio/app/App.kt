@@ -83,11 +83,9 @@ import com.nuvio.app.core.deeplink.AppDeepLink
 import com.nuvio.app.core.deeplink.AppDeepLinkRepository
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
-import com.nuvio.app.core.network.SupabaseProvider
-import com.nuvio.app.core.network.SyncBackendRefreshResult
-import com.nuvio.app.core.network.SyncBackendRepository
 import com.nuvio.app.core.sync.AppForegroundMonitor
 import com.nuvio.app.core.sync.ProfileSettingsSync
+import com.nuvio.app.core.sync.RealtimeSyncInvalidationService
 import com.nuvio.app.core.sync.SyncManager
 import com.nuvio.app.core.ui.NuvioNavigationBar
 import com.nuvio.app.core.ui.NuvioContinueWatchingActionSheet
@@ -380,32 +378,6 @@ private enum class AppGateScreen {
     Main,
 }
 
-private suspend fun refreshSyncBackendSelection() {
-    SyncBackendRepository.ensureLoaded()
-
-    when (val result = SyncBackendRepository.refreshFromManifest()) {
-        SyncBackendRefreshResult.NotConfigured,
-        is SyncBackendRefreshResult.Failed,
-        SyncBackendRefreshResult.Unchanged,
-        -> Unit
-        is SyncBackendRefreshResult.Applied -> {
-            SupabaseProvider.rebuildClient()
-            NetworkStatusRepository.requestRefresh(force = true)
-        }
-        is SyncBackendRefreshResult.RequiresLogout -> {
-            AuthRepository.resetForSyncBackendChange()
-                .onSuccess {
-                    SyncBackendRepository.applyBackendAfterLogout(
-                        backend = result.targetBackend,
-                        revision = result.revision,
-                    )
-                    SupabaseProvider.rebuildClient()
-                    NetworkStatusRepository.requestRefresh(force = true)
-                }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview
@@ -428,14 +400,7 @@ fun App() {
     val amoledEnabled by remember { ThemeSettingsRepository.amoledEnabled }.collectAsStateWithLifecycle()
     NuvioTheme(appTheme = selectedTheme, amoled = amoledEnabled) {
         LaunchedEffect(Unit) {
-            refreshSyncBackendSelection()
             AuthRepository.initialize()
-        }
-
-        LaunchedEffect(Unit) {
-            AppForegroundMonitor.events().collect {
-                refreshSyncBackendSelection()
-            }
         }
 
         LaunchedEffect(Unit) {
@@ -940,6 +905,27 @@ private fun MainAppContent(
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(authState, profileState.activeProfile?.profileIndex) {
+        val authenticatedState = authState as? AuthState.Authenticated ?: return@LaunchedEffect
+        if (authenticatedState.isAnonymous) return@LaunchedEffect
+
+        val activeProfileId = profileState.activeProfile?.profileIndex ?: return@LaunchedEffect
+        RealtimeSyncInvalidationService.start(
+            userId = authenticatedState.userId,
+            profileId = activeProfileId,
+        )
+    }
+
+    DisposableEffect(authState, profileState.activeProfile?.profileIndex) {
+        val authenticatedState = authState as? AuthState.Authenticated
+        if (authenticatedState == null || authenticatedState.isAnonymous || profileState.activeProfile == null) {
+            RealtimeSyncInvalidationService.stop()
+        }
+        onDispose {
+            RealtimeSyncInvalidationService.stop()
         }
     }
 

@@ -11,6 +11,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.put
+import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.player_external_downloading_subtitles
+import nuvio.composeapp.generated.resources.player_external_loading_subtitles
+import org.jetbrains.compose.resources.getString
 
 private const val SkipSegmentResolveTimeoutMs = 4_000L
 
@@ -39,7 +43,7 @@ suspend fun prepareExternalPlayerLaunch(
 
     val subtitlesDeferred = if (forwardSubtitles && !preferredLanguage.equals(SubtitleLanguageOption.NONE, ignoreCase = true)) {
         async {
-            onOverlayMessage("Loading subtitles from addons...")
+            onOverlayMessage(getString(Res.string.player_external_loading_subtitles))
 
             val subtitles = SubtitleForwarder.fetchForExternalPlayer(
                 type = type,
@@ -49,7 +53,7 @@ suspend fun prepareExternalPlayerLaunch(
             )
 
             if (subtitles != null) {
-                onOverlayMessage("Downloading subtitles...")
+                onOverlayMessage(getString(Res.string.player_external_downloading_subtitles))
                 val cachedSubtitles = SubtitleCacheProvider.cacheForExternalPlayer(subtitles)
                 // Fallback: use original URLs if caching fails
                 cachedSubtitles ?: subtitles

@@ -523,15 +523,15 @@ private fun PersonIdentitySidebar(
         Column(verticalArrangement = Arrangement.spacedBy(15.dp)) {
             person.birthday?.let { birthday ->
                 PersonSidebarFact(
-                    label = "Born",
+                    label = stringResource(Res.string.person_detail_born),
                     value = personBirthLine(birthday = birthday, deathday = person.deathday),
                 )
             }
             person.placeOfBirth?.takeIf { it.isNotBlank() }?.let { place ->
-                PersonSidebarFact(label = "Place of birth", value = place)
+                PersonSidebarFact(label = stringResource(Res.string.person_detail_place_of_birth), value = place)
             }
             if (creditSummary.isNotBlank()) {
-                PersonSidebarFact(label = "Credits", value = creditSummary)
+                PersonSidebarFact(label = stringResource(Res.string.person_detail_credits), value = creditSummary)
             }
         }
 
@@ -543,7 +543,7 @@ private fun PersonIdentitySidebar(
                     .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.30f)),
             )
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                SidebarLabel(text = "Biography")
+                SidebarLabel(text = stringResource(Res.string.person_detail_biography))
                 Text(
                     text = biography,
                     style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),

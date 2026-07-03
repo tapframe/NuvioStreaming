@@ -4,6 +4,7 @@ import co.touchlab.kermit.Logger
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.sync.putSyncOriginClientId
 import com.nuvio.app.features.profiles.ProfileRepository
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
@@ -117,6 +118,7 @@ object CollectionSyncService {
             val params = buildJsonObject {
                 put("p_profile_id", profileId)
                 put("p_collections_json", jsonElement)
+                putSyncOriginClientId()
             }
             SupabaseProvider.client.postgrest.rpc("sync_push_collections", params)
             log.d { "pushToRemote — success" }

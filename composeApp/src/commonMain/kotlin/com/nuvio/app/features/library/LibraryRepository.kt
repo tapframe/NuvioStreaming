@@ -5,6 +5,7 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.sync.putSyncOriginClientId
 import com.nuvio.app.features.home.PosterShape
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
@@ -239,6 +240,7 @@ object LibraryRepository {
         ensureLoaded()
 
         if (isTraktLibrarySourceActive()) {
+            log.i { "toggleSaved routed to Trakt library source item=${item.id} type=${item.type} profile=$currentProfileId" }
             syncScope.launch {
                 runCatching { TraktLibraryRepository.toggleWatchlist(item) }
                     .onFailure { e ->
@@ -262,6 +264,7 @@ object LibraryRepository {
 
     fun save(item: LibraryItem) {
         ensureLoaded()
+        log.i { "Saving local library item item=${item.id} type=${item.type} profile=$currentProfileId" }
         itemsById[libraryItemKey(item.id, item.type)] = item.copy(savedAtEpochMs = LibraryClock.nowEpochMs())
         publish()
         persist()
@@ -273,6 +276,7 @@ object LibraryRepository {
         val before = itemsById.size
         itemsById.entries.removeAll { (_, item) -> item.id == id }
         if (itemsById.size != before) {
+            log.i { "Removing local library item id=$id profile=$currentProfileId removed=${before - itemsById.size}" }
             publish()
             persist()
             pushToServer()
@@ -282,6 +286,7 @@ object LibraryRepository {
     private fun remove(id: String, type: String) {
         ensureLoaded()
         if (itemsById.remove(libraryItemKey(id, type)) != null) {
+            log.i { "Removing local library item id=$id type=$type profile=$currentProfileId" }
             publish()
             persist()
             pushToServer()
@@ -347,6 +352,9 @@ object LibraryRepository {
         ensureLoaded()
         val localDesired = desiredMembership[LOCAL_LIBRARY_LIST_KEY] == true
         val currentlyInLocal = itemsById.containsKey(libraryItemKey(item.id, item.type))
+        log.i {
+            "Applying library membership item=${item.id} type=${item.type} profile=$currentProfileId localDesired=$localDesired currentlyInLocal=$currentlyInLocal traktAuthenticated=${TraktAuthRepository.isAuthenticated.value}"
+        }
         if (localDesired != currentlyInLocal) {
             if (localDesired) {
                 save(item)
@@ -379,24 +387,52 @@ object LibraryRepository {
 
     private fun pushToServer() {
         val authState = AuthRepository.state.value
-        if (authState !is AuthState.Authenticated || authState.isAnonymous) return
-        if (isPullingNuvioSyncFromServer || !hasCompletedInitialNuvioSyncPull) return
+        if (authState !is AuthState.Authenticated) {
+            log.w { "Skipping library push: auth state is ${authState::class.simpleName} profile=$currentProfileId" }
+            return
+        }
+        if (authState.isAnonymous) {
+            log.w { "Skipping library push: anonymous auth user=${authState.userId} profile=$currentProfileId" }
+            return
+        }
+        if (isPullingNuvioSyncFromServer) {
+            log.i { "Skipping library push: server pull is active profile=$currentProfileId localItems=${itemsById.size}" }
+            return
+        }
+        if (!hasCompletedInitialNuvioSyncPull) {
+            log.w { "Skipping library push: initial Nuvio sync pull not completed profile=$currentProfileId localItems=${itemsById.size}" }
+            return
+        }
 
         pushJob?.cancel()
         val profileId = currentProfileId
         pushJob = syncScope.launch {
             delay(500)
-            if (profileId != currentProfileId) return@launch
+            if (profileId != currentProfileId) {
+                log.w { "Skipping debounced library push: profile changed scheduled=$profileId current=$currentProfileId" }
+                return@launch
+            }
+            val itemCount = itemsById.size
             runCatching {
                 val syncItems = itemsById.values.map { it.toSyncItem() }
-                if (syncItems.isEmpty()) return@runCatching
+                if (syncItems.isEmpty()) {
+                    log.w { "Skipping library push: sync payload is empty profile=$profileId" }
+                    return@runCatching false
+                }
                 val params = buildJsonObject {
                     put("p_profile_id", profileId)
                     put("p_items", json.encodeToJsonElement(syncItems))
+                    putSyncOriginClientId()
                 }
+                log.i { "Pushing library to server profile=$profileId itemCount=${syncItems.size}" }
                 SupabaseProvider.client.postgrest.rpc("sync_push_library", params)
+                true
+            }.onSuccess { pushed ->
+                if (pushed) {
+                    log.i { "Library push completed profile=$profileId itemCount=$itemCount" }
+                }
             }.onFailure { e ->
-                log.e(e) { "Failed to push library to server" }
+                log.e(e) { "Failed to push library to server profile=$profileId itemCount=$itemCount" }
             }
         }
     }

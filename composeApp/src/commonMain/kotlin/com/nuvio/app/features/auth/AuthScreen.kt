@@ -84,8 +84,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
-import com.nuvio.app.features.dev.DebugSyncBackendSwitch
-import com.nuvio.app.features.dev.shouldShowDebugSyncBackendSwitch
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.PI
@@ -215,7 +213,6 @@ fun AuthScreen(
         AuthRepository.clearError()
     }
 
-    val showDebugSwitch = shouldShowDebugSyncBackendSwitch()
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     Box(
@@ -263,7 +260,6 @@ fun AuthScreen(
                         passwordVisible = passwordVisible,
                         isLoading = isLoading,
                         authError = authError,
-                        showDebugSwitch = showDebugSwitch,
                         formPaneWidth = if (compactLargeScreen) 460.dp else formPaneWidth,
                         brandHorizontalPadding = brandHorizontalPadding,
                         formHorizontalPadding = formHorizontalPadding,
@@ -295,7 +291,6 @@ fun AuthScreen(
                         passwordVisible = passwordVisible,
                         isLoading = isLoading,
                         authError = authError,
-                        showDebugSwitch = showDebugSwitch,
                         statusBarTop = statusBarTop,
                         onEmailChange = {
                             email = it
@@ -329,7 +324,6 @@ private fun AuthMobileLayout(
     passwordVisible: Boolean,
     isLoading: Boolean,
     authError: String?,
-    showDebugSwitch: Boolean,
     statusBarTop: Dp,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
@@ -359,15 +353,6 @@ private fun AuthMobileLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AuthBrandLockup(logoHeight = 38.dp)
-
-            if (showDebugSwitch) {
-                Spacer(modifier = Modifier.height(24.dp))
-                DebugSyncBackendSwitch(
-                    modifier = Modifier.fillMaxWidth(),
-                    requireConfirmation = false,
-                    container = true,
-                )
-            }
 
             Spacer(modifier = Modifier.height(64.dp))
 
@@ -419,7 +404,6 @@ private fun AuthLargeLayout(
     passwordVisible: Boolean,
     isLoading: Boolean,
     authError: String?,
-    showDebugSwitch: Boolean,
     formPaneWidth: Dp,
     brandHorizontalPadding: Dp,
     formHorizontalPadding: Dp,
@@ -473,15 +457,6 @@ private fun AuthLargeLayout(
                     fontWeight = FontWeight.Normal,
                 ),
             )
-
-            if (showDebugSwitch) {
-                Spacer(modifier = Modifier.height(24.dp * scale))
-                DebugSyncBackendSwitch(
-                    modifier = Modifier.widthIn(max = 520.dp * scale),
-                    requireConfirmation = false,
-                    container = true,
-                )
-            }
         }
 
         Box(

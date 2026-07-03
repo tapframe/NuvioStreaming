@@ -55,11 +55,11 @@ object SyncManager {
                     .onFailure { log.e(it) { "Library pull failed" } }
             }
             launch {
-                runCatching { WatchProgressRepository.pullFromServer(profileId) }
+                runCatching { WatchProgressRepository.forceSnapshotRefreshFromServer(profileId) }
                     .onFailure { log.e(it) { "WatchProgress pull failed" } }
             }
             launch {
-                runCatching { WatchedRepository.pullFromServer(profileId) }
+                runCatching { WatchedRepository.forceSnapshotRefreshFromServer(profileId) }
                     .onFailure { log.e(it) { "Watched pull failed" } }
             }
             launch {
@@ -97,6 +97,55 @@ object SyncManager {
 
             lastForegroundPullAtMs = TraktPlatformClock.nowEpochMs()
             pullForegroundForProfile(profileId)
+        }
+    }
+
+    fun requestRealtimeSurfacePull(profileId: Int, surface: String) {
+        val authState = AuthRepository.state.value
+        if (authState !is AuthState.Authenticated || authState.isAnonymous) return
+
+        scope.launch {
+            log.i { "requestRealtimeSurfacePull($profileId, $surface)" }
+            when (surface) {
+                "addons" -> {
+                    runCatching { AddonRepository.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Realtime addons pull failed" } }
+                }
+                "plugins" -> {
+                    if (AppFeaturePolicy.pluginsEnabled) {
+                        runCatching { PluginRepository.pullFromServer(profileId) }
+                            .onFailure { log.e(it) { "Realtime plugins pull failed" } }
+                    }
+                }
+                "library" -> {
+                    runCatching { LibraryRepository.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Realtime library pull failed" } }
+                }
+                "watch_progress" -> {
+                    runCatching { WatchProgressRepository.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Realtime watch progress pull failed" } }
+                }
+                "watched_items" -> {
+                    runCatching { WatchedRepository.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Realtime watched items pull failed" } }
+                }
+                "profile_settings" -> {
+                    runCatching { ProfileSettingsSync.pull(profileId) }
+                        .onFailure { log.e(it) { "Realtime profile settings pull failed" } }
+                }
+                "collections" -> {
+                    runCatching { CollectionSyncService.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Realtime collections pull failed" } }
+                }
+                "home_catalog_settings" -> {
+                    runCatching { HomeCatalogSettingsSyncService.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Realtime home catalog settings pull failed" } }
+                }
+                "profiles" -> {
+                    runCatching { ProfileRepository.pullProfiles() }
+                        .onFailure { log.e(it) { "Realtime profiles pull failed" } }
+                }
+            }
         }
     }
 

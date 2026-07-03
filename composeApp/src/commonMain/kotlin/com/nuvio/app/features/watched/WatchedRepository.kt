@@ -2,6 +2,7 @@ package com.nuvio.app.features.watched
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.features.details.MetaDetails
+import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktSettingsRepository
@@ -11,6 +12,7 @@ import com.nuvio.app.features.watching.sync.SupabaseWatchedSyncAdapter
 import com.nuvio.app.features.watching.sync.TraktWatchedSyncAdapter
 import com.nuvio.app.features.watching.sync.WatchedDeltaEvent
 import com.nuvio.app.features.watching.sync.WatchedSyncAdapter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,6 +28,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 private data class StoredWatchedPayload(
     val items: List<WatchedItem> = emptyList(),
+    val fullyWatchedSeriesKeys: Set<String> = emptySet(),
     val lastSuccessfulPushEpochMs: Long = 0L,
     val deltaCursorEventId: Long = 0L,
     val deltaInitialized: Boolean = false,
@@ -56,6 +59,8 @@ object WatchedRepository {
 
     private val _uiState = MutableStateFlow(WatchedUiState())
     val uiState: StateFlow<WatchedUiState> = _uiState.asStateFlow()
+    private val _fullyWatchedSeriesKeys = MutableStateFlow<Set<String>>(emptySet())
+    val fullyWatchedSeriesKeys: StateFlow<Set<String>> = _fullyWatchedSeriesKeys.asStateFlow()
 
     private var hasLoaded = false
     private var currentProfileId: Int = 1
@@ -84,6 +89,7 @@ object WatchedRepository {
         lastSuccessfulPushEpochMs = 0L
         deltaCursorEventId = 0L
         deltaInitialized = false
+        _fullyWatchedSeriesKeys.value = emptySet()
         _uiState.value = WatchedUiState()
     }
 
@@ -105,10 +111,12 @@ object WatchedRepository {
                 .map(WatchedItem::normalizedMarkedAt)
                 .associateBy { watchedItemKey(it.type, it.id, it.season, it.episode) }
                 .toMutableMap()
+            _fullyWatchedSeriesKeys.value = storedPayload.fullyWatchedSeriesKeys
         } else {
             lastSuccessfulPushEpochMs = 0L
             deltaCursorEventId = 0L
             deltaInitialized = false
+            _fullyWatchedSeriesKeys.value = emptySet()
         }
 
         publish()
@@ -161,6 +169,60 @@ object WatchedRepository {
             }
         }.onFailure { e ->
             log.e(e) { "Failed to pull watched items from server" }
+        }
+    }
+
+    suspend fun forceSnapshotRefreshFromServer(profileId: Int) {
+        TraktAuthRepository.ensureLoaded()
+        TraktSettingsRepository.ensureLoaded()
+        val operationGeneration = activeOperationGeneration(profileId) ?: run {
+            log.d { "Skipping watched snapshot pull for inactive profile $profileId" }
+            return
+        }
+        val pullStartedEpochMs = WatchedClock.nowEpochMs()
+        val localBeforePull = itemsByKey.values
+            .map(WatchedItem::normalizedMarkedAt)
+            .toList()
+        val lastPushEpochMs = lastSuccessfulPushEpochMs
+        runCatching {
+            if (shouldUseTraktWatchedSync()) {
+                pullFullFromAdapter(
+                    adapter = TraktWatchedSyncAdapter,
+                    profileId = profileId,
+                    localBeforePull = localBeforePull,
+                    lastPushEpochMs = lastPushEpochMs,
+                    pullStartedEpochMs = pullStartedEpochMs,
+                    resetDeltaState = true,
+                    operationGeneration = operationGeneration,
+                )
+                return@runCatching
+            }
+
+            val cursorBeforeSnapshot = try {
+                syncAdapter.getDeltaCursor(profileId)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                null
+            }
+            pullFullFromAdapter(
+                adapter = syncAdapter,
+                profileId = profileId,
+                localBeforePull = localBeforePull,
+                lastPushEpochMs = lastPushEpochMs,
+                pullStartedEpochMs = pullStartedEpochMs,
+                resetDeltaState = cursorBeforeSnapshot == null,
+                operationGeneration = operationGeneration,
+            )
+            if (!isActiveOperation(profileId, operationGeneration)) return@runCatching
+            if (cursorBeforeSnapshot != null) {
+                deltaCursorEventId = cursorBeforeSnapshot
+                deltaInitialized = true
+                persist()
+            }
+        }.onFailure { e ->
+            if (e is CancellationException) throw e
+            log.e(e) { "Failed to pull watched items snapshot from server" }
         }
     }
 
@@ -234,7 +296,6 @@ object WatchedRepository {
 
             applyWatchedDeltaEvents(
                 events = events,
-                lastPushEpochMs = lastPushEpochMs,
                 pullStartedEpochMs = pullStartedEpochMs,
             )
             cursor = maxOf(cursor, events.maxOf { it.eventId })
@@ -254,13 +315,20 @@ object WatchedRepository {
 
     private fun applyWatchedDeltaEvents(
         events: Collection<WatchedDeltaEvent>,
-        lastPushEpochMs: Long,
         pullStartedEpochMs: Long,
     ) {
+        var upsertCount = 0
+        var deleteCount = 0
+        var removedCount = 0
+        var removedByFallbackKeyCount = 0
+        var preservedDuringPullCount = 0
+        var ignoredCount = 0
+
         events.forEach { event ->
             val key = watchedItemKey(event.contentType, event.contentId, event.season, event.episode)
             when (event.operation.lowercase()) {
                 watchedDeltaOperationUpsert -> {
+                    upsertCount += 1
                     itemsByKey[key] = WatchedItem(
                         id = event.contentId,
                         type = event.contentType,
@@ -271,14 +339,64 @@ object WatchedRepository {
                     )
                 }
                 watchedDeltaOperationDelete -> {
+                    deleteCount += 1
                     val localItem = itemsByKey[key]
-                    if (localItem != null && shouldPreserveLocalWatchedItem(localItem, lastPushEpochMs, pullStartedEpochMs)) {
+                    if (localItem != null && wasWatchedItemMarkedDuringPull(localItem, pullStartedEpochMs)) {
+                        preservedDuringPullCount += 1
                         return@forEach
                     }
-                    itemsByKey.remove(key)
+                    val removedItem = itemsByKey.remove(key)
+                    if (removedItem != null) {
+                        removedCount += 1
+                    } else if (
+                        removeWatchedItemByStableDeleteKey(
+                            contentId = event.contentId,
+                            contentType = event.contentType,
+                            season = event.season,
+                            episode = event.episode,
+                        )
+                    ) {
+                        removedCount += 1
+                        removedByFallbackKeyCount += 1
+                    }
+                }
+                else -> {
+                    ignoredCount += 1
                 }
             }
         }
+
+        log.i {
+            "Applied watched delta events total=${events.size} upserts=$upsertCount deletes=$deleteCount " +
+                "removed=$removedCount removedByFallbackKey=$removedByFallbackKeyCount " +
+                "preservedDuringPull=$preservedDuringPullCount ignored=$ignoredCount"
+        }
+    }
+
+    private fun removeWatchedItemByStableDeleteKey(
+        contentId: String,
+        contentType: String,
+        season: Int?,
+        episode: Int?,
+    ): Boolean {
+        val fallbackKey = itemsByKey.entries.firstOrNull { (_, item) ->
+            item.id == contentId &&
+                watchedDeleteTypesCompatible(remoteType = contentType, localType = item.type) &&
+                item.season == season &&
+                item.episode == episode
+        }?.key ?: return false
+
+        itemsByKey.remove(fallbackKey)
+        log.w {
+            "Removed watched delta delete with fallback key contentId=$contentId contentType=$contentType " +
+                "season=$season episode=$episode matchedKey=$fallbackKey"
+        }
+        return true
+    }
+
+    private fun watchedDeleteTypesCompatible(remoteType: String, localType: String): Boolean {
+        if (remoteType.equals(localType, ignoreCase = true)) return true
+        return remoteType.isSeriesLikeWatchedType() && localType.isSeriesLikeWatchedType()
     }
 
     fun toggleWatched(item: WatchedItem) {
@@ -380,14 +498,11 @@ object WatchedRepository {
         if (!meta.type.isSeriesLikeWatchedType()) return
 
         ensureLoaded()
-        val shouldMarkSeriesWatched = meta.hasWatchedAllMainSeasonEpisodes(todayIsoDate) { episode ->
-            isWatched(
-                id = meta.id,
-                type = meta.type,
-                season = episode.season,
-                episode = episode.episode,
-            ) || isEpisodeCompleted(episode)
-        }
+        val shouldMarkSeriesWatched = reconcileFullyWatchedSeriesState(
+            meta = meta,
+            todayIsoDate = todayIsoDate,
+            isEpisodeCompleted = isEpisodeCompleted,
+        )
         val seriesWatchedItem = meta.toSeriesWatchedItem()
         val hasSeriesWatchedMarker = isWatched(id = meta.id, type = meta.type)
         if (shouldMarkSeriesWatched) {
@@ -397,6 +512,56 @@ object WatchedRepository {
         } else if (hasSeriesWatchedMarker) {
             unmarkWatched(seriesWatchedItem)
         }
+    }
+
+    fun reconcileFullyWatchedSeriesState(
+        meta: MetaDetails,
+        todayIsoDate: String,
+        isEpisodeWatched: (MetaVideo) -> Boolean = { episode ->
+            isWatched(
+                id = meta.id,
+                type = meta.type,
+                season = episode.season,
+                episode = episode.episode,
+            )
+        },
+        isEpisodeCompleted: (MetaVideo) -> Boolean = { false },
+    ): Boolean {
+        if (!meta.type.isSeriesLikeWatchedType()) return false
+
+        ensureLoaded()
+        val shouldMarkSeriesWatched = meta.hasWatchedAllMainSeasonEpisodes(todayIsoDate) { episode ->
+            isEpisodeWatched(episode) || isEpisodeCompleted(episode)
+        }
+        updateFullyWatchedSeriesKey(
+            key = watchedItemKey(meta.type, meta.id),
+            isFullyWatched = shouldMarkSeriesWatched,
+        )
+        return shouldMarkSeriesWatched
+    }
+
+    fun updateFullyWatchedSeries(
+        id: String,
+        type: String,
+        isFullyWatched: Boolean,
+    ) {
+        if (!type.isSeriesLikeWatchedType()) return
+        ensureLoaded()
+        updateFullyWatchedSeriesKey(
+            key = watchedItemKey(type, id),
+            isFullyWatched = isFullyWatched,
+        )
+    }
+
+    private fun updateFullyWatchedSeriesKey(
+        key: String,
+        isFullyWatched: Boolean,
+    ) {
+        val current = _fullyWatchedSeriesKeys.value
+        val updated = if (isFullyWatched) current + key else current - key
+        if (updated == current) return
+        _fullyWatchedSeriesKeys.value = updated
+        persist()
     }
 
     private fun pushMarksToServer(
@@ -454,6 +619,7 @@ object WatchedRepository {
                     items = itemsByKey.values
                         .map(WatchedItem::normalizedMarkedAt)
                         .sortedByDescending { it.markedAtEpochMs },
+                    fullyWatchedSeriesKeys = _fullyWatchedSeriesKeys.value,
                     lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
                     deltaCursorEventId = deltaCursorEventId,
                     deltaInitialized = deltaInitialized,
@@ -548,10 +714,18 @@ internal fun shouldPreserveLocalWatchedItem(
     lastSuccessfulPushEpochMs: Long,
     pullStartedEpochMs: Long,
 ): Boolean {
-    val markedAt = localItem.markedAtEpochMs
+    val markedAt = normalizeWatchedMarkedAtEpochMs(localItem.markedAtEpochMs)
     val wasMarkedAfterLastPush = lastSuccessfulPushEpochMs > 0L && markedAt > lastSuccessfulPushEpochMs
     val wasMarkedDuringPull = pullStartedEpochMs > 0L && markedAt >= pullStartedEpochMs
     return wasMarkedAfterLastPush || wasMarkedDuringPull
+}
+
+internal fun wasWatchedItemMarkedDuringPull(
+    localItem: WatchedItem,
+    pullStartedEpochMs: Long,
+): Boolean {
+    val markedAt = normalizeWatchedMarkedAtEpochMs(localItem.markedAtEpochMs)
+    return pullStartedEpochMs > 0L && markedAt >= pullStartedEpochMs
 }
 
 internal fun shouldUseTraktWatchedSync(

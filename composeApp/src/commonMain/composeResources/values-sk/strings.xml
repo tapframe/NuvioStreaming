@@ -532,7 +532,6 @@
     <string name="settings_account_status">Stav</string>
     <string name="settings_account_status_anonymous">Anonymný</string>
     <string name="settings_account_status_signed_in">Prihlásený</string>
-    <string name="settings_account_sync_backend">Backend synchronizácie</string>
     <string name="settings_appearance_amoled_black">AMOLED čierna</string>
     <string name="settings_appearance_amoled_description">Použiť čisto čierne pozadie pre OLED obrazovky.</string>
     <string name="settings_appearance_app_language">Jazyk aplikácie</string>
@@ -1906,8 +1905,6 @@
     <string name="addons_appstore_install_button">Pridať</string>
     <string name="compose_auth_terms_prefix">Registráciou súhlasím s</string>
     <string name="compose_auth_terms_link">Podmienkami</string>
-    <string name="debug_backend_switch_confirm_title">Prepnúť backend?</string>
-    <string name="debug_backend_switch_confirm_message">Prepnúť na %1$s a odhlásiť sa? Na vybranom backende sa môžete znova prihlásiť.</string>
     <string name="settings_appearance_app_language_device">Jazyk zariadenia</string>
     <string name="settings_content_discovery_addons_description_appstore">Pripojte osobné mediálne zdroje a spravujte prístup k vlastnej knižnici.</string>
     <string name="settings_playback_external_player_send_skip_segments">Odosielať časové značky intra a outra</string>

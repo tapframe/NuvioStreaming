@@ -206,6 +206,7 @@ object ProfileSettingsSync {
             put("p_profile_id", profileId)
             put("p_platform", MOBILE_SYNC_PLATFORM)
             put("p_settings_json", json.encodeToJsonElement(MobileProfileSettingsBlob.serializer(), blob))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_push_profile_settings_blob", params)
         log.d { "pushToRemoteLocked(profileId=$profileId) — success" }

@@ -20,6 +20,7 @@
     <string name="action_retry">Réessayer</string>
     <string name="action_save">Enregistrer</string>
     <string name="action_saving">Enregistrement…</string>
+    <string name="action_switch">Changer</string>
     <string name="action_validate">Valider</string>
     <string name="addon_installing">Installation en cours</string>
     <string name="addon_title">Addons</string>
@@ -32,6 +33,11 @@
     <string name="addons_badge_unavailable">Indisponible</string>
     <string name="addons_configure">Configurer l’addon</string>
     <string name="addons_delete">Supprimer l’addon</string>
+    <string name="addons_appstore_add_description">Connectez votre propre serveur multimédia pour parcourir et lire depuis votre bibliothèque personnelle.</string>
+    <string name="addons_appstore_empty_subtitle">Ajoutez une URL de serveur ci-dessus pour que Nuvio affiche votre bibliothèque privée.</string>
+    <string name="addons_appstore_empty_title">Aucune bibliothèque personnelle connectée.</string>
+    <string name="addons_appstore_input_placeholder">URL du serveur</string>
+    <string name="addons_appstore_install_button">Ajouter</string>
     <string name="addons_empty_subtitle">Ajoutez une URL de manifeste pour commencer à charger des catalogues, métadonnées, streams ou sous-titres dans Nuvio.</string>
     <string name="addons_empty_title">Aucun addon installé.</string>
     <string name="addons_error_enter_url">Saisissez une URL d’addon.</string>
@@ -311,6 +317,8 @@
     <string name="compose_auth_sign_up">S’inscrire</string>
     <string name="compose_auth_store_locally">Vos données seront uniquement stockées localement</string>
     <string name="compose_auth_tagline">Regardez tout, partout</string>
+    <string name="compose_auth_terms_prefix">En m’inscrivant, j’accepte les</string>
+    <string name="compose_auth_terms_link">Conditions d’utilisation</string>
     <string name="compose_auth_welcome_back">Bon retour</string>
     <string name="compose_catalog_subtitle_library">Bibliothèque</string>
     <string name="compose_catalog_subtitle_trakt_library">Bibliothèque Trakt</string>
@@ -527,6 +535,7 @@
     <string name="settings_appearance_amoled_black">Noir AMOLED</string>
     <string name="settings_appearance_amoled_description">Utilise des fonds noirs purs pour les écrans OLED.</string>
     <string name="settings_appearance_app_language">Langue de l’application</string>
+    <string name="settings_appearance_app_language_device">Langue de l’appareil</string>
     <string name="settings_appearance_app_language_sheet_title">Choisir la langue</string>
     <string name="settings_appearance_continue_watching_description">Afficher, masquer et ajuster le bandeau Continuer à regarder.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
@@ -621,6 +630,7 @@
     <string name="settings_content_discovery_section_home">ACCUEIL</string>
     <string name="settings_content_discovery_section_sources">SOURCES</string>
     <string name="settings_content_discovery_addons_description">Installez, supprimez, mettez à jour et ordonnez vos sources de contenu.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Connectez des sources multimédias personnelles et gérez l’accès à votre propre bibliothèque.</string>
     <string name="settings_content_discovery_plugins_description">Installez des dépôts de scrapers JavaScript et testez des fournisseurs en interne.</string>
     <string name="settings_content_discovery_homescreen_description">Contrôle quels catalogues apparaissent à l’accueil et dans quel ordre.</string>
     <string name="settings_content_discovery_meta_screen_description">Désactivez des sections de détails et réorganisez tout sous le Hero.</string>
@@ -768,6 +778,10 @@
     <string name="settings_notifications_test_title">Notification de test</string>
     <string name="community_section_title">Communauté</string>
     <string name="community_section_description">Découvrez les personnes qui construisent et soutiennent Nuvio sur Mobile, TV et Web.</string>
+    <string name="community_donation_progress_title">Serveur et maintenance de ce mois-ci</string>
+    <string name="community_donation_progress_complete">Couvert. Le soutien supplémentaire va désormais au développement.</string>
+    <string name="community_donation_progress_remaining">Au-delà de 100 %%, le soutien supplémentaire va au développement.</string>
+    <string name="community_loading_donation_progress">Chargement de la progression du financement…</string>
     <string name="community_supporters_not_configured">L’API des supporters n’est pas configurée. Ajoutez DONATIONS_BASE_URL dans local.properties.</string>
     <string name="community_tab_contributors">Contributeurs</string>
     <string name="community_tab_supporters">Supporters</string>
@@ -830,6 +844,8 @@
     <string name="settings_playback_external_player_description_ios">Ouvre les nouvelles lectures avec le lecteur installé sélectionné.</string>
     <string name="settings_playback_external_player_forward_subtitles">Transmettre les sous-titres au lecteur externe</string>
     <string name="settings_playback_external_player_forward_subtitles_description">Récupère les sous-titres d’addons dans votre langue préférée et les transmet au lecteur externe.</string>
+    <string name="settings_playback_external_player_send_skip_segments">Envoyer les horodatages d’intro et d’outro</string>
+    <string name="settings_playback_external_player_send_skip_segments_description">Transmet les horodatages de saut d’intro et d’outro résolus au lecteur externe pour le saut automatique. Ne fonctionne que dans les lecteurs compatibles ; les autres l’ignorent.</string>
     <string name="settings_playback_external_player_none_available">Aucun lecteur externe compatible n’est installé</string>
     <string name="settings_playback_player_preference">Lecteur</string>
     <string name="settings_playback_player_preference_internal">Interne</string>
@@ -851,6 +867,8 @@
     <string name="settings_playback_not_set">Non défini</string>
     <string name="settings_playback_option_default">Par défaut</string>
     <string name="settings_playback_option_device_language">Langue de l’appareil</string>
+    <string name="settings_playback_option_original">Langue originale</string>
+    <string name="settings_playback_option_original_hint">Nécessite l’activation de l’enrichissement TMDB</string>
     <string name="settings_playback_option_forced">Forcé</string>
     <string name="settings_playback_option_none">Aucun</string>
     <string name="settings_playback_addon_subtitle_startup_all">Tous les sous-titres</string>
@@ -894,6 +912,16 @@
     <string name="settings_playback_secondary_audio_language">Langue audio secondaire</string>
     <string name="settings_playback_secondary_subtitle_language">Langue des sous-titres secondaire</string>
     <string name="settings_playback_section_decoder">DÉCODEUR</string>
+    <string name="settings_playback_engine">Moteur de lecture</string>
+    <string name="settings_playback_engine_auto_description">Utiliser d’abord ExoPlayer et basculer sur libmpv si la lecture échoue.</string>
+    <string name="settings_playback_engine_exoplayer_description">Utiliser ExoPlayer et les décodeurs Android Media3.</string>
+    <string name="settings_playback_engine_libmpv_description">Utiliser libmpv pour la lecture Android.</string>
+    <string name="settings_playback_libmpv_video_output">Moteur de rendu libmpv</string>
+    <string name="settings_playback_libmpv_video_output_dialog">Moteur de rendu libmpv</string>
+    <string name="settings_playback_libmpv_hardware_decoding">Décodage matériel libmpv</string>
+    <string name="settings_playback_libmpv_hardware_decoding_description">Utiliser le décodage matériel mpv quand il est disponible.</string>
+    <string name="settings_playback_libmpv_yuv420p">Compatibilité YUV420P libmpv</string>
+    <string name="settings_playback_libmpv_yuv420p_description">Forcer la sortie YUV420P pour les appareils ayant des problèmes de rendu ou de couleur.</string>
     <string name="settings_playback_section_next_episode">ÉPISODE SUIVANT</string>
     <string name="settings_playback_section_player">LECTEUR</string>
     <string name="settings_playback_section_skip_segments">PASSER LES SEGMENTS</string>
@@ -1280,6 +1308,7 @@
     <string name="streams_fetching">Récupération…</string>
     <string name="streams_finding_source">Recherche de la source…</string>
     <string name="streams_loading_subtitles">Chargement des sous-titres depuis les addons…</string>
+    <string name="streams_loading_skip_segments">Chargement des segments à passer…</string>
     <string name="streams_finding_streams">Recherche des streams…</string>
     <string name="streams_link_copied">Lien du stream copié</string>
     <string name="streams_no_direct_link">Aucun lien direct du stream disponible</string>
@@ -1349,7 +1378,7 @@
     <string name="notifications_test_preview_body">Aperçu de l’alerte de sortie d’épisode.</string>
     <string name="notifications_test_send_failed">Impossible d’envoyer une notification de test.</string>
     <string name="notifications_test_sent_for">Notification de test envoyée pour %1$s.</string>
-    <string name="player_engine_unavailable_rebuild">Moteur de lecture MPV indisponible. Reconstruis l’app.</string>
+    <string name="player_engine_unavailable_rebuild">Moteur de lecture MPV indisponible. Reconstruisez l’app.</string>
     <string name="player_unable_to_play_stream">Impossible de lire ce stream.</string>
     <string name="profile_pin_changed_requires_refresh">Le code PIN de ce profil a changé. Connectez-vous une fois pour mettre à jour le verrouillage sur cet appareil.</string>
     <string name="profile_pin_clear_failed">Impossible de supprimer le verrouillage PIN. Réessayez.</string>
@@ -1422,8 +1451,10 @@
     <string name="action_resume_episode">Reprendre %1$s</string>
     <string name="collections_import_error_empty_json">Le JSON est vide.</string>
     <string name="collections_import_error_collection_blank_id">La collection %1$d a un ID vide.</string>
+    <string name="collections_import_error_collection_duplicate_id">L’identifiant de collection « %1$s » est utilisé plusieurs fois.</string>
     <string name="collections_import_error_collection_blank_title">La collection « %1$s » a un titre vide.</string>
     <string name="collections_import_error_folder_blank_id">Le dossier %1$d dans « %2$s » a un ID vide.</string>
+    <string name="collections_import_error_folder_duplicate_id">L’identifiant de dossier « %1$s » est utilisé plusieurs fois dans « %2$s ».</string>
     <string name="collections_import_error_folder_blank_title">Le dossier « %1$s » dans « %2$s » a un titre vide.</string>
     <string name="collections_import_error_source_blank_fields">La source %1$d dans le dossier « %2$s » a des champs vides.</string>
     <string name="collections_import_error_trakt_list_id">La source %1$d dans le dossier « %2$s » n’a pas d’ID de liste Trakt.</string>
@@ -1784,7 +1815,7 @@
     <string name="network_please_check_connection">Vérifiez votre connexion et réessayez.</string>
     <string name="network_request_failed_http">Échec de la requête (HTTP %1$d)</string>
     <string name="player_addon_subtitle_display_format">%1$s (%2$s)</string>
-    <string name="player_error_mpv_unavailable">Moteur de lecture MPV indisponible. Reconstruis l’app.</string>
+    <string name="player_error_mpv_unavailable">Moteur de lecture MPV indisponible. Reconstruisez l’app.</string>
     <string name="player_error_unable_to_play_stream">Impossible de lire ce stream.</string>
     <string name="plugins_badge_disabled">Plugins désactivés</string>
     <string name="plugins_badge_enabled">Plugins activés</string>
@@ -1895,4 +1926,19 @@
     <string name="player_torrent_starting_engine">Démarrage du moteur P2P…</string>
     <string name="player_error_failed_start_torrent">Impossible de démarrer le torrent : %1$s</string>
     <string name="player_error_torrent">Erreur de torrent : %1$s</string>
+    <!-- Person & TMDB entity detail (pass7) -->
+    <string name="person_detail_born">Naissance</string>
+    <string name="person_detail_place_of_birth">Lieu de naissance</string>
+    <string name="person_detail_credits">Crédits</string>
+    <string name="person_detail_biography">Biographie</string>
+    <string name="entity_browse_country">Pays</string>
+    <string name="entity_browse_type">Type</string>
+    <string name="entity_browse_catalogue">Catalogue</string>
+    <string name="entity_browse_about">À propos</string>
+    <string name="player_external_loading_subtitles">Chargement des sous-titres depuis les addons…</string>
+    <string name="player_external_downloading_subtitles">Téléchargement des sous-titres…</string>
+    <plurals name="entity_browse_title_count">
+        <item quantity="one">%d titre</item>
+        <item quantity="other">%d titres</item>
+    </plurals>
 </resources>

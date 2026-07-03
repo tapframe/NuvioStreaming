@@ -1,6 +1,7 @@
 package com.nuvio.app.features.watching.sync
 
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.sync.putSyncOriginClientId
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
@@ -104,6 +105,7 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
         val params = buildJsonObject {
             put("p_profile_id", profileId)
             put("p_entries", json.encodeToJsonElement(syncEntries))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_push_watch_progress", params)
     }
@@ -122,6 +124,7 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
         val params = buildJsonObject {
             put("p_profile_id", profileId)
             put("p_keys", json.encodeToJsonElement(progressKeys))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_delete_watch_progress", params)
     }

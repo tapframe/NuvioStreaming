@@ -31,18 +31,6 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
     @get:Input
     abstract val supabaseAnonKey: Property<String>
 
-    @get:Input
-    abstract val nuvioSupabaseUrl: Property<String>
-
-    @get:Input
-    abstract val nuvioSupabaseAnonKey: Property<String>
-
-    @get:Input
-    abstract val syncBackendManifestUrl: Property<String>
-
-    @get:Input
-    abstract val debugBuild: Property<Boolean>
-
     @TaskAction
     fun generate() {
         val props = Properties()
@@ -58,17 +46,6 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |object SupabaseConfig {
                 |    const val URL = "${supabaseUrl.get()}"
                 |    const val ANON_KEY = "${supabaseAnonKey.get()}"
-                |    const val NUVIO_URL = "${nuvioSupabaseUrl.get()}"
-                |    const val NUVIO_ANON_KEY = "${nuvioSupabaseAnonKey.get()}"
-                |}
-                """.trimMargin()
-            )
-            resolve("SyncBackendBootstrapConfig.kt").writeText(
-                """
-                |package com.nuvio.app.core.network
-                |
-                |object SyncBackendBootstrapConfig {
-                |    const val SWITCH_MANIFEST_URL = "${syncBackendManifestUrl.get()}"
                 |}
                 """.trimMargin()
             )
@@ -140,15 +117,6 @@ abstract class GenerateRuntimeConfigsTask : DefaultTask() {
                 |object AppVersionConfig {
                 |    const val VERSION_NAME = "${appVersionName.get()}"
                 |    const val VERSION_CODE = ${appVersionCode.get()}
-                |}
-                """.trimMargin()
-            )
-            resolve("AppBuildConfig.kt").writeText(
-                """
-                |package com.nuvio.app.core.build
-                |
-                |object AppBuildConfig {
-                |    const val IS_DEBUG_BUILD = ${debugBuild.get()}
                 |}
                 """.trimMargin()
             )
@@ -268,46 +236,13 @@ fun runtimeConfigValue(key: String, fallback: String = ""): String =
         ?: providers.environmentVariable(key).orNull?.trim()?.takeIf { it.isNotBlank() }
         ?: fallback
 
-fun booleanConfigValue(key: String): Boolean? {
-    val rawValue = runtimeLocalProperties.getProperty(key)
-        ?: providers.environmentVariable(key).orNull
-        ?: providers.gradleProperty(key).orNull
-    return rawValue
-        ?.trim()
-        ?.lowercase()
-        ?.let { value ->
-            when (value) {
-                "1", "true", "yes", "y", "debug" -> true
-                "0", "false", "no", "n", "release" -> false
-                else -> null
-            }
-        }
-}
-
-val xcodeConfiguration = providers.environmentVariable("CONFIGURATION").orNull
-    ?.trim()
-    ?.lowercase()
-val kotlinFrameworkBuildType = providers.environmentVariable("KOTLIN_FRAMEWORK_BUILD_TYPE").orNull
-    ?.trim()
-    ?.lowercase()
-val inferredDebugBuild = requestedGradleTasks.any { "debug" in it } ||
-    xcodeConfiguration == "debug" ||
-    kotlinFrameworkBuildType == "debug"
-val isDebugBuild = booleanConfigValue("NUVIO_DEBUG_BUILD")
-    ?: booleanConfigValue("nuvio.debugBuild")
-    ?: inferredDebugBuild
-
 val generateRuntimeConfigs = tasks.register<GenerateRuntimeConfigsTask>("generateRuntimeConfigs") {
     outputDir.set(generatedRuntimeConfigDir)
     localPropertiesFile.set(rootProject.layout.projectDirectory.file("local.properties"))
     appVersionName.set(releaseAppVersionName)
     appVersionCode.set(releaseAppVersionCode)
-    supabaseUrl.set(runtimeConfigValue("SUPABASE_URL"))
-    supabaseAnonKey.set(runtimeConfigValue("SUPABASE_ANON_KEY"))
-    nuvioSupabaseUrl.set(runtimeConfigValue("NUVIO_SUPABASE_URL"))
-    nuvioSupabaseAnonKey.set(runtimeConfigValue("NUVIO_SUPABASE_ANON_KEY"))
-    syncBackendManifestUrl.set(runtimeConfigValue("SYNC_BACKEND_MANIFEST_URL"))
-    debugBuild.set(isDebugBuild)
+    supabaseUrl.set(runtimeConfigValue("NUVIO_SUPABASE_URL"))
+    supabaseAnonKey.set(runtimeConfigValue("NUVIO_SUPABASE_ANON_KEY"))
 }
 
 tasks.withType<KotlinCompilationTask<*>>().configureEach {
@@ -385,7 +320,7 @@ kotlin {
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
                 implementation("com.google.code.gson:gson:2.11.0")
                 implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
-                implementation(libs.ktor.client.android)
+                implementation(libs.ktor.client.okhttp)
                 implementation(libs.androidx.media3.exoplayer.hls)
                 implementation(libs.androidx.media3.exoplayer.dash)
                 implementation(libs.androidx.media3.exoplayer.smoothstreaming)
@@ -427,11 +362,13 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.kotlinx.atomicfu)
+            implementation(libs.kmpalette.core)
             implementation(libs.androidx.navigation.compose)
             implementation(libs.kermit)
             implementation(libs.supabase.postgrest)
             implementation(libs.supabase.auth)
             implementation(libs.supabase.functions)
+            implementation(libs.supabase.realtime)
             implementation(libs.reorderable)
         }
         commonTest.dependencies {

@@ -1858,11 +1858,8 @@
     <string name="compose_auth_terms_link">Условията</string>
     <string name="compose_player_no_subtitle_lines_found">Не са намерени редове със субтитри</string>
     <string name="compose_player_subtitle_lines_load_error">Редовете със субтитри не могат да се заредят</string>
-    <string name="debug_backend_switch_confirm_title">Да се превключи ли бекендът?</string>
-    <string name="debug_backend_switch_confirm_message">Да се превключи ли към %1$s и да излезете? Можете да влезете отново в избрания бекенд.</string>
     <string name="details_actions_menu_label">Още действия</string>
     <string name="p2p_error_unknown">Неизвестна грешка в торента</string>
-    <string name="settings_account_sync_backend">Бекенд за синхронизация</string>
     <string name="settings_appearance_app_language_device">Език на устройството</string>
     <string name="settings_content_discovery_addons_description_appstore">Свържете лични медийни източници и управлявайте достъпа до собствената си библиотека.</string>
     <string name="settings_playback_external_player_send_skip_segments">Изпращане на времеви маркери за интро и аутро</string>

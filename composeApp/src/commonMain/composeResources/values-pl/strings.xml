@@ -1655,7 +1655,6 @@
     <string name="plugins_test_results_count">Wyniki testu (%1$d)</string>
     <string name="plugins_tmdb_required_message">Dostawcy wtyczek wymagają klucza API TMDB. Ustaw go na ekranie TMDB, w przeciwnym razie dostawcy nie będą działać poprawnie.</string>
     <string name="search_error_no_results_for_catalog">Brak wyników wyszukiwania dla %1$s.</string>
-    <string name="settings_account_sync_backend">Backend synchronizacji</string>
     <string name="settings_advanced_clear_cw_cache">Wyczyść pamięć Kontynuuj oglądanie</string>
     <string name="settings_advanced_clear_cw_cache_done">Pamięć wyczyszczona</string>
     <string name="settings_advanced_clear_cw_cache_subtitle">Usuń dane Kontynuuj oglądanie i odśwież postęp</string>

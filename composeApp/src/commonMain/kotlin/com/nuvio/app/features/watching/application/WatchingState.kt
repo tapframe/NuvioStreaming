@@ -18,7 +18,12 @@ object WatchingState {
     fun isPosterWatched(
         watchedKeys: Set<String>,
         item: MetaPreview,
-    ): Boolean = watchedKeys.contains(watchedItemKey(item.type, item.id))
+        fullyWatchedSeriesKeys: Set<String> = emptySet(),
+    ): Boolean {
+        val posterKey = watchedItemKey(item.type, item.id)
+        if (watchedKeys.contains(posterKey)) return true
+        return item.type.isSeriesLikePosterType() && fullyWatchedSeriesKeys.contains(posterKey)
+    }
 
     fun isEpisodeWatched(
         watchedKeys: Set<String>,
@@ -81,6 +86,9 @@ object WatchingState {
         latestCompletedBySeries: Map<WatchingContentRef, WatchingCompletedEpisode>,
     ): List<WatchProgressEntry> = progressEntries.continueWatchingEntries()
 }
+
+private fun String.isSeriesLikePosterType(): Boolean =
+    trim().lowercase() in setOf("series", "show", "tv", "tvshow")
 
 private fun WatchProgressEntry.toDomainProgressRecord(): WatchingProgressRecord =
     normalizedCompletion().let { entry ->

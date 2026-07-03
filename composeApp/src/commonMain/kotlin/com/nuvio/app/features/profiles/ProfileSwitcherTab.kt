@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.Add
@@ -269,6 +271,7 @@ fun ProfileSwitcherTab(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         // Profile avatars row
                         Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(tokens.spacing.cardPadding),
                             verticalAlignment = Alignment.Top,
                         ) {
@@ -458,6 +461,7 @@ fun NativeProfileSwitcherPopup(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(tokens.spacing.cardPadding),
                                 verticalAlignment = Alignment.Top,
                             ) {

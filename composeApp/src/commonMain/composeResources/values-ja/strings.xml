@@ -540,9 +540,6 @@
     <string name="settings_account_status">ステータス</string>
     <string name="settings_account_status_anonymous">匿名</string>
     <string name="settings_account_status_signed_in">サインイン済み</string>
-    <string name="settings_account_sync_backend">同期バックエンド</string>
-    <string name="debug_backend_switch_confirm_title">バックエンドを切り替えますか？</string>
-    <string name="debug_backend_switch_confirm_message">%1$s に切り替えてサインアウトしますか？選択したバックエンドで再度サインインできます。</string>
     <string name="settings_appearance_amoled_black">AMOLED ブラック</string>
     <string name="settings_appearance_amoled_description">OLEDスクリーン向けに純粋な黒背景を使用します。</string>
     <string name="settings_appearance_app_language">アプリの言語</string>
