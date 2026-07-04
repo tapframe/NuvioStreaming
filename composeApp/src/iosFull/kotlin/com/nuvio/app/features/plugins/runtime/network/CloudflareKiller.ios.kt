@@ -18,6 +18,21 @@ import platform.WebKit.WKWebViewConfiguration
 import platform.WebKit.WKWebsiteDataStore
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import platform.WebKit.WKNavigationDelegateProtocol
+import platform.WebKit.WKNavigationResponse
+import platform.WebKit.WKNavigationResponsePolicy
+import platform.WebKit.WKNavigation
+import platform.Foundation.NSHTTPURLResponse
+import platform.Foundation.NSError
+import platform.Foundation.NSURLAuthenticationChallenge
+import platform.Foundation.NSURLSessionAuthChallengeDisposition
+import platform.Foundation.NSURLCredential
+import platform.Foundation.NSURLSessionAuthChallengeUseCredential
+import platform.Foundation.NSURLSessionAuthChallengePerformDefaultHandling
+import platform.Foundation.credentialForTrust
+import platform.darwin.NSObject
+import platform.WebKit.WKNavigationResponsePolicyAllow
+
 
 internal fun platformWebViewSolverImpl(): WebViewSolver = IosWebViewSolver
 
@@ -98,6 +113,9 @@ internal object IosWebViewSolver : WebViewSolver {
         val webViewUserAgent = getOrCaptureUserAgent()
 
         try {
+            val delegate = withContext(Dispatchers.Main) {
+                CloudflareNavigationDelegate()
+            }
             withContext(Dispatchers.Main) {
                 val config = WKWebViewConfiguration()
                 val webView = WKWebView(
@@ -105,6 +123,7 @@ internal object IosWebViewSolver : WebViewSolver {
                     configuration = config,
                 )
                 webView.customUserAgent = webViewUserAgent
+                webView.navigationDelegate = delegate
                 webViewRef = webView
                 webView.loadRequest(NSURLRequest.requestWithURL(nsUrl))
             }
@@ -113,6 +132,11 @@ internal object IosWebViewSolver : WebViewSolver {
                 var solved: CfSolveResult? = null
                 while (solved == null) {
                     delay(100L)
+                    val error = withContext(Dispatchers.Main) { delegate.error }
+                    if (error != null) {
+                        log.e { "CF solve failed due to network/navigation error: ${error.localizedDescription}" }
+                        break
+                    }
                     val cookies = getWkCookies(cookieStore, host)
                     if (cookies.containsKey("cf_clearance")) {
                         val finalUrl = withContext(Dispatchers.Main) {
@@ -154,6 +178,9 @@ internal object IosWebViewSolver : WebViewSolver {
         val webViewUserAgent = getOrCaptureUserAgent()
 
         try {
+            val delegate = withContext(Dispatchers.Main) {
+                CloudflareNavigationDelegate()
+            }
             withContext(Dispatchers.Main) {
                 val config = WKWebViewConfiguration()
                 val webView = WKWebView(
@@ -161,6 +188,7 @@ internal object IosWebViewSolver : WebViewSolver {
                     configuration = config,
                 )
                 webView.customUserAgent = webViewUserAgent
+                webView.navigationDelegate = delegate
                 webViewRef = webView
                 webView.loadRequest(NSURLRequest.requestWithURL(nsUrl))
             }
@@ -169,6 +197,11 @@ internal object IosWebViewSolver : WebViewSolver {
                 var rendered: WebViewFetchResult? = null
                 while (rendered == null) {
                     delay(250L)
+                    val error = withContext(Dispatchers.Main) { delegate.error }
+                    if (error != null) {
+                        log.e { "CF fetch fallback failed due to network/navigation error: ${error.localizedDescription}" }
+                        break
+                    }
                     val state = webViewRef?.evaluateJavascriptString(PAGE_STATE_JS).orEmpty()
                     if (state == "blocked") {
                         return@withTimeoutOrNull null
@@ -179,11 +212,15 @@ internal object IosWebViewSolver : WebViewSolver {
                         if (body.isNotBlank()) {
                             val contentType = webViewRef?.evaluateJavascriptString(PAGE_CONTENT_TYPE_JS)
                                 .orEmpty().ifBlank { "text/html" }
-                            val headersWithContentType = mutableMapOf<String, String>()
-                            headersWithContentType["content-type"] = contentType
+                            val headersWithContentType = withContext(Dispatchers.Main) {
+                                delegate.headers.toMutableMap()
+                            }
+                            if (headersWithContentType.keys.none { it.equals("content-type", ignoreCase = true) }) {
+                                headersWithContentType["content-type"] = contentType
+                            }
                             rendered = WebViewFetchResult(
-                                status = 200,
-                                statusText = "OK",
+                                status = withContext(Dispatchers.Main) { delegate.status },
+                                statusText = withContext(Dispatchers.Main) { delegate.statusText },
                                 url = withContext(Dispatchers.Main) {
                                     webViewRef?.URL?.absoluteString ?: url
                                 },
@@ -286,5 +323,61 @@ internal object IosWebViewSolver : WebViewSolver {
         val normalizedDomain = domain.trimStart('.').lowercase()
         val normalizedHost = host.lowercase()
         return normalizedHost == normalizedDomain || normalizedHost.endsWith(".$normalizedDomain")
+    }
+}
+
+private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegateProtocol {
+    var status: Int = 200
+    var statusText: String = "OK"
+    val headers = mutableMapOf<String, String>()
+    var error: NSError? = null
+
+    override fun webView(
+        webView: WKWebView,
+        decidePolicyForNavigationResponse: WKNavigationResponse,
+        decisionHandler: (WKNavigationResponsePolicy) -> Unit
+    ) {
+        val httpResponse = decidePolicyForNavigationResponse.response as? NSHTTPURLResponse
+        if (httpResponse != null) {
+            status = httpResponse.statusCode.toInt()
+            statusText = NSHTTPURLResponse.localizedStringForStatusCode(httpResponse.statusCode)
+            headers.clear()
+            httpResponse.allHeaderFields.forEach { (key, value) ->
+                headers[key.toString()] = value.toString()
+            }
+        }
+        decisionHandler(WKNavigationResponsePolicyAllow)
+    }
+
+    override fun webView(
+        webView: WKWebView,
+        didFailNavigation: WKNavigation?,
+        withError: NSError
+    ) {
+        error = withError
+    }
+
+    override fun webView(
+        webView: WKWebView,
+        didFailProvisionalNavigation: WKNavigation?,
+        withError: NSError
+    ) {
+        error = withError
+    }
+
+    override fun webView(
+        webView: WKWebView,
+        didReceiveAuthenticationChallenge: platform.Foundation.NSURLAuthenticationChallenge,
+        completionHandler: (platform.Foundation.NSURLSessionAuthChallengeDisposition, platform.Foundation.NSURLCredential?) -> Unit
+    ) {
+        val trust = didReceiveAuthenticationChallenge.protectionSpace.serverTrust
+        if (trust != null) {
+            completionHandler(
+                platform.Foundation.NSURLSessionAuthChallengeUseCredential,
+                NSURLCredential.credentialForTrust(trust)
+            )
+        } else {
+            completionHandler(platform.Foundation.NSURLSessionAuthChallengePerformDefaultHandling, null)
+        }
     }
 }
