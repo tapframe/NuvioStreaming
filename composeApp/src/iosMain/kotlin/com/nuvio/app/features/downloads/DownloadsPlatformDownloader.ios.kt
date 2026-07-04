@@ -37,6 +37,7 @@ import platform.Foundation.NSURLSessionDataTask
 import platform.Foundation.NSURLSessionTask
 import platform.Foundation.setHTTPMethod
 import platform.Foundation.setValue
+import platform.UIKit.UIApplication
 import platform.Foundation.timeIntervalSince1970
 import platform.darwin.NSObject
 import platform.posix.FILE
@@ -175,6 +176,16 @@ internal actual object DownloadsPlatformDownloader {
         } else {
             null
         }
+    }
+
+    actual fun openDownloadsDirectory(): Boolean {
+        val url = NSURL.fileURLWithPath(downloadsDirectoryPath())
+        UIApplication.sharedApplication.openURL(
+            url = url,
+            options = emptyMap<Any?, Any>(),
+            completionHandler = null,
+        )
+        return true
     }
 }
 

@@ -406,6 +406,18 @@ internal fun settingsSearchEntries(
         category = advancedCategory,
         icon = Icons.Rounded.Tune,
     )
+    if (SentrySettingsRepository.isSupported) {
+        addRow(
+            page = SettingsPage.Advanced,
+            key = "sentry-crash-reports",
+            title = stringResource(Res.string.settings_advanced_sentry_reports),
+            description = stringResource(Res.string.settings_advanced_sentry_reports_subtitle),
+            pageLabel = advancedPage,
+            section = stringResource(Res.string.settings_advanced_section_diagnostics),
+            category = advancedCategory,
+            icon = Icons.Rounded.Tune,
+        )
+    }
     addRow(
         page = SettingsPage.Advanced,
         key = "clear-cw-cache",

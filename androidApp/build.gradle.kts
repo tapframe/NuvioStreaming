@@ -16,6 +16,7 @@ fun readXcconfigValue(file: File, key: String): String? {
 
 plugins {
     alias(libs.plugins.androidApplication)
+    alias(libs.plugins.sentry.android.gradle)
 }
 
 val localProps = Properties().apply {
@@ -27,6 +28,14 @@ val releaseStorePassword = localProps.getProperty("NUVIO_RELEASE_STORE_PASSWORD"
 val releaseKeyAlias = localProps.getProperty("NUVIO_RELEASE_KEY_ALIAS")?.takeIf { it.isNotBlank() }
 val releaseKeyPassword = localProps.getProperty("NUVIO_RELEASE_KEY_PASSWORD")?.takeIf { it.isNotBlank() }
 val releaseKeystore = releaseStoreFile?.let(rootProject::file)
+fun envOrLocalProperty(key: String): String? =
+    providers.environmentVariable(key).orNull?.trim()?.takeIf { it.isNotBlank() }
+        ?: localProps.getProperty(key)?.trim()?.takeIf { it.isNotBlank() }
+
+val sentryAuthToken = envOrLocalProperty("SENTRY_AUTH_TOKEN")
+val sentryOrg = envOrLocalProperty("SENTRY_ORG")
+val sentryProject = envOrLocalProperty("SENTRY_PROJECT")
+val sentryMappingUploadEnabled = sentryAuthToken != null && sentryOrg != null && sentryProject != null
 val appVersionConfigFile = rootProject.file("iosApp/Configuration/Version.xcconfig")
 val releaseAppVersionName = readXcconfigValue(appVersionConfigFile, "MARKETING_VERSION")
     ?: error("MARKETING_VERSION is missing from ${appVersionConfigFile.path}")
@@ -108,6 +117,28 @@ android {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+sentry {
+    includeProguardMapping.set(true)
+    autoUploadProguardMapping.set(sentryMappingUploadEnabled)
+    uploadNativeSymbols.set(false)
+    autoUploadNativeSymbols.set(false)
+    includeNativeSources.set(false)
+    includeSourceContext.set(false)
+    autoUploadSourceContext.set(false)
+    includeDependenciesReport.set(false)
+    telemetry.set(false)
+    sentryAuthToken?.let(authToken::set)
+    sentryOrg?.let(org::set)
+    sentryProject?.let(projectName::set)
+    ignoredBuildTypes.set(setOf("debug"))
+    autoInstallation {
+        enabled.set(false)
+    }
+    tracingInstrumentation {
+        enabled.set(false)
     }
 }
 

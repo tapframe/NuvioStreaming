@@ -16,6 +16,10 @@
         android:localeConfig="@xml/locale_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.Nuvio">
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
         <activity
             android:exported="true"
             android:name="com.nuvio.app.MainActivity"
