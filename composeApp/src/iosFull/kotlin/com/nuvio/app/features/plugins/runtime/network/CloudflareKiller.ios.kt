@@ -1,8 +1,8 @@
-@file:Suppress("CONFLICTING_OVERLOADS")
 package com.nuvio.app.features.plugins.runtime.network
 
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.cinterop.readValue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -310,7 +310,6 @@ internal object IosWebViewSolver : WebViewSolver {
     }
 }
 
-@Suppress("CONFLICTING_OVERLOADS")
 @OptIn(ExperimentalForeignApi::class)
 private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegateProtocol {
     var status: Int = 200
@@ -335,7 +334,7 @@ private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegatePro
         decisionHandler(WKNavigationResponsePolicy.WKNavigationResponsePolicyAllow)
     }
 
-    @Suppress("CONFLICTING_OVERLOADS")
+    @ObjCSignatureOverride
     override fun webView(
         webView: WKWebView,
         didFailNavigation: WKNavigation?,
@@ -344,7 +343,7 @@ private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegatePro
         error = withError
     }
 
-    @Suppress("CONFLICTING_OVERLOADS")
+    @ObjCSignatureOverride
     override fun webView(
         webView: WKWebView,
         didFailProvisionalNavigation: WKNavigation?,
