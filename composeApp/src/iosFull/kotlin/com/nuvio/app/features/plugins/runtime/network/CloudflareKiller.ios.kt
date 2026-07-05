@@ -31,7 +31,8 @@ import platform.Foundation.NSURLSessionAuthChallengeUseCredential
 import platform.Foundation.NSURLSessionAuthChallengePerformDefaultHandling
 import platform.Foundation.credentialForTrust
 import platform.darwin.NSObject
-import platform.WebKit.WKNavigationResponsePolicyAllow
+import platform.Foundation.NSURLProtectionSpace
+import platform.Security.SecTrustRef
 
 
 internal fun platformWebViewSolverImpl(): WebViewSolver = IosWebViewSolver
@@ -326,6 +327,8 @@ internal object IosWebViewSolver : WebViewSolver {
     }
 }
 
+@Suppress("CONFLICTING_OVERLOADS")
+@OptIn(ExperimentalForeignApi::class)
 private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegateProtocol {
     var status: Int = 200
     var statusText: String = "OK"
@@ -346,7 +349,7 @@ private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegatePro
                 headers[key.toString()] = value.toString()
             }
         }
-        decisionHandler(WKNavigationResponsePolicyAllow)
+        decisionHandler(WKNavigationResponsePolicy.WKNavigationResponsePolicyAllow)
     }
 
     override fun webView(
