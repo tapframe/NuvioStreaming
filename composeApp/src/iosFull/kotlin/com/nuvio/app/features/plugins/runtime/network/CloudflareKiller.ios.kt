@@ -1,3 +1,4 @@
+@file:Suppress("CONFLICTING_OVERLOADS")
 package com.nuvio.app.features.plugins.runtime.network
 
 import co.touchlab.kermit.Logger
@@ -9,29 +10,11 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import platform.Foundation.NSHTTPCookie
-import platform.Foundation.NSURL
-import platform.Foundation.NSURLRequest
-import platform.WebKit.WKHTTPCookieStore
-import platform.WebKit.WKWebView
-import platform.WebKit.WKWebViewConfiguration
-import platform.WebKit.WKWebsiteDataStore
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
-import platform.WebKit.WKNavigationDelegateProtocol
-import platform.WebKit.WKNavigationResponse
-import platform.WebKit.WKNavigationResponsePolicy
-import platform.WebKit.WKNavigation
-import platform.Foundation.NSHTTPURLResponse
-import platform.Foundation.NSError
-import platform.Foundation.NSURLAuthenticationChallenge
-import platform.Foundation.NSURLSessionAuthChallengeDisposition
-import platform.Foundation.NSURLCredential
-import platform.Foundation.NSURLSessionAuthChallengeUseCredential
-import platform.Foundation.NSURLSessionAuthChallengePerformDefaultHandling
-import platform.Foundation.credentialForTrust
+import platform.Foundation.*
+import platform.WebKit.*
 import platform.darwin.NSObject
-import platform.Foundation.NSURLProtectionSpace
 import platform.Security.SecTrustRef
 
 
@@ -352,6 +335,7 @@ private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegatePro
         decisionHandler(WKNavigationResponsePolicy.WKNavigationResponsePolicyAllow)
     }
 
+    @Suppress("CONFLICTING_OVERLOADS")
     override fun webView(
         webView: WKWebView,
         didFailNavigation: WKNavigation?,
@@ -360,6 +344,7 @@ private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegatePro
         error = withError
     }
 
+    @Suppress("CONFLICTING_OVERLOADS")
     override fun webView(
         webView: WKWebView,
         didFailProvisionalNavigation: WKNavigation?,
@@ -373,7 +358,7 @@ private class CloudflareNavigationDelegate : NSObject(), WKNavigationDelegatePro
         didReceiveAuthenticationChallenge: platform.Foundation.NSURLAuthenticationChallenge,
         completionHandler: (platform.Foundation.NSURLSessionAuthChallengeDisposition, platform.Foundation.NSURLCredential?) -> Unit
     ) {
-        val trust = didReceiveAuthenticationChallenge.protectionSpace.serverTrust
+        val trust = didReceiveAuthenticationChallenge.protectionSpace?.serverTrust
         if (trust != null) {
             completionHandler(
                 platform.Foundation.NSURLSessionAuthChallengeUseCredential,
