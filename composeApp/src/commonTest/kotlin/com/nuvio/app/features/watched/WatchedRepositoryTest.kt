@@ -47,6 +47,30 @@ class WatchedRepositoryTest {
     }
 
     @Test
+    fun fullyWatchedSeries_ignores_explicitly_unavailable_main_episodes() {
+        val meta = MetaDetails(
+            id = "show",
+            type = "series",
+            name = "Show",
+            videos = listOf(
+                MetaVideo(id = "s1e1", title = "Episode 1", season = 1, episode = 1, released = "2026-03-01"),
+                MetaVideo(id = "s3e1", title = "Episode 1", season = 3, episode = 1, released = null, available = false),
+            ),
+        )
+
+        assertEquals(
+            listOf("s1e1"),
+            meta.releasedMainSeasonEpisodes(todayIsoDate = "2026-07-05").map(MetaVideo::id),
+        )
+
+        val result = meta.hasWatchedAllMainSeasonEpisodes(todayIsoDate = "2026-07-05") { episode ->
+            episode.id == "s1e1"
+        }
+
+        assertTrue(result)
+    }
+
+    @Test
     fun mergeWatchedItemsPreservingUnsynced_keeps_local_items_marked_after_last_push() {
         val serverItem = WatchedItem(
             id = "show",

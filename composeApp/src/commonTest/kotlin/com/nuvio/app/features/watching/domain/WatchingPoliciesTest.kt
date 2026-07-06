@@ -26,6 +26,30 @@ class WatchingPoliciesTest {
     }
 
     @Test
+    fun hasWatchedAllMainSeasonEpisodes_ignores_explicitly_unavailable_episodes() {
+        val episodes = listOf(
+            WatchingReleasedEpisode(videoId = "ep1", seasonNumber = 1, episodeNumber = 1, releasedDate = "2026-03-01"),
+            WatchingReleasedEpisode(videoId = "phantom", seasonNumber = 3, episodeNumber = 1, releasedDate = null, available = false),
+        )
+
+        assertEquals(
+            listOf("ep1"),
+            releasedMainSeasonEpisodes(
+                episodes = episodes,
+                todayIsoDate = "2026-07-05",
+            ).map(WatchingReleasedEpisode::videoId),
+        )
+
+        val result = hasWatchedAllMainSeasonEpisodes(
+            episodes = episodes,
+            todayIsoDate = "2026-07-05",
+            isEpisodeWatched = { episode -> episode.videoId == "ep1" },
+        )
+
+        assertTrue(result)
+    }
+
+    @Test
     fun latestCompletedSeriesEpisode_prefers_newer_manual_watch_marker() {
         val latestCompleted = latestCompletedSeriesEpisode(
             content = show,

@@ -93,6 +93,26 @@ actual fun PlatformPlayerSurface(
                 bridge.retry()
             }
 
+            override fun updateNowPlayingMetadata(info: PlayerNowPlayingInfo) {
+                runCatching {
+                    bridge.updateNowPlayingMetadata(
+                        title = info.title,
+                        subtitle = info.subtitle,
+                        artworkUrl = info.artworkUrl,
+                    )
+                }.onFailure { error ->
+                    Logger.w(TAG, error) { "Failed to update iOS Now Playing metadata" }
+                }
+            }
+
+            override fun clearNowPlayingInfo() {
+                runCatching {
+                    bridge.clearNowPlayingInfo()
+                }.onFailure { error ->
+                    Logger.w(TAG, error) { "Failed to clear iOS Now Playing metadata" }
+                }
+            }
+
             override fun configureIosVideoOutput(settings: PlayerSettingsUiState) {
                 bridge.applyIosVideoOutputSettings(settings)
             }

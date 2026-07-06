@@ -1865,7 +1865,7 @@ private fun ReuseCacheDurationDialog(
     onDurationSelected: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val options = listOf(1, 6, 12, 24, 48, 72, 168)
+    val options = listOf(1, 2, 3, 6, 12, 24, 48, 72, 168)
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,

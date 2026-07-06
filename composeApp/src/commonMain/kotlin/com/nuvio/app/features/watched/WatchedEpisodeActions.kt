@@ -100,4 +100,5 @@ private fun MetaVideo.toDomainReleasedEpisode(): WatchingReleasedEpisode =
         title = title,
         thumbnail = thumbnail,
         releasedDate = released,
+        available = available,
     )

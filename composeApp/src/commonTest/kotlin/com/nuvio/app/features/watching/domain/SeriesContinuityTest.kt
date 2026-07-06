@@ -3,6 +3,7 @@ package com.nuvio.app.features.watching.domain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class SeriesContinuityTest {
     private val show = WatchingContentRef(type = "series", id = "show")
@@ -119,6 +120,25 @@ class SeriesContinuityTest {
         assertEquals(2, nextEpisode.seasonNumber)
         assertEquals(2, nextEpisode.episodeNumber)
         assertEquals("s2e2", nextEpisode.videoId)
+    }
+
+    @Test
+    fun nextReleasedEpisodeAfter_skips_explicitly_unavailable_phantom_episode() {
+        val episodesWithPhantom = listOf(
+            WatchingReleasedEpisode(videoId = "s1e1", seasonNumber = 1, episodeNumber = 1, title = "Episode 1", releasedDate = "2026-01-01"),
+            WatchingReleasedEpisode(videoId = "s3e1", seasonNumber = 3, episodeNumber = 1, title = "Episode 1", releasedDate = null, available = false),
+        )
+
+        val nextEpisode = nextReleasedEpisodeAfter(
+            content = show,
+            episodes = episodesWithPhantom,
+            seasonNumber = 1,
+            episodeNumber = 1,
+            todayIsoDate = "2026-07-05",
+            showUnairedNextUp = true,
+        )
+
+        assertNull(nextEpisode)
     }
 
     @Test

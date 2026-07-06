@@ -20,6 +20,12 @@ interface NuvioPlayerBridge {
     fun seekTo(positionMs: Long)
     fun seekBy(offsetMs: Long)
     fun retry()
+    fun updateNowPlayingMetadata(
+        title: String,
+        subtitle: String?,
+        artworkUrl: String?,
+    )
+    fun clearNowPlayingInfo()
     fun configureVideoOutput(
         hardwareDecoder: String,
         targetColorspaceHint: Boolean,

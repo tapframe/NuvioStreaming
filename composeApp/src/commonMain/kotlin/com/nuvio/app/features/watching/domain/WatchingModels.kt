@@ -37,6 +37,7 @@ data class WatchingReleasedEpisode(
     val title: String? = null,
     val thumbnail: String? = null,
     val releasedDate: String? = null,
+    val available: Boolean = true,
 )
 
 data class WatchingCompletedEpisode(

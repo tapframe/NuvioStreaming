@@ -1503,4 +1503,20 @@
   </plurals>
   <string name="cw_new_episode">Nuovo episodio</string>
   <string name="cw_new_season">Nuova stagione</string>
+  <string name="settings_meta_hero_trailer_playback">Riproduci Trailer in Hero</string>
+  <string name="settings_meta_hero_trailer_playback_description">Riproduci l'anteprima dei trailer nella sezione hero quando un trailer è disponibile.</string>
+  <string name="settings_fusion_badges_empty">Nessun URL di badge Fusion importato.</string>
+  <string name="plugins_enable_globally_title">Abilita i Plugin</string>
+  <string name="plugins_enable_globally_desc">Usa i plugin durante la ricerca di stream.</string>
+  <string name="plugins_group_by_repo_title">Raggruppa i provider dei plugin per repository</string>
+  <string name="plugins_group_by_repo_desc">Mostra negli stream un solo provider per repository invece che uno per sorgente.</string>
+  <string name="settings_p2p_title">Streaming P2P</string>
+  <string name="settings_p2p_subtitle">Consenti lo streaming peer-to-peer (torrent)</string>
+  <string name="settings_p2p_hide_stats_title">Nascondi le statistiche torrent</string>
+  <string name="settings_p2p_hide_stats_subtitle">Nascondi buffer, seeds, peers e velocità download durante il caricamento e la riproduzione</string>
+  <string name="compose_settings_root_advanced_description">Avvio e comportamento profili.</string>
+  <string name="supporters_contributors_donation_progress_title">Costi di manutenzione e server</string>
+  <string name="supporters_contributors_donation_progress_complete">Coperto. Qualsiasi supporto ulteriore andrà allo sviluppo.</string>
+  <string name="supporters_contributors_donation_progress_remaining">Dopo il 100%%, eventuale supporto in più andrà allo sviluppo.</string>
+  <string name="supporters_contributors_donate_button">Dona a Nuvio</string>
 </resources>

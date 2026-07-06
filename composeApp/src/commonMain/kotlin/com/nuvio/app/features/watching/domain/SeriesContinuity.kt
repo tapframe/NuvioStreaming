@@ -78,6 +78,7 @@ fun nextReleasedEpisodeAfter(
                 todayIsoDate = todayIsoDate,
                 releasedDate = episode.releasedDate,
                 showUnairedNextUp = showUnairedNextUp,
+                available = episode.available,
             )
         }
     return candidates.firstOrNull { normalizeSeasonNumber(it.seasonNumber) > 0 }
@@ -119,7 +120,13 @@ fun decideSeriesPrimaryAction(
     } else {
         val sorted = episodes
             .sortedWith(compareBy<WatchingReleasedEpisode>({ normalizeSeasonNumber(it.seasonNumber) }, { it.episodeNumber ?: 0 }))
-        val released = sorted.filter { episode -> isReleasedBy(todayIsoDate = todayIsoDate, releasedDate = episode.releasedDate) }
+        val released = sorted.filter { episode ->
+            isReleasedBy(
+                todayIsoDate = todayIsoDate,
+                releasedDate = episode.releasedDate,
+                available = episode.available,
+            )
+        }
         released.firstOrNull { normalizeSeasonNumber(it.seasonNumber) > 0 } ?: released.firstOrNull()
     }
 

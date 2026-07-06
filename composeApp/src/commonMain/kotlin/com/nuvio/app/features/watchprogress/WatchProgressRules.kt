@@ -13,6 +13,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 internal const val ContinueWatchingLimit = DefaultContinueWatchingLimit
+private const val WatchProgressSnapshotConflictToleranceMs = 1_000L
 
 @Serializable
 internal data class StoredWatchProgressPayload(
@@ -122,6 +123,24 @@ internal fun WatchProgressEntry.shouldUseAsCompletedSeedForContinueWatching(): B
 
     val explicitPercent = entry.normalizedProgressPercent ?: return false
     return explicitPercent >= WatchProgressTraktPlaybackNextUpSeedPercentThreshold
+}
+
+internal fun shouldReplaceProgressSnapshotEntry(
+    existing: WatchProgressEntry,
+    candidate: WatchProgressEntry,
+): Boolean {
+    val normalizedExisting = existing.normalizedCompletion()
+    val normalizedCandidate = candidate.normalizedCompletion()
+    val existingInProgress = normalizedExisting.shouldTreatAsInProgressForContinueWatching()
+    val candidateInProgress = normalizedCandidate.shouldTreatAsInProgressForContinueWatching()
+    if (existingInProgress != candidateInProgress) {
+        val inProgressEntry = if (candidateInProgress) normalizedCandidate else normalizedExisting
+        val completedEntry = if (candidateInProgress) normalizedExisting else normalizedCandidate
+        val inProgressIsCurrentEnough =
+            inProgressEntry.lastUpdatedEpochMs >= completedEntry.lastUpdatedEpochMs - WatchProgressSnapshotConflictToleranceMs
+        return if (candidateInProgress) inProgressIsCurrentEnough else !inProgressIsCurrentEnough
+    }
+    return normalizedCandidate.lastUpdatedEpochMs > normalizedExisting.lastUpdatedEpochMs
 }
 
 internal fun shouldCascadeCompletedProgressToWatchedHistory(

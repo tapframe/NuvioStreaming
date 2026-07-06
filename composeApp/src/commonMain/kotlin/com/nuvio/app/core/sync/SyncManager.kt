@@ -10,6 +10,7 @@ import com.nuvio.app.features.home.HomeCatalogSettingsSyncService
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.trakt.TraktCredentialSync
 import com.nuvio.app.features.trakt.TraktPlatformClock
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
@@ -48,6 +49,10 @@ object SyncManager {
                     .onSuccess { log.i { "pullAllForProfile — plugins pull completed" } }
                     .onFailure { log.e(it) { "Plugin pull failed" } }
             }
+
+            runCatching { TraktCredentialSync.pullFromRemote(profileId) }
+                .onSuccess { applied -> log.i { "pullAllForProfile — Trakt credential pull completed applied=$applied" } }
+                .onFailure { log.e(it) { "Trakt credential pull failed" } }
 
             log.i { "pullAllForProfile — launching remaining pulls in parallel" }
             launch {
@@ -152,6 +157,9 @@ object SyncManager {
     private fun pullForegroundForProfile(profileId: Int) {
         scope.launch {
             log.i { "pullForegroundForProfile($profileId) — syncing watch progress, library, collections, and home settings" }
+
+            runCatching { TraktCredentialSync.pullFromRemote(profileId) }
+                .onFailure { log.e(it) { "Foreground Trakt credential pull failed" } }
 
             launch {
                 runCatching { LibraryRepository.pullFromServer(profileId) }

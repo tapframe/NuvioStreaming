@@ -11,7 +11,7 @@ import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktHistory
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktPlayback
 import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktShowProgress
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
-import com.nuvio.app.features.watchprogress.shouldTreatAsInProgressForContinueWatching
+import com.nuvio.app.features.watchprogress.shouldReplaceProgressSnapshotEntry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -43,6 +43,9 @@ private const val TRAKT_COMPLETION_PERCENT_THRESHOLD = 90f
 private const val HISTORY_PAGE_LIMIT = 1000
 private const val HISTORY_MAX_PAGES = 5
 private const val HISTORY_MAX_PAGES_ALL = 20
+private const val WATCHED_PAGE_LIMIT = 250
+private const val WATCHED_MAX_PAGES = 1_000
+private const val WATCHED_SHOWS_EXTENDED = "progress"
 private const val MAX_RECENT_EPISODE_HISTORY_ENTRIES = 300
 private const val METADATA_FETCH_TIMEOUT_MS = 3_500L
 private const val METADATA_FETCH_CONCURRENCY = 5
@@ -688,11 +691,7 @@ object TraktProgressRepository {
     ): List<WatchProgressEntry> = withContext(Dispatchers.Default) {
         ContinueWatchingPreferencesRepository.ensureLoaded()
         val useFurthestEpisode = ContinueWatchingPreferencesRepository.uiState.value.upNextFromFurthestEpisode
-        val payload = httpGetTextWithHeaders(
-            url = "$BASE_URL/sync/watched/shows",
-            headers = headers,
-        )
-        val watchedShows = json.decodeFromString<List<TraktWatchedShowItem>>(payload)
+        val watchedShows = fetchWatchedShowPages(headers)
         updateWatchedShowCaches(watchedShows)
         val mapped = fixAmbiguousWatchedShowSeeds(
             watchedShows.mapNotNull { item ->
@@ -704,6 +703,34 @@ object TraktProgressRepository {
         )
             .sortedByDescending { entry -> entry.lastUpdatedEpochMs }
         mapped
+    }
+
+    private suspend fun fetchWatchedShowPages(
+        headers: Map<String, String>,
+    ): List<TraktWatchedShowItem> {
+        val items = mutableListOf<TraktWatchedShowItem>()
+        var page = 1
+        while (page <= WATCHED_MAX_PAGES) {
+            val response = httpRequestRaw(
+                method = "GET",
+                url = "$BASE_URL/sync/watched/shows?page=$page&limit=$WATCHED_PAGE_LIMIT&extended=$WATCHED_SHOWS_EXTENDED",
+                headers = headers,
+                body = "",
+            )
+            if (response.status !in 200..299) {
+                error("Trakt watched shows request failed: ${response.status}")
+            }
+            val pageItems = json.decodeFromString<List<TraktWatchedShowItem>>(response.body)
+            if (pageItems.isEmpty()) break
+            items.addAll(pageItems)
+            val pageCount = response.headerInt("x-pagination-page-count")
+            if (pageCount != null && page >= pageCount) break
+            page += 1
+        }
+        if (page > WATCHED_MAX_PAGES) {
+            error("Trakt watched shows exceeded max pages")
+        }
+        return items
     }
 
     private fun updateWatchedShowCaches(items: List<TraktWatchedShowItem>) {
@@ -978,18 +1005,6 @@ object TraktProgressRepository {
         return mergedByVideoId.values
             .toList()
             .sortedByDescending { it.lastUpdatedEpochMs }
-    }
-
-    private fun shouldReplaceProgressSnapshotEntry(
-        existing: WatchProgressEntry,
-        candidate: WatchProgressEntry,
-    ): Boolean {
-        val existingInProgress = existing.shouldTreatAsInProgressForContinueWatching()
-        val candidateInProgress = candidate.shouldTreatAsInProgressForContinueWatching()
-        if (existingInProgress != candidateInProgress) {
-            return candidateInProgress
-        }
-        return candidate.lastUpdatedEpochMs > existing.lastUpdatedEpochMs
     }
 
     private fun mergeEntriesPreferRichMetadata(
