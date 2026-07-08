@@ -81,9 +81,8 @@ internal object IosWebViewSolver : WebViewSolver {
             return null
         }
 
-        val cookieStore = WKWebsiteDataStore.defaultDataStore().httpCookieStore
         if (!forceFresh) {
-            val existing = getWkCookies(cookieStore, host)
+            val existing = getWkCookies(host)
             if (existing.containsKey("cf_clearance")) {
                 return CfSolveResult(cookies = existing, userAgent = getOrCaptureUserAgent())
             }
@@ -121,7 +120,7 @@ internal object IosWebViewSolver : WebViewSolver {
                         log.e { "CF solve failed due to network/navigation error: ${error.localizedDescription}" }
                         break
                     }
-                    val cookies = getWkCookies(cookieStore, host)
+                    val cookies = getWkCookies(host)
                     if (cookies.containsKey("cf_clearance")) {
                         val finalUrl = withContext(Dispatchers.Main) {
                             webViewRef?.URL?.absoluteString ?: url
@@ -260,9 +259,9 @@ internal object IosWebViewSolver : WebViewSolver {
     }
 
     private suspend fun getWkCookies(
-        cookieStore: WKHTTPCookieStore,
         host: String,
     ): Map<String, String> = withContext(Dispatchers.Main) {
+        val cookieStore = WKWebsiteDataStore.defaultDataStore().httpCookieStore
         suspendCoroutine { cont ->
             cookieStore.getAllCookies { rawList ->
                 @Suppress("UNCHECKED_CAST")
