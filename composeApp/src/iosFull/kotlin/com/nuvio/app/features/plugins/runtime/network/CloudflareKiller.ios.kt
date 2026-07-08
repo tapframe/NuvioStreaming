@@ -97,39 +97,40 @@ internal object IosWebViewSolver : WebViewSolver {
 
         try {
             val delegate = withContext(Dispatchers.Main) {
-                CloudflareNavigationDelegate()
-            }
-            withContext(Dispatchers.Main) {
+                val d = CloudflareNavigationDelegate()
                 val config = WKWebViewConfiguration()
                 val webView = WKWebView(
                     frame = platform.CoreGraphics.CGRectZero.readValue(),
                     configuration = config,
                 )
                 webView.customUserAgent = webViewUserAgent
-                webView.navigationDelegate = delegate
+                webView.navigationDelegate = d
                 webViewRef = webView
                 webView.loadRequest(NSURLRequest.requestWithURL(nsUrl))
+                d
             }
 
             val result = withTimeoutOrNull(timeoutMs) {
                 var solved: CfSolveResult? = null
-                while (solved == null) {
+                var isFailed = false
+                while (solved == null && !isFailed) {
                     delay(100L)
-                    val error = withContext(Dispatchers.Main) { delegate.error }
-                    if (error != null) {
-                        log.e { "CF solve failed due to network/navigation error: ${error.localizedDescription}" }
-                        break
-                    }
-                    val cookies = getWkCookies(host)
-                    if (cookies.containsKey("cf_clearance")) {
-                        val finalUrl = withContext(Dispatchers.Main) {
-                            webViewRef?.URL?.absoluteString ?: url
+                    withContext(Dispatchers.Main) {
+                        val error = delegate.error
+                        if (error != null) {
+                            log.e { "CF solve failed due to network/navigation error: ${error.localizedDescription}" }
+                            isFailed = true
+                            return@withContext
                         }
-                        solved = CfSolveResult(
-                            cookies = cookies,
-                            userAgent = webViewUserAgent,
-                            redirectUrl = finalUrl.takeIf { it != url },
-                        )
+                        val cookies = getWkCookies(host)
+                        if (cookies.containsKey("cf_clearance")) {
+                            val finalUrl = webViewRef?.URL?.absoluteString ?: url
+                            solved = CfSolveResult(
+                                cookies = cookies,
+                                userAgent = webViewUserAgent,
+                                redirectUrl = finalUrl.takeIf { it != url },
+                            )
+                        }
                     }
                 }
                 solved
@@ -141,6 +142,7 @@ internal object IosWebViewSolver : WebViewSolver {
             return result
         } finally {
             withContext(NonCancellable + Dispatchers.Main) {
+                webViewRef?.navigationDelegate = null
                 webViewRef?.stopLoading()
                 webViewRef = null
             }
@@ -162,54 +164,54 @@ internal object IosWebViewSolver : WebViewSolver {
 
         try {
             val delegate = withContext(Dispatchers.Main) {
-                CloudflareNavigationDelegate()
-            }
-            withContext(Dispatchers.Main) {
+                val d = CloudflareNavigationDelegate()
                 val config = WKWebViewConfiguration()
                 val webView = WKWebView(
                     frame = platform.CoreGraphics.CGRectZero.readValue(),
                     configuration = config,
                 )
                 webView.customUserAgent = webViewUserAgent
-                webView.navigationDelegate = delegate
+                webView.navigationDelegate = d
                 webViewRef = webView
                 webView.loadRequest(NSURLRequest.requestWithURL(nsUrl))
+                d
             }
 
             val result = withTimeoutOrNull(timeoutMs) {
                 var rendered: WebViewFetchResult? = null
-                while (rendered == null) {
+                var isFailed = false
+                while (rendered == null && !isFailed) {
                     delay(250L)
-                    val error = withContext(Dispatchers.Main) { delegate.error }
-                    if (error != null) {
-                        log.e { "CF fetch fallback failed due to network/navigation error: ${error.localizedDescription}" }
-                        break
-                    }
-                    val state = webViewRef?.evaluateJavascriptString(PAGE_STATE_JS).orEmpty()
-                    if (state == "blocked") {
-                        return@withTimeoutOrNull null
-                    }
+                    withContext(Dispatchers.Main) {
+                        val error = delegate.error
+                        if (error != null) {
+                            log.e { "CF fetch fallback failed due to network/navigation error: ${error.localizedDescription}" }
+                            isFailed = true
+                            return@withContext
+                        }
+                        val state = webViewRef?.evaluateJavascriptString(PAGE_STATE_JS).orEmpty()
+                        if (state == "blocked") {
+                            isFailed = true
+                            return@withContext
+                        }
 
-                    if (state == "ok") {
-                        val body = webViewRef?.evaluateJavascriptString(PAGE_BODY_JS).orEmpty()
-                        if (body.isNotBlank()) {
-                            val contentType = webViewRef?.evaluateJavascriptString(PAGE_CONTENT_TYPE_JS)
-                                .orEmpty().ifBlank { "text/html" }
-                            val headersWithContentType = withContext(Dispatchers.Main) {
-                                delegate.headers.toMutableMap()
+                        if (state == "ok") {
+                            val body = webViewRef?.evaluateJavascriptString(PAGE_BODY_JS).orEmpty()
+                            if (body.isNotBlank()) {
+                                val contentType = webViewRef?.evaluateJavascriptString(PAGE_CONTENT_TYPE_JS)
+                                    .orEmpty().ifBlank { "text/html" }
+                                val headersWithContentType = delegate.headers.toMutableMap()
+                                if (headersWithContentType.keys.none { it.equals("content-type", ignoreCase = true) }) {
+                                    headersWithContentType["content-type"] = contentType
+                                }
+                                rendered = WebViewFetchResult(
+                                    status = delegate.status,
+                                    statusText = delegate.statusText,
+                                    url = webViewRef?.URL?.absoluteString ?: url,
+                                    body = body,
+                                    headers = headersWithContentType,
+                                )
                             }
-                            if (headersWithContentType.keys.none { it.equals("content-type", ignoreCase = true) }) {
-                                headersWithContentType["content-type"] = contentType
-                            }
-                            rendered = WebViewFetchResult(
-                                status = withContext(Dispatchers.Main) { delegate.status },
-                                statusText = withContext(Dispatchers.Main) { delegate.statusText },
-                                url = withContext(Dispatchers.Main) {
-                                    webViewRef?.URL?.absoluteString ?: url
-                                },
-                                body = body,
-                                headers = headersWithContentType,
-                            )
                         }
                     }
                 }
@@ -222,6 +224,7 @@ internal object IosWebViewSolver : WebViewSolver {
             return result
         } finally {
             withContext(NonCancellable + Dispatchers.Main) {
+                webViewRef?.navigationDelegate = null
                 webViewRef?.stopLoading()
                 webViewRef = null
             }
@@ -237,25 +240,23 @@ internal object IosWebViewSolver : WebViewSolver {
             }
         }
 
-    private suspend fun getOrCaptureUserAgent(): String {
-        cachedUserAgent?.let { return it }
-        return withContext(Dispatchers.Main) {
-            val webView = WKWebView(
-                frame = platform.CoreGraphics.CGRectZero.readValue(),
-                configuration = WKWebViewConfiguration(),
+    private suspend fun getOrCaptureUserAgent(): String = withContext(Dispatchers.Main) {
+        cachedUserAgent?.let { return@withContext it }
+        val webView = WKWebView(
+            frame = platform.CoreGraphics.CGRectZero.readValue(),
+            configuration = WKWebViewConfiguration(),
+        )
+        val deferred = CompletableDeferred<String>()
+        webView.evaluateJavaScript("navigator.userAgent") { result, _ ->
+            deferred.complete(
+                result as? String
+                    ?: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
             )
-            val deferred = CompletableDeferred<String>()
-            webView.evaluateJavaScript("navigator.userAgent") { result, _ ->
-                deferred.complete(
-                    result as? String
-                        ?: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-                )
-            }
-            val userAgent = deferred.await()
-            // Keep the WebView reference alive during suspension by referencing it here
-            log.d { "Captured User-Agent using WebView. WebView description: ${webView.description}" }
-            userAgent.also { cachedUserAgent = it }
         }
+        val userAgent = deferred.await()
+        // Keep the WebView reference alive during suspension by referencing it here
+        log.d { "Captured User-Agent using WebView. WebView description: ${webView.description}" }
+        userAgent.also { cachedUserAgent = it }
     }
 
     private suspend fun getWkCookies(
