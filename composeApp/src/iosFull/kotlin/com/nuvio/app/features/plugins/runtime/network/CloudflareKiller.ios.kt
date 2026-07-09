@@ -100,7 +100,7 @@ internal object IosWebViewSolver : WebViewSolver {
                 val d = CloudflareNavigationDelegate()
                 val config = WKWebViewConfiguration()
                 val webView = WKWebView(
-                    frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 375.0, 812.0).readValue(),
+                    frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 375.0, 812.0),
                     configuration = config,
                 )
                 webView.customUserAgent = webViewUserAgent
@@ -167,7 +167,7 @@ internal object IosWebViewSolver : WebViewSolver {
                 val d = CloudflareNavigationDelegate()
                 val config = WKWebViewConfiguration()
                 val webView = WKWebView(
-                    frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 375.0, 812.0).readValue(),
+                    frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 375.0, 812.0),
                     configuration = config,
                 )
                 webView.customUserAgent = webViewUserAgent
@@ -243,7 +243,7 @@ internal object IosWebViewSolver : WebViewSolver {
     private suspend fun getOrCaptureUserAgent(): String = withContext(Dispatchers.Main) {
         cachedUserAgent?.let { return@withContext it }
         val webView = WKWebView(
-            frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 375.0, 812.0).readValue(),
+            frame = platform.CoreGraphics.CGRectMake(0.0, 0.0, 375.0, 812.0),
             configuration = WKWebViewConfiguration(),
         )
         val deferred = CompletableDeferred<String>()
