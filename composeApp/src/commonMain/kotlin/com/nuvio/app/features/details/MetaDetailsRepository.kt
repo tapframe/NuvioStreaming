@@ -26,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -113,7 +114,7 @@ object MetaDetailsRepository {
 
         scope.launch {
             val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-            val manifests = findMetaManifests(type = type, id = metaLookupId)
+            val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
 
             if (manifests.isEmpty()) {
                 val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
@@ -197,7 +198,7 @@ object MetaDetailsRepository {
         cachedMetaByRequestKey[requestKey]?.let { return it.baseMeta }
 
         val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
-        val manifests = findMetaManifests(type = type, id = metaLookupId)
+        val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
 
         for (manifest in manifests) {
             val result = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
@@ -215,6 +216,7 @@ object MetaDetailsRepository {
     }
 
     private const val FETCH_TIMEOUT_MS = 5_000L
+    private const val METADATA_PROVIDER_READY_TIMEOUT_MS = 10_000L
     private const val TMDB_ENRICH_TIMEOUT_MS = 5_000L
     private const val MDBLIST_ENRICH_TIMEOUT_MS = 5_000L
 
@@ -269,8 +271,27 @@ object MetaDetailsRepository {
         }
     }
 
-    private fun findMetaManifests(type: String, id: String): List<AddonManifest> =
-        AddonRepository.uiState.value.addons
+    private suspend fun findReadyMetaManifests(type: String, id: String): List<AddonManifest> {
+        AddonRepository.initialize()
+
+        findMetaManifests(AddonRepository.uiState.value, type, id).takeIf { it.isNotEmpty() }?.let { return it }
+
+        if (!AddonRepository.uiState.value.hasPendingEnabledAddonManifests()) {
+            return emptyList()
+        }
+
+        val readyState = withTimeoutOrNull(METADATA_PROVIDER_READY_TIMEOUT_MS) {
+            AddonRepository.uiState.first { state ->
+                findMetaManifests(state, type, id).isNotEmpty() ||
+                    !state.hasPendingEnabledAddonManifests()
+            }
+        } ?: AddonRepository.uiState.value
+
+        return findMetaManifests(readyState, type, id)
+    }
+
+    private fun findMetaManifests(state: com.nuvio.app.features.addons.AddonsUiState, type: String, id: String): List<AddonManifest> =
+        state.addons
             .enabledAddons()
             .mapNotNull { it.manifest }
             .filter { manifest ->
@@ -280,6 +301,9 @@ object MetaDetailsRepository {
                         (resource.idPrefixes.isEmpty() || resource.idPrefixes.any { id.startsWith(it) })
                 }
             }
+
+    private fun com.nuvio.app.features.addons.AddonsUiState.hasPendingEnabledAddonManifests(): Boolean =
+        addons.enabledAddons().any { addon -> addon.manifest == null && addon.isRefreshing }
 
     private suspend fun resolveMetaLookupId(itemId: String, itemType: String): String {
         val tmdbId = itemId

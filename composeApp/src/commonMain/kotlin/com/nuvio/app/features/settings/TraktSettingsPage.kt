@@ -18,7 +18,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -704,9 +704,8 @@ private fun TraktConnectionCard(
                     ),
                 ) {
                     if (uiState.isLoading) {
-                        CircularProgressIndicator(
+                        NuvioLoadingIndicator(
                             color = MaterialTheme.colorScheme.onSurface,
-                            strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp),
                         )
                     } else {
@@ -774,9 +773,8 @@ private fun TraktConnectionCard(
                     enabled = uiState.credentialsConfigured && !uiState.isLoading,
                 ) {
                     if (uiState.isLoading) {
-                        CircularProgressIndicator(
+                        NuvioLoadingIndicator(
                             color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp,
                             modifier = Modifier.size(18.dp),
                         )
                     } else {

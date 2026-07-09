@@ -788,7 +788,7 @@
     <string name="community_section_description">Podívejte se na lidi, kteří tvoří a podporují Nuvio na Mobilech, TV a Webu.</string>
     <string name="community_donation_progress_title">Tento měsíc za servery a údržbu</string>
     <string name="community_donation_progress_complete">Pokryto. Dodatečná podpora nyní půjde na vývoj.</string>
-    <string name="community_donation_progress_remaining">Po dosažení 100%% půjde další podpora na vývoj.</string>
+    <string name="community_donation_progress_remaining">Po dosažení 100% půjde další podpora na vývoj.</string>
     <string name="community_loading_donation_progress">Načítání průběhu financování...</string>
     <string name="community_supporters_not_configured">Supporters API není nakonfigurováno. Přidejte DONATIONS_BASE_URL do local.properties.</string>
     <string name="community_tab_contributors">Přispěvatelé</string>

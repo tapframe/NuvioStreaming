@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.network.NetworkCondition
@@ -39,6 +38,7 @@ import com.nuvio.app.features.home.components.HomeHeroReservedSpace
 import com.nuvio.app.features.home.components.HomeHeroSection
 import com.nuvio.app.features.home.components.HomeSkeletonHero
 import com.nuvio.app.features.home.components.HomeSkeletonRow
+import com.nuvio.app.features.home.components.HomeContinueWatchingSectionBottomPadding
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
 import com.nuvio.app.features.trakt.TraktSettingsRepository
@@ -74,7 +74,6 @@ import com.nuvio.app.features.watching.domain.isReleasedBy
 import com.nuvio.app.features.collection.CollectionRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.home.components.HomeCollectionRowSection
-import com.nuvio.app.features.watchprogress.ContinueWatchingSectionStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
@@ -85,8 +84,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.yield
 import com.nuvio.app.features.trakt.TraktEpisodeMappingService
-import com.nuvio.app.features.home.components.ContinueWatchingLayout
-import com.nuvio.app.features.home.components.continueWatchingLandscapeCardHeight
+import com.nuvio.app.features.home.components.continueWatchingHeroViewportReserveHeight
 import com.nuvio.app.features.home.components.homeSectionHorizontalPaddingForWidth
 import com.nuvio.app.features.home.components.rememberContinueWatchingLayout
 import kotlinx.coroutines.CancellationException
@@ -693,9 +691,6 @@ fun HomeScreen(
         val homeSectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value)
         val continueWatchingLayout = rememberContinueWatchingLayout(maxWidth.value)
         val posterCardStyle = rememberPosterCardStyleUiState()
-        val continueWatchingCardHeight = remember(posterCardStyle.widthDp) {
-            continueWatchingLandscapeCardHeight(posterCardStyle.widthDp)
-        }
         val nativeBottomNavigationOverlayHeight =
             if (LocalNuvioBottomNavigationOverlayPadding.current > 0.dp) {
                 nuvioSafeBottomPadding()
@@ -708,18 +703,24 @@ fun HomeScreen(
             continueWatchingPreferences.style,
             continueWatchingItems.isNotEmpty(),
             continueWatchingLayout,
-            continueWatchingCardHeight,
+            posterCardStyle.widthDp,
+            homeSettingsUiState.hideCatalogUnderline,
             nativeBottomNavigationOverlayHeight,
         ) {
-            heroMobileBelowSectionHeightHint(
-                maxWidthDp = maxWidth.value,
-                continueWatchingVisible = continueWatchingPreferences.isVisible,
-                hasContinueWatchingItems = continueWatchingItems.isNotEmpty(),
-                continueWatchingStyle = continueWatchingPreferences.style,
-                continueWatchingLayout = continueWatchingLayout,
-                continueWatchingCardHeight = continueWatchingCardHeight,
-                bottomNavigationOverlayHeight = nativeBottomNavigationOverlayHeight,
-            )
+            if (
+                maxWidth.value < 600f &&
+                continueWatchingPreferences.isVisible &&
+                continueWatchingItems.isNotEmpty()
+            ) {
+                continueWatchingHeroViewportReserveHeight(
+                    style = continueWatchingPreferences.style,
+                    layout = continueWatchingLayout,
+                    basePosterWidthDp = posterCardStyle.widthDp,
+                    showHeaderAccent = !homeSettingsUiState.hideCatalogUnderline,
+                ) + nativeBottomNavigationOverlayHeight
+            } else {
+                null
+            }
         }
 
         NuvioScreen(
@@ -764,7 +765,7 @@ fun HomeScreen(
                                 style = continueWatchingPreferences.style,
                                 useEpisodeThumbnails = continueWatchingPreferences.useEpisodeThumbnails,
                                 blurNextUp = continueWatchingPreferences.blurNextUp,
-                                modifier = Modifier.padding(bottom = 12.dp),
+                                modifier = Modifier.padding(bottom = HomeContinueWatchingSectionBottomPadding),
                                 sectionPadding = homeSectionPadding,
                                 layout = continueWatchingLayout,
                                 onItemClick = onContinueWatchingClick,
@@ -789,7 +790,7 @@ fun HomeScreen(
                                 style = continueWatchingPreferences.style,
                                 useEpisodeThumbnails = continueWatchingPreferences.useEpisodeThumbnails,
                                 blurNextUp = continueWatchingPreferences.blurNextUp,
-                                modifier = Modifier.padding(bottom = 12.dp),
+                                modifier = Modifier.padding(bottom = HomeContinueWatchingSectionBottomPadding),
                                 sectionPadding = homeSectionPadding,
                                 layout = continueWatchingLayout,
                                 onItemClick = onContinueWatchingClick,
@@ -837,7 +838,7 @@ fun HomeScreen(
                                 style = continueWatchingPreferences.style,
                                 useEpisodeThumbnails = continueWatchingPreferences.useEpisodeThumbnails,
                                 blurNextUp = continueWatchingPreferences.blurNextUp,
-                                modifier = Modifier.padding(bottom = 12.dp),
+                                modifier = Modifier.padding(bottom = HomeContinueWatchingSectionBottomPadding),
                                 sectionPadding = homeSectionPadding,
                                 layout = continueWatchingLayout,
                                 onItemClick = onContinueWatchingClick,
@@ -1166,26 +1167,6 @@ private fun shouldTreatAsActiveInProgressForNextUpSuppression(
     if (!progress.shouldTreatAsInProgressForContinueWatching()) return false
     if (latestCompletedAt == null || latestCompletedAt == Long.MIN_VALUE) return true
     return progress.lastUpdatedEpochMs >= latestCompletedAt
-}
-
-private fun heroMobileBelowSectionHeightHint(
-    maxWidthDp: Float,
-    continueWatchingVisible: Boolean,
-    hasContinueWatchingItems: Boolean,
-    continueWatchingStyle: ContinueWatchingSectionStyle,
-    continueWatchingLayout: ContinueWatchingLayout,
-    continueWatchingCardHeight: Dp,
-    bottomNavigationOverlayHeight: Dp,
-): Dp? {
-    if (maxWidthDp >= 600f || !continueWatchingVisible || !hasContinueWatchingItems) return null
-
-    val sectionHeight = when (continueWatchingStyle) {
-        ContinueWatchingSectionStyle.Card -> continueWatchingCardHeight + 56.dp
-        ContinueWatchingSectionStyle.Wide -> continueWatchingLayout.wideCardHeight + 56.dp
-        ContinueWatchingSectionStyle.Poster ->
-            continueWatchingLayout.posterCardHeight + continueWatchingLayout.posterTitleBlockHeight + 70.dp
-    }
-    return sectionHeight + bottomNavigationOverlayHeight
 }
 
 internal fun buildHomeContinueWatchingItems(

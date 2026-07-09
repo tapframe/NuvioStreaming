@@ -7,11 +7,16 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.collection.CollectionSyncService
 import com.nuvio.app.features.home.HomeCatalogSettingsSyncService
+import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktCredentialSync
 import com.nuvio.app.features.trakt.TraktPlatformClock
+import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.trakt.effectiveLibrarySourceMode
+import com.nuvio.app.features.trakt.shouldUseTraktProgress
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import kotlinx.coroutines.CoroutineScope
@@ -19,15 +24,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private const val FOREGROUND_PULL_DELAY_MS = 2500L
 private const val FOREGROUND_PULL_MIN_INTERVAL_MS = 30 * 60_000L
+private const val PERIODIC_NUVIO_SYNC_PULL_INTERVAL_MS = 60_000L
 
 object SyncManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val log = Logger.withTag("SyncManager")
     private var foregroundPullJob: Job? = null
+    private var periodicNuvioSyncPullJob: Job? = null
+    private var periodicNuvioSyncProfileId: Int? = null
     private var lastForegroundPullAtMs: Long = 0L
 
     fun pullAllForProfile(profileId: Int) {
@@ -36,7 +45,7 @@ object SyncManager {
         if (authState.isAnonymous) return
 
         scope.launch {
-            log.i { "pullAllForProfile($profileId) — auth=${(authState as AuthState.Authenticated).isAnonymous}" }
+            log.i { "pullAllForProfile($profileId) — auth=${authState.isAnonymous}" }
 
             log.i { "pullAllForProfile — pulling addons first (await)..." }
             runCatching { AddonRepository.pullFromServer(profileId) }
@@ -103,6 +112,68 @@ object SyncManager {
             lastForegroundPullAtMs = TraktPlatformClock.nowEpochMs()
             pullForegroundForProfile(profileId)
         }
+    }
+
+    fun startPeriodicNuvioSyncPull(profileId: Int) {
+        val authState = AuthRepository.state.value
+        if (authState !is AuthState.Authenticated || authState.isAnonymous) {
+            stopPeriodicNuvioSyncPull()
+            return
+        }
+        if (periodicNuvioSyncPullJob?.isActive == true && periodicNuvioSyncProfileId == profileId) return
+
+        stopPeriodicNuvioSyncPull()
+        periodicNuvioSyncProfileId = profileId
+        periodicNuvioSyncPullJob = scope.launch {
+            while (isActive) {
+                delay(PERIODIC_NUVIO_SYNC_PULL_INTERVAL_MS)
+
+                val currentAuthState = AuthRepository.state.value
+                if (currentAuthState !is AuthState.Authenticated || currentAuthState.isAnonymous) {
+                    continue
+                }
+                if (ProfileRepository.activeProfileId != profileId) {
+                    continue
+                }
+
+                TraktAuthRepository.ensureLoaded()
+                TraktSettingsRepository.ensureLoaded()
+
+                val traktAuthenticated = TraktAuthRepository.isAuthenticated.value
+                val settings = TraktSettingsRepository.uiState.value
+                val shouldPullLibrary = effectiveLibrarySourceMode(
+                    isAuthenticated = traktAuthenticated,
+                    source = settings.librarySourceMode,
+                ) == LibrarySourceMode.LOCAL
+                val shouldPullWatchProgress = !shouldUseTraktProgress(
+                    isAuthenticated = traktAuthenticated,
+                    source = settings.watchProgressSource,
+                )
+
+                if (!shouldPullLibrary && !shouldPullWatchProgress) {
+                    continue
+                }
+
+                log.i {
+                    "Periodic Nuvio sync pull profile=$profileId " +
+                        "library=$shouldPullLibrary watchProgress=$shouldPullWatchProgress"
+                }
+                if (shouldPullLibrary) {
+                    runCatching { LibraryRepository.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Periodic Nuvio library pull failed" } }
+                }
+                if (shouldPullWatchProgress) {
+                    runCatching { WatchProgressRepository.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Periodic Nuvio watch progress pull failed" } }
+                }
+            }
+        }
+    }
+
+    fun stopPeriodicNuvioSyncPull() {
+        periodicNuvioSyncPullJob?.cancel()
+        periodicNuvioSyncPullJob = null
+        periodicNuvioSyncProfileId = null
     }
 
     fun requestRealtimeSurfacePull(profileId: Int, surface: String) {

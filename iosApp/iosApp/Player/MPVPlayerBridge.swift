@@ -104,6 +104,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func setPlaybackSpeed(speed: Float) { playerVC?.setSpeed(speed) }
     func setMuted(muted: Bool) { playerVC?.setMuted(muted) }
     func setResizeMode(mode: Int32) { playerVC?.setResize(Int(mode)) }
+    func syncVideoSurfaceLayout(width: Double, height: Double) {
+        playerVC?.syncVideoSurfaceLayout(size: CGSize(width: width, height: height))
+    }
 
     // Audio tracks
     func getAudioTrackCount() -> Int32 { Int32(playerVC?.audioTracks.count ?? 0) }
@@ -253,6 +256,8 @@ final class MPVPlayerViewController: UIViewController {
     private let errorStateLock = NSLock()
     private var metalLayer = MetalLayer()
     private var lastAppliedDrawableSize: CGSize = .zero
+    private var externallyManagedViewSize: CGSize?
+    private var pendingSurfaceLayoutWorkItems: [DispatchWorkItem] = []
     private var pendingLoadRequest: PendingLoadRequest?
     private var pendingLoadRetryWorkItem: DispatchWorkItem?
     private var mpv: OpaquePointer?
@@ -313,6 +318,8 @@ final class MPVPlayerViewController: UIViewController {
         metalLayer.framebufferOnly = true
         metalLayer.backgroundColor = UIColor.black.cgColor
         metalLayer.wantsExtendedDynamicRangeContent = true
+        metalLayer.anchorPoint = CGPoint(x: 0, y: 0)
+        metalLayer.position = .zero
         view.layer.addSublayer(metalLayer)
         layoutMetalLayer()
 
@@ -339,19 +346,92 @@ final class MPVPlayerViewController: UIViewController {
         becomeFirstResponder()
         UIApplication.shared.beginReceivingRemoteControlEvents()
         publishCachedNowPlayingInfoIfNeeded()
-        layoutMetalLayer()
+        syncVideoSurfaceLayout()
         attemptStartPendingLoad()
     }
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        layoutMetalLayer()
+        syncVideoSurfaceLayout()
         refreshImmersiveSystemUI()
         attemptStartPendingLoad()
     }
 
+    override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+
+        syncVideoSurfaceLayoutNow(scheduleDeferredPasses: false)
+        coordinator.animate(alongsideTransition: { [weak self] _ in
+            self?.syncVideoSurfaceLayoutNow(scheduleDeferredPasses: false)
+        }, completion: { [weak self] _ in
+            self?.syncVideoSurfaceLayout()
+            self?.attemptStartPendingLoad()
+        })
+    }
+
+    func syncVideoSurfaceLayout(size: CGSize) {
+        if Thread.isMainThread {
+            syncVideoSurfaceLayoutNow(size: size, scheduleDeferredPasses: true)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.syncVideoSurfaceLayoutNow(size: size, scheduleDeferredPasses: true)
+            }
+        }
+    }
+
+    private func syncVideoSurfaceLayout() {
+        if Thread.isMainThread {
+            syncVideoSurfaceLayoutNow(size: nil, scheduleDeferredPasses: true)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.syncVideoSurfaceLayoutNow(size: nil, scheduleDeferredPasses: true)
+            }
+        }
+    }
+
+    private func syncVideoSurfaceLayoutNow(size: CGSize? = nil, scheduleDeferredPasses: Bool) {
+        guard isViewLoaded else { return }
+        if let size, size.width > 1, size.height > 1 {
+            externallyManagedViewSize = size
+            applyExternallyManagedViewSize(size)
+        }
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        layoutMetalLayer()
+
+        if scheduleDeferredPasses {
+            scheduleDeferredSurfaceLayoutPasses()
+        }
+    }
+
+    private func scheduleDeferredSurfaceLayoutPasses() {
+        pendingSurfaceLayoutWorkItems.forEach { $0.cancel() }
+        pendingSurfaceLayoutWorkItems.removeAll(keepingCapacity: true)
+
+        [0.0, 0.05, 0.15, 0.35].forEach { delay in
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.syncVideoSurfaceLayoutNow(scheduleDeferredPasses: false)
+            }
+            pendingSurfaceLayoutWorkItems.append(workItem)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        }
+    }
+
+    private func applyExternallyManagedViewSize(_ size: CGSize) {
+        let targetBounds = CGRect(origin: .zero, size: size)
+        if view.bounds != targetBounds {
+            view.bounds = targetBounds
+        }
+
+        var targetFrame = view.frame
+        if targetFrame.size != size {
+            targetFrame.size = size
+            view.frame = targetFrame
+        }
+    }
+
     private func layoutMetalLayer() {
-        let bounds = view.bounds
+        let bounds = CGRect(origin: .zero, size: externallyManagedViewSize ?? view.bounds.size)
         guard bounds.width > 1, bounds.height > 1 else { return }
 
         let scale = view.window?.screen.nativeScale ?? UIScreen.main.nativeScale
@@ -363,8 +443,10 @@ final class MPVPlayerViewController: UIViewController {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         metalLayer.contentsScale = scale
-        metalLayer.frame = CGRect(origin: .zero, size: bounds.size)
+        metalLayer.position = .zero
+        metalLayer.bounds = CGRect(origin: .zero, size: bounds.size)
         if drawableSize != lastAppliedDrawableSize {
+            // mpv's moltenvk context polls drawableSize and resizes its swapchain.
             metalLayer.drawableSize = drawableSize
             lastAppliedDrawableSize = drawableSize
         }
@@ -382,7 +464,8 @@ final class MPVPlayerViewController: UIViewController {
 
         checkError(mpv_request_log_messages(mpv, "warn"))
 
-        checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &metalLayer))
+        var layerPointer = Int64(Int(bitPattern: Unmanaged.passUnretained(metalLayer).toOpaque()))
+        checkError(mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &layerPointer))
         checkError(mpv_set_option_string(mpv, "vo", "gpu-next"))
         checkError(mpv_set_option_string(mpv, "gpu-api", "vulkan"))
         checkError(mpv_set_option_string(mpv, "gpu-context", "moltenvk"))
@@ -747,6 +830,8 @@ final class MPVPlayerViewController: UIViewController {
         resignFirstResponder()
         pendingLoadRetryWorkItem?.cancel()
         pendingLoadRetryWorkItem = nil
+        pendingSurfaceLayoutWorkItems.forEach { $0.cancel() }
+        pendingSurfaceLayoutWorkItems.removeAll(keepingCapacity: false)
         pendingLoadRequest = nil
         nowPlayingController.invalidate()
         clearPlaybackError()

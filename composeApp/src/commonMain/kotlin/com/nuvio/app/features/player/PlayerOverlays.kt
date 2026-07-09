@@ -40,7 +40,7 @@ import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material.icons.rounded.Speed
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -238,9 +238,8 @@ internal fun OpeningOverlay(
                         },
                 )
             } else {
-                CircularProgressIndicator(
+                NuvioLoadingIndicator(
                     color = Color(0xFFE50914),
-                    strokeWidth = 3.dp,
                     modifier = Modifier.size(54.dp),
                 )
             }

@@ -1331,7 +1331,7 @@
     <string name="collections_trakt_rate_limit_reached">Trakt Αξιολόγηση limit reached</string>
     <string name="collections_trakt_request_failed">Trakt request Απέτυχε</string>
     <string name="community_donation_progress_complete">Covered. Προσθήκηitional support now goes to development.</string>
-    <string name="community_donation_progress_remaining">After 100%%, Προσθήκηitional support goes to development.</string>
+    <string name="community_donation_progress_remaining">After 100%, Προσθήκηitional support goes to development.</string>
     <string name="community_donation_progress_title">Αυτό τον μήνα's server &amp; maintenance</string>
     <string name="community_loading_donation_progress">Φόρτωση funding progress...</string>
     <string name="compose_auth_terms_link">Terms</string>

@@ -32,7 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -576,9 +576,8 @@ private fun EpisodeStreamsSubView(
                         .padding(vertical = NuvioTokens.Space.s40),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(
+                    NuvioLoadingIndicator(
                         color = tokens.colors.accent,
-                        strokeWidth = tokens.borders.medium,
                         modifier = Modifier.size(tokens.icons.lg + NuvioTokens.Space.s4),
                     )
                 }
@@ -608,7 +607,7 @@ private fun EpisodeStreamsSubView(
                 ) {
                     itemsIndexed(
                         items = streams,
-                        key = { index, stream -> "${stream.addonId}::${index}::${stream.url ?: stream.infoHash ?: stream.clientResolve?.infoHash ?: stream.name}" },
+                        key = { index, stream -> "${stream.addonId}::${index}::${stream.url ?: stream.infoHash ?: stream.externalUrl ?: stream.clientResolve?.infoHash ?: stream.name}" },
                     ) { _, stream ->
                         StreamCard(
                             stream = stream,

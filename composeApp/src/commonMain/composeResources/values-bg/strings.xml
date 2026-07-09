@@ -1852,7 +1852,7 @@
     <string name="addons_appstore_install_button">Добави</string>
     <string name="community_donation_progress_title">Сървър и поддръжка за този месец</string>
     <string name="community_donation_progress_complete">Покрито. Допълнителната подкрепа вече отива за разработка.</string>
-    <string name="community_donation_progress_remaining">След 100%% допълнителната подкрепа отива за разработка.</string>
+    <string name="community_donation_progress_remaining">След 100% допълнителната подкрепа отива за разработка.</string>
     <string name="community_loading_donation_progress">Зареждане на напредъка на финансирането...</string>
     <string name="compose_auth_terms_prefix">С регистрацията си се съгласявам с</string>
     <string name="compose_auth_terms_link">Условията</string>

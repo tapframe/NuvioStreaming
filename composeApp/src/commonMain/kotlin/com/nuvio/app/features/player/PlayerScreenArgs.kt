@@ -17,6 +17,7 @@ internal data class PlayerScreenArgs(
     val pauseDescription: String?,
     val onBack: () -> Unit,
     val onOpenInExternalPlayer: ((ExternalPlayerPlaybackRequest) -> Unit)?,
+    val onOpenExternalUrl: ((String) -> Unit)?,
     val modifier: Modifier,
     val logo: String?,
     val poster: String?,

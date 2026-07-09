@@ -788,7 +788,7 @@
     <string name="community_section_description">Mobile・TV・Webを通じてNuvioを構築・支援している人々をご覧ください。</string>
     <string name="community_donation_progress_title">今月のサーバー・メンテナンス費用</string>
     <string name="community_donation_progress_complete">達成済み。追加のサポートは開発費に充てられます。</string>
-    <string name="community_donation_progress_remaining">100%%を超えた追加サポートは開発費に充てられます。</string>
+    <string name="community_donation_progress_remaining">100%を超えた追加サポートは開発費に充てられます。</string>
     <string name="community_loading_donation_progress">資金調達状況を読み込み中...</string>
     <string name="community_supporters_not_configured">サポーターAPIが設定されていません。local.propertiesにDONATIONS_BASE_URLを追加してください。</string>
     <string name="community_tab_contributors">コントリビューター</string>

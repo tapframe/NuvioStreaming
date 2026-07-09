@@ -18,7 +18,6 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -92,8 +91,7 @@ fun TraktListPickerDialog(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(tokens.spacing.listGap),
                         ) {
-                            CircularProgressIndicator(
-                                strokeWidth = tokens.borders.medium,
+                            NuvioLoadingIndicator(
                                 modifier = Modifier.size(tokens.icons.lg),
                             )
                             Text(
@@ -164,9 +162,8 @@ fun TraktListPickerDialog(
                         enabled = !isPending,
                     ) {
                         if (isPending) {
-                            CircularProgressIndicator(
+                            NuvioLoadingIndicator(
                                 color = tokens.colors.onAccent,
-                                strokeWidth = tokens.borders.medium,
                                 modifier = Modifier.size(tokens.icons.sm),
                             )
                         } else {

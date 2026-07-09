@@ -75,7 +75,7 @@ first_booted_ios_simulator() {
   xcrun simctl list devices booted | awk -F '[()]' '/Booted/ { print $2; exit }'
 }
 
-preferred_ios_device() {
+selected_ios_device() {
   xcrun xcdevice list --timeout 5 2>/dev/null | python3 -c '
 import json
 import sys
@@ -91,11 +91,21 @@ physical = [
     if device.get("platform") == "com.apple.platform.iphoneos"
     and not device.get("simulator", False)
     and device.get("available") is True
-    and device.get("modelName") == os.environ["IOS_PREFERRED_DEVICE_MODEL"]
 ]
 
-if physical:
-    print(physical[0].get("identifier", ""))
+preferred_model = os.environ["IOS_PREFERRED_DEVICE_MODEL"]
+preferred = [
+    device for device in physical
+    if device.get("modelName") == preferred_model
+]
+
+selected = (preferred or physical or [None])[0]
+if selected:
+    print("\t".join([
+        selected.get("identifier", ""),
+        selected.get("name", ""),
+        selected.get("modelName", ""),
+    ]))
 '
 }
 
@@ -336,15 +346,27 @@ run_ios_physical() {
   require_command xcodebuild
   require_command xcrun
 
-  local physical_device_id
-  physical_device_id="$(IOS_PREFERRED_DEVICE_MODEL="$IOS_PREFERRED_DEVICE_MODEL" preferred_ios_device)"
+  local physical_device_info
+  physical_device_info="$(IOS_PREFERRED_DEVICE_MODEL="$IOS_PREFERRED_DEVICE_MODEL" selected_ios_device)"
 
-  if [[ -n "$physical_device_id" ]]; then
+  if [[ -n "$physical_device_info" ]]; then
+    local physical_device_id=""
+    local physical_device_name=""
+    local physical_device_model=""
+    IFS=$'\t' read -r physical_device_id physical_device_name physical_device_model <<<"$physical_device_info"
+
     local derived_data_path
     derived_data_path="$(ios_derived_data_path device "$distribution")"
 
     local device_app_path
     device_app_path="$derived_data_path/Build/Products/Debug-iphoneos/$IOS_APP_NAME"
+
+    if [[ "$physical_device_model" == "$IOS_PREFERRED_DEVICE_MODEL" ]]; then
+      echo "Using preferred iOS physical device: ${physical_device_name:-$physical_device_id} ($physical_device_model)"
+    else
+      echo "Preferred iOS device not available: $IOS_PREFERRED_DEVICE_MODEL"
+      echo "Using connected iOS physical device: ${physical_device_name:-$physical_device_id}${physical_device_model:+ ($physical_device_model)}"
+    fi
 
     echo "Building iOS $distribution debug app for physical device $physical_device_id..."
     env NUVIO_IOS_DISTRIBUTION="$distribution" xcodebuild \
@@ -368,8 +390,8 @@ run_ios_physical() {
     return
   fi
 
-  echo "Preferred iOS device not available: $IOS_PREFERRED_DEVICE_MODEL" >&2
-  echo "Connect and unlock that device, then rerun: ./scripts/run-mobile.sh ios p" >&2
+  echo "No available iOS physical devices found." >&2
+  echo "Connect and unlock a device, then rerun: ./scripts/run-mobile.sh ios p" >&2
   exit 1
 }
 

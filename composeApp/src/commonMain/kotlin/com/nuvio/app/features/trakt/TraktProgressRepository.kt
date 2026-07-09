@@ -51,7 +51,6 @@ private const val METADATA_FETCH_TIMEOUT_MS = 3_500L
 private const val METADATA_FETCH_CONCURRENCY = 5
 private const val METADATA_HYDRATION_LIMIT = 110
 private const val REFRESH_BASE_INTERVAL_MS = 60L * 1000L
-private const val REFRESH_MAX_INTERVAL_MS = 15L * 60L * 1000L
 private const val EPISODE_PROGRESS_CACHE_TTL_MS = 30L * 60L * 1000L
 private const val EPISODE_PROGRESS_FETCH_THROTTLE_MS = 60L * 1000L
 private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
@@ -80,7 +79,6 @@ object TraktProgressRepository {
     private val refreshJobMutex = Mutex()
     private var inFlightRefresh: Deferred<Unit>? = null
     private var refreshIntervalMs = REFRESH_BASE_INTERVAL_MS
-    private var consecutiveRefreshFailures = 0
     private var lastKnownMoviesWatchedAt: String? = null
     private var lastKnownEpisodeActivityFingerprint: String? = null
     private var lastKnownActivityFingerprint: String? = null
@@ -103,17 +101,17 @@ object TraktProgressRepository {
                         source = TraktSettingsRepository.uiState.value.watchProgressSource,
                     )
                 ) {
-                    updateRefreshBackoff(success = true)
+                    resetRefreshInterval()
                     continue
                 }
 
-                val success = runCatching {
+                runCatching {
                     refreshIfActivityChanged()
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
                     log.w { "Periodic Trakt activity refresh failed: ${error.message}" }
-                }.isSuccess
-                updateRefreshBackoff(success = success)
+                }
+                resetRefreshInterval()
             }
         }
     }
@@ -272,23 +270,14 @@ object TraktProgressRepository {
         return changed
     }
 
-    private fun updateRefreshBackoff(success: Boolean) {
-        if (success) {
-            consecutiveRefreshFailures = 0
-            refreshIntervalMs = REFRESH_BASE_INTERVAL_MS
-            return
-        }
-
-        consecutiveRefreshFailures += 1
-        refreshIntervalMs = (REFRESH_BASE_INTERVAL_MS shl (consecutiveRefreshFailures - 1))
-            .coerceAtMost(REFRESH_MAX_INTERVAL_MS)
+    private fun resetRefreshInterval() {
+        refreshIntervalMs = REFRESH_BASE_INTERVAL_MS
     }
 
     private fun resetActivitySnapshot() {
         lastKnownMoviesWatchedAt = null
         lastKnownEpisodeActivityFingerprint = null
         lastKnownActivityFingerprint = null
-        consecutiveRefreshFailures = 0
         refreshIntervalMs = REFRESH_BASE_INTERVAL_MS
     }
 

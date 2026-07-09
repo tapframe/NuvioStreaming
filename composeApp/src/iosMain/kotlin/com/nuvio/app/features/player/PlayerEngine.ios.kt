@@ -18,19 +18,24 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitViewController
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.touchlab.kermit.Logger
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.useContents
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.action_play
 import nuvio.composeapp.generated.resources.player_error_mpv_unavailable
 import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
 
 private const val TAG = "NuvioiOSPlayer"
 
@@ -56,6 +61,7 @@ actual fun PlatformPlayerSurface(
     val latestOnControllerReady = rememberUpdatedState(onControllerReady)
     val latestOnSnapshot = rememberUpdatedState(onSnapshot)
     val latestOnError = rememberUpdatedState(onError)
+    val density = LocalDensity.current
     PlayerSettingsRepository.ensureLoaded()
     val playerSettings by PlayerSettingsRepository.uiState.collectAsStateWithLifecycle()
     val latestPlayerSettings = rememberUpdatedState(playerSettings)
@@ -339,7 +345,25 @@ actual fun PlatformPlayerSurface(
     Box(modifier = modifier) {
         UIKitViewController(
             factory = { bridge.createPlayerViewController() },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { size ->
+                    if (size.width > 1 && size.height > 1) {
+                        bridge.syncVideoSurfaceLayout(
+                            width = with(density) { size.width.toDp().value.toDouble() },
+                            height = with(density) { size.height.toDp().value.toDouble() },
+                        )
+                    }
+                },
+            onResize = { viewController, rect ->
+                viewController.view.setFrame(rect)
+                rect.useContents {
+                    bridge.syncVideoSurfaceLayout(
+                        width = size.width,
+                        height = size.height,
+                    )
+                }
+            },
             interactive = false,
         )
         
@@ -364,7 +388,7 @@ actual fun PlatformPlayerSurface(
                 if (!isPlayingLocal) {
                     Icon(
                         imageVector = Icons.Rounded.PlayArrow,
-                        contentDescription = "Play",
+                        contentDescription = stringResource(Res.string.action_play),
                         tint = Color.White,
                         modifier = Modifier.size(64.dp)
                     )

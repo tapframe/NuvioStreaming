@@ -1517,6 +1517,6 @@
   <string name="compose_settings_root_advanced_description">Avvio e comportamento profili.</string>
   <string name="supporters_contributors_donation_progress_title">Costi di manutenzione e server</string>
   <string name="supporters_contributors_donation_progress_complete">Coperto. Qualsiasi supporto ulteriore andrà allo sviluppo.</string>
-  <string name="supporters_contributors_donation_progress_remaining">Dopo il 100%%, eventuale supporto in più andrà allo sviluppo.</string>
+  <string name="supporters_contributors_donation_progress_remaining">Dopo il 100%, eventuale supporto in più andrà allo sviluppo.</string>
   <string name="supporters_contributors_donate_button">Dona a Nuvio</string>
 </resources>
