@@ -25,9 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -38,9 +41,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_audio_tracks
+import nuvio.composeapp.generated.resources.compose_player_audio_offset
+import nuvio.composeapp.generated.resources.compose_player_load_local_audio
+import nuvio.composeapp.generated.resources.compose_player_local_audio_active
 import nuvio.composeapp.generated.resources.compose_player_no_audio_tracks_available
+import nuvio.composeapp.generated.resources.compose_player_remove_local_audio
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
@@ -51,6 +59,12 @@ fun AudioTrackModal(
     onTrackSelected: (Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    showLocalAudioOption: Boolean = false,
+    localAudioUri: String? = null,
+    audioDelayMs: Int = 0,
+    onLocalAudioPicked: () -> Unit = {},
+    onLocalAudioRemoved: () -> Unit = {},
+    onAudioDelayChanged: (Int) -> Unit = {},
 ) {
     val colorScheme = MaterialTheme.colorScheme
 
@@ -102,6 +116,28 @@ fun AudioTrackModal(
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                             )
+                        }
+
+                        if (showLocalAudioOption) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp)
+                                    .padding(bottom = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (localAudioUri == null) {
+                                    LocalAudioLoadRow(onLocalAudioPicked = onLocalAudioPicked)
+                                } else {
+                                    LocalAudioActiveRow(
+                                        onLocalAudioRemoved = onLocalAudioRemoved,
+                                    )
+                                    AudioOffsetSlider(
+                                        audioDelayMs = audioDelayMs,
+                                        onAudioDelayChanged = onAudioDelayChanged,
+                                    )
+                                }
+                            }
                         }
 
                         if (audioTracks.isEmpty()) {
@@ -194,3 +230,122 @@ private fun AudioEmptyState() {
         )
     }
 }
+
+private const val AUDIO_DELAY_MIN_MS = -1000
+private const val AUDIO_DELAY_MAX_MS = 1000
+private const val AUDIO_DELAY_STEP_MS = 50
+
+@Composable
+private fun LocalAudioLoadRow(
+    onLocalAudioPicked: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colorScheme.primaryContainer.copy(alpha = 0.5f))
+            .clickable(onClick = onLocalAudioPicked)
+            .padding(vertical = 10.dp, horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Add,
+            contentDescription = null,
+            tint = colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            text = stringResource(Res.string.compose_player_load_local_audio),
+            color = colorScheme.onPrimaryContainer,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun LocalAudioActiveRow(
+    onLocalAudioRemoved: () -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colorScheme.secondaryContainer.copy(alpha = 0.5f))
+            .padding(vertical = 10.dp, horizontal = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(Res.string.compose_player_local_audio_active),
+            color = colorScheme.onSecondaryContainer,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onLocalAudioRemoved)
+                .padding(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Close,
+                contentDescription = stringResource(Res.string.compose_player_remove_local_audio),
+                tint = colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = stringResource(Res.string.compose_player_remove_local_audio),
+                color = colorScheme.onSecondaryContainer,
+                fontSize = 13.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AudioOffsetSlider(
+    audioDelayMs: Int,
+    onAudioDelayChanged: (Int) -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val delayText = if (audioDelayMs == 0) {
+        "0ms"
+    } else {
+        "${if (audioDelayMs > 0) "+" else ""}${audioDelayMs}ms"
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_player_audio_offset),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                text = delayText,
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+            )
+        }
+        Slider(
+            value = audioDelayMs.toFloat(),
+            onValueChange = { onAudioDelayChanged(it.roundToInt()) },
+            valueRange = AUDIO_DELAY_MIN_MS.toFloat()..AUDIO_DELAY_MAX_MS.toFloat(),
+            steps = ((AUDIO_DELAY_MAX_MS - AUDIO_DELAY_MIN_MS) / AUDIO_DELAY_STEP_MS) - 1,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+

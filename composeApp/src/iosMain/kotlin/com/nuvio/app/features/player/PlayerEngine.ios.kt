@@ -53,6 +53,7 @@ actual fun PlatformPlayerSurface(
     playWhenReady: Boolean,
     resizeMode: PlayerResizeMode,
     useNativeController: Boolean,
+    audioDelayMs: Int = 0,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,

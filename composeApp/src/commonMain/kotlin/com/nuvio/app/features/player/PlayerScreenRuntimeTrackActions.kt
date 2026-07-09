@@ -84,6 +84,7 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
     }
 
     if (
+        !hasLocalAudio &&
         audioTracks.isNotEmpty() &&
         (!preference.audioTrackId.isNullOrBlank() ||
             !preference.audioLanguage.isNullOrBlank() ||
@@ -94,6 +95,8 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded() {
             playerController?.selectAudioTrack(restoredAudioIndex)
             selectedAudioIndex = restoredAudioIndex
         }
+        preferredAudioSelectionApplied = true
+    } else if (hasLocalAudio) {
         preferredAudioSelectionApplied = true
     }
 
@@ -148,6 +151,9 @@ internal fun PlayerScreenRuntime.refreshTracks() {
     restorePersistedTrackPreferenceIfNeeded()
 
     if (!preferredAudioSelectionApplied) {
+        if (hasLocalAudio) {
+            preferredAudioSelectionApplied = true
+        } else {
         val preferredAudioTargets = resolvePreferredAudioLanguageTargets(
             preferredAudioLanguage = playerSettingsUiState.preferredAudioLanguage,
             secondaryPreferredAudioLanguage = playerSettingsUiState.secondaryPreferredAudioLanguage,
@@ -170,6 +176,7 @@ internal fun PlayerScreenRuntime.refreshTracks() {
                 selectedAudioIndex = preferredAudioIndex
             }
             preferredAudioSelectionApplied = true
+        }
         }
     }
 

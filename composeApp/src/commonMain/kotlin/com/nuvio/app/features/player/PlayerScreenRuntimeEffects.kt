@@ -53,6 +53,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     }
 
     LaunchedEffect(activeSourceUrl, activeSourceAudioUrl, activeSourceHeaders, activeSourceResponseHeaders) {
+        logLocalAudio(null, "activeSource changed activeSourceUrl=$activeSourceUrl activeSourceAudioUrl=$activeSourceAudioUrl")
         errorMessage = null
         playerController = null
         playerControllerSourceUrl = null

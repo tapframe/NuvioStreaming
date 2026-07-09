@@ -67,6 +67,7 @@ expect fun PlatformPlayerSurface(
     playWhenReady: Boolean = true,
     resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     useNativeController: Boolean = false,
+    audioDelayMs: Int = 0,
     onControllerReady: (PlayerEngineController) -> Unit,
     onSnapshot: (PlayerPlaybackSnapshot) -> Unit,
     onError: (String?) -> Unit,
