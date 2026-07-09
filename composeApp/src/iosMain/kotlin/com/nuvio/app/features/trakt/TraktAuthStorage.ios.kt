@@ -6,10 +6,10 @@ import platform.Foundation.NSUserDefaults
 internal actual object TraktAuthStorage {
     private const val payloadKey = "trakt_auth_payload"
 
-    actual fun loadPayload(): String? =
-        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(payloadKey))
+    actual fun loadPayload(profileId: Int): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(payloadKey, profileId))
 
-    actual fun savePayload(payload: String) {
-        NSUserDefaults.standardUserDefaults.setObject(payload, forKey = ProfileScopedKey.of(payloadKey))
+    actual fun savePayload(profileId: Int, payload: String) {
+        NSUserDefaults.standardUserDefaults.setObject(payload, forKey = ProfileScopedKey.of(payloadKey, profileId))
     }
 }

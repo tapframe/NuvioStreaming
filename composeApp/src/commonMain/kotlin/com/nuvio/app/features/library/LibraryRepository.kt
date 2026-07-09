@@ -151,7 +151,7 @@ object LibraryRepository {
 
         TraktSettingsRepository.onProfileChanged()
         if (!loadFromDisk(profileId)) return
-        TraktAuthRepository.onProfileChanged()
+        TraktAuthRepository.onProfileChanged(profileId)
         TraktLibraryRepository.onProfileChanged()
         if (TraktAuthRepository.isAuthenticated.value) {
             TraktLibraryRepository.preloadListTabsAsync()

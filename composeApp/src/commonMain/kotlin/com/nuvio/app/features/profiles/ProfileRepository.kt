@@ -154,7 +154,7 @@ object ProfileRepository {
         persist()
         WatchedRepository.onProfileChanged(profileIndex)
         TraktSettingsRepository.onProfileChanged()
-        TraktAuthRepository.onProfileChanged()
+        TraktAuthRepository.onProfileChanged(profileIndex)
         LibraryRepository.onProfileChanged(profileIndex)
         WatchProgressRepository.onProfileChanged(profileIndex)
         AddonRepository.onProfileChanged(profileIndex)
