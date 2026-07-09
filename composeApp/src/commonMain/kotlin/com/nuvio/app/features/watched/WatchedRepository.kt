@@ -19,6 +19,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -70,6 +72,31 @@ object WatchedRepository {
     private var deltaCursorEventId: Long = 0L
     private var deltaInitialized: Boolean = false
     internal var syncAdapter: WatchedSyncAdapter = SupabaseWatchedSyncAdapter
+
+    init {
+        syncScope.launch {
+            var wasTraktWatchedSyncActive = false
+            combine(
+                TraktAuthRepository.isAuthenticated,
+                TraktSettingsRepository.uiState,
+            ) { isAuthenticated, settings ->
+                shouldUseTraktWatchedSync(
+                    isAuthenticated = isAuthenticated,
+                    source = settings.watchProgressSource,
+                )
+            }.distinctUntilChanged().collect { isActive ->
+                val shouldPull = shouldPullTraktWatchedHistoryOnActivation(
+                    wasActive = wasTraktWatchedSyncActive,
+                    isActive = isActive,
+                )
+                wasTraktWatchedSyncActive = isActive
+                if (shouldPull) {
+                    runCatching { pullFromServer(ProfileRepository.activeProfileId) }
+                        .onFailure { e -> log.e(e) { "Trakt watched history pull on activation failed" } }
+                }
+            }
+        }
+    }
 
     fun ensureLoaded() {
         if (hasLoaded) return
@@ -735,6 +762,11 @@ internal fun shouldUseTraktWatchedSync(
     isAuthenticated = isAuthenticated,
     source = source,
 )
+
+internal fun shouldPullTraktWatchedHistoryOnActivation(
+    wasActive: Boolean,
+    isActive: Boolean,
+): Boolean = isActive && !wasActive
 
 private fun String.isSeriesLikeWatchedType(): Boolean =
     trim().lowercase() in setOf("series", "show", "tv", "tvshow")
