@@ -296,7 +296,13 @@ private fun ExoPlayerSurface(
             val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory, extractorsFactory)
             val videoSource = mediaSourceFactory.createMediaSource(videoMediaItem)
             val rawAudioSource = mediaSourceFactory.createMediaSource(playbackMediaItemFromUrl(sourceAudioUrl))
-            val audioSource = if (isLocal) SeekFakingMediaSource(rawAudioSource) else rawAudioSource
+            val audioSource = if (isLocal) {
+                SeekFakingMediaSource(rawAudioSource) {
+                    latestAudioDelayMs.value.toLong() * 1_000L
+                }
+            } else {
+                rawAudioSource
+            }
             val mergedSource = MergingMediaSource(videoSource, audioSource)
             if (isLocal) {
                 logLocalAudio(context, "local audio merged engine=ExoPlayer uri=$sourceAudioUrl delayMs=$audioDelayMs")
@@ -810,6 +816,8 @@ private fun ExoPlayerSurface(
     LaunchedEffect(audioDelayMs, sourceAudioUrl) {
         if (sourceAudioUrl?.startsWith("content://") == true) {
             logLocalAudio(context, "local audio offset changed delayMs=$audioDelayMs")
+            val currentPos = exoPlayer.currentPosition
+            exoPlayer.seekTo(currentPos)
         }
     }
 
@@ -2075,8 +2083,43 @@ internal class SubtitleRequestHeaderDataSource(
 }
 
 @UnstableApi
-private class SeekFakingMediaPeriod(val delegate: MediaPeriod) : MediaPeriod {
+private class SeekFakingSampleStream(
+    val delegate: androidx.media3.exoplayer.source.SampleStream,
+    private val audioDelayUsProvider: () -> Long,
+) : androidx.media3.exoplayer.source.SampleStream {
+    override fun isReady(): Boolean = delegate.isReady
+
+    override fun maybeThrowError() {
+        delegate.maybeThrowError()
+    }
+
+    override fun readData(
+        formatHolder: androidx.media3.exoplayer.FormatHolder,
+        buffer: androidx.media3.decoder.DecoderInputBuffer,
+        readFlags: Int
+    ): Int {
+        val result = delegate.readData(formatHolder, buffer, readFlags)
+        if (result == androidx.media3.common.C.RESULT_BUFFER_READ) {
+            buffer.timeUs = buffer.timeUs + audioDelayUsProvider()
+        }
+        return result
+    }
+
+    override fun skipData(positionUs: Long): Int {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        return delegate.skipData(adjustedPositionUs)
+    }
+}
+
+@UnstableApi
+private class SeekFakingMediaPeriod(
+    val delegate: MediaPeriod,
+    private val audioDelayUsProvider: () -> Long,
+) : MediaPeriod {
     override fun prepare(callback: MediaPeriod.Callback, positionUs: Long) {
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
         delegate.prepare(object : MediaPeriod.Callback {
             override fun onPrepared(mediaPeriod: MediaPeriod) {
                 callback.onPrepared(this@SeekFakingMediaPeriod)
@@ -2085,7 +2128,7 @@ private class SeekFakingMediaPeriod(val delegate: MediaPeriod) : MediaPeriod {
             override fun onContinueLoadingRequested(source: MediaPeriod) {
                 callback.onContinueLoadingRequested(this@SeekFakingMediaPeriod)
             }
-        }, positionUs)
+        }, adjustedPositionUs)
     }
 
     override fun maybeThrowPrepareError() {
@@ -2103,32 +2146,69 @@ private class SeekFakingMediaPeriod(val delegate: MediaPeriod) : MediaPeriod {
         streamResetFlags: BooleanArray,
         positionUs: Long
     ): Long {
-        return delegate.selectTracks(selections, mayRetainStreamFlags, streams, streamResetFlags, positionUs)
+        val delegateStreams = arrayOfNulls<androidx.media3.exoplayer.source.SampleStream>(streams.size)
+        for (i in streams.indices) {
+            val s = streams[i]
+            if (s is SeekFakingSampleStream) {
+                delegateStreams[i] = s.delegate
+            } else {
+                delegateStreams[i] = s
+            }
+        }
+
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        val selectPositionUs = delegate.selectTracks(selections, mayRetainStreamFlags, delegateStreams, streamResetFlags, adjustedPositionUs)
+
+        val streamsCast = streams as Array<androidx.media3.exoplayer.source.SampleStream?>
+        for (i in delegateStreams.indices) {
+            val ds = delegateStreams[i]
+            if (ds != null) {
+                streamsCast[i] = SeekFakingSampleStream(ds, audioDelayUsProvider)
+            } else {
+                streamsCast[i] = null
+            }
+        }
+
+        return selectPositionUs + delayUs
     }
 
     override fun discardBuffer(positionUs: Long, toKeyframe: Boolean) {
-        delegate.discardBuffer(positionUs, toKeyframe)
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        delegate.discardBuffer(adjustedPositionUs, toKeyframe)
     }
 
     override fun readDiscontinuity(): Long {
-        return delegate.readDiscontinuity()
+        val disc = delegate.readDiscontinuity()
+        if (disc == androidx.media3.common.C.TIME_UNSET) return disc
+        return disc + audioDelayUsProvider()
     }
 
     override fun seekToUs(positionUs: Long): Long {
-        delegate.seekToUs(positionUs)
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        delegate.seekToUs(adjustedPositionUs)
         return positionUs
     }
 
     override fun getAdjustedSeekPositionUs(positionUs: Long, seekParameters: SeekParameters): Long {
-        return delegate.getAdjustedSeekPositionUs(positionUs, seekParameters)
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        val adjustedResult = delegate.getAdjustedSeekPositionUs(adjustedPositionUs, seekParameters)
+        return adjustedResult + delayUs
     }
 
     override fun getBufferedPositionUs(): Long {
-        return delegate.bufferedPositionUs
+        val buffered = delegate.bufferedPositionUs
+        if (buffered == androidx.media3.common.C.TIME_END_OF_SOURCE) return buffered
+        return buffered + audioDelayUsProvider()
     }
 
     override fun getNextLoadPositionUs(): Long {
-        return delegate.nextLoadPositionUs
+        val nextLoad = delegate.nextLoadPositionUs
+        if (nextLoad == androidx.media3.common.C.TIME_END_OF_SOURCE) return nextLoad
+        return nextLoad + audioDelayUsProvider()
     }
 
     override fun continueLoading(loadingInfo: LoadingInfo): Boolean {
@@ -2140,19 +2220,24 @@ private class SeekFakingMediaPeriod(val delegate: MediaPeriod) : MediaPeriod {
     }
 
     override fun reevaluateBuffer(positionUs: Long) {
-        delegate.reevaluateBuffer(positionUs)
+        val delayUs = audioDelayUsProvider()
+        val adjustedPositionUs = (positionUs - delayUs).coerceAtLeast(0L)
+        delegate.reevaluateBuffer(adjustedPositionUs)
     }
 }
 
 @UnstableApi
-private class SeekFakingMediaSource(delegate: MediaSource) : WrappingMediaSource(delegate) {
+private class SeekFakingMediaSource(
+    delegate: MediaSource,
+    private val audioDelayUsProvider: () -> Long,
+) : WrappingMediaSource(delegate) {
     override fun createPeriod(
         id: MediaSource.MediaPeriodId,
         allocator: androidx.media3.exoplayer.upstream.Allocator,
         startPositionUs: Long
     ): MediaPeriod {
         val originalPeriod = super.createPeriod(id, allocator, startPositionUs)
-        return SeekFakingMediaPeriod(originalPeriod)
+        return SeekFakingMediaPeriod(originalPeriod, audioDelayUsProvider)
     }
 
     override fun releasePeriod(mediaPeriod: MediaPeriod) {

@@ -231,8 +231,8 @@ private fun AudioEmptyState() {
     }
 }
 
-private const val AUDIO_DELAY_MIN_MS = -1000
-private const val AUDIO_DELAY_MAX_MS = 1000
+private const val AUDIO_DELAY_MIN_MS = -10000
+private const val AUDIO_DELAY_MAX_MS = 10000
 private const val AUDIO_DELAY_STEP_MS = 50
 
 @Composable
