@@ -41,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -268,8 +269,6 @@ fun MetaDetailsScreen(
     LaunchedEffect(
         type,
         id,
-        displayedMeta?.id,
-        uiState.isLoading,
         traktSettingsUiState.moreLikeThisSource,
         traktAuthUiState.mode,
         tmdbSettingsUiState.enabled,
@@ -727,22 +726,43 @@ fun MetaDetailsScreen(
                         .calculateTopPadding()
                         .toPx()
                 }
-                var heroHeightPx by remember(meta.id) { mutableIntStateOf(0) }
-                val thresholdPx = (heroHeightPx - safeAreaTopPx).coerceAtLeast(0f)
-                val detailScrollOffsetPx = if (listState.firstVisibleItemIndex == 0) {
-                    listState.firstVisibleItemScrollOffset.toFloat()
-                } else {
-                    heroHeightPx.toFloat() + listState.firstVisibleItemScrollOffset
+                val heroHeightPxState = remember(meta.id) { mutableIntStateOf(0) }
+                val heroHeightPx = heroHeightPxState.intValue
+                val detailScrollOffsetProvider = remember(listState, heroHeightPxState) {
+                    {
+                        if (listState.firstVisibleItemIndex == 0) {
+                            listState.firstVisibleItemScrollOffset.toFloat()
+                        } else {
+                            heroHeightPxState.intValue.toFloat() + listState.firstVisibleItemScrollOffset
+                        }
+                    }
                 }
-                val heroScrollOffset = detailScrollOffsetPx.toInt()
-                val headerTarget = if (
-                    heroHeightPx > 0 &&
-                    (listState.firstVisibleItemIndex > 0 || detailScrollOffsetPx > thresholdPx)
+                val isScrolledPastHeroHeaderThreshold by remember(
+                    listState,
+                    heroHeightPxState,
+                    safeAreaTopPx,
+                    detailScrollOffsetProvider,
                 ) {
-                    1f
-                } else {
-                    0f
+                    derivedStateOf {
+                        val measuredHeroHeightPx = heroHeightPxState.intValue
+                        val thresholdPx = (measuredHeroHeightPx - safeAreaTopPx).coerceAtLeast(0f)
+                        measuredHeroHeightPx > 0 &&
+                            (listState.firstVisibleItemIndex > 0 || detailScrollOffsetProvider() > thresholdPx)
+                    }
                 }
+                val isHeroTrailerWithinPlayThreshold by remember(
+                    listState,
+                    heroHeightPxState,
+                    safeAreaTopPx,
+                    detailScrollOffsetProvider,
+                ) {
+                    derivedStateOf {
+                        val measuredHeroHeightPx = heroHeightPxState.intValue
+                        val thresholdPx = (measuredHeroHeightPx - safeAreaTopPx).coerceAtLeast(0f)
+                        measuredHeroHeightPx == 0 || detailScrollOffsetProvider() <= thresholdPx
+                    }
+                }
+                val headerTarget = if (isScrolledPastHeroHeaderThreshold) 1f else 0f
                 val heroTrailerSourceUrl = heroTrailerPlaybackSource
                     ?.videoUrl
                     ?.takeIf { it.isNotBlank() && heroTrailerPlaybackEnabled && !heroTrailerFinished && !isLeavingDetails }
@@ -751,8 +771,8 @@ fun MetaDetailsScreen(
                     ?.takeIf { heroTrailerSourceUrl != null && it.isNotBlank() }
                 val heroTrailerPlayWhenReady = heroTrailerSourceUrl != null &&
                     !isLeavingDetails &&
-                    (heroHeightPx == 0 || detailScrollOffsetPx <= thresholdPx)
-                val headerProgress by animateFloatAsState(
+                    isHeroTrailerWithinPlayThreshold
+                val headerProgressState = animateFloatAsState(
                     targetValue = headerTarget,
                     animationSpec = tween(
                         durationMillis = if (headerTarget > 0f) 150 else 100,
@@ -760,6 +780,15 @@ fun MetaDetailsScreen(
                     ),
                     label = "detail_floating_header_progress",
                 )
+                val headerProgressProvider = remember(headerProgressState) {
+                    { headerProgressState.value }
+                }
+                val showHeroBackButton by remember(headerProgressState) {
+                    derivedStateOf { headerProgressState.value <= 0.05f }
+                }
+                val headerInteractive by remember(headerProgressState) {
+                    derivedStateOf { headerProgressState.value > 0.05f }
+                }
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val colorScheme = MaterialTheme.colorScheme
@@ -850,13 +879,16 @@ fun MetaDetailsScreen(
                                 .fillMaxSize()
                                 .zIndex(1f),
                         ) {
-                            item(key = "detail-hero") {
+                            item(
+                                key = "detail-hero",
+                                contentType = "detail-hero",
+                            ) {
                                 DetailHero(
                                     meta = meta,
                                     isTablet = isTablet,
                                     contentMaxWidth = contentMaxWidth,
-                                    scrollOffset = heroScrollOffset,
-                                    onHeightChanged = { heroHeightPx = it },
+                                    scrollOffsetProvider = detailScrollOffsetProvider,
+                                    onHeightChanged = { heroHeightPxState.intValue = it },
                                     heroTrailerSourceUrl = heroTrailerSourceUrl,
                                     heroTrailerSourceAudioUrl = heroTrailerSourceAudioUrl,
                                     heroTrailerReady = heroTrailerReady,
@@ -962,7 +994,10 @@ fun MetaDetailsScreen(
                                 animatedVisibilityScope = animatedVisibilityScope,
                             )
 
-                            item(key = "detail-bottom-spacer") {
+                            item(
+                                key = "detail-bottom-spacer",
+                                contentType = "detail-spacer",
+                            ) {
                                 Spacer(modifier = Modifier.height(nuvioSafeBottomPadding(32.dp)))
                             }
                         }
@@ -976,7 +1011,7 @@ fun MetaDetailsScreen(
                                     .fillMaxWidth()
                                     .height(132.dp)
                                     .graphicsLayer {
-                                        translationY = heroHeightPx.toFloat() - detailScrollOffsetPx
+                                        translationY = heroHeightPx.toFloat() - detailScrollOffsetProvider()
                                     }
                                     .background(
                                         Brush.verticalGradient(
@@ -991,7 +1026,7 @@ fun MetaDetailsScreen(
                             )
                         }
 
-                        if (headerProgress <= 0.05f) {
+                        if (showHeroBackButton) {
                             NuvioBackButton(
                                 onClick = onBackFromDetails,
                                 modifier = Modifier.padding(
@@ -1006,7 +1041,8 @@ fun MetaDetailsScreen(
                         DetailFloatingHeader(
                             meta = meta,
                             isSaved = isSaved,
-                            progress = headerProgress,
+                            progressProvider = headerProgressProvider,
+                            interactive = headerInteractive,
                             backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
                             onBack = onBackFromDetails,
                             onToggleSaved = toggleSaved,
@@ -1408,7 +1444,15 @@ private fun LazyListScope.configuredMetaSectionItems(
         sectionItems: List<MetaScreenSectionItem>,
         forceTabLayout: Boolean = settings.tabLayout,
     ) {
-        item(key = key) {
+        val contentType = if (sectionItems.size == 1) {
+            "detail-section-${sectionItems.first().key.name}"
+        } else {
+            "detail-section-tab-group"
+        }
+        item(
+            key = key,
+            contentType = contentType,
+        ) {
             DetailSectionContainer(
                 horizontalPadding = contentHorizontalPadding,
                 contentMaxWidth = contentMaxWidth,

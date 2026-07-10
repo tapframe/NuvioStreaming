@@ -48,7 +48,8 @@ import org.jetbrains.compose.resources.stringResource
 fun DetailFloatingHeader(
     meta: MetaDetails,
     isSaved: Boolean,
-    progress: Float,
+    progressProvider: () -> Float,
+    interactive: Boolean,
     backgroundColor: Color? = null,
     onBack: () -> Unit,
     onToggleSaved: () -> Unit,
@@ -56,7 +57,6 @@ fun DetailFloatingHeader(
 ) {
     val safeAreaTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val headerTopPadding = (safeAreaTop - 6.dp).coerceAtLeast(safeAreaTop * 0.8f)
-    val interactive = progress > 0.05f
     val surfaceColor = backgroundColor ?: if (isIos) {
         MaterialTheme.colorScheme.surface.copy(alpha = 1.0f)
     } else {
@@ -70,6 +70,7 @@ fun DetailFloatingHeader(
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer {
+                val progress = progressProvider()
                 alpha = progress
                 translationY = lerp((-20).dp, 0.dp, progress).toPx()
                 shadowElevation = 4.dp.toPx()
@@ -89,7 +90,7 @@ fun DetailFloatingHeader(
                     .fillMaxWidth()
                     .padding(top = headerTopPadding, start = 16.dp, end = 16.dp)
                     .height(56.dp)
-                    .graphicsLayer { alpha = progress },
+                    .graphicsLayer { alpha = progressProvider() },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {

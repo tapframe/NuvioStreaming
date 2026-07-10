@@ -227,7 +227,7 @@ object SyncManager {
 
     private fun pullForegroundForProfile(profileId: Int) {
         scope.launch {
-            log.i { "pullForegroundForProfile($profileId) — syncing watch progress, library, collections, and home settings" }
+            log.i { "pullForegroundForProfile($profileId) — syncing watch progress, watched items, library, collections, and home settings" }
 
             runCatching { TraktCredentialSync.pullFromRemote(profileId) }
                 .onFailure { log.e(it) { "Foreground Trakt credential pull failed" } }
@@ -238,8 +238,13 @@ object SyncManager {
             }
 
             launch {
-                runCatching { WatchProgressRepository.pullFromServer(profileId) }
+                runCatching { WatchProgressRepository.forceSnapshotRefreshFromServer(profileId) }
                     .onFailure { log.e(it) { "Foreground watch progress pull failed" } }
+            }
+
+            launch {
+                runCatching { WatchedRepository.forceSnapshotRefreshFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground watched items pull failed" } }
             }
 
             launch {

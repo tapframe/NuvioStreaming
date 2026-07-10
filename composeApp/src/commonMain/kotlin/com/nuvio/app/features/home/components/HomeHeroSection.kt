@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -29,7 +28,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -43,6 +41,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +56,7 @@ import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private const val HERO_BACKGROUND_PARALLAX = 0.055f
 private const val HERO_BACKGROUND_SCALE = 1.14f
@@ -95,6 +95,7 @@ fun HomeHeroSection(
 
     val pagerState = rememberPagerState(pageCount = { items.size })
     val coroutineScope = rememberCoroutineScope()
+    var pagerDragActive by remember { mutableStateOf(false) }
 
     BoxWithConstraints(
         modifier = modifier
@@ -103,6 +104,7 @@ fun HomeHeroSection(
                 pagerState = pagerState,
                 itemCount = items.size,
                 coroutineScope = coroutineScope,
+                onDragActiveChange = { pagerDragActive = it },
             )
             .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)),
     ) {
@@ -113,42 +115,6 @@ fun HomeHeroSection(
         )
         val heroWidthPx = with(LocalDensity.current) { maxWidth.toPx() }
         val heroHeightPx = with(LocalDensity.current) { layout.heroHeight.toPx() }
-        val scrollOffsetPx by remember(listState, heroHeightPx) {
-            derivedStateOf {
-                when {
-                    listState == null -> 0f
-                    listState.firstVisibleItemIndex > 0 -> heroHeightPx
-                    else -> listState.firstVisibleItemScrollOffset.toFloat()
-                }
-            }
-        }
-        val heroScrollScale = heroBackgroundScrollScale(scrollOffsetPx)
-        val heroScrollTranslationY = heroBackgroundScrollTranslationY(scrollOffsetPx)
-        val currentPage = pagerState.currentPage.coerceIn(items.indices)
-        val visiblePages = listOf(
-            currentPage,
-            (currentPage - 1).coerceIn(items.indices),
-            (currentPage + 1).coerceIn(items.indices),
-        ).distinct()
-            .mapNotNull { index ->
-                val pageOffset = heroPageOffset(pagerState, index)
-                val visibility = (1f - abs(pageOffset)).coerceIn(0f, 1f)
-                if (visibility <= 0f) {
-                    null
-                } else {
-                    HeroPageLayer(
-                        page = index,
-                        visibility = visibility,
-                        offset = pageOffset,
-                    )
-                }
-            }
-            .sortedBy(HeroPageLayer::visibility)
-        val currentItem = visiblePages
-            .lastOrNull()
-            ?.page
-            ?.let(items::get)
-            ?: items[currentPage]
 
         Box(
             modifier = Modifier
@@ -168,23 +134,15 @@ fun HomeHeroSection(
             Box(
                 modifier = Modifier.fillMaxSize(),
             ) {
-                visiblePages.forEach { layer ->
-                    AsyncImage(
-                        model = items[layer.page].banner ?: items[layer.page].poster,
-                        contentDescription = items[layer.page].name,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                alpha = layer.visibility
-                                translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                                translationY = heroScrollTranslationY
-                                scaleX = HERO_BACKGROUND_SCALE * heroScrollScale
-                                scaleY = HERO_BACKGROUND_SCALE * heroScrollScale
-                            },
-                        alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
-                        contentScale = ContentScale.Crop,
-                    )
-                }
+                HeroBackgroundLayers(
+                    items = items,
+                    pagerState = pagerState,
+                    listState = listState,
+                    layout = layout,
+                    heroWidthPx = heroWidthPx,
+                    heroHeightPx = heroHeightPx,
+                    includePagerNeighbors = pagerDragActive,
+                )
 
                 Box(
                     modifier = Modifier
@@ -232,20 +190,14 @@ fun HomeHeroSection(
                             .widthIn(max = layout.contentMaxWidth),
                         contentAlignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
                     ) {
-                        visiblePages.forEach { layer ->
-                            Box(
-                                modifier = Modifier.graphicsLayer {
-                                    alpha = layer.visibility
-                                    translationX = -layer.offset * heroWidthPx * HERO_CONTENT_PARALLAX
-                                },
-                            ) {
-                                HeroContentBlock(
-                                    item = items[layer.page],
-                                    layout = layout,
-                                    onItemClick = onItemClick,
-                                )
-                            }
-                        }
+                        HeroContentLayers(
+                            items = items,
+                            pagerState = pagerState,
+                            layout = layout,
+                            heroWidthPx = heroWidthPx,
+                            onItemClick = onItemClick,
+                            includePagerNeighbors = pagerDragActive,
+                        )
                     }
 
                     if (!layout.isTablet) {
@@ -253,7 +205,7 @@ fun HomeHeroSection(
                         Surface(
                             modifier = Modifier
                                 .clickable(enabled = onItemClick != null) {
-                                    onItemClick?.invoke(currentItem)
+                                    onItemClick?.invoke(currentHeroItem(items, pagerState))
                                 },
                             color = MaterialTheme.colorScheme.onBackground,
                             contentColor = MaterialTheme.colorScheme.background,
@@ -275,21 +227,14 @@ fun HomeHeroSection(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             items.forEachIndexed { index, _ ->
-                                val activeFraction = heroPageVisibility(pagerState, index)
-                                Box(
-                                    modifier = Modifier
-                                        .clickable {
-                                            coroutineScope.launch {
-                                                pagerState.animateScrollToPage(index)
-                                            }
+                                HeroPageIndicatorDot(
+                                    pagerState = pagerState,
+                                    page = index,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(index)
                                         }
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.onBackground)
-                                        .graphicsLayer {
-                                            alpha = 0.35f + (0.57f * activeFraction)
-                                        }
-                                        .width(8.dp + (24.dp * activeFraction))
-                                        .height(8.dp),
+                                    },
                                 )
                             }
                         }
@@ -300,11 +245,111 @@ fun HomeHeroSection(
     }
 }
 
-private data class HeroPageLayer(
-    val page: Int,
-    val visibility: Float,
-    val offset: Float,
-)
+@Composable
+private fun HeroBackgroundLayers(
+    items: List<MetaPreview>,
+    pagerState: PagerState,
+    listState: LazyListState?,
+    layout: HomeHeroLayout,
+    heroWidthPx: Float,
+    heroHeightPx: Float,
+    includePagerNeighbors: Boolean,
+) {
+    val layerPages = rememberHeroLayerPages(
+        pagerState = pagerState,
+        itemCount = items.size,
+        includePagerNeighbors = includePagerNeighbors,
+    )
+
+    layerPages.forEach { page ->
+        val item = items[page]
+        AsyncImage(
+            model = item.banner ?: item.poster,
+            contentDescription = item.name,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    val pageOffset = heroPageOffset(pagerState, page)
+                    val scrollOffsetPx = heroScrollOffsetPx(listState, heroHeightPx)
+                    val scrollScale = heroBackgroundScrollScale(scrollOffsetPx)
+
+                    alpha = heroPageVisibility(pageOffset)
+                    translationX = -pageOffset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                    translationY = heroBackgroundScrollTranslationY(scrollOffsetPx)
+                    scaleX = HERO_BACKGROUND_SCALE * scrollScale
+                    scaleY = HERO_BACKGROUND_SCALE * scrollScale
+                },
+            alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
+            contentScale = ContentScale.Crop,
+        )
+    }
+}
+
+@Composable
+private fun HeroContentLayers(
+    items: List<MetaPreview>,
+    pagerState: PagerState,
+    layout: HomeHeroLayout,
+    heroWidthPx: Float,
+    onItemClick: ((MetaPreview) -> Unit)?,
+    includePagerNeighbors: Boolean,
+) {
+    val layerPages = rememberHeroLayerPages(
+        pagerState = pagerState,
+        itemCount = items.size,
+        includePagerNeighbors = includePagerNeighbors,
+    )
+
+    layerPages.forEach { page ->
+        Box(
+            modifier = Modifier.graphicsLayer {
+                val pageOffset = heroPageOffset(pagerState, page)
+
+                alpha = heroPageVisibility(pageOffset)
+                translationX = -pageOffset * heroWidthPx * HERO_CONTENT_PARALLAX
+            },
+        ) {
+            HeroContentBlock(
+                item = items[page],
+                layout = layout,
+                onItemClick = onItemClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberHeroLayerPages(
+    pagerState: PagerState,
+    itemCount: Int,
+    includePagerNeighbors: Boolean,
+): List<Int> {
+    if (itemCount <= 0) return emptyList()
+
+    val currentPage = pagerState.currentPage.coerceIn(0, itemCount - 1)
+    val includeNeighbors = includePagerNeighbors || pagerState.isScrollInProgress
+    return remember(currentPage, includeNeighbors, itemCount) {
+        heroLayerPages(
+            currentPage = currentPage,
+            itemCount = itemCount,
+            includeNeighbors = includeNeighbors,
+        )
+    }
+}
+
+private fun heroLayerPages(
+    currentPage: Int,
+    itemCount: Int,
+    includeNeighbors: Boolean,
+): List<Int> {
+    if (!includeNeighbors || itemCount == 1) return listOf(currentPage)
+
+    val neighbors = listOf(currentPage - 1, currentPage + 1)
+        .map { page -> page.coerceIn(0, itemCount - 1) }
+        .filter { page -> page != currentPage }
+        .distinct()
+    return neighbors + currentPage
+}
 
 private fun heroPageOffset(
     pagerState: PagerState,
@@ -314,8 +359,66 @@ private fun heroPageOffset(
 private fun heroPageVisibility(
     pagerState: PagerState,
     page: Int,
-): Float {
-    return (1f - abs(heroPageOffset(pagerState, page))).coerceIn(0f, 1f)
+): Float = heroPageVisibility(heroPageOffset(pagerState, page))
+
+private fun heroPageVisibility(pageOffset: Float): Float = (1f - abs(pageOffset)).coerceIn(0f, 1f)
+
+private fun currentHeroItem(
+    items: List<MetaPreview>,
+    pagerState: PagerState,
+): MetaPreview {
+    val currentPage = pagerState.currentPage.coerceIn(0, items.lastIndex)
+    val currentVisiblePages = heroLayerPages(
+        currentPage = currentPage,
+        itemCount = items.size,
+        includeNeighbors = true,
+    )
+    val selectedPage = currentVisiblePages.maxBy { page ->
+        heroPageVisibility(pagerState, page)
+    }
+    return items[selectedPage]
+}
+
+@Composable
+private fun HeroPageIndicatorDot(
+    pagerState: PagerState,
+    page: Int,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.onBackground)
+            .graphicsLayer {
+                val activeFraction = heroPageVisibility(pagerState, page)
+                alpha = 0.35f + (0.57f * activeFraction)
+            }
+            .heroPageIndicatorSize(pagerState = pagerState, page = page),
+    )
+}
+
+private fun Modifier.heroPageIndicatorSize(
+    pagerState: PagerState,
+    page: Int,
+): Modifier = layout { measurable, constraints ->
+    val activeFraction = heroPageVisibility(pagerState, page)
+    val widthPx = (8.dp.toPx() + (24.dp.toPx() * activeFraction)).roundToInt()
+    val heightPx = 8.dp.roundToPx()
+    val constrainedWidth = widthPx.coerceIn(constraints.minWidth, constraints.maxWidth)
+    val constrainedHeight = heightPx.coerceIn(constraints.minHeight, constraints.maxHeight)
+    val placeable = measurable.measure(
+        constraints.copy(
+            minWidth = constrainedWidth,
+            maxWidth = constrainedWidth,
+            minHeight = constrainedHeight,
+            maxHeight = constrainedHeight,
+        ),
+    )
+
+    layout(constrainedWidth, constrainedHeight) {
+        placeable.place(0, 0)
+    }
 }
 
 @Composable
@@ -519,6 +622,15 @@ private fun HeroMetaDot() {
     )
 }
 
+private fun heroScrollOffsetPx(
+    listState: LazyListState?,
+    heroHeightPx: Float,
+): Float = when {
+    listState == null -> 0f
+    listState.firstVisibleItemIndex > 0 -> heroHeightPx
+    else -> listState.firstVisibleItemScrollOffset.toFloat()
+}
+
 private fun heroBackgroundScrollScale(scrollOffsetPx: Float): Float {
     val scaleIncrease = if (scrollOffsetPx < 0f) {
         abs(scrollOffsetPx) * HERO_SCROLL_UP_SCALE_MULTIPLIER
@@ -536,6 +648,7 @@ private fun Modifier.homeHeroPagerGesture(
     pagerState: PagerState,
     itemCount: Int,
     coroutineScope: CoroutineScope,
+    onDragActiveChange: (Boolean) -> Unit,
 ): Modifier {
     if (itemCount <= 1) return this
 
@@ -550,47 +663,62 @@ private fun Modifier.homeHeroPagerGesture(
             var totalDx = 0f
             var totalDy = 0f
             var dragging = false
+            var settleAnimationStarted = false
 
-            while (true) {
-                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                velocityTracker.addPosition(change.uptimeMillis, change.position)
+            try {
+                while (true) {
+                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    velocityTracker.addPosition(change.uptimeMillis, change.position)
 
-                if (!change.pressed) {
-                    if (dragging) {
-                        val targetPage = resolveHeroTargetPage(
-                            startPage = startPage,
-                            itemCount = itemCount,
-                            totalDx = totalDx,
-                            velocityX = velocityTracker.calculateVelocity().x,
-                            widthPx = widthPx,
-                        )
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(targetPage)
+                    if (!change.pressed) {
+                        if (dragging) {
+                            val targetPage = resolveHeroTargetPage(
+                                startPage = startPage,
+                                itemCount = itemCount,
+                                totalDx = totalDx,
+                                velocityX = velocityTracker.calculateVelocity().x,
+                                widthPx = widthPx,
+                            )
+                            settleAnimationStarted = true
+                            coroutineScope.launch {
+                                try {
+                                    pagerState.animateScrollToPage(targetPage)
+                                } finally {
+                                    onDragActiveChange(false)
+                                }
+                            }
+                        }
+                        break
+                    }
+
+                    val delta = change.position - change.previousPosition
+                    totalDx += delta.x
+                    totalDy += delta.y
+
+                    if (!dragging) {
+                        val horizontalDrag =
+                            abs(totalDx) > viewConfiguration.touchSlop && abs(totalDx) > abs(totalDy)
+                        val verticalDrag =
+                            abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
+
+                        when {
+                            verticalDrag -> break
+                            horizontalDrag -> {
+                                dragging = true
+                                onDragActiveChange(true)
+                            }
+                            else -> continue
                         }
                     }
-                    break
+
+                    pagerState.dispatchRawDelta(-delta.x)
+                    change.consume()
                 }
-
-                val delta = change.position - change.previousPosition
-                totalDx += delta.x
-                totalDy += delta.y
-
-                if (!dragging) {
-                    val horizontalDrag =
-                        abs(totalDx) > viewConfiguration.touchSlop && abs(totalDx) > abs(totalDy)
-                    val verticalDrag =
-                        abs(totalDy) > viewConfiguration.touchSlop && abs(totalDy) > abs(totalDx)
-
-                    when {
-                        verticalDrag -> break
-                        horizontalDrag -> dragging = true
-                        else -> continue
-                    }
+            } finally {
+                if (dragging && !settleAnimationStarted) {
+                    onDragActiveChange(false)
                 }
-
-                pagerState.dispatchRawDelta(-delta.x)
-                change.consume()
             }
         }
     }

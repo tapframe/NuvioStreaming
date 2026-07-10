@@ -2,10 +2,13 @@ package com.nuvio.app.core.ui
 
 import android.os.Build
 import coil3.ImageLoader
+import coil3.PlatformContext
 import coil3.gif.AnimatedImageDecoder
 import coil3.gif.GifDecoder
 
-internal actual fun ImageLoader.Builder.configurePlatformImageLoader(): ImageLoader.Builder =
+internal actual fun ImageLoader.Builder.configurePlatformImageLoader(
+    context: PlatformContext,
+): ImageLoader.Builder =
     components {
         if (Build.VERSION.SDK_INT >= 28) {
             add(AnimatedImageDecoder.Factory())

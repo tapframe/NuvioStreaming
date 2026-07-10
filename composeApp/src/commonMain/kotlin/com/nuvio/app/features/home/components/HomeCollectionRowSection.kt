@@ -41,7 +41,7 @@ fun HomeCollectionRowSection(
     collection: Collection,
     modifier: Modifier = Modifier,
     sectionPadding: Dp? = null,
-    animateGifs: Boolean = true,
+    animateGifsProvider: () -> Boolean = { true },
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
 ) {
     if (collection.folders.isEmpty()) return
@@ -51,7 +51,7 @@ fun HomeCollectionRowSection(
             collection = collection,
             modifier = modifier.fillMaxWidth(),
             sectionPadding = sectionPadding,
-            animateGifs = animateGifs,
+            animateGifsProvider = animateGifsProvider,
             onFolderClick = onFolderClick,
         )
     } else {
@@ -60,7 +60,7 @@ fun HomeCollectionRowSection(
                 collection = collection,
                 modifier = Modifier.fillMaxWidth(),
                 sectionPadding = homeSectionHorizontalPaddingForWidth(maxWidth.value),
-                animateGifs = animateGifs,
+                animateGifsProvider = animateGifsProvider,
                 onFolderClick = onFolderClick,
             )
         }
@@ -72,7 +72,7 @@ private fun HomeCollectionRowSectionContent(
     collection: Collection,
     modifier: Modifier,
     sectionPadding: Dp,
-    animateGifs: Boolean,
+    animateGifsProvider: () -> Boolean,
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)?,
 ) {
     val homeCatalogSettings by remember {
@@ -91,7 +91,7 @@ private fun HomeCollectionRowSectionContent(
     ) { folder ->
         CollectionFolderCard(
             folder = folder,
-            animateGifs = animateGifs,
+            animateGifsProvider = animateGifsProvider,
             onClick = onFolderClick?.let { { it(collection.id, folder.id) } },
         )
     }
@@ -101,7 +101,7 @@ private fun HomeCollectionRowSectionContent(
 private fun CollectionFolderCard(
     folder: CollectionFolder,
     modifier: Modifier = Modifier,
-    animateGifs: Boolean = true,
+    animateGifsProvider: () -> Boolean = { true },
     onClick: (() -> Unit)? = null,
 ) {
     val posterCardStyle = rememberPosterCardStyleUiState()
@@ -154,7 +154,7 @@ private fun CollectionFolderCard(
                             contentDescription = folder.title,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop,
-                            animateIfPossible = animateGifs && isAnimatedCollectionFolderImage(folder, imageUrl),
+                            animateIfPossible = animateGifsProvider() && isAnimatedCollectionFolderImage(folder, imageUrl),
                         )
                     }
                     !folder.coverEmoji.isNullOrBlank() -> {

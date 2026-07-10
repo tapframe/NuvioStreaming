@@ -27,9 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -283,7 +281,7 @@ object WatchProgressRepository {
 
         if (shouldUseTraktProgress()) {
             log.d { "Force refreshing Trakt watch progress for profile $profileId" }
-            runCatching { TraktProgressRepository.refreshNow() }
+            runCatching { TraktProgressRepository.invalidateAndRefresh() }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
                     log.e(error) { "Failed to force refresh Trakt progress" }
@@ -628,25 +626,23 @@ object WatchProgressRepository {
             }
             if (supportedNeedsResolution.isEmpty()) return@launch
 
-            var resolvedEntries = 0
             val semaphore = Semaphore(WATCH_PROGRESS_METADATA_RESOLUTION_CONCURRENCY)
-            val resolutionResults = coroutineScope {
-                supportedNeedsResolution.map { (key, entries) ->
-                    async {
-                        semaphore.withPermit {
-                            fetchRemoteMetadataGroup(key = key, entries = entries)
-                        }
+            val resolutionResults = Channel<RemoteMetadataResolutionResult>(Channel.UNLIMITED)
+            supportedNeedsResolution.forEach { (key, entries) ->
+                launch {
+                    val result = semaphore.withPermit {
+                        fetchRemoteMetadataGroup(key = key, entries = entries)
                     }
-                }.awaitAll()
+                    resolutionResults.send(result)
+                }
             }
 
-            for (result in resolutionResults) {
+            var resolvedEntries = 0
+            repeat(supportedNeedsResolution.size) {
+                val result = resolutionResults.receive()
                 ensureActive()
                 if (!isActiveOperation(targetProfileId, targetGeneration)) return@launch
-                val meta = result.meta
-                if (meta == null) {
-                    continue
-                }
+                val meta = result.meta ?: return@repeat
 
                 var appliedEntries = 0
                 for (entry in result.entries) {
@@ -672,17 +668,17 @@ object WatchProgressRepository {
                     )
                     appliedEntries += 1
                 }
-                if (appliedEntries == 0) {
-                    continue
-                }
+                if (appliedEntries == 0) return@repeat
 
                 resolvedEntries += appliedEntries
-            }
-            if (resolvedEntries > 0) {
+
                 if (isActiveOperation(targetProfileId, targetGeneration)) {
                     publish()
-                    persist()
                 }
+            }
+            resolutionResults.close()
+            if (resolvedEntries > 0 && isActiveOperation(targetProfileId, targetGeneration)) {
+                persist()
             }
         }
     }
