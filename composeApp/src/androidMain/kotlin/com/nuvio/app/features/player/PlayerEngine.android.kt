@@ -1531,24 +1531,29 @@ private fun ExoPlayer.forceLocalAudioOverride(context: Context, localAudioUrl: S
         "idx=$idx isSelected=${g.isSelected} label=${g.mediaTrackGroup.getFormat(0).label} id=${g.mediaTrackGroup.getFormat(0).id}"
     }.joinToString("; ")
     logLocalAudio(context, "forceLocalAudioOverride: localAudioUrl=$localAudioUrl audioGroups=$logInfo")
+
     if (localAudioUrl?.startsWith("content://") != true || audioGroups.isEmpty()) {
         return false
     }
-    val localGroup = audioGroups.last()
-    if (localGroup.isSelected) {
-        logLocalAudio(context, "forceLocalAudioOverride: local already selected")
-        return true
-    }
+
+    // In remux (e.g. HLS), the local audio track from MergingMediaSource might not be the last group.
+    // It typically has no label, no language, and ID starts with "1:" (as it's a separate renderer source).
+    // We try to match by format first, fallback to last.
+    val localGroup = audioGroups.firstOrNull {
+        it.mediaTrackGroup.getFormat(0).let { f -> f.label.isNullOrBlank() && f.language.isNullOrBlank() }
+    } ?: audioGroups.last()
+
     val builder = trackSelectionParameters.buildUpon()
-    for (g in audioGroups) {
-        if (g === localGroup) {
-            builder.setOverrideForType(TrackSelectionOverride(g.mediaTrackGroup, listOf(0)))
-        } else {
-            builder.setOverrideForType(TrackSelectionOverride(g.mediaTrackGroup, emptyList()))
-        }
-    }
+    // By setting the override for TRACK_TYPE_AUDIO to just this specific group, ExoPlayer automatically
+    // deselects the others. We DO NOT send emptyList() to the video's audio groups, because doing so
+    // causes an IllegalStateException ("Children enabled at different positions") in the MergingMediaSource
+    // when playing remux adaptive streams.
+    builder.setOverrideForType(TrackSelectionOverride(localGroup.mediaTrackGroup, listOf(0)))
+
     trackSelectionParameters = builder.build()
-    val applied = currentTracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }.lastOrNull()?.isSelected == true
+
+    // Verify using our resolved localGroup
+    val applied = currentTracks.groups.find { it === localGroup }?.isSelected == true
     logLocalAudio(context, "forceLocalAudioOverride: applied local selected=$applied")
     return applied
 }
