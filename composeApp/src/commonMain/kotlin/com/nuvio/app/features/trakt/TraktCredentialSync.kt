@@ -8,6 +8,7 @@ import com.nuvio.app.core.sync.putSyncOriginClientId
 import com.nuvio.app.features.profiles.ProfileRepository
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -63,24 +64,42 @@ object TraktCredentialSync {
         }
 
     suspend fun pullFromRemote(profileId: Int = ProfileRepository.activeProfileId): Boolean =
-        mutex.withLock {
+        try {
+            pullFromRemoteOrThrow(profileId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            log.e(error) { "pullFromRemote(profileId=$profileId) failed" }
+            false
+        }
+
+    internal suspend fun pullFromRemoteOrThrow(
+        profileId: Int = ProfileRepository.activeProfileId,
+    ): Boolean = mutex.withLock {
             val authState = AuthRepository.state.value
             if (authState !is AuthState.Authenticated || authState.isAnonymous) return@withLock false
+            val accountId = authState.userId
+            if (ProfileRepository.activeProfileId != profileId) return@withLock false
 
-            runCatching {
-                val params = buildJsonObject {
-                    put("p_profile_id", profileId)
-                }
-                val result = SupabaseProvider.client.postgrest.rpc("sync_pull_provider_credentials", params)
-                val rows = result.decodeList<ProviderCredentialRow>()
-                val row = rows.firstOrNull { it.provider.equals(TRAKT_PROVIDER, ignoreCase = true) }
-                    ?: return@runCatching false
-                val remoteState = row.credentialJson.toTraktAuthState() ?: return@runCatching false
-                TraktAuthRepository.replaceStateFromSync(remoteState)
-            }.getOrElse { error ->
-                log.e(error) { "pullFromRemote(profileId=$profileId) failed" }
-                false
+            val params = buildJsonObject {
+                put("p_profile_id", profileId)
             }
+            val result = SupabaseProvider.client.postgrest.rpc("sync_pull_provider_credentials", params)
+            val currentAuthState = AuthRepository.state.value
+            if (
+                currentAuthState !is AuthState.Authenticated ||
+                currentAuthState.isAnonymous ||
+                currentAuthState.userId != accountId ||
+                ProfileRepository.activeProfileId != profileId
+            ) {
+                throw CancellationException("Trakt credential pull target changed")
+            }
+            val rows = result.decodeList<ProviderCredentialRow>()
+            val row = rows.firstOrNull { it.provider.equals(TRAKT_PROVIDER, ignoreCase = true) }
+                ?: return@withLock false
+            val remoteState = row.credentialJson.toTraktAuthState()
+                ?: error("Remote Trakt credential payload is invalid")
+            TraktAuthRepository.replaceStateFromSync(remoteState)
         }
 
     suspend fun deleteRemote(profileId: Int = ProfileRepository.activeProfileId): Boolean =

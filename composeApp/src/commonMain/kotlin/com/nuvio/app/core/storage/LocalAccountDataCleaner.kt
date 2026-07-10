@@ -1,6 +1,8 @@
 package com.nuvio.app.core.storage
 
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.sync.SyncManager
+import com.nuvio.app.core.sync.ProfileSettingsSync
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.catalog.CatalogRepository
 import com.nuvio.app.features.collection.CollectionMobileSettingsRepository
@@ -27,11 +29,19 @@ import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
+import com.nuvio.app.features.watchprogress.ContinueWatchingEnrichmentCache
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
+import com.nuvio.app.features.watchprogress.WatchProgressSourceCoordinator
 import com.nuvio.app.features.watched.WatchedRepository
 
 internal object LocalAccountDataCleaner {
     fun wipe() {
+        SyncManager.cancelAccountSync()
+        WatchProgressSourceCoordinator.clearLocalState()
+        ProfileSettingsSync.clearAccountState()
+        ContinueWatchingEnrichmentCache.clearLocalState()
+        WatchProgressRepository.clearLocalState()
+        WatchedRepository.clearLocalState()
         PlatformLocalAccountDataCleaner.wipe()
 
         ProfileRepository.clearInMemory()
@@ -43,8 +53,6 @@ internal object LocalAccountDataCleaner {
         HomeCatalogSettingsRepository.clearLocalState()
         MetaScreenSettingsRepository.clearLocalState()
         LibraryRepository.clearLocalState()
-        WatchProgressRepository.clearLocalState()
-        WatchedRepository.clearLocalState()
         ContinueWatchingPreferencesRepository.clearLocalState()
         EpisodeReleaseNotificationsRepository.clearLocalState()
         CollectionMobileSettingsRepository.clearLocalState()

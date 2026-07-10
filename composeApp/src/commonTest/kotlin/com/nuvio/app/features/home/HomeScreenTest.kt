@@ -11,12 +11,25 @@ import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
+import com.nuvio.app.features.trakt.WatchProgressSource
 import com.nuvio.app.features.watching.domain.WatchingContentRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class HomeScreenTest {
+
+    @Test
+    fun `continue watching cache uses the effective progress source`() {
+        assertEquals(
+            WatchProgressSource.TRAKT,
+            effectiveContinueWatchingCacheSource(isTraktProgressActive = true),
+        )
+        assertEquals(
+            WatchProgressSource.NUVIO_SYNC,
+            effectiveContinueWatchingCacheSource(isTraktProgressActive = false),
+        )
+    }
 
     @Test
     fun `home trakt continue watching candidate limits match TV`() {

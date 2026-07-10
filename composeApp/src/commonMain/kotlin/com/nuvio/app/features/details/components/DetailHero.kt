@@ -56,7 +56,7 @@ import org.jetbrains.compose.resources.stringResource
 fun DetailHero(
     meta: MetaDetails,
     isTablet: Boolean = false,
-    scrollOffsetProvider: () -> Float = { 0f },
+    scrollOffset: Int = 0,
     contentMaxWidth: Dp = 560.dp,
     onHeightChanged: (Int) -> Unit = {},
     heroTrailerSourceUrl: String? = null,
@@ -113,7 +113,7 @@ fun DetailHero(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                translationY = scrollOffsetProvider() * 0.5f
+                                translationY = scrollOffset * 0.5f
                                 scaleX = 1.08f
                                 scaleY = 1.08f
                         },
@@ -143,7 +143,7 @@ fun DetailHero(
                             .fillMaxSize()
                             .graphicsLayer {
                                 alpha = trailerAlpha
-                                translationY = scrollOffsetProvider() * 0.5f
+                                translationY = scrollOffset * 0.5f
                                 scaleX = 1.08f
                                 scaleY = 1.08f
                             },

@@ -14,9 +14,10 @@ import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktProgressRepository
 import com.nuvio.app.features.trakt.TraktSettingsRepository
+import com.nuvio.app.features.trakt.WatchProgressSource
+import com.nuvio.app.features.trakt.effectiveWatchProgressSource
 import com.nuvio.app.features.trakt.isTraktCompatibleId
 import com.nuvio.app.features.trakt.resolveEffectiveContentId
-import com.nuvio.app.features.trakt.shouldUseTraktProgress as shouldUseTraktProgressSource
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.sync.ProgressDeltaEvent
 import com.nuvio.app.features.watching.sync.ProgressSyncRecord
@@ -37,7 +38,9 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -76,6 +79,9 @@ private data class WatchProgressDeltaApplyResult(
 
 object WatchProgressRepository {
     private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val accountScopeLock = SynchronizedObject()
+    private var accountScopeJob: Job = SupervisorJob()
+    private var accountScope = CoroutineScope(accountScopeJob + Dispatchers.Default)
     private val log = Logger.withTag("WatchProgressRepository")
 
     private val _uiState = MutableStateFlow(WatchProgressUiState())
@@ -84,10 +90,13 @@ object WatchProgressRepository {
     private var hasLoaded = false
     private var currentProfileId: Int = 1
     private var profileGeneration: Long = 0L
+    private var activeSource: WatchProgressSource = WatchProgressSource.NUVIO_SYNC
+    private val _activeSourceState = MutableStateFlow(activeSource)
+    internal val activeSourceState: StateFlow<WatchProgressSource> = _activeSourceState.asStateFlow()
     private val entriesLock = SynchronizedObject()
     private var entriesByVideoId: MutableMap<String, WatchProgressEntry> = mutableMapOf()
     private var metadataResolutionJob: Job? = null
-    private var isPullingNuvioSyncFromServer = false
+    private val nuvioPullMutex = Mutex()
     private var lastSuccessfulPushEpochMs = 0L
     private var deltaCursorEventId = 0L
     private var deltaInitialized = false
@@ -95,40 +104,6 @@ object WatchProgressRepository {
     internal var syncAdapter: ProgressSyncAdapter = SupabaseProgressSyncAdapter
 
     init {
-        syncScope.launch {
-            TraktAuthRepository.isAuthenticated.collectLatest { authenticated ->
-                if (shouldUseTraktProgressSource(
-                        isAuthenticated = authenticated,
-                        source = TraktSettingsRepository.uiState.value.watchProgressSource,
-                    )
-                ) {
-                    runCatching { TraktProgressRepository.refreshNow() }
-                        .onFailure { error ->
-                            if (error is CancellationException) throw error
-                            log.w { "Failed to refresh Trakt progress after auth: ${error.message}" }
-                        }
-                }
-                publish()
-            }
-        }
-
-        syncScope.launch {
-            TraktSettingsRepository.uiState.collectLatest { settings ->
-                if (shouldUseTraktProgressSource(
-                        isAuthenticated = TraktAuthRepository.isAuthenticated.value,
-                        source = settings.watchProgressSource,
-                    )
-                ) {
-                    runCatching { TraktProgressRepository.refreshNow() }
-                        .onFailure { error ->
-                            if (error is CancellationException) throw error
-                            log.w { "Failed to refresh Trakt progress after source change: ${error.message}" }
-                        }
-                }
-                publish()
-            }
-        }
-
         syncScope.launch {
             TraktProgressRepository.uiState.collectLatest {
                 if (shouldUseTraktProgress()) {
@@ -149,28 +124,43 @@ object WatchProgressRepository {
         TraktAuthRepository.ensureLoaded()
         TraktSettingsRepository.ensureLoaded()
         TraktProgressRepository.ensureLoaded()
-        if (hasLoaded) return
-        loadFromDisk(ProfileRepository.activeProfileId)
-        if (shouldUseTraktProgress()) {
-            TraktProgressRepository.refreshAsync()
+        if (!hasLoaded) {
+            updateActiveSource(
+                effectiveWatchProgressSource(
+                    isTraktAuthenticated = TraktAuthRepository.isAuthenticated.value,
+                    requestedSource = TraktSettingsRepository.uiState.value.watchProgressSource,
+                ),
+            )
+            loadFromDisk(ProfileRepository.activeProfileId)
         }
     }
 
     fun onProfileChanged(profileId: Int) {
         if (profileId == currentProfileId && hasLoaded) return
         TraktSettingsRepository.onProfileChanged()
+        updateActiveSource(
+            effectiveWatchProgressSource(
+                isTraktAuthenticated = TraktAuthRepository.isAuthenticated.value,
+                requestedSource = TraktSettingsRepository.uiState.value.watchProgressSource,
+            ),
+        )
         loadFromDisk(profileId)
         TraktProgressRepository.onProfileChanged()
-        if (shouldUseTraktProgress()) {
-            TraktProgressRepository.refreshAsync()
-        }
     }
 
     fun clearLocalState() {
+        val previousAccountJob = synchronized(accountScopeLock) {
+            accountScopeJob.also {
+                accountScopeJob = SupervisorJob()
+                accountScope = CoroutineScope(accountScopeJob + Dispatchers.Default)
+            }
+        }
+        previousAccountJob.cancel()
         metadataResolutionJob?.cancel()
         hasLoaded = false
         currentProfileId = 1
         profileGeneration += 1L
+        updateActiveSource(WatchProgressSource.NUVIO_SYNC)
         lastAddonMetadataReadyFingerprint = null
         clearLocalEntries()
         lastSuccessfulPushEpochMs = 0L
@@ -223,83 +213,182 @@ object WatchProgressRepository {
             ProfileRepository.activeProfileId == profileId
 
     suspend fun pullFromServer(profileId: Int) {
-        TraktAuthRepository.ensureLoaded()
-        TraktSettingsRepository.ensureLoaded()
-        TraktProgressRepository.ensureLoaded()
-        val operationGeneration = activeOperationGeneration(profileId) ?: run {
-            log.d { "Skipping watch progress pull for inactive profile $profileId" }
-            return
-        }
-
-        val useTraktProgress = shouldUseTraktProgress()
-
-        if (!useTraktProgress && isPullingNuvioSyncFromServer) {
-            log.d { "Skipping watch progress pull for profile $profileId because a Nuvio sync pull is already running" }
-            return
-        }
-        if (!useTraktProgress) {
-            isPullingNuvioSyncFromServer = true
-        }
-
-        try {
-            if (useTraktProgress) {
-                log.d { "Pulling Trakt watch progress for profile $profileId" }
-                runCatching { TraktProgressRepository.refreshNow() }
-                    .onFailure { e ->
-                        if (e is CancellationException) throw e
-                        log.e(e) { "Failed to pull Trakt progress" }
-                    }
-                if (isActiveOperation(profileId, operationGeneration)) {
-                    publish()
-                }
-                return
-            }
-
-            runCatching {
-                log.d { "Pulling Nuvio watch progress for profile $profileId" }
-                pullSupabaseDeltaFromServer(
-                    profileId = profileId,
-                    pullStartedEpochMs = WatchProgressClock.nowEpochMs(),
-                    operationGeneration = operationGeneration,
-                )
-            }.onFailure { e ->
-                if (e is CancellationException) throw e
-                log.e(e) { "Failed to pull watch progress from server" }
-            }
-        } finally {
-            if (!useTraktProgress) {
-                isPullingNuvioSyncFromServer = false
-            }
-        }
+        refreshForSource(
+            profileId = profileId,
+            source = activeSource,
+            sourceChanged = false,
+            force = false,
+        )
     }
 
     suspend fun forceSnapshotRefreshFromServer(profileId: Int) {
-        ensureLoaded()
-        if (currentProfileId != profileId) {
-            loadFromDisk(profileId)
-        }
+        refreshForSource(
+            profileId = profileId,
+            source = activeSource,
+            sourceChanged = false,
+            force = true,
+        )
+    }
 
-        if (shouldUseTraktProgress()) {
-            log.d { "Force refreshing Trakt watch progress for profile $profileId" }
-            runCatching { TraktProgressRepository.invalidateAndRefresh() }
-                .onFailure { error ->
-                    if (error is CancellationException) throw error
-                    log.e(error) { "Failed to force refresh Trakt progress" }
-                }
+    suspend fun selectWatchProgressSource(profileId: Int, source: WatchProgressSource) {
+        WatchProgressSourceCoordinator.selectSource(profileId = profileId, source = source)
+    }
+
+    suspend fun clearLocalAndForceSnapshotRefreshFromServer(profileId: Int) {
+        ContinueWatchingEnrichmentCache.clearAll(profileId)
+        WatchProgressSourceCoordinator.refreshActiveSource(profileId = profileId, force = true)
+    }
+
+    internal fun activateSource(source: WatchProgressSource) {
+        TraktAuthRepository.ensureLoaded()
+        TraktSettingsRepository.ensureLoaded()
+        TraktProgressRepository.ensureLoaded()
+        if (!hasLoaded) {
+            loadFromDisk(ProfileRepository.activeProfileId)
+        }
+        if (activeSource == source) {
             publish()
             return
         }
 
-        val authState = AuthRepository.state.value
-        if (authState !is AuthState.Authenticated || authState.isAnonymous) {
-            log.d { "Skipping force watch progress refresh because Nuvio Sync is not authenticated" }
-            return
+        updateActiveSource(source)
+        metadataResolutionJob?.cancel()
+        if (source == WatchProgressSource.TRAKT) {
+            TraktProgressRepository.clearLocalState()
+        }
+        publish()
+        if (source == WatchProgressSource.NUVIO_SYNC) {
+            resolveRemoteMetadata()
+        }
+    }
+
+    internal suspend fun refreshForSource(
+        profileId: Int,
+        source: WatchProgressSource,
+        sourceChanged: Boolean,
+        force: Boolean,
+    ): Boolean {
+        ensureLoaded()
+        if (currentProfileId != profileId) {
+            loadFromDisk(profileId)
+        }
+        val operationGeneration = activeOperationGeneration(profileId) ?: run {
+            log.d { "Skipping watch progress refresh for inactive profile $profileId" }
+            return false
         }
 
-        deltaCursorEventId = 0L
-        deltaInitialized = false
-        persist()
-        pullFromServer(profileId)
+        activateSource(source)
+        return when (source) {
+            WatchProgressSource.TRAKT -> refreshTraktSource(
+                profileId = profileId,
+                operationGeneration = operationGeneration,
+                sourceChanged = sourceChanged,
+                force = force,
+            )
+
+            WatchProgressSource.NUVIO_SYNC -> refreshNuvioSource(
+                profileId = profileId,
+                operationGeneration = operationGeneration,
+                force = force,
+            )
+        }
+    }
+
+    private suspend fun refreshTraktSource(
+        profileId: Int,
+        operationGeneration: Long,
+        sourceChanged: Boolean,
+        force: Boolean,
+    ): Boolean {
+        if (!TraktAuthRepository.isAuthenticated.value) {
+            log.d { "Skipping Trakt progress refresh because Trakt is not authenticated" }
+            return false
+        }
+
+        return try {
+            if (force || sourceChanged) {
+                TraktProgressRepository.invalidateAndRefresh()
+            } else {
+                TraktProgressRepository.refreshNow()
+            }
+            if (isActiveOperation(profileId, operationGeneration) && activeSource == WatchProgressSource.TRAKT) {
+                publish()
+            }
+            val state = TraktProgressRepository.uiState.value
+            state.hasLoadedRemoteProgress && state.errorMessage == null
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            log.e(error) { "Failed to refresh Trakt watch progress" }
+            false
+        }
+    }
+
+    private suspend fun refreshNuvioSource(
+        profileId: Int,
+        operationGeneration: Long,
+        force: Boolean,
+    ): Boolean {
+        val authState = AuthRepository.state.value
+        if (authState !is AuthState.Authenticated || authState.isAnonymous) {
+            publish()
+            return true
+        }
+
+        return nuvioPullMutex.withLock {
+            try {
+                val pullStartedEpochMs = WatchProgressClock.nowEpochMs()
+                if (force) {
+                    pullNuvioSnapshotFromServer(
+                        profileId = profileId,
+                        pullStartedEpochMs = pullStartedEpochMs,
+                        operationGeneration = operationGeneration,
+                    )
+                } else {
+                    pullSupabaseDeltaFromServer(
+                        profileId = profileId,
+                        pullStartedEpochMs = pullStartedEpochMs,
+                        operationGeneration = operationGeneration,
+                    )
+                }
+                true
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                log.e(error) { "Failed to refresh Nuvio watch progress" }
+                false
+            }
+        }
+    }
+
+    private suspend fun pullNuvioSnapshotFromServer(
+        profileId: Int,
+        pullStartedEpochMs: Long,
+        operationGeneration: Long,
+    ) {
+        val cursorBeforeSnapshot = try {
+            syncAdapter.getDeltaCursor(profileId)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            log.w { "Watch progress cursor unavailable during snapshot refresh: ${error.message}" }
+            null
+        }
+
+        pullFullFromAdapter(
+            profileId = profileId,
+            pullStartedEpochMs = pullStartedEpochMs,
+            resetDeltaState = cursorBeforeSnapshot == null,
+            operationGeneration = operationGeneration,
+            preserveLocalEntries = true,
+        )
+        if (!isActiveOperation(profileId, operationGeneration)) return
+
+        if (cursorBeforeSnapshot != null) {
+            deltaCursorEventId = cursorBeforeSnapshot
+            deltaInitialized = true
+            persist()
+        }
     }
 
     private suspend fun pullSupabaseDeltaFromServer(
@@ -432,21 +521,27 @@ object WatchProgressRepository {
         pullStartedEpochMs: Long,
         resetDeltaState: Boolean,
         operationGeneration: Long,
+        preserveLocalEntries: Boolean = true,
     ) {
         val serverEntries = syncAdapter.pull(profileId = profileId)
         if (!isActiveOperation(profileId, operationGeneration)) return
         log.d {
             "Watch progress snapshot fetched ${serverEntries.size} entries for profile $profileId " +
-                "resetDeltaState=$resetDeltaState"
+                "resetDeltaState=$resetDeltaState preserveLocalEntries=$preserveLocalEntries"
         }
-        replaceLocalEntries(
+        val updatedEntries = if (preserveLocalEntries) {
             mergeWatchProgressEntriesPreservingUnsynced(
-            serverEntries = serverEntries,
-            localEntries = localEntriesSnapshot(),
-            lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
-            pullStartedEpochMs = pullStartedEpochMs,
-            ),
-        )
+                serverEntries = serverEntries,
+                localEntries = localEntriesSnapshot(),
+                lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
+                pullStartedEpochMs = pullStartedEpochMs,
+            )
+        } else {
+            serverEntries.associate { record ->
+                record.videoId to record.toWatchProgressEntry(cached = null)
+            }
+        }
+        replaceLocalEntries(updatedEntries)
         if (resetDeltaState) {
             deltaCursorEventId = 0L
             deltaInitialized = false
@@ -574,13 +669,14 @@ object WatchProgressRepository {
         return merged
     }
 
-    private fun shouldPreserveLocalWatchProgressEntry(
+    internal fun shouldPreserveLocalWatchProgressEntry(
         localEntry: WatchProgressEntry,
         lastSuccessfulPushEpochMs: Long,
         pullStartedEpochMs: Long,
     ): Boolean {
         val updatedAt = localEntry.lastUpdatedEpochMs
-        val wasUpdatedAfterLastPush = lastSuccessfulPushEpochMs > 0L && updatedAt > lastSuccessfulPushEpochMs
+        val wasUpdatedAfterLastPush =
+            lastSuccessfulPushEpochMs <= 0L || updatedAt > lastSuccessfulPushEpochMs
         val wasUpdatedDuringPull = pullStartedEpochMs > 0L && updatedAt >= pullStartedEpochMs
         return wasUpdatedAfterLastPush || wasUpdatedDuringPull
     }
@@ -981,10 +1077,15 @@ object WatchProgressRepository {
     }
 
     private fun pushScrobbleToServer(entry: WatchProgressEntry, profileId: Int) {
-        syncScope.launch {
+        val operationGeneration = profileGeneration.takeIf { profileId == currentProfileId }
+        accountScopeSnapshot().launch {
             runCatching {
                 syncAdapter.push(profileId = profileId, entries = listOf(entry))
-                recordSuccessfulPush(profileId = profileId, entries = listOf(entry))
+                recordSuccessfulPush(
+                    profileId = profileId,
+                    operationGeneration = operationGeneration,
+                    entries = listOf(entry),
+                )
             }.onFailure { e ->
                 log.e(e) { "Failed to push watch progress scrobble" }
             }
@@ -994,7 +1095,7 @@ object WatchProgressRepository {
     private fun pushDeleteToServer(entries: Collection<WatchProgressEntry>) {
         if (shouldUseTraktProgress()) return
         val profileId = currentProfileId
-        syncScope.launch {
+        accountScopeSnapshot().launch {
             runCatching {
                 if (entries.isEmpty()) return@runCatching
                 syncAdapter.delete(profileId = profileId, entries = entries)
@@ -1030,8 +1131,12 @@ object WatchProgressRepository {
         )
     }
 
-    private fun recordSuccessfulPush(profileId: Int, entries: Collection<WatchProgressEntry>) {
-        if (profileId != currentProfileId) return
+    private fun recordSuccessfulPush(
+        profileId: Int,
+        operationGeneration: Long?,
+        entries: Collection<WatchProgressEntry>,
+    ) {
+        if (profileId != currentProfileId || operationGeneration != profileGeneration) return
         val latestPushed = entries
             .asSequence()
             .map { entry -> entry.lastUpdatedEpochMs }
@@ -1043,10 +1148,16 @@ object WatchProgressRepository {
     }
 
     private fun shouldUseTraktProgress(): Boolean =
-        shouldUseTraktProgressSource(
-            isAuthenticated = TraktAuthRepository.isAuthenticated.value,
-            source = TraktSettingsRepository.uiState.value.watchProgressSource,
-        )
+        activeSource == WatchProgressSource.TRAKT
+
+    private fun accountScopeSnapshot(): CoroutineScope = synchronized(accountScopeLock) {
+        accountScope
+    }
+
+    private fun updateActiveSource(source: WatchProgressSource) {
+        activeSource = source
+        _activeSourceState.value = source
+    }
 
     private fun WatchProgressEntry.shouldAttemptTraktPlaybackDelete(): Boolean =
         isTraktCompatibleId(parentMetaId)

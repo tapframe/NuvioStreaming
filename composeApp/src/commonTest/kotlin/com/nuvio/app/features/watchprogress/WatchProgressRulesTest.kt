@@ -317,6 +317,17 @@ class WatchProgressRulesTest {
     }
 
     @Test
+    fun `snapshot preserves local only progress before first successful push`() {
+        assertTrue(
+            WatchProgressRepository.shouldPreserveLocalWatchProgressEntry(
+                localEntry = entry(videoId = "local-only", lastUpdatedEpochMs = 1_000L),
+                lastSuccessfulPushEpochMs = 0L,
+                pullStartedEpochMs = 2_000L,
+            ),
+        )
+    }
+
+    @Test
     fun `up next continue watching uses actual episode id when available`() {
         val item = entry(
             videoId = "kitsu:244:1",

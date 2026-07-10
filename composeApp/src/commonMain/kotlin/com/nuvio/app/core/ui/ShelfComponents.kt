@@ -25,7 +25,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -69,10 +68,6 @@ fun <T> NuvioShelfSection(
     itemContent: @Composable (T) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
-    val duplicateSafeEntries = remember(entries, key) {
-        key?.let { entries.withDuplicateSafeLazyKeys(it) }
-    }
-
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(tokens.spacing.controlGap + NuvioTokens.Space.s2),
@@ -90,11 +85,10 @@ fun <T> NuvioShelfSection(
             contentPadding = rowContentPadding,
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),
         ) {
-            if (duplicateSafeEntries != null) {
+            if (key != null) {
                 items(
-                    items = duplicateSafeEntries,
+                    items = entries.withDuplicateSafeLazyKeys(key),
                     key = { entry -> entry.lazyKey },
-                    contentType = { "poster" },
                 ) { keyedEntry ->
                     if (animatePlacement) {
                         Box(modifier = Modifier.animateItem()) { itemContent(keyedEntry.value) }
@@ -103,10 +97,7 @@ fun <T> NuvioShelfSection(
                     }
                 }
             } else {
-                items(
-                    items = entries,
-                    contentType = { "poster" },
-                ) { entry ->
+                items(entries) { entry ->
                     if (animatePlacement) {
                         Box(modifier = Modifier.animateItem()) { itemContent(entry) }
                     } else {

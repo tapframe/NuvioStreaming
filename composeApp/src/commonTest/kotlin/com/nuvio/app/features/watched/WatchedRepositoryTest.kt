@@ -2,6 +2,7 @@ package com.nuvio.app.features.watched
 
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.trakt.WatchProgressSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -124,6 +125,35 @@ class WatchedRepositoryTest {
     }
 
     @Test
+    fun mergeWatchedItemsPreservingUnsynced_keeps_local_only_item_before_first_push() {
+        val localOnlyItem = watchedItem(id = "local-only", markedAtEpochMs = 1_000L)
+
+        val merged = mergeWatchedItemsPreservingUnsynced(
+            serverItems = emptyList(),
+            localItems = listOf(localOnlyItem),
+            lastSuccessfulPushEpochMs = 0L,
+            pullStartedEpochMs = 2_000L,
+        )
+
+        assertEquals(listOf(localOnlyItem), merged.values.toList())
+    }
+
+    @Test
+    fun traktSnapshot_drops_old_transient_items_missingFromRemote() {
+        val oldTraktItem = watchedItem(id = "old-trakt", markedAtEpochMs = 1_000L)
+
+        val merged = mergeWatchedItemsPreservingUnsynced(
+            serverItems = emptyList(),
+            localItems = listOf(oldTraktItem),
+            lastSuccessfulPushEpochMs = 0L,
+            pullStartedEpochMs = 2_000L,
+            preserveWhenNoSuccessfulPush = false,
+        )
+
+        assertTrue(merged.isEmpty())
+    }
+
+    @Test
     fun playbackCompletionWatchedMarks_doNotMirrorToTraktHistory() {
         assertFalse(
             shouldMirrorWatchedMarkToTraktHistory(
@@ -144,4 +174,119 @@ class WatchedRepositoryTest {
             ),
         )
     }
+
+    @Test
+    fun watchedItemsForSource_keepsNuvioAndTraktSnapshotsIsolated() {
+        val nuvioItem = watchedItem(id = "nuvio", markedAtEpochMs = 1_000L)
+        val traktItem = watchedItem(id = "trakt", markedAtEpochMs = 2_000L)
+
+        assertEquals(
+            listOf(nuvioItem),
+            watchedItemsForSource(
+                source = WatchProgressSource.NUVIO_SYNC,
+                nuvioItems = listOf(nuvioItem),
+                traktItems = listOf(traktItem),
+            ),
+        )
+        assertEquals(
+            listOf(traktItem),
+            watchedItemsForSource(
+                source = WatchProgressSource.TRAKT,
+                nuvioItems = listOf(nuvioItem),
+                traktItems = listOf(traktItem),
+            ),
+        )
+    }
+
+    @Test
+    fun onlyNuvioWatchedStateIsPersisted() {
+        assertTrue(shouldPersistWatchedSource(WatchProgressSource.NUVIO_SYNC))
+        assertFalse(shouldPersistWatchedSource(WatchProgressSource.TRAKT))
+    }
+
+    @Test
+    fun replacingTraktSnapshot_doesNotOverwriteNuvioSnapshot() {
+        val nuvioItem = watchedItem(id = "nuvio", markedAtEpochMs = 1_000L)
+        val previousTraktItem = watchedItem(id = "old-trakt", markedAtEpochMs = 2_000L)
+        val refreshedTraktItem = watchedItem(id = "new-trakt", markedAtEpochMs = 3_000L)
+        val nuvioItems = mutableMapOf("nuvio" to nuvioItem)
+        val traktItems = mutableMapOf("old-trakt" to previousTraktItem)
+
+        replaceWatchedItemsForSource(
+            source = WatchProgressSource.TRAKT,
+            nuvioItems = nuvioItems,
+            traktItems = traktItems,
+            replacement = mapOf("new-trakt" to refreshedTraktItem),
+        )
+
+        assertEquals(mapOf("nuvio" to nuvioItem), nuvioItems)
+        assertEquals(mapOf("new-trakt" to refreshedTraktItem), traktItems)
+    }
+
+    @Test
+    fun effectiveWatchedSource_fallsBackToNuvioWhenTraktIsUnavailable() {
+        assertEquals(
+            WatchProgressSource.NUVIO_SYNC,
+            effectiveWatchedSource(
+                requestedSource = WatchProgressSource.TRAKT,
+                isTraktAuthenticated = false,
+            ),
+        )
+        assertEquals(
+            WatchProgressSource.TRAKT,
+            effectiveWatchedSource(
+                requestedSource = WatchProgressSource.TRAKT,
+                isTraktAuthenticated = true,
+            ),
+        )
+    }
+
+    @Test
+    fun sourceOperationGuard_rejectsResultFromSourceActiveBeforeSwitch() {
+        val traktOperation = WatchedSourceOperation(
+            source = WatchProgressSource.TRAKT,
+            generation = 4L,
+        )
+
+        assertTrue(
+            isWatchedSourceOperationCurrent(
+                operation = traktOperation,
+                activeSource = WatchProgressSource.TRAKT,
+                activeGeneration = 4L,
+            ),
+        )
+        assertFalse(
+            isWatchedSourceOperationCurrent(
+                operation = traktOperation,
+                activeSource = WatchProgressSource.NUVIO_SYNC,
+                activeGeneration = 5L,
+            ),
+        )
+    }
+
+    @Test
+    fun sourceOperationGuard_rejectsOlderRefreshAfterSwitchingAwayAndBack() {
+        val firstTraktOperation = WatchedSourceOperation(
+            source = WatchProgressSource.TRAKT,
+            generation = 7L,
+        )
+
+        assertFalse(
+            isWatchedSourceOperationCurrent(
+                operation = firstTraktOperation,
+                activeSource = WatchProgressSource.TRAKT,
+                activeGeneration = 9L,
+            ),
+        )
+    }
+
+    private fun watchedItem(
+        id: String,
+        markedAtEpochMs: Long,
+    ): WatchedItem = WatchedItem(
+        id = id,
+        type = "movie",
+        name = id,
+        markedAtEpochMs = markedAtEpochMs,
+    )
 }

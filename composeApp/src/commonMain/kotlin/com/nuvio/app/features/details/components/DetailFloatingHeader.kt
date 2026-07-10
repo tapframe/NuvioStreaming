@@ -39,8 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioBackButton
+import com.nuvio.app.core.ui.platformPhysicalTopInset
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.isIos
+import com.nuvio.app.navigation.LocalUseNativeNavigation
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -48,15 +50,20 @@ import org.jetbrains.compose.resources.stringResource
 fun DetailFloatingHeader(
     meta: MetaDetails,
     isSaved: Boolean,
-    progressProvider: () -> Float,
-    interactive: Boolean,
+    progress: Float,
     backgroundColor: Color? = null,
     onBack: () -> Unit,
     onToggleSaved: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val safeAreaTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val useNativeNavigation = LocalUseNativeNavigation.current
+    val safeAreaTop = if (useNativeNavigation) {
+        platformPhysicalTopInset()
+    } else {
+        WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    }
     val headerTopPadding = (safeAreaTop - 6.dp).coerceAtLeast(safeAreaTop * 0.8f)
+    val interactive = progress > 0.05f
     val surfaceColor = backgroundColor ?: if (isIos) {
         MaterialTheme.colorScheme.surface.copy(alpha = 1.0f)
     } else {
@@ -70,7 +77,6 @@ fun DetailFloatingHeader(
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer {
-                val progress = progressProvider()
                 alpha = progress
                 translationY = lerp((-20).dp, 0.dp, progress).toPx()
                 shadowElevation = 4.dp.toPx()
@@ -90,11 +96,11 @@ fun DetailFloatingHeader(
                     .fillMaxWidth()
                     .padding(top = headerTopPadding, start = 16.dp, end = 16.dp)
                     .height(56.dp)
-                    .graphicsLayer { alpha = progressProvider() },
+                    .graphicsLayer { alpha = progress },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (interactive) {
+                if (interactive && !useNativeNavigation) {
                     NuvioBackButton(
                         onClick = onBack,
                         modifier = Modifier.size(40.dp),
@@ -104,6 +110,9 @@ fun DetailFloatingHeader(
                         iconSize = 24.dp,
                     )
                 } else {
+                    // Native iOS navigation owns the back button, but retaining
+                    // this slot keeps the Compose logo centered as the floating
+                    // header replaces the hero while scrolling.
                     Box(modifier = Modifier.size(40.dp))
                 }
 
