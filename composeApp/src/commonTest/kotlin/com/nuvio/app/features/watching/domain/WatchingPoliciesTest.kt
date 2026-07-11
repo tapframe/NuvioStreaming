@@ -2,6 +2,7 @@ package com.nuvio.app.features.watching.domain
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -47,6 +48,44 @@ class WatchingPoliciesTest {
         )
 
         assertTrue(result)
+    }
+
+    @Test
+    fun shouldSurfaceNextEpisode_allows_dated_unavailable_upcoming_episode_only_when_enabled() {
+        assertTrue(
+            shouldSurfaceNextEpisode(
+                watchedSeasonNumber = 1,
+                candidateSeasonNumber = 1,
+                todayIsoDate = "2026-07-05",
+                releasedDate = "2026-07-12",
+                showUnairedNextUp = true,
+                available = false,
+            ),
+        )
+        assertFalse(
+            shouldSurfaceNextEpisode(
+                watchedSeasonNumber = 1,
+                candidateSeasonNumber = 1,
+                todayIsoDate = "2026-07-05",
+                releasedDate = "2026-07-12",
+                showUnairedNextUp = false,
+                available = false,
+            ),
+        )
+    }
+
+    @Test
+    fun shouldSurfaceNextEpisode_keeps_unavailable_phantom_episode_hidden() {
+        assertFalse(
+            shouldSurfaceNextEpisode(
+                watchedSeasonNumber = 1,
+                candidateSeasonNumber = 3,
+                todayIsoDate = "2026-07-05",
+                releasedDate = null,
+                showUnairedNextUp = true,
+                available = false,
+            ),
+        )
     }
 
     @Test

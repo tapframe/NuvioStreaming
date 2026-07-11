@@ -7,6 +7,10 @@ import com.nuvio.app.features.trakt.TraktListTab
 import com.nuvio.app.features.trakt.TraktListType
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LibraryRepositoryTest {
 
@@ -94,4 +98,101 @@ class LibraryRepositoryTest {
             membership,
         )
     }
+
+    @Test
+    fun `local snapshot remains attached to its profile after replacement`() {
+        val state = LibraryLocalState()
+        val profileOneLoad = state.beginProfileLoad(profileId = 1).snapshot
+        assertFalse(profileOneLoad.hasLoaded)
+        assertTrue(profileOneLoad.isLoading)
+
+        val profileOneSnapshot = assertNotNull(
+            state.completeProfileLoad(
+                token = profileOneLoad.token,
+                activeProfileId = 1,
+                items = listOf(libraryItem(id = "profile-one", savedAtEpochMs = 1L)),
+            ),
+        )
+        assertTrue(profileOneSnapshot.hasLoaded)
+        assertFalse(profileOneSnapshot.isLoading)
+
+        val profileTwoToken = state.beginProfileLoad(profileId = 2).snapshot.token
+        state.completeProfileLoad(
+            token = profileTwoToken,
+            activeProfileId = 2,
+            items = listOf(libraryItem(id = "profile-two", savedAtEpochMs = 2L)),
+        )
+        val profileTwoSnapshot = state.snapshot()
+
+        assertEquals(1, profileOneSnapshot.token.profileId)
+        assertEquals(listOf("profile-one"), profileOneSnapshot.items.map { it.id })
+        assertEquals(2, profileTwoSnapshot.token.profileId)
+        assertEquals(listOf("profile-two"), profileTwoSnapshot.items.map { it.id })
+    }
+
+    @Test
+    fun `stale profile load cannot replace current profile items`() {
+        val state = LibraryLocalState()
+        val staleToken = state.beginProfileLoad(profileId = 1).snapshot.token
+        state.completeProfileLoad(
+            token = staleToken,
+            activeProfileId = 1,
+            items = listOf(libraryItem(id = "old", savedAtEpochMs = 1L)),
+        )
+        val staleSnapshot = state.snapshot()
+
+        val currentToken = state.beginProfileLoad(profileId = 2).snapshot.token
+        state.completeProfileLoad(
+            token = currentToken,
+            activeProfileId = 2,
+            items = listOf(libraryItem(id = "current", savedAtEpochMs = 2L)),
+        )
+
+        val staleCommit = state.completeProfileLoad(
+            token = staleToken,
+            activeProfileId = 1,
+            items = listOf(libraryItem(id = "stale", savedAtEpochMs = 3L)),
+        )
+
+        assertNull(staleCommit)
+        var stalePersistenceAccepted = false
+        assertFalse(
+            state.runIfContentCurrent(staleSnapshot) {
+                stalePersistenceAccepted = true
+            },
+        )
+        assertFalse(stalePersistenceAccepted)
+        assertEquals(2, state.snapshot().token.profileId)
+        assertEquals(listOf("current"), state.snapshot().items.map { it.id })
+    }
+
+    @Test
+    fun `stale publication revision is rejected after same profile mutation`() {
+        val state = LibraryLocalState()
+        val token = state.beginProfileLoad(profileId = 1).snapshot.token
+        state.completeProfileLoad(
+            token = token,
+            activeProfileId = 1,
+            items = listOf(libraryItem(id = "first", savedAtEpochMs = 1L)),
+        )
+        val staleSnapshot = state.snapshot()
+        state.upsert(libraryItem(id = "second", savedAtEpochMs = 2L))
+
+        var committed = false
+        val accepted = state.runIfCurrent(staleSnapshot) {
+            committed = true
+        }
+
+        assertFalse(accepted)
+        assertFalse(committed)
+        assertEquals(setOf("first", "second"), state.snapshot().items.map { it.id }.toSet())
+    }
+
+    private fun libraryItem(id: String, savedAtEpochMs: Long): LibraryItem =
+        LibraryItem(
+            id = id,
+            type = "movie",
+            name = id,
+            savedAtEpochMs = savedAtEpochMs,
+        )
 }

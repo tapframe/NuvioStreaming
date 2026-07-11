@@ -48,8 +48,15 @@ internal fun shouldSurfaceNextEpisode(
     showUnairedNextUp: Boolean,
     available: Boolean = true,
 ): Boolean {
-    if (!available) return false
     val isSeasonRollover = normalizeSeasonNumber(candidateSeasonNumber) != normalizeSeasonNumber(watchedSeasonNumber)
+    if (!available) {
+        val daysUntilRelease = daysUntilExplicitRelease(
+            todayIsoDate = todayIsoDate,
+            releasedDate = releasedDate,
+        ) ?: return false
+        if (!showUnairedNextUp || daysUntilRelease <= 0) return false
+        return !isSeasonRollover || daysUntilRelease <= UpcomingNextSeasonWindowDays
+    }
     if (!isSeasonRollover) {
         if (showUnairedNextUp) return true
         return isReleasedBy(todayIsoDate = todayIsoDate, releasedDate = releasedDate)

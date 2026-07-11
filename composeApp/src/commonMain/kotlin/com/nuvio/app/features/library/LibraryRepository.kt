@@ -18,9 +18,12 @@ import com.nuvio.app.features.trakt.effectiveLibrarySourceMode as resolveEffecti
 import com.nuvio.app.features.trakt.shouldUseTraktLibrary
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -31,6 +34,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -80,13 +85,11 @@ object LibraryRepository {
     private val _uiState = MutableStateFlow(LibraryUiState())
     val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
-    private var hasLoaded = false
-    private var currentProfileId: Int = 1
-    private var profileGeneration: Long = 0L
-    private var itemsById: MutableMap<String, LibraryItem> = mutableMapOf()
-    private var isPullingNuvioSyncFromServer = false
-    private var hasCompletedInitialNuvioSyncPull = false
-    private var pushJob: Job? = null
+    private val localState = LibraryLocalState()
+    private val loadLock = SynchronizedObject()
+    private val nuvioPullMutex = Mutex()
+    private val persistenceLock = SynchronizedObject()
+    private val lastPersistedContentRevisionByProfile = mutableMapOf<Int, Long>()
 
     init {
         syncScope.launch {
@@ -128,8 +131,12 @@ object LibraryRepository {
         TraktAuthRepository.ensureLoaded()
         TraktSettingsRepository.ensureLoaded()
         TraktLibraryRepository.ensureLoaded()
-        if (hasLoaded) return
-        loadFromDisk(ProfileRepository.activeProfileId)
+        while (true) {
+            val activeProfileId = ProfileRepository.activeProfileId
+            val snapshot = localState.snapshot()
+            if (snapshot.hasLoaded && snapshot.token.profileId == activeProfileId) break
+            loadFromDisk(activeProfileId)
+        }
         if (TraktAuthRepository.isAuthenticated.value) {
             TraktLibraryRepository.preloadListTabsAsync()
             if (isTraktLibrarySourceActive()) {
@@ -139,12 +146,11 @@ object LibraryRepository {
     }
 
     fun onProfileChanged(profileId: Int) {
-        if (profileId == currentProfileId && hasLoaded) return
-        pushJob?.cancel()
-        isPullingNuvioSyncFromServer = false
-        hasCompletedInitialNuvioSyncPull = false
+        val current = localState.snapshot()
+        if (profileId == current.token.profileId && current.hasLoaded) return
+
         TraktSettingsRepository.onProfileChanged()
-        loadFromDisk(profileId)
+        if (!loadFromDisk(profileId)) return
         TraktAuthRepository.onProfileChanged()
         TraktLibraryRepository.onProfileChanged()
         if (TraktAuthRepository.isAuthenticated.value) {
@@ -156,91 +162,132 @@ object LibraryRepository {
     }
 
     fun clearLocalState() {
-        hasLoaded = false
-        currentProfileId = 1
-        profileGeneration += 1L
-        itemsById.clear()
-        pushJob?.cancel()
-        isPullingNuvioSyncFromServer = false
-        hasCompletedInitialNuvioSyncPull = false
+        val transition = synchronized(loadLock) { localState.reset() }
+        transition.detachedPushJob?.cancel()
         TraktAuthRepository.clearLocalState()
         TraktLibraryRepository.clearLocalState()
         _uiState.value = LibraryUiState()
     }
 
-    private fun loadFromDisk(profileId: Int) {
-        currentProfileId = profileId
-        profileGeneration += 1L
-        hasLoaded = true
-        itemsById.clear()
+    internal fun runAccountStorageWipe(wipeStorage: () -> Unit) {
+        synchronized(loadLock) {
+            val transition = localState.reset()
+            transition.detachedPushJob?.cancel()
+            synchronized(persistenceLock) {
+                try {
+                    wipeStorage()
+                } finally {
+                    lastPersistedContentRevisionByProfile.clear()
+                }
+            }
+        }
+    }
 
-        val payload = LibraryStorage.loadPayload(profileId).orEmpty().trim()
-        if (payload.isNotEmpty()) {
-            val items = runCatching {
+    private fun loadFromDisk(profileId: Int): Boolean {
+        var shouldPublish = false
+        val loaded = synchronized(loadLock) {
+            if (ProfileRepository.activeProfileId != profileId) return@synchronized false
+            val current = localState.snapshot()
+            if (current.hasLoaded && current.token.profileId == profileId) {
+                return@synchronized true
+            }
+
+            val transition = localState.beginProfileLoad(profileId)
+            transition.detachedPushJob?.cancel()
+            shouldPublish = completeLoadFromDisk(transition.snapshot.token)
+            shouldPublish
+        }
+        if (shouldPublish) publish()
+        return loaded
+    }
+
+    private fun completeLoadFromDisk(token: LibraryProfileToken): Boolean {
+        val payload = LibraryStorage.loadPayload(token.profileId).orEmpty().trim()
+        val items = if (payload.isNotEmpty()) {
+            runCatching {
                 json.decodeFromString<StoredLibraryPayload>(payload).items
             }.getOrDefault(emptyList())
-            itemsById = items.associateBy { libraryItemKey(it.id, it.type) }.toMutableMap()
+        } else {
+            emptyList()
         }
 
-        publish()
+        return localState.completeProfileLoad(
+            token = token,
+            activeProfileId = ProfileRepository.activeProfileId,
+            items = items,
+        ) != null
     }
 
     suspend fun pullFromServer(profileId: Int) {
-        val operationGeneration = activeOperationGeneration(profileId) ?: run {
+        val operationToken = activeOperationToken(profileId) ?: run {
             log.d { "Skipping library pull for inactive profile $profileId" }
             return
         }
 
         if (isTraktLibrarySourceActive()) {
-            runCatching { TraktLibraryRepository.refreshNow() }
-                .onFailure { e -> log.e(e) { "Failed to pull Trakt library" } }
-            if (!isActiveOperation(profileId, operationGeneration)) return
-            hasCompletedInitialNuvioSyncPull = true
+            try {
+                TraktLibraryRepository.refreshNow()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                log.e(error) { "Failed to pull Trakt library" }
+            }
+            if (!isActiveOperation(operationToken)) return
             publish()
             return
         }
 
-        isPullingNuvioSyncFromServer = true
-        runCatching {
-            val serverItems = pullAllLibrarySyncItems(profileId)
-            if (!isActiveOperation(profileId, operationGeneration)) return@runCatching
-            if (serverItems.isEmpty() && itemsById.isNotEmpty()) {
-                log.w { "Remote library is empty while local has ${itemsById.size} entries; preserving local library" }
-            } else {
-                itemsById = serverItems
-                    .map { it.toLibraryItem() }
-                    .associateBy { libraryItemKey(it.id, it.type) }
-                    .toMutableMap()
-                persist()
+        nuvioPullMutex.withLock {
+            val serializedToken = activeOperationToken(profileId) ?: return@withLock
+            if (localState.markPullStarted(serializedToken) == null) return@withLock
+
+            var completedSuccessfully = false
+            var appliedItems = false
+            try {
+                val serverItems = pullAllLibrarySyncItems(profileId).map { it.toLibraryItem() }
+                val applyResult = localState.applyServerItems(serializedToken, serverItems)
+                    ?: return@withLock
+                completedSuccessfully = true
+                appliedItems = true
+                if (applyResult.preservedLocalItems) {
+                    log.w {
+                        "Remote library is empty while local has ${applyResult.snapshot.items.size} entries; " +
+                            "preserving local library"
+                    }
+                } else {
+                    persist(applyResult.snapshot)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                log.e(error) { "Failed to pull library from server" }
+            } finally {
+                localState.finishPull(
+                    token = serializedToken,
+                    completedSuccessfully = completedSuccessfully,
+                )
             }
-            hasLoaded = true
-            publish()
-        }.onFailure { e ->
-            log.e(e) { "Failed to pull library from server" }
-        }.also {
-            hasCompletedInitialNuvioSyncPull = true
-            isPullingNuvioSyncFromServer = false
+
+            if (appliedItems) publish()
         }
     }
 
-    private fun activeOperationGeneration(profileId: Int): Long? {
+    private fun activeOperationToken(profileId: Int): LibraryProfileToken? {
         if (ProfileRepository.activeProfileId != profileId) return null
-        if (!hasLoaded || currentProfileId != profileId) {
-            loadFromDisk(profileId)
-        }
-        return profileGeneration
+        if (!loadFromDisk(profileId)) return null
+        return localState.currentTokenIfLoaded(profileId)
+            ?.takeIf { ProfileRepository.activeProfileId == profileId }
     }
 
-    private fun isActiveOperation(profileId: Int, generation: Long): Boolean =
-        currentProfileId == profileId &&
-            profileGeneration == generation &&
-            ProfileRepository.activeProfileId == profileId
+    private fun isActiveOperation(token: LibraryProfileToken): Boolean =
+        localState.isCurrent(token) && ProfileRepository.activeProfileId == token.profileId
 
     fun toggleSaved(item: LibraryItem) {
         ensureLoaded()
 
         if (isTraktLibrarySourceActive()) {
-            log.i { "toggleSaved routed to Trakt library source item=${item.id} type=${item.type} profile=$currentProfileId" }
+            val profileId = localState.snapshot().token.profileId
+            log.i { "toggleSaved routed to Trakt library source item=${item.id} type=${item.type} profile=$profileId" }
             syncScope.launch {
                 runCatching { TraktLibraryRepository.toggleWatchlist(item) }
                     .onFailure { e ->
@@ -255,41 +302,60 @@ object LibraryRepository {
             return
         }
 
-        if (itemsById.containsKey(libraryItemKey(item.id, item.type))) {
-            remove(item.id, item.type)
+        val result = localState.toggle(
+            item.copy(savedAtEpochMs = LibraryClock.nowEpochMs()),
+        )
+        if (result.isSaved) {
+            log.i {
+                "Saving local library item item=${item.id} type=${item.type} " +
+                    "profile=${result.snapshot.token.profileId}"
+            }
         } else {
-            save(item)
+            log.i {
+                "Removing local library item id=${item.id} type=${item.type} " +
+                    "profile=${result.snapshot.token.profileId}"
+            }
         }
+        persist(result.snapshot)
+        publish()
+        pushToServer(result.snapshot)
     }
 
     fun save(item: LibraryItem) {
         ensureLoaded()
-        log.i { "Saving local library item item=${item.id} type=${item.type} profile=$currentProfileId" }
-        itemsById[libraryItemKey(item.id, item.type)] = item.copy(savedAtEpochMs = LibraryClock.nowEpochMs())
+        val snapshot = localState.upsert(item.copy(savedAtEpochMs = LibraryClock.nowEpochMs()))
+        log.i {
+            "Saving local library item item=${item.id} type=${item.type} profile=${snapshot.token.profileId}"
+        }
+        persist(snapshot)
         publish()
-        persist()
-        pushToServer()
+        pushToServer(snapshot)
     }
 
     fun remove(id: String) {
         ensureLoaded()
-        val before = itemsById.size
-        itemsById.entries.removeAll { (_, item) -> item.id == id }
-        if (itemsById.size != before) {
-            log.i { "Removing local library item id=$id profile=$currentProfileId removed=${before - itemsById.size}" }
+        val result = localState.removeById(id)
+        if (result.affectedCount > 0) {
+            log.i {
+                "Removing local library item id=$id profile=${result.snapshot.token.profileId} " +
+                    "removed=${result.affectedCount}"
+            }
+            persist(result.snapshot)
             publish()
-            persist()
-            pushToServer()
+            pushToServer(result.snapshot)
         }
     }
 
     private fun remove(id: String, type: String) {
         ensureLoaded()
-        if (itemsById.remove(libraryItemKey(id, type)) != null) {
-            log.i { "Removing local library item id=$id type=$type profile=$currentProfileId" }
+        val result = localState.remove(id, type)
+        if (result.affectedCount > 0) {
+            log.i {
+                "Removing local library item id=$id type=$type profile=${result.snapshot.token.profileId}"
+            }
+            persist(result.snapshot)
             publish()
-            persist()
-            pushToServer()
+            pushToServer(result.snapshot)
         }
     }
 
@@ -308,9 +374,9 @@ object LibraryRepository {
         }
 
         return if (type != null) {
-            itemsById.containsKey(libraryItemKey(id, type))
+            localState.contains(id, type)
         } else {
-            itemsById.values.any { it.id == id }
+            localState.containsId(id)
         }
     }
 
@@ -321,7 +387,7 @@ object LibraryRepository {
             return TraktLibraryRepository.uiState.value.allItems.firstOrNull { it.id == id }
         }
 
-        return itemsById.values.firstOrNull { it.id == id }
+        return localState.findById(id)
     }
 
     fun libraryListTabs(): List<TraktListTab> {
@@ -337,7 +403,7 @@ object LibraryRepository {
 
     suspend fun getMembershipSnapshot(item: LibraryItem): Map<String, Boolean> {
         ensureLoaded()
-        val inLocal = itemsById.containsKey(libraryItemKey(item.id, item.type))
+        val inLocal = localState.contains(item.id, item.type)
         if (TraktAuthRepository.isAuthenticated.value) {
             val traktMembership = TraktLibraryRepository.getMembershipSnapshot(item).listMembership
             return libraryMembershipWithLocal(
@@ -351,9 +417,12 @@ object LibraryRepository {
     suspend fun applyMembershipChanges(item: LibraryItem, desiredMembership: Map<String, Boolean>) {
         ensureLoaded()
         val localDesired = desiredMembership[LOCAL_LIBRARY_LIST_KEY] == true
-        val currentlyInLocal = itemsById.containsKey(libraryItemKey(item.id, item.type))
+        val currentlyInLocal = localState.contains(item.id, item.type)
+        val profileId = localState.snapshot().token.profileId
         log.i {
-            "Applying library membership item=${item.id} type=${item.type} profile=$currentProfileId localDesired=$localDesired currentlyInLocal=$currentlyInLocal traktAuthenticated=${TraktAuthRepository.isAuthenticated.value}"
+            "Applying library membership item=${item.id} type=${item.type} profile=$profileId " +
+                "localDesired=$localDesired currentlyInLocal=$currentlyInLocal " +
+                "traktAuthenticated=${TraktAuthRepository.isAuthenticated.value}"
         }
         if (localDesired != currentlyInLocal) {
             if (localDesired) {
@@ -385,36 +454,40 @@ object LibraryRepository {
         applyMembershipChanges(item, desiredMembership)
     }
 
-    private fun pushToServer() {
+    private fun pushToServer(snapshot: LibraryLocalSnapshot) {
         val authState = AuthRepository.state.value
+        val profileId = snapshot.token.profileId
+        val itemCount = snapshot.items.size
         if (authState !is AuthState.Authenticated) {
-            log.w { "Skipping library push: auth state is ${authState::class.simpleName} profile=$currentProfileId" }
+            log.w { "Skipping library push: auth state is ${authState::class.simpleName} profile=$profileId" }
             return
         }
         if (authState.isAnonymous) {
-            log.w { "Skipping library push: anonymous auth user=${authState.userId} profile=$currentProfileId" }
+            log.w { "Skipping library push: anonymous auth user=${authState.userId} profile=$profileId" }
             return
         }
-        if (isPullingNuvioSyncFromServer) {
-            log.i { "Skipping library push: server pull is active profile=$currentProfileId localItems=${itemsById.size}" }
+        if (snapshot.isPullingNuvioSyncFromServer) {
+            log.i { "Skipping library push: server pull is active profile=$profileId localItems=$itemCount" }
             return
         }
-        if (!hasCompletedInitialNuvioSyncPull) {
-            log.w { "Skipping library push: initial Nuvio sync pull not completed profile=$currentProfileId localItems=${itemsById.size}" }
+        if (!snapshot.hasCompletedInitialNuvioSyncPull) {
+            log.w { "Skipping library push: initial Nuvio sync pull not completed profile=$profileId localItems=$itemCount" }
             return
         }
 
-        pushJob?.cancel()
-        val profileId = currentProfileId
-        pushJob = syncScope.launch {
+        val pushJob = syncScope.launch(start = CoroutineStart.LAZY) {
             delay(500)
-            if (profileId != currentProfileId) {
-                log.w { "Skipping debounced library push: profile changed scheduled=$profileId current=$currentProfileId" }
+            if (!localState.isCurrent(snapshot)) {
+                val current = localState.snapshot()
+                log.w {
+                    "Skipping stale debounced library push: scheduled=${snapshot.token} " +
+                        "current=${current.token} scheduledRevision=${snapshot.revision} " +
+                        "currentRevision=${current.revision}"
+                }
                 return@launch
             }
-            val itemCount = itemsById.size
             runCatching {
-                val syncItems = itemsById.values.map { it.toSyncItem() }
+                val syncItems = snapshot.items.map { it.toSyncItem() }
                 if (syncItems.isEmpty()) {
                     log.w { "Skipping library push: sync payload is empty profile=$profileId" }
                     return@runCatching false
@@ -432,9 +505,19 @@ object LibraryRepository {
                     log.i { "Library push completed profile=$profileId itemCount=$itemCount" }
                 }
             }.onFailure { e ->
+                if (e is CancellationException) throw e
                 log.e(e) { "Failed to push library to server profile=$profileId itemCount=$itemCount" }
             }
         }
+        pushJob.invokeOnCompletion { localState.clearPushJob(pushJob) }
+
+        val installResult = localState.installPushJob(snapshot, pushJob)
+        if (!installResult.installed) {
+            pushJob.cancel()
+            return
+        }
+        installResult.detachedPushJob?.cancel()
+        pushJob.start()
     }
 
     private suspend fun pullAllLibrarySyncItems(profileId: Int): List<LibrarySyncItem> {
@@ -459,6 +542,7 @@ object LibraryRepository {
     }
 
     private fun publish() {
+        val localSnapshot = localState.snapshot()
         if (isTraktLibrarySourceActive()) {
             val traktState = TraktLibraryRepository.uiState.value
             val sections = traktState.listTabs.mapNotNull { tab ->
@@ -474,7 +558,7 @@ object LibraryRepository {
                 }
             }
 
-            _uiState.value = LibraryUiState(
+            val newUiState = LibraryUiState(
                 sourceMode = LibrarySourceMode.TRAKT,
                 items = traktState.allItems,
                 sections = sections,
@@ -482,10 +566,13 @@ object LibraryRepository {
                 isLoading = traktState.isLoading,
                 errorMessage = traktState.errorMessage,
             )
+            localState.runIfTokenCurrent(localSnapshot.token) {
+                _uiState.value = newUiState
+            }
             return
         }
 
-        val items = itemsById.values
+        val items = localSnapshot.items
             .sortedByDescending { it.savedAtEpochMs }
         val sections = items
             .groupBy { it.type }
@@ -498,25 +585,34 @@ object LibraryRepository {
             }
             .sortedBy { it.displayTitle }
 
-        _uiState.value = LibraryUiState(
+        val newUiState = LibraryUiState(
             sourceMode = LibrarySourceMode.LOCAL,
             items = items,
             sections = sections,
-            isLoaded = true,
-            isLoading = false,
+            isLoaded = localSnapshot.hasLoaded,
+            isLoading = localSnapshot.isLoading,
             errorMessage = null,
         )
+        localState.runIfCurrent(localSnapshot) {
+            _uiState.value = newUiState
+        }
     }
 
-    private fun persist() {
-        LibraryStorage.savePayload(
-            currentProfileId,
-            json.encodeToString(
-                StoredLibraryPayload(
-                    items = itemsById.values.sortedByDescending { it.savedAtEpochMs },
-                ),
+    private fun persist(snapshot: LibraryLocalSnapshot) {
+        val payload = json.encodeToString(
+            StoredLibraryPayload(
+                items = snapshot.items.sortedByDescending { it.savedAtEpochMs },
             ),
         )
+        synchronized(persistenceLock) {
+            val profileId = snapshot.token.profileId
+            val lastPersistedRevision = lastPersistedContentRevisionByProfile[profileId] ?: Long.MIN_VALUE
+            if (snapshot.contentRevision <= lastPersistedRevision) return@synchronized
+            localState.runIfContentCurrent(snapshot) {
+                LibraryStorage.savePayload(profileId, payload)
+                lastPersistedContentRevisionByProfile[profileId] = snapshot.contentRevision
+            }
+        }
     }
 
     private fun refreshTraktLibraryAsync() {
@@ -604,9 +700,6 @@ private fun LibraryItem.toSyncItem(): LibrarySyncItem = LibrarySyncItem(
     addonBaseUrl = addonBaseUrl,
     addedAt = savedAtEpochMs,
 )
-
-private fun libraryItemKey(id: String, type: String): String =
-    "${type.trim().lowercase()}:${id.trim()}"
 
 private fun String.toPosterShape(): PosterShape =
     when (trim().uppercase()) {

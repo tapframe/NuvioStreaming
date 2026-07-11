@@ -42,7 +42,9 @@ internal object LocalAccountDataCleaner {
         ContinueWatchingEnrichmentCache.clearLocalState()
         WatchProgressRepository.clearLocalState()
         WatchedRepository.clearLocalState()
-        PlatformLocalAccountDataCleaner.wipe()
+        LibraryRepository.runAccountStorageWipe {
+            PlatformLocalAccountDataCleaner.wipe()
+        }
 
         ProfileRepository.clearInMemory()
         AddonRepository.clearLocalState()
