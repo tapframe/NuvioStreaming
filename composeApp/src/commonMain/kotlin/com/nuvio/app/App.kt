@@ -28,7 +28,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CheckCircleOutline
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -44,6 +51,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -86,8 +94,14 @@ import com.nuvio.app.core.sync.RealtimeSyncConfig
 import com.nuvio.app.core.sync.RealtimeSyncInvalidationService
 import com.nuvio.app.core.sync.SyncManager
 import com.nuvio.app.core.ui.NuvioNavigationBar
+import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioContinueWatchingActionSheet
-import com.nuvio.app.core.ui.NuvioPosterActionSheet
+import com.nuvio.app.core.ui.NuvioPosterZoomActionOverlay
+import com.nuvio.app.core.ui.PosterZoomAnchor
+import com.nuvio.app.core.ui.PosterZoomAnchorHolder
+import com.nuvio.app.core.ui.PosterZoomOverlayAction
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.PlatformBackHandler
 import com.nuvio.app.core.ui.platformExitApp
@@ -117,6 +131,7 @@ import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
 import com.nuvio.app.features.cloud.CloudLibraryPlaybackResult
 import com.nuvio.app.features.cloud.CloudLibraryPlaybackTargetLookupResult
+import com.nuvio.app.features.cloud.cloudLibraryDisplayArtworkUrl
 import com.nuvio.app.features.cloud.CloudLibraryRepository
 import com.nuvio.app.features.cloud.playbackVideoId
 import com.nuvio.app.features.cloud.providerPosterUrl
@@ -775,7 +790,10 @@ private fun MainAppContent(
         val liquidGlassNativeTabBarSupported = remember { isLiquidGlassNativeTabBarSupported() }
         var showExitConfirmation by rememberSaveable { mutableStateOf(false) }
         var selectedPosterActionTarget by remember { mutableStateOf<PosterActionTarget?>(null) }
+        var selectedPosterAnchor by remember { mutableStateOf<PosterZoomAnchor?>(null) }
+        val posterOverlayHazeState = rememberHazeState()
         var selectedContinueWatchingForActions by remember { mutableStateOf<ContinueWatchingItem?>(null) }
+        var selectedContinueWatchingZoomAnchor by remember { mutableStateOf<PosterZoomAnchor?>(null) }
         var requestedSettingsPageName by rememberSaveable { mutableStateOf<String?>(null) }
         var showLibraryListPicker by remember { mutableStateOf(false) }
         var pickerItem by remember { mutableStateOf<LibraryItem?>(null) }
@@ -796,6 +814,7 @@ private fun MainAppContent(
         val openPosterActions: (PosterActionTarget) -> Unit = { target ->
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
             focusManager.clearFocus(force = true)
+            selectedPosterAnchor = PosterZoomAnchorHolder.consume()
             coroutineScope.launch {
                 withFrameNanos { }
                 selectedPosterActionTarget = target
@@ -1741,8 +1760,24 @@ private fun MainAppContent(
             openContinueWatching(item, true, false)
         }
 
+        val onContinueWatchingRemove: (ContinueWatchingItem) -> Unit = { item ->
+            if (item.isNextUp) {
+                ContinueWatchingPreferencesRepository.addDismissedNextUpKey(
+                    nextUpDismissKey(
+                        item.parentMetaId,
+                        item.nextUpSeedSeasonNumber,
+                        item.nextUpSeedEpisodeNumber,
+                    ),
+                )
+            } else {
+                WatchProgressRepository.removeProgress(contentId = item.parentMetaId)
+            }
+        }
+
         val onContinueWatchingLongPress: (ContinueWatchingItem) -> Unit = { item ->
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+            val zoomAnchor = PosterZoomAnchorHolder.consume()
+            selectedContinueWatchingZoomAnchor = zoomAnchor
             selectedContinueWatchingForActions = item
         }
 
@@ -1751,6 +1786,18 @@ private fun MainAppContent(
                 .fillMaxSize()
                 .background(MaterialTheme.nuvio.colors.background),
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (selectedPosterActionTarget != null || selectedContinueWatchingZoomAnchor != null) {
+                            Modifier.hazeSource(state = posterOverlayHazeState)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .background(MaterialTheme.nuvio.colors.background),
+            ) {
             SharedTransitionLayout {
                 CompositionLocalProvider(
                     LocalUseNativeNavigation provides useNativeNavigation,
@@ -3128,85 +3175,184 @@ private fun MainAppContent(
                 )
                 }
             }
+            }
 
-            NuvioPosterActionSheet(
-                item = selectedPosterActionTarget?.preview,
-                isSaved = selectedPosterActionTarget?.preview?.let { preview ->
-                    LibraryRepository.isSaved(preview.id, preview.type)
-                } == true,
-                isWatched = selectedPosterActionTarget?.preview?.let { preview ->
-                    WatchingState.isPosterWatched(
+            selectedPosterActionTarget?.let { posterActionTarget ->
+                key(posterActionTarget) {
+                    val preview = posterActionTarget.preview
+                    val isSaved = LibraryRepository.isSaved(preview.id, preview.type)
+                    val isWatched = WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,
                         item = preview,
                     )
-                } == true,
-                onDismiss = { selectedPosterActionTarget = null },
-                onToggleLibrary = {
-                    selectedPosterActionTarget?.let { target ->
-                        val preview = target.preview
-                        val libraryItem = target.libraryItem ?: preview.toLibraryItem(savedAtEpochMs = 0L)
-                        if (target.libraryItem != null) {
-                            if (isTraktLibrarySource) {
-                                coroutineScope.launch {
-                                    runCatching {
-                                        val listKey = target.libraryListKey
-                                        if (listKey.isNullOrBlank()) {
-                                            val currentMembership = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                            LibraryRepository.applyMembershipChanges(
-                                                item = libraryItem,
-                                                desiredMembership = currentMembership.mapValues { false },
-                                            )
+                    // Trakt items long-pressed outside the library open the list picker
+                    // instead of removing, so only true removals disintegrate.
+                    val removesFromLibrary = isSaved &&
+                        (posterActionTarget.libraryItem != null || !isTraktLibrarySource)
+                    NuvioPosterZoomActionOverlay(
+                        imageUrl = selectedPosterAnchor?.imageUrl ?: preview.poster,
+                        title = preview.name,
+                        subtitle = preview.releaseInfo
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { formatReleaseDateForDisplay(it) }
+                            ?: preview.type.replaceFirstChar { char ->
+                                if (char.isLowerCase()) char.titlecase() else char.toString()
+                            },
+                        isWatched = isWatched,
+                        anchor = selectedPosterAnchor,
+                        actions = listOf(
+                            PosterZoomOverlayAction(
+                                icon = if (isSaved) Icons.Default.DeleteOutline else Icons.Default.Add,
+                                label = if (isSaved) {
+                                    stringResource(Res.string.hero_remove_from_library)
+                                } else {
+                                    stringResource(Res.string.hero_add_to_library)
+                                },
+                                isDestructive = removesFromLibrary,
+                                onSelected = {
+                                    val libraryItem = posterActionTarget.libraryItem
+                                        ?: preview.toLibraryItem(savedAtEpochMs = 0L)
+                                    if (posterActionTarget.libraryItem != null) {
+                                        if (isTraktLibrarySource) {
+                                            coroutineScope.launch {
+                                                runCatching {
+                                                    val listKey = posterActionTarget.libraryListKey
+                                                    if (listKey.isNullOrBlank()) {
+                                                        val currentMembership = LibraryRepository.getMembershipSnapshot(libraryItem)
+                                                        LibraryRepository.applyMembershipChanges(
+                                                            item = libraryItem,
+                                                            desiredMembership = currentMembership.mapValues { false },
+                                                        )
+                                                    } else {
+                                                        LibraryRepository.removeFromList(libraryItem, listKey)
+                                                    }
+                                                }.onFailure { error ->
+                                                    NuvioToastController.show(
+                                                        error.message ?: getString(Res.string.trakt_lists_update_failed),
+                                                    )
+                                                }
+                                            }
                                         } else {
-                                            LibraryRepository.removeFromList(libraryItem, listKey)
+                                            LibraryRepository.remove(libraryItem.id)
                                         }
-                                    }.onFailure { error ->
-                                        NuvioToastController.show(
-                                            error.message ?: getString(Res.string.trakt_lists_update_failed),
-                                        )
-                                    }
-                                }
-                            } else {
-                                LibraryRepository.remove(libraryItem.id)
-                            }
-                        } else {
-                            if (!isTraktLibrarySource) {
-                                LibraryRepository.toggleSaved(libraryItem)
-                            } else {
-                                pickerItem = libraryItem
-                                pickerTitle = preview.name
-                                pickerTabs = LibraryRepository.libraryListTabs()
-                                pickerMembership = pickerTabs.associate { it.key to false }
-                                pickerPending = true
-                                pickerError = null
-                                showLibraryListPicker = true
-                                coroutineScope.launch {
-                                    runCatching {
-                                        val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
-                                        val tabs = LibraryRepository.libraryListTabs()
-                                        pickerTabs = tabs
-                                        pickerMembership = tabs.associate { tab ->
-                                            tab.key to (snapshot[tab.key] == true)
+                                    } else {
+                                        if (!isTraktLibrarySource) {
+                                            LibraryRepository.toggleSaved(libraryItem)
+                                        } else {
+                                            pickerItem = libraryItem
+                                            pickerTitle = preview.name
+                                            pickerTabs = LibraryRepository.libraryListTabs()
+                                            pickerMembership = pickerTabs.associate { it.key to false }
+                                            pickerPending = true
+                                            pickerError = null
+                                            showLibraryListPicker = true
+                                            coroutineScope.launch {
+                                                runCatching {
+                                                    val snapshot = LibraryRepository.getMembershipSnapshot(libraryItem)
+                                                    val tabs = LibraryRepository.libraryListTabs()
+                                                    pickerTabs = tabs
+                                                    pickerMembership = tabs.associate { tab ->
+                                                        tab.key to (snapshot[tab.key] == true)
+                                                    }
+                                                }.onFailure { error ->
+                                                    pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
+                                                }
+                                                pickerPending = false
+                                            }
                                         }
-                                    }.onFailure { error ->
-                                        pickerError = error.message ?: getString(Res.string.trakt_lists_load_failed)
                                     }
-                                    pickerPending = false
+                                },
+                            ),
+                            PosterZoomOverlayAction(
+                                icon = if (isWatched) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
+                                label = if (isWatched) {
+                                    stringResource(Res.string.hero_mark_unwatched)
+                                } else {
+                                    stringResource(Res.string.hero_mark_watched)
+                                },
+                                onSelected = {
+                                    coroutineScope.launch {
+                                        WatchingActions.togglePosterWatched(preview)
+                                    }
+                                },
+                            ),
+                        ),
+                        hazeState = posterOverlayHazeState,
+                        onDismissed = {
+                            selectedPosterActionTarget = null
+                            selectedPosterAnchor = null
+                        },
+                    )
+                }
+            }
+
+            selectedContinueWatchingForActions?.let { item ->
+                selectedContinueWatchingZoomAnchor?.let { anchor ->
+                    key(item.videoId, anchor) {
+                        val showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
+                        val showDetailsOption = !item.isCloudLibraryContinueWatchingItem()
+                        NuvioPosterZoomActionOverlay(
+                            imageUrl = cloudLibraryDisplayArtworkUrl(anchor.imageUrl ?: item.poster ?: item.imageUrl),
+                            title = item.title,
+                            subtitle = localizedContinueWatchingSubtitle(item),
+                            anchor = anchor,
+                            actions = buildList {
+                                if (showDetailsOption) {
+                                    add(
+                                        PosterZoomOverlayAction(
+                                            icon = Icons.Default.Info,
+                                            label = stringResource(Res.string.cw_action_go_to_details),
+                                            onSelected = {
+                                                navController.navigate(
+                                                    DetailRoute(
+                                                        type = item.parentMetaType,
+                                                        id = item.parentMetaId,
+                                                        title = item.title,
+                                                    ),
+                                                )
+                                            },
+                                        ),
+                                    )
                                 }
-                            }
-                        }
+                                if (showManualPlayOption) {
+                                    add(
+                                        PosterZoomOverlayAction(
+                                            icon = Icons.Default.PlayArrow,
+                                            label = stringResource(Res.string.play_manually),
+                                            onSelected = { onContinueWatchingPlayManually(item) },
+                                        ),
+                                    )
+                                }
+                                if (!item.isNextUp) {
+                                    add(
+                                        PosterZoomOverlayAction(
+                                            icon = Icons.Default.Replay,
+                                            label = stringResource(Res.string.cw_action_start_from_beginning),
+                                            onSelected = { onContinueWatchingStartFromBeginning(item) },
+                                        ),
+                                    )
+                                }
+                                add(
+                                    PosterZoomOverlayAction(
+                                        icon = Icons.Default.DeleteOutline,
+                                        label = stringResource(Res.string.cw_action_remove),
+                                        isDestructive = true,
+                                        onSelected = { onContinueWatchingRemove(item) },
+                                    ),
+                                )
+                            },
+                            hazeState = posterOverlayHazeState,
+                            onDismissed = {
+                                selectedContinueWatchingForActions = null
+                                selectedContinueWatchingZoomAnchor = null
+                            },
+                        )
                     }
-                },
-                onToggleWatched = {
-                    selectedPosterActionTarget?.preview?.let { preview ->
-                        coroutineScope.launch {
-                            WatchingActions.togglePosterWatched(preview)
-                        }
-                    }
-                },
-            )
+                }
+            }
 
             NuvioContinueWatchingActionSheet(
-                item = selectedContinueWatchingForActions,
+                item = selectedContinueWatchingForActions.takeIf { selectedContinueWatchingZoomAnchor == null },
                 showManualPlayOption = StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState),
                 showDetailsOption = selectedContinueWatchingForActions?.isCloudLibraryContinueWatchingItem() != true,
                 onDismiss = { selectedContinueWatchingForActions = null },
@@ -3227,19 +3373,7 @@ private fun MainAppContent(
                 onPlayManually = selectedContinueWatchingForActions
                     ?.let { item -> { onContinueWatchingPlayManually(item) } },
                 onRemove = {
-                    selectedContinueWatchingForActions?.let { item ->
-                        if (item.isNextUp) {
-                            ContinueWatchingPreferencesRepository.addDismissedNextUpKey(
-                                nextUpDismissKey(
-                                    item.parentMetaId,
-                                    item.nextUpSeedSeasonNumber,
-                                    item.nextUpSeedEpisodeNumber,
-                                ),
-                            )
-                        } else {
-                            WatchProgressRepository.removeProgress(contentId = item.parentMetaId)
-                        }
-                    }
+                    selectedContinueWatchingForActions?.let(onContinueWatchingRemove)
                 },
             )
 

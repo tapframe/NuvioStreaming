@@ -65,6 +65,7 @@ import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
 import com.nuvio.app.core.ui.NuvioProgressBar
+import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaEpisodeCardStyle
 import com.nuvio.app.features.details.MetaVideo
@@ -662,6 +663,7 @@ private fun EpisodeHorizontalCard(
     val ratingLabel = remember(imdbRating) { imdbRating?.takeIf { it > 0.0 }?.let(::formatEpisodeRating) }
     val formattedDate = remember(video.released) { video.released?.let { formatReleaseDateForDisplay(it) } }
     val runtimeLabel = remember(video.runtime) { video.runtime?.takeIf { it > 0 }?.let(::formatEpisodeRuntime) }
+    val imageUrl = video.thumbnail ?: fallbackImage
     Box(
         modifier = Modifier
             .width(metrics.cardWidth)
@@ -673,13 +675,13 @@ private fun EpisodeHorizontalCard(
                 color = Color.White.copy(alpha = 0.12f),
                 shape = cardShape,
             )
-            .combinedClickable(
-                enabled = onClick != null || onLongPress != null,
-                onClick = { onClick?.invoke() },
+            .posterCardClickable(
+                onClick = onClick,
                 onLongClick = onLongPress,
+                zoomImageUrl = imageUrl,
+                zoomCornerRadius = metrics.cornerRadius,
             ),
     ) {
-        val imageUrl = video.thumbnail ?: fallbackImage
         val shouldBlurArtwork = blurUnwatchedEpisodes && !isWatched
         if (imageUrl != null) {
             AsyncImage(

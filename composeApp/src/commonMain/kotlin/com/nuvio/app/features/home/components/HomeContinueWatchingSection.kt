@@ -703,7 +703,12 @@ private fun ContinueWatchingCard(
             .aspectRatio(PosterLandscapeAspectRatio)
             .clip(RoundedCornerShape(cardMetrics.cornerRadius))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
+            .posterCardClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                zoomImageUrl = imageUrl,
+                zoomCornerRadius = cardMetrics.cornerRadius,
+            ),
     ) {
         if (imageUrl != null) {
             AsyncImage(
@@ -994,6 +999,7 @@ private fun ContinueWatchingPosterCard(
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
 ) {
+    val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
     Column(
         modifier = Modifier.width(layout.posterCardWidth),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -1004,9 +1010,13 @@ private fun ContinueWatchingPosterCard(
                 .height(layout.posterCardHeight)
                 .clip(RoundedCornerShape(layout.cardRadius))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
+                .posterCardClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    zoomImageUrl = imageUrl,
+                    zoomCornerRadius = layout.cardRadius,
+                ),
         ) {
-            val imageUrl = item.continueWatchingPosterArtworkUrl(useEpisodeThumbnails)
             val shouldBlurArtwork = blurNextUp &&
                 useEpisodeThumbnails &&
                 item.isNextUp &&

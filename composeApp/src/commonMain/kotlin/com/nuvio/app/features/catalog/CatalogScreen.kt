@@ -304,7 +304,12 @@ private fun CatalogPosterTile(
                 .aspectRatio(item.posterShape.catalogAspectRatio())
                 .clip(RoundedCornerShape(cornerRadiusDp.dp))
                 .background(MaterialTheme.colorScheme.surface)
-                .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
+                .posterCardClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    zoomImageUrl = item.poster,
+                    zoomCornerRadius = cornerRadiusDp.dp,
+                ),
         ) {
             if (item.poster != null) {
                 AsyncImage(

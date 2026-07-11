@@ -252,7 +252,12 @@ private fun DiscoverPosterTile(
                 .aspectRatio(item.posterShape.discoverAspectRatio())
                 .clip(RoundedCornerShape(cornerRadiusDp.dp))
                 .background(MaterialTheme.colorScheme.surface)
-                .posterCardClickable(onClick = onClick, onLongClick = onLongClick),
+                .posterCardClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    zoomImageUrl = item.poster,
+                    zoomCornerRadius = cornerRadiusDp.dp,
+                ),
         ) {
             if (item.poster != null) {
                 AsyncImage(
