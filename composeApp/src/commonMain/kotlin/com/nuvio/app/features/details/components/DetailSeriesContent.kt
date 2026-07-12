@@ -187,9 +187,10 @@ fun DetailSeriesContent(
         ) {
             if (seasons.size > 1) {
                 val hasSeasonPosters = seasons.any { season ->
-                    groupedEpisodes[season]
-                        .orEmpty()
-                        .any { !it.seasonPoster.isNullOrBlank() }
+                    meta.customSeasons.any { it.season == season && !it.poster.isNullOrBlank() } ||
+                        groupedEpisodes[season]
+                            .orEmpty()
+                            .any { !it.seasonPoster.isNullOrBlank() }
                 }
                 Column(
                     modifier = Modifier.animateContentSize(animationSpec = tween(280)),
@@ -481,9 +482,11 @@ private fun SeasonPosterScrollRow(
         items(seasons, key = { season -> season }) { season ->
             SeasonPosterButton(
                 label = season.label(),
-                imageUrl = groupedEpisodes[season]
-                    .orEmpty()
-                    .firstNotNullOfOrNull { episode -> episode.seasonPoster }
+                imageUrl = meta.customSeasons.find { it.season == season }?.poster
+                    ?.takeIf { it.isNotBlank() }
+                    ?: groupedEpisodes[season]
+                        .orEmpty()
+                        .firstNotNullOfOrNull { episode -> episode.seasonPoster }
                     ?: meta.poster
                     ?: meta.background,
                 isSelected = season == currentSeason,
