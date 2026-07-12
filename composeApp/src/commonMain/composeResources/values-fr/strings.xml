@@ -283,7 +283,7 @@
     <string name="collections_editor_tmdb_subtitle_network">Chaîne</string>
     <string name="collections_editor_tmdb_subtitle_person">Personne</string>
     <string name="collections_editor_tmdb_subtitle_director">Réalisateur</string>
-    <string name="collections_editor_tmdb_subtitle_discover">TMDB Discover</string>
+    <string name="collections_editor_tmdb_subtitle_discover">Découverte TMDB</string>
     <string name="collections_empty_subtitle">Créez-en une pour organiser vos catalogues.</string>
     <string name="collections_empty_title">Aucune collection</string>
     <string name="collections_folder_count">%1$d dossier(s)</string>
@@ -740,9 +740,9 @@
     <string name="settings_mdb_api_key_title">Clé API MDBList</string>
     <string name="settings_mdb_enable_ratings">Activer les notes MDBList</string>
     <string name="settings_mdb_enable_ratings_description">Afficher les notes externes de MDBList sur les pages de métadonnées lorsqu’un ID IMDb est disponible.</string>
-    <string name="settings_mdb_section_api_key">CLÉ API</string>
+    <string name="settings_mdb_section_api_key">Clé API</string>
     <string name="settings_mdb_section_rating_providers">FOURNISSEURS DE NOTES</string>
-    <string name="settings_mdb_section_title">MDBLIST</string>
+    <string name="settings_mdb_section_title">Notes MDBList</string>
     <string name="settings_meta_actions">Actions</string>
     <string name="settings_meta_actions_description">Contrôles de lecture et d’enregistrement.</string>
     <string name="settings_meta_cast">Casting</string>
@@ -958,6 +958,8 @@
     <string name="settings_playback_selected_count">%1$d sélectionné(s)</string>
     <string name="settings_playback_show_loading_overlay">Afficher la superposition de chargement</string>
     <string name="settings_playback_show_loading_overlay_description">Afficher la superposition de chargement initiale pendant le démarrage d’un stream.</string>
+    <string name="settings_playback_parental_guide">Avertissements de contenu</string>
+    <string name="settings_playback_parental_guide_description">Afficher la superposition de contrôle parental au démarrage de la lecture.</string>
     <string name="settings_playback_subtitle_background_color">Couleur d’arrière-plan</string>
     <string name="settings_playback_subtitle_bold">Gras</string>
     <string name="settings_playback_subtitle_bold_description">Utilise une graisse de police plus épaisse pour les sous-titres.</string>
@@ -1000,7 +1002,7 @@
     <string name="settings_playback_threshold_percentage_description">Afficher la carte de l’épisode suivant lorsque la lecture atteint ce pourcentage.</string>
     <string name="settings_playback_threshold_percentage_value">%1$s %</string>
     <string name="settings_playback_timeout_instant">Instantané</string>
-    <string name="settings_playback_timeout_seconds">%1$ds</string>
+    <string name="settings_playback_timeout_seconds">%1$ss</string>
     <string name="settings_playback_timeout_unlimited">Illimité</string>
     <string name="settings_playback_tunneled_playback">Lecture tunnelisée</string>
     <string name="settings_playback_tunneled_playback_description">Active la lecture tunnelisée pour une latence réduite dans la synchronisation audio/vidéo.</string>
@@ -1038,7 +1040,7 @@
     <string name="settings_tmdb_section_credentials">IDENTIFIANTS</string>
     <string name="settings_tmdb_section_localization">LOCALISATION</string>
     <string name="settings_tmdb_section_modules">MODULES</string>
-    <string name="settings_tmdb_section_title">TMDB</string>
+    <string name="settings_tmdb_section_title">Enrichissement TMDB</string>
     <string name="settings_trakt_approval_redirect">Après approbation, vous serez redirigé automatiquement.</string>
     <string name="settings_trakt_authentication">AUTHENTIFICATION</string>
     <string name="settings_trakt_comments">Commentaires</string>
@@ -1426,13 +1428,13 @@
     <string name="trakt_missing_auth_code">Trakt n’a pas retourné de code d’autorisation</string>
     <string name="trakt_missing_credentials">Identifiants Trakt manquants</string>
     <string name="trakt_progress_load_failed">Impossible de charger la progression Trakt</string>
-    <string name="trakt_public_list">Liste publique Trakt</string>
+    <string name="trakt_public_list">Liste Trakt publique</string>
     <string name="trakt_public_list_enter_valid_id_or_url">Saisissez un ID ou une URL de liste Trakt valide</string>
     <string name="trakt_public_list_items_count">%1$d éléments</string>
     <string name="trakt_public_list_likes_count">%1$d j’aime</string>
     <string name="trakt_public_list_missing_credentials">Identifiants Trakt manquants dans local.properties (TRAKT_CLIENT_ID).</string>
     <string name="trakt_public_list_missing_id">ID de liste Trakt manquant</string>
-    <string name="trakt_public_list_missing_numeric_id">La liste Trakt n’inclut pas d’ID numérique</string>
+    <string name="trakt_public_list_missing_numeric_id">La liste Trakt ne contient pas d’ID numérique</string>
     <string name="trakt_public_list_not_found_or_not_public">Liste Trakt introuvable ou non publique</string>
     <string name="trakt_public_list_rate_limit_reached">Limite de requêtes Trakt atteinte</string>
     <string name="trakt_public_list_request_failed">Échec de la requête Trakt</string>
@@ -1448,7 +1450,7 @@
     <string name="trakt_error_add_watchlist_failed">Échec de l’ajout à votre liste de suivi Trakt</string>
     <string name="trakt_error_add_list_failed">Échec de l’ajout à la liste Trakt</string>
     <string name="trakt_error_missing_ids">Identifiants Trakt compatibles manquants</string>
-    <string name="trakt_error_empty_response">Réponse vide du serveur</string>
+    <string name="trakt_error_empty_response">Corps de réponse vide</string>
     <string name="tmdb_sources_api_key_required">Ajoutez une clé API TMDB dans les paramètres pour utiliser les sources TMDB.</string>
     <string name="tmdb_sources_collection_fallback_title">Collection TMDB %1$d</string>
     <string name="tmdb_sources_collection_not_found">Collection TMDB introuvable</string>
@@ -1536,7 +1538,7 @@
     <string name="downloads_enqueue_started">Téléchargement démarré</string>
     <string name="downloads_enqueue_unsupported_format">Format de stream non pris en charge pour les téléchargements</string>
     <string name="downloads_error_empty_body">Corps de réponse vide</string>
-    <string name="downloads_error_finalize_failed">Impossible de finaliser le fichier téléchargé</string>
+    <string name="downloads_error_finalize_failed">Impossible de finaliser le fichier de téléchargement</string>
     <string name="downloads_error_http_failed">La requête a échoué avec HTTP %1$d</string>
     <string name="downloads_error_not_initialized">Le système de téléchargement n’est pas initialisé</string>
     <string name="downloads_error_open_partial_failed">Impossible d’ouvrir le fichier de téléchargement partiel</string>
@@ -1761,10 +1763,10 @@
     <string name="settings_playback_ios_target_transfer_dialog">Transfert cible</string>
     <!-- Collection editor -->
     <string name="collections_editor_resolved_trakt_list">Liste Trakt résolue</string>
-    <string name="collections_editor_tmdb_discover">TMDB Discover</string>
+    <string name="collections_editor_tmdb_discover">Découverte TMDB</string>
     <string name="collections_editor_watch_region_placeholder">US, KR, JP, IN</string>
     <!-- Collection editor error messages -->
-    <string name="collections_editor_trakt_input_required">Saisissez un nom de liste Trakt, une URL ou un ID</string>
+    <string name="collections_editor_trakt_input_required">Saisissez un nom, une URL ou un ID de liste Trakt</string>
     <string name="collections_editor_tmdb_invalid_id_error">Saisissez un ID ou une URL TMDB valide.</string>
     <string name="collections_editor_tmdb_load_error">Impossible de charger la source TMDB</string>
     <string name="collections_editor_trakt_id_url_required">Saisissez un ID ou une URL de liste Trakt</string>
@@ -1808,7 +1810,7 @@
     <string name="collections_tmdb_api_key_required">Ajoutez une clé API TMDB dans les paramètres pour utiliser les sources TMDB.</string>
     <string name="collections_tmdb_collection_not_found">Collection TMDB introuvable</string>
     <string name="collections_tmdb_company_not_found">Société TMDB introuvable</string>
-    <string name="collections_tmdb_discover_no_data">Découverte TMDB n’a retourné aucune donnée</string>
+    <string name="collections_tmdb_discover_no_data">La découverte TMDB n’a retourné aucune donnée</string>
     <string name="collections_tmdb_list_not_found">Liste TMDB introuvable</string>
     <string name="collections_tmdb_missing_collection_id">ID de collection TMDB manquant</string>
     <string name="collections_tmdb_missing_list_id">ID de liste TMDB manquant</string>
@@ -1839,7 +1841,7 @@
     <string name="network_connection_issue">Problème de connexion</string>
     <string name="network_empty_response_body">Corps de réponse vide</string>
     <string name="network_please_check_connection">Vérifiez votre connexion et réessayez.</string>
-    <string name="network_request_failed_http">Échec de la requête (HTTP %1$d)</string>
+    <string name="network_request_failed_http">La requête a échoué avec HTTP %1$d</string>
     <string name="player_addon_subtitle_display_format">%1$s (%2$s)</string>
     <string name="player_error_mpv_unavailable">Moteur de lecture MPV indisponible. Reconstruisez l’app.</string>
     <string name="player_error_unable_to_play_stream">Impossible de lire ce stream.</string>
@@ -1871,9 +1873,9 @@
     <string name="plugins_group_by_repo_desc">Dans Streams, affiche un fournisseur par dépôt au lieu d’un par source.</string>
     <string name="plugins_group_by_repo_title">Regrouper les fournisseurs par dépôt</string>
     <string name="plugins_input_manifest_placeholder">URL du manifeste du plugin</string>
-    <string name="plugins_manifest_error_name_missing">Nom du manifeste manquant.</string>
+    <string name="plugins_manifest_error_name_missing">Le nom du manifeste est manquant.</string>
     <string name="plugins_manifest_error_no_providers">Le manifeste ne contient aucun fournisseur.</string>
-    <string name="plugins_manifest_error_version_missing">Version du manifeste manquante.</string>
+    <string name="plugins_manifest_error_version_missing">La version du manifeste est manquante.</string>
     <string name="plugins_manifest_name_missing">Le nom du manifeste est manquant.</string>
     <string name="plugins_manifest_no_providers">Le manifeste ne contient aucun fournisseur.</string>
     <string name="plugins_manifest_version_missing">La version du manifeste est manquante.</string>
