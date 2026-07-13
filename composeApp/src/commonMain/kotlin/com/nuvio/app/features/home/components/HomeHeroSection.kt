@@ -30,15 +30,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
@@ -52,6 +58,9 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.features.home.MetaPreview
+import com.nuvio.app.features.details.components.loadedBackdropImageBitmap
+import com.kmpalette.rememberDominantColorState
+import com.kmpalette.extensions.painter.rememberPainterDominantColorState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -90,6 +99,7 @@ fun HomeHeroSection(
     mobileBelowSectionHeightHint: Dp? = null,
     listState: LazyListState? = null,
     onItemClick: ((MetaPreview) -> Unit)? = null,
+    onBackgroundColorChanged: (Color) -> Unit = {},
 ) {
     if (items.isEmpty()) return
 
@@ -149,7 +159,63 @@ fun HomeHeroSection(
             ?.page
             ?.let(items::get)
             ?: items[currentPage]
+        
+        var dominantPainter by remember(currentItem.type, currentItem.id) {
+            mutableStateOf<Painter?>(null)
+        }
+        
+        var dominantBitmap by remember(currentItem.type, currentItem.id) {
+            mutableStateOf<ImageBitmap?>(null)
+        }
 
+        val bitmapColorState = key(currentItem.type, currentItem.id) {
+            rememberDominantColorState(
+                defaultColor = MaterialTheme.colorScheme.background,
+            )
+        }
+
+        val painterColorState = key(currentItem.type, currentItem.id) {
+            rememberPainterDominantColorState(
+                defaultColor = MaterialTheme.colorScheme.background,
+                defaultOnColor = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+        
+        LaunchedEffect(
+            currentItem.type,
+            currentItem.id,
+            dominantBitmap,
+            dominantPainter,
+        ) {
+            val bitmap = dominantBitmap
+            val painter = dominantPainter
+        
+            when {
+                bitmap != null -> bitmapColorState.updateFrom(bitmap)
+                painter != null -> painterColorState.updateFrom(painter)
+            }
+        }
+        
+        val extractedDominantColor = if (dominantBitmap != null) {
+            bitmapColorState.color
+        } else {
+            painterColorState.color
+        }
+        
+        val homeBackgroundColor = lerp(
+            start = MaterialTheme.colorScheme.background,
+            stop = extractedDominantColor,
+            fraction = 0.42f,
+        )
+        
+        LaunchedEffect(
+            currentItem.type,
+            currentItem.id,
+            homeBackgroundColor,
+        ) {
+            onBackgroundColorChanged(homeBackgroundColor)
+        }
+        
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -164,6 +230,20 @@ fun HomeHeroSection(
             ) {
                 Box(modifier = Modifier.fillMaxSize())
             }
+
+            AsyncImage(
+                model = currentItem.banner ?: currentItem.poster,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(64.dp)
+                    .graphicsLayer {
+                        alpha = 0.01f
+                    },
+                onSuccess = { state ->
+                    dominantPainter = state.painter
+                    dominantBitmap = loadedBackdropImageBitmap(state.result)
+                },
+            )
 
             Box(
                 modifier = Modifier.fillMaxSize(),
