@@ -64,7 +64,9 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
+import com.nuvio.app.core.ui.NuvioCardDepthSurface
 import com.nuvio.app.core.ui.NuvioProgressBar
+import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.core.ui.posterCardClickable
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaEpisodeCardStyle
@@ -670,10 +672,10 @@ private fun EpisodeHorizontalCard(
             .height(metrics.cardHeight)
             .clip(cardShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.12f),
+            .nuvioCardDepth(
                 shape = cardShape,
+                surface = NuvioCardDepthSurface.EpisodeCards,
+                fallbackBorderAlpha = 0.12f,
             )
             .posterCardClickable(
                 onClick = onClick,
@@ -699,12 +701,12 @@ private fun EpisodeHorizontalCard(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.10f),
-                            Color.Black.copy(alpha = 0.42f),
-                            Color.Black.copy(alpha = 0.78f),
-                        ),
+                        0f to Color.Transparent,
+                        0.42f to Color.Transparent,
+                        0.56f to Color.Black.copy(alpha = 0.20f),
+                        0.70f to Color.Black.copy(alpha = 0.45f),
+                        0.84f to Color.Black.copy(alpha = 0.68f),
+                        1f to Color.Black.copy(alpha = 0.92f),
                     ),
                 ),
         )

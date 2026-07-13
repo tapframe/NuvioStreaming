@@ -32,11 +32,13 @@
     <string name="addons_badge_unavailable">Indisponibil</string>
     <string name="addons_configure">Configurează extensia</string>
     <string name="addons_delete">Șterge extensia</string>
-    <string name="addons_appstore_add_description">Conectează-ți propriul server media pentru a naviga și a reda din biblioteca personală.</string>
-    <string name="addons_appstore_empty_subtitle">Adaugă un URL de server mai sus când vrei ca Nuvio să îți afișeze biblioteca privată.</string>
-    <string name="addons_appstore_empty_title">Nicio bibliotecă personală conectată.</string>
-    <string name="addons_appstore_input_placeholder">URL Server</string>
-    <string name="addons_appstore_install_button">Adaugă</string>
+    <string name="addons_appstore_add_description">Folosește extensiile preferate pentru a-ți aduce biblioteca în Nuvio.</string>
+    <string name="addons_appstore_empty_subtitle">Adaugă o extensie pentru a începe să-ți construiești biblioteca.</string>
+    <string name="addons_appstore_empty_title">Personalizează Nuvio.</string>
+    <string name="addons_appstore_input_placeholder">URL extensie</string>
+    <string name="addons_appstore_install_button">Adaugă extensie</string>
+    <string name="store_empty_unavailable_title">Nu este nimic aici încă</string>
+    <string name="store_empty_unavailable_message">Extensiile pe care le folosești nu au încă nimic de afișat aici.</string>
     <string name="addons_empty_subtitle">Adaugă un URL de manifest pentru a începe încărcarea de cataloage, metadate, fluxuri sau subtitrări în Nuvio.</string>
     <string name="addons_empty_title">Nu există extensii instalate încă.</string>
     <string name="addons_error_enter_url">Introdu un URL pentru extensie.</string>
@@ -442,7 +444,9 @@
     <string name="compose_settings_root_check_updates_description">Descarcă cea mai recentă versiune</string>
     <string name="compose_settings_root_check_updates_title">Caută actualizări</string>
     <string name="compose_settings_root_content_discovery_description">Gestionează extensiile și sursele de descoperire.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Gestionează extensiile și alege ce apare în Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Gestionează filmele și episoadele descărcate.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Gestionează ce ai salvat pe acest dispozitiv.</string>
     <string name="compose_settings_root_downloads_title">Descărcări</string>
     <string name="compose_settings_root_general_section">GENERAL</string>
     <string name="compose_settings_root_integrations_description">Gestionează integrările disponibile</string>
@@ -656,7 +660,7 @@
     <string name="settings_content_discovery_section_home">ECRAN PRINCIPAL</string>
     <string name="settings_content_discovery_section_sources">SURSE</string>
     <string name="settings_content_discovery_addons_description">Instalează, elimină, reîmprospătează și sortează sursele de conținut.</string>
-    <string name="settings_content_discovery_addons_description_appstore">Conectează surse media personale și gestionează accesul la propria bibliotecă.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Adaugă și gestionează extensiile pe care le folosești cu Nuvio.</string>
     <string name="settings_content_discovery_plugins_description">Instalează depozite de scraper JavaScript și testează furnizorii intern.</string>
     <string name="settings_content_discovery_homescreen_description">Ajustează aspectul ecranului principal, vizibilitatea conținutului și comportamentul posterului</string>
     <string name="settings_content_discovery_meta_screen_description">Setări pentru ecranele de detalii și de episoade.</string>

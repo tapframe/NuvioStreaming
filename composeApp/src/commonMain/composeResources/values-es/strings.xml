@@ -32,11 +32,13 @@
     <string name="addons_badge_unavailable">No disponible</string>
     <string name="addons_configure">Configurar complemento</string>
     <string name="addons_delete">Eliminar complemento</string>
-    <string name="addons_appstore_add_description">Conecte su propio servidor multimedia para navegar y reproducir desde su biblioteca personal.</string>
-    <string name="addons_appstore_empty_subtitle">Agregue una URL de servidor arriba cuando desee que Nuvio muestre su biblioteca privada.</string>
-    <string name="addons_appstore_empty_title">No hay bibliotecas personales conectadas.</string>
-    <string name="addons_appstore_input_placeholder">URL del servidor</string>
-    <string name="addons_appstore_install_button">Agregar</string>
+    <string name="addons_appstore_add_description">Lleva tu biblioteca a Nuvio con los complementos que utilizas.</string>
+    <string name="addons_appstore_empty_subtitle">Agrega un complemento para empezar a crear tu biblioteca.</string>
+    <string name="addons_appstore_empty_title">Haz tuyo Nuvio.</string>
+    <string name="addons_appstore_input_placeholder">URL del complemento</string>
+    <string name="addons_appstore_install_button">Agregar complemento</string>
+    <string name="store_empty_unavailable_title">Aún no hay nada aquí</string>
+    <string name="store_empty_unavailable_message">Tus complementos actuales aún no tienen nada que mostrar aquí.</string>
     <string name="addons_empty_subtitle">Agrega una URL de manifiesto para empezar a cargar catálogos, metadatos, streams o subtítulos en Nuvio.</string>
     <string name="addons_empty_title">Aún no hay complementos instalados.</string>
     <string name="addons_error_enter_url">Introduce una URL de complemento.</string>
@@ -442,7 +444,9 @@
     <string name="compose_settings_root_check_updates_description">Buscar nuevas versiones de la app.</string>
     <string name="compose_settings_root_check_updates_title">Buscar actualizaciones</string>
     <string name="compose_settings_root_content_discovery_description">Administra complementos y fuentes de descubrimiento.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Administra tus complementos y elige qué aparece en Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Administra tus películas y episodios descargados.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Administra lo que has guardado en este dispositivo.</string>
     <string name="compose_settings_root_downloads_title">Descargas</string>
     <string name="compose_settings_root_general_section">GENERAL</string>
     <string name="compose_settings_root_integrations_description">Conecta los servicios TMDB y MDBList.</string>
@@ -638,7 +642,7 @@
     <string name="settings_content_discovery_section_home">INICIO</string>
     <string name="settings_content_discovery_section_sources">FUENTES</string>
     <string name="settings_content_discovery_addons_description">Instala, elimina, actualiza y ordena tus fuentes de contenido.</string>
-    <string name="settings_content_discovery_addons_description_appstore">Conecte fuentes de medios personales y administre el acceso a su propia biblioteca.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Agrega y administra los complementos que utilizas con Nuvio.</string>
     <string name="settings_content_discovery_plugins_description">Instala repositorios de scrapers en JavaScript y prueba proveedores internamente.</string>
     <string name="settings_content_discovery_homescreen_description">Controla qué catálogos aparecen en Inicio y en qué orden.</string>
     <string name="settings_content_discovery_meta_screen_description">Desactiva secciones de detalles y reordena todo debajo del Destacado.</string>

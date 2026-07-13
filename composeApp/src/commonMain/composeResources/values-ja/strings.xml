@@ -32,11 +32,13 @@
     <string name="addons_badge_unavailable">利用不可</string>
     <string name="addons_configure">アドオンを設定</string>
     <string name="addons_delete">アドオンを削除</string>
-    <string name="addons_appstore_add_description">独自のメディアサーバーを接続して、個人ライブラリを参照・再生します。</string>
-    <string name="addons_appstore_empty_subtitle">Nuvioに個人ライブラリを表示させたい場合は、上にサーバーURLを追加してください。</string>
-    <string name="addons_appstore_empty_title">接続された個人ライブラリはありません。</string>
-    <string name="addons_appstore_input_placeholder">サーバーURL</string>
-    <string name="addons_appstore_install_button">追加</string>
+    <string name="addons_appstore_add_description">いつものアドオンで、ライブラリをNuvioにまとめましょう。</string>
+    <string name="addons_appstore_empty_subtitle">アドオンを追加して、ライブラリを作り始めましょう。</string>
+    <string name="addons_appstore_empty_title">Nuvioを自分好みに。</string>
+    <string name="addons_appstore_input_placeholder">アドオンURL</string>
+    <string name="addons_appstore_install_button">アドオンを追加</string>
+    <string name="store_empty_unavailable_title">まだ何もありません</string>
+    <string name="store_empty_unavailable_message">現在のアドオンには、ここに表示できるものがまだありません。</string>
     <string name="addons_empty_subtitle">マニフェストURLを追加して、カタログ・メタデータ・ストリーム・字幕をNuvioに読み込みましょう。</string>
     <string name="addons_empty_title">アドオンがありません</string>
     <string name="addons_error_enter_url">アドオンのURLを入力してください。</string>
@@ -442,7 +444,9 @@
     <string name="compose_settings_root_check_updates_description">最新リリースをダウンロード</string>
     <string name="compose_settings_root_check_updates_title">アップデートを確認</string>
     <string name="compose_settings_root_content_discovery_description">アドオンと探索ソースを管理</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">アドオンを管理して、Nuvioに表示する内容を選べます。</string>
     <string name="compose_settings_root_downloads_description">ダウンロードした映画とエピソードを管理</string>
+    <string name="compose_settings_root_downloads_description_appstore">このデバイスに保存した項目を管理します。</string>
     <string name="compose_settings_root_downloads_title">ダウンロード</string>
     <string name="compose_settings_root_general_section">一般</string>
     <string name="compose_settings_root_integrations_description">利用可能な連携を管理</string>
@@ -638,7 +642,7 @@
     <string name="settings_content_discovery_section_home">ホーム</string>
     <string name="settings_content_discovery_section_sources">ソース</string>
     <string name="settings_content_discovery_addons_description">コンテンツソースのインストール・削除・更新・並べ替え</string>
-    <string name="settings_content_discovery_addons_description_appstore">個人メディアソースを接続し、自分専用ライブラリへのアクセスを管理します。</string>
+    <string name="settings_content_discovery_addons_description_appstore">Nuvioで使うアドオンを追加・管理します。</string>
     <string name="settings_content_discovery_plugins_description">JavaScriptスクレイパーリポジトリのインストールと内部テスト</string>
     <string name="settings_content_discovery_homescreen_description">ホームレイアウト・コンテンツ表示・ポスターの動作を調整</string>
     <string name="settings_content_discovery_meta_screen_description">詳細画面とエピソード画面の設定</string>

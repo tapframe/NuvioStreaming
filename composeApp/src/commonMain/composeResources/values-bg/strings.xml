@@ -433,7 +433,9 @@
     <string name="compose_settings_root_check_updates_description">Изтегли последна версия</string>
     <string name="compose_settings_root_check_updates_title">Провери за актуализации</string>
     <string name="compose_settings_root_content_discovery_description">Управлявай добавки и източници за discovery.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Управлявайте добавките и изберете какво да се показва в Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Управлявай изтеглените филми и епизоди.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Управлявайте запазеното на това устройство.</string>
     <string name="compose_settings_root_downloads_title">Изтегляния</string>
     <string name="compose_settings_root_general_section">ОБЩИ</string>
     <string name="compose_settings_root_integrations_description">Управлявай наличните интеграции</string>
@@ -1845,11 +1847,13 @@
     <string name="player_error_torrent">Грешка в торента: %1$s</string>
     <!-- Current cmp-rewrite string additions -->
     <string name="action_switch">Превключи</string>
-    <string name="addons_appstore_add_description">Свържете собствен медиен сървър, за да разглеждате и възпроизвеждате от личната си библиотека.</string>
-    <string name="addons_appstore_empty_subtitle">Добавете URL на сървър по-горе, когато искате Nuvio да показва вашата лична библиотека.</string>
-    <string name="addons_appstore_empty_title">Няма свързани лични библиотеки.</string>
-    <string name="addons_appstore_input_placeholder">URL на сървър</string>
-    <string name="addons_appstore_install_button">Добави</string>
+    <string name="addons_appstore_add_description">Пренесете библиотеката си в Nuvio с добавките, които използвате.</string>
+    <string name="addons_appstore_empty_subtitle">Добавете добавка, за да започнете да изграждате библиотеката си.</string>
+    <string name="addons_appstore_empty_title">Настройте Nuvio по свой начин.</string>
+    <string name="addons_appstore_input_placeholder">URL на добавка</string>
+    <string name="addons_appstore_install_button">Добавяне на добавка</string>
+    <string name="store_empty_unavailable_title">Все още няма нищо тук</string>
+    <string name="store_empty_unavailable_message">Текущите ви добавки все още нямат какво да покажат тук.</string>
     <string name="community_donation_progress_title">Сървър и поддръжка за този месец</string>
     <string name="community_donation_progress_complete">Покрито. Допълнителната подкрепа вече отива за разработка.</string>
     <string name="community_donation_progress_remaining">След 100% допълнителната подкрепа отива за разработка.</string>
@@ -1861,7 +1865,7 @@
     <string name="details_actions_menu_label">Още действия</string>
     <string name="p2p_error_unknown">Неизвестна грешка в торента</string>
     <string name="settings_appearance_app_language_device">Език на устройството</string>
-    <string name="settings_content_discovery_addons_description_appstore">Свържете лични медийни източници и управлявайте достъпа до собствената си библиотека.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Добавяйте и управлявайте добавките, които използвате с Nuvio.</string>
     <string name="settings_playback_external_player_send_skip_segments">Изпращане на времеви маркери за интро и аутро</string>
     <string name="settings_playback_external_player_send_skip_segments_description">Предайте откритите времеви маркери за интро и аутро към външния плейър за автоматично прескачане. Работи само в плейъри, които го поддържат; останалите плейъри го игнорират.</string>
     <string name="settings_playback_touch_gestures">Жестове с докосване</string>

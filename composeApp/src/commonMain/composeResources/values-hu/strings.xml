@@ -401,7 +401,9 @@
     <string name="compose_settings_root_check_updates_description">A legújabb verzió letöltése</string>
     <string name="compose_settings_root_check_updates_title">Frissítések keresése</string>
     <string name="compose_settings_root_content_discovery_description">Kiegészítők és tartalomforrások kezelése</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Kezeld a kiegészítőket, és válaszd ki, mi jelenjen meg a Nuvióban.</string>
     <string name="compose_settings_root_downloads_description">A letöltött filmek és epizódok kezelése</string>
+    <string name="compose_settings_root_downloads_description_appstore">Kezeld az eszközre mentett tartalmakat.</string>
     <string name="compose_settings_root_downloads_title">Letöltések</string>
     <string name="compose_settings_root_general_section">ÁLTALÁNOS</string>
     <string name="compose_settings_root_integrations_description">Elérhető integrációk kezelése</string>
@@ -1339,11 +1341,13 @@
     <string name="unit_bytes_gb">GB</string>
     <string name="action_switch">Váltás</string>
     <string name="addons_badge_disabled">Kikapcsolva</string>
-    <string name="addons_appstore_add_description">Csatlakoztasd saját médiaszerveredet a személyes könyvtárad böngészéséhez és lejátszásához.</string>
-    <string name="addons_appstore_empty_subtitle">Adj meg egy szerver URL-t fent, ha szeretnéd, hogy a Nuvio megjelenítse a privát könyvtáradat.</string>
-    <string name="addons_appstore_empty_title">Nincsenek csatlakoztatott személyes könyvtárak.</string>
-    <string name="addons_appstore_input_placeholder">Szerver URL</string>
-    <string name="addons_appstore_install_button">Hozzáadás</string>
+    <string name="addons_appstore_add_description">Hozd el a könyvtáradat a Nuvióba a használt kiegészítőkkel.</string>
+    <string name="addons_appstore_empty_subtitle">Adj hozzá egy kiegészítőt a könyvtárad felépítéséhez.</string>
+    <string name="addons_appstore_empty_title">Szabd személyre a Nuviót.</string>
+    <string name="addons_appstore_input_placeholder">Kiegészítő URL-je</string>
+    <string name="addons_appstore_install_button">Kiegészítő hozzáadása</string>
+    <string name="store_empty_unavailable_title">Itt még nincs semmi</string>
+    <string name="store_empty_unavailable_message">A jelenlegi kiegészítőid még nem jelenítenek meg itt semmit.</string>
     <string name="collections_editor_tmdb_genres_movie_placeholder">28,12</string>
     <string name="collections_editor_tmdb_genres_series_placeholder">18,35</string>
     <string name="collections_editor_tmdb_date_from_placeholder">2020-01-01</string>
@@ -1397,7 +1401,7 @@
     <string name="settings_show_secret">Érték megjelenítése</string>
     <string name="settings_continue_watching_style_card">Kártya</string>
     <string name="settings_continue_watching_style_card_description">TV-stílusú fekvő kártya</string>
-    <string name="settings_content_discovery_addons_description_appstore">Személyes médiaforrások csatlakoztatása és a saját könyvtáradhoz való hozzáférés kezelése.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Add hozzá és kezeld a Nuvióval használt kiegészítőket.</string>
     <string name="settings_debrid_cloud_library">Felhő könyvtár</string>
     <string name="settings_debrid_cloud_library_description">A csatlakoztatott fiókjaidban már meglévő fájlok böngészése és lejátszása.</string>
     <string name="settings_debrid_resolve_with">Feloldás ezzel</string>

@@ -32,11 +32,13 @@
     <string name="addons_badge_unavailable">Không khả dụng</string>
     <string name="addons_configure">Cấu hình addon</string>
     <string name="addons_delete">Xóa addon</string>
-    <string name="addons_appstore_add_description">Kết nối máy chủ nội dung của bạn để duyệt và phát thư viện cá nhân.</string>
-    <string name="addons_appstore_empty_subtitle">Thêm URL máy chủ ở trên để Nuvio hiển thị thư viện riêng của bạn.</string>
-    <string name="addons_appstore_empty_title">Chưa kết nối thư viện cá nhân.</string>
-    <string name="addons_appstore_input_placeholder">URL máy chủ</string>
-    <string name="addons_appstore_install_button">Thêm</string>
+    <string name="addons_appstore_add_description">Đưa thư viện của bạn vào Nuvio với các addon bạn sử dụng.</string>
+    <string name="addons_appstore_empty_subtitle">Thêm một addon để bắt đầu xây dựng thư viện của bạn.</string>
+    <string name="addons_appstore_empty_title">Tùy chỉnh Nuvio theo cách của bạn.</string>
+    <string name="addons_appstore_input_placeholder">URL addon</string>
+    <string name="addons_appstore_install_button">Thêm addon</string>
+    <string name="store_empty_unavailable_title">Chưa có nội dung nào ở đây</string>
+    <string name="store_empty_unavailable_message">Các addon bạn đang dùng chưa có nội dung để hiển thị ở đây.</string>
     <string name="addons_empty_subtitle">Thêm URL manifest để tải danh mục, thông tin, nguồn phát hoặc phụ đề vào Nuvio.</string>
     <string name="addons_empty_title">Chưa cài addon nào.</string>
     <string name="addons_error_enter_url">Nhập URL addon.</string>
@@ -442,7 +444,9 @@
     <string name="compose_settings_root_check_updates_description">Tải phiên bản mới nhất.</string>
     <string name="compose_settings_root_check_updates_title">Kiểm tra cập nhật</string>
     <string name="compose_settings_root_content_discovery_description">Quản lý addon và các nguồn khám phá nội dung.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Quản lý addon và chọn nội dung hiển thị trong Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Quản lý phim và tập đã tải xuống.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Quản lý nội dung bạn đã lưu trên thiết bị này.</string>
     <string name="compose_settings_root_downloads_title">Tải xuống</string>
     <string name="compose_settings_root_general_section">CHUNG</string>
     <string name="compose_settings_root_integrations_description">Quản lý các dịch vụ tích hợp.</string>
@@ -641,7 +645,7 @@
     <string name="settings_content_discovery_section_home">TRANG CHỦ</string>
     <string name="settings_content_discovery_section_sources">NGUỒN</string>
     <string name="settings_content_discovery_addons_description">Cài đặt, xóa, làm mới và sắp xếp các nguồn nội dung.</string>
-    <string name="settings_content_discovery_addons_description_appstore">Kết nối nguồn nội dung cá nhân và quản lý thư viện riêng của bạn.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Thêm và quản lý các addon bạn sử dụng với Nuvio.</string>
     <string name="settings_content_discovery_plugins_description">Cài đặt kho Plugin JavaScript và thử nghiệm các dịch vụ nội bộ.</string>
     <string name="settings_content_discovery_homescreen_description">Điều chỉnh bố cục Trang chủ, khả năng hiển thị nội dung và cách hiển thị poster.</string>
     <string name="settings_content_discovery_meta_screen_description">Thiết lập cho trang chi tiết và danh sách tập.</string>

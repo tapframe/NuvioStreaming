@@ -233,7 +233,9 @@
     <string name="compose_settings_root_check_updates_description">Ελέγξτε για νέες εκδόσεις της εφαρμογής.</string>
     <string name="compose_settings_root_check_updates_title">Έλεγχος για ενημερώσεις</string>
     <string name="compose_settings_root_content_discovery_description">Διαχείριση πρόσθετων και πηγών ανακάλυψης.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Διαχειριστείτε τα πρόσθετα και επιλέξτε τι εμφανίζεται στο Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Διαχειριστείτε τις κατεβασμένες ταινίες και επεισόδιά σας.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Διαχειριστείτε όσα έχετε αποθηκεύσει σε αυτή τη συσκευή.</string>
     <string name="compose_settings_root_downloads_title">Λήψεις</string>
     <string name="compose_settings_root_general_section">ΓΕΝΙΚΑ</string>
     <string name="compose_settings_root_integrations_description">Σύνδεση υπηρεσιών TMDB και MDBList.</string>
@@ -1061,11 +1063,13 @@
     <string name="action_saving">Αποθήκευση…</string>
     <string name="action_switch">Εναλλαγή</string>
     <string name="action_validate">Επικύρωση</string>
-    <string name="addons_appstore_add_description">Συνδέστε τον δικό σας διακομιστή μέσων για να περιηγηθείτε και να αναπαραγάγετε από τη δική σας προσωπική βιβλιοθήκη.</string>
-    <string name="addons_appstore_empty_subtitle">Προσθέστε μια διεύθυνση URL διακομιστή παραπάνω όταν θέλετε το Nuvio να εμφανίζει τη δική σας ιδιωτική βιβλιοθήκη.</string>
-    <string name="addons_appstore_empty_title">Δεν υπάρχουν προσωπικές βιβλιοθήκες συνδεδεμένες.</string>
-    <string name="addons_appstore_input_placeholder">Διεύθυνση URL διακομιστή</string>
-    <string name="addons_appstore_install_button">Προσθήκη</string>
+    <string name="addons_appstore_add_description">Φέρτε τη βιβλιοθήκη σας στο Nuvio με τα πρόσθετα που χρησιμοποιείτε.</string>
+    <string name="addons_appstore_empty_subtitle">Προσθέστε ένα πρόσθετο για να αρχίσετε να δημιουργείτε τη βιβλιοθήκη σας.</string>
+    <string name="addons_appstore_empty_title">Κάντε το Nuvio δικό σας.</string>
+    <string name="addons_appstore_input_placeholder">URL πρόσθετου</string>
+    <string name="addons_appstore_install_button">Προσθήκη πρόσθετου</string>
+    <string name="store_empty_unavailable_title">Δεν υπάρχει τίποτα εδώ ακόμη</string>
+    <string name="store_empty_unavailable_message">Τα πρόσθετα που χρησιμοποιείτε δεν έχουν ακόμη τίποτα να εμφανίσουν εδώ.</string>
     <string name="addons_badge_disabled">Απενεργοποιημένο</string>
     <string name="addons_manifest_missing_field">Το manifest είναι κενό "%1$s"</string>
     <string name="cloud_library_connect_action">Σύνδεση λογαριασμού</string>
@@ -1520,7 +1524,7 @@
     <string name="settings_appearance_app_language_device">Device Γλώσσα</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
     <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later.</string>
-    <string name="settings_content_discovery_addons_description_appstore">Connect personal media sources and manage access to your own Βιβλιοθήκη.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Προσθέστε και διαχειριστείτε τα πρόσθετα που χρησιμοποιείτε με το Nuvio.</string>
     <string name="settings_continue_watching_blur_next_up_description">Blur next episode thumbnails in Συνέχεια Watching to avoid spoilers.</string>
     <string name="settings_continue_watching_blur_next_up_title">Blur Unwatched in Συνέχεια Watching</string>
     <string name="settings_continue_watching_section_sort_order">Ταξινόμηση ORDER</string>

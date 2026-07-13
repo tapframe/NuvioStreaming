@@ -148,6 +148,10 @@ fun NuvioPosterCard(
                 .aspectRatio(shape.aspectRatio)
                 .clip(cardShape)
                 .background(tokens.colors.surface)
+                .nuvioCardDepth(
+                    shape = cardShape,
+                    surface = NuvioCardDepthSurface.Posters,
+                )
                 .posterCardClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,

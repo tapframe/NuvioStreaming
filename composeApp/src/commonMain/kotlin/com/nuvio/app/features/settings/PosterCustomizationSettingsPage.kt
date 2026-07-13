@@ -2,8 +2,12 @@ package com.nuvio.app.features.settings
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +15,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,23 +24,81 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
+import com.nuvio.app.core.ui.CardDepthStyleRepository
+import com.nuvio.app.core.ui.CardDepthStyleUiState
+import com.nuvio.app.core.ui.DefaultCardDepthEdgeCoverage
+import com.nuvio.app.core.ui.DefaultCardDepthEdgeStrength
+import com.nuvio.app.core.ui.DefaultCardDepthSheenStrength
 import com.nuvio.app.core.ui.NuvioActionLabel
+import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.NuvioModalBottomSheet
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleUiState
+import com.nuvio.app.core.ui.cardDepthVisual
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_reset
+import nuvio.composeapp.generated.resources.settings_card_depth_apply_to
+import nuvio.composeapp.generated.resources.settings_card_depth_description
+import nuvio.composeapp.generated.resources.settings_card_depth_edge
+import nuvio.composeapp.generated.resources.settings_card_depth_edge_balanced
+import nuvio.composeapp.generated.resources.settings_card_depth_edge_bold
+import nuvio.composeapp.generated.resources.settings_card_depth_edge_subtle
+import nuvio.composeapp.generated.resources.settings_card_depth_edge_value
+import nuvio.composeapp.generated.resources.settings_card_depth_edge_coverage
+import nuvio.composeapp.generated.resources.settings_card_depth_coverage_full
+import nuvio.composeapp.generated.resources.settings_card_depth_coverage_half
+import nuvio.composeapp.generated.resources.settings_card_depth_coverage_top
+import nuvio.composeapp.generated.resources.settings_card_depth_coverage_value
+import nuvio.composeapp.generated.resources.settings_card_depth_enabled
+import nuvio.composeapp.generated.resources.settings_card_depth_fine_tune
+import nuvio.composeapp.generated.resources.settings_card_depth_fine_tune_hint
+import nuvio.composeapp.generated.resources.settings_card_depth_fine_tune_title
+import nuvio.composeapp.generated.resources.settings_card_depth_pad_edge_axis
+import nuvio.composeapp.generated.resources.settings_card_depth_pad_sheen_axis
+import nuvio.composeapp.generated.resources.settings_card_depth_preview_meta
+import nuvio.composeapp.generated.resources.settings_card_depth_preview_title
+import nuvio.composeapp.generated.resources.settings_card_depth_sheen
+import nuvio.composeapp.generated.resources.settings_card_depth_sheen_value
+import nuvio.composeapp.generated.resources.settings_card_depth_sheen_bright
+import nuvio.composeapp.generated.resources.settings_card_depth_sheen_off
+import nuvio.composeapp.generated.resources.settings_card_depth_sheen_soft
+import nuvio.composeapp.generated.resources.settings_card_depth_surface_cast
+import nuvio.composeapp.generated.resources.settings_card_depth_surface_continue_watching
+import nuvio.composeapp.generated.resources.settings_card_depth_surface_episodes
+import nuvio.composeapp.generated.resources.settings_card_depth_surface_posters
+import nuvio.composeapp.generated.resources.settings_card_depth_surface_trailers
+import nuvio.composeapp.generated.resources.settings_card_depth_title
 import nuvio.composeapp.generated.resources.settings_poster_card_radius
 import nuvio.composeapp.generated.resources.settings_poster_card_style
 import nuvio.composeapp.generated.resources.settings_poster_card_width
@@ -89,6 +153,451 @@ internal fun LazyListScope.posterCustomizationSettingsContent(
                 )
             }
         }
+    }
+    item {
+        CardDepthStyleRepository.ensureLoaded()
+        val cardDepthState by CardDepthStyleRepository.uiState.collectAsState()
+        SettingsSection(
+            title = stringResource(Res.string.settings_card_depth_title),
+            isTablet = isTablet,
+            actions = {
+                NuvioActionLabel(
+                    text = stringResource(Res.string.action_reset),
+                    onClick = CardDepthStyleRepository::resetToDefaults,
+                )
+            },
+        ) {
+            SettingsGroup(isTablet = isTablet) {
+                CardDepthStyleControls(
+                    isTablet = isTablet,
+                    uiState = cardDepthState,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CardDepthStyleControls(
+    isTablet: Boolean,
+    uiState: CardDepthStyleUiState,
+) {
+    var showFineTune by remember { mutableStateOf(false) }
+    val edgeOptions = listOf(
+        PresetOption(stringResource(Res.string.settings_card_depth_edge_subtle), 28),
+        PresetOption(stringResource(Res.string.settings_card_depth_edge_balanced), 42),
+        PresetOption(stringResource(Res.string.settings_card_depth_edge_bold), 56),
+    )
+    val sheenOptions = listOf(
+        PresetOption(stringResource(Res.string.settings_card_depth_sheen_off), 0),
+        PresetOption(stringResource(Res.string.settings_card_depth_sheen_soft), 10),
+        PresetOption(stringResource(Res.string.settings_card_depth_sheen_bright), 16),
+    )
+    val coverageOptions = listOf(
+        PresetOption(stringResource(Res.string.settings_card_depth_coverage_top), 0),
+        PresetOption(stringResource(Res.string.settings_card_depth_coverage_half), 50),
+        PresetOption(stringResource(Res.string.settings_card_depth_coverage_full), 100),
+    )
+    val surfaceRows = listOf(
+        stringResource(Res.string.settings_card_depth_surface_posters) to NuvioCardDepthSurface.Posters,
+        stringResource(Res.string.settings_card_depth_surface_continue_watching) to NuvioCardDepthSurface.ContinueWatching,
+        stringResource(Res.string.settings_card_depth_surface_episodes) to NuvioCardDepthSurface.EpisodeCards,
+        stringResource(Res.string.settings_card_depth_surface_cast) to NuvioCardDepthSurface.Cast,
+        stringResource(Res.string.settings_card_depth_surface_trailers) to NuvioCardDepthSurface.Trailers,
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = if (isTablet) 20.dp else 16.dp, vertical = if (isTablet) 18.dp else 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.settings_card_depth_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        PosterToggleRow(
+            title = stringResource(Res.string.settings_card_depth_enabled),
+            checked = uiState.enabled,
+            onCheckedChange = CardDepthStyleRepository::setEnabled,
+        )
+        if (uiState.enabled) {
+            PosterStyleOptionRow(
+                title = stringResource(Res.string.settings_card_depth_edge),
+                selectedValue = uiState.edgeStrength,
+                options = edgeOptions,
+                onSelected = CardDepthStyleRepository::setEdgeStrength,
+            )
+            PosterStyleOptionRow(
+                title = stringResource(Res.string.settings_card_depth_sheen),
+                selectedValue = uiState.sheenStrength,
+                options = sheenOptions,
+                onSelected = CardDepthStyleRepository::setSheenStrength,
+            )
+            PosterStyleOptionRow(
+                title = stringResource(Res.string.settings_card_depth_edge_coverage),
+                selectedValue = uiState.edgeCoverage,
+                options = coverageOptions,
+                onSelected = CardDepthStyleRepository::setEdgeCoverage,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { showFineTune = true },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_card_depth_fine_tune),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Icon(
+                    imageVector = Icons.Rounded.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(
+                text = stringResource(Res.string.settings_card_depth_apply_to),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            surfaceRows.forEach { (title, surface) ->
+                PosterToggleRow(
+                    title = title,
+                    checked = uiState.isSurfaceEnabled(surface),
+                    onCheckedChange = { enabled ->
+                        CardDepthStyleRepository.setSurfaceEnabled(surface, enabled)
+                    },
+                )
+            }
+        }
+    }
+
+    if (showFineTune) {
+        CardDepthFineTuneSheet(
+            initialEdgeStrength = uiState.edgeStrength,
+            initialSheenStrength = uiState.sheenStrength,
+            initialEdgeCoverage = uiState.edgeCoverage,
+            onDismiss = { showFineTune = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CardDepthFineTuneSheet(
+    initialEdgeStrength: Int,
+    initialSheenStrength: Int,
+    initialEdgeCoverage: Int,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var draftEdge by remember { mutableFloatStateOf(initialEdgeStrength.toFloat()) }
+    var draftSheen by remember { mutableFloatStateOf(initialSheenStrength.toFloat()) }
+    var draftCoverage by remember { mutableFloatStateOf(initialEdgeCoverage.toFloat()) }
+
+    fun commitDraft() {
+        CardDepthStyleRepository.setEdgeStrength(draftEdge.roundToInt())
+        CardDepthStyleRepository.setSheenStrength(draftSheen.roundToInt())
+        CardDepthStyleRepository.setEdgeCoverage(draftCoverage.roundToInt())
+    }
+
+    NuvioModalBottomSheet(
+        onDismissRequest = {
+            commitDraft()
+            onDismiss()
+        },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(Res.string.settings_card_depth_fine_tune_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                NuvioActionLabel(
+                    text = stringResource(Res.string.action_reset),
+                    onClick = {
+                        draftEdge = DefaultCardDepthEdgeStrength.toFloat()
+                        draftSheen = DefaultCardDepthSheenStrength.toFloat()
+                        draftCoverage = DefaultCardDepthEdgeCoverage.toFloat()
+                        commitDraft()
+                    },
+                )
+            }
+            Text(
+                text = stringResource(Res.string.settings_card_depth_fine_tune_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            CardDepthPreviewCard(
+                edgeStrength = draftEdge,
+                sheenStrength = draftSheen,
+                edgeCoverage = draftCoverage,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "${stringResource(Res.string.settings_card_depth_edge_value)}: ${formatDepthPercentage(draftEdge)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "${stringResource(Res.string.settings_card_depth_sheen_value)}: ${formatDepthPercentage(draftSheen)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            CardDepthTuningPad(
+                edgeStrength = draftEdge,
+                sheenStrength = draftSheen,
+                onChange = { edge, sheen ->
+                    draftEdge = edge
+                    draftSheen = sheen
+                },
+                onCommit = { edge, sheen ->
+                    CardDepthStyleRepository.setEdgeStrength(edge.roundToInt())
+                    CardDepthStyleRepository.setSheenStrength(sheen.roundToInt())
+                },
+            )
+            Text(
+                text = "${stringResource(Res.string.settings_card_depth_coverage_value)}: ${formatDepthPercentage(draftCoverage)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Slider(
+                value = draftCoverage,
+                onValueChange = { draftCoverage = it },
+                onValueChangeFinished = {
+                    CardDepthStyleRepository.setEdgeCoverage(draftCoverage.roundToInt())
+                },
+                valueRange = 0f..100f,
+                colors = SliderDefaults.colors(
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    activeTrackColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+private fun formatDepthPercentage(value: Float): String {
+    val tenths = (value.coerceIn(0f, 100f) * 10f).roundToInt()
+    return "${tenths / 10}.${tenths % 10}%"
+}
+
+@Composable
+private fun CardDepthPreviewCard(
+    edgeStrength: Float,
+    sheenStrength: Float,
+    edgeCoverage: Float,
+) {
+    val shape = RoundedCornerShape(14.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF33415C),
+                        Color(0xFF232D42),
+                        Color(0xFF141A28),
+                    ),
+                ),
+            )
+            .cardDepthVisual(
+                shape = shape,
+                edgeStrength = edgeStrength,
+                sheenStrength = sheenStrength,
+                edgeCoverage = edgeCoverage,
+            ),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.42f to Color.Transparent,
+                        0.56f to Color.Black.copy(alpha = 0.20f),
+                        0.70f to Color.Black.copy(alpha = 0.45f),
+                        0.84f to Color.Black.copy(alpha = 0.68f),
+                        1f to Color.Black.copy(alpha = 0.92f),
+                    ),
+                ),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.settings_card_depth_preview_meta),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.78f),
+            )
+            Text(
+                text = stringResource(Res.string.settings_card_depth_preview_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CardDepthTuningPad(
+    edgeStrength: Float,
+    sheenStrength: Float,
+    onChange: (Float, Float) -> Unit,
+    onCommit: (Float, Float) -> Unit,
+) {
+    val maxEdge = 70f
+    val maxSheen = 25f
+    val shape = RoundedCornerShape(16.dp)
+    val thumbColor = MaterialTheme.colorScheme.primary
+    val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+    val currentEdge by rememberUpdatedState(edgeStrength)
+    val currentSheen by rememberUpdatedState(sheenStrength)
+    val currentOnChange by rememberUpdatedState(onChange)
+    val currentOnCommit by rememberUpdatedState(onCommit)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                shape = shape,
+            )
+            .pointerInput(Unit) {
+                fun valuesAt(position: Offset): Pair<Float, Float> {
+                    val x = (position.x / size.width).coerceIn(0f, 1f)
+                    val y = 1f - (position.y / size.height).coerceIn(0f, 1f)
+                    return (x * maxEdge) to (y * maxSheen)
+                }
+                detectDragGestures(
+                    onDragStart = { position ->
+                        val (edge, sheen) = valuesAt(position)
+                        currentOnChange(edge, sheen)
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val (edge, sheen) = valuesAt(change.position)
+                        currentOnChange(edge, sheen)
+                    },
+                    onDragEnd = {
+                        currentOnCommit(currentEdge, currentSheen)
+                    },
+                    onDragCancel = {
+                        currentOnCommit(currentEdge, currentSheen)
+                    },
+                )
+            }
+            .pointerInput(Unit) {
+                fun valuesAt(position: Offset): Pair<Float, Float> {
+                    val x = (position.x / size.width).coerceIn(0f, 1f)
+                    val y = 1f - (position.y / size.height).coerceIn(0f, 1f)
+                    return (x * maxEdge) to (y * maxSheen)
+                }
+                detectTapGestures { position ->
+                    val (edge, sheen) = valuesAt(position)
+                    currentOnChange(edge, sheen)
+                    currentOnCommit(edge, sheen)
+                }
+            },
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            for (step in 1..3) {
+                val x = size.width * step / 4f
+                val y = size.height * step / 4f
+                drawLine(
+                    color = gridColor,
+                    start = Offset(x, 0f),
+                    end = Offset(x, size.height),
+                    strokeWidth = 1.dp.toPx(),
+                )
+                drawLine(
+                    color = gridColor,
+                    start = Offset(0f, y),
+                    end = Offset(size.width, y),
+                    strokeWidth = 1.dp.toPx(),
+                )
+            }
+            val thumbX = size.width * (edgeStrength / maxEdge).coerceIn(0f, 1f)
+            val thumbY = size.height * (1f - (sheenStrength / maxSheen).coerceIn(0f, 1f))
+            drawLine(
+                color = thumbColor.copy(alpha = 0.35f),
+                start = Offset(thumbX, 0f),
+                end = Offset(thumbX, size.height),
+                strokeWidth = 1.dp.toPx(),
+            )
+            drawLine(
+                color = thumbColor.copy(alpha = 0.35f),
+                start = Offset(0f, thumbY),
+                end = Offset(size.width, thumbY),
+                strokeWidth = 1.dp.toPx(),
+            )
+            drawCircle(
+                color = thumbColor.copy(alpha = 0.25f),
+                radius = 16.dp.toPx(),
+                center = Offset(thumbX, thumbY),
+            )
+            drawCircle(
+                color = thumbColor,
+                radius = 9.dp.toPx(),
+                center = Offset(thumbX, thumbY),
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 4.dp.toPx(),
+                center = Offset(thumbX, thumbY),
+            )
+        }
+        Text(
+            text = stringResource(Res.string.settings_card_depth_pad_sheen_axis),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(10.dp),
+        )
+        Text(
+            text = stringResource(Res.string.settings_card_depth_pad_edge_axis),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(10.dp),
+        )
     }
 }
 

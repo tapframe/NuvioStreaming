@@ -32,11 +32,13 @@
     <string name="addons_badge_unavailable">Nedostupné</string>
     <string name="addons_configure">Konfigurovat doplněk</string>
     <string name="addons_delete">Smazat doplněk</string>
-    <string name="addons_appstore_add_description">Připojte svůj vlastní mediální server a procházejte i přehrávejte ze své osobní knihovny.</string>
-    <string name="addons_appstore_empty_subtitle">Přidejte výše adresu URL serveru, pokud chcete, aby Nuvio zobrazovalo vaši soukromou knihovnu.</string>
-    <string name="addons_appstore_empty_title">Nejsou připojeny žádné osobní knihovny.</string>
-    <string name="addons_appstore_input_placeholder">URL serveru</string>
-    <string name="addons_appstore_install_button">Přidat</string>
+    <string name="addons_appstore_add_description">Přeneste svou knihovnu do Nuvia pomocí doplňků, které používáte.</string>
+    <string name="addons_appstore_empty_subtitle">Přidejte doplněk a začněte vytvářet svou knihovnu.</string>
+    <string name="addons_appstore_empty_title">Přizpůsobte si Nuvio.</string>
+    <string name="addons_appstore_input_placeholder">URL doplňku</string>
+    <string name="addons_appstore_install_button">Přidat doplněk</string>
+    <string name="store_empty_unavailable_title">Zatím tu nic není</string>
+    <string name="store_empty_unavailable_message">Vaše současné doplňky tu zatím nemají co zobrazit.</string>
     <string name="addons_empty_subtitle">Přidejte URL manifestu, abyste mohli do Nuvio začít načítat katalogy, metadata, streamy nebo titulky.</string>
     <string name="addons_empty_title">Zatím nejsou nainstalovány žádné doplňky.</string>
     <string name="addons_error_enter_url">Zadejte URL doplňku.</string>
@@ -442,7 +444,9 @@
     <string name="compose_settings_root_check_updates_description">Stáhnout nejnovější verzi</string>
     <string name="compose_settings_root_check_updates_title">Zkontrolovat aktualizace</string>
     <string name="compose_settings_root_content_discovery_description">Správa doplňků a zdrojů objevování.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Spravujte doplňky a vyberte, co se má v Nuviu zobrazovat.</string>
     <string name="compose_settings_root_downloads_description">Spravujte své stažené filmy a epizody.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Spravujte obsah uložený v tomto zařízení.</string>
     <string name="compose_settings_root_downloads_title">Stažené položky</string>
     <string name="compose_settings_root_general_section">OBECNÉ</string>
     <string name="compose_settings_root_integrations_description">Spravovat dostupné integrace</string>
@@ -638,7 +642,7 @@
     <string name="settings_content_discovery_section_home">DOMŮ</string>
     <string name="settings_content_discovery_section_sources">ZDROJE</string>
     <string name="settings_content_discovery_addons_description">Instalovat, odstraňovat, obnovovat a třídit vaše zdroje obsahu.</string>
-    <string name="settings_content_discovery_addons_description_appstore">Připojit osobní mediální zdroje a spravovat přístup k vlastní knihovně.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Přidávejte a spravujte doplňky, které používáte s Nuviem.</string>
     <string name="settings_content_discovery_plugins_description">Instalovat repozitáře pro JavaScriptové scarpování a testovat poskytovatele interně.</string>
     <string name="settings_content_discovery_homescreen_description">Upravit rozvržení domovské obrazovky, viditelnost obsahu a chování plakátů.</string>
     <string name="settings_content_discovery_meta_screen_description">Nastavení pro obrazovku detailu a epizody.</string>

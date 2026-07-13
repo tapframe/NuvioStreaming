@@ -33,11 +33,13 @@
     <string name="addons_badge_unavailable">Indisponible</string>
     <string name="addons_configure">Configurer l’addon</string>
     <string name="addons_delete">Supprimer l’addon</string>
-    <string name="addons_appstore_add_description">Connectez votre propre serveur multimédia pour parcourir et lire depuis votre bibliothèque personnelle.</string>
-    <string name="addons_appstore_empty_subtitle">Ajoutez une URL de serveur ci-dessus pour que Nuvio affiche votre bibliothèque privée.</string>
-    <string name="addons_appstore_empty_title">Aucune bibliothèque personnelle connectée.</string>
-    <string name="addons_appstore_input_placeholder">URL du serveur</string>
-    <string name="addons_appstore_install_button">Ajouter</string>
+    <string name="addons_appstore_add_description">Retrouvez votre bibliothèque dans Nuvio avec les addons que vous utilisez.</string>
+    <string name="addons_appstore_empty_subtitle">Ajoutez un addon pour commencer à créer votre bibliothèque.</string>
+    <string name="addons_appstore_empty_title">Personnalisez Nuvio.</string>
+    <string name="addons_appstore_input_placeholder">URL de l’addon</string>
+    <string name="addons_appstore_install_button">Ajouter un addon</string>
+    <string name="store_empty_unavailable_title">Rien à afficher pour le moment</string>
+    <string name="store_empty_unavailable_message">Vos addons actuels n’ont encore rien à afficher ici.</string>
     <string name="addons_empty_subtitle">Ajoutez une URL de manifeste pour commencer à charger des catalogues, métadonnées, streams ou sous-titres dans Nuvio.</string>
     <string name="addons_empty_title">Aucun addon installé.</string>
     <string name="addons_error_enter_url">Saisissez une URL d’addon.</string>
@@ -434,7 +436,9 @@
     <string name="compose_settings_root_check_updates_description">Rechercher de nouvelles versions de l’application.</string>
     <string name="compose_settings_root_check_updates_title">Vérifier les mises à jour</string>
     <string name="compose_settings_root_content_discovery_description">Gérez les addons et sources de découverte.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Gérez vos addons et choisissez ce qui apparaît dans Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Gérez vos films et épisodes téléchargés.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Gérez ce que vous avez enregistré sur cet appareil.</string>
     <string name="compose_settings_root_downloads_title">Téléchargements</string>
     <string name="compose_settings_root_general_section">GÉNÉRAL</string>
     <string name="compose_settings_root_integrations_description">Connectez les services TMDB et MDBList.</string>
@@ -648,7 +652,7 @@
     <string name="settings_content_discovery_section_home">ACCUEIL</string>
     <string name="settings_content_discovery_section_sources">SOURCES</string>
     <string name="settings_content_discovery_addons_description">Installez, supprimez, mettez à jour et ordonnez vos sources de contenu.</string>
-    <string name="settings_content_discovery_addons_description_appstore">Connectez des sources multimédias personnelles et gérez l’accès à votre propre bibliothèque.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Ajoutez et gérez les addons que vous utilisez avec Nuvio.</string>
     <string name="settings_content_discovery_plugins_description">Installez des dépôts de scrapers JavaScript et testez des fournisseurs en interne.</string>
     <string name="settings_content_discovery_homescreen_description">Contrôle quels catalogues apparaissent à l’accueil et dans quel ordre.</string>
     <string name="settings_content_discovery_meta_screen_description">Désactivez des sections de détails et réorganisez tout sous le Hero.</string>

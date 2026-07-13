@@ -32,11 +32,13 @@
     <string name="addons_badge_unavailable">Niet beschikbaar</string>
     <string name="addons_configure">Addon configureren</string>
     <string name="addons_delete">Addon verwijderen</string>
-    <string name="addons_appstore_add_description">Verbind je eigen mediaserver om je persoonlijke bibliotheek te bekijken en af te spelen.</string>
-    <string name="addons_appstore_empty_subtitle">Voeg hierboven een server-URL toe als je wilt dat Nuvio je privébibliotheek toont.</string>
-    <string name="addons_appstore_empty_title">Geen persoonlijke bibliotheken verbonden.</string>
-    <string name="addons_appstore_input_placeholder">Server-URL</string>
-    <string name="addons_appstore_install_button">Toevoegen</string>
+    <string name="addons_appstore_add_description">Breng je bibliotheek naar Nuvio met de add-ons die je gebruikt.</string>
+    <string name="addons_appstore_empty_subtitle">Voeg een add-on toe om je bibliotheek op te bouwen.</string>
+    <string name="addons_appstore_empty_title">Maak Nuvio helemaal van jou.</string>
+    <string name="addons_appstore_input_placeholder">Add-on-URL</string>
+    <string name="addons_appstore_install_button">Add-on toevoegen</string>
+    <string name="store_empty_unavailable_title">Hier is nog niets</string>
+    <string name="store_empty_unavailable_message">Je huidige add-ons hebben hier nog niets om te tonen.</string>
     <string name="addons_empty_subtitle">Voeg een manifest-URL toe om catalogi, metadata, streams of ondertitels in Nuvio te laden.</string>
     <string name="addons_empty_title">Nog geen addons geïnstalleerd.</string>
     <string name="addons_error_enter_url">Voer een addon-URL in.</string>
@@ -442,7 +444,9 @@
     <string name="compose_settings_root_check_updates_description">Download de laatste versie</string>
     <string name="compose_settings_root_check_updates_title">Controleren op updates</string>
     <string name="compose_settings_root_content_discovery_description">Beheer addons en ontdekkingsbronnen.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Beheer add-ons en kies wat er in Nuvio verschijnt.</string>
     <string name="compose_settings_root_downloads_description">Beheer je gedownloade films en afleveringen.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Beheer wat je op dit apparaat hebt opgeslagen.</string>
     <string name="compose_settings_root_downloads_title">Downloads</string>
     <string name="compose_settings_root_general_section">ALGEMEEN</string>
     <string name="compose_settings_root_integrations_description">Beheer beschikbare integraties</string>
@@ -656,7 +660,7 @@
     <string name="settings_content_discovery_section_home">HOME</string>
     <string name="settings_content_discovery_section_sources">BRONNEN</string>
     <string name="settings_content_discovery_addons_description">Installeer, verwijder, vernieuw en sorteer je contentbronnen.</string>
-    <string name="settings_content_discovery_addons_description_appstore">Verbind persoonlijke mediabronnen en beheer toegang tot je eigen bibliotheek.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Voeg de add-ons toe die je met Nuvio gebruikt en beheer ze.</string>
     <string name="settings_content_discovery_plugins_description">Installeer JavaScript-scraperrepository's en test providers intern.</string>
     <string name="settings_content_discovery_homescreen_description">Pas startschermindeling, zichtbaarheid van inhoud en postergedrag aan</string>
     <string name="settings_content_discovery_meta_screen_description">Instellingen voor de detail- en afleveringsschermen.</string>
