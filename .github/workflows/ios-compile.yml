@@ -1,0 +1,44 @@
+name: iOS Compile Check
+
+on:
+  push:
+    branches:
+      - feature/dynamic-home-background
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-ios:
+    name: Compile iOS simulator target
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local properties
+        run: touch local.properties
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Compile common Kotlin metadata
+        run: ./gradlew compileCommonMainKotlinMetadata --stacktrace
+
+      - name: Compile iOS simulator target
+        run: ./gradlew :composeApp:compileKotlinIosSimulatorArm64 --stacktrace
