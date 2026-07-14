@@ -362,6 +362,8 @@
     <string name="compose_player_none">None</string>
     <string name="compose_player_outline">Outline</string>
     <string name="compose_player_outline_color">Outline Color</string>
+    <string name="compose_player_shadow">Shadow</string>
+    <string name="compose_player_shadow_density">Shadow Density</string>
     <string name="compose_player_panel_episodes">Episodes</string>
     <string name="compose_player_panel_sources">Sources</string>
     <string name="compose_player_panel_streams">Streams</string>
@@ -1004,12 +1006,15 @@
     <string name="settings_playback_parental_guide">Content Warnings</string>
     <string name="settings_playback_parental_guide_description">Show parental guidance overlay when playback starts.</string>
     <string name="settings_playback_subtitle_background_color">Background Color</string>
+    <string name="settings_playback_subtitle_background_opacity">Background Opacity</string>
     <string name="settings_playback_subtitle_bold">Bold</string>
     <string name="settings_playback_subtitle_bold_description">Use a heavier subtitle font weight.</string>
     <string name="settings_playback_subtitle_color_transparent">Transparent</string>
     <string name="settings_playback_subtitle_outline">Outline</string>
     <string name="settings_playback_subtitle_outline_color">Outline Color</string>
     <string name="settings_playback_subtitle_outline_description">Draw a border around subtitle text.</string>
+    <string name="settings_playback_subtitle_shadow">Shadow</string>
+    <string name="settings_playback_subtitle_shadow_description">Draw a shadow under subtitle text.</string>
     <string name="settings_playback_subtitle_show_preferred_only">Show Only Preferred Languages</string>
     <string name="settings_playback_subtitle_show_preferred_only_description">Only show subtitles matching your preferred subtitle languages.</string>
     <string name="settings_playback_subtitle_size">Subtitle Size</string>

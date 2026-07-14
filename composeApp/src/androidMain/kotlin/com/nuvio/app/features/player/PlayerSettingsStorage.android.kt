@@ -43,6 +43,8 @@ actual object PlayerSettingsStorage {
     private const val subtitleBottomOffsetKey = "subtitle_bottom_offset"
     private const val subtitleUseForcedSubtitlesKey = "subtitle_use_forced_subtitles"
     private const val subtitleShowOnlyPreferredLanguagesKey = "subtitle_show_only_preferred_languages"
+    private const val subtitleShadowEnabledKey = "subtitle_shadow_enabled"
+    private const val subtitleShadowDensityKey = "subtitle_shadow_density"
     private const val addonSubtitleStartupModeKey = "addon_subtitle_startup_mode"
     private const val streamReuseLastLinkEnabledKey = "stream_reuse_last_link_enabled"
     private const val streamReuseLastLinkCacheHoursKey = "stream_reuse_last_link_cache_hours"
@@ -112,6 +114,8 @@ actual object PlayerSettingsStorage {
         subtitleBottomOffsetKey,
         subtitleUseForcedSubtitlesKey,
         subtitleShowOnlyPreferredLanguagesKey,
+        subtitleShadowEnabledKey,
+        subtitleShadowDensityKey,
         addonSubtitleStartupModeKey,
         streamReuseLastLinkEnabledKey,
         streamReuseLastLinkCacheHoursKey,
@@ -525,6 +529,40 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(subtitleShowOnlyPreferredLanguagesKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleShadowEnabled(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(subtitleShadowEnabledKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, SubtitleStyleState.DEFAULT.shadowEnabled)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveSubtitleShadowEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(subtitleShadowEnabledKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadSubtitleShadowDensity(): Float? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(subtitleShadowDensityKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getFloat(key, SubtitleStyleState.DEFAULT.shadowDensity)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveSubtitleShadowDensity(density: Float) {
+        preferences
+            ?.edit()
+            ?.putFloat(ProfileScopedKey.of(subtitleShadowDensityKey), density)
             ?.apply()
     }
 
@@ -1097,6 +1135,7 @@ actual object PlayerSettingsStorage {
         loadSubtitleBottomOffset()?.let { put(subtitleBottomOffsetKey, encodeSyncInt(it)) }
         loadSubtitleUseForcedSubtitles()?.let { put(subtitleUseForcedSubtitlesKey, encodeSyncBoolean(it)) }
         loadSubtitleShowOnlyPreferredLanguages()?.let { put(subtitleShowOnlyPreferredLanguagesKey, encodeSyncBoolean(it)) }
+        loadSubtitleShadowEnabled()?.let { put(subtitleShadowEnabledKey, encodeSyncBoolean(it)) }
         loadAddonSubtitleStartupMode()?.let { put(addonSubtitleStartupModeKey, encodeSyncString(it)) }
         loadStreamReuseLastLinkEnabled()?.let { put(streamReuseLastLinkEnabledKey, encodeSyncBoolean(it)) }
         loadStreamReuseLastLinkCacheHours()?.let { put(streamReuseLastLinkCacheHoursKey, encodeSyncInt(it)) }
@@ -1172,6 +1211,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncInt(subtitleBottomOffsetKey)?.let(::saveSubtitleBottomOffset)
         payload.decodeSyncBoolean(subtitleUseForcedSubtitlesKey)?.let(::saveSubtitleUseForcedSubtitles)
         payload.decodeSyncBoolean(subtitleShowOnlyPreferredLanguagesKey)?.let(::saveSubtitleShowOnlyPreferredLanguages)
+        payload.decodeSyncBoolean(subtitleShadowEnabledKey)?.let(::saveSubtitleShadowEnabled)
         payload.decodeSyncString(addonSubtitleStartupModeKey)?.let(::saveAddonSubtitleStartupMode)
         payload.decodeSyncBoolean(streamReuseLastLinkEnabledKey)?.let(::saveStreamReuseLastLinkEnabled)
         payload.decodeSyncInt(streamReuseLastLinkCacheHoursKey)?.let(::saveStreamReuseLastLinkCacheHours)

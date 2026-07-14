@@ -51,6 +51,10 @@ internal expect object PlayerSettingsStorage {
     fun saveSubtitleUseForcedSubtitles(enabled: Boolean)
     fun loadSubtitleShowOnlyPreferredLanguages(): Boolean?
     fun saveSubtitleShowOnlyPreferredLanguages(enabled: Boolean)
+    fun loadSubtitleShadowEnabled(): Boolean?
+    fun saveSubtitleShadowEnabled(enabled: Boolean)
+    fun loadSubtitleShadowDensity(): Float?
+    fun saveSubtitleShadowDensity(density: Float)
     fun loadAddonSubtitleStartupMode(): String?
     fun saveAddonSubtitleStartupMode(mode: String)
     fun loadStreamReuseLastLinkEnabled(): Boolean?

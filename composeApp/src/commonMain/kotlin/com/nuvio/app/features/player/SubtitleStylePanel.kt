@@ -22,6 +22,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,18 +55,40 @@ fun SubtitleStylePanel(
     val sectionPadding = if (isCompact) 12.dp else 16.dp
     val gap = if (isCompact) 12.dp else 16.dp
 
+    // Local state drives the UI instantly on every tap.
+    // The outer `style` prop only flows in at first composition.
+    // We do NOT key remember() on `style` — that caused a feedback loop:
+    // tap → commit upstream → upstream re-emits → remember resets localStyle
+    // → LaunchedEffect re-runs → commits again → infinite lag cycle.
+    val localStyle = remember { mutableStateOf(style) }
+
+    // One-way sync: accept genuine external changes (e.g. "Reset defaults").
+    LaunchedEffect(style) {
+        if (style != localStyle.value) {
+            localStyle.value = style
+        }
+    }
+
+    // Commit immediately — no debounce needed. The previous lag was caused by
+    // the remember(style) feedback loop (now fixed), not by the commit cost.
+    // Debouncing caused changes to be lost when the panel closed before firing.
+    val commit: (SubtitleStyleState) -> Unit = { newStyle ->
+        localStyle.value = newStyle
+        onStyleChanged(newStyle)
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         StyleControlsCard(
-            style = style,
+            style = localStyle.value,
             subtitleDelayMs = subtitleDelayMs,
             selectedAddonSubtitle = selectedAddonSubtitle,
             subtitleAutoSyncState = subtitleAutoSyncState,
             isCompact = isCompact,
             sectionPadding = sectionPadding,
             colorScheme = colorScheme,
-            onStyleChanged = onStyleChanged,
+            onStyleChanged = commit,
             onSubtitleDelayChanged = onSubtitleDelayChanged,
             onSubtitleDelayReset = onSubtitleDelayReset,
             onAutoSyncCapture = onAutoSyncCapture,
@@ -195,7 +220,19 @@ private fun StyleControlsCard(
                         else colorScheme.surface.copy(alpha = 0.8f)
                     )
                     .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
-                    .clickable { onStyleChanged(style.copy(outlineEnabled = !style.outlineEnabled)) }
+                    .clickable {
+                        val newOutlineEnabled = !style.outlineEnabled
+                        if (newOutlineEnabled) {
+                            // Turning on outline -> turn off shadow and background
+                            onStyleChanged(style.copy(
+                                outlineEnabled = true,
+                                shadowEnabled = false,
+                                backgroundColor = Color.Transparent,
+                            ))
+                        } else {
+                            onStyleChanged(style.copy(outlineEnabled = false))
+                        }
+                    }
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
                 Text(
@@ -206,6 +243,77 @@ private fun StyleControlsCard(
                     fontSize = 13.sp,
                 )
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_player_shadow),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (style.shadowEnabled) colorScheme.primaryContainer
+                        else colorScheme.surface.copy(alpha = 0.8f)
+                    )
+                    .border(1.dp, colorScheme.outlineVariant.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
+                    .clickable {
+                        val newShadowEnabled = !style.shadowEnabled
+                        if (newShadowEnabled) {
+                            // Turning on shadow -> turn off outline and background
+                            onStyleChanged(style.copy(
+                                shadowEnabled = true,
+                                outlineEnabled = false,
+                                backgroundColor = Color.Transparent,
+                            ))
+                        } else {
+                            onStyleChanged(style.copy(shadowEnabled = false))
+                        }
+                    }
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = if (style.shadowEnabled) stringResource(Res.string.compose_action_on)
+                    else stringResource(Res.string.compose_action_off),
+                    color = if (style.shadowEnabled) colorScheme.onPrimaryContainer else colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(Res.string.compose_player_shadow_density),
+                color = colorScheme.onSurfaceVariant,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+            )
+            StepperControl(
+                value = ((style.shadowDensity * 10f).roundToInt() / 10f).toString(),
+                onMinus = {
+                    onStyleChanged(style.copy(shadowDensity = (style.shadowDensity - 0.2f).coerceAtLeast(0.2f)))
+                },
+                onPlus = {
+                    onStyleChanged(style.copy(shadowDensity = (style.shadowDensity + 0.2f).coerceAtMost(5.0f)))
+                },
+                buttonSize = btnSize,
+                buttonRadius = btnRadius,
+                minWidth = 46.dp,
+                minusIcon = Icons.Rounded.KeyboardArrowDown,
+                plusIcon = Icons.Rounded.KeyboardArrowUp,
+            )
         }
 
         ToggleRow(
@@ -278,6 +386,55 @@ private fun StyleControlsCard(
             selectedColor = style.outlineColor,
             onColorSelected = { onStyleChanged(style.copy(outlineColor = it)) },
         )
+
+        ColorPickerRow(
+            label = stringResource(Res.string.settings_playback_subtitle_background_color),
+            colors = SubtitleBackgroundColorSwatches,
+            selectedColor = style.backgroundColor,
+            onColorSelected = { color ->
+                if (color.alpha == 0f) {
+                    // Turning off background color
+                    onStyleChanged(style.copy(backgroundColor = Color.Transparent))
+                } else {
+                    // Turning on background color -> turn off outline and shadow
+                    onStyleChanged(style.copy(
+                        backgroundColor = color,
+                        outlineEnabled = false,
+                        shadowEnabled = false,
+                    ))
+                }
+            },
+        )
+
+        if (style.backgroundColor.alpha > 0f) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val currentBgAlphaPercent = (style.backgroundColor.alpha * 100f).roundToInt().coerceIn(0, 100)
+                Text(
+                    text = stringResource(Res.string.settings_playback_subtitle_background_opacity),
+                    color = colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+                StepperControl(
+                    value = "$currentBgAlphaPercent%",
+                    onMinus = {
+                        val newAlpha = (currentBgAlphaPercent - 10).coerceAtLeast(5) / 100f
+                        onStyleChanged(style.copy(backgroundColor = style.backgroundColor.copy(alpha = newAlpha)))
+                    },
+                    onPlus = {
+                        val newAlpha = (currentBgAlphaPercent + 10).coerceAtMost(100) / 100f
+                        onStyleChanged(style.copy(backgroundColor = style.backgroundColor.copy(alpha = newAlpha)))
+                    },
+                    buttonSize = btnSize,
+                    buttonRadius = btnRadius,
+                    minWidth = 58.dp,
+                )
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -456,7 +613,16 @@ private fun ColorPickerRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             colors.forEach { color ->
-                val isSelected = selectedColor == color
+                // Match by RGB components (ignore alpha) so opacity changes don't break selection
+                val isSelected = if (color.alpha == 0f && selectedColor.alpha == 0f) {
+                    true // Both transparent
+                } else if (color.alpha == 0f || selectedColor.alpha == 0f) {
+                    false // One transparent, one not
+                } else {
+                    color.red == selectedColor.red &&
+                        color.green == selectedColor.green &&
+                        color.blue == selectedColor.blue
+                }
                 Box(
                     modifier = Modifier
                         .size(22.dp)

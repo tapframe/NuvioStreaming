@@ -369,6 +369,7 @@ private fun ExoPlayerSurface(
     val pendingSubtitleTrackIndex = remember { mutableListOf<Int>() }
     val pendingAudioTrackSelection = remember { mutableListOf<TrackSelectionSnapshot>() }
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+    var nuvioSubtitleOverlayRef by remember { mutableStateOf<NuvioSubtitleOverlay?>(null) }
     var currentSubtitleStyle by remember { mutableStateOf(SubtitleStyleState.DEFAULT) }
     var subtitleSelectionJob by remember { mutableStateOf<Job?>(null) }
 
@@ -502,6 +503,11 @@ private fun ExoPlayerSurface(
                     }
                 }
                 latestOnSnapshot.value(exoPlayer.snapshot())
+            }
+
+            override fun onCues(cueGroup: CueGroup) {
+                // Forward cues to the custom overlay when it is active (shadow mode).
+                nuvioSubtitleOverlayRef?.onCueGroup(cueGroup)
             }
 
         }
@@ -688,7 +694,9 @@ private fun ExoPlayerSurface(
 
                 override fun applySubtitleStyle(style: SubtitleStyleState) {
                     currentSubtitleStyle = style
-                    playerViewRef?.applySubtitleStyle(style)
+                    val overlay = playerViewRef?.syncNuvioSubtitleOverlay(style.shadowEnabled)
+                    nuvioSubtitleOverlayRef = overlay
+                    playerViewRef?.applySubtitleStyle(style, overlay)
                 }
 
                 override fun setSubtitleDelayMs(delayMs: Int) {
@@ -716,12 +724,14 @@ private fun ExoPlayerSurface(
                 this.resizeMode = resizeMode.toExoResizeMode()
                 setShutterBackgroundColor(android.graphics.Color.BLACK)
                 playerViewRef = this
+                val overlay = syncNuvioSubtitleOverlay(currentSubtitleStyle.shadowEnabled)
+                nuvioSubtitleOverlayRef = overlay
                 syncLibassOverlay(
                     player = exoPlayer,
                     enabled = useLibass,
                     renderType = libassRenderType,
                 )
-                applySubtitleStyle(currentSubtitleStyle)
+                applySubtitleStyle(currentSubtitleStyle, overlay)
             }
         },
         update = { playerView ->
@@ -730,12 +740,14 @@ private fun ExoPlayerSurface(
             playerView.resizeMode = resizeMode.toExoResizeMode()
             playerViewRef = playerView
             syncPlayerViewKeepScreenOn()
+            val overlay = playerView.syncNuvioSubtitleOverlay(currentSubtitleStyle.shadowEnabled)
+            nuvioSubtitleOverlayRef = overlay
             playerView.syncLibassOverlay(
                 player = exoPlayer,
                 enabled = useLibass,
                 renderType = libassRenderType,
             )
-            playerView.applySubtitleStyle(currentSubtitleStyle)
+            playerView.applySubtitleStyle(currentSubtitleStyle, overlay)
         },
     )
 }
@@ -1155,15 +1167,44 @@ private class NuvioLibmpvView(
             override fun applySubtitleStyle(style: SubtitleStyleState) {
                 mpv.setPropertyString("sub-ass-override", "no")
                 mpv.setPropertyString("sub-color", style.textColor.toMpvColor())
-                mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
                 mpv.setPropertyString("sub-outline-color", style.outlineColor.toMpvColor())
                 mpv.setPropertyString("sub-border-color", style.outlineColor.toMpvColor())
-                mpv.setPropertyString("sub-border-style", style.toMpvSubtitleBorderStyle())
                 mpv.setPropertyString("sub-bold", if (style.bold) "yes" else "no")
                 mpv.setPropertyInt("sub-font-size", style.toMpvSubtitleFontSize())
-                mpv.setPropertyInt("sub-outline-size", style.toMpvSubtitleOutlineSize())
-                mpv.setPropertyInt("sub-border-size", style.toMpvSubtitleOutlineSize())
                 mpv.setPropertyInt("sub-pos", (100 - style.bottomOffset / 10).coerceIn(0, 100))
+
+                // IMPORTANT: in mpv, `sub-shadow-color` is an ALIAS for `sub-back-color`
+                // (same property). The background color, the shadow color, and the
+                // background-box color all share `sub-back-color`. The three visual
+                // modes (outline / shadow / background) are mutually exclusive in the
+                // UI, so configure `sub-back-color` + `sub-border-style` per active mode.
+                val hasBackground = style.backgroundColor.alphaByte() > 0
+
+                if (hasBackground) {
+                    // BACKGROUND MODE: draw a box behind text, colored by sub-back-color.
+                    // `background-box` (BorderStyle=4) is colored by sub-back-color; its
+                    // margin is controlled by sub-shadow-offset.
+                    mpv.setPropertyString("sub-border-style", "background-box")
+                    mpv.setPropertyString("sub-back-color", style.backgroundColor.toMpvColor())
+                    mpv.setPropertyInt("sub-outline-size", 0)
+                    mpv.setPropertyInt("sub-border-size", 0)
+                    mpv.setPropertyDouble("sub-shadow-offset", 6.0)
+                } else {
+                    // OUTLINE / SHADOW MODE: standard outline-and-shadow border style.
+                    // The shadow is colored by sub-back-color.
+                    mpv.setPropertyString("sub-border-style", "outline-and-shadow")
+                    val outlineSize = style.toMpvSubtitleOutlineSize()
+                    mpv.setPropertyInt("sub-outline-size", outlineSize)
+                    mpv.setPropertyInt("sub-border-size", outlineSize)
+
+                    if (style.shadowEnabled) {
+                        mpv.setPropertyDouble("sub-shadow-offset", style.shadowDensity.toDouble())
+                        mpv.setPropertyString("sub-back-color", "#FF000000")
+                    } else {
+                        mpv.setPropertyDouble("sub-shadow-offset", 0.0)
+                        mpv.setPropertyString("sub-back-color", "#00000000")
+                    }
+                }
             }
 
             override fun setSubtitleDelayMs(delayMs: Int) {
@@ -1261,15 +1302,6 @@ private fun SubtitleStyleState.toMpvSubtitleFontSize(): Int =
 
 private fun SubtitleStyleState.toMpvSubtitleOutlineSize(): Int =
     if (!outlineEnabled) 0 else (outlineWidth * MPV_SUBTITLE_OUTLINE_SIZE_SCALE).toInt().coerceAtLeast(1)
-
-private fun SubtitleStyleState.toMpvSubtitleBorderStyle(): String =
-    if (outlineEnabled) {
-        "outline-and-shadow"
-    } else if (backgroundColor.alphaByte() > 0) {
-        "opaque-box"
-    } else {
-        "outline-and-shadow"
-    }
 
 private const val MPV_SUBTITLE_FONT_SIZE_SCALE = 55.0 / 18.0
 private const val MPV_SUBTITLE_FONT_SIZE_MIN = 36
@@ -1448,7 +1480,34 @@ private fun android.widget.FrameLayout.removeAssOverlayChildren() {
     }
 }
 
-private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
+private fun PlayerView.syncNuvioSubtitleOverlay(shadowEnabled: Boolean): NuvioSubtitleOverlay? {
+    val container = findViewById<android.widget.FrameLayout>(R.id.nuvio_subtitle_overlay_container)
+        ?: return null
+
+    // Remove any stale overlay
+    for (i in container.childCount - 1 downTo 0) {
+        if (container.getChildAt(i) is NuvioSubtitleOverlay) container.removeViewAt(i)
+    }
+
+    if (!shadowEnabled) return null
+
+    val overlay = NuvioSubtitleOverlay(container.context)
+    container.addView(overlay, android.widget.FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+    return overlay
+}
+
+private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState, overlay: NuvioSubtitleOverlay?) {
+    // When shadow is enabled, hand off rendering to our custom overlay which uses
+    // setShadowLayer() directly on the drawing Paint. Hide ExoPlayer's native SubtitleView
+    // to avoid showing both at once.
+    if (style.shadowEnabled && overlay != null) {
+        subtitleView?.visibility = android.view.View.INVISIBLE
+        overlay.applyStyle(style)
+        return
+    }
+
+    // Shadow off — restore native SubtitleView and apply style through CaptionStyleCompat.
+    subtitleView?.visibility = android.view.View.VISIBLE
     subtitleView?.apply {
         val baseBottomPaddingFraction = SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION * 2f / 3f
         val offsetFraction = (style.bottomOffset / 1000f).coerceIn(0f, 0.2f)
@@ -1457,12 +1516,19 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
         setApplyEmbeddedStyles(false)
         setApplyEmbeddedFontSizes(false)
         setBottomPaddingFraction(bottomPaddingFraction)
+        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+
+        val edgeType = when {
+            style.outlineEnabled -> CaptionStyleCompat.EDGE_TYPE_OUTLINE
+            else -> CaptionStyleCompat.EDGE_TYPE_NONE
+        }
+
         setStyle(
             CaptionStyleCompat(
                 style.textColor.toArgb(),
                 style.backgroundColor.toArgb(),
                 android.graphics.Color.TRANSPARENT,
-                if (style.outlineEnabled) CaptionStyleCompat.EDGE_TYPE_OUTLINE else CaptionStyleCompat.EDGE_TYPE_NONE,
+                edgeType,
                 style.outlineColor.toArgb(),
                 if (style.bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT,
             )
@@ -1470,6 +1536,7 @@ private fun PlayerView.applySubtitleStyle(style: SubtitleStyleState) {
         setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, style.fontSizeSp.toFloat())
     }
 }
+
 
 private fun ExoPlayer.extractAudioTracks(context: Context): List<AudioTrack> {
     val tracks = mutableListOf<AudioTrack>()
