@@ -1,6 +1,7 @@
 package com.nuvio.app.core.network
 
 import com.nuvio.app.core.build.AppVersionConfig
+import com.nuvio.app.core.logging.InAppLogger
 import io.github.jan.supabase.annotations.SupabaseInternal
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
@@ -16,7 +17,11 @@ object SupabaseProvider {
     @OptIn(SupabaseInternal::class)
     val client by lazy {
         val userAgent = "NuvioMobile/${AppVersionConfig.VERSION_NAME.ifBlank { "dev" }}"
-        createSupabaseClient(
+        InAppLogger.info(
+            "Network/Supabase",
+            "Creating Supabase client url=${InAppLogger.redactUrl(SupabaseConfig.URL)} userAgent=$userAgent",
+        )
+        val nextClient = createSupabaseClient(
             supabaseUrl = SupabaseConfig.URL,
             supabaseKey = SupabaseConfig.ANON_KEY,
         ) {
@@ -52,5 +57,7 @@ object SupabaseProvider {
             install(Functions)
             install(Realtime)
         }
+        InAppLogger.info("Network/Supabase", "Supabase client created")
+        nextClient
     }
 }

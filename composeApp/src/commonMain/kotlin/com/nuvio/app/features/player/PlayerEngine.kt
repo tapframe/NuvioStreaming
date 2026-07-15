@@ -9,7 +9,17 @@ interface PlayerEngineController {
     fun seekTo(positionMs: Long)
     fun seekBy(offsetMs: Long)
     fun retry()
+    fun isPictureInPictureSupported(): Boolean = false
+    fun startPictureInPicture() {}
     fun setPlaybackSpeed(speed: Float)
+    fun currentPlayerVolume(): PlayerAudioLevel = PlayerAudioLevel(
+        fraction = 1f,
+        isMuted = false,
+    )
+    fun setPlayerVolume(level: Float): PlayerAudioLevel = PlayerAudioLevel(
+        fraction = 1f,
+        isMuted = false,
+    )
     fun setMuted(muted: Boolean) {}
     fun getAudioTracks(): List<AudioTrack>
     fun getSubtitleTracks(): List<SubtitleTrack>

@@ -761,6 +761,7 @@ fun HomeScreen(
                             modifier = Modifier,
                             viewportHeight = maxHeight,
                             mobileBelowSectionHeightHint = mobileHeroBelowSectionHeightHint,
+                            artworkSource = homeSettingsUiState.heroArtworkSource,
                             listState = homeListState,
                             onItemClick = onPosterClick,
                         )

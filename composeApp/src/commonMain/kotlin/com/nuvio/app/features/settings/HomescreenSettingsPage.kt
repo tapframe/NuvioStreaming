@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -30,17 +31,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nuvio.app.core.ui.NuvioActionLabel
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.home.HomeCatalogSettingsItem
 import com.nuvio.app.features.home.HomeCatalogSettingsRepository
+import com.nuvio.app.features.home.HomeHeroArtworkSource
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_reset
 import nuvio.composeapp.generated.resources.layout_hide_unreleased
 import nuvio.composeapp.generated.resources.layout_hide_unreleased_sub
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_message
+import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source
+import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_backdrop
+import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_backdrop_description
+import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_description
+import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_poster
+import nuvio.composeapp.generated.resources.settings_homescreen_artwork_source_poster_description
+import nuvio.composeapp.generated.resources.settings_homescreen_catalogs_source
 import nuvio.composeapp.generated.resources.settings_homescreen_empty_title
 import nuvio.composeapp.generated.resources.settings_homescreen_hide_catalog_underline
 import nuvio.composeapp.generated.resources.settings_homescreen_hide_catalog_underline_description
@@ -58,6 +68,7 @@ import nuvio.composeapp.generated.resources.settings_homescreen_show_hero
 import nuvio.composeapp.generated.resources.settings_homescreen_show_hero_description
 import nuvio.composeapp.generated.resources.settings_homescreen_summary
 import nuvio.composeapp.generated.resources.settings_homescreen_summary_hint
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
@@ -115,18 +126,27 @@ internal fun LazyListScope.homescreenSettingsContent(
     item {
         val catalogOnlyItems = items.filter { !it.isCollection }
         if (heroEnabled && catalogOnlyItems.isNotEmpty()) {
+            val settingsUiState by remember {
+                HomeCatalogSettingsRepository.uiState
+            }.collectAsStateWithLifecycle()
             var heroSourcesExpanded by remember { mutableStateOf(false) }
             SettingsSection(
                 title = stringResource(Res.string.settings_homescreen_section_hero_sources),
                 isTablet = isTablet,
             ) {
-                HeroSourcesDropdown(
-                    isTablet = isTablet,
-                    items = catalogOnlyItems,
-                    selectedHeroSourceCount = selectedHeroSourceCount,
-                    expanded = heroSourcesExpanded,
-                    onExpandedChange = { heroSourcesExpanded = it },
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HeroArtworkSourceOptions(
+                        isTablet = isTablet,
+                        selectedSource = settingsUiState.heroArtworkSource,
+                    )
+                    HeroSourcesDropdown(
+                        isTablet = isTablet,
+                        items = catalogOnlyItems,
+                        selectedHeroSourceCount = selectedHeroSourceCount,
+                        expanded = heroSourcesExpanded,
+                        onExpandedChange = { heroSourcesExpanded = it },
+                    )
+                }
             }
         }
     }
@@ -172,6 +192,98 @@ internal fun LazyListScope.homescreenSettingsContent(
 }
 
 @Composable
+private fun HeroArtworkSourceOptions(
+    isTablet: Boolean,
+    selectedSource: HomeHeroArtworkSource,
+) {
+    SettingsGroup(isTablet = isTablet) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(Res.string.settings_homescreen_artwork_source),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    text = stringResource(Res.string.settings_homescreen_artwork_source_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HeroArtworkSourceOption(
+                    modifier = Modifier.weight(1f),
+                    source = HomeHeroArtworkSource.BACKDROP,
+                    selectedSource = selectedSource,
+                    title = stringResource(Res.string.settings_homescreen_artwork_source_backdrop),
+                    description = stringResource(Res.string.settings_homescreen_artwork_source_backdrop_description),
+                )
+                HeroArtworkSourceOption(
+                    modifier = Modifier.weight(1f),
+                    source = HomeHeroArtworkSource.POSTER,
+                    selectedSource = selectedSource,
+                    title = stringResource(Res.string.settings_homescreen_artwork_source_poster),
+                    description = stringResource(Res.string.settings_homescreen_artwork_source_poster_description),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroArtworkSourceOption(
+    modifier: Modifier,
+    source: HomeHeroArtworkSource,
+    selectedSource: HomeHeroArtworkSource,
+    title: String,
+    description: String,
+) {
+    val selected = selectedSource == source
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+
+    Surface(
+        modifier = modifier
+            .heightIn(min = if (selected) 92.dp else 88.dp)
+            .clickable { HomeCatalogSettingsRepository.setHeroArtworkSource(source) },
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
 private fun HeroSourcesDropdown(
     isTablet: Boolean,
     items: List<HomeCatalogSettingsItem>,
@@ -193,14 +305,19 @@ private fun HeroSourcesDropdown(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
+                    text = stringResource(Res.string.settings_homescreen_catalogs_source),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
                     text = stringResource(
                         Res.string.settings_homescreen_selected_count,
                         selectedHeroSourceCount,
                         HomeCatalogSettingsRepository.HERO_SOURCE_SELECTION_LIMIT,
                     ),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = items.filter { it.heroSourceEnabled }

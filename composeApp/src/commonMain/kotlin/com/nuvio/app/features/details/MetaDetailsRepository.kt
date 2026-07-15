@@ -1,6 +1,7 @@
 package com.nuvio.app.features.details
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
@@ -49,6 +50,7 @@ object MetaDetailsRepository {
 
     fun load(type: String, id: String) {
         log.d { "load() called — type=$type id=$id" }
+        InAppLogger.info("Metadata/MetaDetailsRepository", "Loading meta type=$type id=$id")
         val requestKey = "$type:$id"
         val currentState = _uiState.value
         val mdbListSettings = MdbListSettingsRepository.snapshot()
@@ -58,6 +60,7 @@ object MetaDetailsRepository {
             cachedEntry.metaScreenMeta
                 ?.takeIf { cachedEntry.metaScreenSettingsFingerprint == metaScreenSettingsFingerprint }
                 ?.let { cachedMeta ->
+                    InAppLogger.debug("Metadata/MetaDetailsRepository", "Using cached enriched meta type=$type id=$id")
                     _uiState.value = MetaDetailsUiState(meta = cachedMeta.withUnreleasedFilter())
                     activeRequestKey = requestKey
                     return
@@ -65,6 +68,7 @@ object MetaDetailsRepository {
 
             val cachedBaseMeta = cachedEntry.baseMeta
             if (!shouldEnrichForMetaScreen(cachedBaseMeta, id, mdbListSettings)) {
+                InAppLogger.debug("Metadata/MetaDetailsRepository", "Using cached base meta type=$type id=$id")
                 _uiState.value = MetaDetailsUiState(meta = cachedBaseMeta.withUnreleasedFilter())
                 activeRequestKey = requestKey
                 return
@@ -72,6 +76,7 @@ object MetaDetailsRepository {
 
             if (currentState.isLoading && activeRequestKey == requestKey) {
                 log.d { "Meta screen enrichment already in flight — type=$type id=$id" }
+                InAppLogger.debug("Metadata/MetaDetailsRepository", "Meta enrichment already in flight type=$type id=$id")
                 return
             }
 
@@ -100,12 +105,14 @@ object MetaDetailsRepository {
 
         if (currentState.meta?.type == type && currentState.meta.id == id && !currentState.isLoading) {
             log.d { "Skipping reload for cached meta — type=$type id=$id" }
+            InAppLogger.debug("Metadata/MetaDetailsRepository", "Skipping reload for current meta type=$type id=$id")
             activeRequestKey = requestKey
             return
         }
 
         if (currentState.isLoading && activeRequestKey == requestKey) {
             log.d { "Request already in flight — type=$type id=$id" }
+            InAppLogger.debug("Metadata/MetaDetailsRepository", "Request already in flight type=$type id=$id")
             return
         }
 
@@ -115,6 +122,7 @@ object MetaDetailsRepository {
         scope.launch {
             val metaLookupId = resolveMetaLookupId(itemId = id, itemType = type)
             val manifests = findReadyMetaManifests(type = type, id = metaLookupId)
+            InAppLogger.info("Metadata/MetaDetailsRepository", "Resolved meta lookup id=$metaLookupId manifests=${manifests.size} originalId=$id")
 
             if (manifests.isEmpty()) {
                 val tmdbMeta = tryFetchTmdbFallbackMeta(type = type, id = id)
@@ -131,6 +139,7 @@ object MetaDetailsRepository {
                 }
 
                 log.w { "No addon provides meta for type=$type id=$id" }
+                InAppLogger.warn("Metadata/MetaDetailsRepository", "No addon provides meta type=$type id=$id lookup=$metaLookupId")
                 _uiState.value = MetaDetailsUiState(
                     errorMessage = getString(Res.string.details_no_addon_meta),
                 )
@@ -168,6 +177,7 @@ object MetaDetailsRepository {
                 return@launch
             }
 
+            InAppLogger.error("Metadata/MetaDetailsRepository", "Failed to load meta from all providers type=$type id=$id lookup=$metaLookupId")
             _uiState.value = MetaDetailsUiState(
                 errorMessage = getString(Res.string.details_load_failed_all_addons),
             )
@@ -236,8 +246,10 @@ object MetaDetailsRepository {
         return try {
             TmdbSettingsRepository.ensureLoaded()
             log.d { "Fetching meta from: $url" }
+            InAppLogger.info("Metadata/AddonFetch", "Fetching meta type=$type id=$id url=${InAppLogger.redactUrl(url)}")
             val payload = httpGetText(url)
             log.d { "Raw payload length=${payload.length}, first 500 chars: ${payload.take(500)}" }
+            InAppLogger.debug("Metadata/AddonFetch", "Meta payload length=${payload.length} type=$type id=$id")
             val result = MetaDetailsParser.parse(payload)
             val tmdbEnriched = withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
                 TmdbMetadataService.enrichMeta(
@@ -259,14 +271,20 @@ object MetaDetailsRepository {
                 tmdbEnriched
             }
             log.d { "Parsed meta: type=${enriched.type}, name=${enriched.name}, videos=${enriched.videos.size}" }
+            InAppLogger.info(
+                "Metadata/AddonFetch",
+                "Parsed meta source=${manifest.name} type=${enriched.type} id=${enriched.id} name=${enriched.name} videos=${enriched.videos.size}",
+            )
             if (enriched.videos.isNotEmpty()) {
                 val first = enriched.videos.first()
                 log.d { "First video: id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}" }
+                InAppLogger.debug("Metadata/AddonFetch", "First video id=${first.id} title=${first.title} s=${first.season} e=${first.episode} embeddedStreams=${first.streams.size}")
             }
             enriched
         } catch (e: Throwable) {
             if (e is CancellationException) throw e
             log.e(e) { "Failed to fetch/parse meta from $url (manifest=${manifest.transportUrl})" }
+            InAppLogger.warn("Metadata/AddonFetch", "Failed meta source=${manifest.name} url=${InAppLogger.redactUrl(url)} error=${InAppLogger.throwableSummary(e)}")
             null
         }
     }
@@ -313,21 +331,31 @@ object MetaDetailsRepository {
             ?.toIntOrNull()
             ?: return itemId
 
-        return withTimeoutOrNull(FETCH_TIMEOUT_MS) {
+        val resolved = withTimeoutOrNull(FETCH_TIMEOUT_MS) {
             TmdbService.tmdbToImdb(tmdbId = tmdbId, mediaType = itemType)
         }
             ?.takeIf { it.isNotBlank() }
             ?: itemId
+        InAppLogger.debug("Metadata/MetaDetailsRepository", "TMDB lookup tmdb:$tmdbId mediaType=$itemType resolved=$resolved")
+        return resolved
     }
 
-    private suspend fun tryFetchTmdbFallbackMeta(type: String, id: String): MetaDetails? =
-        withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
+    private suspend fun tryFetchTmdbFallbackMeta(type: String, id: String): MetaDetails? {
+        InAppLogger.info("Metadata/TMDB", "Fetching standalone fallback meta type=$type id=$id")
+        val result = withTimeoutOrNull(TMDB_ENRICH_TIMEOUT_MS) {
             TmdbMetadataService.fetchStandaloneMeta(
                 type = type,
                 id = id,
                 settings = TmdbSettingsRepository.snapshot(),
             )
         }
+        if (result == null) {
+            InAppLogger.warn("Metadata/TMDB", "Standalone fallback returned empty type=$type id=$id")
+        } else {
+            InAppLogger.info("Metadata/TMDB", "Standalone fallback loaded type=${result.type} id=${result.id} name=${result.name}")
+        }
+        return result
+    }
 
     private suspend fun publishLoadedMeta(
         requestKey: String,
@@ -428,7 +456,9 @@ object MetaDetailsRepository {
                 )
             }.onFailure { error ->
                 log.w { "Failed to load Trakt related titles for ${meta.id}: ${error.message}" }
+                InAppLogger.warn("Metadata/Trakt", "Failed related titles id=${meta.id} error=${InAppLogger.throwableSummary(error)}")
             }.getOrDefault(emptyList())
+            InAppLogger.info("Metadata/Trakt", "Related titles id=${meta.id} count=${items.size}")
 
             return meta.copy(
                 moreLikeThis = items,

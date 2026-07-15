@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.buildAddonResourceUrl
@@ -157,10 +158,16 @@ object PlayerStreamsRepository {
         jobHolder()?.cancel()
         stateFlow.value = StreamsUiState()
 
+        InAppLogger.info(
+            "Streams/PlayerStreamsRepository",
+            "Loading player streams type=$type id=$videoId season=${season ?: -1} episode=${episode ?: -1} force=$forceRefresh",
+        )
+
         val streamBadgeRules = StreamBadgeSettingsRepository.snapshot()
         val embeddedStreams = MetaDetailsRepository.findEmbeddedStreams(videoId)
         if (embeddedStreams.isNotEmpty()) {
             log.d { "Using ${embeddedStreams.size} embedded streams for type=$type id=$videoId" }
+            InAppLogger.info("Streams/PlayerStreamsRepository", "Using embedded streams count=${embeddedStreams.size} type=$type id=$videoId")
             val group = AddonStreamGroup(
                 addonName = embeddedStreams.first().addonName,
                 addonId = "embedded",
@@ -194,6 +201,7 @@ object PlayerStreamsRepository {
         )
 
         if (installedAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+            InAppLogger.warn("Streams/PlayerStreamsRepository", "No stream addons or plugin scrapers installed for type=$type id=$videoId")
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoAddonsInstalled,
@@ -219,7 +227,14 @@ object PlayerStreamsRepository {
                 )
             }
 
+        InAppLogger.info(
+            "Streams/PlayerStreamsRepository",
+            "Found addons=${streamAddons.size} pluginGroups=${pluginProviderGroups.size} pluginScrapers=${pluginScrapers.size} " +
+                "for type=$type id=$videoId",
+        )
+
         if (streamAddons.isEmpty() && pluginProviderGroups.isEmpty()) {
+            InAppLogger.warn("Streams/PlayerStreamsRepository", "No compatible stream addon/plugin for type=$type id=$videoId")
             stateFlow.value = StreamsUiState(
                 isAnyLoading = false,
                 emptyStateReason = com.nuvio.app.features.streams.StreamsEmptyStateReason.NoCompatibleAddons,
@@ -336,6 +351,10 @@ object PlayerStreamsRepository {
                     )
 
                     val displayName = addon.addonName
+                    InAppLogger.info(
+                        "Streams/PlayerAddonFetch",
+                        "Fetching streams addon=$displayName addonId=${addon.addonId} url=${InAppLogger.redactUrl(url)}",
+                    )
                     val group = runCatchingUnlessCancelled {
                         val payload = httpGetText(url)
                         StreamParser.parse(
@@ -346,10 +365,12 @@ object PlayerStreamsRepository {
                         )
                     }.fold(
                         onSuccess = { streams ->
+                            InAppLogger.info("Streams/PlayerAddonFetch", "Loaded streams addon=$displayName count=${streams.size}")
                             AddonStreamGroup(displayName, addon.addonId, streams, isLoading = false)
                         },
                         onFailure = { err ->
                             log.w(err) { "Failed: ${displayName}" }
+                            InAppLogger.warn("Streams/PlayerAddonFetch", "Failed addon=$displayName error=${InAppLogger.throwableSummary(err)}")
                             AddonStreamGroup(displayName, addon.addonId, emptyList(), isLoading = false, error = err.message)
                         },
                     )
@@ -361,6 +382,10 @@ object PlayerStreamsRepository {
                 val includeScraperNameInSubtitle = false
                 providerGroup.scrapers.forEach { scraper ->
                     launch {
+                        InAppLogger.info(
+                            "Streams/PlayerPluginFetch",
+                            "Executing scraper=${scraper.name} provider=${providerGroup.addonName} type=$type id=$videoId season=${season ?: -1} episode=${episode ?: -1}",
+                        )
                         val completion = PluginRepository.executeScraper(
                             scraper = scraper,
                             tmdbId = pluginContentId(
@@ -373,6 +398,7 @@ object PlayerStreamsRepository {
                             episode = episode,
                         ).fold(
                             onSuccess = { results ->
+                                InAppLogger.info("Streams/PlayerPluginFetch", "Scraper loaded scraper=${scraper.name} provider=${providerGroup.addonName} count=${results.size}")
                                 StreamLoadCompletion.PluginScraper(
                                     addonId = providerGroup.addonId,
                                     streams = results.map { result ->
@@ -388,6 +414,7 @@ object PlayerStreamsRepository {
                             },
                             onFailure = { error ->
                                 log.w(error) { "Plugin scraper failed: ${scraper.name}" }
+                                InAppLogger.warn("Streams/PlayerPluginFetch", "Scraper failed scraper=${scraper.name} provider=${providerGroup.addonName} error=${InAppLogger.throwableSummary(error)}")
                                 StreamLoadCompletion.PluginScraper(
                                     addonId = providerGroup.addonId,
                                     streams = emptyList(),
@@ -453,6 +480,10 @@ object PlayerStreamsRepository {
             for (availabilityJob in debridAvailabilityJobs) {
                 availabilityJob.join()
             }
+            InAppLogger.info(
+                "Streams/PlayerStreamsRepository",
+                "Finished loading player streams type=$type id=$videoId groups=${stateFlow.value.groups.size} streams=${stateFlow.value.groups.sumOf { it.streams.size }}",
+            )
             launch {
                 DirectDebridStreamPreparer.prepare(
                     streams = stateFlow.value.groups

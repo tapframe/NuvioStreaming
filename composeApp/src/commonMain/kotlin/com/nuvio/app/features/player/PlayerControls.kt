@@ -5,6 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,11 +30,14 @@ import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Forward10
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.VideoLibrary
 import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.Icon
@@ -51,6 +56,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +68,7 @@ import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.core.ui.nuvioTypeScale
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToLong
 
 @Composable
 internal fun PlayerControlsShell(
@@ -82,12 +90,17 @@ internal fun PlayerControlsShell(
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onResizeModeClick: () -> Unit,
-    onSpeedClick: () -> Unit,
-    onSubtitleClick: () -> Unit,
-    onAudioClick: () -> Unit,
+    onSpeedClick: (() -> Unit)? = null,
+    onSubtitleClick: (() -> Unit)? = null,
+    onAudioClick: (() -> Unit)? = null,
     onVideoSettingsClick: (() -> Unit)? = null,
+    onPictureInPictureClick: (() -> Unit)? = null,
+    onInfoClick: (() -> Unit)? = null,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
+    onLiveChannelsClick: (() -> Unit)? = null,
+    qualityLabel: String? = null,
+    onQualityClick: (() -> Unit)? = null,
     onOpenInExternalPlayer: (() -> Unit)? = null,
     onSubmitIntroClick: (() -> Unit)? = null,
     parentalWarnings: List<ParentalWarning> = emptyList(),
@@ -150,6 +163,8 @@ internal fun PlayerControlsShell(
                 onParentalGuideAnimationComplete = onParentalGuideAnimationComplete,
                 onLockToggle = onLockToggle,
                 onVideoSettingsClick = onVideoSettingsClick,
+                onPictureInPictureClick = onPictureInPictureClick,
+                onInfoClick = onInfoClick,
                 onOpenInExternalPlayer = onOpenInExternalPlayer,
                 onBack = onBack,
                 modifier = Modifier
@@ -190,6 +205,9 @@ internal fun PlayerControlsShell(
                     onAudioClick = onAudioClick,
                     onSourcesClick = onSourcesClick,
                     onEpisodesClick = onEpisodesClick,
+                    onLiveChannelsClick = onLiveChannelsClick,
+                    qualityLabel = qualityLabel,
+                    onQualityClick = onQualityClick,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
@@ -218,6 +236,8 @@ private fun PlayerHeader(
     onParentalGuideAnimationComplete: () -> Unit,
     onLockToggle: () -> Unit,
     onVideoSettingsClick: (() -> Unit)?,
+    onPictureInPictureClick: (() -> Unit)?,
+    onInfoClick: (() -> Unit)?,
     onOpenInExternalPlayer: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -347,6 +367,24 @@ private fun PlayerHeader(
                             onClick = onVideoSettingsClick,
                         )
                     }
+                    if (onPictureInPictureClick != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.Rounded.PictureInPictureAlt,
+                            contentDescription = "Picture in Picture",
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onPictureInPictureClick,
+                        )
+                    }
+                    if (onInfoClick != null) {
+                        PlayerHeaderIconButton(
+                            icon = Icons.Rounded.Info,
+                            contentDescription = stringResource(Res.string.compose_player_playback_info),
+                            buttonSize = metrics.headerIconSize + 16.dp,
+                            iconSize = metrics.headerIconSize,
+                            onClick = onInfoClick,
+                        )
+                    }
                     NuvioBackButton(
                         onClick = onBack,
                         containerColor = Color.Black.copy(alpha = 0.35f),
@@ -360,6 +398,7 @@ private fun PlayerHeader(
         }
     }
 }
+
 
 @Composable
 private fun PlayerHeaderIconButton(
@@ -491,11 +530,14 @@ private fun ProgressControls(
     onScrubChange: (Long) -> Unit,
     onScrubFinished: (Long) -> Unit,
     onResizeModeClick: () -> Unit,
-    onSpeedClick: () -> Unit,
-    onSubtitleClick: () -> Unit,
-    onAudioClick: () -> Unit,
+    onSpeedClick: (() -> Unit)? = null,
+    onSubtitleClick: (() -> Unit)? = null,
+    onAudioClick: (() -> Unit)? = null,
     onSourcesClick: (() -> Unit)? = null,
     onEpisodesClick: (() -> Unit)? = null,
+    onLiveChannelsClick: (() -> Unit)? = null,
+    qualityLabel: String? = null,
+    onQualityClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val durationMs = playbackSnapshot.durationMs.coerceAtLeast(1L)
@@ -504,16 +546,28 @@ private fun ProgressControls(
     val audioPainter = appIconPainter(AppIconResource.PlayerAudioFilled)
 
     Column(modifier = modifier) {
-        Slider(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(metrics.sliderTouchHeight)
-                .graphicsLayer(scaleY = metrics.sliderScaleY),
-            value = displayedPositionMs.coerceIn(0L, durationMs).toFloat(),
-            onValueChange = { value -> onScrubChange(value.toLong()) },
-            onValueChangeFinished = { onScrubFinished(displayedPositionMs.coerceIn(0L, durationMs)) },
-            valueRange = 0f..durationMs.toFloat(),
-        )
+                .graphicsLayer(scaleY = metrics.sliderScaleY)
+                .tapToSeekOnTimeline(
+                    durationMs = playbackSnapshot.durationMs,
+                    onSeek = { positionMs ->
+                        val targetPositionMs = positionMs.coerceIn(0L, durationMs)
+                        onScrubChange(targetPositionMs)
+                        onScrubFinished(targetPositionMs)
+                    },
+                ),
+        ) {
+            Slider(
+                modifier = Modifier.fillMaxSize(),
+                value = displayedPositionMs.coerceIn(0L, durationMs).toFloat(),
+                onValueChange = { value -> onScrubChange(value.toLong()) },
+                onValueChangeFinished = { onScrubFinished(displayedPositionMs.coerceIn(0L, durationMs)) },
+                valueRange = 0f..durationMs.toFloat(),
+            )
+        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -548,21 +602,27 @@ private fun ProgressControls(
                         painter = aspectRatioPainter,
                         onClick = onResizeModeClick,
                     )
-                    PlayerActionPillButton(
-                        label = formatPlaybackSpeedLabel(playbackSnapshot.playbackSpeed),
-                        icon = Icons.Rounded.Speed,
-                        onClick = onSpeedClick,
-                    )
-                    PlayerActionPillButton(
-                        label = stringResource(Res.string.compose_player_subs),
-                        painter = subtitlesPainter,
-                        onClick = onSubtitleClick,
-                    )
-                    PlayerActionPillButton(
-                        label = stringResource(Res.string.compose_player_audio),
-                        painter = audioPainter,
-                        onClick = onAudioClick,
-                    )
+                    if (onSpeedClick != null) {
+                        PlayerActionPillButton(
+                            label = formatPlaybackSpeedLabel(playbackSnapshot.playbackSpeed),
+                            icon = Icons.Rounded.Speed,
+                            onClick = onSpeedClick,
+                        )
+                    }
+                    if (onSubtitleClick != null) {
+                        PlayerActionPillButton(
+                            label = stringResource(Res.string.compose_player_subs),
+                            painter = subtitlesPainter,
+                            onClick = onSubtitleClick,
+                        )
+                    }
+                    if (onAudioClick != null) {
+                        PlayerActionPillButton(
+                            label = stringResource(Res.string.compose_player_audio),
+                            painter = audioPainter,
+                            onClick = onAudioClick,
+                        )
+                    }
                     if (onSourcesClick != null) {
                         PlayerActionPillButton(
                             label = stringResource(Res.string.compose_player_sources),
@@ -577,7 +637,53 @@ private fun ProgressControls(
                             onClick = onEpisodesClick,
                         )
                     }
+                    if (onLiveChannelsClick != null) {
+                        PlayerActionPillButton(
+                            label = stringResource(Res.string.compose_player_channels),
+                            icon = Icons.Rounded.Tv,
+                            onClick = onLiveChannelsClick,
+                        )
+                    }
+                    if (onQualityClick != null) {
+                        PlayerActionPillButton(
+                            label = qualityLabel?.takeIf { it.isNotBlank() } ?: "Quality",
+                            onClick = onQualityClick,
+                        )
+                    }
                 }
+            }
+        }
+    }
+}
+
+private fun Modifier.tapToSeekOnTimeline(
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+): Modifier {
+    if (durationMs <= 0L) return this
+
+    return pointerInput(durationMs) {
+        awaitEachGesture {
+            val width = size.width.toFloat().takeIf { it > 0f } ?: return@awaitEachGesture
+            val down = awaitFirstDown(
+                requireUnconsumed = false,
+                pass = PointerEventPass.Initial,
+            )
+            val downPosition = down.position
+            var lastPosition = downPosition
+            var maxDistance = 0f
+
+            while (true) {
+                val event = awaitPointerEvent(pass = PointerEventPass.Final)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                lastPosition = change.position
+                maxDistance = maxOf(maxDistance, (lastPosition - downPosition).getDistance())
+                if (!change.pressed) break
+            }
+
+            if (maxDistance <= viewConfiguration.touchSlop) {
+                val targetFraction = (lastPosition.x / width).coerceIn(0f, 1f)
+                onSeek((durationMs * targetFraction).roundToLong().coerceIn(0L, durationMs))
             }
         }
     }

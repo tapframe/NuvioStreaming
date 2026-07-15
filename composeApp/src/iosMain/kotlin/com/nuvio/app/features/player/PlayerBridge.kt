@@ -20,6 +20,9 @@ interface NuvioPlayerBridge {
     fun seekTo(positionMs: Long)
     fun seekBy(offsetMs: Long)
     fun retry()
+    fun isPictureInPictureSupported(): Boolean
+    fun startPictureInPicture()
+    fun setExperimentalSinglePrimaryPictureInPictureEnabled(enabled: Boolean)
     fun updateNowPlayingMetadata(
         title: String,
         subtitle: String?,
@@ -43,6 +46,8 @@ interface NuvioPlayerBridge {
     )
     fun configureAudioOutput(audioOutput: String)
     fun setPlaybackSpeed(speed: Float)
+    fun getVolume(): Float
+    fun setVolume(volume: Float)
     fun setMuted(muted: Boolean)
     fun setResizeMode(mode: Int) // 0=Fit, 1=Fill, 2=Zoom
     fun syncVideoSurfaceLayout(width: Double, height: Double)
@@ -80,7 +85,10 @@ interface NuvioPlayerBridge {
     fun getPositionMs(): Long
     fun getBufferedMs(): Long
     fun getPlaybackSpeed(): Float
+    fun getVideoWidth(): Int
+    fun getVideoHeight(): Int
     fun getErrorMessage(): String
+    fun getMediaInfoJson(): String
     fun destroy()
 }
 

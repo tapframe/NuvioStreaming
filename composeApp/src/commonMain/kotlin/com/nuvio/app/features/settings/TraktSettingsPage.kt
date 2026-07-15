@@ -25,15 +25,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -41,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
+import com.nuvio.app.features.trakt.TraktAuthenticationMethod
 import com.nuvio.app.features.trakt.TraktBrandAsset
 import com.nuvio.app.features.trakt.TraktAuthUiState
 import com.nuvio.app.features.trakt.TraktConnectionMode
@@ -59,11 +63,22 @@ import nuvio.composeapp.generated.resources.action_cancel
 import nuvio.composeapp.generated.resources.settings_playback_dialog_close
 import nuvio.composeapp.generated.resources.settings_trakt_approval_redirect
 import nuvio.composeapp.generated.resources.settings_trakt_authentication
+import nuvio.composeapp.generated.resources.settings_trakt_auth_method_browser
+import nuvio.composeapp.generated.resources.settings_trakt_auth_method_browser_description
+import nuvio.composeapp.generated.resources.settings_trakt_auth_method_description
+import nuvio.composeapp.generated.resources.settings_trakt_auth_method_device
+import nuvio.composeapp.generated.resources.settings_trakt_auth_method_device_description
+import nuvio.composeapp.generated.resources.settings_trakt_auth_method_title
 import nuvio.composeapp.generated.resources.settings_trakt_comments
+import nuvio.composeapp.generated.resources.settings_trakt_copy_device_code
+import nuvio.composeapp.generated.resources.settings_trakt_device_code_copied
 import nuvio.composeapp.generated.resources.settings_trakt_comments_description
 import nuvio.composeapp.generated.resources.settings_trakt_connect
 import nuvio.composeapp.generated.resources.settings_trakt_connected_as
 import nuvio.composeapp.generated.resources.settings_trakt_default_user
+import nuvio.composeapp.generated.resources.settings_trakt_device_approval_redirect
+import nuvio.composeapp.generated.resources.settings_trakt_device_finish_sign_in
+import nuvio.composeapp.generated.resources.settings_trakt_device_sign_in_description
 import nuvio.composeapp.generated.resources.settings_trakt_disconnect
 import nuvio.composeapp.generated.resources.settings_trakt_failed_open_browser
 import nuvio.composeapp.generated.resources.settings_trakt_features
@@ -71,6 +86,7 @@ import nuvio.composeapp.generated.resources.settings_trakt_finish_sign_in
 import nuvio.composeapp.generated.resources.settings_trakt_intro_description
 import nuvio.composeapp.generated.resources.settings_trakt_missing_credentials
 import nuvio.composeapp.generated.resources.settings_trakt_open_login
+import nuvio.composeapp.generated.resources.settings_trakt_open_activate
 import nuvio.composeapp.generated.resources.settings_trakt_save_actions_description
 import nuvio.composeapp.generated.resources.settings_trakt_sign_in_description
 import nuvio.composeapp.generated.resources.trakt_all_history
@@ -678,14 +694,151 @@ private fun TraktBrandIntro(
 }
 
 @Composable
+private fun TraktAuthenticationMethodSelector(
+    selectedMethod: TraktAuthenticationMethod,
+    enabled: Boolean,
+    onMethodSelected: (TraktAuthenticationMethod) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.settings_trakt_auth_method_title),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text = stringResource(Res.string.settings_trakt_auth_method_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TraktAuthenticationMethodOption(
+                modifier = Modifier.weight(1f),
+                title = stringResource(Res.string.settings_trakt_auth_method_browser),
+                description = stringResource(Res.string.settings_trakt_auth_method_browser_description),
+                selected = selectedMethod == TraktAuthenticationMethod.BROWSER_REDIRECT,
+                enabled = enabled,
+                onClick = { onMethodSelected(TraktAuthenticationMethod.BROWSER_REDIRECT) },
+            )
+            TraktAuthenticationMethodOption(
+                modifier = Modifier.weight(1f),
+                title = stringResource(Res.string.settings_trakt_auth_method_device),
+                description = stringResource(Res.string.settings_trakt_auth_method_device_description),
+                selected = selectedMethod == TraktAuthenticationMethod.DEVICE_CODE,
+                enabled = enabled,
+                onClick = { onMethodSelected(TraktAuthenticationMethod.DEVICE_CODE) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun TraktAuthenticationMethodOption(
+    modifier: Modifier,
+    title: String,
+    description: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val containerColor = if (selected) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+    val contentColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f)
+    }
+    val supportingColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.50f)
+    }
+
+    Surface(
+        modifier = modifier
+            .height(if (selected) 92.dp else 88.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentColor,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = supportingColor,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun TraktDeviceCodeCard(
+    userCode: String,
+    onCopyCode: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = userCode,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Button(onClick = onCopyCode) {
+                Text(stringResource(Res.string.settings_trakt_copy_device_code))
+            }
+        }
+    }
+}
+
+@Composable
 private fun TraktConnectionCard(
     isTablet: Boolean,
     uiState: TraktAuthUiState,
 ) {
     val uriHandler = LocalUriHandler.current
+    val clipboardManager = LocalClipboardManager.current
     val horizontalPadding = if (isTablet) 20.dp else 16.dp
     val verticalPadding = if (isTablet) 18.dp else 16.dp
     val failedOpenBrowserMessage = stringResource(Res.string.settings_trakt_failed_open_browser)
+    val deviceCodeCopiedMessage = stringResource(Res.string.settings_trakt_device_code_copied)
+    var localStatusMessage by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedAuthenticationMethod by remember {
+        mutableStateOf(TraktAuthRepository.selectedAuthenticationMethod())
+    }
 
     Column(
         modifier = Modifier
@@ -693,6 +846,17 @@ private fun TraktConnectionCard(
             .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (uiState.mode != TraktConnectionMode.CONNECTED) {
+            TraktAuthenticationMethodSelector(
+                selectedMethod = selectedAuthenticationMethod,
+                enabled = !uiState.isLoading,
+                onMethodSelected = { method ->
+                    selectedAuthenticationMethod = method
+                    TraktAuthRepository.setAuthenticationMethod(method)
+                },
+            )
+        }
+
         when (uiState.mode) {
             TraktConnectionMode.CONNECTED -> {
                 Text(
@@ -730,16 +894,40 @@ private fun TraktConnectionCard(
 
             TraktConnectionMode.AWAITING_APPROVAL -> {
                 Text(
-                    text = stringResource(Res.string.settings_trakt_finish_sign_in),
+                    text = stringResource(
+                        if (selectedAuthenticationMethod == TraktAuthenticationMethod.DEVICE_CODE) {
+                            Res.string.settings_trakt_device_finish_sign_in
+                        } else {
+                            Res.string.settings_trakt_finish_sign_in
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
                 )
                 Text(
-                    text = stringResource(Res.string.settings_trakt_approval_redirect),
+                    text = stringResource(
+                        if (selectedAuthenticationMethod == TraktAuthenticationMethod.DEVICE_CODE) {
+                            Res.string.settings_trakt_device_approval_redirect
+                        } else {
+                            Res.string.settings_trakt_approval_redirect
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (selectedAuthenticationMethod == TraktAuthenticationMethod.DEVICE_CODE) {
+                    TraktAuthRepository.pendingDeviceUserCode()?.let { userCode ->
+                        TraktDeviceCodeCard(
+                            userCode = userCode,
+                            onCopyCode = {
+                                clipboardManager.setText(AnnotatedString(userCode))
+                                localStatusMessage = deviceCodeCopiedMessage
+                            },
+                        )
+                    }
+                }
+
                 Button(
                     onClick = {
                         val authUrl = TraktAuthRepository.pendingAuthorizationUrl()
@@ -754,7 +942,15 @@ private fun TraktConnectionCard(
                     },
                     enabled = !uiState.isLoading,
                 ) {
-                    Text(stringResource(Res.string.settings_trakt_open_login))
+                    Text(
+                        stringResource(
+                            if (selectedAuthenticationMethod == TraktAuthenticationMethod.DEVICE_CODE) {
+                                Res.string.settings_trakt_open_activate
+                            } else {
+                                Res.string.settings_trakt_open_login
+                            },
+                        ),
+                    )
                 }
                 Button(
                     onClick = TraktAuthRepository::onCancelAuthorization,
@@ -770,7 +966,13 @@ private fun TraktConnectionCard(
 
             TraktConnectionMode.DISCONNECTED -> {
                 Text(
-                    text = stringResource(Res.string.settings_trakt_sign_in_description),
+                    text = stringResource(
+                        if (selectedAuthenticationMethod == TraktAuthenticationMethod.DEVICE_CODE) {
+                            Res.string.settings_trakt_device_sign_in_description
+                        } else {
+                            Res.string.settings_trakt_sign_in_description
+                        },
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -805,7 +1007,15 @@ private fun TraktConnectionCard(
             }
         }
 
-        uiState.statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
+        localStatusMessage
+            ?.takeIf { uiState.mode == TraktConnectionMode.AWAITING_APPROVAL && it.isNotBlank() }
+            ?.let { message ->
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } ?: uiState.statusMessage?.takeIf { it.isNotBlank() }?.let { message ->
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,

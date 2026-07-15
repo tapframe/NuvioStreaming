@@ -11,6 +11,7 @@ import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.player.skip.NextEpisodeInfo
 import com.nuvio.app.features.player.skip.PlayerNextEpisodeRules
 import com.nuvio.app.features.player.skip.SkipIntroRepository
+import com.nuvio.app.features.player.skip.SkipInterval
 import com.nuvio.app.features.streams.BingeGroupCacheRepository
 import com.nuvio.app.features.streams.StreamLinkCacheRepository
 import com.nuvio.app.features.streams.StreamItem
@@ -407,7 +408,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         }
         val positionSec = playbackSnapshot.positionMs / 1000.0
         val current = skipIntervals.firstOrNull { interval ->
-            positionSec >= interval.startTime && positionSec < interval.endTime
+            interval.isEligibleForSkipButton(positionSec)
         }
         if (current != activeSkipInterval) {
             activeSkipInterval = current
@@ -657,5 +658,21 @@ private fun findCredentialRefreshCandidate(
         .maxByOrNull { (score, _) -> score }
         ?.second
 
+private fun SkipInterval.isEligibleForSkipButton(positionSec: Double): Boolean {
+    val effectiveStartTime = if (isIntroLikeSkipInterval()) {
+        (startTime - SKIP_INTRO_PRE_ROLL_SECONDS).coerceAtLeast(0.0)
+    } else {
+        startTime
+    }
+    return positionSec >= effectiveStartTime && positionSec < endTime
+}
+
+private fun SkipInterval.isIntroLikeSkipInterval(): Boolean =
+    when (type.lowercase()) {
+        "intro", "op", "mixed-op" -> true
+        else -> false
+    }
+
+private const val SKIP_INTRO_PRE_ROLL_SECONDS = 25.0
 private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
 private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L

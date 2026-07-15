@@ -23,11 +23,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -70,9 +71,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.features.home.components.CollectionCardRemoteImage
 import com.nuvio.app.isIos
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -693,11 +694,12 @@ private fun PopupProfileBubble(
                 contentAlignment = Alignment.Center,
             ) {
                 if (avatarImageUrl != null) {
-                    AsyncImage(
-                        model = avatarImageUrl,
+                    CollectionCardRemoteImage(
+                        imageUrl = avatarImageUrl,
                         contentDescription = profile.name,
-                        modifier = Modifier.size(48.dp).clip(tokens.shapes.avatar),
+                        modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
+                        animateIfPossible = true,
                     )
                 } else if (profile.name.isNotBlank()) {
                     Text(
@@ -1009,11 +1011,12 @@ fun ActiveProfileMiniAvatar(
         contentAlignment = Alignment.Center,
     ) {
         if (avatarImageUrl != null) {
-            AsyncImage(
-                model = avatarImageUrl,
+            CollectionCardRemoteImage(
+                imageUrl = avatarImageUrl,
                 contentDescription = profile.name,
                 modifier = Modifier.size(size.dp).clip(tokens.shapes.avatar),
                 contentScale = ContentScale.Crop,
+                animateIfPossible = true,
             )
         } else if (profile.name.isNotBlank()) {
             Text(

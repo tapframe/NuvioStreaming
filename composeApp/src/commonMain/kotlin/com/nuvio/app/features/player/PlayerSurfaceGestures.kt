@@ -40,6 +40,7 @@ internal fun Modifier.playerSurfaceTapGestures(
 
 internal fun Modifier.playerSurfaceDragGestures(
     gestureController: PlayerGestureController?,
+    playerController: PlayerEngineController?,
     layoutSize: IntSize,
     sideGestureSystemEdgeExclusionPx: Float,
     playerControlsLockedState: State<Boolean>,
@@ -55,7 +56,7 @@ internal fun Modifier.playerSurfaceDragGestures(
     revealLockedOverlayState: State<() -> Unit>,
     commitHorizontalSeekState: State<(Long) -> Unit>,
 ): Modifier =
-    pointerInput(gestureController, layoutSize, sideGestureSystemEdgeExclusionPx) {
+    pointerInput(gestureController, playerController, layoutSize, sideGestureSystemEdgeExclusionPx) {
         awaitEachGesture {
             val down = awaitFirstDown()
             if (playerControlsLockedState.value) {
@@ -91,7 +92,10 @@ internal fun Modifier.playerSurfaceDragGestures(
                 null
             }
             val initialVolume = if (region == PlayerSideGesture.Volume) {
-                controller?.currentVolume()
+                currentCombinedVolumeLevel(
+                    systemVolume = controller?.currentVolume(),
+                    softwareVolume = playerController?.currentPlayerVolume(),
+                )
             } else {
                 null
             }
@@ -185,8 +189,13 @@ internal fun Modifier.playerSurfaceDragGestures(
                         val activeTotalDy = totalDy - verticalGestureActivationDy
                         val gestureDeltaFraction =
                             (-activeTotalDy / height) * PlayerVerticalGestureSensitivity
-                        controller?.setVolume((initialVolume?.fraction ?: 0f) + gestureDeltaFraction)
-                            ?.let(showVolumeFeedbackState.value)
+                        val target = ((initialVolume?.fraction ?: 0f) + gestureDeltaFraction)
+                            .coerceIn(0f, PlayerMaxVolumeBoost)
+                        setCombinedVolumeLevel(
+                            target = target,
+                            systemController = controller,
+                            engineController = playerController,
+                        )?.let(showVolumeFeedbackState.value)
                     }
                 }
                 change.consume()

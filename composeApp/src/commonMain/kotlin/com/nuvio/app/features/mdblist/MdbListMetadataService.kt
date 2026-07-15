@@ -1,6 +1,7 @@
 package com.nuvio.app.features.mdblist
 
 import co.touchlab.kermit.Logger
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.features.addons.httpPostJson
 import com.nuvio.app.features.details.MetaDetails
 import com.nuvio.app.features.details.MetaExternalRating
@@ -56,6 +57,11 @@ object MdbListMetadataService {
         settings: MdbListSettings,
     ): MetaDetails {
         if (!shouldFetchForMeta(meta, fallbackItemId, settings)) {
+            InAppLogger.debug(
+                "Metadata/MDBList",
+                "skip metaId=${meta.id} fallback=$fallbackItemId enabled=${settings.enabled} " +
+                    "providers=${settings.enabledProvidersInPriorityOrder().joinToString(",")}",
+            )
             return meta.copy(externalRatings = emptyList())
         }
         val apiKey = settings.apiKey.trim()
@@ -66,6 +72,11 @@ object MdbListMetadataService {
         val mediaType = toMdbListMediaType(meta.type)
         val enabledProviders = settings.enabledProvidersInPriorityOrder()
 
+        InAppLogger.info(
+            "Metadata/MDBList",
+            "fetch ratings imdb=$imdbId mediaType=$mediaType providers=${enabledProviders.joinToString(",")}",
+        )
+
         val ratings = fetchRatings(
             imdbId = imdbId,
             mediaType = mediaType,
@@ -73,6 +84,10 @@ object MdbListMetadataService {
             providers = enabledProviders,
         )
 
+        InAppLogger.info(
+            "Metadata/MDBList",
+            "ratings result imdb=$imdbId mediaType=$mediaType count=${ratings.size}",
+        )
         return meta.copy(externalRatings = ratings)
     }
 
@@ -87,7 +102,13 @@ object MdbListMetadataService {
         providers: List<String>,
     ): List<MetaExternalRating> = withContext(Dispatchers.Default) {
         val cacheKey = "$mediaType:$imdbId:$apiKey:${providers.joinToString(",")}"
-        ratingsCache[cacheKey]?.let { return@withContext it }
+        ratingsCache[cacheKey]?.let {
+            InAppLogger.debug(
+                "Metadata/MDBList",
+                "cache hit imdb=$imdbId mediaType=$mediaType providers=${providers.joinToString(",")}",
+            )
+            return@withContext it
+        }
 
         val ratings = coroutineScope {
             providers.map { providerId ->
@@ -120,14 +141,27 @@ object MdbListMetadataService {
             ),
         )
 
+        InAppLogger.info(
+            "Metadata/MDBList",
+            "POST provider=$providerId imdb=$imdbId mediaType=$mediaType url=${InAppLogger.redactUrl(url)} bodyChars=${requestBody.length}",
+        )
+
         return runCatching {
             val payload = httpPostJson(url = url, body = requestBody)
+            InAppLogger.info(
+                "Metadata/MDBList",
+                "POST provider=$providerId imdb=$imdbId ok chars=${payload.length}",
+            )
             val parsed = json.decodeFromString<RatingResponse>(payload)
             val rating = parsed.ratings.firstOrNull()?.rating ?: return@runCatching null
             MetaExternalRating(source = providerId, value = rating)
         }.onFailure { error ->
             if (error is CancellationException) throw error
             log.w { "MDBList request failed for $providerId/$imdbId: ${error.message}" }
+            InAppLogger.warn(
+                "Metadata/MDBList",
+                "POST provider=$providerId imdb=$imdbId failed: ${InAppLogger.throwableSummary(error)}",
+            )
         }.getOrNull()
     }
 

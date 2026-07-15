@@ -36,14 +36,10 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
-import com.nuvio.app.core.ui.NuvioLoadingIndicator
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,8 +47,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -86,6 +85,7 @@ import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.deeplink.AppDeepLink
 import com.nuvio.app.core.deeplink.AppDeepLinkRepository
+import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.sync.AppForegroundMonitor
@@ -93,6 +93,7 @@ import com.nuvio.app.core.sync.ProfileSettingsSync
 import com.nuvio.app.core.sync.RealtimeSyncConfig
 import com.nuvio.app.core.sync.RealtimeSyncInvalidationService
 import com.nuvio.app.core.sync.SyncManager
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import com.nuvio.app.core.ui.NuvioNavigationBar
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioContinueWatchingActionSheet
@@ -157,6 +158,8 @@ import com.nuvio.app.features.library.LibrarySourceMode
 import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.library.toMetaPreview
+import com.nuvio.app.features.livetv.LiveTvChannel
+import com.nuvio.app.features.livetv.LiveTvScreen
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.p2p.P2pConsentDialog
 import com.nuvio.app.features.p2p.P2pSettingsRepository
@@ -350,6 +353,7 @@ enum class AppScreenTab {
     Home,
     Search,
     Library,
+    LiveTv,
     Settings,
     ;
 
@@ -363,6 +367,7 @@ private fun AppScreenTab.toNativeNavigationTab(): NativeNavigationTab = when (th
     AppScreenTab.Home -> NativeNavigationTab.Home
     AppScreenTab.Search -> NativeNavigationTab.Search
     AppScreenTab.Library -> NativeNavigationTab.Library
+    AppScreenTab.LiveTv -> NativeNavigationTab.LiveTv
     AppScreenTab.Settings -> NativeNavigationTab.Settings
 }
 
@@ -370,6 +375,7 @@ private fun NativeNavigationTab.toAppScreenTab(): AppScreenTab = when (this) {
     NativeNavigationTab.Home -> AppScreenTab.Home
     NativeNavigationTab.Search -> AppScreenTab.Search
     NativeNavigationTab.Library -> AppScreenTab.Library
+    NativeNavigationTab.LiveTv -> AppScreenTab.LiveTv
     NativeNavigationTab.Settings -> AppScreenTab.Settings
 }
 
@@ -461,6 +467,7 @@ fun App(
 
         LaunchedEffect(Unit) {
             if (!ownsAppRuntime) return@LaunchedEffect
+            InAppLogger.info("App", "Application started")
             AuthRepository.initialize()
         }
 
@@ -782,6 +789,7 @@ private fun MainAppContent(
         val homeScrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
         val searchScrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
         val libraryScrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+        val liveTvScrollToTopRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
         val settingsRootActionRequests = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
         val currentRoute = navBackStack.lastOrNull() as? AppRoute
         val liquidGlassNativeTabBarEnabled by remember {
@@ -899,6 +907,7 @@ private fun MainAppContent(
                 searchScrollToTopRequests.tryEmit(Unit)
             }
             AppScreenTab.Library -> libraryScrollToTopRequests.tryEmit(Unit)
+            AppScreenTab.LiveTv -> liveTvScrollToTopRequests.tryEmit(Unit)
             AppScreenTab.Settings -> settingsRootActionRequests.tryEmit(Unit)
         }
     }
@@ -1781,6 +1790,26 @@ private fun MainAppContent(
             selectedContinueWatchingForActions = item
         }
 
+        val onLiveTvChannelClick: (LiveTvChannel) -> Unit = { channel ->
+            val launchId = PlayerLaunchStore.put(
+                PlayerLaunch(
+                    profileId = activePlaybackProfileId,
+                    title = channel.name,
+                    sourceUrl = channel.streamUrl,
+                    logo = channel.logoUrl,
+                    streamTitle = channel.name,
+                    streamSubtitle = channel.group,
+                    providerName = "Live TV",
+                    providerAddonId = "live-tv",
+                    contentType = "live",
+                    videoId = channel.id,
+                    parentMetaId = channel.id,
+                    parentMetaType = "live",
+                ),
+            )
+            navController.navigate(PlayerRoute(launchId = launchId))
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -1865,6 +1894,12 @@ private fun MainAppContent(
                                             contentDescription = stringResource(Res.string.compose_nav_library),
                                         )
                                         NavItem(
+                                            selected = selectedTab == AppScreenTab.LiveTv,
+                                            onClick = { handleRootTabClick(AppScreenTab.LiveTv) },
+                                            icon = Icons.Filled.Tv,
+                                            contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                                        )
+                                        NavItem(
                                             selected = selectedTab == AppScreenTab.Settings,
                                             onClick = { handleRootTabClick(AppScreenTab.Settings) },
                                         ) {
@@ -1893,6 +1928,7 @@ private fun MainAppContent(
                                         homeScrollToTopRequests = homeScrollToTopRequests,
                                         searchScrollToTopRequests = searchScrollToTopRequests,
                                         libraryScrollToTopRequests = libraryScrollToTopRequests,
+                                        liveTvScrollToTopRequests = liveTvScrollToTopRequests,
                                         settingsRootActionRequests = settingsRootActionRequests,
                                         animateHomeCollectionGifs = tabsRouteActive,
                                         onCatalogClick = onCatalogClick,
@@ -1947,6 +1983,7 @@ private fun MainAppContent(
                                                 activateTab(AppScreenTab.Settings)
                                             }
                                         },
+                                        onLiveTvChannelClick = onLiveTvChannelClick,
                                         onContinueWatchingClick = onContinueWatchingClick,
                                         onContinueWatchingLongPress = onContinueWatchingLongPress,
                                         onSwitchProfile = onSwitchProfile,
@@ -3514,6 +3551,7 @@ private fun AppTabHost(
     homeScrollToTopRequests: Flow<Unit>,
     searchScrollToTopRequests: Flow<Unit>,
     libraryScrollToTopRequests: Flow<Unit>,
+    liveTvScrollToTopRequests: Flow<Unit>,
     settingsRootActionRequests: Flow<Unit>,
     animateHomeCollectionGifs: Boolean = true,
     onCatalogClick: ((HomeCatalogSection) -> Unit)? = null,
@@ -3524,6 +3562,7 @@ private fun AppTabHost(
     onLibrarySectionViewAllClick: ((LibrarySection) -> Unit)? = null,
     onCloudFilePlay: ((CloudLibraryItem, CloudLibraryFile) -> Unit)? = null,
     onConnectCloudClick: (() -> Unit)? = null,
+    onLiveTvChannelClick: (LiveTvChannel) -> Unit = {},
     onContinueWatchingClick: ((ContinueWatchingItem) -> Unit)? = null,
     onContinueWatchingLongPress: ((ContinueWatchingItem) -> Unit)? = null,
     onSwitchProfile: (() -> Unit)? = null,
@@ -3583,6 +3622,13 @@ private fun AppTabHost(
                         onSectionViewAllClick = onLibrarySectionViewAllClick,
                         onCloudFilePlay = onCloudFilePlay,
                         onConnectCloudClick = onConnectCloudClick,
+                    )
+                }
+
+                AppScreenTab.LiveTv -> {
+                    LiveTvScreen(
+                        scrollToTopRequests = liveTvScrollToTopRequests,
+                        onChannelClick = onLiveTvChannelClick,
                     )
                 }
 
@@ -3688,6 +3734,23 @@ private fun TabletFloatingTopBar(
                                 tokens.colors.textPrimary
                             } else {
                                 tokens.colors.textMuted
+                            },
+                        )
+                    },
+                )
+                TabletTopPillItem(
+                    label = stringResource(Res.string.compose_nav_live_tv),
+                    selected = selectedTab == AppScreenTab.LiveTv,
+                    onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Tv,
+                            contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                            modifier = Modifier.size(18.dp),
+                            tint = if (selectedTab == AppScreenTab.LiveTv) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         )
                     },

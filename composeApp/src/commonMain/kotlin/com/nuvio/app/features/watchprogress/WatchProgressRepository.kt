@@ -186,6 +186,15 @@ object WatchProgressRepository {
             deltaCursorEventId = storedPayload.deltaCursorEventId
             deltaInitialized = storedPayload.deltaInitialized
             replaceLocalEntries(storedPayload.entries)
+            val liveTvEntries = storedPayload.entries.filter { it.isLiveTvEntry() }
+            entriesByVideoId = storedPayload.entries
+                .filterNot { it.isLiveTvEntry() }
+                .associateBy { it.videoId }
+                .toMutableMap()
+            if (liveTvEntries.isNotEmpty()) {
+                persist()
+                pushDeleteToServer(liveTvEntries)
+            }
         } else {
             lastSuccessfulPushEpochMs = 0L
             deltaCursorEventId = 0L
@@ -977,6 +986,8 @@ object WatchProgressRepository {
         persist: Boolean,
         syncRemote: Boolean,
     ) {
+        if (session.isLiveTvSession()) return
+
         val targetProfileId = session.profileId
         val positionMs = snapshot.positionMs.coerceAtLeast(0L)
         val durationMs = snapshot.durationMs.coerceAtLeast(0L)
@@ -1170,7 +1181,7 @@ object WatchProgressRepository {
         }
 
     private fun currentEntries(): List<WatchProgressEntry> {
-        return if (shouldUseTraktProgress()) {
+        val entries = if (shouldUseTraktProgress()) {
             // Merge Trakt remote progress with local-only entries that use
             // non-Trakt-compatible IDs (kitsu:, mal:, anilist:, etc.).
             // Trakt will never return these IDs, so they must come from local storage.
@@ -1193,6 +1204,8 @@ object WatchProgressRepository {
         } else {
             localEntriesSnapshot()
         }
+
+        return entries.filterNot { it.isLiveTvEntry() }
     }
 
     private fun localEntriesSnapshot(): List<WatchProgressEntry> =
@@ -1266,3 +1279,15 @@ object WatchProgressRepository {
                 (resource.idPrefixes.isEmpty() || resource.idPrefixes.any { prefix -> id.startsWith(prefix) })
         }
 }
+
+private fun WatchProgressPlaybackSession.isLiveTvSession(): Boolean =
+    contentType.equals("live", ignoreCase = true) ||
+        parentMetaType.equals("live", ignoreCase = true) ||
+        providerName.equals("Live TV", ignoreCase = true) ||
+        providerAddonId?.equals("live-tv", ignoreCase = true) == true
+
+private fun WatchProgressEntry.isLiveTvEntry(): Boolean =
+    contentType.equals("live", ignoreCase = true) ||
+        parentMetaType.equals("live", ignoreCase = true) ||
+        providerName?.equals("Live TV", ignoreCase = true) == true ||
+        providerAddonId?.equals("live-tv", ignoreCase = true) == true

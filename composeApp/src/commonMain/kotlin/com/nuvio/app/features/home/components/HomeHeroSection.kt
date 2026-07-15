@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
+import com.nuvio.app.features.home.HomeHeroArtworkSource
 import com.nuvio.app.features.home.MetaPreview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -68,8 +70,10 @@ private const val HERO_SCROLL_MAX_SCALE = 1.3f
 private const val HERO_SWIPE_THRESHOLD_FRACTION = 0.16f
 private const val HERO_SWIPE_VELOCITY_THRESHOLD = 300f
 private const val MOBILE_HERO_VIEWPORT_RATIO = 0.82f
+private const val MOBILE_PORTRAIT_HERO_WIDTH_RATIO = 1.5f
 private const val MOBILE_HERO_MIN_HEIGHT_DP = 360f
 private const val MOBILE_HERO_MAX_HEIGHT_DP = 760f
+private const val TABLET_LANDSCAPE_HERO_HEIGHT_MULTIPLIER = 1.5f
 
 internal data class HomeHeroLayout(
     val isTablet: Boolean,
@@ -83,11 +87,12 @@ internal data class HomeHeroLayout(
 )
 
 @Composable
-fun HomeHeroSection(
+internal fun HomeHeroSection(
     items: List<MetaPreview>,
     modifier: Modifier = Modifier,
     viewportHeight: Dp? = null,
     mobileBelowSectionHeightHint: Dp? = null,
+    artworkSource: HomeHeroArtworkSource = HomeHeroArtworkSource.BACKDROP,
     listState: LazyListState? = null,
     onItemClick: ((MetaPreview) -> Unit)? = null,
 ) {
@@ -169,21 +174,28 @@ fun HomeHeroSection(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 visiblePages.forEach { layer ->
-                    AsyncImage(
-                        model = items[layer.page].banner ?: items[layer.page].poster,
-                        contentDescription = items[layer.page].name,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                alpha = layer.visibility
-                                translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
-                                translationY = heroScrollTranslationY
-                                scaleX = HERO_BACKGROUND_SCALE * heroScrollScale
-                                scaleY = HERO_BACKGROUND_SCALE * heroScrollScale
-                            },
-                        alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
-                        contentScale = ContentScale.Crop,
-                    )
+                    val item = items[layer.page]
+                    val artworkUrl = when (artworkSource) {
+                        HomeHeroArtworkSource.POSTER -> item.poster ?: item.banner
+                        HomeHeroArtworkSource.BACKDROP -> item.banner ?: item.poster
+                    }
+                    key(artworkSource, item.type, item.id, artworkUrl) {
+                        AsyncImage(
+                            model = artworkUrl,
+                            contentDescription = item.name,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    alpha = layer.visibility
+                                    translationX = -layer.offset * heroWidthPx * HERO_BACKGROUND_PARALLAX
+                                    translationY = heroScrollTranslationY
+                                    scaleX = HERO_BACKGROUND_SCALE * heroScrollScale
+                                    scaleY = HERO_BACKGROUND_SCALE * heroScrollScale
+                                },
+                            alignment = if (layout.isTablet) Alignment.TopCenter else Alignment.Center,
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
                 }
 
                 Box(
@@ -432,11 +444,18 @@ internal fun homeHeroLayout(
     maxWidthDp: Float,
     viewportHeightDp: Float? = null,
     mobileBelowSectionHeightHintDp: Float? = null,
-): HomeHeroLayout =
-    when {
+): HomeHeroLayout {
+    val isLandscapeViewport = viewportHeightDp?.let { maxWidthDp > it } == true
+    val shortestViewportSideDp = viewportHeightDp?.let { minOf(maxWidthDp, it) } ?: maxWidthDp
+    val shouldBoostTabletLandscapeHero = isLandscapeViewport && shortestViewportSideDp >= 600f
+
+    return when {
         maxWidthDp >= 1200f -> HomeHeroLayout(
             isTablet = true,
-            heroHeight = (maxWidthDp * 0.42f).dp.coerceIn(360.dp, 440.dp),
+            heroHeight = tabletHeroHeight(
+                baseHeight = (maxWidthDp * 0.42f).dp.coerceIn(360.dp, 440.dp),
+                boostForLandscape = shouldBoostTabletLandscapeHero,
+            ),
             contentMaxWidth = 640.dp,
             contentWidthFraction = 0.56f,
             contentHorizontalPadding = 56.dp,
@@ -446,7 +465,10 @@ internal fun homeHeroLayout(
         )
         maxWidthDp >= 840f -> HomeHeroLayout(
             isTablet = true,
-            heroHeight = (maxWidthDp * 0.46f).dp.coerceIn(340.dp, 420.dp),
+            heroHeight = tabletHeroHeight(
+                baseHeight = (maxWidthDp * 0.46f).dp.coerceIn(340.dp, 420.dp),
+                boostForLandscape = shouldBoostTabletLandscapeHero,
+            ),
             contentMaxWidth = 560.dp,
             contentWidthFraction = 0.62f,
             contentHorizontalPadding = 40.dp,
@@ -456,7 +478,10 @@ internal fun homeHeroLayout(
         )
         maxWidthDp >= 600f -> HomeHeroLayout(
             isTablet = true,
-            heroHeight = (maxWidthDp * 0.58f).dp.coerceIn(320.dp, 380.dp),
+            heroHeight = tabletHeroHeight(
+                baseHeight = (maxWidthDp * 0.58f).dp.coerceIn(320.dp, 380.dp),
+                boostForLandscape = shouldBoostTabletLandscapeHero,
+            ),
             contentMaxWidth = 520.dp,
             contentWidthFraction = 0.72f,
             contentHorizontalPadding = 32.dp,
@@ -479,12 +504,28 @@ internal fun homeHeroLayout(
             logoWidthFraction = 0.62f,
         )
     }
+}
+
+private fun tabletHeroHeight(
+    baseHeight: Dp,
+    boostForLandscape: Boolean,
+): Dp {
+    if (!boostForLandscape) return baseHeight
+
+    return (baseHeight.value * TABLET_LANDSCAPE_HERO_HEIGHT_MULTIPLIER).dp
+}
 
 private fun mobileHeroHeight(
     maxWidthDp: Float,
     viewportHeightDp: Float?,
     mobileBelowSectionHeightHintDp: Float?,
 ): Dp {
+    val isPortraitViewport = viewportHeightDp?.let { it >= maxWidthDp } != false
+
+    if (isPortraitViewport) {
+        return (maxWidthDp * MOBILE_PORTRAIT_HERO_WIDTH_RATIO).dp
+    }
+
     val viewportDrivenHeight = viewportHeightDp?.let { (it * MOBILE_HERO_VIEWPORT_RATIO).dp }
     val widthFallbackHeight = (maxWidthDp * 1.16f).dp
     val baseHeight = viewportDrivenHeight ?: widthFallbackHeight
