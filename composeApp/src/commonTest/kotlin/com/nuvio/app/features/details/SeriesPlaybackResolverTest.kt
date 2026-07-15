@@ -156,4 +156,16 @@ class SeriesPlaybackResolverTest {
         assertEquals(2, nextEpisode.episode)
         assertEquals("s2e2", nextEpisode.id)
     }
+
+    @Test
+    fun filterUnavailableFutureSeasons_removes_explicitly_unavailable_season_without_release_date() {
+        val episodes = listOf(
+            MetaVideo(id = "s1e1", title = "Episode 1", season = 1, episode = 1, released = "2026-01-01"),
+            MetaVideo(id = "s3e1", title = "Episode 1", season = 3, episode = 1, released = null, available = false),
+        )
+
+        val filtered = episodes.filterUnavailableFutureSeasons(todayIsoDate = "2026-07-05")
+
+        assertEquals(listOf("s1e1"), filtered.map(MetaVideo::id))
+    }
 }

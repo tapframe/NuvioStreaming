@@ -5,6 +5,7 @@ import com.nuvio.app.features.watching.domain.WatchingContentRef
 import com.nuvio.app.features.watching.domain.WatchingProgressRecord
 import com.nuvio.app.features.watching.domain.continueWatchingProgressEntries
 import com.nuvio.app.features.watching.domain.isProgressComplete
+import com.nuvio.app.features.watching.domain.isSeriesLikeWatchingContentType
 import com.nuvio.app.features.watching.domain.resumeProgressForSeries
 import com.nuvio.app.features.watching.domain.shouldStoreProgress
 import kotlinx.serialization.Serializable
@@ -13,6 +14,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 internal const val ContinueWatchingLimit = DefaultContinueWatchingLimit
+private const val WatchProgressSnapshotConflictToleranceMs = 1_000L
 
 @Serializable
 internal data class StoredWatchProgressPayload(
@@ -20,6 +22,7 @@ internal data class StoredWatchProgressPayload(
     val lastSuccessfulPushEpochMs: Long = 0L,
     val deltaCursorEventId: Long = 0L,
     val deltaInitialized: Boolean = false,
+    val dirtyProgressKeys: Set<String> = emptySet(),
 )
 
 internal object WatchProgressCodec {
@@ -34,8 +37,16 @@ internal object WatchProgressCodec {
     fun decodePayload(payload: String): StoredWatchProgressPayload =
         runCatching {
             json.decodeFromString<StoredWatchProgressPayload>(payload).let { storedPayload ->
+                val migratedEntries = storedPayload.entries
+                    .map { entry -> entry.normalizedCompletion().withResolvedProgressKey() }
+                    .newestByProgressKey()
+                    .values
+                    .sortedWith(watchProgressEntryFreshnessComparator.reversed())
                 storedPayload.copy(
-                    entries = storedPayload.entries.map(WatchProgressEntry::normalizedCompletion),
+                    entries = migratedEntries,
+                    dirtyProgressKeys = storedPayload.dirtyProgressKeys.intersect(
+                        migratedEntries.mapTo(mutableSetOf()) { entry -> entry.resolvedProgressKey() },
+                    ),
                 )
             }
         }.getOrDefault(StoredWatchProgressPayload())
@@ -53,13 +64,18 @@ internal object WatchProgressCodec {
         lastSuccessfulPushEpochMs: Long,
         deltaCursorEventId: Long,
         deltaInitialized: Boolean,
+        dirtyProgressKeys: Set<String> = emptySet(),
     ): String =
         json.encodeToString(
             StoredWatchProgressPayload(
-                entries = entries.toList().sortedByDescending { it.lastUpdatedEpochMs },
+                entries = entries
+                    .newestByProgressKey()
+                    .values
+                    .sortedWith(watchProgressEntryFreshnessComparator.reversed()),
                 lastSuccessfulPushEpochMs = lastSuccessfulPushEpochMs,
                 deltaCursorEventId = deltaCursorEventId,
                 deltaInitialized = deltaInitialized,
+                dirtyProgressKeys = dirtyProgressKeys,
             ),
         )
 }
@@ -79,26 +95,41 @@ internal fun isWatchProgressComplete(
     isEnded = isEnded,
 )
 
-internal fun List<WatchProgressEntry>.resumeEntryForSeries(metaId: String): WatchProgressEntry? =
-    firstOrNull { entry -> entry.parentMetaId == metaId }?.let { seed ->
-        resumeProgressForSeries(
-            content = WatchingContentRef(type = seed.parentMetaType, id = metaId),
-            progressRecords = map(WatchProgressEntry::toDomainProgressRecord),
-        )?.let { record ->
-            firstOrNull { entry -> entry.videoId == record.videoId }
-        }
+internal fun List<WatchProgressEntry>.resumeEntryForSeries(metaId: String): WatchProgressEntry? {
+    val candidates = newestByProgressKey().values.toList()
+    val normalizedMetaId = metaId.trim()
+    if (normalizedMetaId.isEmpty()) return null
+    val contentCandidates = candidates.filter { entry ->
+        entry.parentMetaId.trim() == normalizedMetaId
     }
+    val seed = contentCandidates.firstOrNull() ?: return null
+    val hasSeriesCandidate = contentCandidates.any { entry ->
+        entry.parentMetaType.isSeriesLikeWatchingContentType()
+    }
+    val requestedType = if (hasSeriesCandidate) "series" else seed.parentMetaType
+
+    return resumeProgressForSeries(
+        content = WatchingContentRef(type = requestedType, id = normalizedMetaId),
+        progressRecords = candidates.map(WatchProgressEntry::toDomainProgressRecord),
+    )?.let { record ->
+        candidates.firstOrNull { entry -> entry.resolvedProgressKey() == record.identityKey }
+    }
+}
 
 internal fun List<WatchProgressEntry>.continueWatchingEntries(
     limit: Int = ContinueWatchingLimit,
 ): List<WatchProgressEntry> {
-    val inProgressEntries = filter { entry -> entry.shouldTreatAsInProgressForContinueWatching() }
+    val selectionEntries = filter { entry ->
+        entry.isEffectivelyCompleted || entry.shouldTreatAsInProgressForContinueWatching()
+    }.newestByProgressKey().values.toList()
     val domainEntries = continueWatchingProgressEntries(
-        progressRecords = inProgressEntries.map(WatchProgressEntry::toDomainProgressRecord),
+        progressRecords = selectionEntries.map(WatchProgressEntry::toDomainProgressRecord),
         limit = limit,
     )
-    val ids = domainEntries.map { record -> record.videoId }.toSet()
-    return inProgressEntries.filter { entry -> entry.videoId in ids }
+    val identityKeys = domainEntries.map { record -> record.identityKey }.toSet()
+    return selectionEntries
+        .filter { entry -> entry.resolvedProgressKey() in identityKeys }
+        .filter { entry -> entry.shouldTreatAsInProgressForContinueWatching() }
         .sortedByDescending { it.lastUpdatedEpochMs }
 }
 
@@ -124,6 +155,24 @@ internal fun WatchProgressEntry.shouldUseAsCompletedSeedForContinueWatching(): B
     return explicitPercent >= WatchProgressTraktPlaybackNextUpSeedPercentThreshold
 }
 
+internal fun shouldReplaceProgressSnapshotEntry(
+    existing: WatchProgressEntry,
+    candidate: WatchProgressEntry,
+): Boolean {
+    val normalizedExisting = existing.normalizedCompletion()
+    val normalizedCandidate = candidate.normalizedCompletion()
+    val existingInProgress = normalizedExisting.shouldTreatAsInProgressForContinueWatching()
+    val candidateInProgress = normalizedCandidate.shouldTreatAsInProgressForContinueWatching()
+    if (existingInProgress != candidateInProgress) {
+        val inProgressEntry = if (candidateInProgress) normalizedCandidate else normalizedExisting
+        val completedEntry = if (candidateInProgress) normalizedExisting else normalizedCandidate
+        val inProgressIsCurrentEnough =
+            inProgressEntry.lastUpdatedEpochMs >= completedEntry.lastUpdatedEpochMs - WatchProgressSnapshotConflictToleranceMs
+        return if (candidateInProgress) inProgressIsCurrentEnough else !inProgressIsCurrentEnough
+    }
+    return normalizedCandidate.lastUpdatedEpochMs > normalizedExisting.lastUpdatedEpochMs
+}
+
 internal fun shouldCascadeCompletedProgressToWatchedHistory(
     entry: WatchProgressEntry,
     isUsingTraktProgress: Boolean,
@@ -144,17 +193,18 @@ internal fun isMalformedNextUpSeedContentId(contentId: String?): Boolean {
 private fun WatchProgressEntry.toDomainProgressRecord(): WatchingProgressRecord =
     normalizedCompletion().let { entry ->
         WatchingProgressRecord(
-        content = WatchingContentRef(
-            type = entry.parentMetaType,
-            id = entry.parentMetaId,
-        ),
-        videoId = entry.videoId,
-        seasonNumber = entry.seasonNumber,
-        episodeNumber = entry.episodeNumber,
-        lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
-        lastPositionMs = entry.lastPositionMs,
-        isCompleted = entry.isCompleted,
-        episodeTitle = entry.episodeTitle,
-        episodeThumbnail = entry.episodeThumbnail,
-    )
+            content = WatchingContentRef(
+                type = entry.parentMetaType,
+                id = entry.parentMetaId,
+            ),
+            videoId = entry.videoId,
+            seasonNumber = entry.seasonNumber,
+            episodeNumber = entry.episodeNumber,
+            lastUpdatedEpochMs = entry.lastUpdatedEpochMs,
+            lastPositionMs = entry.lastPositionMs,
+            isCompleted = entry.isEffectivelyCompleted,
+            episodeTitle = entry.episodeTitle,
+            episodeThumbnail = entry.episodeThumbnail,
+            identityKey = entry.resolvedProgressKey(),
+        )
     }

@@ -23,7 +23,7 @@ import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1585,7 +1585,7 @@ private fun DebridDeviceAuthDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                    NuvioLoadingIndicator(modifier = Modifier.size(18.dp))
                     Text(
                         text = startingMessage,
                         style = MaterialTheme.typography.bodyMedium,
@@ -1633,7 +1633,7 @@ private fun DebridDeviceAuthDialog(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (isPolling) {
-                            CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                            NuvioLoadingIndicator(modifier = Modifier.size(16.dp))
                         }
                         Text(
                             text = message,

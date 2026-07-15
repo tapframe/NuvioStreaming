@@ -101,13 +101,27 @@ class StreamModelsTest {
     }
 
     @Test
-    fun `torrent url falls through to http externalUrl`() {
+    fun `plain http externalUrl is surfaced only for external opening`() {
+        val url = "https://example.com/watch"
+        val stream = stream(externalUrl = url)
+
+        assertNull(stream.playableDirectUrl)
+        assertEquals(url, stream.externalOpenUrl)
+        assertTrue(stream.shouldOpenExternally)
+        assertTrue(stream.isSelectableForPlayback(debridEnabled = false))
+    }
+
+    @Test
+    fun `torrent url does not fall through to http externalUrl as playable`() {
         val httpUrl = "https://cdn.example.com/video.mp4"
         val stream = stream(
             url = "torrent://$hexHash",
             externalUrl = httpUrl,
         )
-        assertEquals(httpUrl, stream.playableDirectUrl)
+
+        assertNull(stream.playableDirectUrl)
+        assertEquals(httpUrl, stream.externalOpenUrl)
+        assertFalse(stream.shouldOpenExternally)
     }
 
     // -----------------------------------------------------------------------
@@ -267,6 +281,30 @@ class StreamModelsTest {
         assertFalse(stream.isTorrentStream)
         assertEquals("https://cdn.example.com/video.mp4", stream.playableDirectUrl)
         assertNull(stream.p2pInfoHash)
+    }
+
+    @Test
+    fun `parser keeps externalUrl as external target instead of playable URL`() {
+        val streams = StreamParser.parse(
+            payload = """
+                {
+                  "streams": [
+                    {
+                      "externalUrl": "https://megogo.net/ua/search-extended?query=Barbie",
+                      "name": "Watch on Megogo"
+                    }
+                  ]
+                }
+            """.trimIndent(),
+            addonName = "Ukrainian Streams",
+            addonId = "addon.ukrainian.streams",
+        )
+
+        val stream = streams.single()
+        assertNull(stream.playableDirectUrl)
+        assertEquals("https://megogo.net/ua/search-extended?query=Barbie", stream.externalOpenUrl)
+        assertTrue(stream.shouldOpenExternally)
+        assertTrue(stream.isSelectableForPlayback(debridEnabled = false))
     }
 
     // -----------------------------------------------------------------------

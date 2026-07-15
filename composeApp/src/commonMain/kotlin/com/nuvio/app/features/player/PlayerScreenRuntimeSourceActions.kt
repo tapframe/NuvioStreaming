@@ -49,6 +49,17 @@ internal fun PlayerScreenRuntime.p2pSentinelUrl(infoHash: String, fileIdx: Int?)
 internal fun PlayerScreenRuntime.isP2pStream(stream: StreamItem): Boolean =
     stream.needsLocalDebridResolve && stream.p2pInfoHash != null
 
+internal fun PlayerScreenRuntime.openExternalSourceUrl(stream: StreamItem): Boolean {
+    if (!stream.shouldOpenExternally) return false
+    val url = stream.externalOpenUrl ?: return false
+    val openExternalUrl = args.onOpenExternalUrl ?: return false
+    openExternalUrl(url)
+    showSourcesPanel = false
+    showEpisodesPanel = false
+    controlsVisible = true
+    return true
+}
+
 internal fun StreamItem.playerSourceIdentityKey(): String? {
     p2pInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
         return "torrent:$hash:${p2pFileIdx ?: -1}"
@@ -240,6 +251,7 @@ internal fun PlayerScreenRuntime.switchToSource(stream: StreamItem) {
         switchToP2pSourceStream(stream)
         return
     }
+    if (openExternalSourceUrl(stream)) return
     val url = stream.playableDirectUrl ?: return
     val sourceIdentityKey = stream.playerSourceIdentityKey()
     if (url == activeSourceUrl) {
@@ -292,6 +304,7 @@ internal fun PlayerScreenRuntime.switchToEpisodeStream(stream: StreamItem, episo
         switchToP2pEpisodeStream(stream, episode)
         return
     }
+    if (openExternalSourceUrl(stream)) return
     val url = stream.playableDirectUrl ?: return
     resetEpisodePanelAndNextEpisodeState()
     flushWatchProgress()
@@ -322,7 +335,12 @@ internal fun PlayerScreenRuntime.switchToDownloadedEpisode(downloadItem: Downloa
         fallbackVideoId = episode.id,
     )
     val resolvedVideoId = episode.id.takeIf { it.isNotBlank() } ?: fallbackVideoId
-    val epEntry = WatchProgressRepository.progressForVideo(resolvedVideoId)
+    val epEntry = WatchProgressRepository.progressForVideo(
+        videoId = resolvedVideoId,
+        parentMetaId = parentMetaId,
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
+    )
         ?.takeIf { !it.isCompleted }
     val epResumeFraction = epEntry?.progressPercent
         ?.takeIf { it > 0f }
@@ -426,7 +444,10 @@ private fun PlayerScreenRuntime.resolveEpisodeResume(epVideoId: String, episode:
         fallbackVideoId = epVideoId,
     )
     val epEntry = WatchProgressRepository.progressForVideo(
-        epVideoId.takeIf { it.isNotBlank() } ?: epResumeVideoId,
+        videoId = epVideoId.takeIf { it.isNotBlank() } ?: epResumeVideoId,
+        parentMetaId = parentMetaId,
+        seasonNumber = episode.season,
+        episodeNumber = episode.episode,
     )?.takeIf { !it.isCompleted }
     val epResumeFraction = epEntry?.progressPercent
         ?.takeIf { it > 0f }

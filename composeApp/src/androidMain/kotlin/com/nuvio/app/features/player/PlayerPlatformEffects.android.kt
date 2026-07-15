@@ -5,15 +5,21 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
+import androidx.activity.ComponentActivity
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.PictureInPictureModeChangedInfo
+import androidx.core.util.Consumer
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -57,7 +63,7 @@ actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
 @Composable
 actual fun ManagePlayerPictureInPicture(
     isPlaying: Boolean,
-    playerSize: IntSize,
+    videoSize: IntSize,
 ) {
     val activity = LocalContext.current.findActivity() ?: return
 
@@ -72,9 +78,28 @@ actual fun ManagePlayerPictureInPicture(
             activity = activity,
             isActive = true,
             isPlaying = isPlaying,
-            playerSize = playerSize,
+            videoSize = videoSize,
         )
     }
+}
+
+@Composable
+actual fun rememberIsInPictureInPicture(): Boolean {
+    val context = LocalContext.current
+    val activity = context.findActivity() ?: return false
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+    val componentActivity = activity as? ComponentActivity ?: return false
+    var pipState by remember(activity) { mutableStateOf(componentActivity.isInPictureInPictureMode) }
+    DisposableEffect(componentActivity) {
+        val listener = Consumer<PictureInPictureModeChangedInfo> { info ->
+            pipState = info.isInPictureInPictureMode
+        }
+        componentActivity.addOnPictureInPictureModeChangedListener(listener)
+        onDispose {
+            componentActivity.removeOnPictureInPictureModeChangedListener(listener)
+        }
+    }
+    return pipState
 }
 
 @Composable

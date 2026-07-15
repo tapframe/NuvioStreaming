@@ -12,9 +12,12 @@
     <locale android:name="pl"/>
 	<locale android:name="pt-BR"/>
     <locale android:name="pt"/>
+    <locale android:name="ro"/>
     <locale android:name="sk"/>
     <locale android:name="es"/>
     <locale android:name="tr"/>
     <locale android:name="nb"/>
+    <locale android:name="nl"/>
 	<locale android:name="ja"/>
+    <locale android:name="vi"/>
 </locale-config>

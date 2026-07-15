@@ -14,6 +14,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>nuvio</string>
+				<string>stremio</string>
 			</array>
 		</dict>
 	</array>
@@ -29,9 +30,13 @@
 		<string>outplayer</string>
 		<string>open-vidhub</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
+	<false/>
 </dict>
 </plist>

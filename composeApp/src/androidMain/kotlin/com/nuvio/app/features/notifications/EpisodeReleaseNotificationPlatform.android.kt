@@ -23,7 +23,7 @@ import androidx.work.WorkManager
 import com.nuvio.app.core.storage.ProfileScopedKey
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
-import io.ktor.client.engine.android.Android
+import io.ktor.client.engine.okhttp.OkHttp
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -53,7 +53,7 @@ internal actual object EpisodeReleaseNotificationPlatform {
     private var currentActivity: ComponentActivity? = null
     private var pendingPermissionContinuation: kotlin.coroutines.Continuation<Boolean>? = null
     private val httpClient by lazy {
-        HttpClient(Android) {
+        HttpClient(OkHttp) {
             install(HttpTimeout) {
                 requestTimeoutMillis = 15_000
                 connectTimeoutMillis = 15_000

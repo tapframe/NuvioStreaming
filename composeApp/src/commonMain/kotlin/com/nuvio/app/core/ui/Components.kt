@@ -35,7 +35,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +72,8 @@ import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import com.nuvio.app.navigation.LocalNativeNavigationBarHidden
+import com.nuvio.app.navigation.LocalUseNativeNavigation
 
 @Composable
 fun NuvioScreen(
@@ -143,6 +144,20 @@ fun NuvioScreenHeader(
 ) {
     val tokens = MaterialTheme.nuvio
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val nativeDetailNavigation = LocalUseNativeNavigation.current &&
+        !LocalNativeNavigationBarHidden.current &&
+        onBack != null
+    if (nativeDetailNavigation) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(bottom = NuvioTokens.Space.s4),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+            content = actions,
+        )
+        return
+    }
     val resolvedTopPadding = topPadding ?: if (includeStatusBarPadding) statusBarTop else NuvioTokens.Space.none
     Box(
         modifier = modifier.fillMaxWidth(),
@@ -264,6 +279,8 @@ fun NuvioBackButton(
     iconSize: Dp = NuvioTokens.Icon.md,
     contentDescription: String = stringResource(Res.string.action_back),
 ) {
+    if (LocalUseNativeNavigation.current && !LocalNativeNavigationBarHidden.current) return
+
     Box(
         modifier = modifier
             .size(buttonSize)
@@ -431,9 +448,8 @@ fun NuvioStatusModal(
                 modifier = Modifier.padding(tokens.spacing.dialogPadding),
             ) {
                 if (isBusy) {
-                    CircularProgressIndicator(
+                    NuvioLoadingIndicator(
                         color = tokens.colors.accent,
-                        strokeWidth = NuvioTokens.Border.medium + NuvioTokens.Space.hairline,
                     )
                     Spacer(modifier = Modifier.height(NuvioTokens.Space.s16))
                 }

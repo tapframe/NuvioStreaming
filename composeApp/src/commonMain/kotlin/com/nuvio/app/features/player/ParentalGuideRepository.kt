@@ -8,7 +8,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-private const val PARENTAL_GUIDE_BASE_URL = "https://api.imdbapi.dev"
+private const val PARENTAL_GUIDE_BASE_URL = "https://api.tiffara.com"
 private val imdbIdPattern = Regex("tt\\d+")
 
 data class ParentalGuideResult(

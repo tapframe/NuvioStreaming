@@ -9,14 +9,15 @@
 #    ./scripts/debug_logs.sh [options]
 #
 #  Options:
-#    -s, --serial <id>    ADB device serial (optional, for multi-device)
-#    -t, --tag <regex>    Additional logcat tag filter regex (default: all app)
-#    -c, --clear          Clear logcat buffer before streaming
-#    -h, --help           Show help
+#    -s, --serial <id>     ADB device serial (optional, for multi-device)
+#    -p, --package <name>  Android package/applicationId (default: debug build)
+#    -t, --tag <regex>     Additional logcat tag filter regex (default: all app)
+#    -c, --clear           Clear logcat buffer before streaming
+#    -h, --help            Show help
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 
-PACKAGE="com.nuvio.app"
+PACKAGE="${NUVIO_LOG_PACKAGE:-com.nuviodebug.com}"
 SERIAL=""
 CLEAR_BUFFER=false
 TAG_FILTER=""
@@ -58,10 +59,11 @@ Usage: ./scripts/debug_logs.sh [options]
 Stream live colour-coded ADB logs for Nuvio debug builds.
 
 Options:
-  -s, --serial <id>    ADB device serial (optional)
-  -t, --tag <regex>    Additional grep regex to filter log tags
-  -c, --clear          Clear logcat buffer before streaming
-  -h, --help           Show this help
+  -s, --serial <id>     ADB device serial (optional)
+  -p, --package <name>  Android package/applicationId (default: com.nuviodebug.com)
+  -t, --tag <regex>     Additional grep regex to filter log tags
+  -c, --clear           Clear logcat buffer before streaming
+  -h, --help            Show this help
 
 Hotkeys (while running):
   C   Clear all logs currently shown in the terminal
@@ -70,6 +72,7 @@ Hotkeys (while running):
 Examples:
   ./scripts/debug_logs.sh
   ./scripts/debug_logs.sh --serial emulator-5554
+  ./scripts/debug_logs.sh --package com.nuvio.app
   ./scripts/debug_logs.sh --tag 'MetaDetailsRepo|SeriesContent'
   ./scripts/debug_logs.sh --clear --tag 'Sync|Auth'
 EOF
@@ -79,6 +82,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -s|--serial)  SERIAL="${2:-}"; shift 2 ;;
+    -p|--package) PACKAGE="${2:-}"; shift 2 ;;
     -t|--tag)     TAG_FILTER="${2:-}"; shift 2 ;;
     -c|--clear)   CLEAR_BUFFER=true; shift ;;
     -h|--help)    usage; exit 0 ;;

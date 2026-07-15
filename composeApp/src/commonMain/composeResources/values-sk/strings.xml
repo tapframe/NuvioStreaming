@@ -434,7 +434,9 @@
     <string name="compose_settings_root_check_updates_description">Stiahnuť najnovšie vydanie</string>
     <string name="compose_settings_root_check_updates_title">Skontrolovať aktualizácie</string>
     <string name="compose_settings_root_content_discovery_description">Spravovať doplnky a zdroje objavovania.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Spravujte doplnky a vyberte, čo sa má zobrazovať v Nuviu.</string>
     <string name="compose_settings_root_downloads_description">Spravovať stiahnuté filmy a epizódy.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Spravujte obsah uložený v tomto zariadení.</string>
     <string name="compose_settings_root_downloads_title">Stiahnuté</string>
     <string name="compose_settings_root_general_section">VŠEOBECNÉ</string>
     <string name="compose_settings_root_integrations_description">Spravovať dostupné integrácie</string>
@@ -532,7 +534,6 @@
     <string name="settings_account_status">Stav</string>
     <string name="settings_account_status_anonymous">Anonymný</string>
     <string name="settings_account_status_signed_in">Prihlásený</string>
-    <string name="settings_account_sync_backend">Backend synchronizácie</string>
     <string name="settings_appearance_amoled_black">AMOLED čierna</string>
     <string name="settings_appearance_amoled_description">Použiť čisto čierne pozadie pre OLED obrazovky.</string>
     <string name="settings_appearance_app_language">Jazyk aplikácie</string>
@@ -779,7 +780,7 @@
     <string name="community_section_description">Pozrite sa na ľudí, ktorí budujú a podporujú Nuvio na Mobile, TV a Webe.</string>
     <string name="community_donation_progress_title">Server a údržba tohto mesiaca</string>
     <string name="community_donation_progress_complete">Pokryté. Ďalšia podpora ide na vývoj.</string>
-    <string name="community_donation_progress_remaining">Po 100 %% ide ďalšia podpora na vývoj.</string>
+    <string name="community_donation_progress_remaining">Po 100 % ide ďalšia podpora na vývoj.</string>
     <string name="community_loading_donation_progress">Načítavanie postupu financovania...</string>
     <string name="community_supporters_not_configured">API podporovateľov nie je nakonfigurované. Pridajte DONATIONS_BASE_URL do local.properties.</string>
     <string name="community_tab_contributors">Prispievatelia</string>
@@ -1899,17 +1900,17 @@
     <string name="player_error_torrent">Chyba torrentu: %1$s</string>
     <!-- Current cmp-rewrite string additions -->
     <string name="action_switch">Prepnúť</string>
-    <string name="addons_appstore_add_description">Pripojte vlastný mediálny server na prehliadanie a prehrávanie z vašej osobnej knižnice.</string>
-    <string name="addons_appstore_empty_subtitle">Pridajte URL servera vyššie, ak chcete, aby Nuvio zobrazovalo vašu súkromnú knižnicu.</string>
-    <string name="addons_appstore_empty_title">Nie sú pripojené žiadne osobné knižnice.</string>
-    <string name="addons_appstore_input_placeholder">URL servera</string>
-    <string name="addons_appstore_install_button">Pridať</string>
+    <string name="addons_appstore_add_description">Preneste svoju knižnicu do Nuvia pomocou doplnkov, ktoré používate.</string>
+    <string name="addons_appstore_empty_subtitle">Pridajte doplnok a začnite si vytvárať knižnicu.</string>
+    <string name="addons_appstore_empty_title">Prispôsobte si Nuvio.</string>
+    <string name="addons_appstore_input_placeholder">URL doplnku</string>
+    <string name="addons_appstore_install_button">Pridať doplnok</string>
+    <string name="store_empty_unavailable_title">Zatiaľ tu nič nie je</string>
+    <string name="store_empty_unavailable_message">Doplnky, ktoré používate, tu zatiaľ nemajú čo zobraziť.</string>
     <string name="compose_auth_terms_prefix">Registráciou súhlasím s</string>
     <string name="compose_auth_terms_link">Podmienkami</string>
-    <string name="debug_backend_switch_confirm_title">Prepnúť backend?</string>
-    <string name="debug_backend_switch_confirm_message">Prepnúť na %1$s a odhlásiť sa? Na vybranom backende sa môžete znova prihlásiť.</string>
     <string name="settings_appearance_app_language_device">Jazyk zariadenia</string>
-    <string name="settings_content_discovery_addons_description_appstore">Pripojte osobné mediálne zdroje a spravujte prístup k vlastnej knižnici.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Pridávajte a spravujte doplnky, ktoré používate s Nuviom.</string>
     <string name="settings_playback_external_player_send_skip_segments">Odosielať časové značky intra a outra</string>
     <string name="settings_playback_external_player_send_skip_segments_description">Odovzdať vyriešené časové značky intra a outra externému prehrávaču na automatické preskakovanie. Funguje iba v prehrávačoch, ktoré to podporujú; ostatné prehrávače to ignorujú.</string>
     <string name="settings_playback_option_original">Pôvodný jazyk</string>

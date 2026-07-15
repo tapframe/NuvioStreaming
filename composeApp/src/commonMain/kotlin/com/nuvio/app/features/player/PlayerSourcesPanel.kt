@@ -26,7 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -176,9 +176,8 @@ fun PlayerSourcesPanel(
                                         .padding(vertical = NuvioTokens.Space.s40),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    CircularProgressIndicator(
+                                    NuvioLoadingIndicator(
                                         color = tokens.colors.accent,
-                                        strokeWidth = tokens.borders.medium,
                                         modifier = Modifier.size(tokens.icons.lg + NuvioTokens.Space.s4),
                                     )
                                 }
@@ -208,7 +207,7 @@ fun PlayerSourcesPanel(
                                 ) {
                                     itemsIndexed(
                                         items = streams,
-                                        key = { index, stream -> "${stream.addonId}::${index}::${stream.url ?: stream.infoHash ?: stream.clientResolve?.infoHash ?: stream.name}" },
+                                        key = { index, stream -> "${stream.addonId}::${index}::${stream.url ?: stream.infoHash ?: stream.externalUrl ?: stream.clientResolve?.infoHash ?: stream.name}" },
                                     ) { _, stream ->
                                         val isCurrent = isCurrentStream(
                                             stream = stream,
@@ -272,9 +271,8 @@ internal fun AddonFilterChip(
             horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
         ) {
             if (isLoading) {
-                CircularProgressIndicator(
+                NuvioLoadingIndicator(
                     color = tokens.colors.accent,
-                    strokeWidth = tokens.borders.thin + NuvioTokens.Space.hairline,
                     modifier = Modifier.size(NuvioTokens.Icon.xs),
                 )
             }

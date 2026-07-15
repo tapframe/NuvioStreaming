@@ -31,6 +31,13 @@
     <string name="addons_badge_unavailable">Kullanılamıyor</string>
     <string name="addons_configure">Eklentiyi ayarla</string>
     <string name="addons_delete">Eklentiyi sil</string>
+    <string name="addons_appstore_add_description">Kullandığın eklentilerle kitaplığını Nuvio'ya taşı.</string>
+    <string name="addons_appstore_empty_subtitle">Kitaplığını oluşturmaya başlamak için bir eklenti ekle.</string>
+    <string name="addons_appstore_empty_title">Nuvio'yu kendine göre ayarla.</string>
+    <string name="addons_appstore_input_placeholder">Eklenti URL'si</string>
+    <string name="addons_appstore_install_button">Eklenti ekle</string>
+    <string name="store_empty_unavailable_title">Burada henüz bir şey yok</string>
+    <string name="store_empty_unavailable_message">Kullandığın eklentilerin burada gösterecek bir şeyi yok.</string>
     <string name="addons_empty_subtitle">Nuvio'ya katalog, meta veri, yayın veya altyazı yüklemeye başlamak için bir manifest URL'si ekle.</string>
     <string name="addons_empty_title">Henüz eklenti kurulmamış.</string>
     <string name="addons_error_enter_url">Bir eklenti URL'si gir.</string>
@@ -402,7 +409,9 @@
     <string name="compose_settings_root_check_updates_description">Uygulamanın yeni sürümü var mı kontrol et.</string>
     <string name="compose_settings_root_check_updates_title">Güncellemeleri kontrol et</string>
     <string name="compose_settings_root_content_discovery_description">Eklentileri ve keşif kaynaklarını yönet.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Eklentileri yönet ve Nuvio’da nelerin görüneceğini seç.</string>
     <string name="compose_settings_root_downloads_description">İndirdiğin film ve bölümleri yönet.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Bu cihaza kaydettiklerini yönet.</string>
     <string name="compose_settings_root_downloads_title">İndirilenler</string>
     <string name="compose_settings_root_general_section">GENEL</string>
     <string name="compose_settings_root_integrations_description">TMDB ve MDBList servislerini bağla.</string>
@@ -587,6 +596,7 @@
     <string name="settings_content_discovery_section_home">ANA SAYFA</string>
     <string name="settings_content_discovery_section_sources">KAYNAKLAR</string>
     <string name="settings_content_discovery_addons_description">İçerik kaynaklarını kur, kaldır, yenile ve sırala.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Nuvio ile kullandığın eklentileri ekle ve yönet.</string>
     <string name="settings_content_discovery_plugins_description">JavaScript scraper depoları kur ve sağlayıcıları içeriden test et.</string>
     <string name="settings_content_discovery_homescreen_description">Ana sayfada hangi katalogların hangi sırayla görüneceğini kontrol et.</string>
     <string name="settings_content_discovery_meta_screen_description">Detay bölümlerini kapat ve öne çıkanların altındaki her şeyi yeniden sırala.</string>

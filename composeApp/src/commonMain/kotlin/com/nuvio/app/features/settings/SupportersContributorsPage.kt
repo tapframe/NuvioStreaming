@@ -27,7 +27,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -59,6 +59,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlin.math.roundToInt
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
@@ -208,8 +209,7 @@ private object SupportersContributorsRepository {
 
         val progress = donationsResponse.monthlyGoal
             ?.progressPercent
-            ?.toInt()
-            ?.coerceIn(0, 100)
+            ?.toDonationProgressPercent()
             ?.let { percent -> DonationProgress(progressPercent = percent) }
 
         SupportersResult(
@@ -239,6 +239,15 @@ private object SupportersContributorsRepository {
         val month = parts[1].toLongOrNull() ?: return Long.MIN_VALUE
         val day = parts[2].toLongOrNull() ?: return Long.MIN_VALUE
         return year * 10_000L + month * 100L + day
+    }
+
+    private fun Double.toDonationProgressPercent(): Int? {
+        if (isNaN()) return null
+        return when {
+            this >= 100.0 -> 100
+            this <= 0.0 -> 0
+            else -> roundToInt().coerceIn(0, 99)
+        }
     }
 }
 
@@ -630,13 +639,27 @@ private fun DonationProgressSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(
-            text = stringResource(Res.string.community_donation_progress_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
+        Row(
             modifier = Modifier.fillMaxWidth(),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(Res.string.community_donation_progress_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            if (progress != null && errorMessage == null) {
+                Text(
+                    text = "$percent%",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
 
         if (isLoading && progress == null) {
             LinearProgressIndicator(
@@ -835,7 +858,7 @@ private fun LoadingState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CircularProgressIndicator(strokeWidth = 2.dp)
+        NuvioLoadingIndicator()
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,

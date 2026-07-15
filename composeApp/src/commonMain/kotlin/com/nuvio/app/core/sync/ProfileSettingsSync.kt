@@ -17,6 +17,8 @@ import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepositor
 import com.nuvio.app.features.player.PlayerSettingsStorage
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.profiles.ProfileRepository
+import com.nuvio.app.core.ui.CardDepthStyleRepository
+import com.nuvio.app.core.ui.CardDepthStyleStorage
 import com.nuvio.app.core.ui.PosterCardStyleRepository
 import com.nuvio.app.core.ui.PosterCardStyleStorage
 import com.nuvio.app.features.settings.ThemeSettingsStorage
@@ -39,7 +41,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -86,6 +87,12 @@ object ProfileSettingsSync {
         observeLocalChangesAndPush()
     }
 
+    fun clearAccountState() {
+        observeJob?.cancel()
+        observeJob = null
+        skipNextPushSignature = null
+    }
+
     suspend fun pull(profileId: Int): Boolean {
         ensureRepositoriesLoaded()
         return syncMutex.withLock {
@@ -110,9 +117,6 @@ object ProfileSettingsSync {
 
                 if (remoteJson == null) {
                     log.i { "pull(profileId=$profileId) — no remote settings blob found" }
-                    if (localSignature != defaultSignature()) {
-                        pushToRemoteLocked(profileId, localBlob)
-                    }
                     return@withLock false
                 }
 
@@ -124,7 +128,6 @@ object ProfileSettingsSync {
                         log.e(error) { "pull(profileId=$profileId) — failed to decode remote settings blob" }
                         return@withLock false
                     }
-
                     val remoteSignature = buildSignature(remoteBlob)
                     if (remoteSignature == localSignature) {
                         log.d { "pull(profileId=$profileId) — remote matches local" }
@@ -149,17 +152,18 @@ object ProfileSettingsSync {
         }
     }
 
-    suspend fun pushCurrentProfileToRemote() {
+    suspend fun pushCurrentProfileToRemote(): Boolean {
         ensureRepositoriesLoaded()
-        syncMutex.withLock {
+        return syncMutex.withLock {
             runCatching {
                 val profileId = ProfileRepository.activeProfileId
                 val blob = exportSettingsBlob()
-                if (ProfileRepository.activeProfileId != profileId) return@runCatching
+                if (ProfileRepository.activeProfileId != profileId) return@runCatching false
                 pushToRemoteLocked(profileId, blob)
+                true
             }.onFailure { error ->
                 log.e(error) { "pushCurrentProfileToRemote() — FAILED" }
-            }
+            }.getOrDefault(false)
         }
     }
 
@@ -170,6 +174,7 @@ object ProfileSettingsSync {
             ThemeSettingsRepository.amoledEnabled.map { "amoled" },
             ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.map { "liquid_glass_tab_bar" },
             PosterCardStyleRepository.uiState.map { "poster_card_style" },
+            CardDepthStyleRepository.uiState.map { "card_depth_style" },
             PlayerSettingsRepository.uiState.map { "player" },
             StreamBadgeSettingsRepository.uiState.map { "stream_badges" },
             DebridSettingsRepository.uiState.map { "debrid" },
@@ -206,6 +211,7 @@ object ProfileSettingsSync {
             put("p_profile_id", profileId)
             put("p_platform", MOBILE_SYNC_PLATFORM)
             put("p_settings_json", json.encodeToJsonElement(MobileProfileSettingsBlob.serializer(), blob))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_push_profile_settings_blob", params)
         log.d { "pushToRemoteLocked(profileId=$profileId) — success" }
@@ -217,6 +223,7 @@ object ProfileSettingsSync {
             features = MobileProfileSettingsFeatures(
                 themeSettings = ThemeSettingsStorage.exportToSyncPayload(),
                 posterCardStyleSettingsPayload = PosterCardStyleStorage.loadPayload().orEmpty().trim(),
+                cardDepthStyleSettingsPayload = CardDepthStyleStorage.loadPayload().orEmpty().trim(),
                 playerSettings = PlayerSettingsStorage.exportToSyncPayload(),
                 streamBadgeSettings = StreamBadgeSettingsStorage.exportToSyncPayload(),
                 debridSettings = DebridSettingsStorage.exportToSyncPayload(),
@@ -240,6 +247,9 @@ object ProfileSettingsSync {
 
         PosterCardStyleStorage.savePayload(blob.features.posterCardStyleSettingsPayload)
         PosterCardStyleRepository.onProfileChanged()
+
+        CardDepthStyleStorage.savePayload(blob.features.cardDepthStyleSettingsPayload)
+        CardDepthStyleRepository.onProfileChanged()
 
         PlayerSettingsStorage.replaceFromSyncPayload(blob.features.playerSettings)
         PlayerSettingsRepository.onProfileChanged()
@@ -278,6 +288,7 @@ object ProfileSettingsSync {
     private fun ensureRepositoriesLoaded() {
         ThemeSettingsRepository.ensureLoaded()
         PosterCardStyleRepository.ensureLoaded()
+        CardDepthStyleRepository.ensureLoaded()
         PlayerSettingsRepository.ensureLoaded()
         StreamBadgeSettingsRepository.ensureLoaded()
         DebridSettingsRepository.ensureLoaded()
@@ -294,14 +305,12 @@ object ProfileSettingsSync {
     private fun buildSignature(blob: MobileProfileSettingsBlob): String =
         json.encodeToString(MobileProfileSettingsBlob.serializer(), blob)
 
-    private fun defaultSignature(): String =
-        buildSignature(MobileProfileSettingsBlob())
-
     private fun currentObservedStateSignature(): String = listOf(
         "theme=${ThemeSettingsRepository.selectedTheme.value.name}",
         "amoled=${ThemeSettingsRepository.amoledEnabled.value}",
         "liquid_glass_tab_bar=${ThemeSettingsRepository.liquidGlassNativeTabBarEnabled.value}",
         "poster_card_style=${PosterCardStyleRepository.uiState.value}",
+        "card_depth_style=${CardDepthStyleRepository.uiState.value}",
         "player=${PlayerSettingsRepository.uiState.value}",
         "stream_badges=${StreamBadgeSettingsRepository.uiState.value}",
         "debrid=${DebridSettingsRepository.uiState.value}",
@@ -314,6 +323,7 @@ object ProfileSettingsSync {
         "trakt_comments=${TraktCommentsSettings.enabled.value}",
         "episode_release_alerts=${EpisodeReleaseNotificationsRepository.uiState.value.isEnabled}",
     ).joinToString(separator = "||")
+
 }
 
 @Serializable
@@ -326,6 +336,7 @@ private data class MobileProfileSettingsBlob(
 private data class MobileProfileSettingsFeatures(
     @SerialName("theme_settings") val themeSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("poster_card_style_settings_payload") val posterCardStyleSettingsPayload: String = "",
+    @SerialName("card_depth_style_settings_payload") val cardDepthStyleSettingsPayload: String = "",
     @SerialName("player_settings") val playerSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("stream_badge_settings") val streamBadgeSettings: JsonObject = JsonObject(emptyMap()),
     @SerialName("debrid_settings") val debridSettings: JsonObject = JsonObject(emptyMap()),

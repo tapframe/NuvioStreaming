@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -33,9 +34,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckCircleOutline
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAddCheckCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,7 +55,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
@@ -65,9 +71,16 @@ import com.nuvio.app.core.build.AppFeaturePolicy
 import com.nuvio.app.core.build.TrailerPlaybackMode
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
+import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.ui.NuvioBackButton
+import com.nuvio.app.core.ui.NuvioPosterZoomActionOverlay
+import com.nuvio.app.core.ui.PosterZoomAnchor
+import com.nuvio.app.core.ui.PosterZoomAnchorHolder
+import com.nuvio.app.core.ui.PosterZoomOverlayAction
 import com.nuvio.app.core.ui.TraktListPickerDialog
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import com.nuvio.app.features.details.components.DetailActionButtons
 import com.nuvio.app.features.details.components.DetailSecondaryAction
 import com.nuvio.app.features.details.components.CommentDetailSheet
@@ -111,6 +124,8 @@ import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watchprogress.ContinueWatchingPreferencesRepository
 import com.nuvio.app.features.watching.application.WatchingActions
 import com.nuvio.app.features.watching.application.WatchingState
+import com.kmpalette.rememberDominantColorState
+import com.kmpalette.extensions.painter.rememberPainterDominantColorState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
@@ -159,10 +174,14 @@ fun MetaDetailsScreen(
         WatchedRepository.ensureLoaded()
         WatchedRepository.uiState
     }.collectAsStateWithLifecycle()
+    val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val watchProgressUiState by remember {
         WatchProgressRepository.ensureLoaded()
         WatchProgressRepository.uiState
     }.collectAsStateWithLifecycle()
+    val progressByVideoId = remember(watchProgressUiState.entries, id) {
+        watchProgressUiState.byVideoIdForContent(id)
+    }
     val playerSettingsUiState by remember {
         PlayerSettingsRepository.ensureLoaded()
         PlayerSettingsRepository.uiState
@@ -171,6 +190,8 @@ fun MetaDetailsScreen(
     var autoLoadAttempted by remember(type, id) { mutableStateOf(false) }
     var observedOfflineState by remember(type, id) { mutableStateOf(false) }
     var selectedEpisodeForActions by remember(type, id) { mutableStateOf<MetaVideo?>(null) }
+    var selectedEpisodeZoomAnchor by remember(type, id) { mutableStateOf<PosterZoomAnchor?>(null) }
+    val episodeOverlayHazeState = rememberHazeState()
     var selectedSeasonForActions by remember(type, id) { mutableStateOf<Int?>(null) }
     val commentsEnabled by remember {
         TraktCommentsSettings.ensureLoaded()
@@ -302,9 +323,21 @@ fun MetaDetailsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        when {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (selectedEpisodeZoomAnchor != null) {
+                        Modifier.hazeSource(state = episodeOverlayHazeState)
+                    } else {
+                        Modifier
+                    },
+                )
+                .background(MaterialTheme.colorScheme.background),
+        ) {
+            when {
             displayedMeta == null && uiState.isLoading -> {
-                CircularProgressIndicator(
+                NuvioLoadingIndicator(
                     modifier = Modifier.align(Alignment.Center),
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -357,10 +390,11 @@ fun MetaDetailsScreen(
                 ) {
                     LibraryRepository.isSaved(meta.id, meta.type)
                 }
-                val isWatched = remember(watchedUiState.watchedKeys, metaPreview) {
+                val isWatched = remember(watchedUiState.watchedKeys, fullyWatchedSeriesKeys, metaPreview) {
                     WatchingState.isPosterWatched(
                         watchedKeys = watchedUiState.watchedKeys,
                         item = metaPreview,
+                        fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     )
                 }
                 val openLibraryListPicker = remember(meta) {
@@ -399,9 +433,6 @@ fun MetaDetailsScreen(
                         }
                         Unit
                     }
-                }
-                val progressByVideoId = remember(watchProgressUiState.entries) {
-                    watchProgressUiState.byVideoId
                 }
                 LaunchedEffect(meta.id, meta.type, watchProgressUiState.hasLoadedRemoteProgress) {
                     if (meta.type.lowercase() in setOf("series", "show", "tv", "tvshow")) {
@@ -664,7 +695,12 @@ fun MetaDetailsScreen(
                         fallbackVideoId = video.id,
                     )
                     val streamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
-                    val savedProgress = watchProgressUiState.byVideoId[streamVideoId]
+                    val savedProgress = watchProgressUiState.progressForVideo(
+                        videoId = streamVideoId,
+                        parentMetaId = meta.id,
+                        seasonNumber = season,
+                        episodeNumber = episode,
+                    )
                         ?.takeUnless { it.isCompleted }
                     onPlay?.invoke(
                         meta.type,
@@ -693,7 +729,12 @@ fun MetaDetailsScreen(
                         fallbackVideoId = video.id,
                     )
                     val streamVideoId = video.id.takeIf { it.isNotBlank() } ?: playbackVideoId
-                    val savedProgress = watchProgressUiState.byVideoId[streamVideoId]
+                    val savedProgress = watchProgressUiState.progressForVideo(
+                        videoId = streamVideoId,
+                        parentMetaId = meta.id,
+                        seasonNumber = season,
+                        episodeNumber = episode,
+                    )
                         ?.takeUnless { it.isCompleted }
                     onPlayManually?.invoke(
                         meta.type,
@@ -755,15 +796,66 @@ fun MetaDetailsScreen(
                 )
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val colorScheme = MaterialTheme.colorScheme
                     val isTablet = maxWidth >= 720.dp
                     val contentHorizontalPadding = if (isTablet) 32.dp else 18.dp
                     val contentMaxWidth = detailTabletContentMaxWidth(maxWidth, isTablet)
-                    val cinematicEnabled = metaScreenSettingsUiState.cinematicBackground && deferredMetaWorkAllowed
+                    val backdropUrl = meta.background ?: meta.poster
+                    val backgroundMode = metaScreenSettingsUiState.backgroundMode
+                    val dominantColorEnabled = backgroundMode == MetaScreenBackgroundMode.DominantColor &&
+                        deferredMetaWorkAllowed &&
+                        !backdropUrl.isNullOrBlank()
+                    var dominantBackdropPainter by remember(meta.id, backdropUrl) {
+                        mutableStateOf<Painter?>(null)
+                    }
+                    var dominantBackdropImageBitmap by remember(meta.id, backdropUrl) {
+                        mutableStateOf<ImageBitmap?>(null)
+                    }
+                    val dominantImageBitmapColorState = rememberDominantColorState(
+                        defaultColor = colorScheme.background,
+                        defaultOnColor = colorScheme.onBackground,
+                    )
+                    val dominantPainterColorState = rememberPainterDominantColorState(
+                        defaultColor = colorScheme.background,
+                        defaultOnColor = colorScheme.onBackground,
+                    )
+                    LaunchedEffect(dominantColorEnabled, dominantBackdropImageBitmap, dominantBackdropPainter) {
+                        val imageBitmap = dominantBackdropImageBitmap
+                        val painter = dominantBackdropPainter
+                        if (dominantColorEnabled) {
+                            when {
+                                imageBitmap != null -> runCatching {
+                                    dominantImageBitmapColorState.updateFrom(imageBitmap)
+                                }
+                                painter != null -> runCatching {
+                                    dominantPainterColorState.updateFrom(painter)
+                                }
+                            }
+                        }
+                    }
+                    val extractedDominantColor = if (dominantBackdropImageBitmap != null) {
+                        dominantImageBitmapColorState.color
+                    } else {
+                        dominantPainterColorState.color
+                    }
+                    val dominantBackdropTargetColor = if (dominantColorEnabled) {
+                        dominantBackdropBlendColor(extractedDominantColor, colorScheme.background)
+                    } else {
+                        colorScheme.background
+                    }
+                    val dominantBackdropColor by animateColorAsState(
+                        targetValue = dominantBackdropTargetColor,
+                        animationSpec = tween(
+                            durationMillis = 320,
+                            easing = LinearOutSlowInEasing,
+                        ),
+                        label = "detail_dominant_backdrop_color",
+                    )
 
                     Box(modifier = Modifier.fillMaxSize()) {
-                        if (cinematicEnabled) {
-                            val backdropUrl = meta.background ?: meta.poster
-                            if (backdropUrl != null) {
+                        when (backgroundMode) {
+                            MetaScreenBackgroundMode.Normal -> Unit
+                            MetaScreenBackgroundMode.Cinematic -> if (deferredMetaWorkAllowed && backdropUrl != null) {
                                 AsyncImage(
                                     model = backdropUrl,
                                     contentDescription = null,
@@ -775,7 +867,14 @@ fun MetaDetailsScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.92f)),
+                                        .background(colorScheme.background.copy(alpha = 0.92f)),
+                                )
+                            }
+                            MetaScreenBackgroundMode.DominantColor -> if (deferredMetaWorkAllowed) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(dominantBackdropColor),
                                 )
                             }
                         }
@@ -797,6 +896,11 @@ fun MetaDetailsScreen(
                                     heroTrailerReady = heroTrailerReady,
                                     heroTrailerPlayWhenReady = heroTrailerPlayWhenReady,
                                     heroTrailerMuted = heroTrailerMuted,
+                                    heroGradientColor = dominantBackdropColor.takeIf { dominantColorEnabled },
+                                    onBackdropLoaded = { painter, imageBitmap ->
+                                        dominantBackdropPainter = painter
+                                        dominantBackdropImageBitmap = imageBitmap
+                                    },
                                     onHeroTrailerMuteToggle = {
                                         HeroTrailerAudioState.toggleMuted()
                                     },
@@ -883,7 +987,10 @@ fun MetaDetailsScreen(
                                 watchedKeys = watchedUiState.watchedKeys,
                                 blurUnwatchedEpisodes = metaScreenSettingsUiState.blurUnwatchedEpisodes,
                                 onEpisodeClick = onEpisodePlayClick,
-                                onEpisodeLongPress = { video -> selectedEpisodeForActions = video },
+                                onEpisodeLongPress = { video ->
+                                    selectedEpisodeZoomAnchor = PosterZoomAnchorHolder.consume()
+                                    selectedEpisodeForActions = video
+                                },
                                 onSeasonLongPress = { season -> selectedSeasonForActions = season },
                                 onOpenMeta = onOpenMeta,
                                 onCastClick = onCastClick,
@@ -897,8 +1004,9 @@ fun MetaDetailsScreen(
                             }
                         }
 
-                        if (cinematicEnabled && heroHeightPx > 0) {
-                            val blendColor = MaterialTheme.colorScheme.background
+                        if (backgroundMode.usesBackdropBackground && deferredMetaWorkAllowed && heroHeightPx > 0) {
+                            val blendColor = dominantBackdropColor.takeIf { dominantColorEnabled }
+                                ?: colorScheme.background
                             Box(
                                 modifier = Modifier
                                     .zIndex(0.5f)
@@ -936,12 +1044,15 @@ fun MetaDetailsScreen(
                             meta = meta,
                             isSaved = isSaved,
                             progress = headerProgress,
+                            backgroundColor = dominantBackdropColor.takeIf { dominantColorEnabled },
                             onBack = onBackFromDetails,
                             onToggleSaved = toggleSaved,
                             modifier = Modifier.zIndex(2f),
                         )
 
-                        selectedEpisodeForActions?.let { selectedEpisode ->
+                        selectedEpisodeForActions
+                            ?.takeIf { selectedEpisodeZoomAnchor == null }
+                            ?.let { selectedEpisode ->
                             val isSelectedEpisodeWatched = remember(meta, selectedEpisode, watchedUiState.watchedKeys, progressByVideoId) {
                                 isEpisodeWatchedForActions(
                                     meta = meta,
@@ -1181,6 +1292,155 @@ fun MetaDetailsScreen(
                 ),
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+        }
+
+        val meta = displayedMeta
+        val selectedEpisode = selectedEpisodeForActions
+        val zoomAnchor = selectedEpisodeZoomAnchor
+        if (meta != null && selectedEpisode != null && zoomAnchor != null) {
+            val todayIsoDate = CurrentDateProvider.todayIsoDate()
+            val isSelectedEpisodeWatched = remember(meta, selectedEpisode, watchedUiState.watchedKeys, progressByVideoId) {
+                isEpisodeWatchedForActions(
+                    meta = meta,
+                    episode = selectedEpisode,
+                    watchedKeys = watchedUiState.watchedKeys,
+                    progressByVideoId = progressByVideoId,
+                )
+            }
+            val previousEpisodes = remember(meta, selectedEpisode, todayIsoDate) {
+                meta.previousReleasedEpisodesBefore(
+                    target = selectedEpisode,
+                    todayIsoDate = todayIsoDate,
+                )
+            }
+            val seasonEpisodes = remember(meta, selectedEpisode, todayIsoDate) {
+                meta.releasedEpisodesForSeason(
+                    seasonNumber = selectedEpisode.season,
+                    todayIsoDate = todayIsoDate,
+                )
+            }
+            val arePreviousEpisodesWatched = remember(previousEpisodes, watchedUiState.watchedKeys, progressByVideoId) {
+                areEpisodesWatchedForActions(
+                    meta = meta,
+                    episodes = previousEpisodes,
+                    watchedKeys = watchedUiState.watchedKeys,
+                    progressByVideoId = progressByVideoId,
+                )
+            }
+            val isSeasonWatched = remember(seasonEpisodes, watchedUiState.watchedKeys, progressByVideoId) {
+                areEpisodesWatchedForActions(
+                    meta = meta,
+                    episodes = seasonEpisodes,
+                    watchedKeys = watchedUiState.watchedKeys,
+                    progressByVideoId = progressByVideoId,
+                )
+            }
+            val seasonLabel = selectedEpisode.season?.let {
+                stringResource(Res.string.episodes_season, it)
+            } ?: stringResource(Res.string.episodes_specials)
+            NuvioPosterZoomActionOverlay(
+                imageUrl = zoomAnchor.imageUrl ?: selectedEpisode.thumbnail ?: meta.background ?: meta.poster,
+                title = selectedEpisode.title,
+                subtitle = localizedSeasonEpisodeCode(selectedEpisode.season, selectedEpisode.episode) ?: seasonLabel,
+                isWatched = isSelectedEpisodeWatched,
+                anchor = zoomAnchor,
+                actions = buildList {
+                    add(
+                        PosterZoomOverlayAction(
+                            icon = Icons.Default.CheckCircle,
+                            label = if (isSelectedEpisodeWatched) {
+                                stringResource(Res.string.episode_mark_unwatched)
+                            } else {
+                                stringResource(Res.string.episode_mark_watched)
+                            },
+                            onSelected = {
+                                WatchingActions.toggleEpisodeWatched(
+                                    meta = meta,
+                                    episode = selectedEpisode,
+                                    isCurrentlyWatched = isSelectedEpisodeWatched,
+                                )
+                            },
+                        ),
+                    )
+                    if (previousEpisodes.isNotEmpty()) {
+                        add(
+                            PosterZoomOverlayAction(
+                                icon = Icons.Default.DoneAll,
+                                label = if (arePreviousEpisodesWatched) {
+                                    stringResource(Res.string.episode_mark_previous_unwatched)
+                                } else {
+                                    stringResource(Res.string.episode_mark_previous_watched)
+                                },
+                                onSelected = {
+                                    WatchingActions.togglePreviousEpisodesWatched(
+                                        meta = meta,
+                                        episodes = previousEpisodes,
+                                        areCurrentlyWatched = arePreviousEpisodesWatched,
+                                    )
+                                },
+                            ),
+                        )
+                    }
+                    add(
+                        PosterZoomOverlayAction(
+                            icon = Icons.Default.PlaylistAddCheckCircle,
+                            label = if (isSeasonWatched) {
+                                stringResource(Res.string.episode_mark_season_unwatched, seasonLabel)
+                            } else {
+                                stringResource(Res.string.episode_mark_season_watched, seasonLabel)
+                            },
+                            onSelected = {
+                                WatchingActions.toggleSeasonWatched(
+                                    meta = meta,
+                                    episodes = seasonEpisodes,
+                                    areCurrentlyWatched = isSeasonWatched,
+                                )
+                            },
+                        ),
+                    )
+                    if (onPlayManually != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)) {
+                        add(
+                            PosterZoomOverlayAction(
+                                icon = Icons.Default.PlayArrow,
+                                label = stringResource(Res.string.play_manually),
+                                onSelected = {
+                                    val playbackVideoId = buildPlaybackVideoId(
+                                        parentMetaId = meta.id,
+                                        seasonNumber = selectedEpisode.season,
+                                        episodeNumber = selectedEpisode.episode,
+                                        fallbackVideoId = selectedEpisode.id,
+                                    )
+                                    val streamVideoId = selectedEpisode.id.takeIf { it.isNotBlank() } ?: playbackVideoId
+                                    val savedProgress = progressByVideoId[streamVideoId]
+                                        ?.takeUnless { it.isCompleted }
+                                    onPlayManually.invoke(
+                                        meta.type,
+                                        streamVideoId,
+                                        meta.id,
+                                        meta.type,
+                                        meta.name,
+                                        meta.logo,
+                                        meta.poster,
+                                        meta.background,
+                                        selectedEpisode.season,
+                                        selectedEpisode.episode,
+                                        selectedEpisode.title,
+                                        selectedEpisode.thumbnail,
+                                        selectedEpisode.overview,
+                                        savedProgress?.lastPositionMs,
+                                    )
+                                },
+                            ),
+                        )
+                    }
+                },
+                hazeState = episodeOverlayHazeState,
+                onDismissed = {
+                    selectedEpisodeForActions = null
+                    selectedEpisodeZoomAnchor = null
+                },
             )
         }
     }
@@ -1794,3 +2054,16 @@ private fun detailTabletContentMaxWidth(maxWidth: Dp, isTablet: Boolean): Dp =
     } else {
         (maxWidth * 0.6f).coerceIn(520.dp, 680.dp)
     }
+
+private fun dominantBackdropBlendColor(dominantColor: Color, backgroundColor: Color): Color =
+    backgroundColor.blendTowards(dominantColor, fraction = 0.42f)
+
+private fun Color.blendTowards(target: Color, fraction: Float): Color {
+    val clamped = fraction.coerceIn(0f, 1f)
+    return Color(
+        red = red + (target.red - red) * clamped,
+        green = green + (target.green - green) * clamped,
+        blue = blue + (target.blue - blue) * clamped,
+        alpha = alpha + (target.alpha - alpha) * clamped,
+    )
+}

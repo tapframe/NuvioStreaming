@@ -1,6 +1,7 @@
 package com.nuvio.app.features.watching.sync
 
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.sync.putSyncOriginClientId
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.watched.normalizeWatchedMarkedAtEpochMs
 import io.github.jan.supabase.postgrest.postgrest
@@ -102,6 +103,7 @@ object SupabaseWatchedSyncAdapter : WatchedSyncAdapter {
         val params = buildJsonObject {
             put("p_profile_id", profileId)
             put("p_items", json.encodeToJsonElement(syncItems))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_push_watched_items", params)
     }
@@ -120,6 +122,7 @@ object SupabaseWatchedSyncAdapter : WatchedSyncAdapter {
         val params = buildJsonObject {
             put("p_profile_id", profileId)
             put("p_keys", json.encodeToJsonElement(keys))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_delete_watched_items", params)
     }
