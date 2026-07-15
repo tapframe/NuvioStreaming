@@ -7,16 +7,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-sealed interface AppDeepLink {
+internal sealed interface AppDeepLink {
     data class Meta(
         val type: String,
         val id: String,
     ) : AppDeepLink
 
+    data class AddonInstall(
+        val manifestUrl: String,
+    ) : AppDeepLink
+
     data object Downloads : AppDeepLink
 }
 
-object AppDeepLinkRepository {
+internal object AppDeepLinkRepository {
     private val _pendingDeepLink = MutableStateFlow<AppDeepLink?>(null)
     val pendingDeepLink: StateFlow<AppDeepLink?> = _pendingDeepLink.asStateFlow()
 
@@ -53,19 +57,118 @@ fun buildMetaDeepLinkUrl(
 
 fun buildDownloadsDeepLinkUrl(): String = "nuvio://downloads"
 
-private fun parseAppDeepLink(url: String): AppDeepLink? {
+internal fun parseAppDeepLink(url: String): AppDeepLink? {
     val parsedUrl = runCatching { Url(url) }.getOrNull() ?: return null
-    if (!parsedUrl.protocol.name.equals("nuvio", ignoreCase = true)) return null
+    val scheme = parsedUrl.protocol.name.lowercase()
+    if (scheme == "stremio") {
+        return if (looksLikeAddonHost(parsedUrl.host.lowercase())) {
+            customSchemeToHttpsUrl(url, scheme)?.let(AppDeepLink::AddonInstall)
+        } else {
+            null
+        }
+    }
+    if (scheme != "nuvio") return null
 
-    return when (parsedUrl.host.lowercase()) {
+    val host = parsedUrl.host.lowercase()
+    val pathSegments = parsedUrl.pathSegments.map(String::trim).filter(String::isNotBlank)
+    return when (host) {
         "meta" -> {
-            val type = parsedUrl.parameters["type"]?.trim().orEmpty()
-            val id = parsedUrl.parameters["id"]?.trim().orEmpty()
+            parseMetaFromParameters(parsedUrl)
+                ?: parseMetaFromPath(pathSegments)
+        }
+
+        "detail", "details", "open", "watch" -> parseMetaFromPath(pathSegments)
+
+        "movie", "movies", "series", "show", "shows", "tv" -> {
+            val type = normalizeDeepLinkMediaType(host)
+            val id = pathSegments.firstOrNull()?.let(::normalizeDeepLinkId).orEmpty()
             if (type.isBlank() || id.isBlank()) null else AppDeepLink.Meta(type = type, id = id)
         }
 
+        "imdb", "tmdb" -> parseProviderMetaDeepLink(host, pathSegments, parsedUrl)
+
         "downloads" -> AppDeepLink.Downloads
 
-        else -> null
+        "auth" -> null
+
+        else -> {
+            if (looksLikeAddonHost(host)) {
+                customSchemeToHttpsUrl(url, scheme)?.let(AppDeepLink::AddonInstall)
+            } else {
+                null
+            }
+        }
     }
+}
+
+private fun parseMetaFromParameters(parsedUrl: Url): AppDeepLink.Meta? {
+    val type = firstParameter(parsedUrl, "type", "mediaType", "media_type")
+        ?.let(::normalizeDeepLinkMediaType)
+        .orEmpty()
+    val id = firstParameter(parsedUrl, "id", "imdb", "imdbId", "imdb_id")
+        ?.let(::normalizeDeepLinkId)
+        ?: firstParameter(parsedUrl, "tmdb", "tmdbId", "tmdb_id")
+            ?.let { "tmdb:${it.removePrefix("tmdb:").trim()}" }
+        ?: ""
+    return if (type.isBlank() || id.isBlank()) null else AppDeepLink.Meta(type = type, id = id)
+}
+
+private fun parseMetaFromPath(pathSegments: List<String>): AppDeepLink.Meta? {
+    if (pathSegments.size < 2) return null
+    val type = normalizeDeepLinkMediaType(pathSegments[0])
+    val id = normalizeDeepLinkId(pathSegments[1])
+    return if (type.isBlank() || id.isBlank()) null else AppDeepLink.Meta(type = type, id = id)
+}
+
+private fun parseProviderMetaDeepLink(
+    provider: String,
+    pathSegments: List<String>,
+    parsedUrl: Url,
+): AppDeepLink.Meta? {
+    val first = pathSegments.firstOrNull().orEmpty()
+    val second = pathSegments.getOrNull(1).orEmpty()
+    val firstAsType = normalizeDeepLinkMediaType(first)
+    val queryType = firstParameter(parsedUrl, "type", "mediaType", "media_type")
+        ?.let(::normalizeDeepLinkMediaType)
+        .orEmpty()
+    val type = firstAsType.ifBlank { queryType }
+    val rawId = if (firstAsType.isNotBlank()) second else first
+    val id = when (provider) {
+        "tmdb" -> rawId.removePrefix("tmdb:").trim().takeIf(String::isNotBlank)?.let { "tmdb:$it" }
+        else -> normalizeDeepLinkId(rawId).takeIf(String::isNotBlank)
+    }.orEmpty()
+    return if (type.isBlank() || id.isBlank()) null else AppDeepLink.Meta(type = type, id = id)
+}
+
+private fun firstParameter(parsedUrl: Url, vararg keys: String): String? =
+    keys.firstNotNullOfOrNull { key ->
+        parsedUrl.parameters[key]?.trim()?.takeIf(String::isNotBlank)
+    }
+
+private fun normalizeDeepLinkMediaType(value: String): String =
+    when (value.trim().lowercase()) {
+        "movie", "movies", "film", "films" -> "movie"
+        "series", "show", "shows", "tv", "tvshow", "tvshows" -> "series"
+        else -> ""
+    }
+
+private fun normalizeDeepLinkId(value: String): String =
+    value.trim()
+        .removePrefix("imdb:")
+        .takeIf(String::isNotBlank)
+        .orEmpty()
+
+private fun looksLikeAddonHost(host: String): Boolean =
+    host.contains('.') ||
+        host.equals("localhost", ignoreCase = true) ||
+        host.any(Char::isDigit)
+
+private fun customSchemeToHttpsUrl(url: String, scheme: String): String? {
+    val prefix = "$scheme://"
+    val rest = url.trim()
+        .takeIf { it.startsWith(prefix, ignoreCase = true) }
+        ?.substring(prefix.length)
+        ?.takeIf { it.isNotBlank() && !it.startsWith("/") }
+        ?: return null
+    return "https://$rest"
 }

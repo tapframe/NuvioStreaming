@@ -5,9 +5,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:usesCleartextTraffic="true"
@@ -16,6 +18,10 @@
         android:localeConfig="@xml/locale_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.Nuvio">
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
         <activity
             android:exported="true"
             android:name="com.nuvio.app.MainActivity"
@@ -38,7 +44,33 @@
                     android:host="auth"
                     android:path="/trakt" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="nuvio" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="stremio" />
+            </intent-filter>
         </activity>
+
+        <service
+            android:name="com.nuvio.app.features.player.PlayerNowPlayingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback"
+            android:stopWithTask="false" />
+
+        <receiver
+            android:name="com.nuvio.app.features.player.PlayerNowPlayingActionReceiver"
+            android:exported="false" />
 
         <receiver
             android:name="com.nuvio.app.features.downloads.DownloadsNotificationActionReceiver"
@@ -51,7 +83,7 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/nuvio_file_paths" />
+                android:resource="@xml/file_paths" />
         </provider>
     </application>
 

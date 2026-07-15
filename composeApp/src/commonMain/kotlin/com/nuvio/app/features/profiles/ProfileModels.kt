@@ -1,9 +1,10 @@
 package com.nuvio.app.features.profiles
 
 import androidx.compose.ui.graphics.Color
-import com.nuvio.app.core.network.SyncBackendRepository
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+const val MAX_PROFILES = 6
 
 @Serializable
 data class NuvioProfile(
@@ -78,7 +79,7 @@ val PROFILE_COLORS = listOf(
 )
 
 fun avatarStorageUrl(storagePath: String): String =
-    SyncBackendRepository.selectedBackend.avatarStorageUrl(storagePath)
+    "${com.nuvio.app.core.network.SupabaseConfig.URL}/storage/v1/object/public/avatars/$storagePath"
 
 fun normalizedAvatarUrl(url: String?): String? =
     url?.trim()?.takeIf { it.isValidAvatarUrl() }

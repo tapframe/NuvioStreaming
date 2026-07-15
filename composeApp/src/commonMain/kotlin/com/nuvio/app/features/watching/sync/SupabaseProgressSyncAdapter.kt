@@ -1,7 +1,9 @@
 package com.nuvio.app.features.watching.sync
 
 import com.nuvio.app.core.network.SupabaseProvider
+import com.nuvio.app.core.sync.putSyncOriginClientId
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watchprogress.resolvedProgressKey
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
 import kotlinx.serialization.SerialName
@@ -72,6 +74,7 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
         val serverEntries = result.decodeList<WatchProgressSyncEntry>()
         return serverEntries.map { entry ->
             ProgressSyncRecord(
+                progressKey = entry.progressKey,
                 contentId = entry.contentId,
                 contentType = entry.contentType,
                 videoId = entry.videoId,
@@ -98,12 +101,13 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
                 position = entry.lastPositionMs,
                 duration = entry.durationMs,
                 lastWatched = entry.lastUpdatedEpochMs,
-                progressKey = progressKeyForEntry(entry),
+                progressKey = entry.resolvedProgressKey(),
             )
         }
         val params = buildJsonObject {
             put("p_profile_id", profileId)
             put("p_entries", json.encodeToJsonElement(syncEntries))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_push_watch_progress", params)
     }
@@ -112,26 +116,15 @@ object SupabaseProgressSyncAdapter : ProgressSyncAdapter {
         profileId: Int,
         entries: Collection<WatchProgressEntry>,
     ) {
-        val progressKeys = entries.map { entry ->
-            if (entry.seasonNumber != null && entry.episodeNumber != null) {
-                "${entry.parentMetaId}_s${entry.seasonNumber}e${entry.episodeNumber}"
-            } else {
-                entry.parentMetaId
-            }
-        }
+        val progressKeys = entries.map { entry -> entry.resolvedProgressKey() }
         val params = buildJsonObject {
             put("p_profile_id", profileId)
             put("p_keys", json.encodeToJsonElement(progressKeys))
+            putSyncOriginClientId()
         }
         SupabaseProvider.client.postgrest.rpc("sync_delete_watch_progress", params)
     }
 
-    private fun progressKeyForEntry(entry: WatchProgressEntry): String =
-        if (entry.seasonNumber != null && entry.episodeNumber != null) {
-            "${entry.parentMetaId}_s${entry.seasonNumber}e${entry.episodeNumber}"
-        } else {
-            entry.parentMetaId
-        }
 }
 
 @Serializable
@@ -152,9 +145,9 @@ private data class WatchProgressDeltaSyncEntry(
     @SerialName("event_id") val eventId: Long,
     val operation: String,
     @SerialName("progress_key") val progressKey: String,
-    @SerialName("content_id") val contentId: String,
-    @SerialName("content_type") val contentType: String,
-    @SerialName("video_id") val videoId: String,
+    @SerialName("content_id") val contentId: String = "",
+    @SerialName("content_type") val contentType: String = "",
+    @SerialName("video_id") val videoId: String = "",
     val season: Int? = null,
     val episode: Int? = null,
     val position: Long = 0,

@@ -28,14 +28,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.auth.AuthRepository
 import com.nuvio.app.core.auth.AuthState
 import com.nuvio.app.core.build.AppFeaturePolicy
-import com.nuvio.app.core.network.SyncBackendRepository
 import com.nuvio.app.core.ui.NuvioPrimaryButton
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
-import com.nuvio.app.features.dev.DebugSyncBackendSwitch
-import com.nuvio.app.features.dev.shouldShowDebugSyncBackendSwitch
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_cancel
@@ -53,7 +50,6 @@ import nuvio.composeapp.generated.resources.settings_account_sign_out_confirm_ti
 import nuvio.composeapp.generated.resources.settings_account_status
 import nuvio.composeapp.generated.resources.settings_account_status_anonymous
 import nuvio.composeapp.generated.resources.settings_account_status_signed_in
-import nuvio.composeapp.generated.resources.settings_account_sync_backend
 import org.jetbrains.compose.resources.stringResource
 
 internal fun LazyListScope.accountSettingsContent(
@@ -69,13 +65,11 @@ private fun AccountSettingsBody(
     isTablet: Boolean,
 ) {
     val authState by AuthRepository.state.collectAsStateWithLifecycle()
-    val syncBackendState by SyncBackendRepository.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var showSignOutConfirm by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var isDeletingAccount by remember { mutableStateOf(false) }
     var deleteErrorMessage by remember { mutableStateOf<String?>(null) }
-    val syncBackendLabel = syncBackendState.selectedBackend.displayName
     val deleteAccountFallbackMessage = stringResource(Res.string.auth_account_deletion_failed)
     val canDeleteAccount = AppFeaturePolicy.accountDeletionEnabled && authState is AuthState.Authenticated
 
@@ -115,20 +109,6 @@ private fun AccountSettingsBody(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-
-            if (shouldShowDebugSyncBackendSwitch()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                DebugSyncBackendSwitch(
-                    modifier = Modifier.fillMaxWidth(),
-                    requireConfirmation = true,
-                )
-            } else {
-                Spacer(modifier = Modifier.height(8.dp))
-                AccountInfoRow(
-                    label = stringResource(Res.string.settings_account_sync_backend),
-                    value = syncBackendLabel,
-                )
             }
         }
 
@@ -258,14 +238,14 @@ private fun AccountInfoRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            modifier = Modifier.weight(1f),
             text = value,
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge,
             color = valueColor,
             fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.End,
         )
     }
 }

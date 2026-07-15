@@ -29,6 +29,13 @@
     <string name="addons_badge_unavailable">Utilgjengelig</string>
     <string name="addons_configure">Konfigurer tillegg</string>
     <string name="addons_delete">Slett tillegg</string>
+    <string name="addons_appstore_add_description">Ta med biblioteket ditt til Nuvio med tilleggene du bruker.</string>
+    <string name="addons_appstore_empty_subtitle">Legg til et tillegg for å begynne å bygge biblioteket ditt.</string>
+    <string name="addons_appstore_empty_title">Gjør Nuvio til ditt.</string>
+    <string name="addons_appstore_input_placeholder">URL til tillegg</string>
+    <string name="addons_appstore_install_button">Legg til tillegg</string>
+    <string name="store_empty_unavailable_title">Det er ingenting her ennå</string>
+    <string name="store_empty_unavailable_message">Tilleggene du bruker, har ingenting å vise her ennå.</string>
     <string name="addons_empty_subtitle">Legg til en manifest-URL for å starte lasting av kataloger, metadata, strømmer eller undertekster i Nuvio.</string>
     <string name="addons_empty_title">Ingen tillegg installert ennå.</string>
     <string name="addons_error_enter_url">Skriv inn en tilleggs-URL.</string>
@@ -400,7 +407,9 @@
     <string name="compose_settings_root_check_updates_description">Last ned nyeste versjon</string>
     <string name="compose_settings_root_check_updates_title">Se etter oppdateringer</string>
     <string name="compose_settings_root_content_discovery_description">Administrer tillegg og oppdagelseskilder.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Administrer tillegg og velg hva som vises i Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Administrer nedlastede filmer og episoder.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Administrer det du har lagret på denne enheten.</string>
     <string name="compose_settings_root_downloads_title">Nedlastinger</string>
     <string name="compose_settings_root_general_section">GENERELT</string>
     <string name="compose_settings_root_integrations_description">Administrer tilgjengelige integrasjoner</string>
@@ -581,6 +590,7 @@
     <string name="settings_content_discovery_section_home">HJEM</string>
     <string name="settings_content_discovery_section_sources">KILDER</string>
     <string name="settings_content_discovery_addons_description">Installer, fjern, oppdater og sorter innholdskilder.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Legg til og administrer tilleggene du bruker med Nuvio.</string>
     <string name="settings_content_discovery_plugins_description">Installer JavaScript-scraper-repositories og test providere internt.</string>
     <string name="settings_content_discovery_homescreen_description">Juster hjemmeoppsett, synlighet og plakat-oppførsel.</string>
     <string name="settings_content_discovery_meta_screen_description">Innstillinger for detalj- og episodeskjermer.</string>

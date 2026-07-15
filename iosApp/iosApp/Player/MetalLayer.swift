@@ -17,7 +17,9 @@ class MetalLayer: CAMetalLayer {
             if Thread.isMainThread {
                 super.wantsExtendedDynamicRangeContent = newValue
             } else {
-                DispatchQueue.main.sync {
+                // mpv's vo thread sets this during video-output init while it holds the
+                // core lock; a sync hop here deadlocks against main-thread property reads.
+                DispatchQueue.main.async {
                     super.wantsExtendedDynamicRangeContent = newValue
                 }
             }

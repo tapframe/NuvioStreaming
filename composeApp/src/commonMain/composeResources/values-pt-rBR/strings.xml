@@ -30,6 +30,13 @@
     <string name="addons_badge_unavailable">Indisponível</string>
     <string name="addons_configure">Configurar addon</string>
     <string name="addons_delete">Excluir addon</string>
+    <string name="addons_appstore_add_description">Leve sua biblioteca para o Nuvio com os addons que você usa.</string>
+    <string name="addons_appstore_empty_subtitle">Adicione um addon para começar a montar sua biblioteca.</string>
+    <string name="addons_appstore_empty_title">Deixe o Nuvio do seu jeito.</string>
+    <string name="addons_appstore_input_placeholder">URL do addon</string>
+    <string name="addons_appstore_install_button">Adicionar addon</string>
+    <string name="store_empty_unavailable_title">Ainda não há nada aqui</string>
+    <string name="store_empty_unavailable_message">Os addons que você usa ainda não têm nada para mostrar aqui.</string>
     <string name="addons_empty_subtitle">Adicione uma URL de manifesto para começar a carregar catálogos, metadados, streams ou legendas no Nuvio.</string>
     <string name="addons_empty_title">Nenhum addon instalado ainda.</string>
     <string name="addons_error_enter_url">Insira uma URL de addon.</string>
@@ -401,7 +408,9 @@
     <string name="compose_settings_root_check_updates_description">Baixar a versão mais recente</string>
     <string name="compose_settings_root_check_updates_title">Verificar atualizações</string>
     <string name="compose_settings_root_content_discovery_description">Gerenciar addons e fontes de descoberta.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Gerencie addons e escolha o que aparece no Nuvio.</string>
     <string name="compose_settings_root_downloads_description">Gerencie seus filmes e episódios baixados.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Gerencie o que você salvou neste dispositivo.</string>
     <string name="compose_settings_root_downloads_title">Downloads</string>
     <string name="compose_settings_root_general_section">GERAL</string>
     <string name="compose_settings_root_integrations_description">Gerenciar integrações disponíveis</string>
@@ -582,6 +591,7 @@
     <string name="settings_content_discovery_section_home">PÁGINA INICIAL</string>
     <string name="settings_content_discovery_section_sources">FONTES</string>
     <string name="settings_content_discovery_addons_description">Instale, remova, atualize e ordene suas fontes de conteúdo.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Adicione e gerencie os addons que você usa com o Nuvio.</string>
     <string name="settings_content_discovery_plugins_description">Instale repositórios de scraper JavaScript e teste provedores internamente.</string>
     <string name="settings_content_discovery_homescreen_description">Ajuste layout da página inicial, visibilidade de conteúdo e comportamento de pôsteres</string>
     <string name="settings_content_discovery_meta_screen_description">Configurações para as telas de detalhes e episódios.</string>

@@ -6,6 +6,7 @@ internal actual object PlatformLocalAccountDataCleaner {
     private val plainKeys = listOf(
         "profile_payload",
         "avatar_catalog_payload",
+        "anonymous_user_id",
     )
     private val profilePinCachePrefixes = listOf("profile_pin_cache_")
     private val profileIndexedPrefixes = listOf(
@@ -53,6 +54,7 @@ internal actual object PlatformLocalAccountDataCleaner {
         "trakt_auth_payload",
         "trakt_library_payload",
         "trakt_settings_payload",
+        "pending_watch_progress_source",
         "collection_mobile_settings_payload",
         "collections_payload",
     )
@@ -76,7 +78,10 @@ internal actual object PlatformLocalAccountDataCleaner {
 
         for (key in defaults.dictionaryRepresentation().keys) {
             val keyString = key as? String ?: continue
-            if (keyString.startsWith("stream_link_")) {
+            if (
+                keyString.startsWith("stream_link_") ||
+                keyString.startsWith("cw_enrichment_cache_")
+            ) {
                 defaults.removeObjectForKey(keyString)
             }
         }

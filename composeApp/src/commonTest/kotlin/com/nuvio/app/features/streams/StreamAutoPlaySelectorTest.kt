@@ -170,6 +170,27 @@ class StreamAutoPlaySelectorTest {
     }
 
     @Test
+    fun `first stream mode does not auto select external url browser link`() {
+        val external = stream(
+            addonName = "External Addon",
+            externalUrl = "https://example.com/watch",
+            name = "Watch on site",
+        )
+
+        val selected = StreamAutoPlaySelector.selectAutoPlayStream(
+            streams = listOf(external),
+            mode = StreamAutoPlayMode.FIRST_STREAM,
+            regexPattern = "",
+            source = StreamAutoPlaySource.ALL_SOURCES,
+            installedAddonNames = setOf("External Addon"),
+            selectedAddons = emptySet(),
+            selectedPlugins = emptySet(),
+        )
+
+        assertNull(selected)
+    }
+
+    @Test
     fun `timeout evaluation keeps pending regex debrid candidate open`() {
         val pending = stream(
             addonName = "Torrentio",
@@ -252,6 +273,7 @@ class StreamAutoPlaySelectorTest {
     private fun stream(
         addonName: String,
         url: String? = null,
+        externalUrl: String? = null,
         name: String? = null,
         bingeGroup: String? = null,
         directDebrid: Boolean = false,
@@ -261,6 +283,7 @@ class StreamAutoPlaySelectorTest {
     ): StreamItem = StreamItem(
         name = name,
         url = url,
+        externalUrl = externalUrl,
         infoHash = infoHash,
         addonName = addonName,
         addonId = "addon:$addonName",

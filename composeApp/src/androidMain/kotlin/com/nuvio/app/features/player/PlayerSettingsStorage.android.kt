@@ -20,12 +20,14 @@ import kotlinx.serialization.json.put
 actual object PlayerSettingsStorage {
     private const val preferencesName = "nuvio_player_settings"
     private const val showLoadingOverlayKey = "show_loading_overlay"
+    private const val showParentalGuideKey = "show_parental_guide"
     private const val resizeModeKey = "resize_mode"
     private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
     private const val holdToSpeedValueKey = "hold_to_speed_value"
     private const val touchGesturesEnabledKey = "touch_gestures_enabled"
     private const val externalPlayerEnabledKey = "external_player_enabled"
     private const val externalPlayerForwardSubtitlesKey = "external_player_forward_subtitles"
+    private const val externalPlayerSendSkipSegmentsKey = "external_player_send_skip_segments"
     private const val externalPlayerIdKey = "external_player_id"
     private const val preferredAudioLanguageKey = "preferred_audio_language"
     private const val secondaryPreferredAudioLanguageKey = "secondary_preferred_audio_language"
@@ -87,12 +89,14 @@ actual object PlayerSettingsStorage {
     private const val iosGammaKey = "ios_gamma"
     private val syncKeys = listOf(
         showLoadingOverlayKey,
+        showParentalGuideKey,
         resizeModeKey,
         holdToSpeedEnabledKey,
         holdToSpeedValueKey,
         touchGesturesEnabledKey,
         externalPlayerEnabledKey,
         externalPlayerForwardSubtitlesKey,
+        externalPlayerSendSkipSegmentsKey,
         externalPlayerIdKey,
         preferredAudioLanguageKey,
         secondaryPreferredAudioLanguageKey,
@@ -172,6 +176,23 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(showLoadingOverlayKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadShowParentalGuide(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(showParentalGuideKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, true)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveShowParentalGuide(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(showParentalGuideKey), enabled)
             ?.apply()
     }
 
@@ -267,6 +288,23 @@ actual object PlayerSettingsStorage {
         preferences
             ?.edit()
             ?.putBoolean(ProfileScopedKey.of(externalPlayerForwardSubtitlesKey), enabled)
+            ?.apply()
+    }
+
+    actual fun loadExternalPlayerSendSkipSegments(): Boolean? =
+        preferences?.let { sharedPreferences ->
+            val key = ProfileScopedKey.of(externalPlayerSendSkipSegmentsKey)
+            if (sharedPreferences.contains(key)) {
+                sharedPreferences.getBoolean(key, false)
+            } else {
+                null
+            }
+        }
+
+    actual fun saveExternalPlayerSendSkipSegments(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(externalPlayerSendSkipSegmentsKey), enabled)
             ?.apply()
     }
 
@@ -1036,12 +1074,14 @@ actual object PlayerSettingsStorage {
 
     actual fun exportToSyncPayload(): JsonObject = buildJsonObject {
         loadShowLoadingOverlay()?.let { put(showLoadingOverlayKey, encodeSyncBoolean(it)) }
+        loadShowParentalGuide()?.let { put(showParentalGuideKey, encodeSyncBoolean(it)) }
         loadResizeMode()?.let { put(resizeModeKey, encodeSyncString(it)) }
         loadHoldToSpeedEnabled()?.let { put(holdToSpeedEnabledKey, encodeSyncBoolean(it)) }
         loadHoldToSpeedValue()?.let { put(holdToSpeedValueKey, encodeSyncFloat(it)) }
         loadTouchGesturesEnabled()?.let { put(touchGesturesEnabledKey, encodeSyncBoolean(it)) }
         loadExternalPlayerEnabled()?.let { put(externalPlayerEnabledKey, encodeSyncBoolean(it)) }
         loadExternalPlayerForwardSubtitles()?.let { put(externalPlayerForwardSubtitlesKey, encodeSyncBoolean(it)) }
+        loadExternalPlayerSendSkipSegments()?.let { put(externalPlayerSendSkipSegmentsKey, encodeSyncBoolean(it)) }
         loadExternalPlayerId()?.let { put(externalPlayerIdKey, encodeSyncString(it)) }
         loadPreferredAudioLanguage()?.let { put(preferredAudioLanguageKey, encodeSyncString(it)) }
         loadSecondaryPreferredAudioLanguage()?.let { put(secondaryPreferredAudioLanguageKey, encodeSyncString(it)) }
@@ -1109,12 +1149,14 @@ actual object PlayerSettingsStorage {
         }?.apply()
 
         payload.decodeSyncBoolean(showLoadingOverlayKey)?.let(::saveShowLoadingOverlay)
+        payload.decodeSyncBoolean(showParentalGuideKey)?.let(::saveShowParentalGuide)
         payload.decodeSyncString(resizeModeKey)?.let(::saveResizeMode)
         payload.decodeSyncBoolean(holdToSpeedEnabledKey)?.let(::saveHoldToSpeedEnabled)
         payload.decodeSyncFloat(holdToSpeedValueKey)?.let(::saveHoldToSpeedValue)
         payload.decodeSyncBoolean(touchGesturesEnabledKey)?.let(::saveTouchGesturesEnabled)
         payload.decodeSyncBoolean(externalPlayerEnabledKey)?.let(::saveExternalPlayerEnabled)
         payload.decodeSyncBoolean(externalPlayerForwardSubtitlesKey)?.let(::saveExternalPlayerForwardSubtitles)
+        payload.decodeSyncBoolean(externalPlayerSendSkipSegmentsKey)?.let(::saveExternalPlayerSendSkipSegments)
         payload.decodeSyncString(externalPlayerIdKey)?.let(::saveExternalPlayerId)
         payload.decodeSyncString(preferredAudioLanguageKey)?.let(::savePreferredAudioLanguage)
         payload.decodeSyncString(secondaryPreferredAudioLanguageKey)?.let(::saveSecondaryPreferredAudioLanguage)

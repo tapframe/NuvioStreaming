@@ -37,6 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.nuvio.app.core.ui.NuvioCardDepthSurface
+import com.nuvio.app.core.ui.nuvioCardDepth
 import com.nuvio.app.features.details.MetaTrailer
 import nuvio.composeapp.generated.resources.*
 import nuvio.composeapp.generated.resources.detail_tab_trailer
@@ -193,6 +195,10 @@ private fun TrailerCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(cornerRadius))
+                .nuvioCardDepth(
+                    shape = RoundedCornerShape(cornerRadius),
+                    surface = NuvioCardDepthSurface.Trailers,
+                )
                 .clickable(onClick = onClick),
         ) {
             AsyncImage(

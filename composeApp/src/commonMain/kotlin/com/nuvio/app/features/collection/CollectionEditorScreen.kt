@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -75,47 +76,87 @@ import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+enum class CollectionEditorPage {
+    Root,
+    FolderEditor,
+    CatalogPicker,
+    TmdbSourcePicker,
+    TraktSourcePicker,
+}
+
+fun disposeCollectionEditorPage(page: CollectionEditorPage) {
+    when (page) {
+        CollectionEditorPage.Root -> Unit
+        CollectionEditorPage.FolderEditor -> CollectionEditorRepository.cancelFolderEdit()
+        CollectionEditorPage.CatalogPicker -> CollectionEditorRepository.hideCatalogPicker()
+        CollectionEditorPage.TmdbSourcePicker -> CollectionEditorRepository.hideTmdbSourcePicker()
+        CollectionEditorPage.TraktSourcePicker -> CollectionEditorRepository.hideTraktSourcePicker()
+    }
+}
+
+private val autoDismissedPickerPages = setOf(
+    CollectionEditorPage.TmdbSourcePicker,
+    CollectionEditorPage.TraktSourcePicker,
+)
+
+private fun CollectionEditorUiState.activeEditorPage(): CollectionEditorPage = when {
+    showCatalogPicker -> CollectionEditorPage.CatalogPicker
+    showTmdbSourcePicker -> CollectionEditorPage.TmdbSourcePicker
+    showTraktSourcePicker -> CollectionEditorPage.TraktSourcePicker
+    showFolderEditor && editingFolder != null -> CollectionEditorPage.FolderEditor
+    else -> CollectionEditorPage.Root
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CollectionEditorScreen(
     collectionId: String?,
     onBack: () -> Unit,
+    initialPage: CollectionEditorPage? = null,
+    initializeRepository: Boolean = true,
+    onNavigateToPage: ((page: CollectionEditorPage, title: String) -> Unit)? = null,
 ) {
     val state by CollectionEditorRepository.uiState.collectAsState()
     val bottomInset = nuvioSafeBottomPadding()
 
-    LaunchedEffect(collectionId) {
-        CollectionEditorRepository.initialize(collectionId)
+    LaunchedEffect(collectionId, initializeRepository) {
+        if (initializeRepository) {
+            CollectionEditorRepository.initialize(collectionId)
+        }
+    }
+
+    val page = initialPage ?: state.activeEditorPage()
+    val initialPickerCompletionGeneration = remember(initialPage) {
+        state.sourcePickerCompletionGeneration
+    }
+
+    LaunchedEffect(initialPage, state.sourcePickerCompletionGeneration) {
+        if (
+            initialPage in autoDismissedPickerPages &&
+            state.sourcePickerCompletionGeneration != initialPickerCompletionGeneration
+        ) {
+            onBack()
+        }
+    }
+
+    if (
+        initialPage != null &&
+        page != CollectionEditorPage.Root &&
+        state.editingFolder == null
+    ) {
+        LaunchedEffect(initialPage) { onBack() }
+        return
+    }
+
+    fun closePage(pageToClose: CollectionEditorPage, close: () -> Unit) {
+        close()
+        if (initialPage == pageToClose) {
+            onBack()
+        }
     }
 
     val editingFolder = state.editingFolder
-    if (state.showFolderEditor && editingFolder != null) {
-        if (state.showCatalogPicker) {
-            CatalogPickerScreen(
-                availableCatalogs = state.availableCatalogs,
-                selectedSources = editingFolder.resolvedCatalogSources,
-                onToggle = { CollectionEditorRepository.toggleCatalogSource(it) },
-                onBack = { CollectionEditorRepository.hideCatalogPicker() },
-            )
-            return
-        }
-
-        if (state.showTmdbSourcePicker) {
-            TmdbSourcePickerScreen(
-                state = state,
-                onBack = { CollectionEditorRepository.hideTmdbSourcePicker() },
-            )
-            return
-        }
-
-        if (state.showTraktSourcePicker) {
-            TraktSourcePickerScreen(
-                state = state,
-                onBack = { CollectionEditorRepository.hideTraktSourcePicker() },
-            )
-            return
-        }
-
+    if (page == CollectionEditorPage.FolderEditor && editingFolder != null) {
         val genrePickerIndex = state.genrePickerSourceIndex
         val genrePickerSource = genrePickerIndex?.let { editingFolder.resolvedSources.getOrNull(it) }
         val genrePickerCatalogSource = genrePickerSource?.addonCatalogSource()
@@ -125,7 +166,18 @@ fun CollectionEditorScreen(
 
         FolderEditorPage(
             state = state,
-            onBack = { CollectionEditorRepository.cancelFolderEdit() },
+            onBack = {
+                closePage(CollectionEditorPage.FolderEditor) {
+                    CollectionEditorRepository.cancelFolderEdit()
+                }
+            },
+            onNavigateToPage = onNavigateToPage,
+            onSave = {
+                CollectionEditorRepository.saveFolderEdit()
+                if (initialPage == CollectionEditorPage.FolderEditor) {
+                    onBack()
+                }
+            },
         )
 
         if (
@@ -149,28 +201,40 @@ fun CollectionEditorScreen(
         return
     }
 
-    if (state.showCatalogPicker) {
+    if (page == CollectionEditorPage.CatalogPicker) {
         CatalogPickerScreen(
             availableCatalogs = state.availableCatalogs,
             selectedSources = state.editingFolder?.resolvedCatalogSources.orEmpty(),
             onToggle = { CollectionEditorRepository.toggleCatalogSource(it) },
-            onBack = { CollectionEditorRepository.hideCatalogPicker() },
+            onBack = {
+                closePage(CollectionEditorPage.CatalogPicker) {
+                    CollectionEditorRepository.hideCatalogPicker()
+                }
+            },
         )
         return
     }
 
-    if (state.showTmdbSourcePicker) {
+    if (page == CollectionEditorPage.TmdbSourcePicker) {
         TmdbSourcePickerScreen(
             state = state,
-            onBack = { CollectionEditorRepository.hideTmdbSourcePicker() },
+            onBack = {
+                closePage(CollectionEditorPage.TmdbSourcePicker) {
+                    CollectionEditorRepository.hideTmdbSourcePicker()
+                }
+            },
         )
         return
     }
 
-    if (state.showTraktSourcePicker) {
+    if (page == CollectionEditorPage.TraktSourcePicker) {
         TraktSourcePickerScreen(
             state = state,
-            onBack = { CollectionEditorRepository.hideTraktSourcePicker() },
+            onBack = {
+                closePage(CollectionEditorPage.TraktSourcePicker) {
+                    CollectionEditorRepository.hideTraktSourcePicker()
+                }
+            },
         )
         return
     }
@@ -335,7 +399,10 @@ fun CollectionEditorScreen(
                 ) {
                     NuvioSectionLabel(text = stringResource(Res.string.collections_editor_folders))
                     TextButton(
-                        onClick = { CollectionEditorRepository.addFolder(newFolderTitle) },
+                        onClick = {
+                            CollectionEditorRepository.addFolder(newFolderTitle)
+                            onNavigateToPage?.invoke(CollectionEditorPage.FolderEditor, newFolderTitle)
+                        },
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Add,
@@ -351,9 +418,13 @@ fun CollectionEditorScreen(
             // Folder Items
         if (state.folders.isNotEmpty()) {
             item {
+                val editFolderTitle = stringResource(Res.string.collections_editor_edit_folder)
                 FolderReorderableList(
                     folders = state.folders,
-                    onEdit = { CollectionEditorRepository.editFolder(it) },
+                    onEdit = {
+                        CollectionEditorRepository.editFolder(it)
+                        onNavigateToPage?.invoke(CollectionEditorPage.FolderEditor, editFolderTitle)
+                    },
                     onDelete = { CollectionEditorRepository.removeFolder(it) },
                 )
             }
@@ -558,9 +629,15 @@ private fun FolderListItem(
 private fun FolderEditorPage(
     state: CollectionEditorUiState,
     onBack: () -> Unit,
+    onNavigateToPage: ((page: CollectionEditorPage, title: String) -> Unit)?,
+    onSave: () -> Unit,
 ) {
     val folder = state.editingFolder ?: return
     val bottomInset = nuvioSafeBottomPadding()
+    val catalogPickerTitle = stringResource(Res.string.collections_editor_select_catalogs)
+    val tmdbSourcePickerTitle = stringResource(Res.string.collections_editor_tmdb_sources)
+    val traktSourcePickerTitle = stringResource(Res.string.collections_editor_trakt_sources)
+    val editTraktSourcePickerTitle = stringResource(Res.string.collections_editor_edit_trakt_source)
 
     PlatformBackHandler(enabled = true) {
         onBack()
@@ -725,7 +802,15 @@ private fun FolderEditorPage(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            TextButton(onClick = { CollectionEditorRepository.showTmdbSourcePicker() }) {
+                            TextButton(
+                                onClick = {
+                                    CollectionEditorRepository.showTmdbSourcePicker()
+                                    onNavigateToPage?.invoke(
+                                        CollectionEditorPage.TmdbSourcePicker,
+                                        tmdbSourcePickerTitle,
+                                    )
+                                },
+                            ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = null,
@@ -734,7 +819,15 @@ private fun FolderEditorPage(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(stringResource(Res.string.source_tmdb))
                             }
-                            TextButton(onClick = { CollectionEditorRepository.showTraktSourcePicker() }) {
+                            TextButton(
+                                onClick = {
+                                    CollectionEditorRepository.showTraktSourcePicker()
+                                    onNavigateToPage?.invoke(
+                                        CollectionEditorPage.TraktSourcePicker,
+                                        traktSourcePickerTitle,
+                                    )
+                                },
+                            ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = null,
@@ -743,7 +836,15 @@ private fun FolderEditorPage(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(stringResource(Res.string.collections_editor_add_trakt_source))
                             }
-                            TextButton(onClick = { CollectionEditorRepository.showCatalogPicker() }) {
+                            TextButton(
+                                onClick = {
+                                    CollectionEditorRepository.showCatalogPicker()
+                                    onNavigateToPage?.invoke(
+                                        CollectionEditorPage.CatalogPicker,
+                                        catalogPickerTitle,
+                                    )
+                                },
+                            ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Add,
                                     contentDescription = null,
@@ -784,7 +885,13 @@ private fun FolderEditorPage(
                                 } else if (source.isTrakt) {
                                     FolderTraktSourceCard(
                                         source = source,
-                                        onEdit = { CollectionEditorRepository.editTraktSource(index) },
+                                        onEdit = {
+                                            CollectionEditorRepository.editTraktSource(index)
+                                            onNavigateToPage?.invoke(
+                                                CollectionEditorPage.TraktSourcePicker,
+                                                editTraktSourcePickerTitle,
+                                            )
+                                        },
                                         onRemove = { CollectionEditorRepository.removeCatalogSource(index) },
                                     )
                                 } else if (addonSource != null) {
@@ -823,7 +930,7 @@ private fun FolderEditorPage(
                 NuvioPrimaryButton(
                     text = stringResource(Res.string.collections_editor_save),
                     enabled = folder.title.isNotBlank(),
-                    onClick = { CollectionEditorRepository.saveFolderEdit() },
+                    onClick = onSave,
                 )
             }
         }

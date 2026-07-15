@@ -2,7 +2,6 @@ package com.nuvio.app.core.auth
 
 import co.touchlab.kermit.Logger
 import com.nuvio.app.core.network.SupabaseProvider
-import com.nuvio.app.core.network.SyncBackendRepository
 import com.nuvio.app.core.storage.LocalAccountDataCleaner
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
@@ -11,13 +10,13 @@ import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.functions.functions
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
@@ -39,45 +38,39 @@ object AuthRepository {
         if (initialized) return
         initialized = true
 
+        val savedAnonId = AuthStorage.loadAnonymousUserId()
+        if (savedAnonId != null) {
+            _state.value = AuthState.Authenticated(
+                userId = savedAnonId,
+                email = null,
+                isAnonymous = true,
+            )
+        }
+
         scope.launch {
-            SyncBackendRepository.state.collectLatest { backendState ->
-                if (!backendState.isLoaded) return@collectLatest
-                validatedRemoteUserId = null
-
-                AuthStorage.loadAnonymousUserId()?.let { savedAnonId ->
-                    _state.value = AuthState.Authenticated(
-                        userId = savedAnonId,
-                        email = null,
-                        isAnonymous = true,
-                    )
-                } ?: run {
-                    _state.value = AuthState.Loading
-                }
-
-                SupabaseProvider.client.auth.sessionStatus.collect { status ->
-                    if (AuthStorage.loadAnonymousUserId() != null) return@collect
-                    when (status) {
-                        is SessionStatus.Authenticated -> {
-                            val user = status.session.user
-                            val userId = user?.id.orEmpty()
-                            if (!validateRemoteSession(userId)) return@collect
-                            _state.value = AuthState.Authenticated(
-                                userId = userId,
-                                email = user?.email,
-                                isAnonymous = false,
-                            )
+            SupabaseProvider.client.auth.sessionStatus.collect { status ->
+                if (AuthStorage.loadAnonymousUserId() != null) return@collect
+                when (status) {
+                    is SessionStatus.Authenticated -> {
+                        val user = status.session.user
+                        val userId = user?.id.orEmpty()
+                        if (!validateRemoteSession(userId)) return@collect
+                        _state.value = AuthState.Authenticated(
+                            userId = userId,
+                            email = user?.email,
+                            isAnonymous = false,
+                        )
+                    }
+                    is SessionStatus.NotAuthenticated -> {
+                        _state.value = AuthState.Unauthenticated
+                    }
+                    is SessionStatus.Initializing -> {
+                        if (AuthStorage.loadAnonymousUserId() == null) {
+                            _state.value = AuthState.Loading
                         }
-                        is SessionStatus.NotAuthenticated -> {
-                            _state.value = AuthState.Unauthenticated
-                        }
-                        is SessionStatus.Initializing -> {
-                            if (AuthStorage.loadAnonymousUserId() == null) {
-                                _state.value = AuthState.Loading
-                            }
-                        }
-                        is SessionStatus.RefreshFailure -> {
-                            _state.value = AuthState.Unauthenticated
-                        }
+                    }
+                    is SessionStatus.RefreshFailure -> {
+                        _state.value = AuthState.Unauthenticated
                     }
                 }
             }
@@ -138,19 +131,44 @@ object AuthRepository {
         _error.value = e.message ?: getString(Res.string.auth_sign_in_failed)
     }
 
-    suspend fun signOut(): Result<Unit> = runCatching {
+    suspend fun signOut(): Result<Unit> {
         _error.value = null
-        val wasAnonymous = AuthStorage.loadAnonymousUserId() != null
-        AuthStorage.clearAnonymousUserId()
+        val anonymousRead = runCatching { AuthStorage.loadAnonymousUserId() }
+        val wasAnonymous = anonymousRead.getOrNull() != null
+        val anonymousClear = runCatching { AuthStorage.clearAnonymousUserId() }
         validatedRemoteUserId = null
-        if (!wasAnonymous) {
-            SupabaseProvider.client.auth.signOut()
+        val remoteSignOut = if (wasAnonymous) {
+            Result.success(Unit)
+        } else {
+            runCatching { SupabaseProvider.client.auth.signOut() }
         }
+
+        val fallbackSessionClear = if (remoteSignOut.isFailure) {
+            runCatching { SupabaseProvider.client.auth.clearSession() }
+                .onFailure { error -> log.w(error) { "Failed to clear Supabase session after sign-out failure" } }
+        } else {
+            Result.success(Unit)
+        }
+        val localCleanup = runCatching { LocalAccountDataCleaner.wipe() }
         _state.value = AuthState.Unauthenticated
-        LocalAccountDataCleaner.wipe()
-    }.onFailure { e ->
-        log.e(e) { "Sign-out failed" }
-        _error.value = e.message ?: getString(Res.string.auth_sign_out_failed)
+
+        val failure = anonymousRead.exceptionOrNull()
+            ?: anonymousClear.exceptionOrNull()
+            ?: remoteSignOut.exceptionOrNull()
+            ?: fallbackSessionClear.exceptionOrNull()
+            ?: localCleanup.exceptionOrNull()
+        val cancellation = remoteSignOut.exceptionOrNull() as? CancellationException
+            ?: fallbackSessionClear.exceptionOrNull() as? CancellationException
+        if (cancellation != null) throw cancellation
+        return if (failure == null) {
+            Result.success(Unit)
+        } else {
+            log.e(failure) { "Sign-out did not complete cleanly; all local cleanup steps were attempted" }
+            _error.value = failure.message ?: runCatching {
+                getString(Res.string.auth_sign_out_failed)
+            }.getOrDefault("Sign out failed")
+            Result.failure(failure)
+        }
     }
 
     suspend fun signOutIfSessionInvalid(error: Throwable, source: String): Boolean {
@@ -170,29 +188,11 @@ object AuthRepository {
         }.onFailure { e ->
             log.w(e) { "Failed to clear Supabase session after remote invalidation; continuing local reset" }
         }
+        val localCleanup = runCatching { LocalAccountDataCleaner.wipe() }
         _state.value = AuthState.Unauthenticated
-        LocalAccountDataCleaner.wipe()
-    }
-
-    suspend fun resetForSyncBackendChange(): Result<Unit> = runCatching {
-        _error.value = null
-        val wasAnonymous = AuthStorage.loadAnonymousUserId() != null
-        AuthStorage.clearAnonymousUserId()
-        validatedRemoteUserId = null
-
-        if (!wasAnonymous) {
-            runCatching {
-                SupabaseProvider.client.auth.signOut()
-            }.onFailure { e ->
-                log.w(e) { "Supabase sign-out failed during sync backend reset; continuing local reset" }
-            }
+        localCleanup.onFailure { error ->
+            log.e(error) { "Local account cleanup failed after remote session invalidation" }
         }
-
-        _state.value = AuthState.Unauthenticated
-        LocalAccountDataCleaner.wipe()
-    }.onFailure { e ->
-        log.e(e) { "Sync backend auth reset failed" }
-        _error.value = e.message ?: getString(Res.string.auth_sign_out_failed)
     }
 
     suspend fun deleteAccount(): Result<Unit> = runCatching {
@@ -200,8 +200,11 @@ object AuthRepository {
         SupabaseProvider.client.functions.invoke("delete-account")
         SupabaseProvider.client.auth.signOut()
         validatedRemoteUserId = null
-        _state.value = AuthState.Unauthenticated
-        LocalAccountDataCleaner.wipe()
+        try {
+            LocalAccountDataCleaner.wipe()
+        } finally {
+            _state.value = AuthState.Unauthenticated
+        }
     }.onFailure { e ->
         log.e(e) { "Account deletion failed" }
         _error.value = e.message ?: getString(Res.string.auth_account_deletion_failed)

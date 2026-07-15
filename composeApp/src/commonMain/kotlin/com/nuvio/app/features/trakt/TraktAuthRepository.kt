@@ -65,6 +65,24 @@ object TraktAuthRepository {
         return _uiState.value
     }
 
+    internal fun currentStateForSync(): TraktAuthState {
+        ensureLoaded()
+        return authState
+    }
+
+    internal fun replaceStateFromSync(state: TraktAuthState): Boolean {
+        ensureLoaded()
+        val syncedState = state.copy(
+            pendingAuthorizationState = null,
+            pendingAuthorizationStartedAtMillis = null,
+        )
+        if (authState.syncSignature() == syncedState.syncSignature()) return false
+        authState = syncedState
+        persist()
+        publish(statusMessage = null, errorMessage = null)
+        return true
+    }
+
     fun hasRequiredCredentials(): Boolean =
         TraktConfig.CLIENT_ID.isNotBlank() && TraktConfig.CLIENT_SECRET.isNotBlank()
 
@@ -281,6 +299,7 @@ object TraktAuthRepository {
         )
         persist()
         refreshUserSettings()
+        TraktCredentialSync.pushCurrentToRemote()
         publish(
             isLoading = false,
             statusMessage = localizedString(Res.string.trakt_connected_status),
@@ -312,6 +331,7 @@ object TraktAuthRepository {
             }
         }
 
+        TraktCredentialSync.deleteRemote()
         authState = TraktAuthState()
         persist()
         publish(
@@ -347,11 +367,21 @@ object TraktAuthRepository {
         }.onFailure { error ->
             if (error is CancellationException) throw error
             log.w { "Trakt token refresh failed: ${error.message}" }
-        }.getOrNull() ?: return false
+        }.getOrNull()
+
+        if (response == null) {
+            if (recoverFromRemoteCredentials(refreshToken)) return true
+            return false
+        }
 
         val parsed = runCatching {
             json.decodeFromString<TraktTokenResponse>(response)
-        }.getOrNull() ?: return false
+        }.getOrNull()
+
+        if (parsed == null) {
+            if (recoverFromRemoteCredentials(refreshToken)) return true
+            return false
+        }
 
         authState = authState.copy(
             accessToken = parsed.accessToken,
@@ -361,6 +391,7 @@ object TraktAuthRepository {
             expiresIn = parsed.expiresIn,
         )
         persist()
+        TraktCredentialSync.pushCurrentToRemote()
         publish()
         return true
     }
@@ -443,6 +474,23 @@ object TraktAuthRepository {
         val nowSeconds = TraktPlatformClock.nowEpochMs() / 1_000L
         return nowSeconds >= (expiresAtSeconds - 60)
     }
+
+    private suspend fun recoverFromRemoteCredentials(staleRefreshToken: String): Boolean {
+        val pulled = TraktCredentialSync.pullFromRemote()
+        if (!pulled) return false
+        return authState.isAuthenticated && authState.refreshToken != staleRefreshToken
+    }
+
+    private fun TraktAuthState.syncSignature(): String =
+        listOf(
+            accessToken.orEmpty(),
+            refreshToken.orEmpty(),
+            tokenType.orEmpty(),
+            createdAt?.toString().orEmpty(),
+            expiresIn?.toString().orEmpty(),
+            username.orEmpty(),
+            userSlug.orEmpty(),
+        ).joinToString("|")
 }
 
 @Serializable

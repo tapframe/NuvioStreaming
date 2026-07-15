@@ -111,6 +111,7 @@ fun SearchScreen(
     }.collectAsStateWithLifecycle()
     val recentSearches by SearchHistoryRepository.uiState.collectAsStateWithLifecycle()
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
+    val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val networkStatusUiState by NetworkStatusRepository.uiState.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     var lastRequestedQuery by rememberSaveable { mutableStateOf<String?>(null) }
@@ -305,6 +306,7 @@ fun SearchScreen(
                         SearchRepository.refreshDiscover(addonsUiState.addons)
                     },
                     watchedKeys = watchedUiState.watchedKeys,
+                    fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                     onPosterClick = onPosterClick,
                     onPosterLongClick = onPosterLongClick,
                 )
@@ -360,6 +362,7 @@ fun SearchScreen(
                                 section = section,
                                 modifier = Modifier.padding(bottom = 12.dp),
                                 watchedKeys = watchedUiState.watchedKeys,
+                                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
                                 onPosterClick = onPosterClick,
                                 onPosterLongClick = onPosterLongClick,
                             )

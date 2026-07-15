@@ -27,6 +27,13 @@
     <string name="addons_badge_unavailable">Nicht verfügbar</string>
     <string name="addons_configure">Addon konfigurieren</string>
     <string name="addons_delete">Addon löschen</string>
+    <string name="addons_appstore_add_description">Bring deine Mediathek mit den Addons, die du nutzt, zu Nuvio.</string>
+    <string name="addons_appstore_empty_subtitle">Füge ein Addon hinzu, um deine Mediathek aufzubauen.</string>
+    <string name="addons_appstore_empty_title">Richte Nuvio für dich ein.</string>
+    <string name="addons_appstore_input_placeholder">Addon-URL</string>
+    <string name="addons_appstore_install_button">Addon hinzufügen</string>
+    <string name="store_empty_unavailable_title">Hier gibt es noch nichts</string>
+    <string name="store_empty_unavailable_message">Deine aktuellen Addons zeigen hier noch nichts an.</string>
     <string name="addons_empty_subtitle">Füge eine Manifest-URL hinzu, um Kataloge, Metadaten, Streams oder Untertitel in Nuvio zu laden.</string>
     <string name="addons_empty_title">Noch keine Addons installiert.</string>
     <string name="addons_error_enter_url">Gib eine Addon-URL ein.</string>
@@ -383,7 +390,9 @@
     <string name="compose_settings_root_check_updates_description">Suche nach neuen Versionen der App.</string>
     <string name="compose_settings_root_check_updates_title">Nach Updates suchen</string>
     <string name="compose_settings_root_content_discovery_description">Verwalte Addons und Entdeckungsquellen.</string>
+    <string name="compose_settings_root_content_discovery_description_appstore">Verwalte Addons und wähle aus, was in Nuvio angezeigt wird.</string>
     <string name="compose_settings_root_downloads_description">Verwalte deine heruntergeladenen Filme und Episoden.</string>
+    <string name="compose_settings_root_downloads_description_appstore">Verwalte, was du auf diesem Gerät gespeichert hast.</string>
     <string name="compose_settings_root_downloads_title">Downloads</string>
     <string name="compose_settings_root_general_section">ALLGEMEIN</string>
     <string name="compose_settings_root_integrations_description">TMDB- und MDBList-Dienste verbinden.</string>
@@ -519,6 +528,7 @@
     <string name="settings_content_discovery_section_home">START</string>
     <string name="settings_content_discovery_section_sources">QUELLEN</string>
     <string name="settings_content_discovery_addons_description">Installiere, entferne, aktualisiere und sortiere deine Inhaltsquellen.</string>
+    <string name="settings_content_discovery_addons_description_appstore">Füge die Addons hinzu, die du mit Nuvio nutzt, und verwalte sie.</string>
     <string name="settings_content_discovery_plugins_description">Installiere JavaScript-Scraper-Repositories und teste Anbieter intern.</string>
     <string name="settings_content_discovery_homescreen_description">Lege fest, welche Kataloge auf der Startseite und in welcher Reihenfolge erscheinen.</string>
     <string name="settings_content_discovery_meta_screen_description">Detail-Abschnitte deaktivieren und alles unterhalb des Hero neu anordnen.</string>

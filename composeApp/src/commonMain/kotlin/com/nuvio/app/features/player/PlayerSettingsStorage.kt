@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonObject
 internal expect object PlayerSettingsStorage {
     fun loadShowLoadingOverlay(): Boolean?
     fun saveShowLoadingOverlay(enabled: Boolean)
+    fun loadShowParentalGuide(): Boolean?
+    fun saveShowParentalGuide(enabled: Boolean)
     fun loadResizeMode(): String?
     fun saveResizeMode(mode: String)
     fun loadHoldToSpeedEnabled(): Boolean?
@@ -17,6 +19,8 @@ internal expect object PlayerSettingsStorage {
     fun saveExternalPlayerEnabled(enabled: Boolean)
     fun loadExternalPlayerForwardSubtitles(): Boolean?
     fun saveExternalPlayerForwardSubtitles(enabled: Boolean)
+    fun loadExternalPlayerSendSkipSegments(): Boolean?
+    fun saveExternalPlayerSendSkipSegments(enabled: Boolean)
     fun loadExternalPlayerId(): String?
     fun saveExternalPlayerId(playerId: String?)
     fun loadPreferredAudioLanguage(): String?

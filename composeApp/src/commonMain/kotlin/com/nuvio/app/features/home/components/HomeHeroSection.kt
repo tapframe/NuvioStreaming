@@ -489,14 +489,24 @@ private fun mobileHeroHeight(
     val widthFallbackHeight = (maxWidthDp * 1.16f).dp
     val baseHeight = viewportDrivenHeight ?: widthFallbackHeight
 
-    val cappedHeight = if (viewportHeightDp != null && mobileBelowSectionHeightHintDp != null) {
-        val maxAllowedFromViewport = (viewportHeightDp - mobileBelowSectionHeightHintDp).dp
+    val maxAllowedFromViewportDp = if (viewportHeightDp != null && mobileBelowSectionHeightHintDp != null) {
+        viewportHeightDp - mobileBelowSectionHeightHintDp
+    } else {
+        null
+    }
+    val cappedHeight = if (maxAllowedFromViewportDp != null) {
+        val maxAllowedFromViewport = maxAllowedFromViewportDp.dp
         baseHeight.coerceAtMost(maxAllowedFromViewport)
     } else {
         baseHeight
     }
+    val minHeight = if (maxAllowedFromViewportDp != null) {
+        minOf(MOBILE_HERO_MIN_HEIGHT_DP, maxAllowedFromViewportDp.coerceAtLeast(0f)).dp
+    } else {
+        MOBILE_HERO_MIN_HEIGHT_DP.dp
+    }
 
-    return cappedHeight.coerceIn(MOBILE_HERO_MIN_HEIGHT_DP.dp, MOBILE_HERO_MAX_HEIGHT_DP.dp)
+    return cappedHeight.coerceIn(minHeight, MOBILE_HERO_MAX_HEIGHT_DP.dp)
 }
 
 @Composable

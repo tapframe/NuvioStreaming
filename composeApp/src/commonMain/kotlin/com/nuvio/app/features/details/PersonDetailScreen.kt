@@ -73,6 +73,7 @@ import com.nuvio.app.features.watchprogress.CurrentDateProvider
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
+import com.nuvio.app.navigation.LocalUseNativeNavigation
 
 private sealed interface PersonDetailUiState {
     data object Loading : PersonDetailUiState
@@ -146,19 +147,20 @@ fun PersonDetailScreen(
             )
             }
 
-        // Back button overlaid on top
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(start = 4.dp, top = 4.dp)
-                .align(Alignment.TopStart),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = stringResource(Res.string.action_back),
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
+        if (!LocalUseNativeNavigation.current) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(start = 4.dp, top = 4.dp)
+                    .align(Alignment.TopStart),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(Res.string.action_back),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
@@ -523,15 +525,15 @@ private fun PersonIdentitySidebar(
         Column(verticalArrangement = Arrangement.spacedBy(15.dp)) {
             person.birthday?.let { birthday ->
                 PersonSidebarFact(
-                    label = "Born",
+                    label = stringResource(Res.string.person_detail_born),
                     value = personBirthLine(birthday = birthday, deathday = person.deathday),
                 )
             }
             person.placeOfBirth?.takeIf { it.isNotBlank() }?.let { place ->
-                PersonSidebarFact(label = "Place of birth", value = place)
+                PersonSidebarFact(label = stringResource(Res.string.person_detail_place_of_birth), value = place)
             }
             if (creditSummary.isNotBlank()) {
-                PersonSidebarFact(label = "Credits", value = creditSummary)
+                PersonSidebarFact(label = stringResource(Res.string.person_detail_credits), value = creditSummary)
             }
         }
 
@@ -543,7 +545,7 @@ private fun PersonIdentitySidebar(
                     .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.30f)),
             )
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                SidebarLabel(text = "Biography")
+                SidebarLabel(text = stringResource(Res.string.person_detail_biography))
                 Text(
                     text = biography,
                     style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),

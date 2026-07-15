@@ -55,6 +55,7 @@ import com.nuvio.app.core.ui.NuvioScreenHeader
 import com.nuvio.app.core.ui.NuvioSectionLabel
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.core.ui.NuvioSurfaceCard
+import com.nuvio.app.core.ui.withDuplicateSafeLazyKeys
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -215,6 +216,9 @@ private fun CollectionReorderableList(
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
+    val keyedCollections = remember(collections) {
+        collections.withDuplicateSafeLazyKeys { collection -> collection.id }
+    }
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = lazyListState,
     ) { from, to ->
@@ -229,8 +233,9 @@ private fun CollectionReorderableList(
         state = lazyListState,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        itemsIndexed(collections, key = { _, collection -> collection.id }) { _, collection ->
-            ReorderableItem(reorderableLazyListState, key = collection.id) { isDragging ->
+        itemsIndexed(keyedCollections, key = { _, collection -> collection.lazyKey }) { _, keyedCollection ->
+            val collection = keyedCollection.value
+            ReorderableItem(reorderableLazyListState, key = keyedCollection.lazyKey) { isDragging ->
                 val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
 
                 Surface(

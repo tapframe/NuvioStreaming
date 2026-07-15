@@ -33,12 +33,14 @@ fun snapToAllowedTimeout(value: Int): Int {
 
 data class PlayerSettingsUiState(
     val showLoadingOverlay: Boolean = true,
+    val showParentalGuide: Boolean = true,
     val resizeMode: PlayerResizeMode = PlayerResizeMode.Fit,
     val holdToSpeedEnabled: Boolean = true,
     val holdToSpeedValue: Float = 2f,
     val touchGesturesEnabled: Boolean = true,
     val externalPlayerEnabled: Boolean = false,
     val externalPlayerForwardSubtitles: Boolean = false,
+    val externalPlayerSendSkipSegments: Boolean = false,
     val externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId(),
     val preferredAudioLanguage: String = AudioLanguageOption.DEVICE,
     val secondaryPreferredAudioLanguage: String? = null,
@@ -97,12 +99,14 @@ object PlayerSettingsRepository {
 
     private var hasLoaded = false
     private var showLoadingOverlay = true
+    private var showParentalGuide = true
     private var resizeMode = PlayerResizeMode.Fit
     private var holdToSpeedEnabled = true
     private var holdToSpeedValue = 2f
     private var touchGesturesEnabled = true
     private var externalPlayerEnabled = false
     private var externalPlayerForwardSubtitles = false
+    private var externalPlayerSendSkipSegments = false
     private var externalPlayerId: String? = ExternalPlayerPlatform.defaultPlayerId()
     private var preferredAudioLanguage = AudioLanguageOption.DEVICE
     private var secondaryPreferredAudioLanguage: String? = null
@@ -166,12 +170,14 @@ object PlayerSettingsRepository {
     fun clearLocalState() {
         hasLoaded = false
         showLoadingOverlay = true
+        showParentalGuide = true
         resizeMode = PlayerResizeMode.Fit
         holdToSpeedEnabled = true
         holdToSpeedValue = 2f
         touchGesturesEnabled = true
         externalPlayerEnabled = false
         externalPlayerForwardSubtitles = false
+        externalPlayerSendSkipSegments = false
         externalPlayerId = ExternalPlayerPlatform.defaultPlayerId()
         preferredAudioLanguage = AudioLanguageOption.DEVICE
         secondaryPreferredAudioLanguage = null
@@ -228,6 +234,7 @@ object PlayerSettingsRepository {
     private fun loadFromDisk() {
         hasLoaded = true
         showLoadingOverlay = PlayerSettingsStorage.loadShowLoadingOverlay() ?: true
+        showParentalGuide = PlayerSettingsStorage.loadShowParentalGuide() ?: true
         resizeMode = PlayerSettingsStorage.loadResizeMode()
             ?.let { runCatching { PlayerResizeMode.valueOf(it) }.getOrNull() }
             ?: PlayerResizeMode.Fit
@@ -236,6 +243,7 @@ object PlayerSettingsRepository {
         touchGesturesEnabled = PlayerSettingsStorage.loadTouchGesturesEnabled() ?: true
         externalPlayerEnabled = PlayerSettingsStorage.loadExternalPlayerEnabled() ?: false
         externalPlayerForwardSubtitles = PlayerSettingsStorage.loadExternalPlayerForwardSubtitles() ?: false
+        externalPlayerSendSkipSegments = PlayerSettingsStorage.loadExternalPlayerSendSkipSegments() ?: false
         externalPlayerId = PlayerSettingsStorage.loadExternalPlayerId()
             ?: ExternalPlayerPlatform.defaultPlayerId()
         preferredAudioLanguage =
@@ -366,6 +374,14 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveShowLoadingOverlay(enabled)
     }
 
+    fun setShowParentalGuide(enabled: Boolean) {
+        ensureLoaded()
+        if (showParentalGuide == enabled) return
+        showParentalGuide = enabled
+        publish()
+        PlayerSettingsStorage.saveShowParentalGuide(enabled)
+    }
+
     fun setResizeMode(mode: PlayerResizeMode) {
         ensureLoaded()
         if (resizeMode == mode) return
@@ -430,6 +446,14 @@ object PlayerSettingsRepository {
         externalPlayerForwardSubtitles = enabled
         publish()
         PlayerSettingsStorage.saveExternalPlayerForwardSubtitles(enabled)
+    }
+
+    fun setExternalPlayerSendSkipSegments(enabled: Boolean) {
+        ensureLoaded()
+        if (externalPlayerSendSkipSegments == enabled) return
+        externalPlayerSendSkipSegments = enabled
+        publish()
+        PlayerSettingsStorage.saveExternalPlayerSendSkipSegments(enabled)
     }
 
     fun setPreferredAudioLanguage(language: String) {
@@ -887,12 +911,14 @@ object PlayerSettingsRepository {
     private fun publish() {
         _uiState.value = PlayerSettingsUiState(
             showLoadingOverlay = showLoadingOverlay,
+            showParentalGuide = showParentalGuide,
             resizeMode = resizeMode,
             holdToSpeedEnabled = holdToSpeedEnabled,
             holdToSpeedValue = holdToSpeedValue,
             touchGesturesEnabled = touchGesturesEnabled,
             externalPlayerEnabled = externalPlayerEnabled,
             externalPlayerForwardSubtitles = externalPlayerForwardSubtitles,
+            externalPlayerSendSkipSegments = externalPlayerSendSkipSegments,
             externalPlayerId = externalPlayerId,
             preferredAudioLanguage = preferredAudioLanguage,
             secondaryPreferredAudioLanguage = secondaryPreferredAudioLanguage,

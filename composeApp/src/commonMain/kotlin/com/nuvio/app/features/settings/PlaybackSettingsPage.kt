@@ -24,7 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -334,6 +334,14 @@ private fun PlaybackSettingsSection(
                     onCheckedChange = PlayerSettingsRepository::setShowLoadingOverlay,
                 )
                 SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_parental_guide),
+                    description = stringResource(Res.string.settings_playback_parental_guide_description),
+                    checked = autoPlayPlayerSettings.showParentalGuide,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setShowParentalGuide,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
                 // Player preference picker: Internal / External
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_playback_player_preference),
@@ -367,6 +375,14 @@ private fun PlaybackSettingsSection(
                         checked = autoPlayPlayerSettings.externalPlayerForwardSubtitles,
                         isTablet = isTablet,
                         onCheckedChange = PlayerSettingsRepository::setExternalPlayerForwardSubtitles,
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = stringResource(Res.string.settings_playback_external_player_send_skip_segments),
+                        description = stringResource(Res.string.settings_playback_external_player_send_skip_segments_description),
+                        checked = autoPlayPlayerSettings.externalPlayerSendSkipSegments,
+                        isTablet = isTablet,
+                        onCheckedChange = PlayerSettingsRepository::setExternalPlayerSendSkipSegments,
                     )
                 }
                 SettingsGroupDivider(isTablet = isTablet)
@@ -1857,7 +1873,7 @@ private fun ReuseCacheDurationDialog(
     onDurationSelected: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val options = listOf(1, 6, 12, 24, 48, 72, 168)
+    val options = listOf(1, 2, 3, 6, 12, 24, 48, 72, 168)
 
     BasicAlertDialog(
         onDismissRequest = onDismiss,
@@ -3294,9 +3310,8 @@ private fun IntroDbApiKeyDialog(
                         enabled = !isVerifying
                     ) { 
                         if (isVerifying) {
-                            CircularProgressIndicator(
+                            NuvioLoadingIndicator(
                                 modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         } else {

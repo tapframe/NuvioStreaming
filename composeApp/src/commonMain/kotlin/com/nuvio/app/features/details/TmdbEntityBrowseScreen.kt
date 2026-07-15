@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import nuvio.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import com.nuvio.app.core.ui.landscapePosterHeightForWidth
 import com.nuvio.app.core.ui.landscapePosterWidth
@@ -61,6 +62,7 @@ import com.nuvio.app.features.tmdb.TmdbEntityMediaType
 import com.nuvio.app.features.tmdb.TmdbEntityRailType
 import com.nuvio.app.features.tmdb.TmdbMetadataService
 import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.navigation.LocalUseNativeNavigation
 
 private sealed interface EntityBrowseUiState {
     data object Loading : EntityBrowseUiState
@@ -125,18 +127,20 @@ fun TmdbEntityBrowseScreen(
             }
         }
 
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(start = 4.dp, top = 4.dp)
-                .align(Alignment.TopStart),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = stringResource(Res.string.action_back),
-                tint = MaterialTheme.colorScheme.onSurface,
-            )
+        if (!LocalUseNativeNavigation.current) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(start = 4.dp, top = 4.dp)
+                    .align(Alignment.TopStart),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = stringResource(Res.string.action_back),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
@@ -404,15 +408,15 @@ private fun EntityIdentitySidebar(
 
         Column(verticalArrangement = Arrangement.spacedBy(15.dp)) {
             header.originCountry?.takeIf { it.isNotBlank() }?.let { country ->
-                EntitySidebarFact(label = "Country", value = country)
+                EntitySidebarFact(label = stringResource(Res.string.entity_browse_country), value = country)
             }
             header.secondaryLabel?.takeIf { it.isNotBlank() }?.let { label ->
-                EntitySidebarFact(label = "Type", value = label)
+                EntitySidebarFact(label = stringResource(Res.string.entity_browse_type), value = label)
             }
             if (catalogueCount > 0) {
                 EntitySidebarFact(
-                    label = "Catalogue",
-                    value = "$catalogueCount ${if (catalogueCount == 1) "title" else "titles"}",
+                    label = stringResource(Res.string.entity_browse_catalogue),
+                    value = pluralStringResource(Res.plurals.entity_browse_title_count, catalogueCount, catalogueCount),
                 )
             }
         }
@@ -425,7 +429,7 @@ private fun EntityIdentitySidebar(
                     .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.30f)),
             )
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                EntitySidebarLabel(text = "About")
+                EntitySidebarLabel(text = stringResource(Res.string.entity_browse_about))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),

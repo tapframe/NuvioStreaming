@@ -1,7 +1,7 @@
 package com.nuvio.app.features.watching.sync
 
 import co.touchlab.kermit.Logger
-import com.nuvio.app.features.addons.httpGetTextWithHeaders
+import com.nuvio.app.features.addons.RawHttpResponse
 import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.tmdb.TmdbService
 import com.nuvio.app.features.trakt.TraktAuthRepository
@@ -18,6 +18,9 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private const val BASE_URL = "https://api.trakt.tv"
+private const val WATCHED_PAGE_LIMIT = 250
+private const val WATCHED_MAX_PAGES = 1_000
+private const val WATCHED_SHOWS_EXTENDED = "progress"
 
 
 object TraktWatchedSyncAdapter : WatchedSyncAdapter {
@@ -35,29 +38,15 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
     ): List<WatchedItem> {
         val headers = TraktAuthRepository.authorizedHeaders() ?: return emptyList()
 
-        val (moviesPayload, showsPayload) = coroutineScope {
+        val (movieItems, showItems) = coroutineScope {
             val movies = async {
-                httpGetTextWithHeaders(
-                    url = "$BASE_URL/sync/watched/movies",
-                    headers = headers,
-                )
+                fetchWatchedMoviePages(headers)
             }
             val shows = async {
-                httpGetTextWithHeaders(
-                    url = "$BASE_URL/sync/watched/shows",
-                    headers = headers,
-                )
+                fetchWatchedShowPages(headers)
             }
             movies.await() to shows.await()
         }
-
-        val movieItems = runCatching {
-            json.decodeFromString<List<TraktWatchedMovieDto>>(moviesPayload)
-        }.getOrDefault(emptyList())
-
-        val showItems = runCatching {
-            json.decodeFromString<List<TraktWatchedShowDto>>(showsPayload)
-        }.getOrDefault(emptyList())
 
         val result = mutableListOf<WatchedItem>()
 
@@ -121,6 +110,64 @@ object TraktWatchedSyncAdapter : WatchedSyncAdapter {
 
         return remappedResult
     }
+
+    private suspend fun fetchWatchedMoviePages(headers: Map<String, String>): List<TraktWatchedMovieDto> {
+        val items = mutableListOf<TraktWatchedMovieDto>()
+        var page = 1
+        while (page <= WATCHED_MAX_PAGES) {
+            val response = httpRequestRaw(
+                method = "GET",
+                url = "$BASE_URL/sync/watched/movies?page=$page&limit=$WATCHED_PAGE_LIMIT",
+                headers = headers,
+                body = "",
+            )
+            if (response.status !in 200..299) {
+                error("Trakt watched movies request failed: ${response.status}")
+            }
+            val pageItems = json.decodeFromString<List<TraktWatchedMovieDto>>(response.body)
+            if (pageItems.isEmpty()) break
+            items.addAll(pageItems)
+            val pageCount = response.headerInt("x-pagination-page-count")
+            if (pageCount != null && page >= pageCount) break
+            page += 1
+        }
+        if (page > WATCHED_MAX_PAGES) {
+            error("Trakt watched movies exceeded max pages")
+        }
+        return items
+    }
+
+    private suspend fun fetchWatchedShowPages(headers: Map<String, String>): List<TraktWatchedShowDto> {
+        val items = mutableListOf<TraktWatchedShowDto>()
+        var page = 1
+        while (page <= WATCHED_MAX_PAGES) {
+            val response = httpRequestRaw(
+                method = "GET",
+                url = "$BASE_URL/sync/watched/shows?page=$page&limit=$WATCHED_PAGE_LIMIT&extended=$WATCHED_SHOWS_EXTENDED",
+                headers = headers,
+                body = "",
+            )
+            if (response.status !in 200..299) {
+                error("Trakt watched shows request failed: ${response.status}")
+            }
+            val pageItems = json.decodeFromString<List<TraktWatchedShowDto>>(response.body)
+            if (pageItems.isEmpty()) break
+            items.addAll(pageItems)
+            val pageCount = response.headerInt("x-pagination-page-count")
+            if (pageCount != null && page >= pageCount) break
+            page += 1
+        }
+        if (page > WATCHED_MAX_PAGES) {
+            error("Trakt watched shows exceeded max pages")
+        }
+        return items
+    }
+
+    private fun RawHttpResponse.headerInt(name: String): Int? =
+        headers[name.lowercase()]
+            ?.substringBefore(",")
+            ?.trim()
+            ?.toIntOrNull()
 
     // ── push (add to history) ───────────────────────────────────────────
     override suspend fun push(

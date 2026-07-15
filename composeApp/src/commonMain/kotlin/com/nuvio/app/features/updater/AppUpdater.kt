@@ -15,7 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import com.nuvio.app.core.ui.NuvioLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -488,9 +488,8 @@ fun AppUpdaterHost(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (state.isChecking) {
-                                CircularProgressIndicator(
+                                NuvioLoadingIndicator(
                                     modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                             }
