@@ -11,12 +11,6 @@ import kotlin.test.assertTrue
 class SyncManagerTest {
 
     @Test
-    fun `forced foreground recovery queues behind an active profile sync`() {
-        assertFalse(shouldQueueCoalescedForegroundPull(force = false))
-        assertTrue(shouldQueueCoalescedForegroundPull(force = true))
-    }
-
-    @Test
     fun `source prerequisites finish before source dependent pulls`() = runBlocking {
         val events = mutableListOf<String>()
         var profileSettingsApplied = false

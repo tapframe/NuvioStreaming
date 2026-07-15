@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 
 private const val FOREGROUND_PULL_DELAY_MS = 2500L
 private const val FOREGROUND_PULL_MIN_INTERVAL_MS = 30 * 60_000L
-private const val PERIODIC_NUVIO_SYNC_PULL_INTERVAL_MS = 60_000L
+private const val PERIODIC_NUVIO_SYNC_PULL_INTERVAL_MS = 240_000L
 
 internal enum class ProfileSyncStep {
     Addons,
@@ -129,8 +129,6 @@ internal enum class ProfileSyncRequestResult {
     Coalesced,
     Replaced,
 }
-
-internal fun shouldQueueCoalescedForegroundPull(force: Boolean): Boolean = force
 
 internal class ProfileSyncRequestGate {
     private data class PendingRequest(
@@ -298,11 +296,8 @@ object SyncManager {
                         delay(FOREGROUND_PULL_DELAY_MS)
                     }
                     if (!force && hasRecentFullPull(profileId)) return@launch
-                    startFullProfilePull(
-                        profileId = profileId,
-                        reason = "foreground",
-                        queueIfCoalesced = shouldQueueCoalescedForegroundPull(force),
-                    )
+                    if (ProfileRepository.activeProfileId != profileId) return@launch
+                    pullForegroundForProfile(profileId)
                 } finally {
                     synchronized(pullStateLock) {
                         if (foregroundPullJob === requestJob) {
@@ -324,6 +319,47 @@ object SyncManager {
             lastFullPullProfileId == profileId &&
                 TraktPlatformClock.nowEpochMs() - lastFullPullAtMs < FOREGROUND_PULL_MIN_INTERVAL_MS
         }
+
+    private suspend fun pullForegroundForProfile(profileId: Int) {
+        log.i { "Foreground sync started profile=$profileId" }
+
+        runCatching { ProfileRepository.pullProfiles() }
+            .onFailure { log.e(it) { "Foreground profiles pull failed" } }
+        runCatching { ProfileSettingsSync.pull(profileId) }
+            .onFailure { log.e(it) { "Foreground profile settings pull failed" } }
+
+        coroutineScope {
+            launch {
+                runCatching { AddonRepository.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground addons pull failed" } }
+            }
+            if (AppFeaturePolicy.pluginsEnabled) {
+                launch {
+                    runCatching { PluginRepository.pullFromServer(profileId) }
+                        .onFailure { log.e(it) { "Foreground plugins pull failed" } }
+                }
+            }
+            launch {
+                runCatching { LibraryRepository.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground library pull failed" } }
+            }
+            launch {
+                runCatching {
+                    WatchProgressSourceCoordinator.refreshActiveSource(profileId = profileId, force = true)
+                }.onFailure { log.e(it) { "Foreground active watch source pull failed" } }
+            }
+            launch {
+                runCatching { CollectionSyncService.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground collections pull failed" } }
+            }
+            launch {
+                runCatching { HomeCatalogSettingsSyncService.pullFromServer(profileId) }
+                    .onFailure { log.e(it) { "Foreground home catalog settings pull failed" } }
+            }
+        }
+
+        log.i { "Foreground sync completed profile=$profileId" }
+    }
 
     private fun startFullProfilePull(
         profileId: Int,
@@ -449,15 +485,6 @@ object SyncManager {
         val authState = AuthRepository.state.value
         if (authState !is AuthState.Authenticated || authState.isAnonymous) return
 
-        if (surface == "profile_settings") {
-            startFullProfilePull(
-                profileId = profileId,
-                reason = "realtime_profile_settings",
-                queueIfCoalesced = true,
-            )
-            return
-        }
-
         accountScopeSnapshot().launch {
             log.i { "requestRealtimeSurfacePull($profileId, $surface)" }
             when (surface) {
@@ -479,6 +506,10 @@ object SyncManager {
                     runCatching {
                         WatchProgressSourceCoordinator.refreshActiveSource(profileId = profileId, force = false)
                     }.onFailure { log.e(it) { "Realtime active watch source pull failed" } }
+                }
+                "profile_settings" -> {
+                    runCatching { ProfileSettingsSync.pull(profileId) }
+                        .onFailure { log.e(it) { "Realtime profile settings pull failed" } }
                 }
                 "collections" -> {
                     runCatching { CollectionSyncService.pullFromServer(profileId) }

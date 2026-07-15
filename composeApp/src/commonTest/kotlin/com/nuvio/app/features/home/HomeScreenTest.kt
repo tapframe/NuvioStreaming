@@ -7,14 +7,24 @@ import com.nuvio.app.features.cloud.CloudLibraryProviderState
 import com.nuvio.app.features.cloud.CloudLibraryUiState
 import com.nuvio.app.features.cloud.playbackVideoId
 import com.nuvio.app.features.debrid.DebridProviders
+import com.nuvio.app.features.watchprogress.CachedInProgressItem
+import com.nuvio.app.features.watchprogress.CachedNextUpItem
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
 import com.nuvio.app.features.watchprogress.WatchProgressEntry
+import com.nuvio.app.features.watchprogress.WatchProgressSourceTraktHistory
+import com.nuvio.app.features.watchprogress.nextUpDismissKey
+import com.nuvio.app.features.watchprogress.parseReleaseDateToEpochMs
+import com.nuvio.app.features.watchprogress.resolvedProgressKey
+import com.nuvio.app.features.watchprogress.toContinueWatchingItem
 import com.nuvio.app.features.watched.WatchedItem
 import com.nuvio.app.features.trakt.TRAKT_CONTINUE_WATCHING_DAYS_CAP_ALL
 import com.nuvio.app.features.trakt.WatchProgressSource
 import com.nuvio.app.features.watching.domain.WatchingContentRef
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HomeScreenTest {
@@ -197,6 +207,13 @@ class HomeScreenTest {
             videoId = "show:1:4",
             title = "Show",
             lastUpdatedEpochMs = 500L,
+        ).copy(
+            logo = " ",
+            poster = "",
+            background = "\t",
+            episodeTitle = " ",
+            episodeThumbnail = "",
+            pauseDescription = "  ",
         )
         val cached = ContinueWatchingItem(
             parentMetaId = "show",
@@ -221,13 +238,133 @@ class HomeScreenTest {
 
         val result = buildHomeContinueWatchingItems(
             visibleEntries = listOf(progress),
-            cachedInProgressByVideoId = mapOf(progress.videoId to cached),
+            cachedInProgressByProgressKey = mapOf(progress.resolvedProgressKey() to cached),
             nextUpItemsBySeries = emptyMap(),
         )
 
         assertEquals("https://example.test/cached.jpg", result.single().imageUrl)
         assertEquals("https://example.test/logo.png", result.single().logo)
+        assertEquals("https://example.test/poster.jpg", result.single().poster)
+        assertEquals("https://example.test/backdrop.jpg", result.single().background)
+        assertEquals("Cached Episode", result.single().episodeTitle)
         assertEquals("https://example.test/thumb.jpg", result.single().episodeThumbnail)
+        assertEquals("Cached description", result.single().pauseDescription)
+    }
+
+    @Test
+    fun `continue watching artwork selection skips blank values`() {
+        val progress = progressEntry(
+            videoId = "show:1:4",
+            title = "Show",
+            lastUpdatedEpochMs = 500L,
+        ).copy(
+            logo = " ",
+            poster = "https://example.test/poster.jpg",
+            background = "\t",
+            episodeThumbnail = "",
+        )
+
+        val item = progress.toContinueWatchingItem()
+
+        assertEquals("https://example.test/poster.jpg", item.imageUrl)
+        assertEquals("https://example.test/poster.jpg", item.poster)
+        assertNull(item.logo)
+        assertNull(item.background)
+        assertNull(item.episodeThumbnail)
+    }
+
+    @Test
+    fun `home in progress snapshot preserves cached metadata through serialization round trip`() {
+        val progress = progressEntry(
+            videoId = "show:1:4",
+            title = " ",
+            lastUpdatedEpochMs = 500L,
+        ).copy(
+            progressKey = "opaque-progress-key",
+            logo = "",
+            poster = " ",
+            background = "\t",
+            episodeTitle = "",
+            episodeThumbnail = " ",
+            pauseDescription = "",
+        )
+        val cached = CachedInProgressItem(
+            contentId = "show",
+            contentType = "series",
+            name = "Cached Show",
+            poster = "https://example.test/poster.jpg",
+            backdrop = "https://example.test/backdrop.jpg",
+            logo = "https://example.test/logo.png",
+            videoId = "show:1:4",
+            season = 1,
+            episode = 4,
+            episodeTitle = "Cached Episode",
+            episodeThumbnail = "https://example.test/thumb.jpg",
+            pauseDescription = "Cached description",
+            position = 10L,
+            duration = 20L,
+            lastWatched = 30L,
+            progressPercent = 50f,
+            progressKey = "opaque-progress-key",
+        )
+
+        val snapshot = buildHomeInProgressCacheSnapshot(
+            visibleEntries = listOf(progress),
+            cachedEntries = listOf(cached),
+        ).single()
+        val encoded = Json.encodeToString(CachedInProgressItem.serializer(), snapshot)
+        val restored = Json.decodeFromString(CachedInProgressItem.serializer(), encoded)
+
+        assertEquals("Cached Show", restored.name)
+        assertEquals("https://example.test/poster.jpg", restored.poster)
+        assertEquals("https://example.test/backdrop.jpg", restored.backdrop)
+        assertEquals("https://example.test/logo.png", restored.logo)
+        assertEquals("Cached Episode", restored.episodeTitle)
+        assertEquals("https://example.test/thumb.jpg", restored.episodeThumbnail)
+        assertEquals("Cached description", restored.pauseDescription)
+        assertEquals(progress.lastPositionMs, restored.position)
+        assertEquals(progress.durationMs, restored.duration)
+        assertEquals(progress.lastUpdatedEpochMs, restored.lastWatched)
+        assertEquals("opaque-progress-key", restored.progressKey)
+        assertNull(restored.progressPercent)
+    }
+
+    @Test
+    fun `cached artwork does not cross aliases that share a playback video id`() {
+        val firstProgress = progressEntry(
+            videoId = "shared-video",
+            title = "First",
+            lastUpdatedEpochMs = 500L,
+        ).copy(
+            parentMetaId = "show-a",
+            progressKey = "opaque-a",
+        )
+        val secondProgress = firstProgress.copy(
+            parentMetaId = "show-b",
+            title = "Second",
+            lastUpdatedEpochMs = 400L,
+            progressKey = "opaque-b",
+        )
+        val firstCached = firstProgress.toContinueWatchingItem().copy(
+            imageUrl = "https://example.test/a.jpg",
+            poster = "https://example.test/a.jpg",
+        )
+        val secondCached = secondProgress.toContinueWatchingItem().copy(
+            imageUrl = "https://example.test/b.jpg",
+            poster = "https://example.test/b.jpg",
+        )
+
+        val result = buildHomeContinueWatchingItems(
+            visibleEntries = listOf(firstProgress, secondProgress),
+            cachedInProgressByProgressKey = mapOf(
+                "opaque-a" to firstCached,
+                "opaque-b" to secondCached,
+            ),
+            nextUpItemsBySeries = emptyMap(),
+        ).associateBy(ContinueWatchingItem::parentMetaId)
+
+        assertEquals("https://example.test/a.jpg", result.getValue("show-a").imageUrl)
+        assertEquals("https://example.test/b.jpg", result.getValue("show-b").imageUrl)
     }
 
     @Test
@@ -353,6 +490,34 @@ class HomeScreenTest {
     }
 
     @Test
+    fun `Trakt next up seeds ignore watched items from the separate watched sync`() {
+        val traktProgress = progressEntry(
+            videoId = "show:1:2",
+            title = "Show",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            lastUpdatedEpochMs = 2_000L,
+            isCompleted = true,
+        ).copy(source = WatchProgressSourceTraktHistory)
+        val watchedItem = watchedItem(
+            id = "other-show",
+            season = 3,
+            episode = 8,
+            markedAtEpochMs = 3_000L,
+        )
+
+        val result = buildHomeNextUpSeedCandidates(
+            progressEntries = listOf(traktProgress),
+            watchedItems = listOf(watchedItem),
+            isTraktProgressActive = true,
+            preferFurthestEpisode = true,
+            nowEpochMs = 4_000L,
+        )
+
+        assertEquals(listOf("show"), result.map { it.content.id })
+    }
+
+    @Test
     fun `stale live next up item is dropped when current seed advances`() {
         val staleNextUp = continueWatchingItem(
             videoId = "show:4:11",
@@ -369,6 +534,270 @@ class HomeScreenTest {
         )
 
         assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `home next up waits for the selected seed source before resolving or clearing cache`() {
+        assertFalse(
+            isHomeNextUpSeedSourceLoaded(
+                isTraktProgressActive = false,
+                hasLoadedRemoteProgress = false,
+                hasLoadedWatchedItems = true,
+                hasLoadedRemoteWatchedItems = true,
+            ),
+        )
+        assertFalse(
+            isHomeNextUpSeedSourceLoaded(
+                isTraktProgressActive = false,
+                hasLoadedRemoteProgress = true,
+                hasLoadedWatchedItems = false,
+                hasLoadedRemoteWatchedItems = true,
+            ),
+        )
+        assertFalse(
+            isHomeNextUpSeedSourceLoaded(
+                isTraktProgressActive = false,
+                hasLoadedRemoteProgress = true,
+                hasLoadedWatchedItems = true,
+                hasLoadedRemoteWatchedItems = false,
+            ),
+        )
+        assertTrue(
+            isHomeNextUpSeedSourceLoaded(
+                isTraktProgressActive = false,
+                hasLoadedRemoteProgress = true,
+                hasLoadedWatchedItems = true,
+                hasLoadedRemoteWatchedItems = true,
+            ),
+        )
+        assertTrue(
+            isHomeNextUpSeedSourceLoaded(
+                isTraktProgressActive = true,
+                hasLoadedRemoteProgress = true,
+                hasLoadedWatchedItems = false,
+                hasLoadedRemoteWatchedItems = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `home next up progressively merges live results with unprocessed cache`() {
+        val cachedResolved = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "Next Up • S1E2 • Cached",
+            seedEpisodeNumber = 1,
+            imageUrl = "https://example.test/cached-show.jpg",
+        )
+        val cachedUnprocessed = continueWatchingItem(
+            videoId = "deferred:1:2",
+            subtitle = "Next Up • S1E2 • Deferred",
+            seedEpisodeNumber = 1,
+            imageUrl = "https://example.test/cached-deferred.jpg",
+        )
+        val liveResolved = continueWatchingItem(
+            videoId = "show:1:3",
+            subtitle = "Next Up • S1E3 • Live",
+            seedEpisodeNumber = 1,
+        )
+
+        val result = mergeHomeNextUpItemsWithCache(
+            resolvedItems = mapOf("show" to (300L to liveResolved)),
+            cachedItems = mapOf(
+                "show" to (100L to cachedResolved),
+                "deferred" to (90L to cachedUnprocessed),
+            ),
+            conclusivelyProcessedContentIds = setOf("show"),
+        )
+
+        assertEquals(setOf("show", "deferred"), result.keys)
+        assertEquals("show:1:3", result.getValue("show").second.videoId)
+        assertEquals("https://example.test/cached-show.jpg", result.getValue("show").second.imageUrl)
+        assertEquals("deferred:1:2", result.getValue("deferred").second.videoId)
+    }
+
+    @Test
+    fun `home next up drops conclusive null while retaining transient cache`() {
+        val conclusive = continueWatchingItem(
+            videoId = "conclusive:1:2",
+            subtitle = "Next Up • S1E2",
+        )
+        val transient = continueWatchingItem(
+            videoId = "transient:1:2",
+            subtitle = "Next Up • S1E2",
+        )
+
+        val result = mergeHomeNextUpItemsWithCache(
+            resolvedItems = emptyMap(),
+            cachedItems = mapOf(
+                "conclusive" to (100L to conclusive),
+                "transient" to (90L to transient),
+            ),
+            conclusivelyProcessedContentIds = setOf("conclusive"),
+        )
+
+        assertEquals(setOf("transient"), result.keys)
+    }
+
+    @Test
+    fun `cached next up recalculates aired state from release timestamp`() {
+        val released = "2026-07-12T00:00:00Z"
+        val releaseEpochMs = requireNotNull(parseReleaseDateToEpochMs(released))
+
+        assertTrue(
+            cachedNextUpHasAired(
+                cached = cachedNextUpItem(released = released, hasAired = false),
+                nowEpochMs = releaseEpochMs + 1L,
+            ),
+        )
+        assertFalse(
+            cachedNextUpHasAired(
+                cached = cachedNextUpItem(released = released, hasAired = true),
+                nowEpochMs = releaseEpochMs - 1L,
+            ),
+        )
+    }
+
+    @Test
+    fun `cached next up invalidates whenever the authoritative seed changes`() {
+        assertTrue(
+            hasHomeNextUpSeedChangedFromCache(
+                currentSeason = 2,
+                currentEpisode = 1,
+                cachedSeason = 1,
+                cachedEpisode = 10,
+            ),
+        )
+        assertTrue(
+            hasHomeNextUpSeedChangedFromCache(
+                currentSeason = 1,
+                currentEpisode = 11,
+                cachedSeason = 1,
+                cachedEpisode = 10,
+            ),
+        )
+        assertTrue(
+            hasHomeNextUpSeedChangedFromCache(
+                currentSeason = 1,
+                currentEpisode = 9,
+                cachedSeason = 1,
+                cachedEpisode = 10,
+            ),
+        )
+        assertFalse(
+            hasHomeNextUpSeedChangedFromCache(
+                currentSeason = 1,
+                currentEpisode = 10,
+                cachedSeason = 1,
+                cachedEpisode = 10,
+            ),
+        )
+    }
+
+    @Test
+    fun `home next up does not treat placeholder cache as enriched metadata`() {
+        val placeholder = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+            imageUrl = " ",
+            logo = null,
+            episodeThumbnail = null,
+        ).copy(
+            title = "show",
+            poster = "",
+            background = "\t",
+        )
+
+        assertFalse(hasUsableHomeNextUpMetadata(placeholder))
+    }
+
+    @Test
+    fun `home next up accepts cache with resolved title and artwork`() {
+        val enriched = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+            imageUrl = "https://example.test/show.jpg",
+        ).copy(title = "Resolved Show")
+
+        assertTrue(hasUsableHomeNextUpMetadata(enriched))
+    }
+
+    @Test
+    fun `home next up combines fresh title with cached artwork before classifying metadata`() {
+        val fresh = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+        ).copy(title = "Fresh Show")
+        val cached = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+            imageUrl = "https://example.test/cached-show.jpg",
+        ).copy(title = "show")
+
+        val decision = classifyHomeNextUpCandidateMetadata(
+            freshItem = fresh,
+            cachedFallbackItem = cached,
+            dismissedNextUpKeys = emptySet(),
+        )
+
+        assertEquals(HomeNextUpCandidateMetadataOutcome.Ready, decision.outcome)
+        assertEquals("Fresh Show", decision.item.title)
+        assertEquals("https://example.test/cached-show.jpg", decision.item.imageUrl)
+    }
+
+    @Test
+    fun `home next up combines fresh artwork with cached title before classifying metadata`() {
+        val fresh = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+            imageUrl = "https://example.test/fresh-show.jpg",
+        ).copy(title = "show")
+        val cached = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+        ).copy(title = "Cached Show")
+
+        val decision = classifyHomeNextUpCandidateMetadata(
+            freshItem = fresh,
+            cachedFallbackItem = cached,
+            dismissedNextUpKeys = emptySet(),
+        )
+
+        assertEquals(HomeNextUpCandidateMetadataOutcome.Ready, decision.outcome)
+        assertEquals("Cached Show", decision.item.title)
+        assertEquals("https://example.test/fresh-show.jpg", decision.item.imageUrl)
+    }
+
+    @Test
+    fun `home next up does not count logo alone as card artwork`() {
+        val logoOnly = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+            logo = "https://example.test/show-logo.png",
+        ).copy(title = "Resolved Show")
+
+        assertFalse(hasUsableHomeNextUpMetadata(logoOnly))
+    }
+
+    @Test
+    fun `dismissed placeholder next up is conclusive instead of transient`() {
+        val placeholder = continueWatchingItem(
+            videoId = "show:1:2",
+            subtitle = "S1E2",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            seedSeasonNumber = 1,
+            seedEpisodeNumber = 1,
+        ).copy(title = "show")
+        val dismissKey = nextUpDismissKey("show", 1, 1)
+
+        val decision = classifyHomeNextUpCandidateMetadata(
+            freshItem = placeholder,
+            cachedFallbackItem = null,
+            dismissedNextUpKeys = setOf(dismissKey),
+        )
+
+        assertFalse(hasUsableHomeNextUpMetadata(decision.item))
+        assertEquals(HomeNextUpCandidateMetadataOutcome.Dismissed, decision.outcome)
     }
 
     private fun progressEntry(
@@ -439,6 +868,25 @@ class HomeScreenTest {
             season = season,
             episode = episode,
             markedAtEpochMs = markedAtEpochMs,
+        )
+
+    private fun cachedNextUpItem(
+        released: String?,
+        hasAired: Boolean,
+    ): CachedNextUpItem =
+        CachedNextUpItem(
+            contentId = "show",
+            contentType = "series",
+            name = "Show",
+            videoId = "show:1:2",
+            season = 1,
+            episode = 2,
+            released = released,
+            hasAired = hasAired,
+            lastWatched = 1_000L,
+            sortTimestamp = 1_000L,
+            seedSeason = 1,
+            seedEpisode = 1,
         )
 
     private fun completedSeriesCandidate(index: Int): CompletedSeriesCandidate =

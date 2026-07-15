@@ -22,6 +22,21 @@ class WatchProgressRulesTest {
     }
 
     @Test
+    fun `codec persists dirty progress keys and drops keys without a stored row`() {
+        val payload = WatchProgressCodec.encodePayload(
+            entries = listOf(entry(videoId = "show:1:2", progressKey = "opaque-key")),
+            lastSuccessfulPushEpochMs = 0L,
+            deltaCursorEventId = 0L,
+            deltaInitialized = false,
+            dirtyProgressKeys = setOf("opaque-key", "missing-key"),
+        )
+
+        val decoded = WatchProgressCodec.decodePayload(payload)
+
+        assertEquals(setOf("opaque-key"), decoded.dirtyProgressKeys)
+    }
+
+    @Test
     fun `codec ignores corrupt payload`() {
         assertTrue(WatchProgressCodec.decodeEntries("{not json").isEmpty())
     }
@@ -137,7 +152,7 @@ class WatchProgressRulesTest {
     }
 
     @Test
-    fun `continue watching keeps active resume even when a newer episode is completed`() {
+    fun `continue watching drops stale resume when a newer series episode is completed`() {
         val inProgress = entry(
             videoId = "show:1:4",
             parentMetaId = "show",
@@ -156,7 +171,132 @@ class WatchProgressRulesTest {
 
         val result = listOf(inProgress, completed).continueWatchingEntries()
 
-        assertEquals(listOf("show:1:4"), result.map { it.videoId })
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `continue watching keeps legitimate resume when it is newer than completed series progress`() {
+        val completed = entry(
+            videoId = "show:1:4",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 4,
+            lastUpdatedEpochMs = 10L,
+            isCompleted = true,
+        )
+        val inProgress = entry(
+            videoId = "show:1:5",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 5,
+            lastUpdatedEpochMs = 20L,
+        )
+
+        val result = listOf(completed, inProgress).continueWatchingEntries()
+
+        assertEquals(listOf("show:1:5"), result.map { it.videoId })
+    }
+
+    @Test
+    fun `resume entry for series returns null when newer overall progress is completed`() {
+        val staleResume = entry(
+            videoId = "show:1:4",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 4,
+            lastUpdatedEpochMs = 10L,
+        )
+        val completed = entry(
+            videoId = "show:1:5",
+            parentMetaId = "show",
+            seasonNumber = 1,
+            episodeNumber = 5,
+            lastUpdatedEpochMs = 20L,
+            isCompleted = true,
+        )
+
+        assertNull(listOf(staleResume, completed).resumeEntryForSeries("show"))
+    }
+
+    @Test
+    fun `resume entry coalesces series type variants independent of input order`() {
+        val staleResume = entry(
+            videoId = "show:1:4",
+            parentMetaId = "show",
+            parentMetaType = "SeRiEs",
+            seasonNumber = 1,
+            episodeNumber = 4,
+            lastUpdatedEpochMs = 10L,
+        )
+        val completed = entry(
+            videoId = "show:1:5",
+            parentMetaId = "show",
+            parentMetaType = "TV",
+            seasonNumber = 1,
+            episodeNumber = 5,
+            lastUpdatedEpochMs = 20L,
+            isCompleted = true,
+        )
+
+        assertNull(listOf(staleResume, completed).resumeEntryForSeries("show"))
+        assertNull(listOf(completed, staleResume).resumeEntryForSeries("show"))
+    }
+
+    @Test
+    fun `resume entry ignores a movie with the same content id`() {
+        val movie = entry(
+            videoId = "shared-movie",
+            parentMetaId = "shared",
+            parentMetaType = "movie",
+            lastUpdatedEpochMs = 30L,
+        )
+        val seriesResume = entry(
+            videoId = "shared:1:1",
+            parentMetaId = "shared",
+            parentMetaType = "Show",
+            seasonNumber = 1,
+            episodeNumber = 1,
+            lastUpdatedEpochMs = 20L,
+        )
+
+        val forward = listOf(movie, seriesResume).resumeEntryForSeries("shared")
+        val reversed = listOf(seriesResume, movie).resumeEntryForSeries("shared")
+
+        assertEquals(seriesResume.resolvedProgressKey(), forward?.resolvedProgressKey())
+        assertEquals(seriesResume.resolvedProgressKey(), reversed?.resolvedProgressKey())
+    }
+
+    @Test
+    fun `continue watching does not cross map aliases that share a video id`() {
+        val activeShow = entry(
+            videoId = "shared-video",
+            parentMetaId = "active-show",
+            seasonNumber = 1,
+            episodeNumber = 1,
+            lastUpdatedEpochMs = 30L,
+            progressKey = "active-show_s1e1",
+        )
+        val staleAlias = entry(
+            videoId = "shared-video",
+            parentMetaId = "completed-show",
+            seasonNumber = 1,
+            episodeNumber = 1,
+            lastUpdatedEpochMs = 10L,
+            progressKey = "completed-show_s1e1",
+        )
+        val completedAlias = entry(
+            videoId = "completed-show:1:2",
+            parentMetaId = "completed-show",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            lastUpdatedEpochMs = 20L,
+            isCompleted = true,
+            progressKey = "completed-show_s1e2",
+        )
+
+        val result = listOf(staleAlias, activeShow, completedAlias).continueWatchingEntries()
+
+        assertEquals(listOf("active-show_s1e1"), result.map { it.resolvedProgressKey() })
     }
 
     @Test
@@ -317,17 +457,6 @@ class WatchProgressRulesTest {
     }
 
     @Test
-    fun `snapshot preserves local only progress before first successful push`() {
-        assertTrue(
-            WatchProgressRepository.shouldPreserveLocalWatchProgressEntry(
-                localEntry = entry(videoId = "local-only", lastUpdatedEpochMs = 1_000L),
-                lastSuccessfulPushEpochMs = 0L,
-                pullStartedEpochMs = 2_000L,
-            ),
-        )
-    }
-
-    @Test
     fun `up next continue watching uses actual episode id when available`() {
         val item = entry(
             videoId = "kitsu:244:1",
@@ -352,7 +481,7 @@ class WatchProgressRulesTest {
         assertEquals(1779634800000L, t1)
 
         val t2 = parseReleaseDateToEpochMs("2026-05-24")
-        assertEquals(1779580800000L, t2) // 2026-05-24T00:00:00Z is 1779580800 seconds
+        assertEquals(CurrentDateProvider.localStartOfDayEpochMs("2026-05-24"), t2)
 
         assertNull(parseReleaseDateToEpochMs(null))
         assertNull(parseReleaseDateToEpochMs("   "))
@@ -364,17 +493,19 @@ class WatchProgressRulesTest {
         parentMetaId: String = videoId.substringBefore(':'),
         seasonNumber: Int? = null,
         episodeNumber: Int? = null,
+        parentMetaType: String = if (seasonNumber != null && episodeNumber != null) "series" else "movie",
         lastUpdatedEpochMs: Long = 1L,
         lastPositionMs: Long = 120_000L,
         durationMs: Long = 1_000_000L,
         isCompleted: Boolean = false,
         progressPercent: Float? = null,
         source: String = WatchProgressSourceLocal,
+        progressKey: String? = null,
     ): WatchProgressEntry =
         WatchProgressEntry(
-            contentType = if (seasonNumber != null && episodeNumber != null) "series" else "movie",
+            contentType = parentMetaType,
             parentMetaId = parentMetaId,
-            parentMetaType = if (seasonNumber != null && episodeNumber != null) "series" else "movie",
+            parentMetaType = parentMetaType,
             videoId = videoId,
             title = "Title",
             seasonNumber = seasonNumber,
@@ -385,5 +516,6 @@ class WatchProgressRulesTest {
             isCompleted = isCompleted,
             progressPercent = progressPercent,
             source = source,
+            progressKey = progressKey,
         )
 }

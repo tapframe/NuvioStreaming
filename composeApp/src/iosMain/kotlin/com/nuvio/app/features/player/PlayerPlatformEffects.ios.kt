@@ -48,8 +48,11 @@ actual fun EnterImmersivePlayerMode(keepScreenAwake: Boolean) {
 @Composable
 actual fun ManagePlayerPictureInPicture(
     isPlaying: Boolean,
-    playerSize: IntSize,
+    videoSize: IntSize,
 ) = Unit
+
+@Composable
+actual fun rememberIsInPictureInPicture(): Boolean = false
 
 @Composable
 actual fun rememberPlayerGestureController(): PlayerGestureController? {

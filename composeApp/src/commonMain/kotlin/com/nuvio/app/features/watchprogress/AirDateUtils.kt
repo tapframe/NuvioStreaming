@@ -59,7 +59,7 @@ fun parseReleaseDateToEpochMs(raw: String?): Long? {
     if (epochMs != null) return epochMs
 
     val datePart = isoCalendarDateOrNull(trimmed) ?: return null
-    return parseTraktIsoDateTimeToEpochMs("${datePart}T00:00:00Z")
+    return CurrentDateProvider.localStartOfDayEpochMs(datePart)
 }
 
 class ReleaseAlertState(

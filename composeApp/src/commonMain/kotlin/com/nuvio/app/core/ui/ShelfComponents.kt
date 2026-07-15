@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
@@ -70,6 +72,7 @@ fun <T> NuvioShelfSection(
     viewAllPillSize: NuvioViewAllPillSize = NuvioViewAllPillSize.Default,
     key: ((T) -> Any)? = null,
     animatePlacement: Boolean = false,
+    state: LazyListState = rememberLazyListState(),
     itemContent: @Composable (T) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -87,6 +90,7 @@ fun <T> NuvioShelfSection(
             )
         }
         LazyRow(
+            state = state,
             contentPadding = rowContentPadding,
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),
         ) {
