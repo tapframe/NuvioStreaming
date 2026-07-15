@@ -223,7 +223,7 @@ final class PlayerNowPlayingController {
                 token: center.skipForwardCommand.addTarget { [weak self] event in
                     guard let event = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
                     DispatchQueue.main.async {
-                        self?.owner?.seekByMs(Int64(event.interval * 1000.0), exact: true)
+                        self?.owner?.seekByMs(Int64(event.interval * 1000.0))
                     }
                     return .success
                 }
@@ -235,7 +235,7 @@ final class PlayerNowPlayingController {
                 token: center.skipBackwardCommand.addTarget { [weak self] event in
                     guard let event = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
                     DispatchQueue.main.async {
-                        self?.owner?.seekByMs(-Int64(event.interval * 1000.0), exact: true)
+                        self?.owner?.seekByMs(-Int64(event.interval * 1000.0))
                     }
                     return .success
                 }

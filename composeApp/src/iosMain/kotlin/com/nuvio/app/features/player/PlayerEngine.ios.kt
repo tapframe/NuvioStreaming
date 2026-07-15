@@ -360,8 +360,8 @@ actual fun PlatformPlayerSurface(
                 positionMs = bridge.getPositionMs(),
                 bufferedPositionMs = bridge.getBufferedMs(),
                 playbackSpeed = bridge.getPlaybackSpeed(),
-                videoWidth = bridge.getVideoWidth().takeIf { it > 0 },
-                videoHeight = bridge.getVideoHeight().takeIf { it > 0 },
+                videoWidth = bridge.getVideoWidth().coerceAtLeast(0),
+                videoHeight = bridge.getVideoHeight().coerceAtLeast(0),
                 mediaInfoJson = bridge.getMediaInfoJson(),
             )
             latestOnSnapshot.value(snapshot)

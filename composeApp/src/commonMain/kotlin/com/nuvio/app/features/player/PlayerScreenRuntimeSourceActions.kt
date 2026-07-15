@@ -273,8 +273,8 @@ internal fun PlayerScreenRuntime.switchToLiveChannel(channel: LiveTvChannel) {
     initialLoadCompleted = false
     playbackSnapshot = playbackSnapshot.copy(
         isLoading = true,
-        videoWidth = null,
-        videoHeight = null,
+        videoWidth = 0,
+        videoHeight = 0,
         mediaInfoJson = "{}",
     )
     errorMessage = null
@@ -605,8 +605,8 @@ internal fun PlayerScreenRuntime.selectPlayerQuality(qualityId: String?) {
     activePlaybackSourceUrl = playerQualityState.playbackUrlFor(selectedPlayerQualityId) ?: activeSourceUrl
     playbackSnapshot = playbackSnapshot.copy(
         isLoading = true,
-        videoWidth = null,
-        videoHeight = null,
+        videoWidth = 0,
+        videoHeight = 0,
         mediaInfoJson = "{}",
     )
     initialLoadCompleted = false
