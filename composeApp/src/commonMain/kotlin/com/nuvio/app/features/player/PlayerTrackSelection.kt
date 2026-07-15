@@ -81,16 +81,79 @@ internal fun findPreferredSubtitleTrackIndex(
         }
 
         val matchIndex = tracks.indexOfFirst { track ->
-            languageMatchesPreference(
-                trackLanguage = track.language,
-                targetLanguage = normalizedTarget,
+            subtitleLanguageMatchesTarget(
+                trackLanguage = track.languageVariant(),
+                normalizedTarget = normalizedTarget,
             )
         }
         if (matchIndex >= 0) return matchIndex
+
+        val labelMatchIndex = tracks.indexOfFirst { track ->
+            track.hasNoUsableLanguageTag() &&
+                subtitleLanguageMatchesTarget(
+                    trackLanguage = normalizeLanguageCode(track.label),
+                    normalizedTarget = normalizedTarget,
+                )
+        }
+        if (labelMatchIndex >= 0) return labelMatchIndex
     }
 
     return -1
 }
+
+private fun SubtitleTrack.hasNoUsableLanguageTag(): Boolean {
+    val normalized = normalizeLanguageCode(language)
+    return normalized == null || normalized == "und"
+}
+
+// Tracks tagged with a bare "pt" or "es" often carry the regional variant only in
+// their name/id (e.g. "Português (Brasil)"); mirror the TV app's variant detection
+// so pt-BR / es-419 preferences can find them.
+private fun SubtitleTrack.languageVariant(): String? {
+    val base = normalizeLanguageCode(language) ?: return null
+    val haystack = listOfNotNull(label, language, id)
+        .joinToString(" ")
+        .lowercase()
+    return when (base) {
+        "pt" -> when {
+            BRAZILIAN_TAGS.any(haystack::contains) && EUROPEAN_PT_TAGS.none(haystack::contains) -> "pt-br"
+            else -> base
+        }
+        "es" -> when {
+            LATINO_TAGS.any(haystack::contains) && CASTILIAN_TAGS.none(haystack::contains) -> "es-419"
+            else -> base
+        }
+        else -> base
+    }
+}
+
+// Regional pairs are matched exactly, mirroring the TV app: a "pt" preference must
+// not select a Brazilian track and "es" must not select a Latin American one, nor
+// the reverse. All other languages keep the primary-subtag fallback.
+private fun subtitleLanguageMatchesTarget(trackLanguage: String?, normalizedTarget: String): Boolean {
+    val variant = trackLanguage ?: return false
+    return when (normalizedTarget) {
+        "pt" -> variant == "pt"
+        "es" -> variant == "es"
+        "pt-br" -> variant == "pt-br"
+        "es-419" -> variant == "es-419"
+        else -> languageMatchesPreference(variant, normalizedTarget)
+    }
+}
+
+private val BRAZILIAN_TAGS = listOf(
+    "pt-br", "pt_br", "pob", "brazilian", "brazil", "brasil", "brasileiro", " br", "(br)",
+)
+private val EUROPEAN_PT_TAGS = listOf(
+    "pt-pt", "pt_pt", "iberian", "european", "portugal", "europeu", " eu", "(eu)",
+)
+private val LATINO_TAGS = listOf(
+    "es-419", "es_419", "es-la", "es-lat", "latino", "latinoamerica",
+    "latinoamericano", "latam", "lat am", "latin america",
+)
+private val CASTILIAN_TAGS = listOf(
+    "es-es", "es_es", "castilian", "castellano", "spain", "españa", "espana", "iberian",
+)
 
 internal fun filterAddonSubtitlesForSettings(
     subtitles: List<AddonSubtitle>,

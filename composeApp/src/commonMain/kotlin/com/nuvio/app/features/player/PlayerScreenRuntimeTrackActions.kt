@@ -202,12 +202,7 @@ internal fun PlayerScreenRuntime.refreshTracks() {
                 selectedSubtitleIndex = preferredSubtitleIndex
                 selectedAddonSubtitleId = null
                 useCustomSubtitles = false
-            } else if (
-                preferredSubtitleIndex < 0 &&
-                (subtitleStyle.useForcedSubtitles ||
-                    normalizeLanguageCode(playerSettingsUiState.preferredSubtitleLanguage) ==
-                    SubtitleLanguageOption.FORCED)
-            ) {
+            } else if (preferredSubtitleIndex < 0) {
                 if (selectedSubtitleIndex != -1 || subtitleTracks.any { it.isSelected }) {
                     playerController?.selectSubtitleTrack(-1)
                 }
