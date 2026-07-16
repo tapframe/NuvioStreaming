@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.nuvio.app.core.ui.NuvioIconActionButton
+import com.nuvio.app.core.ui.NativeTabBarScrollEffect
 import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioScreenHeader
@@ -106,6 +107,7 @@ fun LiveTvScreen(
         LiveTvRepository.uiState
     }.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    NativeTabBarScrollEffect(listState)
     val coroutineScope = rememberCoroutineScope()
     val showBackToTop by remember {
         derivedStateOf {
