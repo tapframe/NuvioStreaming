@@ -712,8 +712,7 @@ private fun ExoPlayerSurface(
                     val isInPictureInPicture =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity?.isInPictureInPictureMode == true
                     val isFinishing = activity?.isFinishing == true
-                    val hasActiveNowPlayingSession = nowPlayingController.isActive
-                    if ((!isInPictureInPicture && !hasActiveNowPlayingSession) || isFinishing) {
+                    if (!isInPictureInPicture || isFinishing) {
                         exoPlayer.pause()
                     }
                 }
@@ -1013,8 +1012,7 @@ private fun LibmpvPlayerSurface(
                     val isInPictureInPicture =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity?.isInPictureInPictureMode == true
                     val isFinishing = activity?.isFinishing == true
-                    val hasActiveNowPlayingSession = nowPlayingController?.isActive == true
-                    if ((!isInPictureInPicture && !hasActiveNowPlayingSession) || isFinishing) {
+                    if (!isInPictureInPicture || isFinishing) {
                         view.setPaused(true)
                     }
                 }

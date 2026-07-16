@@ -169,6 +169,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         playerController,
         playerControllerSourceUrl,
         activeSourceUrl,
+        activePlaybackSourceUrl,
+        p2pResolvedSourceUrl,
         title,
         activeStreamTitle,
         activeSeasonNumber,
@@ -178,7 +180,12 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         background,
     ) {
         val controller = playerController ?: return@LaunchedEffect
-        if (playerControllerSourceUrl != activeSourceUrl) return@LaunchedEffect
+        val controllerSourceUrl = playerControllerSourceUrl ?: return@LaunchedEffect
+        val controllerMatchesActivePlayback =
+            controllerSourceUrl == activeSourceUrl ||
+                controllerSourceUrl == activePlaybackSourceUrl ||
+                controllerSourceUrl == p2pResolvedSourceUrl
+        if (!controllerMatchesActivePlayback) return@LaunchedEffect
         controller.updateNowPlayingMetadata(buildNowPlayingInfo())
     }
 
@@ -223,6 +230,9 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     LaunchedEffect(
         playerController,
         playerControllerSourceUrl,
+        activeSourceUrl,
+        activePlaybackSourceUrl,
+        p2pResolvedSourceUrl,
         playbackSnapshot.isLoading,
         playbackSnapshot.durationMs,
         activeInitialPositionMs,
@@ -230,7 +240,12 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         initialSeekApplied,
     ) {
         val controller = playerController ?: return@LaunchedEffect
-        if (playerControllerSourceUrl != activeSourceUrl) return@LaunchedEffect
+        val controllerSourceUrl = playerControllerSourceUrl ?: return@LaunchedEffect
+        val controllerMatchesActivePlayback =
+            controllerSourceUrl == activeSourceUrl ||
+                controllerSourceUrl == activePlaybackSourceUrl ||
+                controllerSourceUrl == p2pResolvedSourceUrl
+        if (!controllerMatchesActivePlayback) return@LaunchedEffect
         if (initialSeekApplied || playbackSnapshot.isLoading) return@LaunchedEffect
 
         val progressFraction = activeInitialProgressFraction
