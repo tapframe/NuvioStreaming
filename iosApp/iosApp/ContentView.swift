@@ -184,6 +184,7 @@ struct RouteWrapper: Hashable, Identifiable {
 @MainActor
 final class TabNavigationCoordinator: ObservableObject {
     @Published var path: [RouteWrapper] = []
+    var onReturnedToRoot: (() -> Void)?
 
     func push(_ route: AppRoute, launchSingleTop: Bool) {
         if launchSingleTop,
@@ -223,8 +224,12 @@ final class TabNavigationCoordinator: ObservableObject {
             .filter { !retainedIDs.contains($0.id) }
             .map(\.route)
 
+        let returnedToRoot = !path.isEmpty && newPath.isEmpty
         path = newPath
         removedRoutes.forEach { AppKt.disposeRoute(route: $0) }
+        if returnedToRoot {
+            onReturnedToRoot?()
+        }
     }
 }
 
@@ -528,8 +533,17 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
 @available(iOS 16.0, *)
 @MainActor
 final class AppNavigationCoordinator: ObservableObject {
-    @Published var selectedTab: NuvioAppTab = .home
+    private static let nativeTabBarVisibleKey = "NuvioNativeTabBarVisible"
+
+    @Published var selectedTab: NuvioAppTab = .home {
+        didSet {
+            if selectedTab != oldValue {
+                setTabBarVisible(true)
+            }
+        }
+    }
     @Published private(set) var isAppReady = false
+    @Published private(set) var isTabBarVisible = true
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
     @Published var isProfileSwitcherPresented = false
 
@@ -542,6 +556,12 @@ final class AppNavigationCoordinator: ObservableObject {
     let profileTabInteraction = NativeProfileTabInteractionCoordinator()
 
     init() {
+        setTabBarVisible(true)
+        allCoordinators.forEach { coordinator in
+            coordinator.onReturnedToRoot = { [weak self] in
+                self?.setTabBarVisible(true)
+            }
+        }
         profileTabInteraction.onLongPress = { [weak self] in
             guard let self, self.isAppReady else { return }
             self.isProfileSwitcherPresented = true
@@ -550,6 +570,24 @@ final class AppNavigationCoordinator: ObservableObject {
 
     private var allCoordinators: [TabNavigationCoordinator] {
         [homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, settingsCoordinator]
+    }
+
+    func reloadTabBarVisibility() {
+        guard let visible = UserDefaults.standard.object(
+            forKey: Self.nativeTabBarVisibleKey
+        ) as? Bool else {
+            return
+        }
+        if isTabBarVisible != visible {
+            isTabBarVisible = visible
+        }
+    }
+
+    private func setTabBarVisible(_ visible: Bool) {
+        UserDefaults.standard.set(visible, forKey: Self.nativeTabBarVisibleKey)
+        if isTabBarVisible != visible {
+            isTabBarVisible = visible
+        }
     }
 
     func coordinator(for tab: NuvioAppTab) -> TabNavigationCoordinator {
@@ -587,6 +625,7 @@ final class AppNavigationCoordinator: ObservableObject {
         isAppReady = ready
         if !ready {
             isProfileSwitcherPresented = false
+            setTabBarVisible(true)
             selectedTab = .home
             allCoordinators.forEach { $0.popToRoot() }
         }
@@ -765,11 +804,15 @@ struct TabContentView: View {
         // stack. Applying it here keeps the authentication/profile gate truly
         // full-screen on iOS 26, where a modifier on TabView itself is ignored.
         .toolbar(
-            usesNativeTabBar && appCoordinator.isAppReady && coordinator.path.isEmpty
+            usesNativeTabBar &&
+                appCoordinator.isAppReady &&
+                coordinator.path.isEmpty &&
+                appCoordinator.isTabBarVisible
                 ? Visibility.visible
                 : Visibility.hidden,
             for: .tabBar
         )
+        .animation(.easeInOut(duration: 0.18), value: appCoordinator.isTabBarVisible)
     }
 }
 
@@ -1253,15 +1296,24 @@ struct NativeNavContentView: View {
             }
         }
         .tint(Color(uiColor: iconStore.accentColor))
-        .tabBarMinimizeBehavior(.automatic)
+        .tabBarMinimizeBehavior(.onScrollDown)
     }
 
     @ViewBuilder
     var body: some View {
-        if #available(iOS 26.0, *), usesNativeTabBar {
-            nativeTabs
-        } else {
-            legacyTabs
+        Group {
+            if #available(iOS 26.0, *), usesNativeTabBar {
+                nativeTabs
+            } else {
+                legacyTabs
+            }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: Notification.Name("NuvioNativeTabChromeDidChange")
+            )
+        ) { _ in
+            appCoordinator.reloadTabBarVisibility()
         }
     }
 }
