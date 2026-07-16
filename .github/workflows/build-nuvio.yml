@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 0.2.24-enhanced
+      - 0.2.25-enhanced
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -129,6 +129,19 @@ jobs:
           DIRECT_DEBRID_API_BASE_URL=${{ secrets.DIRECT_DEBRID_API_BASE_URL }}
           NUVIO_IOS_DISTRIBUTION=full
           EOF
+
+      - name: Cache iOS build dependencies
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+            ~/Library/Caches/org.swift.swiftpm
+            iosApp/build/SourcePackages
+          key: ${{ runner.os }}-ios-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'MPVKit/Package.swift', 'iosApp/iosApp.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-ios-
 
       - name: Build iOS App via Xcode
         run: |
