@@ -1485,6 +1485,9 @@
     <string name="updates_download_empty_body">Empty download body</string>
     <string name="updates_download_file_missing">Downloaded update file is missing.</string>
     <string name="updates_downloading_progress">Downloading %1$d%</string>
+    <string name="updates_debug_test_complete">Banner test complete</string>
+    <string name="updates_debug_test_description">Preview the banner and simulated download progress.</string>
+    <string name="updates_debug_test_title">Test update banner</string>
     <string name="updates_install_failed">Unable to start installation</string>
     <string name="updates_latest_version">You&apos;re using the latest version.</string>
     <string name="updates_message_allow_installs">Enable app installs for Nuvio, then come back and continue.</string>
@@ -1492,6 +1495,7 @@
     <string name="updates_message_no_updates">No updates found.</string>
     <string name="updates_message_ready">A new version is ready to install.</string>
     <string name="updates_not_available">In-app updates are not available on this build.</string>
+    <string name="updates_no_release_notes">No release notes were provided.</string>
     <string name="updates_preparing_download">Preparing download</string>
     <string name="updates_release_notes">Release notes</string>
     <string name="updates_title_allow_installs">Allow installs to continue</string>

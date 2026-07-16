@@ -2,6 +2,7 @@ package com.nuvio.app.features.updater
 
 expect object AppUpdaterPlatform {
     val isSupported: Boolean
+    val isDebugBuild: Boolean
 
     fun getSupportedAbis(): List<String>
 

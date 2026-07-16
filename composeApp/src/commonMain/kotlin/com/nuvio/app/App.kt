@@ -218,6 +218,7 @@ import com.nuvio.app.features.trakt.TraktAuthRepository
 import com.nuvio.app.features.trakt.TraktListTab
 import com.nuvio.app.features.trakt.TraktScrobbleRepository
 import com.nuvio.app.features.updater.AppUpdaterHost
+import com.nuvio.app.features.updater.AppUpdaterPlatform
 import com.nuvio.app.features.updater.rememberAppUpdaterController
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watchprogress.ContinueWatchingItem
@@ -1810,11 +1811,15 @@ private fun MainAppContent(
             navController.navigate(PlayerRoute(launchId = launchId))
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.nuvio.colors.background),
+        AppUpdaterHost(
+            controller = appUpdaterController,
+            modifier = Modifier.fillMaxSize(),
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.nuvio.colors.background),
+            ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -2023,6 +2028,13 @@ private fun MainAppContent(
                                                     showNoUpdateFeedback = true,
                                                 )
                                             }
+                                        } else {
+                                            null
+                                        },
+                                        onTestUpdateBannerClick = if (
+                                            AppFeaturePolicy.inAppUpdaterEnabled && AppUpdaterPlatform.isDebugBuild
+                                        ) {
+                                            appUpdaterController::showDebugTestUpdate
                                         } else {
                                             null
                                         },
@@ -3040,6 +3052,13 @@ private fun MainAppContent(
                         } else {
                             null
                         },
+                        onTestUpdateBannerClick = if (
+                            AppFeaturePolicy.inAppUpdaterEnabled && AppUpdaterPlatform.isDebugBuild
+                        ) {
+                            appUpdaterController::showDebugTestUpdate
+                        } else {
+                            null
+                        },
                     )
                 }
                 entry<DownloadsSettingsRoute> { route ->
@@ -3517,12 +3536,7 @@ private fun MainAppContent(
                     .zIndex(20f),
             )
 
-            AppUpdaterHost(
-                controller = appUpdaterController,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .zIndex(25f),
-            )
+            }
         }
 }
 
@@ -3580,6 +3594,7 @@ private fun AppTabHost(
     onSupportersContributorsSettingsClick: () -> Unit = {},
     onLicensesAttributionsSettingsClick: () -> Unit = {},
     onCheckForUpdatesClick: (() -> Unit)? = null,
+    onTestUpdateBannerClick: (() -> Unit)? = null,
     onCollectionsSettingsClick: () -> Unit = {},
     onFolderClick: ((collectionId: String, folderId: String) -> Unit)? = null,
     requestedSettingsPageName: String? = null,
@@ -3654,6 +3669,7 @@ private fun AppTabHost(
                         onSupportersContributorsClick = onSupportersContributorsSettingsClick,
                         onLicensesAttributionsClick = onLicensesAttributionsSettingsClick,
                         onCheckForUpdatesClick = onCheckForUpdatesClick,
+                        onTestUpdateBannerClick = onTestUpdateBannerClick,
                         onCollectionsClick = onCollectionsSettingsClick,
                     )
                 }

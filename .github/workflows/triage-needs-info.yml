@@ -2,7 +2,9 @@ name: Triage (needs-info)
 
 on:
   issues:
-    types: [opened, edited, reopened]
+    # A reopen is an explicit human triage decision. Do not run automatic
+    # closure/needs-info rules again after a maintainer reopens an issue.
+    types: [opened, edited]
 
 permissions:
   issues: write
@@ -23,6 +25,19 @@ jobs:
             const title = (issue.title || "").trim();
             const body = issue.body || "";
             const labels = (issue.labels || []).map(l => (typeof l === "string" ? l : l.name).toLowerCase());
+
+            // An edit can happen after a human has reopened an issue. Preserve
+            // that explicit triage decision instead of closing it again.
+            const events = await github.paginate(github.rest.issues.listEvents, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            if (events.some(event => event.event === "reopened")) {
+              core.info(`#${issue_number}: skipping triage because it was manually reopened.`);
+              return;
+            }
 
             const NEEDS_INFO = "needs-info";
             const NEEDS_INFO_COLOR = "d4c5f9";
@@ -72,12 +87,14 @@ jobs:
 
             function isEmptyish(value) {
               const text = normalizedMeaningfulText(value);
-              return !text || /^(_?no response_?|n\/a|na|none|no|not available|-|\.)$/i.test(text);
+              return !text ||
+                !/[\p{L}\p{N}]/u.test(text) ||
+                /^(_?no response_?|n\/a|na|none|no|not available|-|\.)$/i.test(text);
             }
 
             function isVague(value) {
               const text = normalizedMeaningfulText(value);
-              return /^(same|same issue|me too|not working|doesn't work|doesnt work|broken|bug|issue|problem|help|please fix|crash|crashes|it crashes|see video|see screenshot|as title)$/i.test(text);
+              return /^(same|same issue|same as above|see above|me too|not working|doesn't work|doesnt work|does not work|nothing happens|broken|bug|issue|problem|error|failed|failure|help|please fix|crash|crashes|it crashes|see video|see screenshot|as title)$/i.test(text);
             }
 
             function hasUsefulText(value, minimumLength) {
@@ -119,16 +136,26 @@ jobs:
             const isCrashIssue = crashPattern.test(crashContext);
             const normalizedLogs = normalizedMeaningfulText(logs);
             const hasLogs = normalizedLogs.length >= 20 && !isEmptyish(normalizedLogs);
+            const hasDetailedDescription = hasUsefulText(description, 80);
 
             if (!summaryTitle || summaryTitle.length < 8 || genericTitle.test(summaryTitle) || numericOnlyTitle.test(summaryTitle)) {
               problems.push("Issue title (replace the default `[Bug]:` prefix with a short summary of the actual problem)");
             }
-            if (!hasUsefulText(description, 50)) {
+            if (!hasUsefulText(description, 20)) {
               problems.push("Bug description (explain the problem in detail, not just \"not working\" or \"same issue\")");
             }
-            if (!hasUsefulText(steps, 40)) problems.push("Steps to reproduce (please list exact steps)");
-            if (!hasUsefulText(expected, 10)) problems.push("Expected behavior");
-            if (!hasUsefulText(actual, 20)) problems.push("Actual behavior (include any on-screen error text)");
+            // Some valid bugs only need one short action (for example, "Login" or
+            // "Open Continue Watching"). Judge the report as a whole instead of
+            // imposing arbitrary per-field character counts.
+            if (!hasUsefulText(steps, 5) && !hasDetailedDescription) {
+              problems.push("Steps to reproduce (please list exact steps)");
+            }
+            if (!hasUsefulText(expected, 3) && !hasDetailedDescription) {
+              problems.push("Expected behavior");
+            }
+            if (!hasUsefulText(actual, 3) && !hasDetailedDescription) {
+              problems.push("Actual behavior (include any on-screen error text)");
+            }
 
             async function ensureLabel(name, color, description) {
               try {
