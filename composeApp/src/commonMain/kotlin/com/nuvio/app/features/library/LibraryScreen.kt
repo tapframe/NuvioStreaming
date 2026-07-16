@@ -14,8 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,9 +23,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -84,8 +85,6 @@ import com.nuvio.app.core.ui.NativeTabBarScrollEffect
 import com.nuvio.app.core.ui.NuvioScreen
 import com.nuvio.app.core.ui.NuvioNetworkOfflineCard
 import com.nuvio.app.core.ui.NuvioScreenHeader
-import com.nuvio.app.core.ui.NuvioViewAllPillSize
-import com.nuvio.app.core.ui.NuvioShelfSection
 import com.nuvio.app.core.ui.nuvioConsumePointerEvents
 import com.nuvio.app.features.cloud.CloudLibraryFile
 import com.nuvio.app.features.cloud.CloudLibraryItem
@@ -150,6 +149,10 @@ fun LibraryScreen(
         mutableStateOf(buildLibraryReleaseCalendarFallbackEvents(uiState.items))
     }
     var releaseCalendarLoading by remember(uiState.items) { mutableStateOf(false) }
+    var selectedMediaTypeName by rememberSaveable { mutableStateOf(LibraryMediaType.Movie.name) }
+    val selectedMediaType = remember(selectedMediaTypeName) {
+        runCatching { LibraryMediaType.valueOf(selectedMediaTypeName) }.getOrDefault(LibraryMediaType.Movie)
+    }
     var selectedProviderId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedTypeName by rememberSaveable { mutableStateOf<String?>(null) }
     val selectedType = remember(selectedTypeName) {
@@ -220,17 +223,29 @@ fun LibraryScreen(
     val librarySectionsDisplay = if (
         sourceMode != LibraryViewMode.Cloud && uiState.isLoaded && uiState.sections.isNotEmpty()
     ) {
-        disintegration.sync(uiState.sections, LIBRARY_SECTION_PREVIEW_LIMIT)
+        disintegration.sync(uiState.sections)
     } else {
         disintegration.reset()
         emptyList()
     }
+    val selectedLibraryEntries = remember(librarySectionsDisplay, selectedMediaType) {
+        librarySectionsDisplay
+            .flatMap { section -> section.entries }
+            .filter { entry -> selectedMediaType.matches(entry.item) }
+    }
 
-    NuvioScreen(
-        modifier = modifier,
-        horizontalPadding = 0.dp,
-        listState = listState,
-    ) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val libraryGridColumns = remember(maxWidth) {
+            ((maxWidth - LIBRARY_GRID_HORIZONTAL_PADDING * 2) / LIBRARY_GRID_MIN_CELL_WIDTH)
+                .toInt()
+                .coerceIn(LIBRARY_GRID_MIN_COLUMNS, LIBRARY_GRID_MAX_COLUMNS)
+        }
+
+        NuvioScreen(
+            modifier = Modifier.fillMaxSize(),
+            horizontalPadding = 0.dp,
+            listState = listState,
+        ) {
         stickyHeader {
             Box(modifier = Modifier.fillMaxWidth()) {
                 Box(
@@ -276,6 +291,17 @@ fun LibraryScreen(
                         },
                         modifier = Modifier.padding(horizontal = 16.dp),
                     )
+                    if (sourceMode == LibraryViewMode.Saved) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LibraryMediaTypeSwitch(
+                            selectedType = selectedMediaType,
+                            onTypeSelected = { type ->
+                                selectedMediaTypeName = type.name
+                                coroutineScope.launch { listState.animateScrollToItem(0) }
+                            },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                 }
             }
@@ -370,15 +396,24 @@ fun LibraryScreen(
                 }
 
                 else -> {
-                    librarySections(
-                        displaySections = librarySectionsDisplay,
-                        watchedKeys = watchedUiState.watchedKeys,
-                        showHeaderAccent = !homeCatalogSettingsUiState.hideCatalogUnderline,
-                        onPosterClick = onPosterClick,
-                        onSectionViewAllClick = onSectionViewAllClick,
-                        onPosterLongClick = onPosterLongClick,
-                        onDisintegrated = disintegration::onExited,
-                    )
+                    if (selectedLibraryEntries.isEmpty()) {
+                        item {
+                            HomeEmptyStateCard(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                title = stringResource(Res.string.library_empty_title),
+                                message = stringResource(Res.string.library_empty_message),
+                            )
+                        }
+                    } else {
+                        libraryGrid(
+                            entries = selectedLibraryEntries,
+                            columns = libraryGridColumns,
+                            watchedKeys = watchedUiState.watchedKeys,
+                            onPosterClick = onPosterClick,
+                            onPosterLongClick = onPosterLongClick,
+                            onDisintegrated = disintegration::onExited,
+                        )
+                    }
                 }
             }
         }
@@ -548,6 +583,33 @@ private fun LibrarySourceSwitch(
 }
 
 @Composable
+private fun LibraryMediaTypeSwitch(
+    selectedType: LibraryMediaType,
+    onTypeSelected: (LibraryMediaType) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        LibraryChip(
+            label = stringResource(Res.string.collections_editor_tmdb_movies),
+            selected = selectedType == LibraryMediaType.Movie,
+            onClick = { onTypeSelected(LibraryMediaType.Movie) },
+            modifier = Modifier.weight(1f),
+            expanded = true,
+        )
+        LibraryChip(
+            label = stringResource(Res.string.collections_editor_tmdb_series),
+            selected = selectedType == LibraryMediaType.Series,
+            onClick = { onTypeSelected(LibraryMediaType.Series) },
+            modifier = Modifier.weight(1f),
+            expanded = true,
+        )
+    }
+}
+
+@Composable
 private fun CloudLibraryToolbar(
     uiState: CloudLibraryUiState,
     selectedProviderId: String?,
@@ -645,10 +707,12 @@ private fun LibraryChip(
     loading: Boolean = false,
     error: Boolean = false,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    expanded: Boolean = false,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
@@ -656,9 +720,15 @@ private fun LibraryChip(
         border = if (selected) BorderStroke(1.dp, colorScheme.primary.copy(alpha = 0.45f)) else null,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = if (expanded) {
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+            } else {
+                Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+            },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = if (expanded) Arrangement.Center else Arrangement.spacedBy(6.dp),
         ) {
             if (loading) {
                 NuvioLoadingIndicator(
@@ -2011,58 +2081,84 @@ private enum class LibraryViewMode {
     Cloud,
 }
 
-private fun LazyListScope.librarySections(
-    displaySections: List<LibraryDisplaySection>,
+private fun LazyListScope.libraryGrid(
+    entries: List<LibraryDisplayEntry>,
+    columns: Int,
     watchedKeys: Set<String>,
-    showHeaderAccent: Boolean,
     onPosterClick: ((LibraryItem) -> Unit)?,
-    onSectionViewAllClick: ((LibrarySection) -> Unit)?,
     onPosterLongClick: ((LibraryItem, LibrarySection) -> Unit)?,
     onDisintegrated: (String) -> Unit,
 ) {
     items(
-        items = displaySections,
-        key = { section -> section.type },
-    ) { section ->
-        NuvioShelfSection(
-            title = section.displayTitle,
-            entries = section.previewEntries,
-            headerHorizontalPadding = 16.dp,
-            rowContentPadding = PaddingValues(horizontal = 16.dp),
-            showHeaderAccent = showHeaderAccent,
-            onViewAllClick = section.source
-                ?.takeIf { it.items.size > LIBRARY_SECTION_PREVIEW_LIMIT }
-                ?.let { source -> onSectionViewAllClick?.let { { it(source) } } },
-            viewAllPillSize = NuvioViewAllPillSize.Compact,
-            key = { entry -> entry.globalKey },
-            animatePlacement = true,
-        ) { entry ->
-            val item = entry.item
-            val posterItem = item.toMetaPreview()
-            val entrySource = entry.section
-            DisintegratingContainer(
-                disintegrating = entry.exiting,
-                onDisintegrated = { onDisintegrated(entry.globalKey) },
-            ) {
-                HomePosterCard(
-                    item = posterItem,
-                    isWatched = WatchingState.isPosterWatched(
-                        watchedKeys = watchedKeys,
-                        item = posterItem,
-                    ),
-                    onClick = if (entry.exiting) null else onPosterClick?.let { { it(item) } },
-                    onLongClick = if (entry.exiting || entrySource == null) {
-                        null
-                    } else {
-                        onPosterLongClick?.let { { it(item, entrySource) } }
-                    },
-                )
+        items = entries.chunked(columns),
+        key = { row -> row.joinToString(separator = "|") { entry -> entry.globalKey } },
+    ) { rowEntries ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = LIBRARY_GRID_HORIZONTAL_PADDING,
+                    end = LIBRARY_GRID_HORIZONTAL_PADDING,
+                    bottom = LIBRARY_GRID_VERTICAL_SPACING,
+                ),
+            horizontalArrangement = Arrangement.spacedBy(LIBRARY_GRID_HORIZONTAL_SPACING),
+            verticalAlignment = Alignment.Top,
+        ) {
+            rowEntries.forEach { entry ->
+                val item = entry.item
+                val posterItem = item.toMetaPreview()
+                val entrySource = entry.section
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    DisintegratingContainer(
+                        disintegrating = entry.exiting,
+                        onDisintegrated = { onDisintegrated(entry.globalKey) },
+                    ) {
+                        HomePosterCard(
+                            item = posterItem,
+                            isWatched = WatchingState.isPosterWatched(
+                                watchedKeys = watchedKeys,
+                                item = posterItem,
+                            ),
+                            onClick = if (entry.exiting) null else onPosterClick?.let { { it(item) } },
+                            onLongClick = if (entry.exiting || entrySource == null) {
+                                null
+                            } else {
+                                onPosterLongClick?.let { { it(item, entrySource) } }
+                            },
+                        )
+                    }
+                }
+            }
+            repeat(columns - rowEntries.size) {
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
     }
 }
 
-private const val LIBRARY_SECTION_PREVIEW_LIMIT = 18
+private const val LIBRARY_GRID_MIN_COLUMNS = 2
+private const val LIBRARY_GRID_MAX_COLUMNS = 6
+private val LIBRARY_GRID_HORIZONTAL_PADDING = 16.dp
+private val LIBRARY_GRID_MIN_CELL_WIDTH = 108.dp
+private val LIBRARY_GRID_HORIZONTAL_SPACING = 8.dp
+private val LIBRARY_GRID_VERTICAL_SPACING = 16.dp
+
+private enum class LibraryMediaType {
+    Movie,
+    Series,
+    ;
+
+    fun matches(item: LibraryItem): Boolean = when (this) {
+        Movie -> item.type.equals("movie", ignoreCase = true)
+        Series -> item.type.equals("series", ignoreCase = true) ||
+            item.type.equals("tv", ignoreCase = true) ||
+            item.type.equals("show", ignoreCase = true) ||
+            item.type.equals("tvshow", ignoreCase = true)
+    }
+}
 
 private data class LibraryDisplayEntry(
     val globalKey: String,
@@ -2075,7 +2171,7 @@ private data class LibraryDisplaySection(
     val source: LibrarySection?,
     val type: String,
     val displayTitle: String,
-    val previewEntries: List<LibraryDisplayEntry>,
+    val entries: List<LibraryDisplayEntry>,
 )
 
 private class LibraryExitingEntry(
@@ -2102,13 +2198,13 @@ private class LibraryDisintegrationHolder {
         previous = LinkedHashMap()
     }
 
-    fun sync(sections: List<LibrarySection>, previewLimit: Int): List<LibraryDisplaySection> {
+    fun sync(sections: List<LibrarySection>): List<LibraryDisplaySection> {
         @Suppress("UNUSED_EXPRESSION")
         invalidations
 
         val current = LinkedHashMap<String, LibraryExitingEntry>()
         sections.forEach { section ->
-            section.items.take(previewLimit).forEachIndexed { index, item ->
+            section.items.forEachIndexed { index, item ->
                 val key = libraryGlobalKey(section.type, item)
                 current[key] = LibraryExitingEntry(item, section.type, section.displayTitle, index)
             }
@@ -2129,8 +2225,8 @@ private class LibraryDisintegrationHolder {
 
         for (section in sections) {
             seenTypes += section.type
-            val entries = ArrayList<LibraryDisplayEntry>(previewLimit + 1)
-            section.items.take(previewLimit).forEach { item ->
+            val entries = ArrayList<LibraryDisplayEntry>(section.items.size + 1)
+            section.items.forEach { item ->
                 entries += LibraryDisplayEntry(
                     globalKey = libraryGlobalKey(section.type, item),
                     item = item,
