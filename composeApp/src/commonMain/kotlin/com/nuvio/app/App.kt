@@ -1004,9 +1004,11 @@ private fun MainAppContent(
         initialHomeReady,
         profileSwitchLoading,
         useNativeNavigation,
+        ownsAppRuntime,
     ) {
-        val visible = !useNativeNavigation &&
-            liquidGlassNativeTabBarSupported &&
+        if (useNativeNavigation && !ownsAppRuntime) return@LaunchedEffect
+
+        val visible = liquidGlassNativeTabBarSupported &&
             liquidGlassNativeTabBarEnabled &&
             initialHomeReady &&
             !profileSwitchLoading &&
@@ -1014,9 +1016,11 @@ private fun MainAppContent(
         NativeTabBridge.publishTabBarVisible(visible)
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(useNativeNavigation) {
         onDispose {
-            NativeTabBridge.publishTabBarVisible(false)
+            if (!useNativeNavigation) {
+                NativeTabBridge.publishTabBarVisible(false)
+            }
         }
     }
 
