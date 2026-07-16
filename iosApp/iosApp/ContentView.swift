@@ -790,11 +790,17 @@ private struct DetailDestinationView: View {
     @ObservedObject var appCoordinator: AppNavigationCoordinator
 
     private var usesComposeNavigationHeader: Bool {
-        wrapper.route is DetailRoute || wrapper.route is StreamRoute
+        wrapper.route is DetailRoute ||
+            wrapper.route is StreamRoute ||
+            wrapper.route is FolderDetailRoute
+    }
+
+    private var hidesNativeNavigationBar: Bool {
+        wrapper.route.hidesNavigationBar || usesComposeNavigationHeader
     }
 
     private var showsReadabilityFade: Bool {
-        !wrapper.route.hidesNavigationBar && !usesComposeNavigationHeader
+        !hidesNativeNavigationBar
     }
 
     private var content: some View {
@@ -822,7 +828,7 @@ private struct DetailDestinationView: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .toolbar(
-            wrapper.route.hidesNavigationBar ? Visibility.hidden : Visibility.visible,
+            hidesNativeNavigationBar ? Visibility.hidden : Visibility.visible,
             for: .navigationBar
         )
     }
