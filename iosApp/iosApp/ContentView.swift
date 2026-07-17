@@ -539,6 +539,7 @@ final class NativeProfileTabInteractionCoordinator: NSObject, UIGestureRecognize
 @MainActor
 final class AppNavigationCoordinator: ObservableObject {
     private static let nativeTabBarVisibleKey = "NuvioNativeTabBarVisible"
+    private static let liveTvTabVisibleKey = "NuvioLiveTvNavigationVisible"
 
     @Published var selectedTab: NuvioAppTab = .home {
         didSet {
@@ -549,6 +550,7 @@ final class AppNavigationCoordinator: ObservableObject {
     }
     @Published private(set) var isAppReady = false
     @Published private(set) var isTabBarVisible = true
+    @Published private(set) var isLiveTvTabVisible = false
     @Published private var localizedTabTitles: [NuvioAppTab: String] = [:]
     @Published var isProfileSwitcherPresented = false
 
@@ -562,6 +564,7 @@ final class AppNavigationCoordinator: ObservableObject {
 
     init() {
         setTabBarVisible(true)
+        reloadLiveTvTabVisibility()
         allCoordinators.forEach { coordinator in
             coordinator.onReturnedToRoot = { [weak self] in
                 self?.setTabBarVisible(true)
@@ -575,6 +578,10 @@ final class AppNavigationCoordinator: ObservableObject {
 
     private var allCoordinators: [TabNavigationCoordinator] {
         [homeCoordinator, searchCoordinator, libraryCoordinator, liveTvCoordinator, settingsCoordinator]
+    }
+
+    var availableTabs: [NuvioAppTab] {
+        NuvioAppTab.allCases.filter { $0 != .liveTv || isLiveTvTabVisible }
     }
 
     func reloadTabBarVisibility() {
@@ -595,6 +602,16 @@ final class AppNavigationCoordinator: ObservableObject {
         }
     }
 
+    func reloadLiveTvTabVisibility() {
+        let visible = UserDefaults.standard.bool(forKey: Self.liveTvTabVisibleKey)
+        if isLiveTvTabVisible != visible {
+            isLiveTvTabVisible = visible
+        }
+        if !visible && selectedTab == .liveTv {
+            selectedTab = .home
+        }
+    }
+
     func coordinator(for tab: NuvioAppTab) -> TabNavigationCoordinator {
         switch tab {
         case .home: return homeCoordinator
@@ -607,6 +624,10 @@ final class AppNavigationCoordinator: ObservableObject {
 
     func activateTab(named tabName: String) {
         guard let tab = NuvioAppTab.from(kotlinName: tabName) else { return }
+        guard tab != .liveTv || isLiveTvTabVisible else {
+            selectedTab = .home
+            return
+        }
         if tab == .home || isAppReady {
             selectedTab = tab
         }
@@ -655,9 +676,10 @@ final class AppNavigationCoordinator: ObservableObject {
             AppKt.disposeRoute(route: route)
             return
         }
-        let targetTab = NuvioAppTab.from(kotlinName: route.preferredTabName)
+        let requestedTab = NuvioAppTab.from(kotlinName: route.preferredTabName)
             ?? tab(for: origin)
             ?? selectedTab
+        let targetTab = requestedTab == .liveTv && !isLiveTvTabVisible ? .home : requestedTab
         let target = coordinator(for: targetTab)
         selectedTab = targetTab
         target.push(route, launchSingleTop: launchSingleTop)
@@ -1220,7 +1242,7 @@ struct NativeNavContentView: View {
 
     private var legacyTabs: some View {
         TabView(selection: tabSelection) {
-            ForEach(NuvioAppTab.allCases, id: \.self) { tab in
+            ForEach(appCoordinator.availableTabs, id: \.self) { tab in
                 TabContentView(
                     tab: tab,
                     usesNativeTabBar: usesNativeTabBar,
@@ -1253,7 +1275,7 @@ struct NativeNavContentView: View {
     @available(iOS 26.0, *)
     private var nativeTabs: some View {
         TabView(selection: tabSelection) {
-            ForEach(NuvioAppTab.allCases, id: \.self) { tab in
+            ForEach(appCoordinator.availableTabs, id: \.self) { tab in
                 if tab == .settings {
                     Tab(value: tab) {
                         TabContentView(
@@ -1336,6 +1358,13 @@ struct NativeNavContentView: View {
             )
         ) { _ in
             appCoordinator.reloadTabBarVisibility()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: Notification.Name("NuvioLiveTvNavigationVisibilityDidChange")
+            )
+        ) { _ in
+            appCoordinator.reloadLiveTvTabVisibility()
         }
     }
 }

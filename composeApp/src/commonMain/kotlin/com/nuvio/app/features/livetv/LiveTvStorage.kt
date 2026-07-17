@@ -9,4 +9,7 @@ internal expect object LiveTvStorage {
     fun saveFavoriteChannelIdsBlob(blob: String)
     fun loadLastWatchedChannelId(): String?
     fun saveLastWatchedChannelId(channelId: String)
+    fun loadNavigationEnabled(): Boolean?
+    fun saveNavigationEnabled(enabled: Boolean)
+    fun publishNavigationVisibility(visible: Boolean)
 }

@@ -747,6 +747,9 @@
     <string name="live_tv_load_failed">Playlist could not be loaded</string>
     <string name="live_tv_no_playlist_title">No playlist configured</string>
     <string name="live_tv_no_playlist_message">Add one or more M3U playlists in Settings > Integrations > Live TV to list channels here.</string>
+    <string name="live_tv_settings_section_navigation">NAVIGATION</string>
+    <string name="live_tv_settings_navigation_title">Show Live TV in navigation</string>
+    <string name="live_tv_settings_navigation_description">Display the Live TV tab in the app navigation bar.</string>
     <string name="live_tv_settings_section_playlist">PLAYLISTS</string>
     <string name="live_tv_settings_playlist_label">M3U playlists</string>
     <string name="live_tv_settings_playlist_name_label">Playlist name</string>

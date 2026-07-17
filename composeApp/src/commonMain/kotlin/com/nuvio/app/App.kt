@@ -159,6 +159,7 @@ import com.nuvio.app.features.library.LibraryScreen
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.library.toMetaPreview
 import com.nuvio.app.features.livetv.LiveTvChannel
+import com.nuvio.app.features.livetv.LiveTvRepository
 import com.nuvio.app.features.livetv.LiveTvScreen
 import com.nuvio.app.features.notifications.EpisodeReleaseNotificationsRepository
 import com.nuvio.app.features.p2p.P2pConsentDialog
@@ -819,6 +820,11 @@ private fun MainAppContent(
             LibraryRepository.ensureLoaded()
             LibraryRepository.uiState
         }.collectAsStateWithLifecycle()
+        val liveTvUiState by remember {
+            LiveTvRepository.ensureLoaded()
+            LiveTvRepository.uiState
+        }.collectAsStateWithLifecycle()
+        val showLiveTvInNavigation = liveTvUiState.showInNavigation
         val authState by AuthRepository.state.collectAsStateWithLifecycle()
         val openPosterActions: (PosterActionTarget) -> Unit = { target ->
             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -888,10 +894,15 @@ private fun MainAppContent(
     var watchSourceReconnectPending by remember { mutableStateOf(false) }
 
     fun activateTab(tab: AppScreenTab) {
-        if (useNativeNavigation && onActivate != null) {
-            onActivate(tab)
+        val destination = if (tab == AppScreenTab.LiveTv && !showLiveTvInNavigation) {
+            AppScreenTab.Home
         } else {
-            selectedTab = tab
+            tab
+        }
+        if (useNativeNavigation && onActivate != null) {
+            onActivate(destination)
+        } else {
+            selectedTab = destination
         }
     }
 
@@ -913,15 +924,25 @@ private fun MainAppContent(
         }
     }
 
+    LaunchedEffect(showLiveTvInNavigation, selectedTab) {
+        if (!showLiveTvInNavigation && selectedTab == AppScreenTab.LiveTv) {
+            activateTab(AppScreenTab.Home)
+        }
+    }
+
     LaunchedEffect(
         liquidGlassNativeTabBarSupported,
         liquidGlassNativeTabBarEnabled,
         useNativeNavigation,
         currentRoute,
         selectedTab,
+        showLiveTvInNavigation,
     ) {
         NativeTabBridge.requestedTabs.collectLatest { requestedTab ->
             val requestedAppTab = requestedTab.toAppScreenTab()
+            if (requestedAppTab == AppScreenTab.LiveTv && !showLiveTvInNavigation) {
+                return@collectLatest
+            }
             if (
                 useNativeNavigation &&
                 currentRoute is TabsRoute &&
@@ -1902,12 +1923,14 @@ private fun MainAppContent(
                                             icon = Res.drawable.sidebar_library,
                                             contentDescription = stringResource(Res.string.compose_nav_library),
                                         )
-                                        NavItem(
-                                            selected = selectedTab == AppScreenTab.LiveTv,
-                                            onClick = { handleRootTabClick(AppScreenTab.LiveTv) },
-                                            icon = Icons.Filled.Tv,
-                                            contentDescription = stringResource(Res.string.compose_nav_live_tv),
-                                        )
+                                        if (showLiveTvInNavigation) {
+                                            NavItem(
+                                                selected = selectedTab == AppScreenTab.LiveTv,
+                                                onClick = { handleRootTabClick(AppScreenTab.LiveTv) },
+                                                icon = Icons.Filled.Tv,
+                                                contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                                            )
+                                        }
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Settings,
                                             onClick = { handleRootTabClick(AppScreenTab.Settings) },
@@ -2069,6 +2092,7 @@ private fun MainAppContent(
                                 if (isTabletLayout && !useNativeBottomTabs) {
                                     TabletFloatingTopBar(
                                         selectedTab = selectedTab,
+                                        showLiveTv = showLiveTvInNavigation,
                                         onTabSelected = ::handleRootTabClick,
                                         onProfileSelected = onProfileSelected,
                                         onAddProfileRequested = onSwitchProfile,
@@ -3685,6 +3709,7 @@ private fun AppTabHost(
 @Composable
 private fun TabletFloatingTopBar(
     selectedTab: AppScreenTab,
+    showLiveTv: Boolean,
     onTabSelected: (AppScreenTab) -> Unit,
     onProfileSelected: (NuvioProfile) -> Unit,
     onAddProfileRequested: () -> Unit,
@@ -3761,23 +3786,25 @@ private fun TabletFloatingTopBar(
                         )
                     },
                 )
-                TabletTopPillItem(
-                    label = stringResource(Res.string.compose_nav_live_tv),
-                    selected = selectedTab == AppScreenTab.LiveTv,
-                    onClick = { onTabSelected(AppScreenTab.LiveTv) },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.Tv,
-                            contentDescription = stringResource(Res.string.compose_nav_live_tv),
-                            modifier = Modifier.size(18.dp),
-                            tint = if (selectedTab == AppScreenTab.LiveTv) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    },
-                )
+                if (showLiveTv) {
+                    TabletTopPillItem(
+                        label = stringResource(Res.string.compose_nav_live_tv),
+                        selected = selectedTab == AppScreenTab.LiveTv,
+                        onClick = { onTabSelected(AppScreenTab.LiveTv) },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Filled.Tv,
+                                contentDescription = stringResource(Res.string.compose_nav_live_tv),
+                                modifier = Modifier.size(18.dp),
+                                tint = if (selectedTab == AppScreenTab.LiveTv) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        },
+                    )
+                }
                 Surface(
                     color = if (selectedTab == AppScreenTab.Settings) {
                         tokens.colors.overlaySelected

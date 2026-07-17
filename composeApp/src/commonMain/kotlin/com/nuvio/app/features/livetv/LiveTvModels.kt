@@ -29,9 +29,13 @@ data class LiveTvUiState(
     val channels: List<LiveTvChannel> = emptyList(),
     val favoriteChannelIds: Set<String> = emptySet(),
     val lastWatchedChannelId: String? = null,
+    val isNavigationEnabled: Boolean = true,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val hasPlaylist: Boolean
         get() = playlists.isNotEmpty() || playlistUrl.isNotBlank()
+
+    val showInNavigation: Boolean
+        get() = hasPlaylist && isNavigationEnabled
 }

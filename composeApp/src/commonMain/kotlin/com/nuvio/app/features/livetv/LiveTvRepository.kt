@@ -30,7 +30,9 @@ object LiveTvRepository {
             playlists = playlists,
             favoriteChannelIds = loadFavoriteChannelIds(),
             lastWatchedChannelId = LiveTvStorage.loadLastWatchedChannelId(),
+            isNavigationEnabled = LiveTvStorage.loadNavigationEnabled() ?: true,
         )
+        publishNavigationVisibility()
         if (playlists.isNotEmpty()) {
             refresh()
         }
@@ -52,6 +54,7 @@ object LiveTvRepository {
             isLoading = false,
             errorMessage = null,
         )
+        publishNavigationVisibility()
         if (playlists.isNotEmpty()) {
             refresh()
         }
@@ -78,6 +81,7 @@ object LiveTvRepository {
             playlists = playlists,
             errorMessage = null,
         )
+        publishNavigationVisibility()
         refresh()
     }
 
@@ -110,6 +114,7 @@ object LiveTvRepository {
             playlists = playlists,
             errorMessage = null,
         )
+        publishNavigationVisibility()
         refresh()
     }
 
@@ -145,6 +150,7 @@ object LiveTvRepository {
             playlists = playlists,
             errorMessage = null,
         )
+        publishNavigationVisibility()
         refresh()
     }
 
@@ -159,6 +165,7 @@ object LiveTvRepository {
             isLoading = false,
             errorMessage = null,
         )
+        publishNavigationVisibility()
         if (playlists.any { it.isEnabled }) {
             refresh()
         }
@@ -184,9 +191,19 @@ object LiveTvRepository {
             isLoading = false,
             errorMessage = null,
         )
+        publishNavigationVisibility()
         if (playlists.any { it.isEnabled }) {
             refresh()
         }
+    }
+
+    fun setNavigationEnabled(enabled: Boolean) {
+        ensureLoaded()
+        if (_uiState.value.isNavigationEnabled == enabled) return
+
+        LiveTvStorage.saveNavigationEnabled(enabled)
+        _uiState.value = _uiState.value.copy(isNavigationEnabled = enabled)
+        publishNavigationVisibility()
     }
 
     fun refresh() {
@@ -200,6 +217,7 @@ object LiveTvRepository {
                 isLoading = false,
                 errorMessage = null,
             )
+            publishNavigationVisibility()
             return
         }
 
@@ -273,6 +291,10 @@ object LiveTvRepository {
         ensureLoaded()
         LiveTvStorage.saveLastWatchedChannelId(channel.id)
         _uiState.value = _uiState.value.copy(lastWatchedChannelId = channel.id)
+    }
+
+    private fun publishNavigationVisibility() {
+        LiveTvStorage.publishNavigationVisibility(_uiState.value.showInNavigation)
     }
 
     private fun loadSavedPlaylists(): List<LiveTvPlaylist> {

@@ -10,6 +10,7 @@ actual object LiveTvStorage {
     private const val playlistsBlobKey = "playlists_blob"
     private const val favoriteChannelIdsBlobKey = "favorite_channel_ids_blob"
     private const val lastWatchedChannelIdKey = "last_watched_channel_id"
+    private const val navigationEnabledKey = "navigation_enabled"
 
     private var preferences: SharedPreferences? = null
 
@@ -56,4 +57,19 @@ actual object LiveTvStorage {
             ?.putString(ProfileScopedKey.of(lastWatchedChannelIdKey), channelId)
             ?.apply()
     }
+
+    actual fun loadNavigationEnabled(): Boolean? {
+        val preferences = preferences ?: return null
+        val key = ProfileScopedKey.of(navigationEnabledKey)
+        return if (preferences.contains(key)) preferences.getBoolean(key, true) else null
+    }
+
+    actual fun saveNavigationEnabled(enabled: Boolean) {
+        preferences
+            ?.edit()
+            ?.putBoolean(ProfileScopedKey.of(navigationEnabledKey), enabled)
+            ?.apply()
+    }
+
+    actual fun publishNavigationVisibility(visible: Boolean) = Unit
 }
