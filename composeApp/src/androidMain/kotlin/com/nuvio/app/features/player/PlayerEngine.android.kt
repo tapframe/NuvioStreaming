@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
@@ -467,16 +466,6 @@ private fun ExoPlayerSurface(
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
             exoPlayer.pause()
         }
-        PlayerPictureInPictureManager.registerTogglePlaybackCallback {
-            if (exoPlayer.isPlaying) {
-                exoPlayer.pause()
-            } else {
-                if (exoPlayer.playbackState == androidx.media3.common.Player.STATE_ENDED) {
-                    exoPlayer.seekTo(0L)
-                }
-                exoPlayer.play()
-            }
-        }
 
         fun reportPlayerError(error: PlaybackException) {
             if (
@@ -695,7 +684,6 @@ private fun ExoPlayerSurface(
         exoPlayer.addAnalyticsListener(analyticsListener)
         onDispose {
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
-            PlayerPictureInPictureManager.registerTogglePlaybackCallback(null)
             exoPlayer.removeListener(listener)
             exoPlayer.removeAnalyticsListener(analyticsListener)
             playerViewRef?.keepScreenOn = false
@@ -1107,20 +1095,8 @@ private fun LibmpvPlayerSurface(
         PlayerPictureInPictureManager.registerPausePlaybackCallback {
             view.setPaused(true)
         }
-        PlayerPictureInPictureManager.registerTogglePlaybackCallback {
-            val snapshot = view.snapshot()
-            if (snapshot.isPlaying) {
-                view.setPaused(true)
-            } else {
-                if (snapshot.isEnded) {
-                    view.seekToMs(0L)
-                }
-                view.setPaused(false)
-            }
-        }
         onDispose {
             PlayerPictureInPictureManager.registerPausePlaybackCallback(null)
-            PlayerPictureInPictureManager.registerTogglePlaybackCallback(null)
             view.keepScreenOn = false
         }
     }
@@ -1316,12 +1292,6 @@ private class NuvioLibmpvView(
 
     fun setPaused(paused: Boolean) {
         runCatching { mpv.setPropertyBoolean("pause", paused) }
-    }
-
-    fun seekToMs(positionMs: Long) {
-        runCatching {
-            mpv.command("seek", (positionMs.coerceAtLeast(0L) / 1000.0).toString(), "absolute")
-        }
     }
 
     fun snapshot(): PlayerPlaybackSnapshot {
@@ -1520,6 +1490,14 @@ private class NuvioLibmpvView(
                 mpv.setPropertyString("video-aspect-override", "no")
             }
         }
+    }
+
+    fun seekToMs(positionMs: Long) {
+        mpv.command(
+            "seek",
+            (positionMs.coerceAtLeast(0L) / 1000.0).toString(),
+            "absolute",
+        )
     }
 
     fun seekByMs(offsetMs: Long) {
