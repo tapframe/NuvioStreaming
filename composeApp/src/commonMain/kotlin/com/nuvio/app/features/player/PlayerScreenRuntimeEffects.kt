@@ -693,6 +693,6 @@ private fun SkipInterval.isIntroLikeSkipInterval(): Boolean =
         else -> false
     }
 
-private const val SKIP_INTRO_PRE_ROLL_SECONDS = 25.0
+private const val SKIP_INTRO_PRE_ROLL_SECONDS = 10.0
 private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
 private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L
