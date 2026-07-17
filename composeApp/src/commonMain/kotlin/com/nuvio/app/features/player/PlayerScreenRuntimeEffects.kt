@@ -173,6 +173,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         p2pResolvedSourceUrl,
         title,
         activeStreamTitle,
+        activeLogo,
         activeSeasonNumber,
         activeEpisodeNumber,
         activeEpisodeTitle,
@@ -513,7 +514,11 @@ private fun PlayerScreenRuntime.buildNowPlayingInfo(): PlayerNowPlayingInfo {
             episodeNumber = activeEpisodeNumber,
             episodeTitle = activeEpisodeTitle,
         ),
-        artworkUrl = firstNonBlankUrl(poster, background),
+        artworkUrl = if (isLiveTvPlayback) {
+            firstNonBlankUrl(activeLogo, poster, background)
+        } else {
+            firstNonBlankUrl(poster, background)
+        },
     )
 }
 
