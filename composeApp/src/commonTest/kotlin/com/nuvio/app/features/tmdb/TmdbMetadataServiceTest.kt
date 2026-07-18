@@ -60,6 +60,7 @@ class TmdbMetadataServiceTest {
                 MetaVideo(
                     id = "ep1",
                     title = "Episode 1",
+                    released = "2023-12-31T19:00:00Z",
                     season = 1,
                     episode = 1,
                 ),
@@ -113,6 +114,101 @@ class TmdbMetadataServiceTest {
         assertEquals(listOf("HBO"), result.networks.map { it.name })
         assertEquals("Pilot", result.videos.first().title)
         assertEquals(58, result.videos.first().runtime)
+        assertEquals("2023-12-31T19:00:00Z", result.videos.first().released)
+    }
+
+    @Test
+    fun `applyEnrichment replaces episode release only when enabled`() {
+        val addonRelease = "2023-12-31T19:00:00Z"
+        val base = MetaDetails(
+            id = "tt1234567",
+            type = "series",
+            name = "Original",
+            videos = listOf(
+                MetaVideo(
+                    id = "ep1",
+                    title = "Episode 1",
+                    released = addonRelease,
+                    season = 1,
+                    episode = 1,
+                ),
+            ),
+        )
+        val episodes = mapOf(
+            (1 to 1) to TmdbEpisodeEnrichment(
+                title = null,
+                overview = null,
+                thumbnail = null,
+                airDate = "2024-01-01",
+                runtimeMinutes = null,
+            ),
+        )
+
+        val disabled = TmdbMetadataService.applyEnrichment(
+            meta = base,
+            enrichment = null,
+            episodeMap = episodes,
+            settings = TmdbSettings(enabled = true),
+        )
+        val enabled = TmdbMetadataService.applyEnrichment(
+            meta = base,
+            enrichment = null,
+            episodeMap = episodes,
+            settings = TmdbSettings(enabled = true, useReleaseDates = true),
+        )
+
+        assertEquals(addonRelease, disabled.videos.first().released)
+        assertEquals("2024-01-01", enabled.videos.first().released)
+    }
+
+    @Test
+    fun `applyEnrichment replaces top level release dates only when enabled`() {
+        val base = MetaDetails(
+            id = "tt1234567",
+            type = "series",
+            name = "Original",
+            releaseInfo = "2023-12-31T19:00:00Z",
+            lastAirDate = "2023-12-31T20:00:00Z",
+        )
+        val enrichment = TmdbEnrichment(
+            localizedTitle = null,
+            description = null,
+            genres = emptyList(),
+            backdrop = null,
+            logo = null,
+            poster = null,
+            people = emptyList(),
+            director = emptyList(),
+            writer = emptyList(),
+            releaseInfo = "2024-01-01",
+            lastAirDate = "2024-12-31",
+            rating = null,
+            runtimeMinutes = null,
+            ageRating = null,
+            status = null,
+            countries = emptyList(),
+            language = null,
+            productionCompanies = emptyList(),
+            networks = emptyList(),
+        )
+
+        val disabled = TmdbMetadataService.applyEnrichment(
+            meta = base,
+            enrichment = enrichment,
+            episodeMap = emptyMap(),
+            settings = TmdbSettings(enabled = true),
+        )
+        val enabled = TmdbMetadataService.applyEnrichment(
+            meta = base,
+            enrichment = enrichment,
+            episodeMap = emptyMap(),
+            settings = TmdbSettings(enabled = true, useReleaseDates = true),
+        )
+
+        assertEquals(base.releaseInfo, disabled.releaseInfo)
+        assertEquals(base.lastAirDate, disabled.lastAirDate)
+        assertEquals("2024-01-01", enabled.releaseInfo)
+        assertEquals("2024-12-31", enabled.lastAirDate)
     }
 
     @Test

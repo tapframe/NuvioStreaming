@@ -59,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -93,7 +94,11 @@ import com.nuvio.app.core.sync.ProfileSettingsSync
 import com.nuvio.app.core.sync.RealtimeSyncConfig
 import com.nuvio.app.core.sync.RealtimeSyncInvalidationService
 import com.nuvio.app.core.sync.SyncManager
+import com.nuvio.app.core.ui.LocalNuvioNavBarScrollState
 import com.nuvio.app.core.ui.NuvioNavigationBar
+import com.nuvio.app.core.ui.NuvioClassicNavigationBar
+import com.nuvio.app.core.ui.NuvioNavBarScrollState
+import com.nuvio.app.core.ui.rememberNuvioNavBarScrollState
 import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioContinueWatchingActionSheet
 import com.nuvio.app.core.ui.NuvioPosterZoomActionOverlay
@@ -190,6 +195,7 @@ import com.nuvio.app.features.settings.PluginsSettingsScreen
 import com.nuvio.app.features.settings.AccountSettingsScreen
 import com.nuvio.app.features.settings.SupportersContributorsSettingsScreen
 import com.nuvio.app.features.settings.LicensesAttributionsSettingsScreen
+import com.nuvio.app.features.settings.NavBarStyle
 import com.nuvio.app.features.settings.ThemeSettingsRepository
 import com.nuvio.app.features.collection.CollectionManagementScreen
 import com.nuvio.app.features.collection.CollectionEditorScreen
@@ -418,7 +424,7 @@ fun App(
     onReplace: ((AppRoute) -> Unit)? = null,
     onActivate: ((AppScreenTab) -> Unit)? = null,
     onAppReady: ((Boolean) -> Unit)? = null,
-    onTabTitles: ((home: String, search: String, library: String, profile: String) -> Unit)? = null,
+    onTabTitles: ((home: String, search: String, library: String, profile: String, switchProfile: String, addProfile: String) -> Unit)? = null,
     nativeProfileSwitcherController: NativeProfileSwitcherController? = null,
 ) {
     setSingletonImageLoaderFactory { context ->
@@ -747,7 +753,7 @@ private fun MainAppContent(
     onGoBack: (() -> Unit)? = null,
     onReplace: ((AppRoute) -> Unit)? = null,
     onActivate: ((AppScreenTab) -> Unit)? = null,
-    onTabTitles: ((home: String, search: String, library: String, profile: String) -> Unit)? = null,
+    onTabTitles: ((home: String, search: String, library: String, profile: String, switchProfile: String, addProfile: String) -> Unit)? = null,
     nativeProfileSwitcherController: NativeProfileSwitcherController? = null,
     onRootContentReady: ((Boolean) -> Unit)? = null,
     onSwitchProfile: () -> Unit = {},
@@ -857,6 +863,8 @@ private fun MainAppContent(
     val nativeTabSearchTitle = stringResource(Res.string.compose_nav_search)
     val nativeTabLibraryTitle = stringResource(Res.string.compose_nav_library)
     val nativeTabProfileTitle = stringResource(Res.string.compose_nav_profile)
+    val nativeSwitchProfileTitle = stringResource(Res.string.compose_settings_root_switch_profile_title)
+    val nativeAddProfileTitle = stringResource(Res.string.compose_profile_add_profile)
     val homescreenSettingsTitle = stringResource(Res.string.compose_settings_page_homescreen)
     val metaScreenSettingsTitle = stringResource(Res.string.compose_settings_page_meta_screen)
     val continueWatchingSettingsTitle = stringResource(Res.string.compose_settings_page_continue_watching)
@@ -934,6 +942,8 @@ private fun MainAppContent(
         nativeTabSearchTitle,
         nativeTabLibraryTitle,
         nativeTabProfileTitle,
+        nativeSwitchProfileTitle,
+        nativeAddProfileTitle,
         onTabTitles,
     ) {
         NativeTabBridge.publishTabTitles(
@@ -947,6 +957,8 @@ private fun MainAppContent(
             nativeTabSearchTitle,
             nativeTabLibraryTitle,
             nativeTabProfileTitle,
+            nativeSwitchProfileTitle,
+            nativeAddProfileTitle,
         )
     }
 
@@ -1834,6 +1846,9 @@ private fun MainAppContent(
                             liquidGlassNativeTabBarSupported && liquidGlassNativeTabBarEnabled && initialHomeReady
                         }
                         val tabsRouteActive = currentRoute is TabsRoute
+                        val navBarScrollState = rememberNuvioNavBarScrollState()
+                        val navBarHazeState = rememberHazeState()
+                        val navBarStyleSetting by remember { ThemeSettingsRepository.navBarStyle }.collectAsStateWithLifecycle()
                         val onProfileSelected: (NuvioProfile) -> Unit = { profile ->
                             profileSwitchLoading = true
                             NativeTabBridge.publishTabBarVisible(false)
@@ -1849,8 +1864,8 @@ private fun MainAppContent(
                             containerColor = Color.Transparent,
                             contentWindowInsets = WindowInsets(0),
                             bottomBar = {
-                                if (!isTabletLayout && !useNativeBottomTabs) {
-                                    NuvioNavigationBar {
+                                if (!isTabletLayout && !useNativeBottomTabs && navBarStyleSetting == NavBarStyle.CLASSIC) {
+                                    NuvioClassicNavigationBar {
                                         NavItem(
                                             selected = selectedTab == AppScreenTab.Home,
                                             onClick = { handleRootTabClick(AppScreenTab.Home) },
@@ -1886,11 +1901,14 @@ private fun MainAppContent(
                         ) { innerPadding ->
                             Box(modifier = Modifier.fillMaxSize()) {
                                 CompositionLocalProvider(
-                                    LocalNuvioBottomNavigationOverlayPadding provides if (useNativeBottomTabs) 49.dp else 0.dp,
+                                    LocalNuvioBottomNavigationOverlayPadding provides if (useNativeBottomTabs) 49.dp else if (!isTabletLayout && navBarStyleSetting != NavBarStyle.CLASSIC) 72.dp else 0.dp,
+                                    LocalNuvioNavBarScrollState provides navBarScrollState,
                                 ) {
                                     AppTabHost(
                                         modifier = Modifier
                                             .fillMaxSize()
+                                            .then(if (navBarStyleSetting != NavBarStyle.CLASSIC) Modifier.hazeSource(state = navBarHazeState) else Modifier)
+                                            .then(if (navBarStyleSetting == NavBarStyle.ADAPTIVE) Modifier.nestedScroll(navBarScrollState.nestedScrollConnection) else Modifier)
                                             .padding(innerPadding),
                                         selectedTab = selectedTab,
                                         searchFocusRequestCount = searchFocusRequestCount,
@@ -2032,6 +2050,55 @@ private fun MainAppContent(
                                         onProfileSelected = onProfileSelected,
                                         onAddProfileRequested = onSwitchProfile,
                                     )
+                                }
+
+                                // Floating pill navigation bar overlay
+                                if (!isTabletLayout && !useNativeBottomTabs && navBarStyleSetting != NavBarStyle.CLASSIC) {
+                                    // Force expand/collapse for non-adaptive modes
+                                    when (navBarStyleSetting) {
+                                        NavBarStyle.EXPANDED -> navBarScrollState.expand()
+                                        NavBarStyle.COMPACT -> navBarScrollState.collapse()
+                                        else -> {} // ADAPTIVE — scroll controls it
+                                    }
+                                    NuvioNavigationBar(
+                                        modifier = Modifier.align(Alignment.BottomCenter),
+                                        scrollState = navBarScrollState,
+                                        hazeState = navBarHazeState,
+                                    ) {
+                                        NavItem(
+                                            selected = selectedTab == AppScreenTab.Home,
+                                            onClick = { handleRootTabClick(AppScreenTab.Home) },
+                                            icon = Icons.Filled.Home,
+                                            contentDescription = stringResource(Res.string.compose_nav_home),
+                                            label = stringResource(Res.string.compose_nav_home),
+                                        )
+                                        NavItem(
+                                            selected = selectedTab == AppScreenTab.Search,
+                                            onClick = { handleRootTabClick(AppScreenTab.Search) },
+                                            icon = Res.drawable.sidebar_search,
+                                            contentDescription = stringResource(Res.string.compose_nav_search),
+                                            label = stringResource(Res.string.compose_nav_search),
+                                        )
+                                        NavItem(
+                                            selected = selectedTab == AppScreenTab.Library,
+                                            onClick = { handleRootTabClick(AppScreenTab.Library) },
+                                            icon = Res.drawable.sidebar_library,
+                                            contentDescription = stringResource(Res.string.compose_nav_library),
+                                            label = stringResource(Res.string.compose_nav_library),
+                                        )
+                                        NavItem(
+                                            selected = selectedTab == AppScreenTab.Settings,
+                                            onClick = { handleRootTabClick(AppScreenTab.Settings) },
+                                            label = stringResource(Res.string.compose_nav_profile),
+                                        ) {
+                                            ProfileSwitcherTab(
+                                                selected = selectedTab == AppScreenTab.Settings,
+                                                onClick = { handleRootTabClick(AppScreenTab.Settings) },
+                                                onProfileSelected = onProfileSelected,
+                                                onAddProfileRequested = onSwitchProfile,
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

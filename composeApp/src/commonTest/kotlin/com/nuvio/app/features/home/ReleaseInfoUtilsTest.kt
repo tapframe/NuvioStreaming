@@ -1,5 +1,6 @@
 package com.nuvio.app.features.home
 
+import com.nuvio.app.core.time.parseEpisodeReleaseEpochMs
 import com.nuvio.app.features.catalog.CatalogTarget
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -7,19 +8,20 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ReleaseInfoUtilsTest {
+    private val nowEpochMs = requireNotNull(parseEpisodeReleaseEpochMs("2026-05-06T12:00:00Z"))
 
     @Test
     fun `raw released date after today is unreleased`() {
         val item = preview(rawReleaseDate = "2026-06-15T00:00:00.000Z", releaseInfo = "2026")
 
-        assertTrue(item.isUnreleased(todayIsoDate = "2026-05-06"))
+        assertTrue(item.isUnreleased(todayIsoDate = "2026-05-06", nowEpochMs = nowEpochMs))
     }
 
     @Test
     fun `release info full date after today is unreleased`() {
         val item = preview(rawReleaseDate = null, releaseInfo = "2026-06-15")
 
-        assertTrue(item.isUnreleased(todayIsoDate = "2026-05-06"))
+        assertTrue(item.isUnreleased(todayIsoDate = "2026-05-06", nowEpochMs = nowEpochMs))
     }
 
     @Test
@@ -31,8 +33,8 @@ class ReleaseInfoUtilsTest {
 
     @Test
     fun `released and unknown dates are kept`() {
-        assertFalse(preview(rawReleaseDate = "2026-05-06", releaseInfo = "2026").isUnreleased("2026-05-06"))
-        assertFalse(preview(rawReleaseDate = "2026-05-05", releaseInfo = "2026").isUnreleased("2026-05-06"))
+        assertFalse(preview(rawReleaseDate = "2026-05-06", releaseInfo = "2026").isUnreleased("2026-05-06", nowEpochMs))
+        assertFalse(preview(rawReleaseDate = "2026-05-05", releaseInfo = "2026").isUnreleased("2026-05-06", nowEpochMs))
         assertFalse(preview(rawReleaseDate = null, releaseInfo = null).isUnreleased("2026-05-06"))
     }
 
@@ -55,7 +57,7 @@ class ReleaseInfoUtilsTest {
             availableItemCount = 2,
         )
 
-        val result = section.filterReleasedItems(todayIsoDate = "2026-05-06")
+        val result = section.filterReleasedItems(todayIsoDate = "2026-05-06", nowEpochMs = nowEpochMs)
 
         assertEquals(listOf("released"), result.items.map { it.id })
         assertEquals(2, result.availableItemCount)

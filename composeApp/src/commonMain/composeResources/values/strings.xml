@@ -358,6 +358,7 @@
     <string name="compose_player_font_size_value">%1$dsp</string>
     <string name="compose_player_lock_controls">Lock player controls</string>
     <string name="compose_player_loading_lines">Loading subtitle lines...</string>
+    <string name="compose_player_languages">Languages</string>
     <string name="compose_player_no_subtitle_lines_found">No subtitle lines found</string>
     <string name="compose_player_subtitle_lines_load_error">Unable to load subtitle lines</string>
     <string name="compose_player_no_audio_tracks_available">No audio tracks available</string>
@@ -571,6 +572,12 @@
     <string name="settings_appearance_app_language">App Language</string>
     <string name="settings_appearance_app_language_device">Device language</string>
     <string name="settings_appearance_app_language_sheet_title">Choose Language</string>
+    <string name="settings_appearance_nav_bar_style">Navigation Bar</string>
+    <string name="settings_appearance_nav_bar_style_sheet_title">Navigation Bar Style</string>
+    <string name="settings_nav_bar_style_adaptive">Adaptive</string>
+    <string name="settings_nav_bar_style_expanded">Always Expanded</string>
+    <string name="settings_nav_bar_style_compact">Always Compact</string>
+    <string name="settings_nav_bar_style_classic">Classic</string>
     <string name="settings_appearance_continue_watching_description">Settings for the Continue Watching section.</string>
     <string name="settings_appearance_liquid_glass">Liquid Glass</string>
     <string name="settings_appearance_liquid_glass_description">Use the native iPhone tab bar on iOS 26 and later.</string>
@@ -602,6 +609,8 @@
     <string name="settings_homescreen_show_hero_description">Display hero carousel at top of home.</string>
     <string name="layout_hide_unreleased">Hide Unreleased Content</string>
     <string name="layout_hide_unreleased_sub">Hide movies and shows that haven't been released yet.</string>
+    <string name="layout_catalog_type">Show Catalog Type</string>
+    <string name="layout_catalog_type_sub">Show type suffix next to catalog name (Movie/Series).</string>
     <string name="settings_homescreen_hide_catalog_underline">Hide Catalog Underline</string>
     <string name="settings_homescreen_hide_catalog_underline_description">Remove the accent line under catalog and collection titles throughout the app.</string>
     <string name="settings_homescreen_summary">%1$d of %2$d catalogs visible • %3$d hero sources selected</string>
@@ -1019,7 +1028,7 @@
     <string name="settings_playback_subtitle_size">Subtitle Size</string>
     <string name="settings_playback_subtitle_text_color">Text Color</string>
     <string name="settings_playback_subtitle_use_forced">Use Forced Subtitles</string>
-    <string name="settings_playback_subtitle_use_forced_description">Prefer forced subtitles when matching your subtitle language settings.</string>
+    <string name="settings_playback_subtitle_use_forced_description">Prefer forced subtitles when audio matches the subtitle language; if unavailable, select nothing.</string>
     <string name="settings_playback_subtitle_vertical_offset">Vertical Offset</string>
     <string name="settings_playback_skip_intro_outro_recap">Skip Intro</string>
     <string name="settings_playback_skip_intro_outro_recap_description">Use introdb.app to detect intros and recaps.</string>
@@ -1069,6 +1078,8 @@
     <string name="settings_tmdb_module_credits_description">Cast with photos, director, and writer from TMDB</string>
     <string name="settings_tmdb_module_details">Details</string>
     <string name="settings_tmdb_module_details_description">Runtime, status, country, and language from TMDB</string>
+    <string name="settings_tmdb_module_release_dates">Release dates</string>
+    <string name="settings_tmdb_module_release_dates_description">Use TMDB broadcaster air dates instead of precise add-on release times</string>
     <string name="settings_tmdb_module_episodes">Episodes</string>
     <string name="settings_tmdb_module_episodes_description">Episode titles, overviews, thumbnails, and runtime from TMDB</string>
     <string name="settings_tmdb_module_more_like_this">More Like This</string>
@@ -1472,6 +1483,7 @@
     <string name="stream_default_name">Stream</string>
     <string name="source_embedded">Embedded</string>
     <string name="trakt_authorization_denied">Authorization denied</string>
+    <string name="trakt_authorization_expired_reconnect">Your Trakt authorization is no longer valid. Reconnect your Trakt account.</string>
     <string name="trakt_complete_sign_in_browser">Complete Trakt sign in in your browser</string>
     <string name="trakt_connected">Connected to Trakt</string>
     <string name="trakt_disconnected">Disconnected from Trakt</string>

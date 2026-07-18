@@ -66,6 +66,7 @@ fun <T> NuvioShelfSection(
     modifier: Modifier = Modifier,
     headerHorizontalPadding: Dp = 0.dp,
     rowContentPadding: PaddingValues = PaddingValues(0.dp),
+    rowModifier: Modifier = Modifier,
     itemSpacing: Dp = 10.dp,
     showHeaderAccent: Boolean = true,
     onViewAllClick: (() -> Unit)? = null,
@@ -90,6 +91,7 @@ fun <T> NuvioShelfSection(
             )
         }
         LazyRow(
+            modifier = rowModifier,
             state = state,
             contentPadding = rowContentPadding,
             horizontalArrangement = Arrangement.spacedBy(itemSpacing),

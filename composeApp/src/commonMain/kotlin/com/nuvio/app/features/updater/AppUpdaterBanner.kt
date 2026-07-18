@@ -55,6 +55,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.build.AppFeaturePolicy
+import com.nuvio.app.core.ui.AppTheme
+import com.nuvio.app.core.ui.appTheme
 import com.nuvio.app.core.ui.nuvio
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.action_close
@@ -174,7 +176,12 @@ private fun AppUpdateBanner(
         label = "updateBannerProgress",
     )
     val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-    val progressColor = MaterialTheme.colorScheme.primary
+    val isWhiteTheme = MaterialTheme.appTheme == AppTheme.WHITE
+    val progressColor = if (isWhiteTheme) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
     val dividerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
     val debugTestComplete = state.isDebugTest && !state.isDownloading && !state.isUpdateAvailable
     val subtitle = when {
@@ -244,6 +251,7 @@ private fun AppUpdateBanner(
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
                         state.errorMessage != null -> MaterialTheme.colorScheme.error
+                        state.isDownloading && isWhiteTheme -> MaterialTheme.colorScheme.onSurface
                         state.isDownloading -> MaterialTheme.colorScheme.onPrimary
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     },

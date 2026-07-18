@@ -1,6 +1,7 @@
 package com.nuvio.app.features.debrid
 
 import com.nuvio.app.features.addons.RawHttpResponse
+import com.nuvio.app.features.addons.DefaultRawHttpResponseMaxBytes
 import com.nuvio.app.features.addons.httpRequestRaw
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
@@ -27,6 +28,8 @@ internal object DebridApiJson {
 
 internal object TorboxApiClient {
     private const val BASE_URL = "https://api.torbox.app"
+    // Torbox returns up to 1,000 items, each with its full files array.
+    private const val cloudListResponseMaxBytes = 16 * 1024 * 1024
 
     suspend fun startDeviceAuthorization(
         appName: String,
@@ -120,6 +123,7 @@ internal object TorboxApiClient {
             method = "GET",
             url = "$BASE_URL/v1/api/torrents/mylist",
             apiKey = apiKey,
+            maxResponseBodyBytes = cloudListResponseMaxBytes,
         )
 
     suspend fun listCloudUsenet(apiKey: String): DebridApiResponse<TorboxEnvelopeDto<List<TorboxCloudItemDto>>> =
@@ -127,6 +131,7 @@ internal object TorboxApiClient {
             method = "GET",
             url = "$BASE_URL/v1/api/usenet/mylist",
             apiKey = apiKey,
+            maxResponseBodyBytes = cloudListResponseMaxBytes,
         )
 
     suspend fun listCloudWebDownloads(apiKey: String): DebridApiResponse<TorboxEnvelopeDto<List<TorboxCloudItemDto>>> =
@@ -134,6 +139,7 @@ internal object TorboxApiClient {
             method = "GET",
             url = "$BASE_URL/v1/api/webdl/mylist",
             apiKey = apiKey,
+            maxResponseBodyBytes = cloudListResponseMaxBytes,
         )
 
     suspend fun requestDownloadLink(
@@ -222,6 +228,7 @@ internal object TorboxApiClient {
         apiKey: String,
         body: String = "",
         contentType: String? = null,
+        maxResponseBodyBytes: Int = DefaultRawHttpResponseMaxBytes,
     ): DebridApiResponse<T> {
         val headers = authHeaders(apiKey) + listOfNotNull(
             contentType?.let { "Content-Type" to it },
@@ -232,6 +239,7 @@ internal object TorboxApiClient {
             url = url,
             headers = headers,
             body = body,
+            maxResponseBodyBytes = maxResponseBodyBytes,
         )
         return DebridApiResponse(
             status = response.status,

@@ -12,7 +12,6 @@ import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.trakt.TraktAuthRepository
-import com.nuvio.app.features.trakt.TraktCredentialSync
 import com.nuvio.app.features.trakt.TraktPlatformClock
 import com.nuvio.app.features.trakt.TraktSettingsRepository
 import com.nuvio.app.features.trakt.effectiveLibrarySourceMode
@@ -39,7 +38,6 @@ internal enum class ProfileSyncStep {
     Addons,
     Plugins,
     ProfileSettings,
-    TraktCredentials,
     Library,
     ActiveWatchSource,
     Collections,
@@ -50,7 +48,6 @@ internal data class ProfileSyncOperations(
     val pullAddons: suspend (Int) -> Unit,
     val pullPlugins: suspend (Int) -> Unit,
     val pullProfileSettings: suspend (Int) -> Unit,
-    val pullTraktCredentials: suspend (Int) -> Unit,
     val pullLibrary: suspend (Int) -> Unit,
     val refreshActiveWatchSource: suspend (Int) -> Unit,
     val pullCollections: suspend (Int) -> Unit,
@@ -94,16 +91,7 @@ internal suspend fun runOrderedProfileSync(
         runStep(ProfileSyncStep.Plugins, operations.pullPlugins)
     }
 
-    coroutineScope {
-        val settingsJob = launch {
-            runStep(ProfileSyncStep.ProfileSettings, operations.pullProfileSettings)
-        }
-        val credentialsJob = launch {
-            runStep(ProfileSyncStep.TraktCredentials, operations.pullTraktCredentials)
-        }
-        settingsJob.join()
-        credentialsJob.join()
-    }
+    runStep(ProfileSyncStep.ProfileSettings, operations.pullProfileSettings)
 
     coroutineScope {
         launch {
@@ -229,7 +217,6 @@ object SyncManager {
         pullAddons = { profileId -> AddonRepository.pullFromServer(profileId) },
         pullPlugins = { profileId -> PluginRepository.pullFromServer(profileId) },
         pullProfileSettings = { profileId -> ProfileSettingsSync.pull(profileId) },
-        pullTraktCredentials = { profileId -> TraktCredentialSync.pullFromRemoteOrThrow(profileId) },
         pullLibrary = { profileId -> LibraryRepository.pullFromServer(profileId) },
         refreshActiveWatchSource = { profileId ->
             val result = WatchProgressSourceCoordinator.refreshActiveSource(profileId = profileId, force = true)

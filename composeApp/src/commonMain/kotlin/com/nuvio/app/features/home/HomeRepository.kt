@@ -208,7 +208,7 @@ object HomeRepository {
                 if (section.items.isEmpty()) return@mapNotNull null
                 val customTitle = preference?.customTitle.orEmpty()
                 section.copy(
-                    title = customTitle.ifBlank { section.title },
+                    title = customTitle.ifBlank { definition.titleFor(snapshot.showCatalogType) },
                 )
             }
 
