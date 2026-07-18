@@ -69,6 +69,7 @@ fun AudioTrackModal(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val railWidth = minOf(maxWidth, 444.dp)
+            val railMaxHeight = (maxHeight - 64.dp).coerceAtLeast(120.dp).coerceAtMost(620.dp)
 
             Column(
                 modifier = Modifier
@@ -111,7 +112,8 @@ fun AudioTrackModal(
                 } else {
                     LazyColumn(
                         modifier = Modifier
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .heightIn(max = railMaxHeight),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         contentPadding = PaddingValues(vertical = 8.dp),
                     ) {
