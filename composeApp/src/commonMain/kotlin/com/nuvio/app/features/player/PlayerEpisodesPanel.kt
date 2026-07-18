@@ -34,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -48,6 +47,7 @@ import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.ui.NuvioAnimatedWatchedBadge
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.nuvio
+import com.nuvio.app.core.ui.spoilerBlur
 import com.nuvio.app.features.debrid.DebridSettingsRepository
 import com.nuvio.app.features.details.MetaVideo
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
@@ -384,7 +384,11 @@ private fun EpisodeRow(
                     contentDescription = episode.title,
                     modifier = Modifier
                         .fillMaxSize()
-                        .then(if (shouldBlurArtwork) Modifier.blur(NuvioTokens.Space.s18) else Modifier),
+                        .spoilerBlur(
+                            active = blurUnwatchedEpisodes,
+                            blurred = shouldBlurArtwork,
+                            radius = NuvioTokens.Space.s18,
+                        ),
                     contentScale = ContentScale.Crop,
                 )
             }

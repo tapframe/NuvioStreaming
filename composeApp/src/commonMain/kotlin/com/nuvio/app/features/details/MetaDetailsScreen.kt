@@ -944,6 +944,8 @@ fun MetaDetailsScreen(
                                 showManualPlayOption = showManualPlayOption,
                                 preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
                                 preferredEpisodeNumber = seriesAction?.episodeNumber,
+                                isEpisodePositionReady = watchedUiState.isLoaded &&
+                                    watchProgressUiState.hasLoadedRemoteProgress,
                                 hasProductionSection = hasProductionSection,
                                 hasTrailersSection = hasTrailersSection,
                                 hasEpisodes = hasEpisodes,
@@ -1334,8 +1336,15 @@ fun MetaDetailsScreen(
             val seasonLabel = selectedEpisode.season?.let {
                 stringResource(Res.string.episodes_season, it)
             } ?: stringResource(Res.string.episodes_specials)
+            val shouldProtectArtwork = metaScreenSettingsUiState.blurUnwatchedEpisodes &&
+                !isSelectedEpisodeWatched
+            val actionArtworkUrl = if (shouldProtectArtwork) {
+                zoomAnchor.imageUrl ?: meta.background ?: meta.poster
+            } else {
+                zoomAnchor.imageUrl ?: selectedEpisode.thumbnail ?: meta.background ?: meta.poster
+            }
             NuvioPosterZoomActionOverlay(
-                imageUrl = zoomAnchor.imageUrl ?: selectedEpisode.thumbnail ?: meta.background ?: meta.poster,
+                imageUrl = actionArtworkUrl,
                 title = selectedEpisode.title,
                 subtitle = localizedSeasonEpisodeCode(selectedEpisode.season, selectedEpisode.episode) ?: seasonLabel,
                 isWatched = isSelectedEpisodeWatched,
@@ -1582,6 +1591,7 @@ private fun LazyListScope.configuredMetaSectionItems(
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
+    isEpisodePositionReady: Boolean,
     hasProductionSection: Boolean,
     hasTrailersSection: Boolean,
     hasEpisodes: Boolean,
@@ -1658,6 +1668,7 @@ private fun LazyListScope.configuredMetaSectionItems(
                     showManualPlayOption = showManualPlayOption,
                     preferredEpisodeSeasonNumber = preferredEpisodeSeasonNumber,
                     preferredEpisodeNumber = preferredEpisodeNumber,
+                    isEpisodePositionReady = isEpisodePositionReady,
                     hasProductionSection = hasProductionSection,
                     hasTrailersSection = hasTrailersSection,
                     hasEpisodes = hasEpisodes,
@@ -1807,6 +1818,7 @@ private fun ConfiguredMetaSections(
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
+    isEpisodePositionReady: Boolean,
     hasProductionSection: Boolean,
     hasTrailersSection: Boolean,
     hasEpisodes: Boolean,
@@ -1952,6 +1964,7 @@ private fun ConfiguredMetaSections(
                         horizontalScrollPadding = horizontalScrollPadding,
                         preferredSeasonNumber = preferredEpisodeSeasonNumber,
                         preferredEpisodeNumber = preferredEpisodeNumber,
+                        isEpisodePositionReady = isEpisodePositionReady,
                         episodeCardStyle = settings.episodeCardStyle,
                         progressByVideoId = progressByVideoId,
                         watchedKeys = watchedKeys,
