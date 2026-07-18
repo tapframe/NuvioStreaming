@@ -39,6 +39,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.VideoSize
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
@@ -226,6 +227,8 @@ private fun ExoPlayerSurface(
     val latestSubtitleDelayMs = rememberUpdatedState(subtitleDelayMs)
     val latestExternalSubtitleMimeType = rememberUpdatedState(selectedExternalSubtitleMimeType)
     var playerViewRef by remember { mutableStateOf<PlayerView?>(null) }
+    var videoAspectRatio by remember(playerSourceKey) { mutableStateOf(0f) }
+    val latestVideoAspectRatio = rememberUpdatedState(videoAspectRatio)
     var decoderPriorityOverride by remember(playerSourceKey) { mutableStateOf<Int?>(null) }
     var fallbackStartPositionMs by remember(playerSourceKey) { mutableStateOf<Long?>(null) }
     val effectiveDecoderPriority = decoderPriorityOverride ?: playerSettings.decoderPriority
@@ -311,7 +314,9 @@ private fun ExoPlayerSurface(
             shouldNormalizeCuePositionProvider = {
                 latestExternalSubtitleMimeType.value == MimeTypes.TEXT_VTT
             },
-            videoBoundsFractionProvider = { playerViewRef?.videoBoundsFraction() },
+            videoBoundsFractionProvider = {
+                playerViewRef?.videoBoundsFraction(latestVideoAspectRatio.value)
+            },
         )
             .setExtensionRendererMode(effectiveDecoderPriority)
             .setEnableDecoderFallback(true)
@@ -514,10 +519,6 @@ private fun ExoPlayerSurface(
                 dispatchExoPlayerSnapshot()
             }
 
-            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
-                latestOnSnapshot.value(exoPlayer.snapshot())
-            }
-
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 syncPlayerViewKeepScreenOn()
                 dispatchExoPlayerSnapshot()
@@ -525,6 +526,13 @@ private fun ExoPlayerSurface(
 
             override fun onPlaybackParametersChanged(playbackParameters: androidx.media3.common.PlaybackParameters) {
                 dispatchExoPlayerSnapshot()
+            }
+
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                latestOnSnapshot.value(exoPlayer.snapshot())
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                }
             }
 
             override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
@@ -1714,19 +1722,33 @@ private fun ExoPlayer.logCurrentTracks(context: String) {
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-private fun PlayerView.videoBoundsFraction(): RectF? {
+private fun PlayerView.videoBoundsFraction(aspectRatio: Float): RectF? {
     val subtitleView = this.subtitleView ?: return null
+    val viewWidth = subtitleView.width.toFloat()
+    val viewHeight = subtitleView.height.toFloat()
+    if (viewWidth <= 0f || viewHeight <= 0f) return null
+
+    if (aspectRatio > 0f) {
+        val parentRatio = viewWidth / viewHeight
+        return if (parentRatio > aspectRatio) {
+            val fitW = viewHeight * aspectRatio
+            val leftPx = (viewWidth - fitW) / 2f
+            RectF(leftPx / viewWidth, 0f, (leftPx + fitW) / viewWidth, 1f)
+        } else {
+            val fitH = viewWidth / aspectRatio
+            val topPx = (viewHeight - fitH) / 2f
+            RectF(0f, topPx / viewHeight, 1f, (topPx + fitH) / viewHeight)
+        }
+    }
+
     val contentFrame = getTag(androidx.media3.ui.R.id.exo_content_frame) as? AspectRatioFrameLayout
         ?: findViewById<AspectRatioFrameLayout>(androidx.media3.ui.R.id.exo_content_frame)
             ?.also { setTag(androidx.media3.ui.R.id.exo_content_frame, it) }
         ?: return null
-    val viewWidth = subtitleView.width.toFloat()
-    val viewHeight = subtitleView.height.toFloat()
     val frameWidth = contentFrame.width.toFloat()
     val frameHeight = contentFrame.height.toFloat()
-    if (viewWidth <= 0f || viewHeight <= 0f || frameWidth <= 0f || frameHeight <= 0f) {
-        return null
-    }
+    if (frameWidth <= 0f || frameHeight <= 0f) return null
+    if (frameWidth > viewWidth || frameHeight > viewHeight) return null
     val left = contentFrame.x / viewWidth
     val top = contentFrame.y / viewHeight
     return RectF(
