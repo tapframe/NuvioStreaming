@@ -102,7 +102,7 @@ internal fun PlayerQualityPanel(
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                             )
-                            PanelChipButton(
+                            PlayerDialogButton(
                                 label = stringResource(Res.string.action_close),
                                 onClick = onDismiss,
                             )

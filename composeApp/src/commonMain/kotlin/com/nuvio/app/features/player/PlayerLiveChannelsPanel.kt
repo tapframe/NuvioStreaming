@@ -212,7 +212,7 @@ fun PlayerLiveChannelsPanel(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            PanelChipButton(
+                            PlayerDialogButton(
                                 label = stringResource(Res.string.action_close),
                                 onClick = onDismiss,
                             )
